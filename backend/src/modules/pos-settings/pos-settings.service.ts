@@ -1,6 +1,11 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { UpdatePosSettingsDto } from './dto/update-pos-settings.dto';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { UpdatePosSettingsDto } from "./dto/update-pos-settings.dto";
 
 @Injectable()
 export class PosSettingsService {
@@ -9,19 +14,37 @@ export class PosSettingsService {
   constructor(private prisma: PrismaService) {}
 
   async findByTenant(tenantId: string) {
-    // Atomic upsert so two concurrent "first view" calls don't race on
-    // create and hit P2002. The update branch is a no-op when the row
-    // already exists — just returns it.
-    return this.prisma.posSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
-      update: {},
-      create: {
-        tenantId,
-        enableTablelessMode: false,
-        enableTwoStepCheckout: true, // Default to true for better workflow
-        enableCustomerOrdering: true,
-      },
+    // v3.0.1 — findFirst + opportunistic create (with P2002 race-safety)
+    // instead of upsert with compound-unique key. Prisma rejects
+    // `findUnique`/`upsert` whose compound-unique key includes `branchId: null`
+    // even when the underlying constraint allows NULL — see helper note
+    // in branch-scope.ts. Two concurrent first-view calls still converge:
+    // the loser catches P2002 (unique violation on the tenant-default
+    // row) and re-reads instead of erroring.
+    const existing = await this.prisma.posSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
+    if (existing) return existing;
+    try {
+      return await this.prisma.posSettings.create({
+        data: {
+          tenantId,
+          enableTablelessMode: false,
+          enableTwoStepCheckout: true, // Default to true for better workflow
+          enableCustomerOrdering: true,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        // A concurrent caller won the race; their row is now the
+        // canonical tenant-default. Re-read and return it.
+        const row = await this.prisma.posSettings.findFirst({
+          where: { tenantId, branchId: null },
+        });
+        if (row) return row;
+      }
+      throw e;
+    }
   }
 
   async update(tenantId: string, updateDto: UpdatePosSettingsDto) {
@@ -42,7 +65,9 @@ export class PosSettingsService {
     //      both writes in one txn makes them succeed/fail together.
     let cancelledSelfPayIntents = 0;
     const settings = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.posSettings.findUnique({ where: { tenantId_branchId: { tenantId, branchId: null } } });
+      const existing = await tx.posSettings.findFirst({
+        where: { tenantId, branchId: null },
+      });
 
       // Note: Tableless mode and customer ordering can now work together
       // - With tableId: DINE_IN order (customer scans table QR)
@@ -53,12 +78,12 @@ export class PosSettingsService {
         const willHaveTwoStepCheckout =
           updateDto.enableTwoStepCheckout !== undefined
             ? updateDto.enableTwoStepCheckout
-            : existing?.enableTwoStepCheckout ?? true;
+            : (existing?.enableTwoStepCheckout ?? true);
 
         if (!willHaveTwoStepCheckout) {
           throw new BadRequestException(
-            'İki aşamalı ödeme, QR menüden müşteri sipariş oluşturma için zorunludur. ' +
-            'Lütfen önce iki aşamalı ödemeyi etkinleştirin.'
+            "İki aşamalı ödeme, QR menüden müşteri sipariş oluşturma için zorunludur. " +
+              "Lütfen önce iki aşamalı ödemeyi etkinleştirin.",
           );
         }
       }
@@ -68,12 +93,12 @@ export class PosSettingsService {
         const willHaveCustomerOrdering =
           updateDto.enableCustomerOrdering !== undefined
             ? updateDto.enableCustomerOrdering
-            : existing?.enableCustomerOrdering ?? true;
+            : (existing?.enableCustomerOrdering ?? true);
 
         if (willHaveCustomerOrdering) {
           throw new BadRequestException(
-            'QR menü sipariş aktifken iki aşamalı ödeme kapatılamaz. ' +
-            'Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.'
+            "QR menü sipariş aktifken iki aşamalı ödeme kapatılamaz. " +
+              "Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.",
           );
         }
       }
@@ -88,29 +113,57 @@ export class PosSettingsService {
         existing?.enableCustomerSelfPay === true
       ) {
         const cancelled = await tx.pendingSelfPayment.updateMany({
-          where: { tenantId, status: 'PENDING' },
+          where: { tenantId, status: "PENDING" },
           data: {
-            status: 'EXPIRED',
-            failureReason: 'tenant_disabled_self_pay',
+            status: "EXPIRED",
+            failureReason: "tenant_disabled_self_pay",
           },
         });
         cancelledSelfPayIntents = cancelled.count;
       }
 
-      // Atomic upsert closes the pre-iter-60 read-then-create race —
-      // two concurrent "first update" calls converge on a single row
-      // instead of one hitting P2002.
-      return tx.posSettings.upsert({
-        where: { tenantId_branchId: { tenantId, branchId: null } },
-        update: updateDto,
-        create: {
-          tenantId,
-          enableTablelessMode: updateDto.enableTablelessMode ?? false,
-          enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? true,
-          enableCustomerOrdering: updateDto.enableCustomerOrdering ?? true,
-          enableCustomerSelfPay: updateDto.enableCustomerSelfPay ?? false,
-        },
-      });
+      // v3.0.1 — manual upsert because Prisma's upsert rejects
+      // compound-unique with branchId: null (see findByTenant note).
+      // Race-safety: the outer `existing` lookup is the pre-check; if
+      // a parallel txn raced ahead and inserted the row between our
+      // read and write, the update path's WHERE will still match and
+      // the create path's P2002 catches the duplicate at the inner
+      // catch.
+      if (existing) {
+        const updated = await tx.posSettings.updateMany({
+          where: { tenantId, branchId: null },
+          data: updateDto,
+        });
+        if (updated.count > 0) {
+          return tx.posSettings.findFirstOrThrow({
+            where: { tenantId, branchId: null },
+          });
+        }
+      }
+      try {
+        return await tx.posSettings.create({
+          data: {
+            tenantId,
+            enableTablelessMode: updateDto.enableTablelessMode ?? false,
+            enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? true,
+            enableCustomerOrdering: updateDto.enableCustomerOrdering ?? true,
+            enableCustomerSelfPay: updateDto.enableCustomerSelfPay ?? false,
+          },
+        });
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          // Concurrent first-update raced ahead; redo as an update
+          // against the now-existing row.
+          await tx.posSettings.updateMany({
+            where: { tenantId, branchId: null },
+            data: updateDto,
+          });
+          return tx.posSettings.findFirstOrThrow({
+            where: { tenantId, branchId: null },
+          });
+        }
+        throw e;
+      }
     });
 
     if (cancelledSelfPayIntents > 0) {

@@ -1,16 +1,16 @@
-import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { CatalogModule } from '../catalog/catalog.module';
-import { MarketplaceModule } from '../marketplace/marketplace.module';
-import { OutboxModule } from '../outbox/outbox.module';
-import { QuoteService } from './quote.service';
-import { CheckoutService } from './checkout.service';
-import { CheckoutController } from './checkout.controller';
-import { HardwareOrdersService } from './hardware-orders.service';
-import { HardwareOrdersController } from './hardware-orders.controller';
-import { CheckoutIntentService } from './checkout-intent.service';
-import { CheckoutSettlementService } from './checkout-settlement.service';
-import { CheckoutNotificationsService } from './checkout-notifications.service';
+import { Module } from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { CatalogModule } from "../catalog/catalog.module";
+import { MarketplaceModule } from "../marketplace/marketplace.module";
+import { OutboxModule } from "../outbox/outbox.module";
+import { QuoteService } from "./quote.service";
+import { CheckoutService } from "./checkout.service";
+import { CheckoutController } from "./checkout.controller";
+import { HardwareOrdersService } from "./hardware-orders.service";
+import { HardwareOrdersController } from "./hardware-orders.controller";
+import { CheckoutIntentService } from "./checkout-intent.service";
+import { CheckoutSettlementService } from "./checkout-settlement.service";
+import { CheckoutNotificationsService } from "./checkout-notifications.service";
 
 @Module({
   imports: [PrismaModule, CatalogModule, MarketplaceModule, OutboxModule],

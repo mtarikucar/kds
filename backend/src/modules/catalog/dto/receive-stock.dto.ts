@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   IsArray,
@@ -9,10 +9,10 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
 export class ReceiveStockDto {
-  @ApiProperty({ example: 10, description: 'Units received (must be ≥ 1)' })
+  @ApiProperty({ example: 10, description: "Units received (must be ≥ 1)" })
   @IsInt()
   @Min(1)
   @Max(10_000)
@@ -21,7 +21,7 @@ export class ReceiveStockDto {
   @ApiProperty({
     required: false,
     type: [String],
-    description: 'Optional serials — at most qty entries; extras are ignored',
+    description: "Optional serials — at most qty entries; extras are ignored",
   })
   @IsOptional()
   @IsArray()
@@ -36,7 +36,7 @@ export class ReceiveStockDto {
   @MaxLength(128, { each: true })
   @Matches(/^[A-Za-z0-9._:-]+$/, {
     each: true,
-    message: 'each serial must be alphanumeric + . _ : - (1-128 chars)',
+    message: "each serial must be alphanumeric + . _ : - (1-128 chars)",
   })
   serials?: string[];
 }

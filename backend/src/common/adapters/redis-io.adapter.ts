@@ -1,8 +1,8 @@
-import { INestApplicationContext, Logger } from '@nestjs/common';
-import { IoAdapter } from '@nestjs/platform-socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
-import { createClient } from 'redis';
-import { ServerOptions } from 'socket.io';
+import { INestApplicationContext, Logger } from "@nestjs/common";
+import { IoAdapter } from "@nestjs/platform-socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient } from "redis";
+import { ServerOptions } from "socket.io";
 
 /**
  * Socket.IO IoAdapter backed by Redis pub/sub. Without this, a
@@ -28,15 +28,16 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   async connectToRedis(): Promise<void> {
-    const url = process.env.REDIS_URL ??
+    const url =
+      process.env.REDIS_URL ??
       (process.env.REDIS_HOST && process.env.REDIS_PORT
         ? `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
         : undefined);
 
     if (!url) {
       this.logger.warn(
-        'REDIS_URL not set — Socket.IO will use the in-memory adapter. ' +
-          'Multi-replica deployments will LOSE realtime events across replicas.',
+        "REDIS_URL not set — Socket.IO will use the in-memory adapter. " +
+          "Multi-replica deployments will LOSE realtime events across replicas.",
       );
       return;
     }
@@ -49,7 +50,7 @@ export class RedisIoAdapter extends IoAdapter {
       url,
       socket: {
         reconnectStrategy: (retries: number) => {
-          if (retries > 3) return new Error('redis unreachable');
+          if (retries > 3) return new Error("redis unreachable");
           return Math.min(retries * 200, 1000);
         },
       },
@@ -60,13 +61,13 @@ export class RedisIoAdapter extends IoAdapter {
 
     let pubSawError = false;
     let subSawError = false;
-    pubClient.on('error', (err) => {
+    pubClient.on("error", (err) => {
       if (!pubSawError) {
         this.logger.error(`Redis pub client error: ${err.message}`);
         pubSawError = true;
       }
     });
-    subClient.on('error', (err) => {
+    subClient.on("error", (err) => {
       if (!subSawError) {
         this.logger.error(`Redis sub client error: ${err.message}`);
         subSawError = true;
@@ -78,19 +79,27 @@ export class RedisIoAdapter extends IoAdapter {
       this.adapterConstructor = createAdapter(pubClient, subClient);
       this.pubClient = pubClient;
       this.subClient = subClient;
-      this.logger.log('Socket.IO Redis adapter connected');
+      this.logger.log("Socket.IO Redis adapter connected");
     } catch (err: any) {
       this.logger.error(
         `Redis connection failed (${err.message}). Falling back to in-memory Socket.IO adapter — multi-replica broadcasts will be silently broken until Redis is reachable.`,
       );
-      try { await pubClient.disconnect(); } catch {}
-      try { await subClient.disconnect(); } catch {}
+      try {
+        await pubClient.disconnect();
+      } catch {}
+      try {
+        await subClient.disconnect();
+      } catch {}
     }
   }
 
   async disconnectRedis(): Promise<void> {
-    try { await this.pubClient?.quit(); } catch {}
-    try { await this.subClient?.quit(); } catch {}
+    try {
+      await this.pubClient?.quit();
+    } catch {}
+    try {
+      await this.subClient?.quit();
+    } catch {}
   }
 
   createIOServer(port: number, options?: ServerOptions): any {

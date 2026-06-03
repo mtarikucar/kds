@@ -1,11 +1,25 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { DomainEventBus } from '../outbox/domain-event-bus.service';
-import { KMS_PROVIDER_TOKEN } from '../kms/kms.module';
-import { KmsProvider } from '../kms/kms-provider.interface';
-import { assertPublicHttpUrl, UnsafeUrlError } from '../../common/net/url-safety';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { DomainEventBus } from "../outbox/domain-event-bus.service";
+import { KMS_PROVIDER_TOKEN } from "../kms/kms.module";
+import { KmsProvider } from "../kms/kms-provider.interface";
+import {
+  assertPublicHttpUrl,
+  UnsafeUrlError,
+} from "../../common/net/url-safety";
 
 /**
  * Outbound webhook delivery — tenants subscribe to event types and we POST
@@ -27,7 +41,7 @@ import { assertPublicHttpUrl, UnsafeUrlError } from '../../common/net/url-safety
 // Encryption context for webhook secrets. Bound into the KMS AAD so a
 // leaked ciphertext from a different purpose (e.g. integration credentials)
 // can't be decrypted as a webhook secret.
-const KMS_PURPOSE = 'webhook_secret';
+const KMS_PURPOSE = "webhook_secret";
 
 // Event-type allowlist gate. Outbound webhooks fire `*` subscriptions for
 // every tenant event by default — without this filter, a tenant could
@@ -40,14 +54,14 @@ const KMS_PURPOSE = 'webhook_secret';
 // Block by prefix instead of allowlist to keep adding new business events
 // frictionless; only sensitive events need to be added here.
 const BLOCKED_EVENT_TYPE_PREFIXES: readonly string[] = [
-  'user.password',
-  'user.email_verification',
-  'auth.',
-  'subscription.upgrade.requested',
-  'subscription.renewal.failed',
-  'subscription.payment.',
-  'kms.',
-  'audit.',
+  "user.password",
+  "user.email_verification",
+  "auth.",
+  "subscription.upgrade.requested",
+  "subscription.renewal.failed",
+  "subscription.payment.",
+  "kms.",
+  "audit.",
 ];
 
 function isPublishableEventType(type: string): boolean {
@@ -64,7 +78,7 @@ function isPublishableEventType(type: string): boolean {
 // genuinely needs more.
 const SUBSCRIPTION_CAP_PER_TENANT = Math.max(
   1,
-  Number(process.env.WEBHOOK_SUBSCRIPTION_CAP_PER_TENANT ?? '20'),
+  Number(process.env.WEBHOOK_SUBSCRIPTION_CAP_PER_TENANT ?? "20"),
 );
 
 @Injectable()
@@ -85,7 +99,7 @@ export class WebhookOutboundService {
     // (cap-1) and create the cap-th row; the absolute bound is N+1 which
     // is acceptable for what is a DoS guard, not a precise quota.
     const activeCount = await this.prisma.tenantWebhookSubscription.count({
-      where: { tenantId, status: 'active' },
+      where: { tenantId, status: "active" },
     });
     if (activeCount >= SUBSCRIPTION_CAP_PER_TENANT) {
       throw new BadRequestException(
@@ -106,11 +120,12 @@ export class WebhookOutboundService {
       const { url } = await assertPublicHttpUrl(input.url);
       canonical = url;
     } catch (e) {
-      const msg = e instanceof UnsafeUrlError ? e.message : 'invalid webhook URL';
+      const msg =
+        e instanceof UnsafeUrlError ? e.message : "invalid webhook URL";
       throw new BadRequestException(msg);
     }
-    const secret = `whs_${randomBytes(24).toString('base64url')}`;
-    const secretHash = createHash('sha256').update(secret).digest('hex');
+    const secret = `whs_${randomBytes(24).toString("base64url")}`;
+    const secretHash = createHash("sha256").update(secret).digest("hex");
     // KMS-encrypt the raw secret so the worker can sign deliveries with it.
     // Tenant-scoped AAD means a leak in tenant A's blob is useless for B.
     const secretEncBuf = await this.kms.encrypt({
@@ -124,13 +139,13 @@ export class WebhookOutboundService {
         // Store the canonical (lowercased-host) URL so duplicate
         // subscriptions for the same endpoint look like duplicates.
         url: canonical.toString(),
-        events: input.events ?? ['*'],
+        events: input.events ?? ["*"],
         secretHash,
         // Prisma's Bytes column expects Uint8Array; widen Node Buffer.
         secretEnc: new Uint8Array(secretEncBuf),
       },
     });
-    return { ...row, secret };  // secret returned once; never re-derivable
+    return { ...row, secret }; // secret returned once; never re-derivable
   }
 
   /**
@@ -139,9 +154,14 @@ export class WebhookOutboundService {
    * the row predates the secretEnc column — that delivery should be
    * marked permanently failed by the caller.
    */
-  async unsealSecret(subscription: { tenantId: string; secretEnc: Uint8Array | null }): Promise<string> {
+  async unsealSecret(subscription: {
+    tenantId: string;
+    secretEnc: Uint8Array | null;
+  }): Promise<string> {
     if (!subscription.secretEnc) {
-      throw new Error('legacy subscription has no encrypted secret — re-subscribe to receive deliveries');
+      throw new Error(
+        "legacy subscription has no encrypted secret — re-subscribe to receive deliveries",
+      );
     }
     return this.kms.decrypt({
       context: { tenantId: subscription.tenantId, purpose: KMS_PURPOSE },
@@ -152,7 +172,7 @@ export class WebhookOutboundService {
   async list(tenantId: string) {
     return this.prisma.tenantWebhookSubscription.findMany({
       where: { tenantId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -165,11 +185,17 @@ export class WebhookOutboundService {
     const result = await this.prisma.tenantWebhookSubscription.deleteMany({
       where: { id, tenantId },
     });
-    if (result.count === 0) throw new NotFoundException('Subscription not found');
+    if (result.count === 0)
+      throw new NotFoundException("Subscription not found");
   }
 
   /** Bus-side fan-out: enqueue one delivery row per matching subscription. */
-  async fanOut(event: { id: string; type: string; tenantId: string | null; payload: unknown }): Promise<void> {
+  async fanOut(event: {
+    id: string;
+    type: string;
+    tenantId: string | null;
+    payload: unknown;
+  }): Promise<void> {
     if (!event.tenantId) return;
     // Internal events (password resets, billing internals, audit records,
     // KMS rotation) must never reach an external webhook subscriber. This
@@ -179,11 +205,11 @@ export class WebhookOutboundService {
     const subs = await this.prisma.tenantWebhookSubscription.findMany({
       where: {
         tenantId: event.tenantId,
-        status: 'active',
+        status: "active",
       },
     });
     for (const s of subs) {
-      const matches = s.events.includes('*') || s.events.includes(event.type);
+      const matches = s.events.includes("*") || s.events.includes(event.type);
       if (!matches) continue;
       await this.prisma.webhookDelivery
         .create({
@@ -193,7 +219,7 @@ export class WebhookOutboundService {
             eventType: event.type,
             eventId: event.id,
             url: s.url,
-            status: 'pending',
+            status: "pending",
             nextAttemptAt: new Date(),
           },
         })
@@ -206,17 +232,29 @@ export class WebhookOutboundService {
 
   /** Build the signature header value for one payload + timestamp. */
   static sign(secret: string, timestamp: number, body: string): string {
-    const mac = createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
+    const mac = createHmac("sha256", secret)
+      .update(`${timestamp}.${body}`)
+      .digest("hex");
     return `t=${timestamp},v1=${mac}`;
   }
 
   /** Verify an inbound signature (used by tests + receiver SDKs). */
-  static verify(secret: string, header: string, body: string, toleranceMs = 5 * 60_000): boolean {
-    const parts = Object.fromEntries(header.split(',').map((p) => p.split('=')));
+  static verify(
+    secret: string,
+    header: string,
+    body: string,
+    toleranceMs = 5 * 60_000,
+  ): boolean {
+    const parts = Object.fromEntries(
+      header.split(",").map((p) => p.split("=")),
+    );
     const ts = Number(parts.t);
-    const v1 = String(parts.v1 ?? '');
-    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > toleranceMs) return false;
-    const expected = createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');
+    const v1 = String(parts.v1 ?? "");
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > toleranceMs)
+      return false;
+    const expected = createHmac("sha256", secret)
+      .update(`${ts}.${body}`)
+      .digest("hex");
     if (expected.length !== v1.length) return false;
     return timingSafeEqual(Buffer.from(expected), Buffer.from(v1));
   }

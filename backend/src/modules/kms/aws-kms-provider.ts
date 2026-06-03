@@ -1,5 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { KmsDecryptInput, KmsEncryptInput, KmsProvider } from './kms-provider.interface';
+import { Injectable, Logger } from "@nestjs/common";
+import {
+  KmsDecryptInput,
+  KmsEncryptInput,
+  KmsProvider,
+} from "./kms-provider.interface";
 
 /**
  * AWS KMS provider (stub).
@@ -20,24 +24,27 @@ import { KmsDecryptInput, KmsEncryptInput, KmsProvider } from './kms-provider.in
  */
 @Injectable()
 export class AwsKmsProvider implements KmsProvider {
-  readonly id = 'aws';
+  readonly id = "aws";
   private readonly logger = new Logger(AwsKmsProvider.name);
 
   async encrypt(_input: KmsEncryptInput): Promise<Buffer> {
     throw new Error(
-      'AwsKmsProvider stub — install @aws-sdk/client-kms and replace this stub. ' +
-        'Until then, KMS_PROVIDER=env is the supported configuration.',
+      "AwsKmsProvider stub — install @aws-sdk/client-kms and replace this stub. " +
+        "Until then, KMS_PROVIDER=env is the supported configuration.",
     );
   }
 
   async decrypt(_input: KmsDecryptInput): Promise<string> {
-    throw new Error('AwsKmsProvider stub — see encrypt()');
+    throw new Error("AwsKmsProvider stub — see encrypt()");
   }
 
   async healthCheck() {
     return {
       ok: false,
-      details: { provider: 'aws', error: 'not implemented; install @aws-sdk/client-kms' },
+      details: {
+        provider: "aws",
+        error: "not implemented; install @aws-sdk/client-kms",
+      },
     };
   }
 }

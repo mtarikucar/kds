@@ -8,10 +8,10 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentMethod } from '../../../common/constants/order-status.enum';
-import { EmptyStringToUndefined } from '../../../common/dto/transforms';
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { PaymentMethod } from "../../../common/constants/order-status.enum";
+import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 
 // E.164-ish: 8-15 digits, optional leading +. Mirrors the regex in
 // customer-orders/dto/create-customer-order.dto.ts so phones are
@@ -25,13 +25,17 @@ export class CreatePaymentDto {
   // garbage. The service has a remaining-amount gate that would
   // also catch overpayment, but DTO-level rejection avoids burning
   // a $transaction on obviously-broken input.
-  @ApiProperty({ description: 'Payment amount', minimum: 0.01, maximum: 10_000_000 })
+  @ApiProperty({
+    description: "Payment amount",
+    minimum: 0.01,
+    maximum: 10_000_000,
+  })
   @IsNumber()
   @Min(0.01)
   @Max(10_000_000)
   amount: number;
 
-  @ApiProperty({ enum: PaymentMethod, description: 'Payment method' })
+  @ApiProperty({ enum: PaymentMethod, description: "Payment method" })
   @IsEnum(PaymentMethod)
   method: PaymentMethod;
 
@@ -39,14 +43,16 @@ export class CreatePaymentDto {
   // discretion: comped dessert" but not a 100KB blob. Notes land
   // in the Payment audit row, which is reprinted on the receipt
   // snapshot and shows in admin lists.
-  @ApiPropertyOptional({ description: 'Payment notes' })
+  @ApiPropertyOptional({ description: "Payment notes" })
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   @MaxLength(500)
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'External gateway transaction identifier' })
+  @ApiPropertyOptional({
+    description: "External gateway transaction identifier",
+  })
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
@@ -55,7 +61,7 @@ export class CreatePaymentDto {
 
   @ApiPropertyOptional({
     description:
-      'Client-generated idempotency key. Retries sharing the same (orderId, idempotencyKey) return the existing payment instead of creating a duplicate.',
+      "Client-generated idempotency key. Retries sharing the same (orderId, idempotencyKey) return the existing payment instead of creating a duplicate.",
   })
   @EmptyStringToUndefined()
   @IsString()
@@ -66,11 +72,15 @@ export class CreatePaymentDto {
   // Same shape as the QR-menu CreateCustomerOrderDto — without this
   // an admin-side payment.create could persist a junk phone that
   // findOrCreateByPhone then uses as the canonical Customer.phone.
-  @ApiPropertyOptional({ description: 'Customer phone for linking to customer record' })
+  @ApiPropertyOptional({
+    description: "Customer phone for linking to customer record",
+  })
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, { message: 'customerPhone must match E.164 shape (8-15 digits, optional +)' })
+  @Matches(PHONE_REGEX, {
+    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  })
   customerPhone?: string;
 }

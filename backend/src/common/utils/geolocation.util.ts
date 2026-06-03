@@ -84,9 +84,6 @@ export function isValidCoordinates(
   if (longitude === null || longitude === undefined) return false;
 
   return (
-    latitude >= -90 &&
-    latitude <= 90 &&
-    longitude >= -180 &&
-    longitude <= 180
+    latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
   );
 }

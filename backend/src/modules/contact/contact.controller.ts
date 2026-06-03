@@ -8,17 +8,22 @@ import {
   Post,
   Query,
   UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { ContactService } from './contact.service';
-import { CreateContactDto } from './dto/create-contact.dto';
-import { Public } from '../auth/decorators/public.decorator';
-import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
-import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
+} from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
+import { ContactService } from "./contact.service";
+import { CreateContactDto } from "./dto/create-contact.dto";
+import { Public } from "../auth/decorators/public.decorator";
+import { SuperAdminGuard } from "../superadmin/guards/superadmin.guard";
+import { SuperAdminRoute } from "../superadmin/decorators/superadmin.decorator";
 
-@ApiTags('contact')
-@Controller('contact')
+@ApiTags("contact")
+@Controller("contact")
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
@@ -28,8 +33,8 @@ export class ContactController {
   // SMTP open-relay for spammers.
   @Throttle({ default: { limit: 3, ttl: 60 * 60_000 } })
   @Post()
-  @ApiOperation({ summary: 'Submit a contact form message (Public endpoint)' })
-  @ApiResponse({ status: 201, description: 'Message sent successfully' })
+  @ApiOperation({ summary: "Submit a contact form message (Public endpoint)" })
+  @ApiResponse({ status: 201, description: "Message sent successfully" })
   create(@Body() createContactDto: CreateContactDto) {
     return this.contactService.create(createContactDto);
   }
@@ -48,11 +53,8 @@ export class ContactController {
   @SuperAdminRoute()
   @Get()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get paginated contact messages (SuperAdmin only)' })
-  findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  @ApiOperation({ summary: "Get paginated contact messages (SuperAdmin only)" })
+  findAll(@Query("page") page?: string, @Query("limit") limit?: string) {
     const pageNum = page ? parseInt(page, 10) || 1 : 1;
     const limitNum = limit ? parseInt(limit, 10) || 50 : 50;
     return this.contactService.findAll(pageNum, limitNum);
@@ -60,19 +62,19 @@ export class ContactController {
 
   @UseGuards(SuperAdminGuard)
   @SuperAdminRoute()
-  @Get(':id')
+  @Get(":id")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a single contact message (SuperAdmin only)' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiOperation({ summary: "Get a single contact message (SuperAdmin only)" })
+  findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.contactService.findOne(id);
   }
 
   @UseGuards(SuperAdminGuard)
   @SuperAdminRoute()
-  @Patch(':id/read')
+  @Patch(":id/read")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Mark message as read (SuperAdmin only)' })
-  markAsRead(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiOperation({ summary: "Mark message as read (SuperAdmin only)" })
+  markAsRead(@Param("id", ParseUUIDPipe) id: string) {
     return this.contactService.markAsRead(id);
   }
 }

@@ -1,17 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AdapterFactory } from '../adapters/adapter-factory';
-import { DeliveryOrderService } from '../services/delivery-order.service';
-import { DeliveryAuthService } from '../services/delivery-auth.service';
-import { DeliveryConfigService } from '../services/delivery-config.service';
-import { DeliveryLogService } from '../services/delivery-log.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Interval } from "@nestjs/schedule";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { AdapterFactory } from "../adapters/adapter-factory";
+import { DeliveryOrderService } from "../services/delivery-order.service";
+import { DeliveryAuthService } from "../services/delivery-auth.service";
+import { DeliveryConfigService } from "../services/delivery-config.service";
+import { DeliveryLogService } from "../services/delivery-log.service";
 import {
   POLLING_PLATFORMS,
   PLATFORM_POLL_INTERVALS,
   CIRCUIT_BREAKER_THRESHOLD,
-} from '../constants/platform-status-map';
-import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
+} from "../constants/platform-status-map";
+import {
+  PlatformLogDirection,
+  PlatformLogAction,
+} from "../constants/platform.enum";
 
 /** Maximum number of tenants to poll in parallel per tick. */
 const CONCURRENCY = 10;
@@ -42,8 +45,10 @@ export class OrderPollingScheduler {
     try {
       // Advisory lock across replicas so horizontal scaling doesn't
       // double-poll the platforms (and double-bill our API quotas).
-      const [{ locked }] = await this.prisma.$queryRawUnsafe<{ locked: boolean }[]>(
-        `SELECT pg_try_advisory_lock(${this.lockId('order-polling')}) AS locked`,
+      const [{ locked }] = await this.prisma.$queryRawUnsafe<
+        { locked: boolean }[]
+      >(
+        `SELECT pg_try_advisory_lock(${this.lockId("order-polling")}) AS locked`,
       );
       if (!locked) return;
 
@@ -51,7 +56,7 @@ export class OrderPollingScheduler {
         await this.runOnce();
       } finally {
         await this.prisma.$queryRawUnsafe(
-          `SELECT pg_advisory_unlock(${this.lockId('order-polling')})`,
+          `SELECT pg_advisory_unlock(${this.lockId("order-polling")})`,
         );
       }
     } finally {

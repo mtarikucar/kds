@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
-import { OrderStatus } from '../constants/order-status.enum';
+import { BadRequestException } from "@nestjs/common";
+import { OrderStatus } from "../constants/order-status.enum";
 
 /**
  * Valid state transitions for orders
@@ -40,7 +40,7 @@ export function validateTransition(from: OrderStatus, to: OrderStatus): void {
     throw new BadRequestException(
       `Geçersiz durum geçişi: ${from} → ${to}. ` +
         `${from} durumundan izin verilen geçişler: ${
-          VALID_TRANSITIONS[from]?.join(', ') || 'hiçbiri (terminal durum)'
+          VALID_TRANSITIONS[from]?.join(", ") || "hiçbiri (terminal durum)"
         }`,
     );
   }
@@ -52,9 +52,7 @@ export function validateTransition(from: OrderStatus, to: OrderStatus): void {
  * @returns true if order is in terminal state
  */
 export function isTerminalState(status: OrderStatus): boolean {
-  return (
-    status === OrderStatus.PAID || status === OrderStatus.CANCELLED
-  );
+  return status === OrderStatus.PAID || status === OrderStatus.CANCELLED;
 }
 
 /**

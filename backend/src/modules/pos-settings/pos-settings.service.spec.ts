@@ -5,19 +5,29 @@ import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-moc
 /**
  * Iter-60 regressions for pos-settings update atomicity.
  *
- * Two pre-fix issues:
+ * Pre-fix issues:
  *
  *  1. First-time update race: findUnique → create-or-update — two
  *     concurrent first-update calls both saw null on the read and both
  *     hit the create branch, second one tripping the unique-tenantId
- *     P2002. iter-60 collapses to a single upsert inside the txn.
+ *     P2002.
  *
  *  2. Self-pay cancel atomicity: pendingSelfPayment.updateMany ran
  *     OUTSIDE the settings write, so a settings update failure left
  *     intents wrongly EXPIRED while enableCustomerSelfPay was still
- *     TRUE on the DB. iter-60 wraps both writes in one $transaction.
+ *     TRUE on the DB.
+ *
+ * v3.0.1 update — Prisma 6 rejects findUnique/upsert on a compound
+ * unique whose nullable column receives null at the client layer
+ * (`tenantId_branchId: { branchId: null }`). The service now does:
+ *   findFirst(tenantId, branchId=null)
+ *     → existing? updateMany + findFirstOrThrow
+ *     → no?       create with P2002 fallback to updateMany
+ * Both writes still happen inside the same $transaction, the self-pay
+ * cancel and the settings write still co-locate atomically, and the
+ * concurrent first-update race is closed by the P2002 catch.
  */
-describe('PosSettingsService.update (iter-60)', () => {
+describe('PosSettingsService.update (iter-60 + v3.0.1 findFirst pattern)', () => {
   let prisma: MockPrismaClient;
   let svc: PosSettingsService;
 
@@ -29,10 +39,10 @@ describe('PosSettingsService.update (iter-60)', () => {
     svc = new PosSettingsService(prisma as any);
   });
 
-  it('uses upsert (not findUnique → create) so concurrent first-updates do not P2002', async () => {
-    // Simulate a brand-new tenant — no existing posSettings row.
-    prisma.posSettings.findUnique.mockResolvedValue(null);
-    (prisma.posSettings.upsert as any).mockResolvedValue({
+  it('first-update path: no findUnique/upsert; create on miss, updateMany on hit', async () => {
+    // Brand-new tenant — no existing posSettings row.
+    (prisma.posSettings.findFirst as any).mockResolvedValue(null);
+    (prisma.posSettings.create as any).mockResolvedValue({
       tenantId: 't1',
       enableCustomerOrdering: true,
       enableTwoStepCheckout: true,
@@ -40,24 +50,24 @@ describe('PosSettingsService.update (iter-60)', () => {
 
     await svc.update('t1', { enableCustomerOrdering: true });
 
-    // The legacy code path called .create() — that's the race vector
-    // and must not be the write surface any more.
-    expect((prisma.posSettings.create as any).mock.calls.length).toBe(0);
-    expect((prisma.posSettings.upsert as any).mock.calls.length).toBe(1);
-    const upsertArgs = (prisma.posSettings.upsert as any).mock.calls[0][0];
-    expect(upsertArgs.where).toEqual({
-      tenantId_branchId: { tenantId: 't1', branchId: null },
-    });
+    // findUnique/upsert MUST be untouched — both reject `branchId: null` at the client layer.
+    expect((prisma.posSettings.findUnique as any).mock.calls.length).toBe(0);
+    expect((prisma.posSettings.upsert as any).mock.calls.length).toBe(0);
+    // Create is the brand-new-tenant write.
+    expect((prisma.posSettings.create as any).mock.calls.length).toBe(1);
+    const createArgs = (prisma.posSettings.create as any).mock.calls[0][0];
+    expect(createArgs.data.tenantId).toBe('t1');
   });
 
   it('updates run inside a single $transaction (atomicity envelope)', async () => {
-    prisma.posSettings.findUnique.mockResolvedValue({
+    (prisma.posSettings.findFirst as any).mockResolvedValue({
       tenantId: 't1',
       enableCustomerSelfPay: true,
       enableCustomerOrdering: true,
       enableTwoStepCheckout: true,
-    } as any);
-    (prisma.posSettings.upsert as any).mockResolvedValue({ tenantId: 't1' });
+    });
+    (prisma.posSettings.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.posSettings.findFirstOrThrow as any).mockResolvedValue({ tenantId: 't1' });
     (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({ count: 0 });
 
     await svc.update('t1', { enableTablelessMode: true });
@@ -66,13 +76,13 @@ describe('PosSettingsService.update (iter-60)', () => {
     expect((prisma.$transaction as any).mock.calls.length).toBe(1);
   });
 
-  it('disabling self-pay cancels in-flight intents in the SAME txn as the settings upsert', async () => {
-    prisma.posSettings.findUnique.mockResolvedValue({
+  it('disabling self-pay cancels in-flight intents in the SAME txn as the settings write', async () => {
+    (prisma.posSettings.findFirst as any).mockResolvedValue({
       tenantId: 't1',
       enableCustomerSelfPay: true,
       enableCustomerOrdering: true,
       enableTwoStepCheckout: true,
-    } as any);
+    });
 
     // Capture call order to assert both fire inside the txn.
     const callOrder: string[] = [];
@@ -80,16 +90,17 @@ describe('PosSettingsService.update (iter-60)', () => {
       callOrder.push('pendingSelfPayment.updateMany');
       return { count: 3 };
     });
-    (prisma.posSettings.upsert as any).mockImplementation(async () => {
-      callOrder.push('posSettings.upsert');
-      return { tenantId: 't1' };
+    (prisma.posSettings.updateMany as any).mockImplementation(async () => {
+      callOrder.push('posSettings.updateMany');
+      return { count: 1 };
     });
+    (prisma.posSettings.findFirstOrThrow as any).mockResolvedValue({ tenantId: 't1' });
 
     await svc.update('t1', { enableCustomerSelfPay: false });
 
     expect(callOrder).toEqual([
       'pendingSelfPayment.updateMany',
-      'posSettings.upsert',
+      'posSettings.updateMany',
     ]);
 
     // The cancel WHERE must scope by tenantId AND status=PENDING — a
@@ -103,13 +114,14 @@ describe('PosSettingsService.update (iter-60)', () => {
   });
 
   it('does NOT cancel intents when self-pay was already disabled', async () => {
-    prisma.posSettings.findUnique.mockResolvedValue({
+    (prisma.posSettings.findFirst as any).mockResolvedValue({
       tenantId: 't1',
       enableCustomerSelfPay: false,
       enableCustomerOrdering: true,
       enableTwoStepCheckout: true,
-    } as any);
-    (prisma.posSettings.upsert as any).mockResolvedValue({ tenantId: 't1' });
+    });
+    (prisma.posSettings.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.posSettings.findFirstOrThrow as any).mockResolvedValue({ tenantId: 't1' });
 
     await svc.update('t1', { enableCustomerSelfPay: false });
 
@@ -117,33 +129,35 @@ describe('PosSettingsService.update (iter-60)', () => {
   });
 
   it('throws BadRequestException when enableCustomerOrdering=true without two-step checkout', async () => {
-    prisma.posSettings.findUnique.mockResolvedValue({
+    (prisma.posSettings.findFirst as any).mockResolvedValue({
       tenantId: 't1',
       enableTwoStepCheckout: false,
       enableCustomerSelfPay: false,
       enableCustomerOrdering: false,
-    } as any);
+    });
 
     await expect(
       svc.update('t1', { enableCustomerOrdering: true }),
     ).rejects.toThrow(BadRequestException);
 
     // Validation rejection must NOT leak through to a settings write.
-    expect((prisma.posSettings.upsert as any).mock.calls.length).toBe(0);
+    expect((prisma.posSettings.updateMany as any).mock.calls.length).toBe(0);
+    expect((prisma.posSettings.create as any).mock.calls.length).toBe(0);
     expect((prisma.pendingSelfPayment.updateMany as any).mock.calls.length).toBe(0);
   });
 
   it('throws BadRequestException when disabling two-step while customer ordering stays on', async () => {
-    prisma.posSettings.findUnique.mockResolvedValue({
+    (prisma.posSettings.findFirst as any).mockResolvedValue({
       tenantId: 't1',
       enableTwoStepCheckout: true,
       enableCustomerOrdering: true,
       enableCustomerSelfPay: false,
-    } as any);
+    });
 
     await expect(
       svc.update('t1', { enableTwoStepCheckout: false }),
     ).rejects.toThrow(BadRequestException);
-    expect((prisma.posSettings.upsert as any).mock.calls.length).toBe(0);
+    expect((prisma.posSettings.updateMany as any).mock.calls.length).toBe(0);
+    expect((prisma.posSettings.create as any).mock.calls.length).toBe(0);
   });
 });

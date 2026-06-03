@@ -3,11 +3,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateProductDto } from '../dto/create-product.dto';
-import { UpdateProductDto } from '../dto/update-product.dto';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateProductDto } from "../dto/create-product.dto";
+import { UpdateProductDto } from "../dto/update-product.dto";
 
 @Injectable()
 export class ProductsService {
@@ -18,16 +18,20 @@ export class ProductsService {
     if (!product) return null;
 
     // Transform productImages array to images array
-    const images = product.productImages?.map((pti: any) => ({
-      ...pti.image,
-      order: pti.order,
-    })) || [];
+    const images =
+      product.productImages?.map((pti: any) => ({
+        ...pti.image,
+        order: pti.order,
+      })) || [];
 
     // Transform modifierGroups from junction table format
-    const modifierGroups = product.modifierGroups?.map((pmg: any) => ({
-      ...pmg.group,
-      displayOrder: pmg.displayOrder,
-    })).sort((a: any, b: any) => a.displayOrder - b.displayOrder) || [];
+    const modifierGroups =
+      product.modifierGroups
+        ?.map((pmg: any) => ({
+          ...pmg.group,
+          displayOrder: pmg.displayOrder,
+        }))
+        .sort((a: any, b: any) => a.displayOrder - b.displayOrder) || [];
 
     // Remove productImages and modifierGroups junction table, add transformed versions
     const { productImages, modifierGroups: _, ...rest } = product;
@@ -48,7 +52,9 @@ export class ProductsService {
     });
 
     if (!category) {
-      throw new BadRequestException('Invalid category or category does not belong to your tenant');
+      throw new BadRequestException(
+        "Invalid category or category does not belong to your tenant",
+      );
     }
 
     // Create product first
@@ -70,14 +76,18 @@ export class ProductsService {
           include: {
             image: true,
           },
-          orderBy: { order: 'asc' },
+          orderBy: { order: "asc" },
         },
       },
     });
 
     // Attach images if provided
     if (createProductDto.imageIds && createProductDto.imageIds.length > 0) {
-      await this.attachImagesToProduct(product.id, createProductDto.imageIds, tenantId);
+      await this.attachImagesToProduct(
+        product.id,
+        createProductDto.imageIds,
+        tenantId,
+      );
 
       // Fetch updated product with images
       return this.findOne(product.id, tenantId);
@@ -105,7 +115,7 @@ export class ProductsService {
           include: {
             image: true,
           },
-          orderBy: { order: 'asc' },
+          orderBy: { order: "asc" },
         },
         modifierGroups: {
           include: {
@@ -113,18 +123,18 @@ export class ProductsService {
               include: {
                 modifiers: {
                   where: { isAvailable: true },
-                  orderBy: { displayOrder: 'asc' },
+                  orderBy: { displayOrder: "asc" },
                 },
               },
             },
           },
-          orderBy: { displayOrder: 'asc' },
+          orderBy: { displayOrder: "asc" },
         },
       },
-      orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
     });
 
-    return products.map(product => this.transformProductResponse(product));
+    return products.map((product) => this.transformProductResponse(product));
   }
 
   async findOne(id: string, tenantId: string) {
@@ -139,7 +149,7 @@ export class ProductsService {
           include: {
             image: true,
           },
-          orderBy: { order: 'asc' },
+          orderBy: { order: "asc" },
         },
       },
     });
@@ -151,7 +161,11 @@ export class ProductsService {
     return this.transformProductResponse(product);
   }
 
-  async update(id: string, updateProductDto: UpdateProductDto, tenantId: string) {
+  async update(
+    id: string,
+    updateProductDto: UpdateProductDto,
+    tenantId: string,
+  ) {
     // Check if product exists and belongs to tenant
     await this.findOne(id, tenantId);
 
@@ -165,7 +179,9 @@ export class ProductsService {
       });
 
       if (!category) {
-        throw new BadRequestException('Invalid category or category does not belong to your tenant');
+        throw new BadRequestException(
+          "Invalid category or category does not belong to your tenant",
+        );
       }
     }
 
@@ -179,7 +195,7 @@ export class ProductsService {
       data: productData,
     });
     if (claim.count === 0) {
-      throw new BadRequestException('Product not found');
+      throw new BadRequestException("Product not found");
     }
 
     // Update images if provided
@@ -212,10 +228,10 @@ export class ProductsService {
       // unavailable" (soft-delete via isAvailable:false).
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
+        err.code === "P2003"
       ) {
         throw new ConflictException(
-          'Cannot delete a product that has associated orders. Mark it as unavailable instead.',
+          "Cannot delete a product that has associated orders. Mark it as unavailable instead.",
         );
       }
       throw err;
@@ -227,7 +243,9 @@ export class ProductsService {
     const product = await this.findOne(id, tenantId);
 
     if (!product.stockTracked) {
-      throw new BadRequestException('Stock tracking is not enabled for this product');
+      throw new BadRequestException(
+        "Stock tracking is not enabled for this product",
+      );
     }
 
     // Atomic increment with a conditional gate so two concurrent
@@ -251,8 +269,9 @@ export class ProductsService {
         where: { id, tenantId },
         select: { id: true },
       });
-      if (!fresh) throw new NotFoundException(`Product with ID ${id} not found`);
-      throw new BadRequestException('Insufficient stock');
+      if (!fresh)
+        throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new BadRequestException("Insufficient stock");
     }
     // Sync isAvailable from the post-increment value. Two concurrent
     // updateStock calls both run this follow-up; both converge to the
@@ -293,7 +312,7 @@ export class ProductsService {
       const foundSet = new Set(owned.map((o) => o.id));
       const missing = imageIds.filter((id) => !foundSet.has(id));
       throw new BadRequestException(
-        `Image(s) not found or do not belong to your tenant: ${missing.join(', ')}`,
+        `Image(s) not found or do not belong to your tenant: ${missing.join(", ")}`,
       );
     }
 
@@ -330,10 +349,10 @@ export class ProductsService {
       include: {
         image: true,
       },
-      orderBy: { order: 'asc' },
+      orderBy: { order: "asc" },
     });
 
-    return productToImages.map(pti => ({
+    return productToImages.map((pti) => ({
       ...pti.image,
       order: pti.order,
     }));
@@ -361,14 +380,16 @@ export class ProductsService {
     });
 
     if (existingLinks.length !== imageIds.length) {
-      throw new BadRequestException('Image count mismatch');
+      throw new BadRequestException("Image count mismatch");
     }
 
     // Update order for each image in junction table
     for (let i = 0; i < imageIds.length; i++) {
-      const link = existingLinks.find(l => l.imageId === imageIds[i]);
+      const link = existingLinks.find((l) => l.imageId === imageIds[i]);
       if (!link) {
-        throw new BadRequestException(`Image ${imageIds[i]} does not belong to this product`);
+        throw new BadRequestException(
+          `Image ${imageIds[i]} does not belong to this product`,
+        );
       }
 
       await this.prisma.productToImage.update({
@@ -409,7 +430,7 @@ export class ProductsService {
     });
 
     if (!link) {
-      throw new NotFoundException('Image not found on this product');
+      throw new NotFoundException("Image not found on this product");
     }
 
     // Delete the link from junction table (image stays in library for reuse)
@@ -430,7 +451,7 @@ export class ProductsService {
           tenantId,
         },
       },
-      orderBy: { order: 'asc' },
+      orderBy: { order: "asc" },
     });
 
     for (let i = 0; i < remainingLinks.length; i++) {

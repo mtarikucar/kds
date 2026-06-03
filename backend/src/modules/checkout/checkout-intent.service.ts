@@ -1,10 +1,10 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { PaymentsFacadeService } from '../payments-core/payments-facade.service';
-import { Cart, CartQuote } from './checkout.types';
-import { QuoteService } from './quote.service';
-import { CheckoutBuyerDto } from './dto/create-intent.dto';
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { PaymentsFacadeService } from "../payments-core/payments-facade.service";
+import { Cart, CartQuote } from "./checkout.types";
+import { QuoteService } from "./quote.service";
+import { CheckoutBuyerDto } from "./dto/create-intent.dto";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -29,7 +29,7 @@ import { CheckoutBuyerDto } from './dto/create-intent.dto';
 
 // PayTR's merchant_oid limit is 64 chars. "CK-" + 36-char uuid = 39 chars,
 // well under the cap.
-const PAYMENT_REF_PREFIX = 'CK-';
+const PAYMENT_REF_PREFIX = "CK-";
 
 export interface CreateIntentResult {
   paymentRef: string;
@@ -64,7 +64,7 @@ export class CheckoutIntentService {
       // PayTR rejects amount=0; surface a clean BadRequest instead of a
       // gateway 400 (which would be cached as a generic failure).
       throw new BadRequestException(
-        'Cart total is 0 — nothing to charge. Use the admin-comp path for free provisioning.',
+        "Cart total is 0 — nothing to charge. Use the admin-comp path for free provisioning.",
       );
     }
 
@@ -85,10 +85,10 @@ export class CheckoutIntentService {
     );
     const basket = quote.lines.map((line, i) => {
       const cadenceSuffix =
-        line.cadence === 'oneTime'
-          ? ''
-          : ` (${line.cadence === 'yearly' ? 'yıllık' : 'aylık'})`;
-      const qtySuffix = line.qty > 1 ? ` x${line.qty}` : '';
+        line.cadence === "oneTime"
+          ? ""
+          : ` (${line.cadence === "yearly" ? "yıllık" : "aylık"})`;
+      const qtySuffix = line.qty > 1 ? ` x${line.qty}` : "";
       return {
         name: `${line.name}${qtySuffix}${cadenceSuffix}`,
         priceCents: line.subtotalCents + lineOverheads[i],
@@ -109,18 +109,18 @@ export class CheckoutIntentService {
         cartJson: cart as any,
         amountCents: quote.totalCents,
         currency: quote.currency,
-        providerId: 'paytr',
-        status: 'pending',
+        providerId: "paytr",
+        status: "pending",
       },
     });
 
-    const intent = await this.payments.createIntent('paytr', {
+    const intent = await this.payments.createIntent("paytr", {
       tenantId,
       externalRef: paymentRef,
       idempotencyKey: paymentRef,
       amountCents: quote.totalCents,
       currency: quote.currency,
-      purpose: 'mixed-cart-checkout',
+      purpose: "mixed-cart-checkout",
       buyer: {
         email: buyer.email,
         name: buyer.name,
@@ -133,8 +133,8 @@ export class CheckoutIntentService {
     });
 
     const clientAction = (intent.clientAction ?? {}) as Record<string, unknown>;
-    const iframeToken = String(clientAction.iframeToken ?? '');
-    const paymentLink = String(clientAction.paymentLink ?? '');
+    const iframeToken = String(clientAction.iframeToken ?? "");
+    const paymentLink = String(clientAction.paymentLink ?? "");
 
     return {
       paymentRef,

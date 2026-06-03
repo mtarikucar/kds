@@ -1,4 +1,10 @@
-import { Injectable, Logger, Inject, forwardRef, Optional } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  Inject,
+  forwardRef,
+  Optional,
+} from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { addDays, addHours } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -274,7 +280,10 @@ export class SubscriptionSchedulerService {
       // window.
       const result = await this.prisma.$transaction(async (tx) => {
         const r = await tx.subscription.updateMany({
-          where: { id: { in: ids }, status: { not: SubscriptionStatus.CANCELLED } },
+          where: {
+            id: { in: ids },
+            status: { not: SubscriptionStatus.CANCELLED },
+          },
           data: {
             status: SubscriptionStatus.CANCELLED,
             endedAt: now,
@@ -305,7 +314,9 @@ export class SubscriptionSchedulerService {
         }
         return r;
       });
-      this.logger.log(`Cancelled ${result.count} subscriptions at period end (events emitted)`);
+      this.logger.log(
+        `Cancelled ${result.count} subscriptions at period end (events emitted)`,
+      );
     });
   }
 
@@ -327,7 +338,12 @@ export class SubscriptionSchedulerService {
           status: SubscriptionStatus.PAST_DUE,
           currentPeriodEnd: { lte: sevenDaysAgo },
         },
-        select: { id: true, tenantId: true, planId: true, plan: { select: { name: true } } },
+        select: {
+          id: true,
+          tenantId: true,
+          planId: true,
+          plan: { select: { name: true } },
+        },
       });
       if (expiring.length === 0) {
         this.logger.log("No past-due subscriptions to expire");
@@ -379,7 +395,9 @@ export class SubscriptionSchedulerService {
         }
         return u;
       });
-      this.logger.log(`Expired ${updated.count} past-due subscriptions (events emitted)`);
+      this.logger.log(
+        `Expired ${updated.count} past-due subscriptions (events emitted)`,
+      );
     });
   }
 

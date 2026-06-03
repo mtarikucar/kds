@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { StockAlertsService } from './stock-alerts.service';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { StockAlertsService } from "./stock-alerts.service";
 
 // Iter-95: same window cap reasoning as iter-92 (waste-logs +
 // ingredient-movements) and iter-89 (analytics). 366 days covers
@@ -9,27 +9,32 @@ import { StockAlertsService } from './stock-alerts.service';
 const STOCK_DASHBOARD_MAX_RANGE_DAYS = 366;
 const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function parseWindow(startDate?: string, endDate?: string): { gte?: Date; lte?: Date } {
+function parseWindow(
+  startDate?: string,
+  endDate?: string,
+): { gte?: Date; lte?: Date } {
   const window: { gte?: Date; lte?: Date } = {};
   let start: Date | undefined;
   let end: Date | undefined;
   if (startDate) {
     start = new Date(startDate);
     if (Number.isNaN(start.getTime())) {
-      throw new BadRequestException('startDate must be a valid ISO-8601 date');
+      throw new BadRequestException("startDate must be a valid ISO-8601 date");
     }
     window.gte = start;
   }
   if (endDate) {
     end = new Date(endDate);
     if (Number.isNaN(end.getTime())) {
-      throw new BadRequestException('endDate must be a valid ISO-8601 date');
+      throw new BadRequestException("endDate must be a valid ISO-8601 date");
     }
     window.lte = end;
   }
   if (start && end) {
     if (start > end) {
-      throw new BadRequestException('startDate must be before or equal to endDate');
+      throw new BadRequestException(
+        "startDate must be before or equal to endDate",
+      );
     }
     const windowDays = (end.getTime() - start.getTime()) / MILLIS_PER_DAY;
     if (windowDays > STOCK_DASHBOARD_MAX_RANGE_DAYS) {
@@ -64,20 +69,27 @@ export class StockDashboardService {
       this.stockAlerts.checkExpiringBatches(tenantId),
       this.prisma.ingredientMovement.findMany({
         where: { tenantId },
-        include: { stockItem: { select: { id: true, name: true, unit: true } } },
-        orderBy: { createdAt: 'desc' },
+        include: {
+          stockItem: { select: { id: true, name: true, unit: true } },
+        },
+        orderBy: { createdAt: "desc" },
         take: 10,
       }),
       this.prisma.wasteLog.aggregate({
         where: {
           tenantId,
-          createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 30)) },
+          createdAt: {
+            gte: new Date(new Date().setDate(new Date().getDate() - 30)),
+          },
         },
         _sum: { cost: true },
         _count: true,
       }),
       this.prisma.purchaseOrder.count({
-        where: { tenantId, status: { in: ['DRAFT', 'SUBMITTED', 'PARTIALLY_RECEIVED'] } },
+        where: {
+          tenantId,
+          status: { in: ["DRAFT", "SUBMITTED", "PARTIALLY_RECEIVED"] },
+        },
       }),
     ]);
 
@@ -100,7 +112,13 @@ export class StockDashboardService {
   async getValuation(tenantId: string) {
     const items = await this.prisma.stockItem.findMany({
       where: { tenantId, isActive: true },
-      select: { id: true, name: true, unit: true, currentStock: true, costPerUnit: true },
+      select: {
+        id: true,
+        name: true,
+        unit: true,
+        currentStock: true,
+        costPerUnit: true,
+      },
     });
 
     const itemValuations = items.map((item) => ({
@@ -108,7 +126,10 @@ export class StockDashboardService {
       totalValue: Number(item.currentStock) * Number(item.costPerUnit),
     }));
 
-    const totalValue = itemValuations.reduce((sum, item) => sum + item.totalValue, 0);
+    const totalValue = itemValuations.reduce(
+      (sum, item) => sum + item.totalValue,
+      0,
+    );
 
     return {
       totalValue,
@@ -117,13 +138,17 @@ export class StockDashboardService {
     };
   }
 
-  async getMovementSummary(tenantId: string, startDate?: string, endDate?: string) {
+  async getMovementSummary(
+    tenantId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
     const where: any = { tenantId };
     const window = parseWindow(startDate, endDate);
     if (window.gte || window.lte) where.createdAt = window;
 
     const byType = await this.prisma.ingredientMovement.groupBy({
-      by: ['type'],
+      by: ["type"],
       where,
       _sum: { quantity: true },
       _count: true,

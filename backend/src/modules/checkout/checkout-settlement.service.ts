@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CheckoutService } from './checkout.service';
-import { Cart } from './checkout.types';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CheckoutService } from "./checkout.service";
+import { Cart } from "./checkout.types";
 
 // v2.8.85 — webhook-side settlement for mixed-cart checkouts.
 //
@@ -42,13 +42,13 @@ export class CheckoutSettlementService {
       this.logger.warn(`PayTR success for unknown checkout ref=${paymentRef}`);
       return;
     }
-    if (intent.status === 'provisioned') {
+    if (intent.status === "provisioned") {
       this.logger.log(
         `Idempotent PayTR success for ref=${paymentRef} (already provisioned)`,
       );
       return;
     }
-    if (intent.status === 'failed') {
+    if (intent.status === "failed") {
       // A late "success" overriding a recorded failure is suspicious. PayTR
       // would not normally do this, but if it does we want a paper trail
       // before silently provisioning. Refuse and surface the conflict.
@@ -64,8 +64,8 @@ export class CheckoutSettlementService {
     // catches the (tenant, paymentRef) hit and returns the cached row);
     // this status flip is the cheap first guard.
     await this.prisma.checkoutIntent.updateMany({
-      where: { paymentRef, status: 'pending' },
-      data: { status: 'succeeded', succeededAt: new Date() },
+      where: { paymentRef, status: "pending" },
+      data: { status: "succeeded", succeededAt: new Date() },
     });
 
     try {
@@ -77,14 +77,14 @@ export class CheckoutSettlementService {
       await this.prisma.checkoutIntent.update({
         where: { paymentRef },
         data: {
-          status: 'provisioned',
+          status: "provisioned",
           provisionedAt: new Date(),
           hardwareOrderId: result.hardwareOrderId ?? null,
           addOnIds: result.addOnIds,
         },
       });
       this.logger.log(
-        `Provisioned mixed-cart checkout ref=${paymentRef} tenant=${intent.tenantId} hwOrder=${result.hardwareOrderId ?? 'none'} addOns=${result.addOnIds.length} paymentType=${paymentType ?? 'unknown'}`,
+        `Provisioned mixed-cart checkout ref=${paymentRef} tenant=${intent.tenantId} hwOrder=${result.hardwareOrderId ?? "none"} addOns=${result.addOnIds.length} paymentType=${paymentType ?? "unknown"}`,
       );
     } catch (err) {
       // Roll back the status flip so a manual retry (or the recovery
@@ -92,7 +92,7 @@ export class CheckoutSettlementService {
       // succeededAt timestamp stays — we know PayTR did charge the card.
       await this.prisma.checkoutIntent.update({
         where: { paymentRef },
-        data: { status: 'succeeded' },
+        data: { status: "succeeded" },
       });
       this.logger.error(
         `Provisioning failed for ref=${paymentRef} after PayTR success — left in 'succeeded' for retry. err=${(err as Error).message}`,
@@ -110,7 +110,7 @@ export class CheckoutSettlementService {
       this.logger.warn(`PayTR failure for unknown checkout ref=${paymentRef}`);
       return;
     }
-    if (intent.status === 'provisioned') {
+    if (intent.status === "provisioned") {
       // The buyer already got the goods. A late failure callback is the
       // gateway's mistake (or a reordering between concurrent retries).
       // Don't roll back provisioning — log and bail.
@@ -123,13 +123,15 @@ export class CheckoutSettlementService {
     // multi-kilobyte HTML error pages and we don't want those persisted.
     const trimmed = reason ? reason.slice(0, 500) : null;
     await this.prisma.checkoutIntent.updateMany({
-      where: { paymentRef, status: { in: ['pending', 'succeeded'] } },
+      where: { paymentRef, status: { in: ["pending", "succeeded"] } },
       data: {
-        status: 'failed',
+        status: "failed",
         failureReason: trimmed,
         failedAt: new Date(),
       },
     });
-    this.logger.log(`Marked checkout ref=${paymentRef} failed: ${trimmed ?? 'no reason'}`);
+    this.logger.log(
+      `Marked checkout ref=${paymentRef} failed: ${trimmed ?? "no reason"}`,
+    );
   }
 }

@@ -13,7 +13,7 @@
  * the next audit will flag — use these instead.
  */
 
-import { UserRole } from '../constants/roles.enum';
+import { UserRole } from "../constants/roles.enum";
 
 /**
  * The authorization context for every branch-scoped request.
@@ -65,11 +65,16 @@ export function branchScope(scope: BranchScope): {
  *   2. Fall back to the tenant-default row (tenantId, null).
  *   3. If neither exists, return null and let the caller seed.
  *
- * Settings models use `@@unique([tenantId, branchId])` with
- * NULLS NOT DISTINCT, so the (tenantId, null) lookup hits the same
- * index as the override lookup — no extra cost.
- *
  *   const pos = await loadBranchSettings(prisma.posSettings, scope);
+ *
+ * v3.0.1 — findFirst instead of findUnique. Prisma rejects
+ * `findUnique({ tenantId_branchId: { branchId: null } })` at runtime
+ * because the generated client treats compound-unique NULL fields as
+ * a hard "must not be null" boundary, regardless of the underlying
+ * @@unique declaration. findFirst applies the same predicate via a
+ * standard WHERE evaluation, which Postgres handles correctly via the
+ * compound index. Cost is identical to findUnique (same index scan)
+ * but Prisma client validation no longer trips.
  *
  * The delegate type is the minimal slice of a Prisma model delegate
  * we need; this avoids dragging in the generated Prisma types just
@@ -77,28 +82,24 @@ export function branchScope(scope: BranchScope): {
  */
 export async function loadBranchSettings<T>(
   delegate: {
-    findUnique(args: { where: any; [k: string]: any }): Promise<T | null>;
+    findFirst(args: { where: any; [k: string]: any }): Promise<T | null>;
   },
   scope: BranchScope,
   extra: { select?: any; include?: any } = {},
 ): Promise<T | null> {
-  const overrideRow = await delegate.findUnique({
+  const overrideRow = await delegate.findFirst({
     ...extra,
     where: {
-      tenantId_branchId: {
-        tenantId: scope.tenantId,
-        branchId: scope.branchId,
-      },
+      tenantId: scope.tenantId,
+      branchId: scope.branchId,
     },
   });
   if (overrideRow) return overrideRow;
-  return delegate.findUnique({
+  return delegate.findFirst({
     ...extra,
     where: {
-      tenantId_branchId: {
-        tenantId: scope.tenantId,
-        branchId: null,
-      },
+      tenantId: scope.tenantId,
+      branchId: null,
     },
   });
 }

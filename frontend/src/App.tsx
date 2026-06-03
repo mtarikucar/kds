@@ -218,7 +218,15 @@ function App() {
 
       {/* Protected Routes - ADMIN, MANAGER, WAITER */}
       <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER]}><Layout /></ProtectedRoute>}>
-        <Route path="/pos" element={<POSPage />} />
+        {/* v3.0.0 — POS is tier-gated (BASIC+). FREE plans (post-trial
+            fallback) see the UpsellCard; backend pos-settings endpoints
+            also return 403 for these tenants. Sidebar item is hidden
+            via the same posAccess feature flag below. */}
+        <Route path="/pos" element={
+          <FeatureGate feature="posAccess" fallback={<UpsellCard planName="BASIC" />}>
+            <POSPage />
+          </FeatureGate>
+        } />
         <Route path="/customers" element={<CustomersPage />} />
         <Route path="/customers/:id" element={<CustomerDetailPage />} />
       </Route>

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from './prisma/prisma.service';
-import Redis from 'ioredis';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "./prisma/prisma.service";
+import Redis from "ioredis";
 
 /**
  * Wrap a hot-path probe so a hung downstream can't stall the K8s readiness
@@ -16,7 +16,10 @@ import Redis from 'ioredis';
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   let t: NodeJS.Timeout;
   const timeout = new Promise<never>((_, reject) => {
-    t = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+    t = setTimeout(
+      () => reject(new Error(`${label} timeout after ${ms}ms`)),
+      ms,
+    );
   });
   return Promise.race([p, timeout]).finally(() => clearTimeout(t));
 }
@@ -28,7 +31,7 @@ export class AppService {
 
   constructor(private readonly prisma: PrismaService) {
     // Initialize Redis client for health checks
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
     this.redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 1,
       retryStrategy: () => null, // Don't retry on health checks
@@ -38,15 +41,15 @@ export class AppService {
   async getHealth(): Promise<object> {
     const timestamp = new Date().toISOString();
     const checks: any = {
-      status: 'ok',
+      status: "ok",
       timestamp,
-      service: 'HummyTummy API',
-      version: '1.0.0',
+      service: "HummyTummy API",
+      version: "1.0.0",
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
+      environment: process.env.NODE_ENV || "development",
       checks: {
-        database: 'unknown',
-        redis: 'unknown',
+        database: "unknown",
+        redis: "unknown",
       },
     };
 
@@ -55,12 +58,12 @@ export class AppService {
       await withTimeout(
         this.prisma.$queryRaw`SELECT 1`,
         AppService.HEALTH_PROBE_TIMEOUT_MS,
-        'db',
+        "db",
       );
-      checks.checks.database = 'healthy';
+      checks.checks.database = "healthy";
     } catch (error) {
-      checks.checks.database = 'unhealthy';
-      checks.status = 'degraded';
+      checks.checks.database = "unhealthy";
+      checks.status = "degraded";
     }
 
     // Check Redis connectivity
@@ -68,12 +71,12 @@ export class AppService {
       await withTimeout(
         this.redis.ping(),
         AppService.HEALTH_PROBE_TIMEOUT_MS,
-        'redis',
+        "redis",
       );
-      checks.checks.redis = 'healthy';
+      checks.checks.redis = "healthy";
     } catch (error) {
-      checks.checks.redis = 'unhealthy';
-      checks.status = 'degraded';
+      checks.checks.redis = "unhealthy";
+      checks.status = "degraded";
     }
 
     return checks;

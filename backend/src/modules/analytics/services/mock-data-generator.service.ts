@@ -1,7 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PersonState, InsightType, InsightCategory, InsightSeverity } from '../enums/analytics.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  PersonState,
+  InsightType,
+  InsightCategory,
+  InsightSeverity,
+} from "../enums/analytics.enum";
 
 interface TableInfo {
   id: string;
@@ -32,7 +37,7 @@ export class MockDataGeneratorService {
     branchId: string,
     startDate: Date,
     endDate: Date,
-    intervalMinutes: number = 5
+    intervalMinutes: number = 5,
   ): Promise<number> {
     const tables = await this.getTables(tenantId);
     if (tables.length === 0) {
@@ -69,13 +74,13 @@ export class MockDataGeneratorService {
       for (const table of occupiedTables) {
         const partySize = Math.min(
           Math.floor(Math.random() * table.capacity) + 1,
-          table.capacity
+          table.capacity,
         );
 
         for (let i = 0; i < partySize; i++) {
           const point = this.generateOccupancyPoint(
             table,
-            `track_${tenantId.slice(0, 8)}_${++trackingIdCounter}`
+            `track_${tenantId.slice(0, 8)}_${++trackingIdCounter}`,
           );
 
           records.push({
@@ -112,7 +117,9 @@ export class MockDataGeneratorService {
         });
       }
 
-      currentTime = new Date(currentTime.getTime() + intervalMinutes * 60 * 1000);
+      currentTime = new Date(
+        currentTime.getTime() + intervalMinutes * 60 * 1000,
+      );
     }
 
     // Batch insert
@@ -123,7 +130,9 @@ export class MockDataGeneratorService {
       });
     }
 
-    this.logger.log(`Generated ${records.length} occupancy records for tenant ${tenantId}`);
+    this.logger.log(
+      `Generated ${records.length} occupancy records for tenant ${tenantId}`,
+    );
     return records.length;
   }
 
@@ -134,7 +143,7 @@ export class MockDataGeneratorService {
     tenantId: string,
     branchId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<number> {
     const records: Array<{
       hourBucket: Date;
@@ -165,15 +174,20 @@ export class MockDataGeneratorService {
         for (let z = 0; z < gridSize; z++) {
           // Higher traffic near center and entrance areas
           const distanceFromCenter = Math.sqrt(
-            Math.pow(x - gridSize / 2, 2) + Math.pow(z - gridSize / 2, 2)
+            Math.pow(x - gridSize / 2, 2) + Math.pow(z - gridSize / 2, 2),
           );
-          const locationMultiplier = 1 - distanceFromCenter / (gridSize / 2) * 0.5;
+          const locationMultiplier =
+            1 - (distanceFromCenter / (gridSize / 2)) * 0.5;
 
           // Add entrance bonus (assume entrance at z=0)
           const entranceBonus = z < 2 ? 1.5 : 1;
 
           const baseCount = Math.floor(
-            activityLevel * 20 * locationMultiplier * entranceBonus * (0.5 + Math.random() * 0.5)
+            activityLevel *
+              20 *
+              locationMultiplier *
+              entranceBonus *
+              (0.5 + Math.random() * 0.5),
           );
 
           if (baseCount > 0) {
@@ -222,7 +236,9 @@ export class MockDataGeneratorService {
       }
     }
 
-    this.logger.log(`Generated ${records.length} traffic flow records for tenant ${tenantId}`);
+    this.logger.log(
+      `Generated ${records.length} traffic flow records for tenant ${tenantId}`,
+    );
     return records.length;
   }
 
@@ -233,7 +249,7 @@ export class MockDataGeneratorService {
     tenantId: string,
     branchId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<number> {
     const tables = await this.getTables(tenantId);
     if (tables.length === 0) {
@@ -275,11 +291,15 @@ export class MockDataGeneratorService {
         // Simulate different utilization based on table location and capacity
         const baseUtilization = 0.3 + Math.random() * 0.5;
         const weekendMultiplier = isWeekend ? 1.3 : 1;
-        const capacityMultiplier = table.capacity <= 2 ? 1.2 : table.capacity >= 6 ? 0.8 : 1;
+        const capacityMultiplier =
+          table.capacity <= 2 ? 1.2 : table.capacity >= 6 ? 0.8 : 1;
 
         const operatingMinutes = 12 * 60; // 12 hours operation
         const occupiedMinutes = Math.floor(
-          operatingMinutes * baseUtilization * weekendMultiplier * capacityMultiplier
+          operatingMinutes *
+            baseUtilization *
+            weekendMultiplier *
+            capacityMultiplier,
         );
 
         const diningRatio = 0.6 + Math.random() * 0.3;
@@ -287,16 +307,23 @@ export class MockDataGeneratorService {
         const idleMinutes = occupiedMinutes - diningMinutes;
         const emptyMinutes = operatingMinutes - occupiedMinutes;
 
-        const sessions = Math.max(1, Math.floor(occupiedMinutes / (45 + Math.random() * 30)));
-        const avgSessionDuration = sessions > 0 ? occupiedMinutes / sessions : null;
-        const avgDiningDuration = sessions > 0 ? diningMinutes / sessions : null;
+        const sessions = Math.max(
+          1,
+          Math.floor(occupiedMinutes / (45 + Math.random() * 30)),
+        );
+        const avgSessionDuration =
+          sessions > 0 ? occupiedMinutes / sessions : null;
+        const avgDiningDuration =
+          sessions > 0 ? diningMinutes / sessions : null;
         const avgIdleDuration = sessions > 0 ? idleMinutes / sessions : null;
 
         const avgOrderValueBase = 50 + Math.random() * 100;
         const ordersCount = sessions;
         const revenueGenerated = avgOrderValueBase * ordersCount;
-        const avgOrderValue = ordersCount > 0 ? revenueGenerated / ordersCount : null;
-        const revenuePerMinute = occupiedMinutes > 0 ? revenueGenerated / occupiedMinutes : null;
+        const avgOrderValue =
+          ordersCount > 0 ? revenueGenerated / ordersCount : null;
+        const revenuePerMinute =
+          occupiedMinutes > 0 ? revenueGenerated / occupiedMinutes : null;
         const utilizationScore = (occupiedMinutes / operatingMinutes) * 100;
 
         // Generate peak hours
@@ -351,7 +378,9 @@ export class MockDataGeneratorService {
       }
     }
 
-    this.logger.log(`Generated ${records.length} table analytics records for tenant ${tenantId}`);
+    this.logger.log(
+      `Generated ${records.length} table analytics records for tenant ${tenantId}`,
+    );
     return records.length;
   }
 
@@ -401,9 +430,9 @@ export class MockDataGeneratorService {
           weeklyRevenue: 450,
           potentialRevenue: 850,
         },
-        potentialImpact: 'Could increase table revenue by 45%',
+        potentialImpact: "Could increase table revenue by 45%",
         confidenceScore: 0.85,
-        status: 'NEW',
+        status: "NEW",
         validFrom: now,
         validUntil: oneWeekFromNow,
         tenantId,
@@ -416,9 +445,11 @@ export class MockDataGeneratorService {
       type: InsightType.TRAFFIC_BOTTLENECK,
       category: InsightCategory.OPERATIONAL,
       severity: InsightSeverity.INFO,
-      title: 'Congestion detected near entrance during peak hours',
-      description: 'Customer flow analysis shows significant congestion near the main entrance between 12:00-13:00 and 19:00-20:00.',
-      recommendation: 'Consider adding a waiting area or implementing a reservation system to better manage peak hour traffic.',
+      title: "Congestion detected near entrance during peak hours",
+      description:
+        "Customer flow analysis shows significant congestion near the main entrance between 12:00-13:00 and 19:00-20:00.",
+      recommendation:
+        "Consider adding a waiting area or implementing a reservation system to better manage peak hour traffic.",
       affectedTableIds: [],
       affectedAreaData: {
         x: 0,
@@ -431,9 +462,9 @@ export class MockDataGeneratorService {
         peakCongestion: 0.85,
         affectedHours: [12, 13, 19, 20],
       },
-      potentialImpact: 'Could reduce customer wait time by 40%',
+      potentialImpact: "Could reduce customer wait time by 40%",
       confidenceScore: 0.78,
-      status: 'NEW',
+      status: "NEW",
       validFrom: now,
       validUntil: oneWeekFromNow,
       tenantId,
@@ -445,9 +476,11 @@ export class MockDataGeneratorService {
       type: InsightType.CUSTOMER_BEHAVIOR,
       category: InsightCategory.CUSTOMER,
       severity: InsightSeverity.INFO,
-      title: 'Customers are staying longer after dining',
-      description: 'Average post-dining time has increased to 45 minutes, reducing table turnover during peak hours.',
-      recommendation: 'Consider offering take-away desserts or implementing subtle cues (like presenting the bill) to encourage turnover.',
+      title: "Customers are staying longer after dining",
+      description:
+        "Average post-dining time has increased to 45 minutes, reducing table turnover during peak hours.",
+      recommendation:
+        "Consider offering take-away desserts or implementing subtle cues (like presenting the bill) to encourage turnover.",
       affectedTableIds: [],
       affectedAreaData: null,
       supportingData: {
@@ -456,9 +489,9 @@ export class MockDataGeneratorService {
         targetIdleTime: 15, // minutes
         revenueImpact: -15, // percent
       },
-      potentialImpact: 'Could increase revenue by 15% during peak hours',
+      potentialImpact: "Could increase revenue by 15% during peak hours",
       confidenceScore: 0.72,
-      status: 'NEW',
+      status: "NEW",
       validFrom: now,
       validUntil: oneWeekFromNow,
       tenantId,
@@ -470,10 +503,12 @@ export class MockDataGeneratorService {
       type: InsightType.SPACE_OPTIMIZATION,
       category: InsightCategory.LAYOUT,
       severity: InsightSeverity.WARNING,
-      title: 'Dead zone detected in corner area',
-      description: 'The northeast corner of the restaurant receives minimal customer traffic and contributes only 5% of total revenue.',
-      recommendation: 'Consider adding a promotional display, bar seating, or converting to a cozy lounge area to increase utilization.',
-      affectedTableIds: tables.slice(0, 2).map(t => t.id),
+      title: "Dead zone detected in corner area",
+      description:
+        "The northeast corner of the restaurant receives minimal customer traffic and contributes only 5% of total revenue.",
+      recommendation:
+        "Consider adding a promotional display, bar seating, or converting to a cozy lounge area to increase utilization.",
+      affectedTableIds: tables.slice(0, 2).map((t) => t.id),
       affectedAreaData: {
         x: 8,
         z: 8,
@@ -485,9 +520,9 @@ export class MockDataGeneratorService {
         areaRevenuePercent: 5,
         potentialIncrease: 200, // percent
       },
-      potentialImpact: 'Could generate additional $500/day in revenue',
+      potentialImpact: "Could generate additional $500/day in revenue",
       confidenceScore: 0.81,
-      status: 'NEW',
+      status: "NEW",
       validFrom: now,
       validUntil: oneWeekFromNow,
       tenantId,
@@ -501,7 +536,9 @@ export class MockDataGeneratorService {
       });
     }
 
-    this.logger.log(`Generated ${insights.length} insights for tenant ${tenantId}`);
+    this.logger.log(
+      `Generated ${insights.length} insights for tenant ${tenantId}`,
+    );
     return insights.length;
   }
 
@@ -511,7 +548,7 @@ export class MockDataGeneratorService {
   async generateAllMockData(
     tenantId: string,
     branchId: string,
-    daysBack: number = 7
+    daysBack: number = 7,
   ): Promise<{
     occupancyRecords: number;
     trafficFlowRecords: number;
@@ -519,11 +556,28 @@ export class MockDataGeneratorService {
     insights: number;
   }> {
     const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - daysBack * 24 * 60 * 60 * 1000);
+    const startDate = new Date(
+      endDate.getTime() - daysBack * 24 * 60 * 60 * 1000,
+    );
 
-    const occupancyRecords = await this.generateOccupancyData(tenantId, branchId, startDate, endDate);
-    const trafficFlowRecords = await this.generateTrafficFlowData(tenantId, branchId, startDate, endDate);
-    const tableAnalyticsRecords = await this.generateTableAnalyticsData(tenantId, branchId, startDate, endDate);
+    const occupancyRecords = await this.generateOccupancyData(
+      tenantId,
+      branchId,
+      startDate,
+      endDate,
+    );
+    const trafficFlowRecords = await this.generateTrafficFlowData(
+      tenantId,
+      branchId,
+      startDate,
+      endDate,
+    );
+    const tableAnalyticsRecords = await this.generateTableAnalyticsData(
+      tenantId,
+      branchId,
+      startDate,
+      endDate,
+    );
     const insights = await this.generateInsights(tenantId, branchId);
 
     return {
@@ -540,12 +594,20 @@ export class MockDataGeneratorService {
   async clearAnalyticsData(tenantId: string, branchId: string): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.occupancyRecord.deleteMany({ where: { tenantId, branchId } }),
-      this.prisma.trafficFlowRecord.deleteMany({ where: { tenantId, branchId } }),
+      this.prisma.trafficFlowRecord.deleteMany({
+        where: { tenantId, branchId },
+      }),
       this.prisma.tableAnalytics.deleteMany({ where: { tenantId, branchId } }),
-      this.prisma.analyticsInsight.deleteMany({ where: { tenantId, branchId } }),
-      this.prisma.analyticsHeatmapCache.deleteMany({ where: { tenantId, branchId } }),
+      this.prisma.analyticsInsight.deleteMany({
+        where: { tenantId, branchId },
+      }),
+      this.prisma.analyticsHeatmapCache.deleteMany({
+        where: { tenantId, branchId },
+      }),
     ]);
-    this.logger.log(`Cleared analytics data for tenant ${tenantId} / branch ${branchId}`);
+    this.logger.log(
+      `Cleared analytics data for tenant ${tenantId} / branch ${branchId}`,
+    );
   }
 
   // Private helper methods
@@ -578,13 +640,19 @@ export class MockDataGeneratorService {
     return 0.3;
   }
 
-  private selectRandomTables(tables: TableInfo[], activityLevel: number): TableInfo[] {
+  private selectRandomTables(
+    tables: TableInfo[],
+    activityLevel: number,
+  ): TableInfo[] {
     const targetCount = Math.floor(tables.length * activityLevel);
     const shuffled = [...tables].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, targetCount);
   }
 
-  private generateOccupancyPoint(table: TableInfo, trackingId: string): OccupancyPoint {
+  private generateOccupancyPoint(
+    table: TableInfo,
+    trackingId: string,
+  ): OccupancyPoint {
     const offsetX = (Math.random() - 0.5) * 1.5;
     const offsetZ = (Math.random() - 0.5) * 1.5;
 

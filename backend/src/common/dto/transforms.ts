@@ -1,4 +1,4 @@
-import { Transform, TransformFnParams } from 'class-transformer';
+import { Transform, TransformFnParams } from "class-transformer";
 
 /**
  * class-validator's `@IsOptional()` only skips validation for `null` and
@@ -20,7 +20,7 @@ import { Transform, TransformFnParams } from 'class-transformer';
  */
 export const EmptyStringToUndefined = () =>
   Transform(({ value }: TransformFnParams) =>
-    typeof value === 'string' && value.trim() === '' ? undefined : value,
+    typeof value === "string" && value.trim() === "" ? undefined : value,
   );
 
 /**
@@ -45,8 +45,9 @@ export const EmptyStringToUndefined = () =>
 export const EmptyStringToNumber = () =>
   Transform(({ value }: TransformFnParams) => {
     if (value === undefined || value === null) return undefined;
-    if (typeof value === 'string' && value.trim() === '') return undefined;
-    if (typeof value === 'number') return Number.isNaN(value) ? undefined : value;
+    if (typeof value === "string" && value.trim() === "") return undefined;
+    if (typeof value === "number")
+      return Number.isNaN(value) ? undefined : value;
     const parsed = Number(value);
     return Number.isNaN(parsed) ? undefined : parsed;
   });
@@ -68,13 +69,13 @@ export const EmptyStringToNumber = () =>
  */
 export const StringToBoolean = () =>
   Transform(({ value }: TransformFnParams) => {
-    if (typeof value === 'boolean') return value;
+    if (typeof value === "boolean") return value;
     if (value === undefined || value === null) return undefined;
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       const normalized = value.trim().toLowerCase();
-      if (normalized === '') return undefined;
-      if (normalized === 'true' || normalized === '1') return true;
-      if (normalized === 'false' || normalized === '0') return false;
+      if (normalized === "") return undefined;
+      if (normalized === "true" || normalized === "1") return true;
+      if (normalized === "false" || normalized === "0") return false;
     }
     if (value === 1) return true;
     if (value === 0) return false;

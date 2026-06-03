@@ -1,11 +1,11 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { CatalogService } from '../catalog/catalog.service';
-import { TenantMarketplaceService } from '../marketplace/tenant-marketplace.service';
-import { Cart, CartQuote, PricedLine } from './checkout.types';
-import { QuoteService } from './quote.service';
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { CatalogService } from "../catalog/catalog.service";
+import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
+import { Cart, CartQuote, PricedLine } from "./checkout.types";
+import { QuoteService } from "./quote.service";
 
 /**
  * Checkout orchestrator — turns a Cart into:
@@ -42,7 +42,11 @@ export class CheckoutService {
     tenantId: string,
     cart: Cart,
     paymentRef: string | null,
-  ): Promise<{ quote: CartQuote; hardwareOrderId?: string; addOnIds: string[] }> {
+  ): Promise<{
+    quote: CartQuote;
+    hardwareOrderId?: string;
+    addOnIds: string[];
+  }> {
     const quote = await this.quoteSvc.quote(cart);
 
     // Idempotency: webhook retries and double-clicks on the success page
@@ -64,14 +68,22 @@ export class CheckoutService {
           where: { tenantId, paymentRef },
           select: { id: true },
         });
-        this.logger.log(`Idempotent confirmAndProvision hit for paymentRef=${paymentRef}`);
-        return { quote, hardwareOrderId: existing.id, addOnIds: addOnRows.map((r) => r.id) };
+        this.logger.log(
+          `Idempotent confirmAndProvision hit for paymentRef=${paymentRef}`,
+        );
+        return {
+          quote,
+          hardwareOrderId: existing.id,
+          addOnIds: addOnRows.map((r) => r.id),
+        };
       }
     }
 
-    const hardwareLines = quote.lines.filter((l) => l.type === 'hardware' || l.type === 'service');
-    const addOnLines = quote.lines.filter((l) => l.type === 'addon');
-    const planLines = quote.lines.filter((l) => l.type === 'plan');
+    const hardwareLines = quote.lines.filter(
+      (l) => l.type === "hardware" || l.type === "service",
+    );
+    const addOnLines = quote.lines.filter((l) => l.type === "addon");
+    const planLines = quote.lines.filter((l) => l.type === "plan");
 
     // v2.8.99.3 — tenant-scoped active-branch validation. The buyer
     // picked a branch in the shipping form; we trust the SPA to copy
@@ -84,7 +96,7 @@ export class CheckoutService {
     let validatedBranchId: string | null = null;
     if (cart.branchId) {
       const branch = await this.prisma.branch.findFirst({
-        where: { id: cart.branchId, tenantId, status: 'active' },
+        where: { id: cart.branchId, tenantId, status: "active" },
         select: { id: true },
       });
       if (!branch) {
@@ -112,11 +124,11 @@ export class CheckoutService {
         // order-level flag is just a quick filter.
         const onsiteServiceLines = hardwareLines.filter(
           (l) =>
-            l.type === 'service' &&
-            ((l.meta as any)?.serviceMeta?.serviceType === 'onsite' ||
+            l.type === "service" &&
+            ((l.meta as any)?.serviceMeta?.serviceType === "onsite" ||
               // Legacy fallback (the 2 hardcoded codes don't carry
               // serviceMeta from the catalog).
-              l.code.startsWith('onsite_install')),
+              l.code.startsWith("onsite_install")),
         );
         const order = await tx.hardwareOrder.create({
           data: {
@@ -128,8 +140,11 @@ export class CheckoutService {
             // history. branchId is for traceability + future
             // "orders shipping to this branch" reports.
             branchId: validatedBranchId,
-            status: paymentRef ? 'paid' : 'pending_payment',
-            subtotalCents: hardwareLines.reduce((a, l) => a + l.subtotalCents, 0),
+            status: paymentRef ? "paid" : "pending_payment",
+            subtotalCents: hardwareLines.reduce(
+              (a, l) => a + l.subtotalCents,
+              0,
+            ),
             taxCents: Math.round(
               hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) *
                 (quote.taxCents / Math.max(1, quote.subtotalCents)),
@@ -141,15 +156,16 @@ export class CheckoutService {
             currency: quote.currency,
             shippingAddress: cart.shippingAddress as any,
             billingAddress: cart.billingAddress as any,
-            installation: onsiteServiceLines.length > 0 ? 'requested' : null,
+            installation: onsiteServiceLines.length > 0 ? "requested" : null,
             paymentRef,
           },
         });
         hardwareOrderId = order.id;
 
-        for (const l of hardwareLines.filter((l) => l.type === 'hardware')) {
+        for (const l of hardwareLines.filter((l) => l.type === "hardware")) {
           const productId = (l.meta as any)?.productId as string;
-          const acquisition = ((l.meta as any)?.acquisition as 'sell' | 'rent') ?? 'sell';
+          const acquisition =
+            ((l.meta as any)?.acquisition as "sell" | "rent") ?? "sell";
           // Allocate stock inside the same tx so over-selling is impossible.
           const { serials } = await this.catalog.allocate(productId, l.qty, tx);
           await tx.hardwareOrderItem.create({
@@ -180,9 +196,10 @@ export class CheckoutService {
               tenantId,
               hwOrderId: order.id,
               branchId: (meta.branchId as string) ?? null,
-              status: 'requested',
+              status: "requested",
               preferredDates:
-                Array.isArray(meta.preferredDates) && meta.preferredDates.length > 0
+                Array.isArray(meta.preferredDates) &&
+                meta.preferredDates.length > 0
                   ? (meta.preferredDates as string[]).map((d) => new Date(d))
                   : [],
               notes:
@@ -214,16 +231,16 @@ export class CheckoutService {
         await tx.outboxEvent.create({
           data: {
             id: uuidv7(),
-            type: 'subscription.upgrade.requested.v1',
+            type: "subscription.upgrade.requested.v1",
             tenantId,
             payload: {
               tenantId,
               planCode: l.code,
-              billingCycle: (l.meta as any)?.billingCycle ?? 'MONTHLY',
+              billingCycle: (l.meta as any)?.billingCycle ?? "MONTHLY",
               paymentRef,
             } as any,
             idempotencyKey: uuidv7(),
-            status: 'queued',
+            status: "queued",
             nextAttemptAt: new Date(),
           },
         });
@@ -234,17 +251,21 @@ export class CheckoutService {
       await tx.outboxEvent.create({
         data: {
           id: uuidv7(),
-          type: 'checkout.completed.v1',
+          type: "checkout.completed.v1",
           tenantId,
           payload: {
             tenantId,
             paymentRef,
-            quote: { lines: quote.lines, totalCents: quote.totalCents, currency: quote.currency },
+            quote: {
+              lines: quote.lines,
+              totalCents: quote.totalCents,
+              currency: quote.currency,
+            },
             hardwareOrderId,
             addOnIds,
           } as any,
           idempotencyKey: uuidv7(),
-          status: 'queued',
+          status: "queued",
           nextAttemptAt: new Date(),
         },
       });
@@ -258,17 +279,19 @@ export class CheckoutService {
         await tx.outboxEvent.create({
           data: {
             id: uuidv7(),
-            type: 'hardware.order.placed.v1',
+            type: "hardware.order.placed.v1",
             tenantId,
             payload: {
               tenantId,
               hardwareOrderId,
-              totalCents: hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) + quote.shippingCents,
+              totalCents:
+                hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) +
+                quote.shippingCents,
               currency: quote.currency,
               paymentRef,
             } as any,
             idempotencyKey: uuidv7(),
-            status: 'queued',
+            status: "queued",
             nextAttemptAt: new Date(),
           },
         });

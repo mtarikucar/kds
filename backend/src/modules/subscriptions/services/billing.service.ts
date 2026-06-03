@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { InvoiceStatus } from '../../../common/constants/subscription.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
+import { randomBytes } from "crypto";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { InvoiceStatus } from "../../../common/constants/subscription.enum";
 import {
   splitGrossAmount,
   DEFAULT_KDV_RATE,
-} from '../../../common/helpers/kdv.helper';
+} from "../../../common/helpers/kdv.helper";
 
 type PrismaLike = Prisma.TransactionClient | PrismaService;
 
@@ -26,7 +26,7 @@ export class BillingService {
    * different reduced rate, and for testing.
    */
   private get kdvRate(): number {
-    const raw = this.config.get<string>('KDV_RATE');
+    const raw = this.config.get<string>("KDV_RATE");
     if (!raw) return DEFAULT_KDV_RATE;
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : DEFAULT_KDV_RATE;
@@ -42,7 +42,7 @@ export class BillingService {
   private async generateInvoiceNumber(tx: PrismaLike): Promise<string> {
     const now = new Date();
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, "0");
     const scope = `${year}${month}`;
 
     const counter = await tx.invoiceCounter.upsert({
@@ -51,8 +51,8 @@ export class BillingService {
       update: { sequence: { increment: 1 } },
     });
 
-    const sequence = String(counter.sequence).padStart(4, '0');
-    const suffix = randomBytes(3).toString('hex'); // 6 hex chars
+    const sequence = String(counter.sequence).padStart(4, "0");
+    const suffix = randomBytes(3).toString("hex"); // 6 hex chars
     return `INV-${scope}-${sequence}-${suffix}`;
   }
 
@@ -76,7 +76,7 @@ export class BillingService {
     // charged. For TRY invoices we reverse-engineer KDV; for non-TRY
     // currencies (INTERNATIONAL tenants on the EMAIL flow) we keep
     // tax at 0 since per-jurisdiction VAT is out of scope.
-    const isTurkish = currency.toUpperCase() === 'TRY';
+    const isTurkish = currency.toUpperCase() === "TRY";
     const { subtotal, tax, total } = isTurkish
       ? splitGrossAmount(amount, this.kdvRate)
       : (() => {
@@ -166,7 +166,7 @@ export class BillingService {
     const [items, total] = await Promise.all([
       this.prisma.invoice.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: { payment: true },
         skip,
         take,
@@ -175,7 +175,12 @@ export class BillingService {
     ]);
     return {
       items,
-      meta: { total, page, pageSize: take, totalPages: Math.ceil(total / take) },
+      meta: {
+        total,
+        page,
+        pageSize: take,
+        totalPages: Math.ceil(total / take),
+      },
     };
   }
 
@@ -207,7 +212,7 @@ export class BillingService {
     const [items, total] = await Promise.all([
       this.prisma.invoice.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           subscription: { include: { plan: true } },
           payment: true,
@@ -219,7 +224,12 @@ export class BillingService {
     ]);
     return {
       items,
-      meta: { total, page, pageSize: take, totalPages: Math.ceil(total / take) },
+      meta: {
+        total,
+        page,
+        pageSize: take,
+        totalPages: Math.ceil(total / take),
+      },
     };
   }
 

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsNotEmpty, IsString, MaxLength } from "class-validator";
 
 /**
  * Body for POST /superadmin/auth/refresh.
@@ -18,7 +18,7 @@ import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
  * pathological inputs.
  */
 export class SuperAdminRefreshTokenDto {
-  @ApiProperty({ description: 'Refresh token issued at the end of verify-2fa' })
+  @ApiProperty({ description: "Refresh token issued at the end of verify-2fa" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(4096)

@@ -11,26 +11,37 @@ import {
   Request,
   Query,
   ParseUUIDPipe,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { OrdersService } from '../services/orders.service';
-import { PaymentsService } from '../services/payments.service';
-import { CreateOrderDto } from '../dto/create-order.dto';
-import { UpdateOrderDto } from '../dto/update-order.dto';
-import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
-import { TransferTableOrdersDto } from '../dto/transfer-table.dto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/guards/roles.guard';
-import { TenantGuard } from '../../auth/guards/tenant.guard';
-import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
-import { CheckLimit, LimitType } from '../../subscriptions/decorators/check-limit.decorator';
-import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '../../../common/constants/roles.enum';
-import { OrderStatus } from '../../../common/constants/order-status.enum';
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+  ApiQuery,
+} from "@nestjs/swagger";
+import { OrdersService } from "../services/orders.service";
+import { PaymentsService } from "../services/payments.service";
+import { CreateOrderDto } from "../dto/create-order.dto";
+import { UpdateOrderDto } from "../dto/update-order.dto";
+import { UpdateOrderStatusDto } from "../dto/update-order-status.dto";
+import { TransferTableOrdersDto } from "../dto/transfer-table.dto";
+import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../../auth/guards/roles.guard";
+import { TenantGuard } from "../../auth/guards/tenant.guard";
+import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
+import {
+  CheckLimit,
+  LimitType,
+} from "../../subscriptions/decorators/check-limit.decorator";
+import { Roles } from "../../auth/decorators/roles.decorator";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
+import { UserRole } from "../../../common/constants/roles.enum";
+import { OrderStatus } from "../../../common/constants/order-status.enum";
 
-@ApiTags('orders')
+@ApiTags("orders")
 @ApiBearerAuth()
-@Controller('orders')
+@Controller("orders")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class OrdersController {
   constructor(
@@ -42,10 +53,10 @@ export class OrdersController {
   @UseGuards(PlanFeatureGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @CheckLimit(LimitType.MONTHLY_ORDERS)
-  @ApiOperation({ summary: 'Create a new order (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 201, description: 'Order successfully created' })
-  @ApiResponse({ status: 400, description: 'Invalid data' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiOperation({ summary: "Create a new order (ADMIN, MANAGER, WAITER)" })
+  @ApiResponse({ status: 201, description: "Order successfully created" })
+  @ApiResponse({ status: 400, description: "Invalid data" })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
   create(@Body() createOrderDto: CreateOrderDto, @Request() req) {
     return this.ordersService.create(createOrderDto, req.user.id, req.tenantId);
   }
@@ -54,32 +65,50 @@ export class OrdersController {
   // STATIC-PREFIX ROUTES (before :id wildcard)
   // ========================================
 
-  @Post('transfer-table')
+  @Post("transfer-table")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Transfer orders from one table to another (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 200, description: 'Orders successfully transferred' })
-  @ApiResponse({ status: 400, description: 'Invalid transfer request' })
-  @ApiResponse({ status: 404, description: 'Source or target table not found' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  transferTableOrders(@Body() dto: TransferTableOrdersDto, @Request() req) {
-    return this.ordersService.transferTableOrders(dto, req.tenantId);
+  @ApiOperation({
+    summary:
+      "Transfer orders from one table to another (ADMIN, MANAGER, WAITER)",
+  })
+  @ApiResponse({ status: 200, description: "Orders successfully transferred" })
+  @ApiResponse({ status: 400, description: "Invalid transfer request" })
+  @ApiResponse({ status: 404, description: "Source or target table not found" })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
+  transferTableOrders(
+    @Body() dto: TransferTableOrdersDto,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.ordersService.transferTableOrders(scope, dto);
   }
 
-  @Post('sync-table-statuses')
+  @Post("sync-table-statuses")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Sync all table statuses based on their active orders (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'Table statuses synced successfully' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  syncTableStatuses(@Request() req) {
-    return this.ordersService.syncTableStatuses(req.tenantId);
+  @ApiOperation({
+    summary:
+      "Sync all table statuses based on their active orders (ADMIN, MANAGER)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Table statuses synced successfully",
+  })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
+  syncTableStatuses(@CurrentScope() scope: BranchScope) {
+    return this.ordersService.syncTableStatuses(scope);
   }
 
-  @Get('group-bill-summary/:groupId')
+  @Get("group-bill-summary/:groupId")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Get combined bill summary for a table group' })
-  @ApiResponse({ status: 200, description: 'Group bill summary with all items' })
-  getGroupBillSummary(@Param('groupId', new ParseUUIDPipe()) groupId: string, @Request() req) {
-    return this.paymentsService.getGroupBillSummary(groupId, req.tenantId);
+  @ApiOperation({ summary: "Get combined bill summary for a table group" })
+  @ApiResponse({
+    status: 200,
+    description: "Group bill summary with all items",
+  })
+  getGroupBillSummary(
+    @Param("groupId", new ParseUUIDPipe()) groupId: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.paymentsService.getGroupBillSummary(scope, groupId);
   }
 
   // ========================================
@@ -88,25 +117,50 @@ export class OrdersController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Get all orders (ADMIN, MANAGER, WAITER)' })
-  @ApiQuery({ name: 'tableId', required: false, description: 'Filter by table ID' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by status (comma-separated for multiple: PENDING,PREPARING,READY)' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter by start date (ISO format)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter by end date (ISO format)' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number (1-based, default 1)' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Page size (default 100, max 500)' })
-  @ApiResponse({ status: 200, description: 'Paginated list of orders' })
+  @ApiOperation({ summary: "Get all orders (ADMIN, MANAGER, WAITER)" })
+  @ApiQuery({
+    name: "tableId",
+    required: false,
+    description: "Filter by table ID",
+  })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    description:
+      "Filter by status (comma-separated for multiple: PENDING,PREPARING,READY)",
+  })
+  @ApiQuery({
+    name: "startDate",
+    required: false,
+    description: "Filter by start date (ISO format)",
+  })
+  @ApiQuery({
+    name: "endDate",
+    required: false,
+    description: "Filter by end date (ISO format)",
+  })
+  @ApiQuery({
+    name: "page",
+    required: false,
+    description: "Page number (1-based, default 1)",
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "Page size (default 100, max 500)",
+  })
+  @ApiResponse({ status: 200, description: "Paginated list of orders" })
   findAll(
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     // Iter-87: ParseUUIDPipe rejects non-UUID tableId at the boundary
     // so Prisma never sees a malformed value (the UUID column would
     // throw P2023 and surface as a confusing 500).
-    @Query('tableId', new ParseUUIDPipe({ optional: true })) tableId?: string,
-    @Query('status') status?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query("tableId", new ParseUUIDPipe({ optional: true })) tableId?: string,
+    @Query("status") status?: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
   ) {
     // Iter-87: parse + validate each query param explicitly. Pre-fix
     // status was `split(',').map(trim) as OrderStatus[]` — the cast
@@ -119,13 +173,13 @@ export class OrdersController {
     if (status) {
       const allowed = new Set<string>(Object.values(OrderStatus));
       statuses = status
-        .split(',')
+        .split(",")
         .map((s) => s.trim())
         .filter(Boolean) as OrderStatus[];
       const invalid = statuses.filter((s) => !allowed.has(s));
       if (invalid.length > 0) {
         throw new BadRequestException(
-          `status must be one of: ${[...allowed].join(', ')} (invalid: ${invalid.join(', ')})`,
+          `status must be one of: ${[...allowed].join(", ")} (invalid: ${invalid.join(", ")})`,
         );
       }
     }
@@ -133,100 +187,127 @@ export class OrdersController {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
     if (start && Number.isNaN(start.getTime())) {
-      throw new BadRequestException('startDate must be a valid ISO-8601 date string');
+      throw new BadRequestException(
+        "startDate must be a valid ISO-8601 date string",
+      );
     }
     if (end && Number.isNaN(end.getTime())) {
-      throw new BadRequestException('endDate must be a valid ISO-8601 date string');
+      throw new BadRequestException(
+        "endDate must be a valid ISO-8601 date string",
+      );
     }
 
     const pageNum = page ? Math.max(1, parseInt(page, 10) || 1) : 1;
     const limitNum = limit ? parseInt(limit, 10) || 100 : 100;
     const take = limitNum;
     const skip = (pageNum - 1) * limitNum;
-    return this.ordersService.findAll(req.tenantId, tableId, statuses, start, end, take, skip);
+    return this.ordersService.findAll(
+      scope,
+      tableId,
+      statuses,
+      start,
+      end,
+      take,
+      skip,
+    );
   }
 
-  @Get(':id')
+  @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Get an order by ID (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 200, description: 'Order details' })
-  @ApiResponse({ status: 404, description: 'Order not found' })
-  findOne(@Param('id') id: string, @Request() req) {
-    return this.ordersService.findOne(id, req.tenantId);
+  @ApiOperation({ summary: "Get an order by ID (ADMIN, MANAGER, WAITER)" })
+  @ApiResponse({ status: 200, description: "Order details" })
+  @ApiResponse({ status: 404, description: "Order not found" })
+  findOne(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.ordersService.findOne(scope, id);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Update an order (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 200, description: 'Order successfully updated' })
-  @ApiResponse({ status: 404, description: 'Order not found' })
-  @ApiResponse({ status: 400, description: 'Cannot update paid or cancelled orders' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiOperation({ summary: "Update an order (ADMIN, MANAGER, WAITER)" })
+  @ApiResponse({ status: 200, description: "Order successfully updated" })
+  @ApiResponse({ status: 404, description: "Order not found" })
+  @ApiResponse({
+    status: 400,
+    description: "Cannot update paid or cancelled orders",
+  })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
   update(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() updateOrderDto: UpdateOrderDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.ordersService.update(id, updateOrderDto, req.tenantId);
+    return this.ordersService.update(scope, id, updateOrderDto);
   }
 
-  @Patch(':id/status')
+  @Patch(":id/status")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Update order status (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 200, description: 'Order status successfully updated' })
-  @ApiResponse({ status: 404, description: 'Order not found' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiOperation({ summary: "Update order status (ADMIN, MANAGER, WAITER)" })
+  @ApiResponse({
+    status: 200,
+    description: "Order status successfully updated",
+  })
+  @ApiResponse({ status: 404, description: "Order not found" })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
   updateStatus(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() updateStatusDto: UpdateOrderStatusDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.ordersService.updateStatus(id, updateStatusDto, req.tenantId);
+    return this.ordersService.updateStatus(scope, id, updateStatusDto);
   }
 
-  @Post(':id/approve')
+  @Post(":id/approve")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Approve a pending customer order (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 200, description: 'Order successfully approved' })
-  @ApiResponse({ status: 404, description: 'Order not found' })
-  @ApiResponse({ status: 400, description: 'Order is not pending approval' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  approveOrder(@Param('id') id: string, @Request() req) {
-    return this.ordersService.approveOrder(id, req.user.id, req.tenantId);
+  @ApiOperation({
+    summary: "Approve a pending customer order (ADMIN, MANAGER, WAITER)",
+  })
+  @ApiResponse({ status: 200, description: "Order successfully approved" })
+  @ApiResponse({ status: 404, description: "Order not found" })
+  @ApiResponse({ status: 400, description: "Order is not pending approval" })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
+  approveOrder(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.ordersService.approveOrder(scope, id);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Delete an order (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'Order successfully deleted' })
-  @ApiResponse({ status: 404, description: 'Order not found' })
-  @ApiResponse({ status: 400, description: 'Can only delete pending or cancelled orders' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  remove(@Param('id') id: string, @Request() req) {
-    return this.ordersService.remove(id, req.tenantId);
+  @ApiOperation({ summary: "Delete an order (ADMIN, MANAGER)" })
+  @ApiResponse({ status: 200, description: "Order successfully deleted" })
+  @ApiResponse({ status: 404, description: "Order not found" })
+  @ApiResponse({
+    status: 400,
+    description: "Can only delete pending or cancelled orders",
+  })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
+  remove(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.ordersService.remove(scope, id);
   }
 
-  @Delete(':orderId/items/:itemId')
+  @Delete(":orderId/items/:itemId")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({
     summary:
-      'Remove a single OrderItem (preserves OrderItemPayment allocations on other items)',
+      "Remove a single OrderItem (preserves OrderItemPayment allocations on other items)",
   })
-  @ApiResponse({ status: 200, description: 'Item removed, order totals recalculated' })
-  @ApiResponse({ status: 404, description: 'Order or item not found' })
+  @ApiResponse({
+    status: 200,
+    description: "Item removed, order totals recalculated",
+  })
+  @ApiResponse({ status: 404, description: "Order or item not found" })
   @ApiResponse({
     status: 400,
-    description: 'Order is paid/cancelled/awaiting approval, or last item being removed',
+    description:
+      "Order is paid/cancelled/awaiting approval, or last item being removed",
   })
   @ApiResponse({
     status: 409,
-    description: 'Item has partial per-item payments — refund first',
+    description: "Item has partial per-item payments — refund first",
   })
   removeItem(
-    @Param('orderId') orderId: string,
-    @Param('itemId') itemId: string,
-    @Request() req,
+    @Param("orderId") orderId: string,
+    @Param("itemId") itemId: string,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.ordersService.removeItem(orderId, itemId, req.tenantId);
+    return this.ordersService.removeItem(scope, orderId, itemId);
   }
 }

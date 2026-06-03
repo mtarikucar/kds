@@ -7,10 +7,10 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { RecipeIngredientDto } from './create-recipe.dto';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { RecipeIngredientDto } from "./create-recipe.dto";
 
 // Iter-93: keep same caps as Create. Update can replace the ingredients
 // list outright; the size guard still applies.
@@ -19,19 +19,22 @@ const RECIPE_NAME_MAX = 200;
 const RECIPE_NOTES_MAX = 2000;
 
 export class UpdateRecipeDto {
-  @ApiPropertyOptional({ description: 'Recipe name' })
+  @ApiPropertyOptional({ description: "Recipe name" })
   @IsString()
   @IsOptional()
   @MaxLength(RECIPE_NAME_MAX)
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Recipe notes' })
+  @ApiPropertyOptional({ description: "Recipe notes" })
   @IsString()
   @IsOptional()
   @MaxLength(RECIPE_NOTES_MAX)
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'Number of portions this recipe makes', minimum: 1 })
+  @ApiPropertyOptional({
+    description: "Number of portions this recipe makes",
+    minimum: 1,
+  })
   @IsNumber()
   @Min(1)
   @IsOptional()
@@ -39,7 +42,7 @@ export class UpdateRecipeDto {
 
   @ApiPropertyOptional({
     type: [RecipeIngredientDto],
-    description: 'Replace all ingredients (stockItemId must be unique)',
+    description: "Replace all ingredients (stockItemId must be unique)",
     maxItems: MAX_RECIPE_INGREDIENTS,
   })
   @IsArray()

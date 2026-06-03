@@ -1,9 +1,9 @@
-import { Prisma, PrismaClient } from '@prisma/client';
-import { randomBytes } from 'crypto';
+import { Prisma, PrismaClient } from "@prisma/client";
+import { randomBytes } from "crypto";
 import {
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_QUARANTINE_DAYS,
-} from '../constants/subdomain.const';
+} from "../constants/subdomain.const";
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
@@ -31,7 +31,7 @@ export async function isSubdomainQuarantined(
 export async function reserveSubdomain(
   prisma: PrismaLike,
   subdomain: string,
-  reason: 'tenant_deleted' | 'tenant_suspended' | 'subdomain_changed',
+  reason: "tenant_deleted" | "tenant_suspended" | "subdomain_changed",
 ): Promise<void> {
   const availableAfter = new Date();
   availableAfter.setDate(availableAfter.getDate() + SUBDOMAIN_QUARANTINE_DAYS);
@@ -48,5 +48,5 @@ export async function reserveSubdomain(
  * when generating a subdomain from a human-readable name.
  */
 export function randomSubdomainSuffix(): string {
-  return randomBytes(4).toString('hex').slice(0, 6);
+  return randomBytes(4).toString("hex").slice(0, 6);
 }

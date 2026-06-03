@@ -3,17 +3,17 @@ import {
   ExecutionContext,
   UnauthorizedException,
   CanActivate,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { IS_SUPERADMIN_PUBLIC_KEY } from '../decorators/superadmin.decorator';
-import { PrismaService } from '../../../prisma/prisma.service';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { IS_SUPERADMIN_PUBLIC_KEY } from "../decorators/superadmin.decorator";
+import { PrismaService } from "../../../prisma/prisma.service";
 
 export interface SuperAdminJwtPayload {
   sub: string;
   email: string;
-  type: 'superadmin';
+  type: "superadmin";
   /** Token version carried at mint time. Must equal the live value on
    * the SuperAdmin row, otherwise the token is rejected (force-logout
    * on password/2FA change, explicit logout, etc.). */
@@ -43,20 +43,20 @@ export class SuperAdminGuard implements CanActivate {
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
-      throw new UnauthorizedException('No token provided');
+      throw new UnauthorizedException("No token provided");
     }
 
     try {
       const payload = await this.jwtService.verifyAsync<SuperAdminJwtPayload>(
         token,
         {
-          secret: this.configService.get<string>('SUPERADMIN_JWT_SECRET'),
-          algorithms: ['HS256'],
+          secret: this.configService.get<string>("SUPERADMIN_JWT_SECRET"),
+          algorithms: ["HS256"],
         },
       );
 
-      if (payload.type !== 'superadmin') {
-        throw new UnauthorizedException('Invalid token type');
+      if (payload.type !== "superadmin") {
+        throw new UnauthorizedException("Invalid token type");
       }
 
       const superAdmin = await this.prisma.superAdmin.findUnique({
@@ -72,12 +72,15 @@ export class SuperAdminGuard implements CanActivate {
         },
       });
 
-      if (!superAdmin || superAdmin.status !== 'ACTIVE') {
-        throw new UnauthorizedException('SuperAdmin not found or inactive');
+      if (!superAdmin || superAdmin.status !== "ACTIVE") {
+        throw new UnauthorizedException("SuperAdmin not found or inactive");
       }
 
-      if (typeof payload.ver === 'number' && payload.ver !== superAdmin.tokenVersion) {
-        throw new UnauthorizedException('Session revoked');
+      if (
+        typeof payload.ver === "number" &&
+        payload.ver !== superAdmin.tokenVersion
+      ) {
+        throw new UnauthorizedException("Session revoked");
       }
 
       request.superAdmin = superAdmin;
@@ -86,12 +89,12 @@ export class SuperAdminGuard implements CanActivate {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException("Invalid token");
     }
   }
 
   private extractTokenFromHeader(request: any): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    const [type, token] = request.headers.authorization?.split(" ") ?? [];
+    return type === "Bearer" ? token : undefined;
   }
 }

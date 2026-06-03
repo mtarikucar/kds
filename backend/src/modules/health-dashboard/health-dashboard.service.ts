@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
 
 /**
  * Branch-health score. The number ops actually wants on their dashboard.
@@ -30,11 +30,12 @@ export class HealthDashboardService {
       where: { id: branchId, tenantId },
       select: { id: true },
     });
-    if (!branch) throw new NotFoundException('Branch not found for this tenant');
+    if (!branch)
+      throw new NotFoundException("Branch not found for this tenant");
 
     const [devices, lastFiscal, lastOrder] = await Promise.all([
       this.prisma.device.findMany({
-        where: { tenantId, branchId, status: { notIn: ['retired'] } },
+        where: { tenantId, branchId, status: { notIn: ["retired"] } },
         select: { status: true },
       }),
       // Iter-65: scope by branch. FiscalReceipt has no direct branchId,
@@ -46,38 +47,47 @@ export class HealthDashboardService {
       this.prisma.fiscalReceipt.findFirst({
         where: {
           tenantId,
-          status: 'issued',
+          status: "issued",
           fiscalDevice: { branchId },
         },
-        orderBy: { issuedAt: 'desc' },
+        orderBy: { issuedAt: "desc" },
         select: { issuedAt: true },
       }),
       // Iter-65: Order has a direct branchId, just add it to the WHERE.
       // Same misleading-aggregate concern as the fiscal lookup above.
       this.prisma.order.findFirst({
         where: { tenantId, branchId },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),
     ]);
 
-    const onlinePct = devices.length === 0
-      ? 1
-      : devices.filter((d) => d.status === 'online').length / devices.length;
+    const onlinePct =
+      devices.length === 0
+        ? 1
+        : devices.filter((d) => d.status === "online").length / devices.length;
 
     const minutesSince = (d?: Date | null) =>
-      d ? Math.max(0, (Date.now() - new Date(d).getTime()) / 60_000) : Number.POSITIVE_INFINITY;
+      d
+        ? Math.max(0, (Date.now() - new Date(d).getTime()) / 60_000)
+        : Number.POSITIVE_INFINITY;
 
     const fiscalAge = minutesSince(lastFiscal?.issuedAt ?? null);
     const orderAge = minutesSince(lastOrder?.createdAt ?? null);
 
     // Linear penalty above thresholds, floor at 0.
-    const fiscalScore = fiscalAge === Number.POSITIVE_INFINITY ? 0.5 : Math.max(0, 1 - Math.max(0, fiscalAge - 60) / 240);
-    const orderScore = orderAge === Number.POSITIVE_INFINITY ? 0.5 : Math.max(0, 1 - Math.max(0, orderAge - 15) / 120);
+    const fiscalScore =
+      fiscalAge === Number.POSITIVE_INFINITY
+        ? 0.5
+        : Math.max(0, 1 - Math.max(0, fiscalAge - 60) / 240);
+    const orderScore =
+      orderAge === Number.POSITIVE_INFINITY
+        ? 0.5
+        : Math.max(0, 1 - Math.max(0, orderAge - 15) / 120);
 
     const composite = (onlinePct + fiscalScore + orderScore) / 3;
     const score = Math.round(composite * 100);
-    const pill = score >= 85 ? 'green' : score >= 60 ? 'yellow' : 'red';
+    const pill = score >= 85 ? "green" : score >= 60 ? "yellow" : "red";
 
     return {
       branchId,
@@ -85,8 +95,12 @@ export class HealthDashboardService {
       pill,
       breakdown: {
         devicesOnlinePct: Math.round(onlinePct * 100),
-        fiscalAgeMinutes: Number.isFinite(fiscalAge) ? Math.round(fiscalAge) : null,
-        orderAgeMinutes: Number.isFinite(orderAge) ? Math.round(orderAge) : null,
+        fiscalAgeMinutes: Number.isFinite(fiscalAge)
+          ? Math.round(fiscalAge)
+          : null,
+        orderAgeMinutes: Number.isFinite(orderAge)
+          ? Math.round(orderAge)
+          : null,
       },
       countedDevices: devices.length,
     };
@@ -94,10 +108,12 @@ export class HealthDashboardService {
 
   async tenantOverview(tenantId: string) {
     const branches = await this.prisma.branch.findMany({
-      where: { tenantId, status: 'active' },
+      where: { tenantId, status: "active" },
       select: { id: true, name: true },
     });
-    const scores = await Promise.all(branches.map((b) => this.branchScore(tenantId, b.id)));
+    const scores = await Promise.all(
+      branches.map((b) => this.branchScore(tenantId, b.id)),
+    );
     return branches.map((b, i) => ({ ...b, health: scores[i] }));
   }
 }

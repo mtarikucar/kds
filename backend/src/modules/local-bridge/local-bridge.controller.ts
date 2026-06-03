@@ -1,24 +1,34 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
-import { Public } from '../auth/decorators/public.decorator';
-import { LocalBridgeService } from './local-bridge.service';
-import { BridgeTokenGuard } from './bridge-token.guard';
-import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
-import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
-import { PlanFeature } from '../../common/constants/subscription.enum';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
+import { Public } from "../auth/decorators/public.decorator";
+import { LocalBridgeService } from "./local-bridge.service";
+import { BridgeTokenGuard } from "./bridge-token.guard";
+import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
+import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
+import { PlanFeature } from "../../common/constants/subscription.enum";
 import {
   BridgeHeartbeatDto,
   ClaimBridgeDto,
   CreateBridgeSlotDto,
-} from './dto/local-bridge.dto';
+} from "./dto/local-bridge.dto";
 
-@ApiTags('Local Bridge')
-@Controller('v1/bridges')
+@ApiTags("Local Bridge")
+@Controller("v1/bridges")
 export class LocalBridgeController {
   constructor(private readonly bridges: LocalBridgeService) {}
 
@@ -33,7 +43,7 @@ export class LocalBridgeController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Get()
-  list(@Req() req: any, @Query('branchId') branchId?: string) {
+  list(@Req() req: any, @Query("branchId") branchId?: string) {
     return this.bridges.list(req.user.tenantId, branchId);
   }
 
@@ -45,7 +55,10 @@ export class LocalBridgeController {
   @RequiresFeature(PlanFeature.MULTI_LOCATION)
   @ApiBearerAuth()
   @Post()
-  @ApiOperation({ summary: 'Provision a new bridge slot — returns provisioning token (shown once) (ADMIN only)' })
+  @ApiOperation({
+    summary:
+      "Provision a new bridge slot — returns provisioning token (shown once) (ADMIN only)",
+  })
   createSlot(@Req() req: any, @Body() body: CreateBridgeSlotDto) {
     return this.bridges.createSlot(req.user.tenantId, body);
   }
@@ -53,8 +66,8 @@ export class LocalBridgeController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @Delete(':id')
-  retire(@Req() req: any, @Param('id') id: string) {
+  @Delete(":id")
+  retire(@Req() req: any, @Param("id") id: string) {
     return this.bridges.retire(req.user.tenantId, id);
   }
 
@@ -68,15 +81,20 @@ export class LocalBridgeController {
   // relaxed in a future refactor. A legitimate bridge claims exactly
   // once per provisioning.
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @Post('claim')
-  @ApiOperation({ summary: 'Bridge exchanges provisioning token for a long-lived bearer token' })
+  @Post("claim")
+  @ApiOperation({
+    summary:
+      "Bridge exchanges provisioning token for a long-lived bearer token",
+  })
   claim(@Body() body: ClaimBridgeDto) {
     return this.bridges.claim(body);
   }
 
   @UseGuards(BridgeTokenGuard)
-  @Post('heartbeat')
-  @ApiOperation({ summary: 'Bridge heartbeat. Auth: Authorization: Bridge <token>' })
+  @Post("heartbeat")
+  @ApiOperation({
+    summary: "Bridge heartbeat. Auth: Authorization: Bridge <token>",
+  })
   heartbeat(@Req() req: any, @Body() body: BridgeHeartbeatDto) {
     return this.bridges.heartbeat(req.bridge.id, body);
   }

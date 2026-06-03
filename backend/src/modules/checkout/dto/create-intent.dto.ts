@@ -7,10 +7,10 @@ import {
   Matches,
   MaxLength,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CartDto } from './cart.dto';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { CartDto } from "./cart.dto";
 
 // v2.8.85 — input contract for `POST /v1/checkout/intent`.
 //
@@ -50,7 +50,7 @@ export class CheckoutBuyerDto {
   @IsNotEmpty()
   @MaxLength(PHONE_MAX)
   @Matches(/^[+()\d\s-]{6,32}$/, {
-    message: 'phone must contain digits, spaces, +, -, () only',
+    message: "phone must contain digits, spaces, +, -, () only",
   })
   phone!: string;
 
@@ -90,7 +90,10 @@ export class CreateCheckoutIntentDto {
   // checkout.service.confirmAndProvision. Optional because the manual
   // address mode and non-hardware checkouts (plan/addon-only) don't
   // carry a branch reference.
-  @ApiPropertyOptional({ description: 'Tenant-owned branch the order ships to (snapshot only — see checkout.service)' })
+  @ApiPropertyOptional({
+    description:
+      "Tenant-owned branch the order ships to (snapshot only — see checkout.service)",
+  })
   @IsOptional()
   @IsUUID()
   branchId?: string;

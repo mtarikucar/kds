@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { CatalogService } from '../catalog/catalog.service';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { CatalogService } from "../catalog/catalog.service";
 
 /**
  * Shipment + warranty + installation orchestration for hardware orders.
@@ -21,13 +25,20 @@ export class ShipmentService {
   ) {}
 
   /** Create a shipment for an order. Marks order status=shipped. */
-  async createShipment(hardwareOrderId: string, input: { carrier: string; trackingNo?: string; meta?: Record<string, unknown> }) {
+  async createShipment(
+    hardwareOrderId: string,
+    input: {
+      carrier: string;
+      trackingNo?: string;
+      meta?: Record<string, unknown>;
+    },
+  ) {
     const order = await this.prisma.hardwareOrder.findUnique({
       where: { id: hardwareOrderId },
       include: { items: true },
     });
-    if (!order) throw new NotFoundException('Hardware order not found');
-    if (order.status !== 'paid' && order.status !== 'fulfillment') {
+    if (!order) throw new NotFoundException("Hardware order not found");
+    if (order.status !== "paid" && order.status !== "fulfillment") {
       throw new BadRequestException(`Cannot ship from status=${order.status}`);
     }
 
@@ -37,7 +48,7 @@ export class ShipmentService {
         orderId: hardwareOrderId,
         carrier: input.carrier,
         trackingNo: input.trackingNo,
-        status: input.trackingNo ? 'in_transit' : 'pending',
+        status: input.trackingNo ? "in_transit" : "pending",
         shippedAt: input.trackingNo ? new Date() : null,
         meta: input.meta as any,
       },
@@ -50,14 +61,19 @@ export class ShipmentService {
 
     await this.prisma.hardwareOrder.update({
       where: { id: hardwareOrderId },
-      data: { status: input.trackingNo ? 'shipped' : 'fulfillment' },
+      data: { status: input.trackingNo ? "shipped" : "fulfillment" },
     });
 
     await this.outbox
       .append({
-        type: 'hardware.order.shipped.v1',
+        type: "hardware.order.shipped.v1",
         tenantId: order.tenantId,
-        payload: { orderId: hardwareOrderId, shipmentId: shipment.id, carrier: input.carrier, trackingNo: input.trackingNo },
+        payload: {
+          orderId: hardwareOrderId,
+          shipmentId: shipment.id,
+          carrier: input.carrier,
+          trackingNo: input.trackingNo,
+        },
       })
       .catch(() => undefined);
 
@@ -82,26 +98,28 @@ export class ShipmentService {
         : { shipments: { some: { id: shipmentId } } },
       select: { id: true, tenantId: true },
     });
-    if (!order) throw new NotFoundException('Shipment not found');
+    if (!order) throw new NotFoundException("Shipment not found");
 
-    const s = await this.prisma.shipment.findUnique({ where: { id: shipmentId } });
-    if (!s) throw new NotFoundException('Shipment not found');
-    if (s.status === 'delivered') return s;
+    const s = await this.prisma.shipment.findUnique({
+      where: { id: shipmentId },
+    });
+    if (!s) throw new NotFoundException("Shipment not found");
+    if (s.status === "delivered") return s;
 
     const updated = await this.prisma.shipment.update({
       where: { id: shipmentId },
-      data: { status: 'delivered', deliveredAt: new Date() },
+      data: { status: "delivered", deliveredAt: new Date() },
     });
     // Order is already tenant-validated by the findFirst above; reuse the
     // resolved order.id rather than re-routing through shipment.orderId.
     await this.prisma.hardwareOrder.update({
       where: { id: order.id },
-      data: { status: 'delivered' },
+      data: { status: "delivered" },
     });
 
     await this.outbox
       .append({
-        type: 'hardware.order.delivered.v1',
+        type: "hardware.order.delivered.v1",
         tenantId: order.tenantId,
         payload: { orderId: order.id, shipmentId },
       })
@@ -111,6 +129,9 @@ export class ShipmentService {
   }
 
   listForOrder(hardwareOrderId: string) {
-    return this.prisma.shipment.findMany({ where: { orderId: hardwareOrderId }, orderBy: { id: 'asc' } });
+    return this.prisma.shipment.findMany({
+      where: { orderId: hardwareOrderId },
+      orderBy: { id: "asc" },
+    });
   }
 }

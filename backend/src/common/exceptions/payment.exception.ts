@@ -1,16 +1,19 @@
-import { HttpStatus } from '@nestjs/common';
-import { BusinessException } from './business.exception';
-import { ErrorCode } from '../interfaces/error-response.interface';
+import { HttpStatus } from "@nestjs/common";
+import { BusinessException } from "./business.exception";
+import { ErrorCode } from "../interfaces/error-response.interface";
 
 /**
  * Payment failed exception
  */
 export class PaymentFailedException extends BusinessException {
   constructor(reason?: string, details?: any) {
-    const message = reason
-      ? `Payment failed: ${reason}`
-      : 'Payment failed';
-    super(message, ErrorCode.PAYMENT_FAILED, HttpStatus.PAYMENT_REQUIRED, details);
+    const message = reason ? `Payment failed: ${reason}` : "Payment failed";
+    super(
+      message,
+      ErrorCode.PAYMENT_FAILED,
+      HttpStatus.PAYMENT_REQUIRED,
+      details,
+    );
   }
 }
 
@@ -35,7 +38,7 @@ export class InvalidPaymentMethodException extends BusinessException {
   constructor(method?: string) {
     const message = method
       ? `Invalid payment method: ${method}`
-      : 'Invalid payment method';
+      : "Invalid payment method";
     super(message, ErrorCode.INVALID_PAYMENT_METHOD, HttpStatus.BAD_REQUEST);
   }
 }

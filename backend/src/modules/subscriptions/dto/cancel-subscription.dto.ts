@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from "class-validator";
 
 /**
  * Body for POST /subscriptions/:id/cancel.

@@ -3,12 +3,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
-import { normalizePhone } from './customers.helpers';
-import { paginated } from '../../common/pagination';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateCustomerDto, UpdateCustomerDto } from "./dto/customer.dto";
+import { normalizePhone } from "./customers.helpers";
+import { paginated } from "../../common/pagination";
 
 const WAITER_CUSTOMER_SELECT = {
   id: true,
@@ -56,28 +56,28 @@ export class CustomersService {
     // a 1MB string would otherwise trigger a 3 × 1MB ILIKE-scan per
     // customer row (10K rows → 30GB of comparison work).
     if (opts.search && opts.search.length > 200) {
-      throw new BadRequestException('search must be 200 chars or less');
+      throw new BadRequestException("search must be 200 chars or less");
     }
 
     const where: Prisma.CustomerWhereInput = { tenantId };
     if (opts.search) {
       const term = opts.search.trim();
       where.OR = [
-        { name: { contains: term, mode: 'insensitive' } },
+        { name: { contains: term, mode: "insensitive" } },
         { phone: { contains: term } },
-        { email: { contains: term, mode: 'insensitive' } },
+        { email: { contains: term, mode: "insensitive" } },
       ];
     }
 
     // Front-of-house roles get a trimmed projection — WAITER doesn't need
     // totalSpent, birthday, preferences or notes on the POS customer list.
-    const isPrivileged = role === 'ADMIN' || role === 'MANAGER';
+    const isPrivileged = role === "ADMIN" || role === "MANAGER";
     const select = isPrivileged ? undefined : WAITER_CUSTOMER_SELECT;
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.customer.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
         ...(select ? { select } : {}),
@@ -91,9 +91,9 @@ export class CustomersService {
   async findOne(id: string, tenantId: string) {
     const customer = await this.prisma.customer.findFirst({
       where: { id, tenantId },
-      include: { orders: { take: 10, orderBy: { createdAt: 'desc' } } },
+      include: { orders: { take: 10, orderBy: { createdAt: "desc" } } },
     });
-    if (!customer) throw new NotFoundException('Customer not found');
+    if (!customer) throw new NotFoundException("Customer not found");
     return customer;
   }
 
@@ -111,14 +111,16 @@ export class CustomersService {
         }),
       },
     });
-    if (result.count !== 1) throw new NotFoundException('Customer not found');
+    if (result.count !== 1) throw new NotFoundException("Customer not found");
     return this.prisma.customer.findFirst({ where: { id, tenantId } });
   }
 
   async remove(id: string, tenantId: string) {
     try {
-      const result = await this.prisma.customer.deleteMany({ where: { id, tenantId } });
-      if (result.count !== 1) throw new NotFoundException('Customer not found');
+      const result = await this.prisma.customer.deleteMany({
+        where: { id, tenantId },
+      });
+      if (result.count !== 1) throw new NotFoundException("Customer not found");
       return { id, deleted: true };
     } catch (err) {
       // LoyaltyTransaction.customer onDelete is Restrict (migration
@@ -129,10 +131,10 @@ export class CustomersService {
       // (tracked as a deferred follow-up).
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
+        err.code === "P2003"
       ) {
         throw new ConflictException(
-          'Cannot delete a customer with loyalty history. Anonymize the record instead.',
+          "Cannot delete a customer with loyalty history. Anonymize the record instead.",
         );
       }
       throw err;
@@ -181,7 +183,7 @@ export class CustomersService {
       // of surfacing a 500 to the caller.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
         const recovered = await this.prisma.customer.findFirst({
           where: { phone: canonical, tenantId },
@@ -196,45 +198,60 @@ export class CustomersService {
     return this.prisma.customer.findFirst({
       where: { phone: normalizePhone(phone), tenantId },
       include: {
-        orders: { take: 10, orderBy: { createdAt: 'desc' } },
-        loyaltyTransactions: { take: 10, orderBy: { createdAt: 'desc' } },
+        orders: { take: 10, orderBy: { createdAt: "desc" } },
+        loyaltyTransactions: { take: 10, orderBy: { createdAt: "desc" } },
       },
     });
   }
 
-  async updateStatistics(customerId: string, tenantId: string, orderAmount: number | Prisma.Decimal) {
+  async updateStatistics(
+    customerId: string,
+    tenantId: string,
+    orderAmount: number | Prisma.Decimal,
+  ) {
     // Serializable isolation: the read-modify-write below is a classic
     // lost-update target — two concurrent orders for the same customer
     // would each read totalOrders=N, both write N+1, and the database
     // would land at N+1 instead of N+2. Postgres' default READ
     // COMMITTED doesn't catch this; Serializable does (the second tx
     // gets a 40001 and Prisma retries it).
-    return this.prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findFirst({
-        where: { id: customerId, tenantId },
-      });
-      if (!customer) throw new NotFoundException('Customer not found');
+    return this.prisma.$transaction(
+      async (tx) => {
+        const customer = await tx.customer.findFirst({
+          where: { id: customerId, tenantId },
+        });
+        if (!customer) throw new NotFoundException("Customer not found");
 
-      const amount = new Prisma.Decimal(orderAmount);
-      const newTotalOrders = customer.totalOrders + 1;
-      const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(amount);
-      const newAverageOrder = newTotalSpent.div(newTotalOrders);
+        const amount = new Prisma.Decimal(orderAmount);
+        const newTotalOrders = customer.totalOrders + 1;
+        const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(
+          amount,
+        );
+        const newAverageOrder = newTotalSpent.div(newTotalOrders);
 
-      const result = await tx.customer.updateMany({
-        where: { id: customerId, tenantId },
-        data: {
-          totalOrders: newTotalOrders,
-          totalSpent: newTotalSpent,
-          averageOrder: newAverageOrder,
-          lastVisit: new Date(),
-        },
-      });
-      if (result.count !== 1) throw new BadRequestException('Customer update race');
-      return tx.customer.findFirstOrThrow({ where: { id: customerId, tenantId } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        const result = await tx.customer.updateMany({
+          where: { id: customerId, tenantId },
+          data: {
+            totalOrders: newTotalOrders,
+            totalSpent: newTotalSpent,
+            averageOrder: newAverageOrder,
+            lastVisit: new Date(),
+          },
+        });
+        if (result.count !== 1)
+          throw new BadRequestException("Customer update race");
+        return tx.customer.findFirstOrThrow({
+          where: { id: customerId, tenantId },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
-  async getAnalytics(tenantId: string, options?: { startDate?: Date; endDate?: Date }) {
+  async getAnalytics(
+    tenantId: string,
+    options?: { startDate?: Date; endDate?: Date },
+  ) {
     const whereNew: Prisma.CustomerWhereInput = { tenantId };
     if (options?.startDate || options?.endDate) {
       whereNew.createdAt = {};
@@ -242,29 +259,31 @@ export class CustomersService {
       if (options.endDate) whereNew.createdAt.lte = options.endDate;
     }
 
-    const [totalCustomers, newCustomers, topCustomers, avg] = await Promise.all([
-      this.prisma.customer.count({ where: { tenantId } }),
-      this.prisma.customer.count({ where: whereNew }),
-      this.prisma.customer.findMany({
-        where: { tenantId },
-        orderBy: { totalSpent: 'desc' },
-        take: 10,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          totalOrders: true,
-          totalSpent: true,
-          averageOrder: true,
-          loyaltyPoints: true,
-        },
-      }),
-      this.prisma.customer.aggregate({
-        where: { tenantId },
-        _avg: { totalSpent: true },
-      }),
-    ]);
+    const [totalCustomers, newCustomers, topCustomers, avg] = await Promise.all(
+      [
+        this.prisma.customer.count({ where: { tenantId } }),
+        this.prisma.customer.count({ where: whereNew }),
+        this.prisma.customer.findMany({
+          where: { tenantId },
+          orderBy: { totalSpent: "desc" },
+          take: 10,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            totalOrders: true,
+            totalSpent: true,
+            averageOrder: true,
+            loyaltyPoints: true,
+          },
+        }),
+        this.prisma.customer.aggregate({
+          where: { tenantId },
+          _avg: { totalSpent: true },
+        }),
+      ],
+    );
 
     return {
       totalCustomers,
@@ -279,7 +298,7 @@ export class CustomersService {
       where: { id: customerId, tenantId },
       include: {
         orders: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 20,
           select: {
             id: true,
@@ -290,12 +309,12 @@ export class CustomersService {
           },
         },
         loyaltyTransactions: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 20,
         },
       },
     });
-    if (!customer) throw new NotFoundException('Customer not found');
+    if (!customer) throw new NotFoundException("Customer not found");
     return customer;
   }
 }

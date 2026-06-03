@@ -1,12 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma/prisma.service';
-import { EmailService } from '../../common/services/email.service';
-import { DomainEventBus } from '../outbox/domain-event-bus.service';
-import {
-  EventTypes,
-  HardwareOrderPlacedPayload,
-} from '../outbox/event-types';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma/prisma.service";
+import { EmailService } from "../../common/services/email.service";
+import { DomainEventBus } from "../outbox/domain-event-bus.service";
+import { EventTypes, HardwareOrderPlacedPayload } from "../outbox/event-types";
 
 // v2.8.86 — listens for hardware.order.placed.v1 and sends the buyer
 // the order-placed email.
@@ -76,7 +73,9 @@ export class CheckoutNotificationsService implements OnModuleInit {
    *      soft-deleted).
    *   3. Skip + log if neither yields a target.
    */
-  async sendOrderPlacedEmail(payload: HardwareOrderPlacedPayload): Promise<void> {
+  async sendOrderPlacedEmail(
+    payload: HardwareOrderPlacedPayload,
+  ): Promise<void> {
     const order = await this.prisma.hardwareOrder.findFirst({
       where: { id: payload.hardwareOrderId, tenantId: payload.tenantId },
       include: { items: true },
@@ -94,15 +93,17 @@ export class CheckoutNotificationsService implements OnModuleInit {
         name: true,
         reportEmails: true,
         users: {
-          where: { role: 'ADMIN', status: 'ACTIVE' },
+          where: { role: "ADMIN", status: "ACTIVE" },
           select: { email: true, firstName: true, lastName: true },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
           take: 1,
         },
       },
     });
     if (!tenant) {
-      this.logger.warn(`Tenant ${payload.tenantId} not found at email-send time`);
+      this.logger.warn(
+        `Tenant ${payload.tenantId} not found at email-send time`,
+      );
       return;
     }
 
@@ -140,7 +141,7 @@ export class CheckoutNotificationsService implements OnModuleInit {
     await this.email.sendEmail({
       to: recipientEmail,
       subject: `Donanım siparişiniz alındı — #${shortId}`,
-      template: 'order-placed',
+      template: "order-placed",
       context: {
         recipientName,
         tenantName: tenant.name,
@@ -156,13 +157,16 @@ export class CheckoutNotificationsService implements OnModuleInit {
         showShipping: order.shippingCents > 0,
         total: fmt(order.totalCents),
         shippingAddressLines,
-        installationRequested: order.installation === 'requested',
-        appUrl: this.config.get<string>('FRONTEND_URL', 'https://hummytummy.com'),
+        installationRequested: order.installation === "requested",
+        appUrl: this.config.get<string>(
+          "FRONTEND_URL",
+          "https://hummytummy.com",
+        ),
       },
     });
 
     this.logger.log(
-      `order-placed email sent for order=${order.id} tenant=${payload.tenantId} to=${recipientEmail.replace(/(^.).+(@.+$)/, '$1***$2')}`,
+      `order-placed email sent for order=${order.id} tenant=${payload.tenantId} to=${recipientEmail.replace(/(^.).+(@.+$)/, "$1***$2")}`,
     );
   }
 
@@ -174,22 +178,22 @@ export class CheckoutNotificationsService implements OnModuleInit {
    */
   private formatAddress(raw: unknown): string[] {
     if (!raw) return [];
-    if (typeof raw === 'string') {
+    if (typeof raw === "string") {
       return raw
         .split(/\r?\n/)
         .map((s) => s.trim())
         .filter(Boolean);
     }
-    if (typeof raw === 'object') {
+    if (typeof raw === "object") {
       const obj = raw as Record<string, unknown>;
       const lines: string[] = [];
       const push = (v: unknown) => {
-        if (typeof v === 'string' && v.trim()) lines.push(v.trim());
+        if (typeof v === "string" && v.trim()) lines.push(v.trim());
       };
       push(obj.recipientName);
       push(obj.line1 ?? obj.street);
       push(obj.line2);
-      const district = [obj.district, obj.city].filter(Boolean).join(', ');
+      const district = [obj.district, obj.city].filter(Boolean).join(", ");
       if (district) lines.push(district);
       push(obj.postalCode);
       push(obj.country);

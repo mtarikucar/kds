@@ -99,6 +99,10 @@ const SECTIONS: NavSection[] = [
         icon: ShoppingCart,
         labelKey: 'navigation.pos',
         roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
+        // v3.0.0 — hide POS for FREE plans (post-trial fallback). The
+        // route itself is also wrapped in <FeatureGate feature="posAccess">;
+        // hiding the nav prevents the dead-end click.
+        gate: { feature: 'posAccess' },
       },
       {
         to: '/kitchen',

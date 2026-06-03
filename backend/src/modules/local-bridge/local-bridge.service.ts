@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { createHash, randomBytes } from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
 
 /**
  * Local Bridge Agent registry + telemetry.
@@ -29,11 +34,11 @@ export class LocalBridgeService {
   ) {}
 
   private newToken(): string {
-    return uuidv7() + '.' + randomBytes(32).toString('base64url');
+    return uuidv7() + "." + randomBytes(32).toString("base64url");
   }
 
   private hash(raw: string): string {
-    return createHash('sha256').update(raw).digest('hex');
+    return createHash("sha256").update(raw).digest("hex");
   }
 
   /** Admin: provision a new bridge agent slot for a branch. */
@@ -44,7 +49,7 @@ export class LocalBridgeService {
     const branch = await this.prisma.branch.findFirst({
       where: { id: input.branchId, tenantId },
     });
-    if (!branch) throw new BadRequestException('Branch not found');
+    if (!branch) throw new BadRequestException("Branch not found");
 
     const provisioningToken = this.newToken();
     const row = await this.prisma.localBridgeAgent.create({
@@ -54,7 +59,7 @@ export class LocalBridgeService {
         provisioningTokenHash: this.hash(provisioningToken),
         productSku: input.productSku,
         hostname: input.hostname,
-        status: 'claiming',
+        status: "claiming",
       },
     });
 
@@ -67,7 +72,12 @@ export class LocalBridgeService {
   }
 
   /** Bridge: exchange provisioning token for a long-lived bearer token. */
-  async claim(input: { provisioningToken: string; hostname?: string; os?: string; agentVersion?: string }) {
+  async claim(input: {
+    provisioningToken: string;
+    hostname?: string;
+    os?: string;
+    agentVersion?: string;
+  }) {
     const provisioningTokenHash = this.hash(input.provisioningToken);
 
     // Atomically transition the row out of `claiming` with the provisioning
@@ -76,24 +86,26 @@ export class LocalBridgeService {
     // clean rejection instead of issuing a duplicate bearer.
     const token = this.newToken();
     const newTokenHash = this.hash(token);
-    const tokenExpiresAt = new Date(Date.now() + LocalBridgeService.TOKEN_TTL_MS);
+    const tokenExpiresAt = new Date(
+      Date.now() + LocalBridgeService.TOKEN_TTL_MS,
+    );
 
     const claim = await this.prisma.localBridgeAgent.updateMany({
-      where: { provisioningTokenHash, status: 'claiming' },
+      where: { provisioningTokenHash, status: "claiming" },
       data: {
         tokenHash: newTokenHash,
         tokenExpiresAt,
-        provisioningTokenHash: null,  // single-use
+        provisioningTokenHash: null, // single-use
         provisionedAt: new Date(),
         hostname: input.hostname,
         os: input.os,
         agentVersion: input.agentVersion,
-        status: 'online',
+        status: "online",
         lastSeenAt: new Date(),
       },
     });
     if (claim.count === 0) {
-      throw new NotFoundException('Invalid or already-used provisioning token');
+      throw new NotFoundException("Invalid or already-used provisioning token");
     }
 
     // Re-read by the new token hash. Doing the lookup-by-result, not by id,
@@ -114,7 +126,7 @@ export class LocalBridgeService {
     // logs for on-call investigation.
     await this.outbox
       .append({
-        type: 'bridge.provisioned.v1',
+        type: "bridge.provisioned.v1",
         tenantId: updated.tenantId,
         payload: { bridgeId: updated.id, branchId: updated.branchId },
       })
@@ -137,7 +149,9 @@ export class LocalBridgeService {
   async authenticateToken(rawToken: string) {
     if (!rawToken) return null;
     const tokenHash = this.hash(rawToken);
-    const row = await this.prisma.localBridgeAgent.findFirst({ where: { tokenHash } });
+    const row = await this.prisma.localBridgeAgent.findFirst({
+      where: { tokenHash },
+    });
     if (!row) return null;
     if (row.tokenExpiresAt && row.tokenExpiresAt < new Date()) return null;
     return row;
@@ -150,7 +164,7 @@ export class LocalBridgeService {
     await this.prisma.localBridgeAgent.update({
       where: { id: bridgeId },
       data: {
-        status: 'online',
+        status: "online",
         lastSeenAt: new Date(),
         hostname: payload.hostname,
         os: payload.os,
@@ -163,8 +177,8 @@ export class LocalBridgeService {
   async sweepStale(): Promise<number> {
     const cutoff = new Date(Date.now() - LocalBridgeService.HEARTBEAT_GRACE_MS);
     const res = await this.prisma.localBridgeAgent.updateMany({
-      where: { status: 'online', lastSeenAt: { lt: cutoff } },
-      data: { status: 'offline' },
+      where: { status: "online", lastSeenAt: { lt: cutoff } },
+      data: { status: "offline" },
     });
     return res.count;
   }
@@ -172,7 +186,7 @@ export class LocalBridgeService {
   list(tenantId: string, branchId?: string) {
     return this.prisma.localBridgeAgent.findMany({
       where: { tenantId, ...(branchId ? { branchId } : {}) },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -185,9 +199,9 @@ export class LocalBridgeService {
     // a different tenant out of their hardware.
     const claim = await this.prisma.localBridgeAgent.updateMany({
       where: { id: bridgeId, tenantId },
-      data: { status: 'retired', tokenHash: null, provisioningTokenHash: null },
+      data: { status: "retired", tokenHash: null, provisioningTokenHash: null },
     });
-    if (claim.count === 0) throw new NotFoundException('Bridge not found');
+    if (claim.count === 0) throw new NotFoundException("Bridge not found");
     return this.prisma.localBridgeAgent.findFirstOrThrow({
       where: { id: bridgeId, tenantId },
     });

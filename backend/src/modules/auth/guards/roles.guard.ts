@@ -1,8 +1,14 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import { UserRole } from '../../../common/constants/roles.enum';
-import { shouldBypassGlobalAuth } from '../../../common/helpers/guard-bypass.helper';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Logger,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { ROLES_KEY } from "../decorators/roles.decorator";
+import { UserRole } from "../../../common/constants/roles.enum";
+import { shouldBypassGlobalAuth } from "../../../common/helpers/guard-bypass.helper";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -20,10 +26,10 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredRoles) {
       // v2.8.96 — surface the missing @Roles annotation. The guard
@@ -34,14 +40,14 @@ export class RolesGuard implements CanActivate {
       // and at worst an unintended privilege grant on a sensitive
       // endpoint. The once-per-handler warn gives dev/test a loud
       // breadcrumb to fix without spamming prod logs.
-      const controllerName = context.getClass()?.name ?? '?';
-      const handlerName = context.getHandler()?.name ?? '?';
+      const controllerName = context.getClass()?.name ?? "?";
+      const handlerName = context.getHandler()?.name ?? "?";
       const key = `${controllerName}.${handlerName}`;
       if (!RolesGuard.warnedHandlers.has(key)) {
         RolesGuard.warnedHandlers.add(key);
         this.logger.warn(
           `Endpoint ${key} has no @Roles() annotation; granting access to all authenticated roles. ` +
-          `If this is intentional add @Roles(UserRole.ADMIN, UserRole.MANAGER, ...) — or document with @Roles() listing every role you want to allow.`,
+            `If this is intentional add @Roles(UserRole.ADMIN, UserRole.MANAGER, ...) — or document with @Roles() listing every role you want to allow.`,
         );
       }
       return true;
@@ -50,13 +56,13 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
 
     if (!user) {
-      throw new ForbiddenException('User not authenticated');
+      throw new ForbiddenException("User not authenticated");
     }
 
     const hasRole = requiredRoles.some((role) => user.role === role);
 
     if (!hasRole) {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenException("Insufficient permissions");
     }
 
     return true;

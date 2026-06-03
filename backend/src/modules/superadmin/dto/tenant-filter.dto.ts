@@ -1,23 +1,31 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, IsIn, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
-import { TenantStatus } from '../../../common/constants/subscription.enum';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsInt,
+  IsIn,
+  Min,
+  Max,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { TenantStatus } from "../../../common/constants/subscription.enum";
 
 // Re-export so existing imports of `TenantStatus from './tenant-filter.dto'`
 // keep working while the canonical definition lives in the common module.
 export { TenantStatus };
 
 export const TENANT_SORTABLE_FIELDS = [
-  'createdAt',
-  'updatedAt',
-  'name',
-  'status',
-  'subdomain',
+  "createdAt",
+  "updatedAt",
+  "name",
+  "status",
+  "subdomain",
 ] as const;
 export type TenantSortableField = (typeof TENANT_SORTABLE_FIELDS)[number];
 
 export class TenantFilterDto {
-  @ApiPropertyOptional({ description: 'Search by name or email' })
+  @ApiPropertyOptional({ description: "Search by name or email" })
   @IsOptional()
   @IsString()
   search?: string;
@@ -27,7 +35,7 @@ export class TenantFilterDto {
   @IsEnum(TenantStatus)
   status?: TenantStatus;
 
-  @ApiPropertyOptional({ description: 'Filter by plan ID' })
+  @ApiPropertyOptional({ description: "Filter by plan ID" })
   @IsOptional()
   @IsString()
   planId?: string;
@@ -48,18 +56,18 @@ export class TenantFilterDto {
   limit?: number = 20;
 
   @ApiPropertyOptional({
-    description: 'Sort by field',
-    default: 'createdAt',
+    description: "Sort by field",
+    default: "createdAt",
     enum: TENANT_SORTABLE_FIELDS,
   })
   @IsOptional()
   @IsIn(TENANT_SORTABLE_FIELDS)
-  sortBy?: TenantSortableField = 'createdAt';
+  sortBy?: TenantSortableField = "createdAt";
 
-  @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' })
+  @ApiPropertyOptional({ enum: ["asc", "desc"], default: "desc" })
   @IsOptional()
-  @IsEnum(['asc', 'desc'])
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  @IsEnum(["asc", "desc"])
+  sortOrder?: "asc" | "desc" = "desc";
 }
 
 export class UpdateTenantStatusDto {
@@ -67,7 +75,7 @@ export class UpdateTenantStatusDto {
   @IsEnum(TenantStatus)
   status: TenantStatus;
 
-  @ApiPropertyOptional({ description: 'Reason for status change' })
+  @ApiPropertyOptional({ description: "Reason for status change" })
   @IsOptional()
   @IsString()
   reason?: string;

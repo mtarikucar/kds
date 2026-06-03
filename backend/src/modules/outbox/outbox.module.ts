@@ -1,8 +1,8 @@
-import { Global, Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { DomainEventBus } from './domain-event-bus.service';
-import { OutboxService } from './outbox.service';
-import { OutboxWorkerService } from './outbox-worker.service';
+import { Global, Module } from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { DomainEventBus } from "./domain-event-bus.service";
+import { OutboxService } from "./outbox.service";
+import { OutboxWorkerService } from "./outbox-worker.service";
 
 /**
  * Outbox + in-process bus ship as a @Global module so every feature can call

@@ -1,34 +1,34 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
 
 export enum LoyaltyTransactionType {
-  EARNED = 'EARNED',
-  REDEEMED = 'REDEEMED',
-  EXPIRED = 'EXPIRED',
-  ADJUSTMENT = 'ADJUSTMENT',
-  BONUS = 'BONUS',
-  REFERRAL = 'REFERRAL',
+  EARNED = "EARNED",
+  REDEEMED = "REDEEMED",
+  EXPIRED = "EXPIRED",
+  ADJUSTMENT = "ADJUSTMENT",
+  BONUS = "BONUS",
+  REFERRAL = "REFERRAL",
 }
 
 export enum LoyaltyTier {
-  BRONZE = 'BRONZE',
-  SILVER = 'SILVER',
-  GOLD = 'GOLD',
-  PLATINUM = 'PLATINUM',
+  BRONZE = "BRONZE",
+  SILVER = "SILVER",
+  GOLD = "GOLD",
+  PLATINUM = "PLATINUM",
 }
 
 const LOYALTY_CONFIG = {
   pointsPerCurrencyUnit: 1,
-  currencyPerPoint: new Prisma.Decimal('0.1'),
+  currencyPerPoint: new Prisma.Decimal("0.1"),
   minRedeemPoints: 100,
   welcomeBonus: 50,
   birthdayBonus: 100,
   tiers: {
-    BRONZE: { threshold: 0, multiplier: 1.0, name: 'Bronze' },
-    SILVER: { threshold: 500, multiplier: 1.25, name: 'Silver' },
-    GOLD: { threshold: 2000, multiplier: 1.5, name: 'Gold' },
-    PLATINUM: { threshold: 5000, multiplier: 2.0, name: 'Platinum' },
+    BRONZE: { threshold: 0, multiplier: 1.0, name: "Bronze" },
+    SILVER: { threshold: 500, multiplier: 1.25, name: "Silver" },
+    GOLD: { threshold: 2000, multiplier: 1.5, name: "Gold" },
+    PLATINUM: { threshold: 5000, multiplier: 2.0, name: "Platinum" },
   },
 };
 
@@ -53,58 +53,65 @@ export class LoyaltyService {
     points: number,
     type: LoyaltyTransactionType,
     description: string,
-    metadata?: { orderId?: string; orderNumber?: string; orderAmount?: number | Prisma.Decimal },
+    metadata?: {
+      orderId?: string;
+      orderNumber?: string;
+      orderAmount?: number | Prisma.Decimal;
+    },
   ) {
     if (!Number.isInteger(points) || points === 0) {
-      throw new BadRequestException('points must be a non-zero integer');
+      throw new BadRequestException("points must be a non-zero integer");
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findFirst({
-        where: { id: customerId, tenantId },
-      });
-      if (!customer) throw new BadRequestException('Customer not found');
-
-      const balanceBefore = customer.loyaltyPoints;
-      const balanceAfter = balanceBefore + points;
-
-      if (points < 0) {
-        const needed = -points;
-        if (balanceBefore < needed) {
-          throw new BadRequestException('Insufficient loyalty points');
-        }
-        const result = await tx.customer.updateMany({
-          where: { id: customerId, tenantId, loyaltyPoints: { gte: needed } },
-          data: { loyaltyPoints: { decrement: needed } },
-        });
-        if (result.count !== 1) {
-          throw new BadRequestException('Insufficient loyalty points (race)');
-        }
-      } else {
-        await tx.customer.updateMany({
+    return this.prisma.$transaction(
+      async (tx) => {
+        const customer = await tx.customer.findFirst({
           where: { id: customerId, tenantId },
-          data: { loyaltyPoints: { increment: points } },
         });
-      }
+        if (!customer) throw new BadRequestException("Customer not found");
 
-      const transaction = await tx.loyaltyTransaction.create({
-        data: {
-          tenantId,
-          customerId,
-          type,
-          points,
-          description,
-          orderId: metadata?.orderId,
-          orderNumber: metadata?.orderNumber,
-          orderAmount: metadata?.orderAmount as any,
-          balanceBefore,
-          balanceAfter,
-          metadata: metadata ? { additional: metadata as any } : undefined,
-        },
-      });
+        const balanceBefore = customer.loyaltyPoints;
+        const balanceAfter = balanceBefore + points;
 
-      return { transaction, newBalance: balanceAfter };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (points < 0) {
+          const needed = -points;
+          if (balanceBefore < needed) {
+            throw new BadRequestException("Insufficient loyalty points");
+          }
+          const result = await tx.customer.updateMany({
+            where: { id: customerId, tenantId, loyaltyPoints: { gte: needed } },
+            data: { loyaltyPoints: { decrement: needed } },
+          });
+          if (result.count !== 1) {
+            throw new BadRequestException("Insufficient loyalty points (race)");
+          }
+        } else {
+          await tx.customer.updateMany({
+            where: { id: customerId, tenantId },
+            data: { loyaltyPoints: { increment: points } },
+          });
+        }
+
+        const transaction = await tx.loyaltyTransaction.create({
+          data: {
+            tenantId,
+            customerId,
+            type,
+            points,
+            description,
+            orderId: metadata?.orderId,
+            orderNumber: metadata?.orderNumber,
+            orderAmount: metadata?.orderAmount as any,
+            balanceBefore,
+            balanceAfter,
+            metadata: metadata ? { additional: metadata as any } : undefined,
+          },
+        });
+
+        return { transaction, newBalance: balanceAfter };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async earnPointsFromOrder(
@@ -137,62 +144,73 @@ export class LoyaltyService {
     // customer got DOUBLE points for one sale. Wrapping the dedup
     // read in the same Serializable txn makes the loser see the
     // winner's INSERT and short-circuit.
-    const txResult = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.loyaltyTransaction.findFirst({
-        where: {
-          customerId,
-          orderId,
-          type: LoyaltyTransactionType.EARNED,
-          customer: { tenantId },
-        },
-      });
-      if (existing) {
-        const cust = await tx.customer.findFirst({
-          where: { id: customerId, tenantId },
-          select: { loyaltyPoints: true },
+    const txResult = await this.prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.loyaltyTransaction.findFirst({
+          where: {
+            customerId,
+            orderId,
+            type: LoyaltyTransactionType.EARNED,
+            customer: { tenantId },
+          },
         });
-        return { transaction: existing, newBalance: cust?.loyaltyPoints ?? 0, didCredit: false };
-      }
-      if (points <= 0) {
-        const cust = await tx.customer.findFirst({
+        if (existing) {
+          const cust = await tx.customer.findFirst({
+            where: { id: customerId, tenantId },
+            select: { loyaltyPoints: true },
+          });
+          return {
+            transaction: existing,
+            newBalance: cust?.loyaltyPoints ?? 0,
+            didCredit: false,
+          };
+        }
+        if (points <= 0) {
+          const cust = await tx.customer.findFirst({
+            where: { id: customerId, tenantId },
+            select: { loyaltyPoints: true },
+          });
+          return {
+            transaction: null,
+            newBalance: cust?.loyaltyPoints ?? 0,
+            didCredit: false,
+          };
+        }
+
+        // Inline the awardPoints write path — calling out to it would
+        // start a nested $transaction, which Prisma handles but defeats
+        // the in-txn dedup guarantee above. Pre-iter-37 the outer
+        // findFirst was outside the txn AND awardPoints opened its own
+        // — the dedup never saw the winner.
+        const customer = await tx.customer.findFirst({
           where: { id: customerId, tenantId },
-          select: { loyaltyPoints: true },
         });
-        return { transaction: null, newBalance: cust?.loyaltyPoints ?? 0, didCredit: false };
-      }
+        if (!customer) throw new BadRequestException("Customer not found");
+        const balanceBefore = customer.loyaltyPoints;
+        const balanceAfter = balanceBefore + points;
 
-      // Inline the awardPoints write path — calling out to it would
-      // start a nested $transaction, which Prisma handles but defeats
-      // the in-txn dedup guarantee above. Pre-iter-37 the outer
-      // findFirst was outside the txn AND awardPoints opened its own
-      // — the dedup never saw the winner.
-      const customer = await tx.customer.findFirst({
-        where: { id: customerId, tenantId },
-      });
-      if (!customer) throw new BadRequestException('Customer not found');
-      const balanceBefore = customer.loyaltyPoints;
-      const balanceAfter = balanceBefore + points;
-
-      await tx.customer.updateMany({
-        where: { id: customerId, tenantId },
-        data: { loyaltyPoints: { increment: points } },
-      });
-      const transaction = await tx.loyaltyTransaction.create({
-        data: {
-          tenantId,
-          customerId,
-          type: LoyaltyTransactionType.EARNED,
-          points,
-          description: `Earned ${points} points from order ${orderNumber}`,
-          orderId,
-          orderNumber,
-          orderAmount: orderAmount as any,
-          balanceBefore,
-          balanceAfter,
-        },
-      });
-      return { transaction, newBalance: balanceAfter, didCredit: true };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        await tx.customer.updateMany({
+          where: { id: customerId, tenantId },
+          data: { loyaltyPoints: { increment: points } },
+        });
+        const transaction = await tx.loyaltyTransaction.create({
+          data: {
+            tenantId,
+            customerId,
+            type: LoyaltyTransactionType.EARNED,
+            points,
+            description: `Earned ${points} points from order ${orderNumber}`,
+            orderId,
+            orderNumber,
+            orderAmount: orderAmount as any,
+            balanceBefore,
+            balanceAfter,
+          },
+        });
+        return { transaction, newBalance: balanceAfter, didCredit: true };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     // Tier promotion outside the txn — it only ever moves UPWARD
     // (lifetimePoints is sum-of-positive entries; refunds/redemptions
@@ -200,9 +218,16 @@ export class LoyaltyService {
     // updateMany inside checkAndUpgradeTier is its own race guard.
     // Skipping when we didn't actually credit avoids an unnecessary
     // aggregate query on idempotent retries.
-    let tierUpgrade: { upgraded: boolean; oldTier: LoyaltyTier; newTier: LoyaltyTier } | null = null;
+    let tierUpgrade: {
+      upgraded: boolean;
+      oldTier: LoyaltyTier;
+      newTier: LoyaltyTier;
+    } | null = null;
     if (txResult.didCredit) {
-      const tierResult = await this.checkAndUpgradeTier(customerId, tenantId).catch(() => null);
+      const tierResult = await this.checkAndUpgradeTier(
+        customerId,
+        tenantId,
+      ).catch(() => null);
       tierUpgrade = tierResult?.upgraded ? (tierResult as any) : null;
     }
     return {
@@ -246,51 +271,57 @@ export class LoyaltyService {
     // /identify taps could both see "no bonus yet" and both credit,
     // producing duplicate welcome gifts. Wrap check + create in one
     // Serializable tx so the second arrival sees the first's write.
-    return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.loyaltyTransaction.findFirst({
-        where: {
-          customerId,
-          type: LoyaltyTransactionType.BONUS,
-          description: { startsWith: 'Welcome bonus:' },
-          customer: { tenantId },
-        },
-      });
-      if (existing) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.loyaltyTransaction.findFirst({
+          where: {
+            customerId,
+            type: LoyaltyTransactionType.BONUS,
+            description: { startsWith: "Welcome bonus:" },
+            customer: { tenantId },
+          },
+        });
+        if (existing) {
+          const customer = await tx.customer.findFirst({
+            where: { id: customerId, tenantId },
+            select: { loyaltyPoints: true },
+          });
+          return {
+            transaction: existing,
+            newBalance: customer?.loyaltyPoints ?? 0,
+          };
+        }
+
         const customer = await tx.customer.findFirst({
           where: { id: customerId, tenantId },
-          select: { loyaltyPoints: true },
         });
-        return { transaction: existing, newBalance: customer?.loyaltyPoints ?? 0 };
-      }
+        if (!customer) throw new BadRequestException("Customer not found");
 
-      const customer = await tx.customer.findFirst({
-        where: { id: customerId, tenantId },
-      });
-      if (!customer) throw new BadRequestException('Customer not found');
+        const points = LOYALTY_CONFIG.welcomeBonus;
+        const balanceBefore = customer.loyaltyPoints;
+        const balanceAfter = balanceBefore + points;
 
-      const points = LOYALTY_CONFIG.welcomeBonus;
-      const balanceBefore = customer.loyaltyPoints;
-      const balanceAfter = balanceBefore + points;
+        await tx.customer.updateMany({
+          where: { id: customerId, tenantId },
+          data: { loyaltyPoints: { increment: points } },
+        });
 
-      await tx.customer.updateMany({
-        where: { id: customerId, tenantId },
-        data: { loyaltyPoints: { increment: points } },
-      });
+        const transaction = await tx.loyaltyTransaction.create({
+          data: {
+            tenantId,
+            customerId,
+            type: LoyaltyTransactionType.BONUS,
+            points,
+            description: `Welcome bonus: ${points} points`,
+            balanceBefore,
+            balanceAfter,
+          },
+        });
 
-      const transaction = await tx.loyaltyTransaction.create({
-        data: {
-          tenantId,
-          customerId,
-          type: LoyaltyTransactionType.BONUS,
-          points,
-          description: `Welcome bonus: ${points} points`,
-          balanceBefore,
-          balanceAfter,
-        },
-      });
-
-      return { transaction, newBalance: balanceAfter };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return { transaction, newBalance: balanceAfter };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async awardBirthdayBonus(customerId: string, tenantId: string) {
@@ -303,12 +334,16 @@ export class LoyaltyService {
     );
   }
 
-  async getTransactionHistory(customerId: string, tenantId: string, limit = 50) {
+  async getTransactionHistory(
+    customerId: string,
+    tenantId: string,
+    limit = 50,
+  ) {
     // Tenant-scoped via relation filter to block cross-tenant probing by
     // guessed customerId.
     return this.prisma.loyaltyTransaction.findMany({
       where: { customerId, customer: { tenantId } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: Math.min(limit, 200),
     });
   }
@@ -318,9 +353,11 @@ export class LoyaltyService {
       where: { id: customerId, tenantId },
       select: { loyaltyPoints: true },
     });
-    if (!customer) throw new BadRequestException('Customer not found');
+    if (!customer) throw new BadRequestException("Customer not found");
 
-    const redeemable = LOYALTY_CONFIG.currencyPerPoint.mul(customer.loyaltyPoints);
+    const redeemable = LOYALTY_CONFIG.currencyPerPoint.mul(
+      customer.loyaltyPoints,
+    );
     return {
       points: customer.loyaltyPoints,
       redeemableAmount: redeemable.toNumber(),
@@ -342,7 +379,10 @@ export class LoyaltyService {
         _sum: { points: true },
       }),
       this.prisma.loyaltyTransaction.aggregate({
-        where: { customer: { tenantId }, type: LoyaltyTransactionType.REDEEMED },
+        where: {
+          customer: { tenantId },
+          type: LoyaltyTransactionType.REDEEMED,
+        },
         _sum: { points: true },
       }),
     ]);
@@ -356,14 +396,18 @@ export class LoyaltyService {
       avgPointsPerCustomer: Math.round(totalsAgg._avg.loyaltyPoints ?? 0),
       pointsEarned,
       pointsRedeemed,
-      redemptionRate: pointsEarned > 0 ? (pointsRedeemed / pointsEarned) * 100 : 0,
+      redemptionRate:
+        pointsEarned > 0 ? (pointsRedeemed / pointsEarned) * 100 : 0,
     };
   }
 
   calculateTier(lifetimePoints: number): LoyaltyTier {
-    if (lifetimePoints >= LOYALTY_CONFIG.tiers.PLATINUM.threshold) return LoyaltyTier.PLATINUM;
-    if (lifetimePoints >= LOYALTY_CONFIG.tiers.GOLD.threshold) return LoyaltyTier.GOLD;
-    if (lifetimePoints >= LOYALTY_CONFIG.tiers.SILVER.threshold) return LoyaltyTier.SILVER;
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.PLATINUM.threshold)
+      return LoyaltyTier.PLATINUM;
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.GOLD.threshold)
+      return LoyaltyTier.GOLD;
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.SILVER.threshold)
+      return LoyaltyTier.SILVER;
     return LoyaltyTier.BRONZE;
   }
 
@@ -376,7 +420,7 @@ export class LoyaltyService {
       where: { id: customerId, tenantId },
       select: { id: true, loyaltyTier: true },
     });
-    if (!customer) throw new BadRequestException('Customer not found');
+    if (!customer) throw new BadRequestException("Customer not found");
 
     const lifetimeAgg = await this.prisma.loyaltyTransaction.aggregate({
       where: { customerId, customer: { tenantId }, points: { gt: 0 } },
@@ -386,7 +430,12 @@ export class LoyaltyService {
     const calculatedTier = this.calculateTier(lifetimePoints);
     const currentTier = customer.loyaltyTier as LoyaltyTier;
 
-    const order = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
+    const order = [
+      LoyaltyTier.BRONZE,
+      LoyaltyTier.SILVER,
+      LoyaltyTier.GOLD,
+      LoyaltyTier.PLATINUM,
+    ];
     if (order.indexOf(calculatedTier) > order.indexOf(currentTier)) {
       // Compound WHERE on the observed tier guards two parallel orders
       // that both cross the threshold from each declaring an upgrade.
@@ -400,7 +449,9 @@ export class LoyaltyService {
       if (claim.count === 0) {
         return { upgraded: false, newTier: calculatedTier };
       }
-      this.logger.log(`Customer ${customerId} upgraded from ${currentTier} to ${calculatedTier}`);
+      this.logger.log(
+        `Customer ${customerId} upgraded from ${currentTier} to ${calculatedTier}`,
+      );
       return { upgraded: true, oldTier: currentTier, newTier: calculatedTier };
     }
     return { upgraded: false, newTier: currentTier };
@@ -411,7 +462,7 @@ export class LoyaltyService {
       where: { id: customerId, tenantId },
       select: { loyaltyTier: true },
     });
-    if (!customer) throw new BadRequestException('Customer not found');
+    if (!customer) throw new BadRequestException("Customer not found");
 
     const lifetimeAgg = await this.prisma.loyaltyTransaction.aggregate({
       where: { customerId, customer: { tenantId }, points: { gt: 0 } },
@@ -421,7 +472,12 @@ export class LoyaltyService {
     const currentTier = customer.loyaltyTier as LoyaltyTier;
     const currentTierInfo = this.getTierInfo(currentTier);
 
-    const order = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
+    const order = [
+      LoyaltyTier.BRONZE,
+      LoyaltyTier.SILVER,
+      LoyaltyTier.GOLD,
+      LoyaltyTier.PLATINUM,
+    ];
     const nextIdx = order.indexOf(currentTier) + 1;
     const nextTier = nextIdx < order.length ? order[nextIdx] : null;
     const nextTierInfo = nextTier ? this.getTierInfo(nextTier) : null;
@@ -432,7 +488,9 @@ export class LoyaltyService {
       lifetimePoints,
       nextTier,
       nextTierInfo,
-      pointsToNextTier: nextTierInfo ? nextTierInfo.threshold - lifetimePoints : 0,
+      pointsToNextTier: nextTierInfo
+        ? nextTierInfo.threshold - lifetimePoints
+        : 0,
       progressPercentage: nextTierInfo
         ? Math.min(100, (lifetimePoints / nextTierInfo.threshold) * 100)
         : 100,
@@ -448,7 +506,8 @@ export class LoyaltyService {
     source: string;
     metadata?: any;
   }) {
-    const { customerId, tenantId, points, type, description, metadata } = params;
+    const { customerId, tenantId, points, type, description, metadata } =
+      params;
 
     // The earlier `type as LoyaltyTransactionType` silently accepted
     // any string and persisted it. The `type` column then carried
@@ -457,9 +516,13 @@ export class LoyaltyService {
     // filters in checkAndUpgradeTier and getLoyaltyStats which group
     // by the canonical enum names. Reject here so the wiring bug
     // surfaces at the call site, not in the analytics aggregate.
-    if (!Object.values(LoyaltyTransactionType).includes(type as LoyaltyTransactionType)) {
+    if (
+      !Object.values(LoyaltyTransactionType).includes(
+        type as LoyaltyTransactionType,
+      )
+    ) {
       throw new BadRequestException(
-        `Invalid loyalty transaction type "${type}". Expected one of: ${Object.values(LoyaltyTransactionType).join(', ')}`,
+        `Invalid loyalty transaction type "${type}". Expected one of: ${Object.values(LoyaltyTransactionType).join(", ")}`,
       );
     }
 

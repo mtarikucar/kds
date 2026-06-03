@@ -1,4 +1,4 @@
-import { DeliveryPlatform } from '../constants/platform.enum';
+import { DeliveryPlatform } from "../constants/platform.enum";
 
 export interface NormalizedOrderItem {
   externalItemId: string;

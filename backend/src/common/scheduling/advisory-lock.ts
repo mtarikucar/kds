@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
 
 /**
  * Postgres advisory-lock wrapper, factored out of SubscriptionSchedulerService

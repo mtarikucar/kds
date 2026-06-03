@@ -9,24 +9,24 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateModifierDto {
   // String caps mirror CreateModifierGroupDto + the iter-48 catalog pattern.
-  @ApiProperty({ example: 'extra_cheese' })
+  @ApiProperty({ example: "extra_cheese" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   name: string;
 
-  @ApiProperty({ example: 'Ekstra Peynir' })
+  @ApiProperty({ example: "Ekstra Peynir" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   displayName: string;
 
-  @ApiProperty({ example: '+50gr kaşar peyniri', required: false })
+  @ApiProperty({ example: "+50gr kaşar peyniri", required: false })
   @IsString()
   @IsOptional()
   @MaxLength(2000)
@@ -39,7 +39,7 @@ export class CreateModifierDto {
   // line multiplies modifier price by quantity. Negative values are
   // intentionally rejected here even though the schema allows them — the
   // service-side flow has no "discount modifier" path today.
-  @ApiProperty({ example: 25.00, default: 0 })
+  @ApiProperty({ example: 25.0, default: 0 })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(10_000)
@@ -57,7 +57,7 @@ export class CreateModifierDto {
   @IsOptional()
   displayOrder?: number;
 
-  @ApiProperty({ example: 'uuid-of-modifier-group' })
+  @ApiProperty({ example: "uuid-of-modifier-group" })
   @IsUUID()
   groupId: string;
 }

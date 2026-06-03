@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 
 export const DEFAULT_KDV_RATE = 0.2;
 
@@ -19,7 +19,10 @@ export function splitGrossAmount(
   gross: Prisma.Decimal | number | string,
   rate: number = DEFAULT_KDV_RATE,
 ): KdvSplit {
-  const total = new Prisma.Decimal(gross).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  const total = new Prisma.Decimal(gross).toDecimalPlaces(
+    2,
+    Prisma.Decimal.ROUND_HALF_UP,
+  );
   const subtotal = total
     .div(1 + rate)
     .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);

@@ -1,5 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
 
 /**
  * Read + retry surface for the outbox DLQ. Events that exhaust the worker's
@@ -18,15 +23,20 @@ export class SuperAdminOutboxService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async listFailed(params: { tenantId?: string; type?: string; limit?: number; cursor?: string }) {
+  async listFailed(params: {
+    tenantId?: string;
+    type?: string;
+    limit?: number;
+    cursor?: string;
+  }) {
     const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
     const rows = await this.prisma.outboxEvent.findMany({
       where: {
-        status: 'failed',
+        status: "failed",
         ...(params.tenantId ? { tenantId: params.tenantId } : {}),
         ...(params.type ? { type: params.type } : {}),
       },
-      orderBy: { id: 'desc' },
+      orderBy: { id: "desc" },
       take: limit + 1,
       ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
       select: {
@@ -51,17 +61,17 @@ export class SuperAdminOutboxService {
     // One round-trip per status so the ops dashboard can show queue health
     // alongside DLQ depth.
     const [queued, dispatching, dispatched, failed] = await Promise.all([
-      this.prisma.outboxEvent.count({ where: { status: 'queued' } }),
-      this.prisma.outboxEvent.count({ where: { status: 'dispatching' } }),
-      this.prisma.outboxEvent.count({ where: { status: 'dispatched' } }),
-      this.prisma.outboxEvent.count({ where: { status: 'failed' } }),
+      this.prisma.outboxEvent.count({ where: { status: "queued" } }),
+      this.prisma.outboxEvent.count({ where: { status: "dispatching" } }),
+      this.prisma.outboxEvent.count({ where: { status: "dispatched" } }),
+      this.prisma.outboxEvent.count({ where: { status: "failed" } }),
     ]);
     return { queued, dispatching, dispatched, failed };
   }
 
   async getEvent(id: string) {
     const row = await this.prisma.outboxEvent.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException('Outbox event not found');
+    if (!row) throw new NotFoundException("Outbox event not found");
     return row;
   }
 
@@ -75,15 +85,15 @@ export class SuperAdminOutboxService {
    */
   async requeue(ids: string[], opts: { resetAttempts?: boolean } = {}) {
     if (!Array.isArray(ids) || ids.length === 0) {
-      throw new BadRequestException('ids[] must contain at least one event id');
+      throw new BadRequestException("ids[] must contain at least one event id");
     }
     if (ids.length > 100) {
-      throw new BadRequestException('Maximum 100 events per requeue call');
+      throw new BadRequestException("Maximum 100 events per requeue call");
     }
     const result = await this.prisma.outboxEvent.updateMany({
-      where: { id: { in: ids }, status: 'failed' },
+      where: { id: { in: ids }, status: "failed" },
       data: {
-        status: 'queued',
+        status: "queued",
         nextAttemptAt: new Date(),
         lastError: null,
         ...(opts.resetAttempts ? { attempts: 0 } : {}),

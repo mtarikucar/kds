@@ -6,14 +6,14 @@ import {
   forwardRef,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OrderStatus } from '../../common/constants/order-status.enum';
-import { validateTransition } from '../../common/utils/order-state-machine';
-import { OrderItemStatus } from './dto/update-order-item-status.dto';
-import { KdsGateway } from './kds.gateway';
-import { DeliveryStatusSyncService } from '../delivery-platforms/services/delivery-status-sync.service';
-import { StockDeductionService } from '../stock-management/services/stock-deduction.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OrderStatus } from "../../common/constants/order-status.enum";
+import { validateTransition } from "../../common/utils/order-state-machine";
+import { OrderItemStatus } from "./dto/update-order-item-status.dto";
+import { KdsGateway } from "./kds.gateway";
+import { DeliveryStatusSyncService } from "../delivery-platforms/services/delivery-status-sync.service";
+import { StockDeductionService } from "../stock-management/services/stock-deduction.service";
 
 @Injectable()
 export class KdsService {
@@ -71,7 +71,7 @@ export class KdsService {
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
       take: 200,
     });
   }
@@ -90,9 +90,12 @@ export class KdsService {
     }
 
     // Prevent status updates for orders awaiting approval
-    if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+    if (
+      order.requiresApproval &&
+      order.status === OrderStatus.PENDING_APPROVAL
+    ) {
       throw new BadRequestException(
-        'Order requires approval before status can be changed. Please approve the order first.'
+        "Order requires approval before status can be changed. Please approve the order first.",
       );
     }
 
@@ -117,7 +120,7 @@ export class KdsService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Order status changed concurrently — refresh and retry.',
+        "Order status changed concurrently — refresh and retry.",
       );
     }
     const updatedOrder = await this.prisma.order.findUniqueOrThrow({
@@ -135,9 +138,17 @@ export class KdsService {
     // Trigger stock deduction at the configured status (if applicable)
     if (this.stockDeductionService) {
       try {
-        const result = await this.stockDeductionService.deductForOrder(id, tenantId, status);
+        const result = await this.stockDeductionService.deductForOrder(
+          id,
+          tenantId,
+          status,
+        );
         if (result?.lowStockAlerts?.length) {
-          this.kdsGateway.emitLowStockAlert(tenantId, order.branchId, result.lowStockAlerts);
+          this.kdsGateway.emitLowStockAlert(
+            tenantId,
+            order.branchId,
+            result.lowStockAlerts,
+          );
         }
       } catch (error: any) {
         this.logger.error(
@@ -152,7 +163,9 @@ export class KdsService {
 
     // Sync status to delivery platform (if applicable)
     this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch((err) => {
-      this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
+      this.logger.error(
+        `Delivery platform sync failed for order ${id}: ${err.message}`,
+      );
     });
 
     return updatedOrder;
@@ -193,7 +206,7 @@ export class KdsService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Item status changed concurrently — refresh and retry.',
+        "Item status changed concurrently — refresh and retry.",
       );
     }
     const updatedOrderItem = await this.prisma.orderItem.findUniqueOrThrow({
@@ -209,14 +222,28 @@ export class KdsService {
       select: { status: true },
     });
 
-    const allReady = allItems.every((item) => item.status === OrderItemStatus.READY);
+    const allReady = allItems.every(
+      (item) => item.status === OrderItemStatus.READY,
+    );
     if (allReady && orderItem.order.status !== OrderStatus.READY) {
-      if (!orderItem.order.requiresApproval || orderItem.order.status !== OrderStatus.PENDING_APPROVAL) {
-        await this.updateOrderStatus(orderItem.orderId, OrderStatus.READY, tenantId);
+      if (
+        !orderItem.order.requiresApproval ||
+        orderItem.order.status !== OrderStatus.PENDING_APPROVAL
+      ) {
+        await this.updateOrderStatus(
+          orderItem.orderId,
+          OrderStatus.READY,
+          tenantId,
+        );
       }
     }
 
-    this.kdsGateway.emitOrderItemStatusChange(tenantId, updatedOrderItem.order.branchId, itemId, status);
+    this.kdsGateway.emitOrderItemStatusChange(
+      tenantId,
+      updatedOrderItem.order.branchId,
+      itemId,
+      status,
+    );
 
     return updatedOrderItem;
   }
@@ -248,7 +275,7 @@ export class KdsService {
     });
     if (cancelClaim.count === 0) {
       throw new BadRequestException(
-        'Order status changed concurrently — refresh and retry.',
+        "Order status changed concurrently — refresh and retry.",
       );
     }
     const updatedOrder = await this.prisma.order.findUniqueOrThrow({
@@ -276,12 +303,21 @@ export class KdsService {
     }
 
     // Emit status change via WebSocket
-    this.kdsGateway.emitOrderStatusChange(tenantId, order.branchId, id, OrderStatus.CANCELLED);
+    this.kdsGateway.emitOrderStatusChange(
+      tenantId,
+      order.branchId,
+      id,
+      OrderStatus.CANCELLED,
+    );
 
     // Sync cancellation to delivery platform (if applicable)
-    this.deliveryStatusSync?.syncStatusToPlatform(id, OrderStatus.CANCELLED).catch((err) => {
-      this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
-    });
+    this.deliveryStatusSync
+      ?.syncStatusToPlatform(id, OrderStatus.CANCELLED)
+      .catch((err) => {
+        this.logger.error(
+          `Delivery platform sync failed for order ${id}: ${err.message}`,
+        );
+      });
 
     return updatedOrder;
   }

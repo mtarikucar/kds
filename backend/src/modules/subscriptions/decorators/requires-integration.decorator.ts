@@ -1,6 +1,6 @@
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
-export const REQUIRED_INTEGRATIONS_KEY = 'requiredIntegrations';
+export const REQUIRED_INTEGRATIONS_KEY = "requiredIntegrations";
 
 /**
  * v2.8.88 — gate a route on the presence of at least one

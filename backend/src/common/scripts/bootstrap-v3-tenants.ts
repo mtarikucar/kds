@@ -20,13 +20,13 @@
  * Use: `npx ts-node backend/scripts/bootstrap-v3-tenants.ts`
  * or via the deploy runbook hook.
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 // Exported as a function (not module-load side effect) so the spec can
 // call it with a mocked PrismaClient. The CLI entry point at the bottom
 // calls runBootstrap() with a real client.
 export async function ensureMainBranchForTenants(
-  prisma: Pick<PrismaClient, 'tenant' | 'branch' | 'user'>,
+  prisma: Pick<PrismaClient, "tenant" | "branch" | "user">,
 ): Promise<{ createdBranches: number; stampedAdmins: number }> {
   const tenants = await prisma.tenant.findMany({
     select: { id: true, timezone: true, name: true },
@@ -37,8 +37,8 @@ export async function ensureMainBranchForTenants(
 
   for (const tenant of tenants) {
     const existing = await prisma.branch.findFirst({
-      where: { tenantId: tenant.id, status: 'active' },
-      orderBy: { createdAt: 'asc' },
+      where: { tenantId: tenant.id, status: "active" },
+      orderBy: { createdAt: "asc" },
       select: { id: true },
     });
 
@@ -48,9 +48,9 @@ export async function ensureMainBranchForTenants(
         await prisma.branch.create({
           data: {
             tenantId: tenant.id,
-            name: 'Main',
-            timezone: tenant.timezone ?? 'UTC',
-            status: 'active',
+            name: "Main",
+            timezone: tenant.timezone ?? "UTC",
+            status: "active",
           },
           select: { id: true },
         })
@@ -61,7 +61,7 @@ export async function ensureMainBranchForTenants(
     const stamp = await prisma.user.updateMany({
       where: {
         tenantId: tenant.id,
-        role: 'ADMIN',
+        role: "ADMIN",
         primaryBranchId: null,
       },
       data: { primaryBranchId: mainBranchId },
@@ -73,13 +73,13 @@ export async function ensureMainBranchForTenants(
 }
 
 export async function verifyInvariants(
-  prisma: Pick<PrismaClient, 'tenant' | 'user'>,
+  prisma: Pick<PrismaClient, "tenant" | "user">,
 ): Promise<void> {
   // Every tenant must end with ≥1 active branch.
   const orphanTenants = await prisma.tenant.findMany({
     where: {
       branches: {
-        none: { status: 'active' },
+        none: { status: "active" },
       },
     },
     select: { id: true, name: true },
@@ -90,7 +90,7 @@ export async function verifyInvariants(
         `have no active branch (${orphanTenants
           .slice(0, 5)
           .map((t) => `${t.name}:${t.id}`)
-          .join(', ')}...).`,
+          .join(", ")}...).`,
     );
   }
 
@@ -99,7 +99,7 @@ export async function verifyInvariants(
   // first INSERT that trips the constraint.
   const restrictedOrphans = await prisma.user.count({
     where: {
-      role: { in: ['WAITER', 'KITCHEN', 'COURIER'] },
+      role: { in: ["WAITER", "KITCHEN", "COURIER"] },
       primaryBranchId: null,
     },
   });
@@ -110,7 +110,7 @@ export async function verifyInvariants(
     );
   }
 
-  console.log('bootstrap-v3-tenants: invariants OK.');
+  console.log("bootstrap-v3-tenants: invariants OK.");
 }
 
 export async function runBootstrap(): Promise<void> {

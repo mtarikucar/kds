@@ -1,6 +1,6 @@
-import { HttpStatus } from '@nestjs/common';
-import { BusinessException } from './business.exception';
-import { ErrorCode } from '../interfaces/error-response.interface';
+import { HttpStatus } from "@nestjs/common";
+import { BusinessException } from "./business.exception";
+import { ErrorCode } from "../interfaces/error-response.interface";
 
 /**
  * Validation exception for input validation errors
@@ -8,12 +8,7 @@ import { ErrorCode } from '../interfaces/error-response.interface';
  */
 export class ValidationException extends BusinessException {
   constructor(message: string, details?: any) {
-    super(
-      message,
-      ErrorCode.VALIDATION_ERROR,
-      HttpStatus.BAD_REQUEST,
-      details,
-    );
+    super(message, ErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, details);
   }
 }
 
@@ -22,9 +17,7 @@ export class ValidationException extends BusinessException {
  */
 export class InvalidInputException extends BusinessException {
   constructor(field: string, reason?: string) {
-    const message = reason
-      ? `Invalid ${field}: ${reason}`
-      : `Invalid ${field}`;
+    const message = reason ? `Invalid ${field}: ${reason}` : `Invalid ${field}`;
     super(message, ErrorCode.INVALID_INPUT, HttpStatus.BAD_REQUEST);
   }
 }

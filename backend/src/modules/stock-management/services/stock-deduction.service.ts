@@ -3,11 +3,11 @@ import {
   Injectable,
   Logger,
   ConflictException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
-import { StockSettingsService } from './stock-settings.service';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
+import { StockSettingsService } from "./stock-settings.service";
 
 type Tx = Prisma.TransactionClient;
 
@@ -118,7 +118,9 @@ export class StockDeductionService {
       if (!recipe) continue;
       const yieldVal = recipe.yield || 1;
       for (const ingredient of recipe.ingredients) {
-        const perServing = new Prisma.Decimal(ingredient.quantity).div(yieldVal);
+        const perServing = new Prisma.Decimal(ingredient.quantity).div(
+          yieldVal,
+        );
         const needed = perServing.mul(orderItem.quantity);
         const existing = acc.get(ingredient.stockItemId);
         if (existing) {
@@ -170,8 +172,8 @@ export class StockDeductionService {
         quantity: { gt: 0 },
       },
       orderBy: [
-        { expiryDate: { sort: 'asc', nulls: 'last' } },
-        { receivedAt: 'asc' },
+        { expiryDate: { sort: "asc", nulls: "last" } },
+        { receivedAt: "asc" },
       ],
     });
     // v2.8.93 — track batch-level cost during consumption so the
@@ -247,7 +249,8 @@ export class StockDeductionService {
     const refreshed = await tx.stockItem.findFirst({
       where: { id: deduction.stockItemId, tenantId },
     });
-    const wentNegative = !!refreshed && new Prisma.Decimal(refreshed.currentStock).lt(0);
+    const wentNegative =
+      !!refreshed && new Prisma.Decimal(refreshed.currentStock).lt(0);
     const movementNotes = wentNegative
       ? `Order ${orderNumber} ⚠ NEGATIVE_STOCK currentStock=${refreshed!.currentStock}`
       : `Order ${orderNumber}`;
@@ -262,7 +265,7 @@ export class StockDeductionService {
         quantity: totalDeducted.neg() as any,
         costPerUnit: finalCost ?? undefined,
         notes: movementNotes,
-        referenceType: 'ORDER',
+        referenceType: "ORDER",
         referenceId: orderId,
         stockItemId: deduction.stockItemId,
         tenantId,
@@ -288,7 +291,7 @@ export class StockDeductionService {
       where: {
         tenantId,
         type: IngredientMovementType.ORDER_DEDUCTION,
-        referenceType: 'ORDER',
+        referenceType: "ORDER",
         referenceId: orderId,
       },
     });
@@ -311,12 +314,14 @@ export class StockDeductionService {
           where: {
             tenantId,
             type: IngredientMovementType.ORDER_REVERSAL,
-            referenceType: 'ORDER_REVERSAL',
+            referenceType: "ORDER_REVERSAL",
             referenceId: orderId,
           },
           select: { stockItemId: true },
         });
-        const reversedItems = new Set(existingReversals.map((m) => m.stockItemId));
+        const reversedItems = new Set(
+          existingReversals.map((m) => m.stockItemId),
+        );
 
         for (const movement of movements) {
           if (reversedItems.has(movement.stockItemId)) continue;
@@ -340,8 +345,9 @@ export class StockDeductionService {
               type: IngredientMovementType.ORDER_REVERSAL,
               quantity: reverseQty as any,
               costPerUnit: movement.costPerUnit ?? undefined,
-              notes: `Reversal: order cancellation (${movement.notes ?? ''})`.trim(),
-              referenceType: 'ORDER_REVERSAL',
+              notes:
+                `Reversal: order cancellation (${movement.notes ?? ""})`.trim(),
+              referenceType: "ORDER_REVERSAL",
               referenceId: orderId,
               stockItemId: movement.stockItemId,
               tenantId,

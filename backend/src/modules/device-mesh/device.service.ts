@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { createHash, randomBytes } from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
 
 /**
  * Device registry + pairing + heartbeat + command queue.
@@ -48,7 +53,7 @@ export class DeviceService {
     // bias). Rejection sampling against the largest multiple of 36
     // ≤ 256 (= 252) eliminates the bias at the cost of a tiny retry
     // overhead (~1.5% of bytes rejected).
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const ceiling = 256 - (256 % alphabet.length); // 252
     const chars: string[] = [];
     while (chars.length < 6) {
@@ -58,27 +63,34 @@ export class DeviceService {
         chars.push(alphabet[buf[i] % alphabet.length]);
       }
     }
-    return chars.join('');
+    return chars.join("");
   }
 
   private newToken(): string {
-    return uuidv7() + '.' + randomBytes(24).toString('base64url');
+    return uuidv7() + "." + randomBytes(24).toString("base64url");
   }
 
   private hashToken(raw: string): string {
-    return createHash('sha256').update(raw).digest('hex');
+    return createHash("sha256").update(raw).digest("hex");
   }
 
   async createSlot(
     tenantId: string,
-    input: { kind: string; branchId?: string; capabilities?: string[]; model?: string; serial?: string; ownership?: 'sold' | 'rented' | 'byo' },
+    input: {
+      kind: string;
+      branchId?: string;
+      capabilities?: string[];
+      model?: string;
+      serial?: string;
+      ownership?: "sold" | "rented" | "byo";
+    },
   ) {
     if (input.branchId) {
       const branch = await this.prisma.branch.findFirst({
         where: { id: input.branchId, tenantId },
       });
       if (!branch) {
-        throw new BadRequestException('Branch not found for this tenant');
+        throw new BadRequestException("Branch not found for this tenant");
       }
     }
     let pairCode = this.newPairCode();
@@ -92,14 +104,20 @@ export class DeviceService {
     // 503 instead.
     let attempts = 0;
     for (let i = 0; i < 5; i++) {
-      const exists = await this.prisma.device.findUnique({ where: { pairCode } });
+      const exists = await this.prisma.device.findUnique({
+        where: { pairCode },
+      });
       if (!exists) break;
       attempts = i + 1;
-      this.logger.warn(`Pair code collision (attempt=${attempts}) tenant=${tenantId}; regenerating`);
+      this.logger.warn(
+        `Pair code collision (attempt=${attempts}) tenant=${tenantId}; regenerating`,
+      );
       pairCode = this.newPairCode();
     }
     if (attempts >= 5) {
-      throw new Error('Could not allocate unique pair code after 5 attempts — retry the request');
+      throw new Error(
+        "Could not allocate unique pair code after 5 attempts — retry the request",
+      );
     }
 
     const row = await this.prisma.device.create({
@@ -108,18 +126,20 @@ export class DeviceService {
         branchId: input.branchId ?? null,
         kind: input.kind,
         capabilities: input.capabilities ?? [],
-        status: 'unprovisioned',
+        status: "unprovisioned",
         model: input.model,
         serial: input.serial,
-        ownership: input.ownership ?? 'byo',
+        ownership: input.ownership ?? "byo",
         pairCode,
-        pairCodeExpiresAt: new Date(Date.now() + DeviceService.PAIR_CODE_TTL_MS),
+        pairCodeExpiresAt: new Date(
+          Date.now() + DeviceService.PAIR_CODE_TTL_MS,
+        ),
       },
     });
 
     await this.outbox
       .append({
-        type: 'device.slot_created.v1',
+        type: "device.slot_created.v1",
         tenantId,
         payload: { deviceId: row.id, kind: row.kind, branchId: row.branchId },
       })
@@ -131,7 +151,10 @@ export class DeviceService {
     return { ...row, pairCode };
   }
 
-  async list(tenantId: string, filters?: { branchId?: string; kind?: string; status?: string }) {
+  async list(
+    tenantId: string,
+    filters?: { branchId?: string; kind?: string; status?: string },
+  ) {
     // v2.8.97 — explicit select. Pre-fix the list returned every column
     // including pairCode (still-active if pre-pair), pairCodeExpiresAt,
     // and tokenHash (sha256, but still — no reason to ship hashes
@@ -163,7 +186,7 @@ export class DeviceService {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: [{ branchId: 'asc' }, { kind: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ branchId: "asc" }, { kind: "asc" }, { createdAt: "asc" }],
     });
   }
 
@@ -173,21 +196,28 @@ export class DeviceService {
     // caller, so a future refactor that drops the `!==` check would
     // leak a cross-tenant device's pairing metadata.
     const row = await this.prisma.device.findFirst({ where: { id, tenantId } });
-    if (!row) throw new NotFoundException('Device not found');
+    if (!row) throw new NotFoundException("Device not found");
     return row;
   }
 
   /** Device → server pair. Returns the raw token; never stored raw. */
-  async pair(input: { pairCode: string; model?: string; serial?: string; capabilities?: string[] }) {
-    const row = await this.prisma.device.findUnique({ where: { pairCode: input.pairCode } });
-    if (!row) throw new NotFoundException('Pair code invalid or expired');
+  async pair(input: {
+    pairCode: string;
+    model?: string;
+    serial?: string;
+    capabilities?: string[];
+  }) {
+    const row = await this.prisma.device.findUnique({
+      where: { pairCode: input.pairCode },
+    });
+    if (!row) throw new NotFoundException("Pair code invalid or expired");
     if (!row.pairCodeExpiresAt || row.pairCodeExpiresAt < new Date()) {
       // Atomically clear the expired code so it cannot be reused.
       await this.prisma.device.update({
         where: { id: row.id },
         data: { pairCode: null, pairCodeExpiresAt: null },
       });
-      throw new BadRequestException('Pair code expired — request a new one');
+      throw new BadRequestException("Pair code expired — request a new one");
     }
 
     const token = this.newToken();
@@ -220,7 +250,7 @@ export class DeviceService {
         pairCodeExpiresAt: { gt: now },
       },
       data: {
-        status: 'paired',
+        status: "paired",
         tokenHash,
         tokenExpiresAt,
         pairCode: null,
@@ -233,7 +263,7 @@ export class DeviceService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Pair code already claimed by another device or expired — request a new one',
+        "Pair code already claimed by another device or expired — request a new one",
       );
     }
     // v2.8.94 — defense-in-depth: re-fetch with (id, tenantId) compound.
@@ -246,7 +276,7 @@ export class DeviceService {
 
     await this.outbox
       .append({
-        type: 'device.paired.v1',
+        type: "device.paired.v1",
         tenantId: row.tenantId,
         payload: { deviceId: row.id, kind: row.kind, branchId: row.branchId },
       })
@@ -275,12 +305,20 @@ export class DeviceService {
     return row;
   }
 
-  async heartbeat(deviceId: string, payload: { batteryPct?: number; ip?: string; agentVersion?: string; queueDepth?: number }) {
+  async heartbeat(
+    deviceId: string,
+    payload: {
+      batteryPct?: number;
+      ip?: string;
+      agentVersion?: string;
+      queueDepth?: number;
+    },
+  ) {
     const now = new Date();
     await this.prisma.device.update({
       where: { id: deviceId },
       data: {
-        status: 'online',
+        status: "online",
         lastSeenAt: now,
       },
     });
@@ -289,11 +327,14 @@ export class DeviceService {
         .create({
           data: {
             id: uuidv7(),
-            tenantId: (await this.prisma.device.findUnique({ where: { id: deviceId }, select: { tenantId: true } }))!.tenantId,
+            tenantId: (await this.prisma.device.findUnique({
+              where: { id: deviceId },
+              select: { tenantId: true },
+            }))!.tenantId,
             deviceId,
-            level: 'info',
-            category: 'heartbeat',
-            message: 'heartbeat',
+            level: "info",
+            category: "heartbeat",
+            message: "heartbeat",
             payload: payload as any,
           },
         })
@@ -310,10 +351,10 @@ export class DeviceService {
     const cutoff = new Date(Date.now() - DeviceService.HEARTBEAT_GRACE_MS);
     const res = await this.prisma.device.updateMany({
       where: {
-        status: 'online',
+        status: "online",
         lastSeenAt: { lt: cutoff },
       },
-      data: { status: 'offline' },
+      data: { status: "offline" },
     });
     if (res.count > 0) this.logger.debug(`Marked ${res.count} devices offline`);
     return res.count;
@@ -328,9 +369,11 @@ export class DeviceService {
     // null someone else's tokenHash and lock their device out.
     const claim = await this.prisma.device.updateMany({
       where: { id: row.id, tenantId },
-      data: { status: 'retired', tokenHash: null },
+      data: { status: "retired", tokenHash: null },
     });
-    if (claim.count === 0) throw new NotFoundException('Device not found');
-    return this.prisma.device.findFirstOrThrow({ where: { id: row.id, tenantId } });
+    if (claim.count === 0) throw new NotFoundException("Device not found");
+    return this.prisma.device.findFirstOrThrow({
+      where: { id: row.id, tenantId },
+    });
   }
 }

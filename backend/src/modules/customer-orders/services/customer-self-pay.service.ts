@@ -6,19 +6,22 @@ import {
   Logger,
   NotFoundException,
   forwardRef,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { Prisma } from '@prisma/client';
-import { createHash, randomBytes } from 'crypto';
-import * as Sentry from '@sentry/node';
-import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaymentsService } from '../../orders/services/payments.service';
-import { PaytrAdapter } from '../../payments/adapters/paytr.adapter';
-import { CustomerSessionService } from '../../customers/customer-session.service';
-import { CreatePayIntentDto } from '../dto/pay-intent.dto';
-import { OrderStatus, PaymentStatus } from '../../../common/constants/order-status.enum';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { Prisma } from "@prisma/client";
+import { createHash, randomBytes } from "crypto";
+import * as Sentry from "@sentry/node";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { PaymentsService } from "../../orders/services/payments.service";
+import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
+import { CustomerSessionService } from "../../customers/customer-session.service";
+import { CreatePayIntentDto } from "../dto/pay-intent.dto";
+import {
+  OrderStatus,
+  PaymentStatus,
+} from "../../../common/constants/order-status.enum";
 
 // Self-pay intent reservation window. PayTR 3DS step + customer
 // hesitation comfortably fit in 15 min; longer windows leave a
@@ -38,11 +41,11 @@ function selfPayError(code: string, message: string): BadRequestException {
   return new BadRequestException({
     message,
     code,
-    error: 'Bad Request',
+    error: "Bad Request",
     statusCode: 400,
   });
 }
-const MERCHANT_OID_PREFIX = 'SP'; // "SP" — Self-Pay (subscription is "SUB")
+const MERCHANT_OID_PREFIX = "SP"; // "SP" — Self-Pay (subscription is "SUB")
 
 /**
  * Truncate a string to N UTF-8 bytes (PayTR basket lines are
@@ -51,13 +54,13 @@ const MERCHANT_OID_PREFIX = 'SP'; // "SP" — Self-Pay (subscription is "SUB")
  * undercounts Turkish letters and emoji.
  */
 function truncateUtf8(input: string, maxBytes: number): string {
-  if (!input) return '';
-  const buf = Buffer.from(input, 'utf8');
+  if (!input) return "";
+  const buf = Buffer.from(input, "utf8");
   if (buf.byteLength <= maxBytes) return input;
   // Walk back to a UTF-8-safe boundary so we don't split a multi-byte char.
   let end = maxBytes;
   while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
-  return buf.subarray(0, end).toString('utf8');
+  return buf.subarray(0, end).toString("utf8");
 }
 
 interface ItemsByOrderShape {
@@ -88,7 +91,7 @@ export async function fetchOrderItemReservations(
   const pending = await prisma.pendingSelfPayment.findMany({
     where: {
       tenantId,
-      status: 'PENDING',
+      status: "PENDING",
       expiresAt: { gt: new Date() },
       ...(excludeIntentId ? { id: { not: excludeIntentId } } : {}),
     },
@@ -146,24 +149,26 @@ export class CustomerSelfPayService {
    * trail of "customer started a self-pay but didn't finish" is
    * useful for retention metrics and disputed-charge investigations.
    */
-  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'self-pay-intent-expire' })
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: "self-pay-intent-expire" })
   async expireStaleIntents(): Promise<void> {
     await withAdvisoryLock(
       this.prisma,
-      'self-pay-intent-expire',
+      "self-pay-intent-expire",
       async () => {
         const result = await this.prisma.pendingSelfPayment.updateMany({
           where: {
-            status: 'PENDING',
+            status: "PENDING",
             expiresAt: { lt: new Date() },
           },
           data: {
-            status: 'EXPIRED',
-            failureReason: 'TTL expired (sweeper)',
+            status: "EXPIRED",
+            failureReason: "TTL expired (sweeper)",
           },
         });
         if (result.count > 0) {
-          this.logger.log(`self-pay sweeper: transitioned ${result.count} PENDING intents to EXPIRED`);
+          this.logger.log(
+            `self-pay sweeper: transitioned ${result.count} PENDING intents to EXPIRED`,
+          );
         }
       },
       this.logger,
@@ -181,8 +186,10 @@ export class CustomerSelfPayService {
     // can hide the "Pay Now" button on tenants that haven't opted
     // in. The createPayIntent path will also enforce it server-side
     // — this is a UX-layer convenience.
-    const posSettings = await this.prisma.posSettings.findUnique({
-      where: { tenantId_branchId: { tenantId: session.tenantId, branchId: null } },
+    // v3.0.1 — findFirst (compound-unique with branchId: null trips
+    // Prisma client validation; see branch-scope helper note).
+    const posSettings = await this.prisma.posSettings.findFirst({
+      where: { tenantId: session.tenantId, branchId: null },
       select: { enableCustomerSelfPay: true },
     });
     const selfPayEnabled = !!posSettings?.enableCustomerSelfPay;
@@ -224,7 +231,7 @@ export class CustomerSelfPayService {
           where: { status: PaymentStatus.COMPLETED },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     // Reservations from other customers' PENDING PayTR intents.
@@ -272,7 +279,7 @@ export class CustomerSelfPayService {
       );
       // Tolerance for sub-kuruş rounding from the residual rule.
       const nonAllocationPaid = paidAmount.sub(allocationPaid);
-      if (nonAllocationPaid.gt(new Prisma.Decimal('0.01'))) return false;
+      if (nonAllocationPaid.gt(new Prisma.Decimal("0.01"))) return false;
       return true;
     });
 
@@ -311,7 +318,7 @@ export class CustomerSelfPayService {
           unitTotal: perUnit.toFixed(2),
           itemTotal: itemTotal.toFixed(2),
           modifierLabels: (item.modifiers || [])
-            .map((m) => m.modifier?.displayName || m.modifier?.name || '')
+            .map((m) => m.modifier?.displayName || m.modifier?.name || "")
             .filter(Boolean),
         };
       });
@@ -356,15 +363,18 @@ export class CustomerSelfPayService {
    * hand them, so an attacker who could swap Origin would otherwise
    * funnel customers to a phishing page after payment.
    */
-  private resolveReturnUrls(origin?: string): { okUrl: string; failUrl: string } {
+  private resolveReturnUrls(origin?: string): {
+    okUrl: string;
+    failUrl: string;
+  } {
     const fallbackOk =
-      this.config.get<string>('PAYTR_OK_URL_POS') ??
-      this.config.get<string>('PAYTR_OK_URL') ??
-      'http://localhost:5173/payment-result';
+      this.config.get<string>("PAYTR_OK_URL_POS") ??
+      this.config.get<string>("PAYTR_OK_URL") ??
+      "http://localhost:5173/payment-result";
     const fallbackFail =
-      this.config.get<string>('PAYTR_FAIL_URL_POS') ??
-      this.config.get<string>('PAYTR_FAIL_URL') ??
-      'http://localhost:5173/payment-result';
+      this.config.get<string>("PAYTR_FAIL_URL_POS") ??
+      this.config.get<string>("PAYTR_FAIL_URL") ??
+      "http://localhost:5173/payment-result";
 
     if (!origin) return { okUrl: fallbackOk, failUrl: fallbackFail };
 
@@ -377,9 +387,10 @@ export class CustomerSelfPayService {
     // value must enumerate every legitimate origin, character for
     // character. Comma-separated, parsed via URL() so a typo surfaces
     // immediately instead of silently failing as "no match".
-    const allowedRaw = this.config.get<string>('PAYTR_ALLOWED_RETURN_ORIGINS') ?? '';
+    const allowedRaw =
+      this.config.get<string>("PAYTR_ALLOWED_RETURN_ORIGINS") ?? "";
     const allowedOrigins = allowedRaw
-      .split(',')
+      .split(",")
       .map((s) => s.trim())
       .filter(Boolean)
       .filter((s) => {
@@ -399,7 +410,7 @@ export class CustomerSelfPayService {
 
     // Origin like https://restaurant.hummytummy.com — same path
     // suffix the SPA uses for the path-based variant ("/payment-result").
-    const base = origin.replace(/\/+$/, '');
+    const base = origin.replace(/\/+$/, "");
     return {
       okUrl: `${base}/payment-result`,
       failUrl: `${base}/payment-result`,
@@ -417,20 +428,21 @@ export class CustomerSelfPayService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: session.tenantId },
     });
-    if (!tenant) throw new NotFoundException('Tenant not found');
+    if (!tenant) throw new NotFoundException("Tenant not found");
 
     // Tenant-owner opt-in: needs to flip the toggle in POS settings
     // before customers can self-pay. This
     // is a deliberate guard so a restaurant without a PayTR merchant
     // account doesn't surface a button that will only ever fail.
-    const posSettings = await this.prisma.posSettings.findUnique({
-      where: { tenantId_branchId: { tenantId: session.tenantId, branchId: null } },
+    // v3.0.1 — findFirst (see branch-scope helper note).
+    const posSettings = await this.prisma.posSettings.findFirst({
+      where: { tenantId: session.tenantId, branchId: null },
       select: { enableCustomerSelfPay: true },
     });
     if (!posSettings?.enableCustomerSelfPay) {
       throw selfPayError(
-        'SELF_PAY_DISABLED',
-        'Self-pay is not enabled for this restaurant. Please ask the waiter to take your payment.',
+        "SELF_PAY_DISABLED",
+        "Self-pay is not enabled for this restaurant. Please ask the waiter to take your payment.",
       );
     }
 
@@ -484,10 +496,10 @@ export class CustomerSelfPayService {
     // throws on mismatch as defence in depth; this pre-check produces
     // a clean structured error before the PendingSelfPayment row is
     // reserved.
-    const tenantCurrency = tenant.currency || 'TRY';
-    if (tenantCurrency !== 'TRY') {
+    const tenantCurrency = tenant.currency || "TRY";
+    if (tenantCurrency !== "TRY") {
       throw selfPayError(
-        'SELF_PAY_UNSUPPORTED_CURRENCY',
+        "SELF_PAY_UNSUPPORTED_CURRENCY",
         `Self-pay yalnızca TRY ile çalışan restoranlarda kullanılabilir (mevcut: ${tenantCurrency}).`,
       );
     }
@@ -502,7 +514,9 @@ export class CustomerSelfPayService {
     // view-side filter already hides these orders; this guard
     // catches a stale client that still posts an intent before its
     // cache refreshes.
-    const orderIdsTouched = Array.from(new Set(requested.map((i) => i.orderId)));
+    const orderIdsTouched = Array.from(
+      new Set(requested.map((i) => i.orderId)),
+    );
     const guardedOrders = await this.prisma.order.findMany({
       where: { id: { in: orderIdsTouched }, tenantId: session.tenantId },
       select: {
@@ -535,7 +549,7 @@ export class CustomerSelfPayService {
       );
       if (paid.gte(new Prisma.Decimal(o.finalAmount))) {
         throw selfPayError(
-          'ORDER_ALREADY_PAID',
+          "ORDER_ALREADY_PAID",
           `Order ${o.id} is already fully paid — refresh the menu to update your view.`,
         );
       }
@@ -550,11 +564,11 @@ export class CustomerSelfPayService {
         new Prisma.Decimal(0),
       );
       const nonAllocationPaid = paid.sub(allocPaid);
-      if (nonAllocationPaid.gt(new Prisma.Decimal('0.01'))) {
+      if (nonAllocationPaid.gt(new Prisma.Decimal("0.01"))) {
         throw selfPayError(
-          'SELF_PAY_DISABLED_MIXED_PAYMENT',
+          "SELF_PAY_DISABLED_MIXED_PAYMENT",
           `Order ${o.id} has a payment that wasn't recorded at item level. ` +
-            'Self-pay is disabled here — please call the waiter to settle.',
+            "Self-pay is disabled here — please call the waiter to settle.",
         );
       }
     }
@@ -580,9 +594,10 @@ export class CustomerSelfPayService {
       const reserved = reservations.get(item.id) ?? 0;
       const remaining = item.quantity - alreadyPaid - reserved;
       if (entry.quantity > remaining) {
-        const reasonSuffix = reserved > 0
-          ? ` (${reserved} reserved by another in-flight payment)`
-          : '';
+        const reasonSuffix =
+          reserved > 0
+            ? ` (${reserved} reserved by another in-flight payment)`
+            : "";
         throw new BadRequestException(
           `Item ${entry.orderItemId} has ${remaining} units remaining, cannot pay ${entry.quantity}${reasonSuffix}`,
         );
@@ -596,13 +611,16 @@ export class CustomerSelfPayService {
         orderId: item.orderId,
         items: [],
       };
-      bucket.items.push({ orderItemId: entry.orderItemId, quantity: entry.quantity });
+      bucket.items.push({
+        orderItemId: entry.orderItemId,
+        quantity: entry.quantity,
+      });
       itemsByOrder.set(item.orderId, bucket);
     }
     totalAmount = totalAmount.toDecimalPlaces(2);
 
     if (totalAmount.lte(0)) {
-      throw new BadRequestException('Nothing to pay');
+      throw new BadRequestException("Nothing to pay");
     }
 
     const merchantOid = this.generateMerchantOid(session.tenantId);
@@ -622,21 +640,27 @@ export class CustomerSelfPayService {
     // phone). A second tap with identical inputs lands the existing
     // PENDING intent — the URL the customer is redirected to is the
     // same one as the first tap.
-    const reqHash = createHash('sha256')
+    const reqHash = createHash("sha256")
       .update(sessionId)
-      .update('|')
-      .update(JSON.stringify(Array.from(itemsByOrder.values()).sort((a, b) => a.orderId.localeCompare(b.orderId))))
-      .update('|')
+      .update("|")
+      .update(
+        JSON.stringify(
+          Array.from(itemsByOrder.values()).sort((a, b) =>
+            a.orderId.localeCompare(b.orderId),
+          ),
+        ),
+      )
+      .update("|")
       .update(totalAmount.toString())
-      .update('|')
-      .update(dto.customerPhone ?? '')
-      .digest('hex')
+      .update("|")
+      .update(dto.customerPhone ?? "")
+      .digest("hex")
       .slice(0, 32);
     const dedupExisting = await this.prisma.pendingSelfPayment.findFirst({
       where: {
         sessionId,
         tenantId: session.tenantId,
-        status: 'PENDING',
+        status: "PENDING",
         requestHash: reqHash,
         expiresAt: { gt: new Date() },
       },
@@ -653,7 +677,7 @@ export class CustomerSelfPayService {
       // poll the merchantOid path and complete the existing flow
       // instead of restarting.
       throw new ConflictException(
-        'A payment for these items is already in progress — complete it in the open tab, or wait 15 minutes for it to expire.',
+        "A payment for these items is already in progress — complete it in the open tab, or wait 15 minutes for it to expire.",
       );
     }
 
@@ -705,7 +729,7 @@ export class CustomerSelfPayService {
       );
       if (distinctBranches.length !== 1) {
         throw new BadRequestException(
-          'Self-pay intent spans multiple branches — split into separate intents.',
+          "Self-pay intent spans multiple branches — split into separate intents.",
         );
       }
       const intentBranchId = distinctBranches[0];
@@ -718,7 +742,7 @@ export class CustomerSelfPayService {
           branchId: intentBranchId,
           itemsByOrder: Array.from(itemsByOrder.values()) as any,
           amount: totalAmount,
-          status: 'PENDING',
+          status: "PENDING",
           customerPhone: dto.customerPhone,
           expiresAt,
           // v2.8.98 — deterministic dedup key over (session, items,
@@ -744,7 +768,7 @@ export class CustomerSelfPayService {
       const item = requested.find((i) => i.id === entry.orderItemId)!;
       const perUnit = this.paymentsService.derivePerUnitNet(item, item.order);
       basket.push([
-        truncateUtf8((item.product as any)?.name ?? 'Ürün', 80) || 'Ürün',
+        truncateUtf8((item.product as any)?.name ?? "Ürün", 80) || "Ürün",
         perUnit.toFixed(2),
         entry.quantity,
       ]);
@@ -763,7 +787,7 @@ export class CustomerSelfPayService {
       // valid Turkish mobile shape (starts with 05, 11 digits) but
       // is not a real number. We don't pass the customer's actual
       // phone here either — same PII rationale as the email.
-      const safePhone = '05000000000';
+      const safePhone = "05000000000";
 
       const result = await this.paytrAdapter.getIframeToken({
         merchantOid,
@@ -772,8 +796,8 @@ export class CustomerSelfPayService {
         // adapter's currency-gate fires as defence in depth.
         currency: orderCurrency,
         email: safeEmail,
-        userName: 'Müşteri',
-        userAddress: 'Masa',
+        userName: "Müşteri",
+        userAddress: "Masa",
         userPhone: safePhone,
         userBasket: basket,
         userIp,
@@ -804,8 +828,8 @@ export class CustomerSelfPayService {
       await this.prisma.pendingSelfPayment.update({
         where: { id: intent.id },
         data: {
-          status: 'FAILED',
-          failureReason: 'paytr_token_error',
+          status: "FAILED",
+          failureReason: "paytr_token_error",
         },
       });
       throw err;
@@ -837,19 +861,19 @@ export class CustomerSelfPayService {
       where: { merchantOid },
     });
     if (!intent || intent.sessionId !== sessionId) {
-      throw new NotFoundException('Payment intent not found for this session');
+      throw new NotFoundException("Payment intent not found for this session");
     }
 
     let status = intent.status;
     let failureReason = intent.failureReason;
-    if (status === 'PENDING' && intent.expiresAt < new Date()) {
+    if (status === "PENDING" && intent.expiresAt < new Date()) {
       const updated = await this.prisma.pendingSelfPayment.updateMany({
-        where: { id: intent.id, status: 'PENDING' },
-        data: { status: 'EXPIRED', failureReason: 'expired' },
+        where: { id: intent.id, status: "PENDING" },
+        data: { status: "EXPIRED", failureReason: "expired" },
       });
       if (updated.count > 0) {
-        status = 'EXPIRED';
-        failureReason = 'expired';
+        status = "EXPIRED";
+        failureReason = "expired";
       }
     }
 
@@ -857,7 +881,9 @@ export class CustomerSelfPayService {
     // expired by the time the customer returns, we still return the
     // payment outcome (the important bit) and just leave `remaining`
     // null. The receipt UI handles a null remaining gracefully.
-    let remaining: Awaited<ReturnType<typeof this.getPayableItemsForSession>> | null = null;
+    let remaining: Awaited<
+      ReturnType<typeof this.getPayableItemsForSession>
+    > | null = null;
     try {
       remaining = await this.getPayableItemsForSession(sessionId);
     } catch {
@@ -898,7 +924,7 @@ export class CustomerSelfPayService {
       this.logger.warn(`self-pay webhook: unknown merchantOid=${merchantOid}`);
       return;
     }
-    if (intent.status !== 'PENDING') {
+    if (intent.status !== "PENDING") {
       // Idempotent — PayTR retried; we already settled.
       return;
     }
@@ -950,7 +976,7 @@ export class CustomerSelfPayService {
           bucket.orderId,
           {
             items: bucket.items,
-            method: 'CARD' as any,
+            method: "CARD" as any,
             transactionId: merchantOid,
             customerPhone: intent.customerPhone || undefined,
             // Per-order idempotency key — PayTR retry returns the same
@@ -959,7 +985,7 @@ export class CustomerSelfPayService {
             idempotencyKey: `selfpay:${merchantOid}:${bucket.orderId}`,
             notes: paytrPaymentType
               ? `Self-pay via PayTR (${paytrPaymentType})`
-              : 'Self-pay via PayTR',
+              : "Self-pay via PayTR",
           },
           intent.tenantId,
         );
@@ -970,8 +996,8 @@ export class CustomerSelfPayService {
       // won't be overwritten; a concurrent failure path won't be
       // downgraded to SUCCEEDED.
       await this.prisma.pendingSelfPayment.updateMany({
-        where: { id: intent.id, status: 'PENDING' },
-        data: { status: 'SUCCEEDED', succeededAt: new Date() },
+        where: { id: intent.id, status: "PENDING" },
+        data: { status: "SUCCEEDED", succeededAt: new Date() },
       });
     } catch (err: any) {
       this.logger.error(
@@ -979,7 +1005,10 @@ export class CustomerSelfPayService {
         err?.stack,
       );
       Sentry.captureException(err, {
-        tags: { event: 'SELF_PAY_SETTLEMENT_FAILED', tenantId: intent.tenantId },
+        tags: {
+          event: "SELF_PAY_SETTLEMENT_FAILED",
+          tenantId: intent.tenantId,
+        },
         extra: { merchantOid, sessionId: intent.sessionId, raw: err?.message },
       });
       // Coded failureReason → frontend maps to localized message.
@@ -991,10 +1020,10 @@ export class CustomerSelfPayService {
       // succeeded must not be downgraded to FAILED. The Sentry alert
       // above is still emitted regardless — ops gets the signal.
       await this.prisma.pendingSelfPayment.updateMany({
-        where: { id: intent.id, status: 'PENDING' },
+        where: { id: intent.id, status: "PENDING" },
         data: {
-          status: 'FAILED',
-          failureReason: 'settlement_error',
+          status: "FAILED",
+          failureReason: "settlement_error",
         },
       });
     }
@@ -1005,10 +1034,10 @@ export class CustomerSelfPayService {
     reason: string | undefined,
   ): Promise<void> {
     await this.prisma.pendingSelfPayment.updateMany({
-      where: { merchantOid, status: 'PENDING' },
+      where: { merchantOid, status: "PENDING" },
       data: {
-        status: 'FAILED',
-        failureReason: reason ?? 'paytr_reported_failure',
+        status: "FAILED",
+        failureReason: reason ?? "paytr_reported_failure",
       },
     });
   }
@@ -1016,9 +1045,9 @@ export class CustomerSelfPayService {
   // ──────────────────────────────────────────────────────────────────
 
   private generateMerchantOid(tenantId: string): string {
-    const tenantHex = tenantId.replace(/-/g, '').slice(0, 12);
+    const tenantHex = tenantId.replace(/-/g, "").slice(0, 12);
     const ts = Date.now().toString(36);
-    const rand = randomBytes(3).toString('hex');
+    const rand = randomBytes(3).toString("hex");
     return `${MERCHANT_OID_PREFIX}${tenantHex}${ts}${rand}`;
   }
 }

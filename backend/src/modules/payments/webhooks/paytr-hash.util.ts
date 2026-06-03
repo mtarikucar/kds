@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as crypto from "crypto";
 
 export interface CallbackHashInput {
   merchantOid: string;
@@ -16,9 +16,9 @@ export interface CallbackHashInput {
 export function computeCallbackHash(input: CallbackHashInput): string {
   const { merchantOid, merchantSalt, status, totalAmount, merchantKey } = input;
   return crypto
-    .createHmac('sha256', merchantKey)
+    .createHmac("sha256", merchantKey)
     .update(`${merchantOid}${merchantSalt}${status}${totalAmount}`)
-    .digest('base64');
+    .digest("base64");
 }
 
 export function verifyCallbackHash(

@@ -1,6 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { KmsDecryptInput, KmsEncryptInput, KmsProvider } from './kms-provider.interface';
+import { Injectable } from "@nestjs/common";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
+import {
+  KmsDecryptInput,
+  KmsEncryptInput,
+  KmsProvider,
+} from "./kms-provider.interface";
 
 /**
  * Env-derived KMS — same scheme that integration-gateway has been using
@@ -37,11 +46,11 @@ import { KmsDecryptInput, KmsEncryptInput, KmsProvider } from './kms-provider.in
  * format flag column on the row (not a magic-byte heuristic).
  */
 const ENVELOPE_VERSION_V1 = 0x01;
-const ALGORITHM_AES_256_GCM = 'aes-256-gcm';
+const ALGORITHM_AES_256_GCM = "aes-256-gcm";
 
 @Injectable()
 export class EnvKmsProvider implements KmsProvider {
-  readonly id = 'env';
+  readonly id = "env";
 
   /**
    * Active key version for new encryptions. Read from env so ops can roll
@@ -49,7 +58,7 @@ export class EnvKmsProvider implements KmsProvider {
    * historical v1 blobs continue to decrypt with the v1 key derivation.
    */
   private currentVersion(): number {
-    const v = Number(process.env.KMS_KEY_VERSION ?? '1');
+    const v = Number(process.env.KMS_KEY_VERSION ?? "1");
     return Number.isFinite(v) && v > 0 ? Math.floor(v) : 1;
   }
 
@@ -65,7 +74,9 @@ export class EnvKmsProvider implements KmsProvider {
       return (
         process.env.INTEGRATION_KEY ??
         process.env.KMS_MASTER_KEY ??
-        (process.env.NODE_ENV === 'production' ? null : 'dev-only-do-not-use-in-prod')
+        (process.env.NODE_ENV === "production"
+          ? null
+          : "dev-only-do-not-use-in-prod")
       );
     }
     return process.env[`KMS_MASTER_KEY_V${version}`] ?? null;
@@ -79,8 +90,8 @@ export class EnvKmsProvider implements KmsProvider {
     const ctx = Object.keys(context)
       .sort()
       .map((k) => `${k}=${context[k]}`)
-      .join('|');
-    return createHash('sha256').update(`v${version}::${base}::${ctx}`).digest();
+      .join("|");
+    return createHash("sha256").update(`v${version}::${base}::${ctx}`).digest();
   }
 
   /**
@@ -92,23 +103,31 @@ export class EnvKmsProvider implements KmsProvider {
     const ctx = Object.keys(context)
       .sort()
       .map((k) => `${k}=${context[k]}`)
-      .join('|');
-    return Buffer.from(`v${version}|${ALGORITHM_AES_256_GCM}|${ctx}`, 'utf8');
+      .join("|");
+    return Buffer.from(`v${version}|${ALGORITHM_AES_256_GCM}|${ctx}`, "utf8");
   }
 
   async encrypt({ context, plaintext }: KmsEncryptInput): Promise<Buffer> {
     const version = this.currentVersion();
     const key = this.deriveKey(version, context);
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
     cipher.setAAD(this.aad(version, context));
-    const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const ct = Buffer.concat([
+      cipher.update(plaintext, "utf8"),
+      cipher.final(),
+    ]);
     const tag = cipher.getAuthTag();
-    return Buffer.concat([Buffer.from([ENVELOPE_VERSION_V1, version]), iv, tag, ct]);
+    return Buffer.concat([
+      Buffer.from([ENVELOPE_VERSION_V1, version]),
+      iv,
+      tag,
+      ct,
+    ]);
   }
 
   async decrypt({ context, ciphertext }: KmsDecryptInput): Promise<string> {
-    if (ciphertext.length === 0) throw new Error('Empty ciphertext');
+    if (ciphertext.length === 0) throw new Error("Empty ciphertext");
     // First byte must be the v1 envelope marker. Previously a non-v1 byte
     // would fall through to a legacy decoder that collided with the
     // 1/256 of real v1 blobs whose IV began with a non-0x01 byte — wait,
@@ -117,23 +136,30 @@ export class EnvKmsProvider implements KmsProvider {
     // producer in this codebase ever wrote the legacy format, refuse
     // unknown markers explicitly.
     if (ciphertext[0] !== ENVELOPE_VERSION_V1) {
-      throw new Error(`Unknown KMS envelope version: 0x${ciphertext[0].toString(16)}`);
+      throw new Error(
+        `Unknown KMS envelope version: 0x${ciphertext[0].toString(16)}`,
+      );
     }
     const version = ciphertext[1];
     const key = this.deriveKey(version, context);
     const iv = ciphertext.subarray(2, 14);
     const tag = ciphertext.subarray(14, 30);
     const ct = ciphertext.subarray(30);
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
     decipher.setAAD(this.aad(version, context));
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+    return Buffer.concat([decipher.update(ct), decipher.final()]).toString(
+      "utf8",
+    );
   }
 
   async healthCheck() {
     return {
       ok: Boolean(process.env.INTEGRATION_KEY || process.env.KMS_MASTER_KEY),
-      details: { provider: 'env', warning: 'env-derived key — use AWS KMS in production' },
+      details: {
+        provider: "env",
+        warning: "env-derived key — use AWS KMS in production",
+      },
     };
   }
 }

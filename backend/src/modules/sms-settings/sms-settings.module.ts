@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { CustomersModule } from '../customers/customers.module';
-import { SmsSettingsController } from './sms-settings.controller';
-import { SmsSettingsService } from './sms-settings.service';
-import { SmsNotificationService } from './sms-notification.service';
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { Module } from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { CustomersModule } from "../customers/customers.module";
+import { SmsSettingsController } from "./sms-settings.controller";
+import { SmsSettingsService } from "./sms-settings.service";
+import { SmsNotificationService } from "./sms-notification.service";
+import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 
 @Module({
   imports: [PrismaModule, CustomersModule, SubscriptionsModule],

@@ -1,7 +1,12 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateAddOnDto, UpdateAddOnDto } from './dto/addon.dto';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateAddOnDto, UpdateAddOnDto } from "./dto/addon.dto";
 
 /**
  * Catalog management for marketplace add-ons.
@@ -30,15 +35,15 @@ export class AddOnCatalogService {
         ...(filters?.status ? { status: filters.status } : {}),
         ...(filters?.kind ? { kind: filters.kind } : {}),
       },
-      orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+      orderBy: [{ kind: "asc" }, { name: "asc" }],
     });
   }
 
   /** Public marketplace — returns only published rows, fields trimmed for UI. */
   async listPublic() {
     const rows = await this.prisma.marketplaceAddOn.findMany({
-      where: { status: 'published' },
-      orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+      where: { status: "published" },
+      orderBy: [{ kind: "asc" }, { name: "asc" }],
     });
     return rows.map((r) => ({
       code: r.code,
@@ -53,7 +58,9 @@ export class AddOnCatalogService {
   }
 
   async findByCodeOrThrow(code: string) {
-    const row = await this.prisma.marketplaceAddOn.findUnique({ where: { code } });
+    const row = await this.prisma.marketplaceAddOn.findUnique({
+      where: { code },
+    });
     if (!row) throw new NotFoundException(`Add-on not found: ${code}`);
     return row;
   }
@@ -68,14 +75,17 @@ export class AddOnCatalogService {
           kind: dto.kind,
           billing: dto.billing,
           priceCents: dto.priceCents,
-          currency: dto.currency ?? 'TRY',
+          currency: dto.currency ?? "TRY",
           grants: dto.grants as any,
           deps: dto.deps ?? [],
-          status: dto.status ?? 'draft',
+          status: dto.status ?? "draft",
         },
       });
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
         throw new ConflictException(`Add-on code already exists: ${dto.code}`);
       }
       throw e;
@@ -83,8 +93,10 @@ export class AddOnCatalogService {
   }
 
   async update(id: string, dto: UpdateAddOnDto) {
-    const exists = await this.prisma.marketplaceAddOn.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException('Add-on not found');
+    const exists = await this.prisma.marketplaceAddOn.findUnique({
+      where: { id },
+    });
+    if (!exists) throw new NotFoundException("Add-on not found");
     return this.prisma.marketplaceAddOn.update({
       where: { id },
       data: {
@@ -102,7 +114,7 @@ export class AddOnCatalogService {
   }
 
   async archive(id: string) {
-    return this.update(id, { status: 'archived' });
+    return this.update(id, { status: "archived" });
   }
 
   /**
@@ -112,8 +124,10 @@ export class AddOnCatalogService {
    */
   async resolveDeps(deps: string[]): Promise<string[]> {
     const missing: string[] = [];
-    const addonCodes = deps.filter((d) => !d.startsWith('plan:'));
-    const planNames = deps.filter((d) => d.startsWith('plan:')).map((d) => d.slice('plan:'.length));
+    const addonCodes = deps.filter((d) => !d.startsWith("plan:"));
+    const planNames = deps
+      .filter((d) => d.startsWith("plan:"))
+      .map((d) => d.slice("plan:".length));
 
     if (addonCodes.length > 0) {
       const found = await this.prisma.marketplaceAddOn.findMany({
@@ -132,7 +146,7 @@ export class AddOnCatalogService {
       for (const n of planNames) if (!have.has(n)) missing.push(`plan:${n}`);
     }
     if (missing.length > 0) {
-      throw new BadRequestException(`Unresolved deps: ${missing.join(', ')}`);
+      throw new BadRequestException(`Unresolved deps: ${missing.join(", ")}`);
     }
     return missing;
   }

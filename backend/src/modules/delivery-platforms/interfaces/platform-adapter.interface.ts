@@ -1,5 +1,5 @@
-import { DeliveryPlatformConfig } from '@prisma/client';
-import { NormalizedOrder } from './platform-order.interface';
+import { DeliveryPlatformConfig } from "@prisma/client";
+import { NormalizedOrder } from "./platform-order.interface";
 
 export interface AuthResult {
   token: string;
@@ -18,22 +18,42 @@ export interface PlatformAdapter {
   authenticate(config: DeliveryPlatformConfig): Promise<AuthResult>;
 
   /** Accept an incoming order on the platform */
-  acceptOrder(config: DeliveryPlatformConfig, externalOrderId: string): Promise<void>;
+  acceptOrder(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+  ): Promise<void>;
 
   /** Reject an incoming order on the platform */
-  rejectOrder(config: DeliveryPlatformConfig, externalOrderId: string, reason?: string): Promise<void>;
+  rejectOrder(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+    reason?: string,
+  ): Promise<void>;
 
   /** Mark order as being prepared */
-  markPreparing(config: DeliveryPlatformConfig, externalOrderId: string): Promise<void>;
+  markPreparing(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+  ): Promise<void>;
 
   /** Mark order as ready for pickup */
-  markReady(config: DeliveryPlatformConfig, externalOrderId: string): Promise<void>;
+  markReady(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+  ): Promise<void>;
 
   /** Mark order as picked up by courier */
-  markPickedUp(config: DeliveryPlatformConfig, externalOrderId: string): Promise<void>;
+  markPickedUp(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+  ): Promise<void>;
 
   /** Cancel an order on the platform */
-  cancelOrder(config: DeliveryPlatformConfig, externalOrderId: string, reason?: string): Promise<void>;
+  cancelOrder(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+    reason?: string,
+  ): Promise<void>;
 
   /** Poll platform for new orders (Getir, Migros, Trendyol) */
   pollNewOrders?(config: DeliveryPlatformConfig): Promise<NormalizedOrder[]>;
@@ -42,7 +62,10 @@ export interface PlatformAdapter {
   parseWebhookOrder?(rawPayload: Record<string, any>): NormalizedOrder;
 
   /** Push menu items to platform */
-  syncMenu?(config: DeliveryPlatformConfig, items: MenuSyncItem[]): Promise<void>;
+  syncMenu?(
+    config: DeliveryPlatformConfig,
+    items: MenuSyncItem[],
+  ): Promise<void>;
 
   /** Update single item availability on platform */
   updateItemAvailability?(

@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateRecipeDto, RecipeIngredientDto } from '../dto/create-recipe.dto';
-import { UpdateRecipeDto } from '../dto/update-recipe.dto';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateRecipeDto, RecipeIngredientDto } from "../dto/create-recipe.dto";
+import { UpdateRecipeDto } from "../dto/update-recipe.dto";
 
 // Iter-93: pagination cap on recipes list. Most tenants have ~50 distinct
 // product recipes; large chains in our pipeline have ~500. 500 is a comfortable
@@ -42,17 +47,24 @@ export class RecipesService {
     tenantId: string,
     pagination?: { limit?: number; offset?: number },
   ) {
-    const take = Math.min(pagination?.limit ?? RECIPES_DEFAULT_TAKE, RECIPES_HARD_MAX_TAKE);
+    const take = Math.min(
+      pagination?.limit ?? RECIPES_DEFAULT_TAKE,
+      RECIPES_HARD_MAX_TAKE,
+    );
     const skip = pagination?.offset ?? 0;
     return this.prisma.recipe.findMany({
       where: { tenantId },
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, currentStock: true },
+            },
+          },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take,
       skip,
     });
@@ -64,11 +76,21 @@ export class RecipesService {
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true, costPerUnit: true } } },
+          include: {
+            stockItem: {
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+                currentStock: true,
+                costPerUnit: true,
+              },
+            },
+          },
         },
       },
     });
-    if (!recipe) throw new NotFoundException('Recipe not found');
+    if (!recipe) throw new NotFoundException("Recipe not found");
     return recipe;
   }
 
@@ -78,11 +100,22 @@ export class RecipesService {
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true, costPerUnit: true } } },
+          include: {
+            stockItem: {
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+                currentStock: true,
+                costPerUnit: true,
+              },
+            },
+          },
         },
       },
     });
-    if (!recipe) throw new NotFoundException('No recipe found for this product');
+    if (!recipe)
+      throw new NotFoundException("No recipe found for this product");
     return recipe;
   }
 
@@ -95,13 +128,14 @@ export class RecipesService {
     const product = await this.prisma.product.findFirst({
       where: { id: dto.productId, tenantId },
     });
-    if (!product) throw new BadRequestException('Product not found');
+    if (!product) throw new BadRequestException("Product not found");
 
     // Check if recipe already exists for this product within this tenant
     const existing = await this.prisma.recipe.findFirst({
       where: { productId: dto.productId, tenantId },
     });
-    if (existing) throw new ConflictException('A recipe already exists for this product');
+    if (existing)
+      throw new ConflictException("A recipe already exists for this product");
 
     // Verify all stock items exist
     const stockItemIds = dto.ingredients.map((i) => i.stockItemId);
@@ -109,7 +143,7 @@ export class RecipesService {
       where: { id: { in: stockItemIds }, tenantId },
     });
     if (stockItems.length !== stockItemIds.length) {
-      throw new BadRequestException('One or more stock items not found');
+      throw new BadRequestException("One or more stock items not found");
     }
 
     return this.prisma.recipe.create({
@@ -130,7 +164,11 @@ export class RecipesService {
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, currentStock: true },
+            },
+          },
         },
       },
     });
@@ -152,7 +190,7 @@ export class RecipesService {
         },
       });
       if (updated.count === 0) {
-        throw new BadRequestException('Recipe not found');
+        throw new BadRequestException("Recipe not found");
       }
 
       // Replace ingredients if provided
@@ -166,7 +204,7 @@ export class RecipesService {
           where: { id: { in: stockItemIds }, tenantId },
         });
         if (stockItems.length !== stockItemIds.length) {
-          throw new BadRequestException('One or more stock items not found');
+          throw new BadRequestException("One or more stock items not found");
         }
 
         // Delete existing ingredients
@@ -187,7 +225,16 @@ export class RecipesService {
         include: {
           product: { select: { id: true, name: true, price: true } },
           ingredients: {
-            include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
+            include: {
+              stockItem: {
+                select: {
+                  id: true,
+                  name: true,
+                  unit: true,
+                  currentStock: true,
+                },
+              },
+            },
           },
         },
       });
@@ -198,7 +245,9 @@ export class RecipesService {
     const recipe = await this.findOne(id, tenantId);
     // Log loudly — deleting a recipe stops ingredient deduction for the
     // bound product without any other signal.
-    const logger = new (await import('@nestjs/common')).Logger('RecipesService');
+    const logger = new (await import("@nestjs/common")).Logger(
+      "RecipesService",
+    );
     logger.warn(
       `Recipe ${recipe.name ?? recipe.id} removed for product ${recipe.productId}; ingredient auto-deduction for this product has stopped.`,
     );
@@ -207,7 +256,7 @@ export class RecipesService {
       where: { id, tenantId },
     });
     if (result.count === 0) {
-      throw new BadRequestException('Recipe not found');
+      throw new BadRequestException("Recipe not found");
     }
     return { id };
   }
@@ -234,7 +283,9 @@ export class RecipesService {
       maxQuantity: Math.min(
         ...recipe.ingredients.map((ingredient) => {
           const perUnit = Number(ingredient.quantity) / recipe.yield;
-          return perUnit > 0 ? Math.floor(Number(ingredient.stockItem.currentStock) / perUnit) : Infinity;
+          return perUnit > 0
+            ? Math.floor(Number(ingredient.stockItem.currentStock) / perUnit)
+            : Infinity;
         }),
       ),
       ingredients: results,

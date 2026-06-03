@@ -1,9 +1,9 @@
-import { Global, Module } from '@nestjs/common';
-import { PaymentProviderRegistry } from './payment-provider.registry';
-import { PaymentsFacadeService } from './payments-facade.service';
-import { MockPaymentProvider } from './adapters/mock-payment-provider';
-import { PaytrPaymentProvider } from './adapters/paytr-payment-provider';
-import { PaytrAdapterModule } from '../payments/adapters/paytr-adapter.module';
+import { Global, Module } from "@nestjs/common";
+import { PaymentProviderRegistry } from "./payment-provider.registry";
+import { PaymentsFacadeService } from "./payments-facade.service";
+import { MockPaymentProvider } from "./adapters/mock-payment-provider";
+import { PaytrPaymentProvider } from "./adapters/paytr-payment-provider";
+import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
 
 /**
  * Payments-core module. Exposes the provider-neutral interface that the
@@ -20,7 +20,12 @@ import { PaytrAdapterModule } from '../payments/adapters/paytr-adapter.module';
 @Global()
 @Module({
   imports: [PaytrAdapterModule],
-  providers: [PaymentProviderRegistry, PaymentsFacadeService, MockPaymentProvider, PaytrPaymentProvider],
+  providers: [
+    PaymentProviderRegistry,
+    PaymentsFacadeService,
+    MockPaymentProvider,
+    PaytrPaymentProvider,
+  ],
   exports: [PaymentProviderRegistry, PaymentsFacadeService],
 })
 export class PaymentsCoreModule {}

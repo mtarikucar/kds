@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateStockItemDto } from '../dto/create-stock-item.dto';
-import { UpdateStockItemDto } from '../dto/update-stock-item.dto';
-import { StockItemQueryDto } from '../dto/stock-item-query.dto';
-import { Prisma } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateStockItemDto } from "../dto/create-stock-item.dto";
+import { UpdateStockItemDto } from "../dto/update-stock-item.dto";
+import { StockItemQueryDto } from "../dto/stock-item-query.dto";
+import { Prisma } from "@prisma/client";
 
 @Injectable()
 export class StockItemsService {
@@ -14,8 +18,8 @@ export class StockItemsService {
 
     if (query.search) {
       where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { sku: { contains: query.search, mode: 'insensitive' } },
+        { name: { contains: query.search, mode: "insensitive" } },
+        { sku: { contains: query.search, mode: "insensitive" } },
       ];
     }
     if (query.categoryId) where.categoryId = query.categoryId;
@@ -23,9 +27,9 @@ export class StockItemsService {
 
     const orderBy: Prisma.StockItemOrderByWithRelationInput = {};
     if (query.sortBy) {
-      orderBy[query.sortBy] = query.sortOrder || 'asc';
+      orderBy[query.sortBy] = query.sortOrder || "asc";
     } else {
-      orderBy.name = 'asc';
+      orderBy.name = "asc";
     }
 
     return this.prisma.stockItem.findMany({
@@ -40,11 +44,14 @@ export class StockItemsService {
       where: { id, tenantId },
       include: {
         category: true,
-        batches: { where: { quantity: { gt: 0 } }, orderBy: { expiryDate: 'asc' } },
+        batches: {
+          where: { quantity: { gt: 0 } },
+          orderBy: { expiryDate: "asc" },
+        },
         supplierStockItems: { include: { supplier: true } },
       },
     });
-    if (!item) throw new NotFoundException('Stock item not found');
+    if (!item) throw new NotFoundException("Stock item not found");
     return item;
   }
 
@@ -59,8 +66,7 @@ export class StockItemsService {
 
   async update(id: string, dto: UpdateStockItemDto, tenantId: string) {
     await this.findOne(id, tenantId);
-    const data =
-      'sku' in dto ? { ...dto, sku: dto.sku ? dto.sku : null } : dto;
+    const data = "sku" in dto ? { ...dto, sku: dto.sku ? dto.sku : null } : dto;
     // Defence-in-depth: tenant filter in the update's own WHERE so the
     // pre-check can't be the *only* tenant guard. updateMany + count
     // check (TOCTOU-safe) — if the row was deleted between the pre-check
@@ -70,7 +76,7 @@ export class StockItemsService {
       data,
     });
     if (result.count === 0) {
-      throw new NotFoundException('Stock item not found');
+      throw new NotFoundException("Stock item not found");
     }
     return this.prisma.stockItem.findUnique({
       where: { id },
@@ -97,7 +103,7 @@ export class StockItemsService {
       where: { id, tenantId },
     });
     if (result.count === 0) {
-      throw new NotFoundException('Stock item not found');
+      throw new NotFoundException("Stock item not found");
     }
     return { id };
   }
@@ -134,7 +140,7 @@ export class StockItemsService {
         stockItem: { trackExpiry: true },
       },
       include: { stockItem: true },
-      orderBy: { expiryDate: 'asc' },
+      orderBy: { expiryDate: "asc" },
     });
   }
 }

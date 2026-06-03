@@ -28,6 +28,8 @@ describe('UsageService.getSnapshot (v2.8.88)', () => {
       },
       user: { count: jest.fn().mockResolvedValue(3) },
       branch: { count: jest.fn().mockResolvedValue(2) },
+      // v3.0.0 — tables dimension now in the snapshot
+      table: { count: jest.fn().mockResolvedValue(12) },
       product: { count: jest.fn().mockResolvedValue(48) },
       order: { count: jest.fn().mockResolvedValue(122) },
     };
@@ -36,6 +38,7 @@ describe('UsageService.getSnapshot (v2.8.88)', () => {
         features: {},
         limits: {
           'limit.maxUsers': 15,
+          'limit.maxTables': 50,
           'limit.maxProducts': 500,
           'limit.maxMonthlyOrders': 5000,
           'limit.maxBranches': 3, // from extra_branch ×2 add-ons
@@ -51,9 +54,17 @@ describe('UsageService.getSnapshot (v2.8.88)', () => {
     const snap = await svc.getSnapshot(tenantId);
     expect(snap.users).toEqual({ current: 3, max: 15 });
     expect(snap.branches).toEqual({ current: 2, max: 3 });
+    expect(snap.tables).toEqual({ current: 12, max: 50 });
     expect(snap.products).toEqual({ current: 48, max: 500 });
     expect(snap.monthlyOrders).toEqual({ current: 122, max: 5000 });
     expect(snap.computedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('v3.0.0 — branches.count predicate excludes archived rows', async () => {
+    await svc.getSnapshot(tenantId);
+    expect(prisma.branch.count).toHaveBeenCalledWith({
+      where: { tenantId, status: 'active' },
+    });
   });
 
   it('caches per-tenant for 60s — second call skips Prisma + engine', async () => {
@@ -77,12 +88,15 @@ describe('UsageService.getSnapshot (v2.8.88)', () => {
       id: tenantId,
       currentPlan: {
         maxUsers: 5,
+        maxTables: 25,
+        maxBranches: 1,
         maxProducts: 100,
         maxMonthlyOrders: 1000,
       },
     });
     const snap = await svc.getSnapshot(tenantId);
     expect(snap.users.max).toBe(5);
+    expect(snap.tables.max).toBe(25);
     expect(snap.products.max).toBe(100);
     expect(snap.monthlyOrders.max).toBe(1000);
     expect(snap.branches.max).toBe(1); // default when no grant

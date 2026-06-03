@@ -3,12 +3,15 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateStockCountDto } from '../dto/create-stock-count.dto';
-import { UpdateStockCountItemDto } from '../dto/update-stock-count-item.dto';
-import { StockCountStatus, IngredientMovementType } from '../../../common/constants/stock-management.enum';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateStockCountDto } from "../dto/create-stock-count.dto";
+import { UpdateStockCountItemDto } from "../dto/update-stock-count-item.dto";
+import {
+  StockCountStatus,
+  IngredientMovementType,
+} from "../../../common/constants/stock-management.enum";
 
 @Injectable()
 export class StockCountsService {
@@ -25,7 +28,7 @@ export class StockCountsService {
       const allowed = Object.values(StockCountStatus) as string[];
       if (!allowed.includes(status)) {
         throw new BadRequestException(
-          `status must be one of: ${allowed.join(', ')}`,
+          `status must be one of: ${allowed.join(", ")}`,
         );
       }
       where.status = status;
@@ -34,7 +37,7 @@ export class StockCountsService {
     return this.prisma.stockCount.findMany({
       where,
       include: { _count: { select: { items: true } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -43,15 +46,30 @@ export class StockCountsService {
       where: { id, tenantId },
       include: {
         items: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true, branchId: true } } },
+          include: {
+            stockItem: {
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+                currentStock: true,
+                branchId: true,
+              },
+            },
+          },
         },
       },
     });
-    if (!count) throw new NotFoundException('Stock count not found');
+    if (!count) throw new NotFoundException("Stock count not found");
     return count;
   }
 
-  async create(dto: CreateStockCountDto, tenantId: string, branchId: string, userId?: string) {
+  async create(
+    dto: CreateStockCountDto,
+    tenantId: string,
+    branchId: string,
+    userId?: string,
+  ) {
     const itemsWhere: Prisma.StockItemWhereInput = { tenantId, isActive: true };
     if (dto.stockItemIds?.length) {
       itemsWhere.id = { in: dto.stockItemIds };
@@ -62,7 +80,7 @@ export class StockCountsService {
       select: { id: true, currentStock: true },
     });
     if (stockItems.length === 0) {
-      throw new BadRequestException('No stock items found for counting');
+      throw new BadRequestException("No stock items found for counting");
     }
 
     // Refuse to start a second IN_PROGRESS count that overlaps with an
@@ -78,7 +96,7 @@ export class StockCountsService {
     });
     if (existing) {
       throw new ConflictException(
-        'Another stock count is already in progress for one or more of these items',
+        "Another stock count is already in progress for one or more of these items",
       );
     }
 
@@ -98,20 +116,31 @@ export class StockCountsService {
       },
       include: {
         items: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, currentStock: true },
+            },
+          },
         },
       },
     });
   }
 
-  async updateItem(countId: string, itemId: string, dto: UpdateStockCountItemDto, tenantId: string) {
+  async updateItem(
+    countId: string,
+    itemId: string,
+    dto: UpdateStockCountItemDto,
+    tenantId: string,
+  ) {
     const count = await this.findOne(countId, tenantId);
     if (count.status !== StockCountStatus.IN_PROGRESS) {
-      throw new BadRequestException('Can only update items in an in-progress count');
+      throw new BadRequestException(
+        "Can only update items in an in-progress count",
+      );
     }
 
     const countItem = count.items.find((i) => i.id === itemId);
-    if (!countItem) throw new NotFoundException('Stock count item not found');
+    if (!countItem) throw new NotFoundException("Stock count item not found");
 
     const variance = dto.countedQty - Number(countItem.expectedQty);
 
@@ -124,18 +153,22 @@ export class StockCountsService {
       data: { countedQty: dto.countedQty, variance },
     });
     if (result.count === 0) {
-      throw new NotFoundException('Stock count item not found');
+      throw new NotFoundException("Stock count item not found");
     }
     return this.prisma.stockCountItem.findUnique({
       where: { id: itemId },
-      include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } },
+      include: {
+        stockItem: {
+          select: { id: true, name: true, unit: true, branchId: true },
+        },
+      },
     });
   }
 
   async finalize(id: string, tenantId: string) {
     const count = await this.findOne(id, tenantId);
     if (count.status !== StockCountStatus.IN_PROGRESS) {
-      throw new BadRequestException('Can only finalize an in-progress count');
+      throw new BadRequestException("Can only finalize an in-progress count");
     }
 
     // Ensure all items have been counted
@@ -161,7 +194,7 @@ export class StockCountsService {
       });
       if (claim.count === 0) {
         throw new ConflictException(
-          'Stock count was finalized or cancelled concurrently — refresh and retry.',
+          "Stock count was finalized or cancelled concurrently — refresh and retry.",
         );
       }
 
@@ -202,7 +235,7 @@ export class StockCountsService {
             type: IngredientMovementType.COUNT_ADJUSTMENT,
             quantity: adjustment as any,
             notes: `Stock count adjustment: ${count.name || `Count #${count.id.slice(0, 8)}`}`,
-            referenceType: 'STOCK_COUNT',
+            referenceType: "STOCK_COUNT",
             referenceId: count.id,
             stockItemId: item.stockItemId,
             branchId: item.stockItem.branchId,
@@ -215,7 +248,16 @@ export class StockCountsService {
         where: { id },
         include: {
           items: {
-            include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
+            include: {
+              stockItem: {
+                select: {
+                  id: true,
+                  name: true,
+                  unit: true,
+                  currentStock: true,
+                },
+              },
+            },
           },
         },
       });
@@ -225,7 +267,7 @@ export class StockCountsService {
   async cancel(id: string, tenantId: string) {
     const count = await this.findOne(id, tenantId);
     if (count.status !== StockCountStatus.IN_PROGRESS) {
-      throw new BadRequestException('Can only cancel an in-progress count');
+      throw new BadRequestException("Can only cancel an in-progress count");
     }
 
     // Defence-in-depth IDOR — tenantId in the WHERE.

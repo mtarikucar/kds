@@ -1,24 +1,24 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsEnum, IsOptional, IsString, IsInt, Min, Max } from "class-validator";
+import { Type } from "class-transformer";
 
 export class UserFilterDto {
-  @ApiPropertyOptional({ description: 'Search by name or email' })
+  @ApiPropertyOptional({ description: "Search by name or email" })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by role' })
+  @ApiPropertyOptional({ description: "Filter by role" })
   @IsOptional()
   @IsString()
   role?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by tenant ID' })
+  @ApiPropertyOptional({ description: "Filter by tenant ID" })
   @IsOptional()
   @IsString()
   tenantId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by status' })
+  @ApiPropertyOptional({ description: "Filter by status" })
   @IsOptional()
   @IsString()
   status?: string;
@@ -40,17 +40,17 @@ export class UserFilterDto {
 }
 
 export class UserActivityFilterDto {
-  @ApiPropertyOptional({ description: 'Filter by user ID' })
+  @ApiPropertyOptional({ description: "Filter by user ID" })
   @IsOptional()
   @IsString()
   userId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by tenant ID' })
+  @ApiPropertyOptional({ description: "Filter by tenant ID" })
   @IsOptional()
   @IsString()
   tenantId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by action type' })
+  @ApiPropertyOptional({ description: "Filter by action type" })
   @IsOptional()
   @IsString()
   action?: string;

@@ -1,5 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsBoolean,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from "class-validator";
 
 /**
  * iter-66 — three new DTO classes replacing inline `@Body() body: { ... }`
@@ -24,13 +30,15 @@ import { IsBoolean, IsObject, IsOptional, IsString, MaxLength } from 'class-vali
  */
 
 export class ToggleIntegrationStatusDto {
-  @ApiProperty({ description: 'New enabled state' })
+  @ApiProperty({ description: "New enabled state" })
   @IsBoolean()
   isEnabled: boolean;
 }
 
 export class UpdateDeviceStatusDto {
-  @ApiProperty({ description: 'Hardware status snapshot merged into config.device_status' })
+  @ApiProperty({
+    description: "Hardware status snapshot merged into config.device_status",
+  })
   @IsObject()
   // The service stores this as `device_status` on the integration row;
   // @IsObject() rejects strings / arrays / null at validation time so a
@@ -45,7 +53,7 @@ export class ReportDeviceEventDto {
   @MaxLength(120)
   event: string;
 
-  @ApiPropertyOptional({ description: 'Optional event payload' })
+  @ApiPropertyOptional({ description: "Optional event payload" })
   @IsOptional()
   @IsObject()
   data?: Record<string, unknown>;

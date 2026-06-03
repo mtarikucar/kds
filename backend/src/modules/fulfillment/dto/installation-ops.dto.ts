@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,7 +10,7 @@ import {
   IsUUID,
   MaxLength,
   MinLength,
-} from 'class-validator';
+} from "class-validator";
 
 /**
  * Body for POST /v1/installation. Previously the controller accepted an
@@ -21,12 +21,14 @@ import {
  * converts the body into a proper DTO class so ValidationPipe fires.
  */
 export class CreateInstallationRequestDto {
-  @ApiPropertyOptional({ description: 'Branch the install is for (defaults to tenant HQ)' })
+  @ApiPropertyOptional({
+    description: "Branch the install is for (defaults to tenant HQ)",
+  })
   @IsOptional()
   @IsUUID()
   branchId?: string;
 
-  @ApiPropertyOptional({ description: 'Hardware order being fulfilled' })
+  @ApiPropertyOptional({ description: "Hardware order being fulfilled" })
   @IsOptional()
   @IsUUID()
   hwOrderId?: string;
@@ -36,14 +38,17 @@ export class CreateInstallationRequestDto {
   // operator typing the wrong string at the DTO-less boundary couldn't
   // smuggle in arbitrary text that downstream date arithmetic would
   // silently coerce to Invalid Date.
-  @ApiPropertyOptional({ description: 'Customer-preferred install dates (ISO-8601)', type: [String] })
+  @ApiPropertyOptional({
+    description: "Customer-preferred install dates (ISO-8601)",
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(10)
   @IsDateString({}, { each: true })
   preferredDates?: string[];
 
-  @ApiPropertyOptional({ description: 'Free-form note (audit trail)' })
+  @ApiPropertyOptional({ description: "Free-form note (audit trail)" })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -56,18 +61,20 @@ export class CreateInstallationRequestDto {
  * validated class. Caps mirror the surrounding fulfillment DTOs.
  */
 export class FileWarrantyClaimDto {
-  @ApiProperty({ description: 'One-line description of the failure (required)' })
+  @ApiProperty({
+    description: "One-line description of the failure (required)",
+  })
   @IsString()
   @MinLength(3)
   @MaxLength(200)
   issue: string;
 
-  @ApiPropertyOptional({ enum: ['low', 'medium', 'high'], default: 'medium' })
+  @ApiPropertyOptional({ enum: ["low", "medium", "high"], default: "medium" })
   @IsOptional()
-  @IsIn(['low', 'medium', 'high'])
-  severity?: 'low' | 'medium' | 'high';
+  @IsIn(["low", "medium", "high"])
+  severity?: "low" | "medium" | "high";
 
-  @ApiPropertyOptional({ description: 'Long-form context (audit trail)' })
+  @ApiPropertyOptional({ description: "Long-form context (audit trail)" })
   @IsOptional()
   @IsString()
   @MaxLength(4000)
@@ -89,26 +96,31 @@ export class CreateShipmentDto {
   @MaxLength(64)
   carrier: string;
 
-  @ApiPropertyOptional({ description: 'Carrier-side tracking number' })
+  @ApiPropertyOptional({ description: "Carrier-side tracking number" })
   @IsOptional()
   @IsString()
   @MaxLength(128)
   trackingNo?: string;
 
-  @ApiPropertyOptional({ description: 'Carrier-specific extras (label url, weight, etc.)' })
+  @ApiPropertyOptional({
+    description: "Carrier-specific extras (label url, weight, etc.)",
+  })
   @IsOptional()
   @IsObject()
   meta?: Record<string, unknown>;
 }
 
 export class ScheduleInstallationDto {
-  @ApiProperty({ example: '2026-06-15T09:00:00.000Z', description: 'ISO-8601 scheduled date/time' })
-  @IsDateString({}, { message: 'scheduledFor must be an ISO-8601 date string' })
+  @ApiProperty({
+    example: "2026-06-15T09:00:00.000Z",
+    description: "ISO-8601 scheduled date/time",
+  })
+  @IsDateString({}, { message: "scheduledFor must be an ISO-8601 date string" })
   scheduledFor: string;
 
   // MinLength(1) so an explicit "" can't silently overwrite a previously-set
   // technician — to clear an assignment, the client should omit the field.
-  @ApiProperty({ required: false, description: 'Technician id / handle' })
+  @ApiProperty({ required: false, description: "Technician id / handle" })
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -117,7 +129,10 @@ export class ScheduleInstallationDto {
 }
 
 export class CompleteInstallationDto {
-  @ApiProperty({ required: false, description: 'Close-out note appended to the request' })
+  @ApiProperty({
+    required: false,
+    description: "Close-out note appended to the request",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(4000)
@@ -125,7 +140,10 @@ export class CompleteInstallationDto {
 }
 
 export class CancelInstallationDto {
-  @ApiProperty({ required: false, description: 'Cancellation reason (audit trail)' })
+  @ApiProperty({
+    required: false,
+    description: "Cancellation reason (audit trail)",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)

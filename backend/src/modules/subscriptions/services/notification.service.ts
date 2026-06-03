@@ -27,7 +27,10 @@ export class NotificationService {
   // bursts like sendTrialEndingReminder firing for every trial-ending
   // tenant in one tick, this serialized the email queue on disk I/O
   // and CPU compile time.
-  private readonly templateCache = new Map<string, HandlebarsTemplateDelegate>();
+  private readonly templateCache = new Map<
+    string,
+    HandlebarsTemplateDelegate
+  >();
 
   constructor(private configService: ConfigService) {
     // process.cwd() instead of __dirname — same reasoning EmailService
@@ -89,7 +92,9 @@ export class NotificationService {
         html,
       });
 
-      this.logger.log(`Email sent to ${maskEmail(options.to)}: ${options.subject}`);
+      this.logger.log(
+        `Email sent to ${maskEmail(options.to)}: ${options.subject}`,
+      );
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email: ${error.message}`);
@@ -119,7 +124,9 @@ export class NotificationService {
     }
   }
 
-  private async loadTemplate(templateName: string): Promise<HandlebarsTemplateDelegate> {
+  private async loadTemplate(
+    templateName: string,
+  ): Promise<HandlebarsTemplateDelegate> {
     const cached = this.templateCache.get(templateName);
     if (cached) return cached;
     const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);

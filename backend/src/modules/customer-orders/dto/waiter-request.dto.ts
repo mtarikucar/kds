@@ -1,5 +1,12 @@
-import { IsOptional, IsString, IsUUID, Length, Matches, MaxLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+  MaxLength,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * Customer-session token shape: 32 random bytes encoded as hex = exactly
@@ -12,7 +19,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 const SESSION_ID_REGEX = /^[0-9a-f]{64}$/;
 
 export class CreateWaiterRequestDto {
-  @ApiPropertyOptional({ description: 'Table ID; optional for tableless (counter) orders' })
+  @ApiPropertyOptional({
+    description: "Table ID; optional for tableless (counter) orders",
+  })
   @IsOptional()
   @IsUUID()
   tableId?: string;
@@ -20,10 +29,12 @@ export class CreateWaiterRequestDto {
   @ApiProperty()
   @IsString()
   @Length(64, 64)
-  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
+  @Matches(SESSION_ID_REGEX, {
+    message: "sessionId must be a 64-char lower-hex string",
+  })
   sessionId: string;
 
-  @ApiPropertyOptional({ example: 'We need extra plates' })
+  @ApiPropertyOptional({ example: "We need extra plates" })
   @IsString()
   @IsOptional()
   @MaxLength(500)
@@ -31,7 +42,9 @@ export class CreateWaiterRequestDto {
 }
 
 export class CreateBillRequestDto {
-  @ApiPropertyOptional({ description: 'Table ID; optional for tableless (counter) orders' })
+  @ApiPropertyOptional({
+    description: "Table ID; optional for tableless (counter) orders",
+  })
   @IsOptional()
   @IsUUID()
   tableId?: string;
@@ -39,6 +52,8 @@ export class CreateBillRequestDto {
   @ApiProperty()
   @IsString()
   @Length(64, 64)
-  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
+  @Matches(SESSION_ID_REGEX, {
+    message: "sessionId must be a 64-char lower-hex string",
+  })
   sessionId: string;
 }

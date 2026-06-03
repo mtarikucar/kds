@@ -2,11 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateCategoryDto } from '../dto/create-category.dto';
-import { UpdateCategoryDto } from '../dto/update-category.dto';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateCategoryDto } from "../dto/create-category.dto";
+import { UpdateCategoryDto } from "../dto/update-category.dto";
 
 @Injectable()
 export class CategoriesService {
@@ -34,7 +34,7 @@ export class CategoriesService {
           },
         },
       },
-      orderBy: { displayOrder: 'asc' },
+      orderBy: { displayOrder: "asc" },
     });
   }
 
@@ -46,7 +46,7 @@ export class CategoriesService {
       },
       include: {
         products: {
-          orderBy: { name: 'asc' },
+          orderBy: { name: "asc" },
         },
       },
     });
@@ -58,7 +58,11 @@ export class CategoriesService {
     return category;
   }
 
-  async update(id: string, updateCategoryDto: UpdateCategoryDto, tenantId: string) {
+  async update(
+    id: string,
+    updateCategoryDto: UpdateCategoryDto,
+    tenantId: string,
+  ) {
     // Check if category exists and belongs to tenant
     await this.findOne(id, tenantId);
 
@@ -68,7 +72,7 @@ export class CategoriesService {
       data: updateCategoryDto,
     });
     if (claim.count === 0) {
-      throw new ConflictException('Category not found');
+      throw new ConflictException("Category not found");
     }
     // Defence-in-depth — the updateMany above proved tenant ownership,
     // but a refactor that reorders steps would see an id-only read and
@@ -93,10 +97,11 @@ export class CategoriesService {
             where: { id, tenantId },
             include: { _count: { select: { products: true } } },
           });
-          if (!category) throw new NotFoundException(`Category with ID ${id} not found`);
+          if (!category)
+            throw new NotFoundException(`Category with ID ${id} not found`);
           if (category._count.products > 0) {
             throw new ConflictException(
-              'Cannot delete category with existing products. Please delete or reassign products first.',
+              "Cannot delete category with existing products. Please delete or reassign products first.",
             );
           }
           return tx.category.delete({ where: { id, tenantId } });
@@ -106,9 +111,12 @@ export class CategoriesService {
     } catch (err) {
       // SERIALIZATION_FAILURE (40001) → P2034 in Prisma. Surface as 409
       // so the client retries (the typical UX is a "Try again" button).
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2034"
+      ) {
         throw new ConflictException(
-          'Category was modified concurrently — refresh and try again.',
+          "Category was modified concurrently — refresh and try again.",
         );
       }
       throw err;

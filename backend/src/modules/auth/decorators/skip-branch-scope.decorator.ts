@@ -1,4 +1,4 @@
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
 /**
  * Mark a controller or handler as tenant-wide — BranchGuard skips it.
@@ -14,5 +14,6 @@ import { SetMetadata } from '@nestjs/common';
  * `controller-needs-scope-or-skip` enforces this and is the standing
  * v3.0.0 invariant for new endpoints.
  */
-export const IS_SKIP_BRANCH_SCOPE_KEY = 'isSkipBranchScope';
-export const SkipBranchScope = () => SetMetadata(IS_SKIP_BRANCH_SCOPE_KEY, true);
+export const IS_SKIP_BRANCH_SCOPE_KEY = "isSkipBranchScope";
+export const SkipBranchScope = () =>
+  SetMetadata(IS_SKIP_BRANCH_SCOPE_KEY, true);

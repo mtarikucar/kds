@@ -4,9 +4,9 @@ import {
   Logger,
   OnModuleInit,
   UnauthorizedException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { URLSearchParams } from 'url';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { URLSearchParams } from "url";
 import {
   PaymentIntent,
   PaymentIntentRequest,
@@ -16,10 +16,10 @@ import {
   ProviderWebhookEvent,
   RefundRequest,
   RefundTransaction,
-} from '../payment-provider.interface';
-import { PaymentProviderRegistry } from '../payment-provider.registry';
-import { PaytrAdapter } from '../../payments/adapters/paytr.adapter';
-import { verifyCallbackHash } from '../../payments/webhooks/paytr-hash.util';
+} from "../payment-provider.interface";
+import { PaymentProviderRegistry } from "../payment-provider.registry";
+import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
+import { verifyCallbackHash } from "../../payments/webhooks/paytr-hash.util";
 
 /**
  * Thin shim that exposes the existing PaytrAdapter behind the
@@ -37,8 +37,8 @@ import { verifyCallbackHash } from '../../payments/webhooks/paytr-hash.util';
  */
 @Injectable()
 export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
-  readonly id = 'paytr';
-  readonly modes: PaymentMode[] = ['online'];
+  readonly id = "paytr";
+  readonly modes: PaymentMode[] = ["online"];
   private readonly logger = new Logger(PaytrPaymentProvider.name);
 
   constructor(
@@ -54,7 +54,7 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     if (process.env.PAYTR_MERCHANT_ID && process.env.PAYTR_MERCHANT_KEY) {
       this.registry.register(this);
     } else {
-      this.logger.warn('PayTR credentials missing — provider not registered');
+      this.logger.warn("PayTR credentials missing — provider not registered");
     }
   }
 
@@ -71,13 +71,13 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     // than silently submitting bad telemetry.
     const buyer = req.buyer ?? {};
     const missing: string[] = [];
-    if (!buyer.email) missing.push('buyer.email');
-    if (!buyer.name) missing.push('buyer.name');
-    if (!buyer.phone) missing.push('buyer.phone');
-    if (!req.buyerIp) missing.push('buyerIp');
+    if (!buyer.email) missing.push("buyer.email");
+    if (!buyer.name) missing.push("buyer.name");
+    if (!buyer.phone) missing.push("buyer.phone");
+    if (!req.buyerIp) missing.push("buyerIp");
     if (missing.length > 0) {
       throw new BadRequestException(
-        `PayTR intent requires: ${missing.join(', ')}. Provide them at checkout — fraud-scoring needs real values.`,
+        `PayTR intent requires: ${missing.join(", ")}. Provide them at checkout — fraud-scoring needs real values.`,
       );
     }
     // Currency safety gate (mirrors PaymentsService.createIntent +
@@ -86,7 +86,7 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     // numeric amount in TL. The adapter rejects non-TRY too, but
     // surfacing the error here gives the mixed-cart caller a clean
     // 400 before any reservation rows are written.
-    if (req.currency !== 'TRY') {
+    if (req.currency !== "TRY") {
       throw new BadRequestException(
         `PayTR yalnızca TRY ile tahsilat yapar. İstenen para birimi: ${req.currency}.`,
       );
@@ -113,7 +113,7 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
       userBasket = req.basket.map((line) => [
         // Sanitise line name: PayTR rejects baskets containing newlines, and
         // gateway logs are easier to read with a length cap.
-        line.name.replace(/[\r\n\t]+/g, ' ').slice(0, 80),
+        line.name.replace(/[\r\n\t]+/g, " ").slice(0, 80),
         // PayTR expects line subtotal as a decimal string in major units.
         ((line.priceCents * line.qty) / 100).toFixed(2),
         line.qty,
@@ -128,20 +128,23 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
       merchantOid: req.externalRef.slice(0, 64),
       email: buyer.email!,
       userName: buyer.name!,
-      userAddress: typeof buyer.address === 'string' ? buyer.address : 'N/A',
+      userAddress: typeof buyer.address === "string" ? buyer.address : "N/A",
       userPhone: buyer.phone!,
       userIp: req.buyerIp!,
       userBasket,
-      okUrl: req.returnUrl ?? 'https://hummytummy.com/checkout/success',
-      failUrl: req.returnUrl ?? 'https://hummytummy.com/checkout/failure',
+      okUrl: req.returnUrl ?? "https://hummytummy.com/checkout/success",
+      failUrl: req.returnUrl ?? "https://hummytummy.com/checkout/failure",
     });
     return {
       providerId: this.id,
       intentId: result.merchantOid,
-      status: 'pending',
+      status: "pending",
       amountCents: req.amountCents,
       currency: req.currency,
-      clientAction: { iframeToken: result.token, paymentLink: result.paymentLink },
+      clientAction: {
+        iframeToken: result.token,
+        paymentLink: result.paymentLink,
+      },
     };
   }
 
@@ -149,18 +152,18 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     // PayTR settlement is webhook-driven, but the façade exposes a polling
     // shape too. Use the inquiry endpoint as the source of truth.
     const inq = (await this.paytr.inquiryStatus(intentId)) as any;
-    const rawStatus = String(inq?.status ?? '').toLowerCase();
+    const rawStatus = String(inq?.status ?? "").toLowerCase();
     return {
       providerId: this.id,
       intentId,
       status:
-        rawStatus === 'success' || rawStatus === 'succeeded'
-          ? 'succeeded'
-          : rawStatus === 'failed'
-            ? 'failed'
-            : 'pending',
-      amountCents: Math.round(parseFloat(inq?.totalAmount ?? '0') * 100),
-      currency: 'TRY',
+        rawStatus === "success" || rawStatus === "succeeded"
+          ? "succeeded"
+          : rawStatus === "failed"
+            ? "failed"
+            : "pending",
+      amountCents: Math.round(parseFloat(inq?.totalAmount ?? "0") * 100),
+      currency: "TRY",
       acquirerRef: inq?.reference,
       raw: inq,
     };
@@ -174,8 +177,9 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     return {
       providerId: this.id,
       intentId: req.intentId,
-      refundId: (out as any).refundId ?? (out as any).reference ?? req.idempotencyKey,
-      status: (out as any).status === 'SUCCEEDED' ? 'refunded' : 'failed',
+      refundId:
+        (out as any).refundId ?? (out as any).reference ?? req.idempotencyKey,
+      status: (out as any).status === "SUCCEEDED" ? "refunded" : "failed",
       amountCents: req.amountCents ?? 0,
     };
   }
@@ -202,24 +206,29 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
    *     merchantOid+merchantSalt+status+totalAmount) — identical to
    *     `verifyCallbackHash` used by the legacy controller.
    */
-  async parseWebhook(_signature: string, raw: Buffer | string): Promise<ProviderWebhookEvent[]> {
-    const body = typeof raw === 'string' ? raw : raw.toString('utf8');
+  async parseWebhook(
+    _signature: string,
+    raw: Buffer | string,
+  ): Promise<ProviderWebhookEvent[]> {
+    const body = typeof raw === "string" ? raw : raw.toString("utf8");
     const parsed = this.parsePaytrBody(body);
 
-    const merchantOid = String(parsed.merchant_oid ?? '');
-    const status = String(parsed.status ?? '');
-    const totalAmount = String(parsed.total_amount ?? '');
-    const providedHash = String(parsed.hash ?? '');
+    const merchantOid = String(parsed.merchant_oid ?? "");
+    const status = String(parsed.status ?? "");
+    const totalAmount = String(parsed.total_amount ?? "");
+    const providedHash = String(parsed.hash ?? "");
 
-    const merchantKey = this.config.get<string>('PAYTR_MERCHANT_KEY');
-    const merchantSalt = this.config.get<string>('PAYTR_MERCHANT_SALT');
+    const merchantKey = this.config.get<string>("PAYTR_MERCHANT_KEY");
+    const merchantSalt = this.config.get<string>("PAYTR_MERCHANT_SALT");
     if (!merchantKey || !merchantSalt) {
       // Mirrors the legacy controller's posture: if we can't verify, we
       // refuse to emit downstream events. The legacy controller returns
       // "OK" to PayTR to stop retries; the façade path is internal so
       // throwing surfaces the misconfiguration in the caller's logs.
-      this.logger.error('PayTR webhook verification skipped — credentials missing in env');
-      throw new UnauthorizedException('PayTR webhook verification unavailable');
+      this.logger.error(
+        "PayTR webhook verification skipped — credentials missing in env",
+      );
+      throw new UnauthorizedException("PayTR webhook verification unavailable");
     }
 
     if (
@@ -237,15 +246,15 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
       })
     ) {
       this.logger.warn(
-        `Rejected PayTR façade callback with bad/missing hash for oid=${merchantOid || '<empty>'}`,
+        `Rejected PayTR façade callback with bad/missing hash for oid=${merchantOid || "<empty>"}`,
       );
-      throw new UnauthorizedException('PayTR webhook signature mismatch');
+      throw new UnauthorizedException("PayTR webhook signature mismatch");
     }
 
     return [
       {
         providerId: this.id,
-        type: status === 'success' ? 'payment.succeeded' : 'payment.failed',
+        type: status === "success" ? "payment.succeeded" : "payment.failed",
         payload: {
           merchantOid,
           status,
@@ -264,7 +273,7 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
    * body (CI tests do), prefer that. Otherwise fall back to URLSearchParams.
    */
   private parsePaytrBody(body: string): Record<string, string | undefined> {
-    if (body.startsWith('{')) {
+    if (body.startsWith("{")) {
       try {
         return JSON.parse(body) as Record<string, string | undefined>;
       } catch {
@@ -278,6 +287,9 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
   }
 
   async healthCheck() {
-    return { ok: Boolean(process.env.PAYTR_MERCHANT_ID), details: { configured: Boolean(process.env.PAYTR_MERCHANT_ID) } };
+    return {
+      ok: Boolean(process.env.PAYTR_MERCHANT_ID),
+      details: { configured: Boolean(process.env.PAYTR_MERCHANT_ID) },
+    };
   }
 }

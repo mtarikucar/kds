@@ -6,13 +6,13 @@ import {
   IsUUID,
   Max,
   Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IngredientMovementType,
   WasteReason,
-} from '../../../common/constants/stock-management.enum';
+} from "../../../common/constants/stock-management.enum";
 
 // Iter-92: shared shape for the stock-management list endpoints
 // (`/stock-management/waste-logs` and `/stock-management/movements`).
@@ -25,7 +25,7 @@ import {
 const HARD_MAX_TAKE = 5000;
 
 export class ListWasteLogsQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by stock item UUID' })
+  @ApiPropertyOptional({ description: "Filter by stock item UUID" })
   @IsOptional()
   @IsUUID()
   stockItemId?: string;
@@ -35,12 +35,12 @@ export class ListWasteLogsQueryDto {
   @IsEnum(WasteReason)
   reason?: WasteReason;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 start date' })
+  @ApiPropertyOptional({ description: "ISO-8601 start date" })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 end date' })
+  @ApiPropertyOptional({ description: "ISO-8601 end date" })
   @IsOptional()
   @IsDateString()
   endDate?: string;
@@ -64,19 +64,19 @@ export class ListWasteLogsQueryDto {
 }
 
 export class WasteLogsSummaryQueryDto {
-  @ApiPropertyOptional({ description: 'ISO-8601 start date' })
+  @ApiPropertyOptional({ description: "ISO-8601 start date" })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 end date' })
+  @ApiPropertyOptional({ description: "ISO-8601 end date" })
   @IsOptional()
   @IsDateString()
   endDate?: string;
 }
 
 export class ListIngredientMovementsQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by stock item UUID' })
+  @ApiPropertyOptional({ description: "Filter by stock item UUID" })
   @IsOptional()
   @IsUUID()
   stockItemId?: string;
@@ -86,12 +86,12 @@ export class ListIngredientMovementsQueryDto {
   @IsEnum(IngredientMovementType)
   type?: IngredientMovementType;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 start date' })
+  @ApiPropertyOptional({ description: "ISO-8601 start date" })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 end date' })
+  @ApiPropertyOptional({ description: "ISO-8601 end date" })
   @IsOptional()
   @IsDateString()
   endDate?: string;

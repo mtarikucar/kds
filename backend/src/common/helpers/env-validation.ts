@@ -16,17 +16,17 @@ export interface EnvRule {
   prodOnly?: boolean;
 }
 
-const NODE_ENV = process.env.NODE_ENV ?? 'development';
-const IS_PROD = NODE_ENV === 'production';
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+const IS_PROD = NODE_ENV === "production";
 
 const CORE_SECRETS = [
-  'JWT_SECRET',
-  'JWT_REFRESH_SECRET',
-  'SUPERADMIN_JWT_SECRET',
-  'SUPERADMIN_JWT_REFRESH_SECRET',
-  'MARKETING_JWT_SECRET',
-  'MARKETING_JWT_REFRESH_SECRET',
-  'ENCRYPTION_MASTER_KEY',
+  "JWT_SECRET",
+  "JWT_REFRESH_SECRET",
+  "SUPERADMIN_JWT_SECRET",
+  "SUPERADMIN_JWT_REFRESH_SECRET",
+  "MARKETING_JWT_SECRET",
+  "MARKETING_JWT_REFRESH_SECRET",
+  "ENCRYPTION_MASTER_KEY",
   // INTEGRATION_KEY is the seed for the per-tenant envelope key in
   // IntegrationService (see iter-8 commit message). IntegrationService
   // throws on missing key in production, but only at the FIRST encrypt
@@ -34,7 +34,7 @@ const CORE_SECRETS = [
   // webhook from PayTR/Yemeksepeti. Validating here pulls the failure
   // forward to boot, which the orchestrator catches and surfaces as
   // a deploy failure instead of an opaque 500.
-  'INTEGRATION_KEY',
+  "INTEGRATION_KEY",
   // MARKETING_INGEST_TOKEN: shared secret the marketing CRM uses to
   // POST /marketing/leads/ingest. The IngestTokenGuard fails closed
   // when unset, but only when an ingest request actually arrives —
@@ -44,11 +44,11 @@ const CORE_SECRETS = [
   // secret to be set as a GitHub secret; this aligns the RUNTIME
   // boot-gate with the CI deploy-gate so the failure mode is
   // identical in both environments.
-  'MARKETING_INGEST_TOKEN',
+  "MARKETING_INGEST_TOKEN",
 ];
 
 const RULES: EnvRule[] = [
-  { key: 'DATABASE_URL', required: true, minLength: 10 },
+  { key: "DATABASE_URL", required: true, minLength: 10 },
   // JWT realms — presence is enforced in every environment. Length + cross-realm
   // uniqueness are enforced only in production so dev setups with the short
   // .env.example placeholders don't fail to boot. Operators still get a
@@ -60,30 +60,30 @@ const RULES: EnvRule[] = [
     distinctFrom: IS_PROD ? CORE_SECRETS.filter((x) => x !== k) : undefined,
   })),
   // Production-only
-  { key: 'CORS_ORIGIN', required: true, prodOnly: true },
-  { key: 'SENTRY_DSN', required: false, prodOnly: true },
+  { key: "CORS_ORIGIN", required: true, prodOnly: true },
+  { key: "SENTRY_DSN", required: false, prodOnly: true },
   // PayTR — required in production because the Turkish payment flow is
   // useless without them. Dev can run without (PaymentsService throws a
   // clear "credentials not configured" error if the user actually tries
   // to check out without setting them).
-  { key: 'PAYTR_MERCHANT_ID', required: true, prodOnly: true },
-  { key: 'PAYTR_MERCHANT_KEY', required: true, prodOnly: true, minLength: 8 },
-  { key: 'PAYTR_MERCHANT_SALT', required: true, prodOnly: true, minLength: 8 },
-  { key: 'PAYTR_OK_URL', required: true, prodOnly: true, minLength: 10 },
-  { key: 'PAYTR_FAIL_URL', required: true, prodOnly: true, minLength: 10 },
+  { key: "PAYTR_MERCHANT_ID", required: true, prodOnly: true },
+  { key: "PAYTR_MERCHANT_KEY", required: true, prodOnly: true, minLength: 8 },
+  { key: "PAYTR_MERCHANT_SALT", required: true, prodOnly: true, minLength: 8 },
+  { key: "PAYTR_OK_URL", required: true, prodOnly: true, minLength: 10 },
+  { key: "PAYTR_FAIL_URL", required: true, prodOnly: true, minLength: 10 },
   // POS-specific redirect URLs for customer self-pay (QR menu PayTR
   // flow). Optional — falls back to the subscription PAYTR_OK_URL /
   // PAYTR_FAIL_URL if unset, but production should set them so
   // subdomain restaurants don't bounce customers to the wrong host.
-  { key: 'PAYTR_OK_URL_POS', required: false, prodOnly: true, minLength: 10 },
-  { key: 'PAYTR_FAIL_URL_POS', required: false, prodOnly: true, minLength: 10 },
+  { key: "PAYTR_OK_URL_POS", required: false, prodOnly: true, minLength: 10 },
+  { key: "PAYTR_FAIL_URL_POS", required: false, prodOnly: true, minLength: 10 },
   // Comma-separated regex patterns for valid return origins (e.g.
   // `https://.*\.hummytummy\.com,https://hummytummy\.com`). When the
   // QR menu is opened on a subdomain, the backend honors that origin
   // for PayTR's redirect IF it matches one of these patterns. Empty
   // → only the global PAYTR_*_URL_POS is used (subdomain customers
   // bounce back to the platform host).
-  { key: 'PAYTR_ALLOWED_RETURN_ORIGINS', required: false, prodOnly: false },
+  { key: "PAYTR_ALLOWED_RETURN_ORIGINS", required: false, prodOnly: false },
   // PAYTR_TEST_MODE defaults to "1" in adapter; PAYTR_WEBHOOK_ALLOWED_IPS
   // is optional defence-in-depth. Production-mode guard below.
 
@@ -93,9 +93,9 @@ const RULES: EnvRule[] = [
   // confirmations, contact-form replies). In a B2B SaaS that's
   // data-loss-by-misconfiguration. dev keeps the lax behavior so local
   // workflows aren't blocked on SMTP creds.
-  { key: 'EMAIL_HOST', required: true, prodOnly: true, minLength: 3 },
-  { key: 'EMAIL_USER', required: true, prodOnly: true },
-  { key: 'EMAIL_PASSWORD', required: true, prodOnly: true },
+  { key: "EMAIL_HOST", required: true, prodOnly: true, minLength: 3 },
+  { key: "EMAIL_USER", required: true, prodOnly: true },
+  { key: "EMAIL_PASSWORD", required: true, prodOnly: true },
   // EMAIL_PORT optional — defaults to 587 in the transporter; EMAIL_FROM
   // optional — falls back to noreply@hummytummy.com in callers.
 ];
@@ -108,7 +108,7 @@ export function validateEnv(): void {
     if (rule.prodOnly && !IS_PROD) continue;
     const value = process.env[rule.key];
 
-    if (!value || value.trim() === '') {
+    if (!value || value.trim() === "") {
       if (rule.required) {
         errors.push(`Missing required environment variable: ${rule.key}`);
       }
@@ -119,7 +119,11 @@ export function validateEnv(): void {
       errors.push(
         `${rule.key} must be at least ${rule.minLength} characters (got ${value.length})`,
       );
-    } else if (!IS_PROD && value.length < 32 && CORE_SECRETS.includes(rule.key)) {
+    } else if (
+      !IS_PROD &&
+      value.length < 32 &&
+      CORE_SECRETS.includes(rule.key)
+    ) {
       warnings.push(
         `${rule.key} is ${value.length} chars — OK for dev, but < 32 chars will abort boot in production`,
       );
@@ -139,24 +143,26 @@ export function validateEnv(): void {
   if (warnings.length > 0) {
     // eslint-disable-next-line no-console
     console.warn(
-      `\n[env-validation] warnings (dev mode — production would fail):\n  - ${warnings.join('\n  - ')}\n`,
+      `\n[env-validation] warnings (dev mode — production would fail):\n  - ${warnings.join("\n  - ")}\n`,
     );
   }
 
   // Placeholder detection — catch .env.example leaking into real envs.
   const placeholders = [
-    'your-super-secret-jwt-key-change-in-production-32chars',
-    'your-super-secret-refresh-key-change-in-production',
-    'change-me-32-chars-minimum-superadmin-jwt-secret',
-    'change-me-32-chars-minimum-superadmin-refresh-secret',
-    'change-me-32-chars-minimum-at-rest-encryption-key',
-    'your-marketing-jwt-secret-change-in-production',
-    'your-marketing-jwt-refresh-secret-change-in-production',
+    "your-super-secret-jwt-key-change-in-production-32chars",
+    "your-super-secret-refresh-key-change-in-production",
+    "change-me-32-chars-minimum-superadmin-jwt-secret",
+    "change-me-32-chars-minimum-superadmin-refresh-secret",
+    "change-me-32-chars-minimum-at-rest-encryption-key",
+    "your-marketing-jwt-secret-change-in-production",
+    "your-marketing-jwt-refresh-secret-change-in-production",
   ];
   if (IS_PROD) {
     for (const key of CORE_SECRETS) {
-      if (placeholders.includes(process.env[key] ?? '')) {
-        errors.push(`${key} is still set to the .env.example placeholder value`);
+      if (placeholders.includes(process.env[key] ?? "")) {
+        errors.push(
+          `${key} is still set to the .env.example placeholder value`,
+        );
       }
     }
   }
@@ -167,10 +173,12 @@ export function validateEnv(): void {
   // money actually moving. Hard-fail boot.
   if (IS_PROD) {
     const testMode = process.env.PAYTR_TEST_MODE;
-    if (testMode === undefined || testMode === '' || testMode === '1') {
+    if (testMode === undefined || testMode === "" || testMode === "1") {
       errors.push(
         'PAYTR_TEST_MODE must be set to "0" in production ' +
-          '(current value: "' + (testMode ?? '<unset>') + '"). Test-mode payments do not move real money.',
+          '(current value: "' +
+          (testMode ?? "<unset>") +
+          '"). Test-mode payments do not move real money.',
       );
     }
   }
@@ -178,7 +186,7 @@ export function validateEnv(): void {
   if (errors.length > 0) {
     // eslint-disable-next-line no-console
     console.error(
-      `\n[env-validation] startup aborted:\n  - ${errors.join('\n  - ')}\n`,
+      `\n[env-validation] startup aborted:\n  - ${errors.join("\n  - ")}\n`,
     );
     process.exit(1);
   }

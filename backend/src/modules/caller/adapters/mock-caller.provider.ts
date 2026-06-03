@@ -1,5 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { CallerProvider, NormalisedCallerEvent } from '../caller-provider.interface';
+import { Injectable } from "@nestjs/common";
+import {
+  CallerProvider,
+  NormalisedCallerEvent,
+} from "../caller-provider.interface";
 
 /**
  * Mock caller provider. Reflects whatever JSON is posted into the test
@@ -9,17 +12,20 @@ import { CallerProvider, NormalisedCallerEvent } from '../caller-provider.interf
  */
 @Injectable()
 export class MockCallerProvider implements CallerProvider {
-  readonly id = 'mock';
+  readonly id = "mock";
 
-  async parseWebhook(_signature: string, raw: Buffer | string): Promise<NormalisedCallerEvent[]> {
-    const body = typeof raw === 'string' ? raw : raw.toString('utf8');
+  async parseWebhook(
+    _signature: string,
+    raw: Buffer | string,
+  ): Promise<NormalisedCallerEvent[]> {
+    const body = typeof raw === "string" ? raw : raw.toString("utf8");
     try {
       const parsed = JSON.parse(body);
       const list = Array.isArray(parsed) ? parsed : [parsed];
       return list.map((p) => ({
         providerId: this.id,
-        callId: p.callId ?? 'mock-' + Math.random().toString(36).slice(2),
-        kind: p.kind ?? 'incoming',
+        callId: p.callId ?? "mock-" + Math.random().toString(36).slice(2),
+        kind: p.kind ?? "incoming",
         e164: p.e164,
         occurredAt: p.occurredAt ?? new Date().toISOString(),
         durationMs: p.durationMs,
@@ -31,6 +37,6 @@ export class MockCallerProvider implements CallerProvider {
   }
 
   async healthCheck() {
-    return { ok: true, details: { mode: 'mock' } };
+    return { ok: true, details: { mode: "mock" } };
   }
 }

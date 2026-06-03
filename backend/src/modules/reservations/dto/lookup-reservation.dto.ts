@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Matches, MaxLength } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsString, Matches, MaxLength } from "class-validator";
 
 // Same E.164-ish regex CreateReservationDto + CancelPublicReservationDto
 // already use. Phone is matched verbatim against
@@ -16,15 +16,16 @@ const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
  * attacker can't slow down the DB with megabyte query strings.
  */
 export class LookupReservationDto {
-  @ApiProperty({ description: 'Customer phone from booking time (E.164-ish)' })
+  @ApiProperty({ description: "Customer phone from booking time (E.164-ish)" })
   @IsString()
   @MaxLength(20)
   @Matches(PHONE_REGEX, {
-    message: 'phone must be a valid phone number (8-15 digits, optional leading +)',
+    message:
+      "phone must be a valid phone number (8-15 digits, optional leading +)",
   })
   phone: string;
 
-  @ApiProperty({ description: 'Reservation number issued at booking time' })
+  @ApiProperty({ description: "Reservation number issued at booking time" })
   @IsString()
   @MaxLength(32)
   reservationNumber: string;

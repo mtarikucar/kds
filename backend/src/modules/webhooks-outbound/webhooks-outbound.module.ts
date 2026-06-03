@@ -1,11 +1,11 @@
-import { Logger, Module, OnModuleInit } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { DomainEventBus } from '../outbox/domain-event-bus.service';
-import { WebhookOutboundService } from './webhook-outbound.service';
-import { WebhookDeliveryWorkerService } from './webhook-delivery-worker.service';
-import { WebhooksOutboundController } from './webhooks-outbound.controller';
+import { Logger, Module, OnModuleInit } from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { DomainEventBus } from "../outbox/domain-event-bus.service";
+import { WebhookOutboundService } from "./webhook-outbound.service";
+import { WebhookDeliveryWorkerService } from "./webhook-delivery-worker.service";
+import { WebhooksOutboundController } from "./webhooks-outbound.controller";
 // v2.8.88: WebhooksOutboundController gates on API_ACCESS via PlanFeatureGuard.
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 
 /**
  * Outbound webhook module — subscriptions + delivery worker + tenant API.
@@ -40,7 +40,7 @@ export class WebhooksOutboundModule implements OnModuleInit {
     this.bus.onAny(async (ev) => {
       await this.svc.fanOut(ev).catch((err) => {
         this.logger.error(
-          `fanOut failed for event=${ev.type} tenantId=${(ev as any).tenantId ?? 'n/a'}: ${(err as Error).message}`,
+          `fanOut failed for event=${ev.type} tenantId=${(ev as any).tenantId ?? "n/a"}: ${(err as Error).message}`,
           (err as Error).stack,
         );
       });

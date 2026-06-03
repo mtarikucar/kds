@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { DeliveryLogService } from '../services/delivery-log.service';
-import { DeliveryStatusSyncService } from '../services/delivery-status-sync.service';
-import { DeliveryAuthService } from '../services/delivery-auth.service';
-import { AdapterFactory } from '../adapters/adapter-factory';
-import { PlatformLogAction } from '../constants/platform.enum';
-import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
+import { Injectable, Logger } from "@nestjs/common";
+import { Interval } from "@nestjs/schedule";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { DeliveryLogService } from "../services/delivery-log.service";
+import { DeliveryStatusSyncService } from "../services/delivery-status-sync.service";
+import { DeliveryAuthService } from "../services/delivery-auth.service";
+import { AdapterFactory } from "../adapters/adapter-factory";
+import { PlatformLogAction } from "../constants/platform.enum";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 @Injectable()
 export class RetryScheduler {
@@ -27,7 +27,7 @@ export class RetryScheduler {
   @Interval(60_000) // Every 1 minute
   async retryFailedOperations() {
     if (this.isRunning) {
-      this.logger.debug('Previous retry tick still running, skipping');
+      this.logger.debug("Previous retry tick still running, skipping");
       return;
     }
     this.isRunning = true;
@@ -41,9 +41,14 @@ export class RetryScheduler {
       // circuit-breaker counter, others silently accept the dup and
       // tag the order with two acceptance timestamps). order-polling
       // and entitlement-projector already use this helper.
-      await withAdvisoryLock(this.prisma, 'delivery-retry-scheduler', async () => {
-        await this.runRetries();
-      }, this.logger);
+      await withAdvisoryLock(
+        this.prisma,
+        "delivery-retry-scheduler",
+        async () => {
+          await this.runRetries();
+        },
+        this.logger,
+      );
     } finally {
       this.isRunning = false;
     }
@@ -56,10 +61,7 @@ export class RetryScheduler {
       for (const op of failedOps) {
         try {
           // Retry status sync operations
-          if (
-            op.action === PlatformLogAction.STATUS_UPDATE &&
-            op.orderId
-          ) {
+          if (op.action === PlatformLogAction.STATUS_UPDATE && op.orderId) {
             // Re-read current order status from DB to avoid syncing
             // stale status. Compound WHERE with the log's tenantId
             // (defence-in-depth) so a corrupt log entry pointing at
@@ -70,7 +72,9 @@ export class RetryScheduler {
             });
             if (!order) {
               await this.logService.markRetrySuccess(op.id);
-              this.logger.log(`Order ${op.orderId} no longer exists, skipping retry for log ${op.id}`);
+              this.logger.log(
+                `Order ${op.orderId} no longer exists, skipping retry for log ${op.id}`,
+              );
               continue;
             }
             await this.statusSyncService.syncStatusToPlatform(
@@ -95,7 +99,7 @@ export class RetryScheduler {
             // back to the platform side.
             if (
               order &&
-              ['CANCELLED', 'REJECTED', 'PAID'].includes(order.status as string)
+              ["CANCELLED", "REJECTED", "PAID"].includes(order.status as string)
             ) {
               await this.logService.markRetrySuccess(op.id);
               this.logger.log(
@@ -104,21 +108,26 @@ export class RetryScheduler {
               continue;
             }
             if (order?.source && order.tenantId) {
-              const config = await this.prisma.deliveryPlatformConfig.findUnique({
-                where: {
-                  tenantId_platform: {
-                    tenantId: order.tenantId,
-                    platform: order.source,
+              const config =
+                await this.prisma.deliveryPlatformConfig.findUnique({
+                  where: {
+                    tenantId_platform: {
+                      tenantId: order.tenantId,
+                      platform: order.source,
+                    },
                   },
-                },
-              });
+                });
               if (config) {
-                const freshConfig = await this.authService.ensureValidToken(config.id);
+                const freshConfig = await this.authService.ensureValidToken(
+                  config.id,
+                );
                 if (freshConfig) {
                   const adapter = this.adapterFactory.getAdapter(order.source);
                   await adapter.acceptOrder(freshConfig, op.externalId);
                   await this.logService.markRetrySuccess(op.id);
-                  this.logger.log(`ORDER_ACCEPTED retry succeeded for log ${op.id}`);
+                  this.logger.log(
+                    `ORDER_ACCEPTED retry succeeded for log ${op.id}`,
+                  );
                   continue;
                 }
               }
@@ -130,9 +139,7 @@ export class RetryScheduler {
           }
         } catch (error: any) {
           await this.logService.incrementRetry(op.id);
-          this.logger.warn(
-            `Retry failed for log ${op.id}: ${error.message}`,
-          );
+          this.logger.warn(`Retry failed for log ${op.id}: ${error.message}`);
         }
       }
 

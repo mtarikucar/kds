@@ -286,7 +286,7 @@
     "description": "Zamonaviy restoran boshqaruv platformasi. Operatsiyalarni soddalashtiring, mijozlarni mamnun qiling.",
     "contact": "Aloqa",
     "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
-    "phone": "+90 546 678 04 95",
+    "phone": "+90 850 840 73 03",
     "product": "Mahsulot",
     "company": "Kompaniya",
     "support": "Qo'llab-quvvatlash",
@@ -502,8 +502,10 @@
     "title": "Aloqa",
     "subtitle": "Savollar, so'rovlar va izohlaringiz uchun biz bilan bog'laning.",
     "backToHome": "Bosh sahifaga qaytish",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "Email"
+      "email": "Email",
+      "phone": "Telefon"
     },
     "sections": {
       "general": {

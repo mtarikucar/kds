@@ -109,12 +109,11 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
   };
 
   // v2.8.88 — integration grants. Engine surfaces them as
-  // `effectiveFeatures.integrations.<domain> = [...vendors]`.
+  // `effectiveFeatures.integrations.<domain> = [...vendors]`. v3.0.0
+  // — `integrations` is now a typed field on EffectiveFeatures, so
+  // the `as any` cast that used to live here is gone.
   const hasIntegration = (domain: string, vendor?: string): boolean => {
-    const integrations = (effectiveFeatures as any)?.integrations as
-      | Record<string, string[]>
-      | undefined;
-    const vendors = integrations?.[domain];
+    const vendors = effectiveFeatures?.integrations?.[domain];
     if (!Array.isArray(vendors) || vendors.length === 0) return false;
     if (!vendor) return true;
     return vendors.includes(vendor);

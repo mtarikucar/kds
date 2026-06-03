@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { StockAlertsService } from '../services/stock-alerts.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { StockAlertsService } from "../services/stock-alerts.service";
 
 /**
  * Hourly background check for low-stock + expiring batches. Previously
@@ -27,11 +27,13 @@ export class StockAlertsScheduler {
     try {
       const [{ locked }] = await this.prisma.$queryRawUnsafe<
         { locked: boolean }[]
-      >(`SELECT pg_try_advisory_lock(${this.lockId('stock-alerts')}) AS locked`);
+      >(
+        `SELECT pg_try_advisory_lock(${this.lockId("stock-alerts")}) AS locked`,
+      );
       if (!locked) return;
       try {
         const tenants = await this.prisma.tenant.findMany({
-          where: { status: 'ACTIVE' },
+          where: { status: "ACTIVE" },
           select: { id: true },
         });
         for (const { id } of tenants) {
@@ -46,7 +48,7 @@ export class StockAlertsScheduler {
         }
       } finally {
         await this.prisma.$queryRawUnsafe(
-          `SELECT pg_advisory_unlock(${this.lockId('stock-alerts')})`,
+          `SELECT pg_advisory_unlock(${this.lockId("stock-alerts")})`,
         );
       }
     } finally {

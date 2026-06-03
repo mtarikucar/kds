@@ -2,11 +2,11 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateWasteLogDto } from '../dto/create-waste-log.dto';
-import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateWasteLogDto } from "../dto/create-waste-log.dto";
+import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
 
 // Iter-92: hard cap on the explicit date window for the waste log list /
 // summary queries. Same memory-bound reasoning as iter-64 (reports) and
@@ -23,27 +23,32 @@ const DEFAULT_TAKE = 500;
  * constructs Invalid Date) plus the range cap that doesn't fit cleanly
  * into the DTO layer.
  */
-function parseWindow(startDate?: string, endDate?: string): { gte?: Date; lte?: Date } {
+function parseWindow(
+  startDate?: string,
+  endDate?: string,
+): { gte?: Date; lte?: Date } {
   const window: { gte?: Date; lte?: Date } = {};
   let start: Date | undefined;
   let end: Date | undefined;
   if (startDate) {
     start = new Date(startDate);
     if (Number.isNaN(start.getTime())) {
-      throw new BadRequestException('startDate must be a valid ISO-8601 date');
+      throw new BadRequestException("startDate must be a valid ISO-8601 date");
     }
     window.gte = start;
   }
   if (endDate) {
     end = new Date(endDate);
     if (Number.isNaN(end.getTime())) {
-      throw new BadRequestException('endDate must be a valid ISO-8601 date');
+      throw new BadRequestException("endDate must be a valid ISO-8601 date");
     }
     window.lte = end;
   }
   if (start && end) {
     if (start > end) {
-      throw new BadRequestException('startDate must be before or equal to endDate');
+      throw new BadRequestException(
+        "startDate must be before or equal to endDate",
+      );
     }
     const windowDays = (end.getTime() - start.getTime()) / MILLIS_PER_DAY;
     if (windowDays > STOCK_LOG_MAX_RANGE_DAYS) {
@@ -85,7 +90,7 @@ export class WasteLogsService {
     return this.prisma.wasteLog.findMany({
       where,
       include: { stockItem: { select: { id: true, name: true, unit: true } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take,
       skip,
     });
@@ -96,7 +101,7 @@ export class WasteLogsService {
       const stockItem = await tx.stockItem.findFirst({
         where: { id: dto.stockItemId, tenantId },
       });
-      if (!stockItem) throw new BadRequestException('Stock item not found');
+      if (!stockItem) throw new BadRequestException("Stock item not found");
 
       const wasteQty = new Prisma.Decimal(dto.quantity);
 
@@ -129,7 +134,10 @@ export class WasteLogsService {
       let remaining = wasteQty;
       const batches = await tx.stockBatch.findMany({
         where: { stockItemId: stockItem.id, tenantId, quantity: { gt: 0 } },
-        orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
+        orderBy: [
+          { expiryDate: { sort: "asc", nulls: "last" } },
+          { receivedAt: "asc" },
+        ],
       });
       let consumed = new Prisma.Decimal(0);
       let weightedCostAcc = new Prisma.Decimal(0);
@@ -144,7 +152,9 @@ export class WasteLogsService {
         remaining = remaining.sub(take);
         consumed = consumed.add(take);
         if (batch.costPerUnit != null) {
-          weightedCostAcc = weightedCostAcc.add(new Prisma.Decimal(batch.costPerUnit).mul(take));
+          weightedCostAcc = weightedCostAcc.add(
+            new Prisma.Decimal(batch.costPerUnit).mul(take),
+          );
         }
       }
 
@@ -155,7 +165,9 @@ export class WasteLogsService {
             ? new Prisma.Decimal(stockItem.costPerUnit)
             : null;
       const cost = costPerUnit
-        ? wasteQty.mul(costPerUnit).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP)
+        ? wasteQty
+            .mul(costPerUnit)
+            .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP)
         : null;
 
       const wasteLog = await tx.wasteLog.create({
@@ -169,7 +181,9 @@ export class WasteLogsService {
           branchId: stockItem.branchId,
           createdById: userId,
         },
-        include: { stockItem: { select: { id: true, name: true, unit: true } } },
+        include: {
+          stockItem: { select: { id: true, name: true, unit: true } },
+        },
       });
 
       await tx.ingredientMovement.create({
@@ -177,8 +191,8 @@ export class WasteLogsService {
           type: IngredientMovementType.WASTE,
           quantity: wasteQty.neg() as any,
           costPerUnit: costPerUnit ? (costPerUnit as any) : undefined,
-          notes: `Waste: ${dto.reason}${dto.notes ? ` - ${dto.notes}` : ''}`,
-          referenceType: 'WASTE_LOG',
+          notes: `Waste: ${dto.reason}${dto.notes ? ` - ${dto.notes}` : ""}`,
+          referenceType: "WASTE_LOG",
           referenceId: wasteLog.id,
           stockItemId: dto.stockItemId,
           tenantId,
@@ -198,7 +212,7 @@ export class WasteLogsService {
 
     const [byReason, totalCost, recentLogs] = await Promise.all([
       this.prisma.wasteLog.groupBy({
-        by: ['reason'],
+        by: ["reason"],
         where,
         _sum: { quantity: true, cost: true },
         _count: true,
@@ -210,8 +224,10 @@ export class WasteLogsService {
       }),
       this.prisma.wasteLog.findMany({
         where,
-        include: { stockItem: { select: { id: true, name: true, unit: true } } },
-        orderBy: { createdAt: 'desc' },
+        include: {
+          stockItem: { select: { id: true, name: true, unit: true } },
+        },
+        orderBy: { createdAt: "desc" },
         take: 10,
       }),
     ]);

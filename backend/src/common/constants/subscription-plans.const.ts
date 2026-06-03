@@ -1,4 +1,4 @@
-import { SubscriptionPlanType } from './subscription.enum';
+import { SubscriptionPlanType } from "./subscription.enum";
 
 export interface PlanConfig {
   name: SubscriptionPlanType;
@@ -32,11 +32,11 @@ export interface PlanConfig {
 export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   [SubscriptionPlanType.FREE]: {
     name: SubscriptionPlanType.FREE,
-    displayName: 'Ücretsiz',
-    description: 'Deneme sürümü sona erdiğinde kullanılan kısıtlı plan',
+    displayName: "Ücretsiz",
+    description: "Deneme sürümü sona erdiğinde kullanılan kısıtlı plan",
     monthlyPrice: 0,
     yearlyPrice: 0,
-    currency: 'TRY',
+    currency: "TRY",
     trialDays: 0,
     limits: {
       maxUsers: 2,
@@ -60,13 +60,13 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   },
   [SubscriptionPlanType.BASIC]: {
     name: SubscriptionPlanType.BASIC,
-    displayName: 'Başlangıç',
-    description: 'Kafe ve küçük restoranlar için temel POS + stok takibi',
+    displayName: "Başlangıç",
+    description: "Kafe ve küçük restoranlar için temel POS + stok takibi",
     // TRY prices are KDV-inclusive (advertised gross). BillingService
     // reverse-engineers the KDV split when issuing invoices.
     monthlyPrice: 499,
     yearlyPrice: 4490,
-    currency: 'TRY',
+    currency: "TRY",
     trialDays: 14,
     limits: {
       maxUsers: 5,
@@ -90,11 +90,12 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   },
   [SubscriptionPlanType.PRO]: {
     name: SubscriptionPlanType.PRO,
-    displayName: 'Profesyonel',
-    description: 'Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi',
+    displayName: "Profesyonel",
+    description:
+      "Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi",
     monthlyPrice: 1299,
     yearlyPrice: 12990,
-    currency: 'TRY',
+    currency: "TRY",
     trialDays: 14,
     limits: {
       maxUsers: 15,
@@ -118,11 +119,12 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   },
   [SubscriptionPlanType.BUSINESS]: {
     name: SubscriptionPlanType.BUSINESS,
-    displayName: 'Kurumsal',
-    description: 'Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek',
+    displayName: "Kurumsal",
+    description:
+      "Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek",
     monthlyPrice: 2999,
     yearlyPrice: 29990,
-    currency: 'TRY',
+    currency: "TRY",
     trialDays: 14,
     limits: {
       maxUsers: -1, // unlimited

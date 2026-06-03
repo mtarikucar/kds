@@ -1,5 +1,5 @@
-import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 /**
  * Initialize Sentry error tracking and performance monitoring
@@ -10,19 +10,24 @@ export function initSentry() {
 
   // Only initialize if DSN is provided
   if (!dsn) {
-    console.log('⚠️  Sentry DSN not configured - error tracking disabled');
+    console.log("⚠️  Sentry DSN not configured - error tracking disabled");
     return;
   }
 
   Sentry.init({
     dsn,
-    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+    environment:
+      process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development",
 
     // Performance Monitoring
-    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
+    tracesSampleRate: parseFloat(
+      process.env.SENTRY_TRACES_SAMPLE_RATE || "0.1",
+    ),
 
     // Profiling
-    profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
+    profilesSampleRate: parseFloat(
+      process.env.SENTRY_PROFILES_SAMPLE_RATE || "0.1",
+    ),
     integrations: [
       nodeProfilingIntegration() as any,
       // Prisma integration for database query monitoring
@@ -33,11 +38,11 @@ export function initSentry() {
     beforeSendTransaction(event) {
       // Add slow query warning tag
       if (event.contexts?.trace?.data) {
-        const dbDuration = event.contexts.trace.data['db.duration'];
-        if (typeof dbDuration === 'number' && dbDuration > 100) {
+        const dbDuration = event.contexts.trace.data["db.duration"];
+        if (typeof dbDuration === "number" && dbDuration > 100) {
           event.tags = {
             ...event.tags,
-            slow_query: 'true',
+            slow_query: "true",
           };
         }
       }
@@ -45,17 +50,17 @@ export function initSentry() {
     },
 
     // Release tracking
-    release: `restaurant-pos-backend@${process.env.npm_package_version || 'unknown'}`,
+    release: `restaurant-pos-backend@${process.env.npm_package_version || "unknown"}`,
 
     // Filter out sensitive data
     beforeSend(event, hint) {
       // Remove sensitive headers
       if (event.request?.headers) {
-        delete event.request.headers['authorization'];
-        delete event.request.headers['cookie'];
-        delete event.request.headers['x-api-key'];
-        delete event.request.headers['x-webhook-signature'];
-        delete event.request.headers['x-csrf-token'];
+        delete event.request.headers["authorization"];
+        delete event.request.headers["cookie"];
+        delete event.request.headers["x-api-key"];
+        delete event.request.headers["x-webhook-signature"];
+        delete event.request.headers["x-csrf-token"];
       }
 
       // Scrub user PII — the NestJS exception filter attaches
@@ -71,21 +76,27 @@ export function initSentry() {
       // Remove sensitive query params
       if (event.request?.query_string) {
         // Handle both string and array formats
-        if (typeof event.request.query_string === 'string') {
+        if (typeof event.request.query_string === "string") {
           const sanitized = event.request.query_string
-            .replace(/password=[^&]*/gi, 'password=[REDACTED]')
-            .replace(/token=[^&]*/gi, 'token=[REDACTED]')
-            .replace(/api_key=[^&]*/gi, 'api_key=[REDACTED]');
+            .replace(/password=[^&]*/gi, "password=[REDACTED]")
+            .replace(/token=[^&]*/gi, "token=[REDACTED]")
+            .replace(/api_key=[^&]*/gi, "api_key=[REDACTED]");
           event.request.query_string = sanitized;
         } else if (Array.isArray(event.request.query_string)) {
           // Sanitize array format [key, value][]
-          event.request.query_string = event.request.query_string.map(([key, value]) => {
-            const lowerKey = key.toLowerCase();
-            if (lowerKey === 'password' || lowerKey === 'token' || lowerKey === 'api_key') {
-              return [key, '[REDACTED]'] as [string, string];
-            }
-            return [key, value] as [string, string];
-          }) as [string, string][];
+          event.request.query_string = event.request.query_string.map(
+            ([key, value]) => {
+              const lowerKey = key.toLowerCase();
+              if (
+                lowerKey === "password" ||
+                lowerKey === "token" ||
+                lowerKey === "api_key"
+              ) {
+                return [key, "[REDACTED]"] as [string, string];
+              }
+              return [key, value] as [string, string];
+            },
+          ) as [string, string][];
         }
       }
 
@@ -93,7 +104,7 @@ export function initSentry() {
     },
   });
 
-  console.log('✅ Sentry error tracking initialized');
+  console.log("✅ Sentry error tracking initialized");
 }
 
 /**
@@ -108,14 +119,21 @@ export function captureException(error: Error, context?: Record<string, any>) {
 /**
  * Capture a message manually
  */
-export function captureMessage(message: string, level: Sentry.SeverityLevel = 'info') {
+export function captureMessage(
+  message: string,
+  level: Sentry.SeverityLevel = "info",
+) {
   Sentry.captureMessage(message, level);
 }
 
 /**
  * Set user context for error tracking
  */
-export function setUser(user: { id: string; email?: string; username?: string }) {
+export function setUser(user: {
+  id: string;
+  email?: string;
+  username?: string;
+}) {
   Sentry.setUser(user);
 }
 

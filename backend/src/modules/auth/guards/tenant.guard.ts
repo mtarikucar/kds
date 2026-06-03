@@ -1,6 +1,6 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { shouldBypassGlobalAuth } from '../../../common/helpers/guard-bypass.helper';
+import { Injectable, CanActivate, ExecutionContext } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { shouldBypassGlobalAuth } from "../../../common/helpers/guard-bypass.helper";
 
 @Injectable()
 export class TenantGuard implements CanActivate {

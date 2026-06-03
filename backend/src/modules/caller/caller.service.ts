@@ -1,8 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { NormalisedCallerEvent } from './caller-provider.interface';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { NormalisedCallerEvent } from "./caller-provider.interface";
 
 /**
  * Caller / phone-order ingest. The flow:
@@ -33,7 +33,7 @@ export class CallerService {
       select: { id: true },
     });
     if (!tenant) {
-      throw new NotFoundException('Unknown tenant');
+      throw new NotFoundException("Unknown tenant");
     }
 
     // Try a customer match by e164. Keeps the column denormalised so the UI
@@ -65,13 +65,13 @@ export class CallerService {
     await this.outbox
       .append({
         type:
-          event.kind === 'incoming'
-            ? 'caller.incoming.v1'
-            : event.kind === 'answered'
-              ? 'caller.answered.v1'
-              : event.kind === 'ended'
-                ? 'caller.ended.v1'
-                : 'caller.missed.v1',
+          event.kind === "incoming"
+            ? "caller.incoming.v1"
+            : event.kind === "answered"
+              ? "caller.answered.v1"
+              : event.kind === "ended"
+                ? "caller.ended.v1"
+                : "caller.missed.v1",
         tenantId,
         payload: {
           callerEventId: row.id,
@@ -81,7 +81,9 @@ export class CallerService {
           customerId,
         },
       })
-      .catch((e) => this.logger.warn(`caller outbox emit failed: ${(e as Error).message}`));
+      .catch((e) =>
+        this.logger.warn(`caller outbox emit failed: ${(e as Error).message}`),
+      );
 
     return row;
   }
@@ -89,7 +91,7 @@ export class CallerService {
   listRecent(tenantId: string, limit = 50) {
     return this.prisma.callerEvent.findMany({
       where: { tenantId },
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { occurredAt: "desc" },
       take: Math.min(limit, 500),
     });
   }

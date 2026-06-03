@@ -1,5 +1,12 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 /**
  * iter-63 — these three DTOs replace inline `@Body() body: { … }` types
@@ -24,17 +31,21 @@ const FIELD_MAX = 200;
 const TOKEN_MAX = 128;
 
 export class CreateBridgeSlotDto {
-  @ApiProperty({ description: 'Branch the bridge belongs to' })
+  @ApiProperty({ description: "Branch the bridge belongs to" })
   @IsUUID()
   branchId: string;
 
-  @ApiPropertyOptional({ description: 'Product SKU printed on the packing slip' })
+  @ApiPropertyOptional({
+    description: "Product SKU printed on the packing slip",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(FIELD_MAX)
   productSku?: string;
 
-  @ApiPropertyOptional({ description: 'Initial hostname hint (admin-supplied)' })
+  @ApiPropertyOptional({
+    description: "Initial hostname hint (admin-supplied)",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(FIELD_MAX)
@@ -42,7 +53,10 @@ export class CreateBridgeSlotDto {
 }
 
 export class ClaimBridgeDto {
-  @ApiProperty({ description: 'One-time provisioning token (shown to operator once at order fulfillment)' })
+  @ApiProperty({
+    description:
+      "One-time provisioning token (shown to operator once at order fulfillment)",
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(16)

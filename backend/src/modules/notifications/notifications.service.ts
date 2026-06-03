@@ -1,8 +1,16 @@
-import { Injectable, Inject, NotFoundException, forwardRef } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateNotificationDto, NotificationType } from './dto/create-notification.dto';
-import { NotificationsGateway } from './notifications.gateway';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  forwardRef,
+} from "@nestjs/common";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import {
+  CreateNotificationDto,
+  NotificationType,
+} from "./dto/create-notification.dto";
+import { NotificationsGateway } from "./notifications.gateway";
 
 @Injectable()
 export class NotificationsService {
@@ -27,7 +35,8 @@ export class NotificationsService {
     // supply a branchId (system-wide / tenant-wide notifications),
     // fall back to the tenant's first active branch.
     const branchId =
-      data.branchId ?? (await this.resolveTenantFallbackBranchId(data.tenantId));
+      data.branchId ??
+      (await this.resolveTenantFallbackBranchId(data.tenantId));
     return this.prisma.notification.create({
       data: { ...data, branchId },
     });
@@ -42,10 +51,12 @@ export class NotificationsService {
    * impossible in v3 (tenant bootstrap guarantees one) but we surface
    * a clear error rather than letting Prisma reject with an FK violation.
    */
-  private async resolveTenantFallbackBranchId(tenantId: string): Promise<string> {
+  private async resolveTenantFallbackBranchId(
+    tenantId: string,
+  ): Promise<string> {
     const branch = await this.prisma.branch.findFirst({
-      where: { tenantId, status: 'active' },
-      orderBy: { createdAt: 'asc' },
+      where: { tenantId, status: "active" },
+      orderBy: { createdAt: "asc" },
       select: { id: true },
     });
     if (!branch) {
@@ -64,17 +75,14 @@ export class NotificationsService {
         // Include notifications that never expire (expiresAt is null) or haven't expired yet
         AND: [
           {
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
-            ],
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
           },
         ],
       },
       include: {
         readBy: { where: { userId } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 50,
     });
   }
@@ -94,7 +102,7 @@ export class NotificationsService {
       select: { id: true },
     });
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException("Notification not found");
     }
     return this.prisma.userNotificationRead.upsert({
       where: { notificationId_userId: { notificationId, userId } },
@@ -134,7 +142,9 @@ export class NotificationsService {
     // natural branch context exists at the call site.
     const branchId =
       createNotificationDto.branchId ??
-      (await this.resolveTenantFallbackBranchId(createNotificationDto.tenantId));
+      (await this.resolveTenantFallbackBranchId(
+        createNotificationDto.tenantId,
+      ));
     // Create notification in database
     const notification = await this.prisma.notification.create({
       data: {
@@ -145,7 +155,7 @@ export class NotificationsService {
         branchId,
         userId: createNotificationDto.userId,
         isGlobal: createNotificationDto.isGlobal || false,
-        priority: createNotificationDto.priority || 'NORMAL',
+        priority: createNotificationDto.priority || "NORMAL",
         data: createNotificationDto.data,
         expiresAt: createNotificationDto.expiresAt
           ? new Date(createNotificationDto.expiresAt)
@@ -197,8 +207,8 @@ export class NotificationsService {
     const admins = await this.prisma.user.findMany({
       where: {
         tenantId,
-        role: { in: ['ADMIN', 'MANAGER'] },
-        status: 'ACTIVE',
+        role: { in: ["ADMIN", "MANAGER"] },
+        status: "ACTIVE",
       },
       select: { id: true },
     });
@@ -228,7 +238,7 @@ export class NotificationsService {
       branchId: resolvedBranchId,
       userId: admin.id,
       isGlobal: false,
-      priority: 'NORMAL',
+      priority: "NORMAL",
       data: notificationData.data,
       createdAt,
     }));

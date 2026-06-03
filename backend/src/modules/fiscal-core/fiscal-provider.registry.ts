@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { FiscalProvider } from './fiscal-provider.interface';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { FiscalProvider } from "./fiscal-provider.interface";
 
 @Injectable()
 export class FiscalProviderRegistry {
@@ -8,7 +8,9 @@ export class FiscalProviderRegistry {
 
   register(provider: FiscalProvider): void {
     this.providers.set(provider.id, provider);
-    this.logger.log(`Registered FiscalProvider: ${provider.id} (caps=${provider.capabilities.join(',')})`);
+    this.logger.log(
+      `Registered FiscalProvider: ${provider.id} (caps=${provider.capabilities.join(",")})`,
+    );
   }
 
   get(id: string): FiscalProvider {

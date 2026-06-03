@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 import {
   IsEmail,
   IsEnum,
@@ -7,8 +7,8 @@ import {
   Matches,
   MaxLength,
   MinLength,
-} from 'class-validator';
-import { UserRole } from '../../../common/constants/roles.enum';
+} from "class-validator";
+import { UserRole } from "../../../common/constants/roles.enum";
 
 // Same caps iter-43 applied to the auth DTOs — replicated here so
 // the users surface has identical bcryptjs CPU-DoS hardening and
@@ -20,29 +20,33 @@ const EMAIL_MAX_LENGTH = 254;
 const NAME_MAX_LENGTH = 100;
 
 export class CreateUserDto {
-  @ApiProperty({ example: 'user@restaurant.com' })
+  @ApiProperty({ example: "user@restaurant.com" })
   @IsEmail()
   @IsNotEmpty()
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 
-  @ApiProperty({ example: 'Passw0rd!', minLength: 8, maxLength: PASSWORD_MAX_LENGTH })
+  @ApiProperty({
+    example: "Passw0rd!",
+    minLength: 8,
+    maxLength: PASSWORD_MAX_LENGTH,
+  })
   @IsString()
   @MinLength(8)
   @MaxLength(PASSWORD_MAX_LENGTH)
   @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message:
-      'Password must contain at least one lowercase letter, one uppercase letter, and one digit',
+      "Password must contain at least one lowercase letter, one uppercase letter, and one digit",
   })
   password: string;
 
-  @ApiProperty({ example: 'John' })
+  @ApiProperty({ example: "John" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(NAME_MAX_LENGTH)
   firstName: string;
 
-  @ApiProperty({ example: 'Doe' })
+  @ApiProperty({ example: "Doe" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(NAME_MAX_LENGTH)

@@ -1,20 +1,20 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
-import { HardwareOrdersService } from './hardware-orders.service';
-import { ListHardwareOrdersQueryDto } from './dto/list-hardware-orders.dto';
+import { Controller, Get, Param, Query, Req, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
+import { HardwareOrdersService } from "./hardware-orders.service";
+import { ListHardwareOrdersQueryDto } from "./dto/list-hardware-orders.dto";
 
 // v2.8.89 — order list + detail expose buyer email + phone + shipping
 // address; ADMIN/MANAGER only. Pre-v2.8.89 any authenticated tenant
 // role could enumerate the order list.
-@ApiTags('Hardware Orders')
+@ApiTags("Hardware Orders")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.MANAGER)
-@Controller('v1/hardware-orders')
+@Controller("v1/hardware-orders")
 export class HardwareOrdersController {
   constructor(private readonly orders: HardwareOrdersService) {}
 
@@ -28,9 +28,11 @@ export class HardwareOrdersController {
     return this.orders.listMine(req.user.tenantId, query.status);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'One order — items, shipments, installation requests' })
-  getMine(@Req() req: any, @Param('id') id: string) {
+  @Get(":id")
+  @ApiOperation({
+    summary: "One order — items, shipments, installation requests",
+  })
+  getMine(@Req() req: any, @Param("id") id: string) {
     return this.orders.getMine(req.user.tenantId, id);
   }
 }

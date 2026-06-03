@@ -1,7 +1,7 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CommandQueueService } from '../device-mesh/command-queue.service';
-import { DomainEventBus } from '../outbox/domain-event-bus.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CommandQueueService } from "../device-mesh/command-queue.service";
+import { DomainEventBus } from "../outbox/domain-event-bus.service";
 
 /**
  * Routes Order events into the Device Mesh as `show_order` commands on
@@ -30,10 +30,14 @@ export class KdsRoutingService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.bus.on('order.created.v1', (e) => this.onOrderEvent(e, 'show_order'));
-    this.bus.on('order.updated.v1', (e) => this.onOrderEvent(e, 'show_order'));
-    this.bus.on('order.completed.v1', (e) => this.onOrderEvent(e, 'clear_order'));
-    this.bus.on('order.cancelled.v1', (e) => this.onOrderEvent(e, 'clear_order'));
+    this.bus.on("order.created.v1", (e) => this.onOrderEvent(e, "show_order"));
+    this.bus.on("order.updated.v1", (e) => this.onOrderEvent(e, "show_order"));
+    this.bus.on("order.completed.v1", (e) =>
+      this.onOrderEvent(e, "clear_order"),
+    );
+    this.bus.on("order.cancelled.v1", (e) =>
+      this.onOrderEvent(e, "clear_order"),
+    );
   }
 
   /**
@@ -42,9 +46,16 @@ export class KdsRoutingService implements OnModuleInit {
    * and enqueues commands. Idempotency key includes the event id so retries
    * from the outbox worker don't duplicate commands.
    */
-  private async onOrderEvent(event: { id: string; payload: any; tenantId: string | null }, kind: 'show_order' | 'clear_order'): Promise<void> {
+  private async onOrderEvent(
+    event: { id: string; payload: any; tenantId: string | null },
+    kind: "show_order" | "clear_order",
+  ): Promise<void> {
     try {
-      const p = event.payload as { orderId?: string; tenantId?: string; branchId?: string };
+      const p = event.payload as {
+        orderId?: string;
+        tenantId?: string;
+        branchId?: string;
+      };
 
       // Tenant-scope precedence — the outbox envelope's tenantId is the
       // authoritative source (the publisher writes both the column and
@@ -76,8 +87,8 @@ export class KdsRoutingService implements OnModuleInit {
       const devices = await this.prisma.device.findMany({
         where: {
           tenantId,
-          kind: 'kds_screen',
-          status: { in: ['online', 'offline', 'paired'] },
+          kind: "kds_screen",
+          status: { in: ["online", "offline", "paired"] },
           ...(p.branchId ? { branchId: p.branchId } : {}),
         },
         select: { id: true },
@@ -98,15 +109,15 @@ export class KdsRoutingService implements OnModuleInit {
       const RECENT_WINDOW_MS = 5_000;
       const recentCutoff = new Date(Date.now() - RECENT_WINDOW_MS);
       let recentByDevice = new Set<string>();
-      if (kind === 'show_order') {
+      if (kind === "show_order") {
         const recent = await this.prisma.deviceCommand.findMany({
           where: {
             tenantId,
-            kind: 'show_order',
+            kind: "show_order",
             deviceId: { in: devices.map((d) => d.id) },
-            status: { in: ['queued', 'inflight'] },
+            status: { in: ["queued", "inflight"] },
             createdAt: { gte: recentCutoff },
-            payload: { path: ['orderId'], equals: p.orderId } as any,
+            payload: { path: ["orderId"], equals: p.orderId } as any,
           },
           select: { deviceId: true },
         });
@@ -116,11 +127,11 @@ export class KdsRoutingService implements OnModuleInit {
       }
 
       for (const d of devices) {
-        if (kind === 'show_order' && recentByDevice.has(d.id)) continue;
+        if (kind === "show_order" && recentByDevice.has(d.id)) continue;
         await this.commands.enqueue(tenantId, d.id, {
           kind,
           payload: { orderId: p.orderId },
-          priority: kind === 'show_order' ? 5 : 3,
+          priority: kind === "show_order" ? 5 : 3,
           // Idempotency includes the outbox event id so a retried delivery
           // collapses onto the same command row.
           idempotencyKey: `${event.id}:${d.id}:${kind}`,

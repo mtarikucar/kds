@@ -1,6 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
 
 /**
  * Hardware product catalog. The public store reads `published` rows; the
@@ -13,9 +18,12 @@ export class CatalogService {
 
   async listPublic(filters?: { category?: string }) {
     const rows = await this.prisma.hardwareProduct.findMany({
-      where: { status: 'published', ...(filters?.category ? { category: filters.category } : {}) },
+      where: {
+        status: "published",
+        ...(filters?.category ? { category: filters.category } : {}),
+      },
       include: { inventory: { select: { available: true } } },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      orderBy: [{ category: "asc" }, { name: "asc" }],
     });
     return rows.map((r) => this.toPublicView(r));
   }
@@ -31,7 +39,7 @@ export class CatalogService {
       where: { sku },
       include: { inventory: { select: { available: true } } },
     });
-    if (!row || row.status !== 'published') {
+    if (!row || row.status !== "published") {
       // Don't leak whether a draft/archived row exists — same NotFound
       // for both "doesn't exist" and "not for sale".
       throw new NotFoundException(`SKU not found: ${sku}`);
@@ -51,9 +59,13 @@ export class CatalogService {
    * does NOT bleed into the public payload unless explicitly listed here.
    */
   private toPublicView(row: any) {
-    const available = Array.isArray(row.inventory) && row.inventory.length > 0
-      ? row.inventory.reduce((acc: number, inv: any) => acc + (inv.available ?? 0), 0)
-      : 0;
+    const available =
+      Array.isArray(row.inventory) && row.inventory.length > 0
+        ? row.inventory.reduce(
+            (acc: number, inv: any) => acc + (inv.available ?? 0),
+            0,
+          )
+        : 0;
     // Strip the inventory relation entirely from the public payload —
     // we replace it with a single scalar `available` field.
     const { inventory: _omitted, ...rest } = row;
@@ -67,7 +79,7 @@ export class CatalogService {
         ...(filters?.category ? { category: filters.category } : {}),
       },
       include: { inventory: true },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      orderBy: [{ category: "asc" }, { name: "asc" }],
     });
   }
 
@@ -76,7 +88,7 @@ export class CatalogService {
       where: { id },
       include: { inventory: true },
     });
-    if (!row) throw new NotFoundException('Product not found');
+    if (!row) throw new NotFoundException("Product not found");
     return row;
   }
 
@@ -124,27 +136,35 @@ export class CatalogService {
             serviceMeta: input.serviceMeta as any,
             priceCents: input.priceCents,
             rentalMonthlyCents: input.rentalMonthlyCents,
-            currency: input.currency ?? 'TRY',
+            currency: input.currency ?? "TRY",
             warrantyMonths: input.warrantyMonths ?? 12,
             images: input.images ?? [],
             shippingProfile: input.shippingProfile as any,
-            status: input.status ?? 'draft',
+            status: input.status ?? "draft",
           },
         });
         await tx.hardwareInventory.create({ data: { productId: product.id } });
         return product;
       });
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
         throw new ConflictException(`SKU exists: ${input.sku}`);
       }
       throw e;
     }
   }
 
-  async update(id: string, input: Partial<Omit<Parameters<CatalogService['create']>[0], 'sku'>>) {
-    const exists = await this.prisma.hardwareProduct.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException('Product not found');
+  async update(
+    id: string,
+    input: Partial<Omit<Parameters<CatalogService["create"]>[0], "sku">>,
+  ) {
+    const exists = await this.prisma.hardwareProduct.findUnique({
+      where: { id },
+    });
+    if (!exists) throw new NotFoundException("Product not found");
     return this.prisma.hardwareProduct.update({
       where: { id },
       data: {
@@ -181,7 +201,17 @@ export class CatalogService {
     const pending = await this.prisma.hardwareOrderItem.count({
       where: {
         productId: id,
-        order: { status: { notIn: ['delivered', 'installed', 'refunded', 'returned', 'cancelled'] } },
+        order: {
+          status: {
+            notIn: [
+              "delivered",
+              "installed",
+              "refunded",
+              "returned",
+              "cancelled",
+            ],
+          },
+        },
       },
     });
     if (pending > 0) {
@@ -189,12 +219,12 @@ export class CatalogService {
         `Cannot archive — ${pending} unfulfilled order line(s) reference this product. Ship or cancel them first.`,
       );
     }
-    return this.update(id, { status: 'archived' });
+    return this.update(id, { status: "archived" });
   }
 
   /** Inventory ops — adjust stock and serials in one place to keep totals consistent. */
   async receiveStock(productId: string, qty: number, serials?: string[]) {
-    if (qty < 1) throw new BadRequestException('qty must be ≥ 1');
+    if (qty < 1) throw new BadRequestException("qty must be ≥ 1");
     return this.prisma.hardwareInventory.update({
       where: { productId },
       data: {
@@ -220,8 +250,14 @@ export class CatalogService {
    * commits — at that point the row is exclusively ours, so a plain
    * read + update of the remaining serials is race-free.
    */
-  async allocate(productId: string, qty: number, tx?: Prisma.TransactionClient) {
-    const client = (tx ?? this.prisma) as Prisma.TransactionClient | PrismaService;
+  async allocate(
+    productId: string,
+    qty: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = (tx ?? this.prisma) as
+      | Prisma.TransactionClient
+      | PrismaService;
 
     const claim = await client.hardwareInventory.updateMany({
       where: { productId, available: { gte: qty } },
@@ -231,14 +267,20 @@ export class CatalogService {
       },
     });
     if (claim.count === 0) {
-      const inv = await client.hardwareInventory.findUnique({ where: { productId } });
-      if (!inv) throw new NotFoundException('No inventory row for product');
-      throw new BadRequestException(`Insufficient stock: have ${inv.available}, need ${qty}`);
+      const inv = await client.hardwareInventory.findUnique({
+        where: { productId },
+      });
+      if (!inv) throw new NotFoundException("No inventory row for product");
+      throw new BadRequestException(
+        `Insufficient stock: have ${inv.available}, need ${qty}`,
+      );
     }
 
     // Pop serials post-claim. Re-reading is cheap (single row) and we know
     // we own the decrement at this point.
-    const inv = await client.hardwareInventory.findUnique({ where: { productId } });
+    const inv = await client.hardwareInventory.findUnique({
+      where: { productId },
+    });
     const popped = inv!.serialsAvailable.slice(0, qty);
     if (popped.length > 0) {
       const remaining = inv!.serialsAvailable.slice(popped.length);

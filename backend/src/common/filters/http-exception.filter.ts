@@ -4,13 +4,13 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-} from '@nestjs/common';
-import { Request, Response } from 'express';
-import { ErrorResponse } from '../interfaces/error-response.interface';
-import { BusinessException } from '../exceptions/business.exception';
-import { LoggerService } from '../services/logger.service';
-import { Prisma } from '@prisma/client';
-import { captureException, setContext } from '../../sentry.config';
+} from "@nestjs/common";
+import { Request, Response } from "express";
+import { ErrorResponse } from "../interfaces/error-response.interface";
+import { BusinessException } from "../exceptions/business.exception";
+import { LoggerService } from "../services/logger.service";
+import { Prisma } from "@prisma/client";
+import { captureException, setContext } from "../../sentry.config";
 
 /**
  * Global exception filter
@@ -25,14 +25,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isDevelopment = process.env.NODE_ENV === "development";
 
     // Generate request ID for tracking
     const requestId = this.generateRequestId();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message: string | string[] = 'Internal server error';
-    let error = 'InternalServerError';
+    let message: string | string[] = "Internal server error";
+    let error = "InternalServerError";
     let details: any = undefined;
     let stack: string | undefined = undefined;
 
@@ -42,16 +42,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse() as any;
       message = exceptionResponse.message || exception.message;
-      error = exceptionResponse.errorCode || 'BusinessError';
+      error = exceptionResponse.errorCode || "BusinessError";
       details = exceptionResponse.details;
     } else if (exception instanceof HttpException) {
       // Standard HTTP exceptions
       statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
-      if (typeof exceptionResponse === 'string') {
+      if (typeof exceptionResponse === "string") {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
+      } else if (typeof exceptionResponse === "object") {
         message = (exceptionResponse as any).message || exception.message;
         error = (exceptionResponse as any).error || exception.name;
       }
@@ -65,13 +65,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Prisma.PrismaClientValidationError) {
       // Prisma validation errors
       statusCode = HttpStatus.BAD_REQUEST;
-      message = 'Database validation error';
-      error = 'DatabaseValidationError';
+      message = "Database validation error";
+      error = "DatabaseValidationError";
       details = isDevelopment ? exception.message : undefined;
     } else if (exception instanceof Error) {
       // Generic errors
-      message = isDevelopment ? exception.message : 'An unexpected error occurred';
-      error = isDevelopment ? exception.name : 'Internal Server Error';
+      message = isDevelopment
+        ? exception.message
+        : "An unexpected error occurred";
+      error = isDevelopment ? exception.name : "Internal Server Error";
       stack = isDevelopment ? exception.stack : undefined;
     }
 
@@ -101,12 +103,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // cause from both the user and the logs.
     if (statusCode >= 500 && exception instanceof Error) {
       try {
-        setContext('http', {
+        setContext("http", {
           url: request.url,
           method: request.method,
           headers: {
-            'user-agent': request.headers['user-agent'],
-            'content-type': request.headers['content-type'],
+            "user-agent": request.headers["user-agent"],
+            "content-type": request.headers["content-type"],
           },
           statusCode,
           requestId,
@@ -114,7 +116,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         // Intentionally omit email here: Sentry retains breadcrumbs/events
         // for weeks and user email is unnecessary for triage when we already
         // have the user id + tenant id. Reduces our GDPR/KVKK surface.
-        setContext('user', {
+        setContext("user", {
           id: (request as any).user?.id,
           tenantId: (request as any).user?.tenantId,
         });
@@ -133,7 +135,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         // received an error response by this point, so the goal is
         // ops observability, not request flow.
         this.logger.error(
-          `Sentry capture failed (${(sentryErr as Error)?.message ?? 'unknown'}); ` +
+          `Sentry capture failed (${(sentryErr as Error)?.message ?? "unknown"}); ` +
             `original exception preserved (type=${(exception as any)?.constructor?.name ?? typeof exception}): ${(exception as Error)?.message ?? exception}`,
           (sentryErr as Error)?.stack,
         );
@@ -156,66 +158,67 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const { code, meta } = exception;
 
     switch (code) {
-      case 'P2002': // Unique constraint violation
+      case "P2002": // Unique constraint violation
         return {
           statusCode: HttpStatus.CONFLICT,
-          message: `A record with this ${(meta?.target as string[])?.join(', ')} already exists`,
-          error: 'UniqueConstraintViolation',
+          message: `A record with this ${(meta?.target as string[])?.join(", ")} already exists`,
+          error: "UniqueConstraintViolation",
           details: meta,
         };
 
-      case 'P2025': // Record not found
+      case "P2025": // Record not found
         return {
           statusCode: HttpStatus.NOT_FOUND,
-          message: 'Record not found',
-          error: 'RecordNotFound',
+          message: "Record not found",
+          error: "RecordNotFound",
           details: meta,
         };
 
-      case 'P2003': // Foreign key constraint violation
+      case "P2003": // Foreign key constraint violation
         return {
           statusCode: HttpStatus.BAD_REQUEST,
-          message: 'Related record not found or cannot delete record with dependencies',
-          error: 'ForeignKeyConstraintViolation',
+          message:
+            "Related record not found or cannot delete record with dependencies",
+          error: "ForeignKeyConstraintViolation",
           details: meta,
         };
 
-      case 'P2014': // Required relation violation
+      case "P2014": // Required relation violation
         return {
           statusCode: HttpStatus.BAD_REQUEST,
-          message: 'The change would violate a required relation',
-          error: 'RequiredRelationViolation',
+          message: "The change would violate a required relation",
+          error: "RequiredRelationViolation",
           details: meta,
         };
 
-      case 'P2016': // Query interpretation error
+      case "P2016": // Query interpretation error
         return {
           statusCode: HttpStatus.BAD_REQUEST,
-          message: 'Invalid query parameters',
-          error: 'InvalidQuery',
+          message: "Invalid query parameters",
+          error: "InvalidQuery",
           details: meta,
         };
 
-      case 'P2021': // Table does not exist
+      case "P2021": // Table does not exist
         return {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Database configuration error',
-          error: 'DatabaseConfigError',
+          message: "Database configuration error",
+          error: "DatabaseConfigError",
           details: meta,
         };
 
-      case 'P2024': // Connection timeout
+      case "P2024": // Connection timeout
         return {
           statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-          message: 'Database connection timeout',
-          error: 'DatabaseTimeout',
+          message: "Database connection timeout",
+          error: "DatabaseTimeout",
         };
 
       default:
         return {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'Database error occurred',
-          error: 'DatabaseError',
+          message: "Database error occurred",
+          error: "DatabaseError",
           details: { code, meta },
         };
     }
@@ -246,23 +249,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
       method: request.method,
       url: request.url,
       statusCode,
-      userId: (request as any).user?.id ?? 'anonymous',
-      tenant: (request as any).user?.tenantId || 'N/A',
-      userAgent: request.headers['user-agent'],
+      userId: (request as any).user?.id ?? "anonymous",
+      tenant: (request as any).user?.tenantId || "N/A",
+      userAgent: request.headers["user-agent"],
       ip: request.ip,
     };
 
     if (statusCode >= 500) {
       // Server errors - log as error with stack trace
       this.logger.error(
-        `Internal error: ${exception instanceof Error ? exception.message : 'Unknown error'}`,
+        `Internal error: ${exception instanceof Error ? exception.message : "Unknown error"}`,
         exception instanceof Error ? exception.stack : undefined,
         JSON.stringify(logMessage),
       );
     } else if (statusCode >= 400) {
       // Client errors - log as warning
       this.logger.warn(
-        `Client error: ${exception instanceof Error ? exception.message : 'Unknown error'}`,
+        `Client error: ${exception instanceof Error ? exception.message : "Unknown error"}`,
         JSON.stringify(logMessage),
       );
     }

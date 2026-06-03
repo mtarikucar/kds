@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { entitlementKeys } from '../entitlements/entitlementsApi';
+import { getApiErrorMessage } from '../../lib/api-error';
+import i18n from '../../i18n/config';
 
 export interface MarketplaceAddOn {
   code: string;
@@ -66,9 +68,17 @@ export const usePurchaseAddOn = () => {
       // to expire — they'd click "purchase" and see no UI change
       // until they hard-refresh.
       qc.invalidateQueries({ queryKey: ['subscriptions', 'effective-features'] });
-      toast.success('Add-on purchased.');
+      toast.success(
+        i18n.t('marketplace:purchase.success', { defaultValue: 'Add-on purchased.' }),
+      );
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Purchase failed'),
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('marketplace:purchase.failed', { defaultValue: 'Purchase failed' }),
+        ),
+      ),
   });
 };
 

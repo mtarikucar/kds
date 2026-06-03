@@ -6,27 +6,31 @@ import {
   Inject,
   forwardRef,
   Optional,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateOrderDto } from '../dto/create-order.dto';
-import { UpdateOrderDto } from '../dto/update-order.dto';
-import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
-import { TransferTableOrdersDto } from '../dto/transfer-table.dto';
-import { OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
-import { validateTransition } from '../../../common/utils/order-state-machine';
-import { TableStatus } from '../../tables/dto/create-table.dto';
-import { Logger } from '@nestjs/common';
-import { KdsGateway } from '../../kds/kds.gateway';
-import { DeliveryStatusSyncService } from '../../delivery-platforms/services/delivery-status-sync.service';
-import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
-import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
-import { TaxCalculationService } from '../../accounting/services/tax-calculation.service';
-import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
-import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
-import { ReservationStatus } from '../../reservations/constants/reservation-status.enum';
-import { OutboxService } from '../../outbox/outbox.service';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateOrderDto } from "../dto/create-order.dto";
+import { UpdateOrderDto } from "../dto/update-order.dto";
+import { UpdateOrderStatusDto } from "../dto/update-order-status.dto";
+import { TransferTableOrdersDto } from "../dto/transfer-table.dto";
+import {
+  OrderStatus,
+  StockMovementType,
+} from "../../../common/constants/order-status.enum";
+import { validateTransition } from "../../../common/utils/order-state-machine";
+import { TableStatus } from "../../tables/dto/create-table.dto";
+import { Logger } from "@nestjs/common";
+import { KdsGateway } from "../../kds/kds.gateway";
+import { DeliveryStatusSyncService } from "../../delivery-platforms/services/delivery-status-sync.service";
+import { StockDeductionService } from "../../stock-management/services/stock-deduction.service";
+import { SmsNotificationService } from "../../sms-settings/sms-notification.service";
+import { TaxCalculationService } from "../../accounting/services/tax-calculation.service";
+import { withTransaction, addBreadcrumb } from "../../../common/utils/tracing";
+import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
+import { ReservationStatus } from "../../reservations/constants/reservation-status.enum";
+import { OutboxService } from "../../outbox/outbox.service";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -68,7 +72,14 @@ export class OrdersService {
    * misconfigured outbox never breaks order creation — the existing
    * kdsGateway Socket.IO path continues to power the live KDS UI.
    */
-  private emitOrderEvent(type: 'order.created.v1' | 'order.updated.v1' | 'order.completed.v1' | 'order.cancelled.v1', order: any): void {
+  private emitOrderEvent(
+    type:
+      | "order.created.v1"
+      | "order.updated.v1"
+      | "order.completed.v1"
+      | "order.cancelled.v1",
+    order: any,
+  ): void {
     if (!this.outbox) return;
     this.outbox
       .append({
@@ -88,7 +99,9 @@ export class OrdersService {
           totalCents: this.toIntCents(order?.finalAmount),
         },
       })
-      .catch((e) => this.logger.warn(`outbox emit ${type} failed: ${(e as Error).message}`));
+      .catch((e) =>
+        this.logger.warn(`outbox emit ${type} failed: ${(e as Error).message}`),
+      );
   }
 
   /**
@@ -106,14 +119,14 @@ export class OrdersService {
     // Decimal has a toFixed; number doesn't. Detect by feature instead of
     // by `instanceof Decimal` so the helper works in test fixtures that
     // pass plain numbers.
-    const asDecimal = (v as { toFixed?: (n: number) => string });
-    if (typeof asDecimal.toFixed === 'function' && typeof v !== 'number') {
-      const fixed = asDecimal.toFixed!(2);                 // "123.45"
-      const cents = Number(fixed.replace('.', ''));         // 12345
+    const asDecimal = v as { toFixed?: (n: number) => string };
+    if (typeof asDecimal.toFixed === "function" && typeof v !== "number") {
+      const fixed = asDecimal.toFixed!(2); // "123.45"
+      const cents = Number(fixed.replace(".", "")); // 12345
       return Number.isFinite(cents) ? cents : undefined;
     }
-    if (typeof v === 'number') return Math.round(v * 100);
-    if (typeof v === 'string') {
+    if (typeof v === "number") return Math.round(v * 100);
+    if (typeof v === "string") {
       const cents = Math.round(parseFloat(v) * 100);
       return Number.isFinite(cents) ? cents : undefined;
     }
@@ -141,7 +154,7 @@ export class OrdersService {
     const pendingIntents = await tx.pendingSelfPayment.findMany({
       where: {
         tenantId,
-        status: 'PENDING',
+        status: "PENDING",
         expiresAt: { gt: new Date() },
       },
       select: { itemsByOrder: true },
@@ -160,8 +173,8 @@ export class OrdersService {
     });
     if (conflicts) {
       throw new ConflictException(
-        'A customer is currently paying for this order via PayTR. ' +
-          'Wait until their payment finalizes (or expires) before modifying.',
+        "A customer is currently paying for this order via PayTR. " +
+          "Wait until their payment finalizes (or expires) before modifying.",
       );
     }
   }
@@ -190,9 +203,9 @@ export class OrdersService {
       } catch (err) {
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002' &&
+          err.code === "P2002" &&
           Array.isArray((err.meta as any)?.target) &&
-          (err.meta as any).target.includes('orderNumber')
+          (err.meta as any).target.includes("orderNumber")
         ) {
           lastErr = err;
           continue;
@@ -200,36 +213,48 @@ export class OrdersService {
         throw err;
       }
     }
-    this.logger.error(`Failed to allocate order number after ${maxAttempts} tries: ${lastErr}`);
-    throw new BadRequestException('Could not allocate an order number — please retry');
+    this.logger.error(
+      `Failed to allocate order number after ${maxAttempts} tries: ${lastErr}`,
+    );
+    throw new BadRequestException(
+      "Could not allocate an order number — please retry",
+    );
   }
 
-  async create(createOrderDto: CreateOrderDto, userId: string, tenantId: string) {
+  async create(
+    createOrderDto: CreateOrderDto,
+    userId: string,
+    tenantId: string,
+  ) {
     const created = await this.createInner(createOrderDto, userId, tenantId);
     // Outbox emit happens AFTER the transaction commits so consumers don't
     // see an order that later rolled back. Best-effort: a failed emit logs
     // a warning but never undoes a committed order.
-    this.emitOrderEvent('order.created.v1', created);
+    this.emitOrderEvent("order.created.v1", created);
     return created;
   }
 
-  private async createInner(createOrderDto: CreateOrderDto, userId: string, tenantId: string) {
+  private async createInner(
+    createOrderDto: CreateOrderDto,
+    userId: string,
+    tenantId: string,
+  ) {
     return withTransaction(
       {
-        name: 'order.create',
-        op: 'order',
+        name: "order.create",
+        op: "order",
         tags: {
-          'order.type': createOrderDto.type,
-          'tenant.id': tenantId,
-          'user.id': userId,
-          'has_table': String(!!createOrderDto.tableId),
+          "order.type": createOrderDto.type,
+          "tenant.id": tenantId,
+          "user.id": userId,
+          has_table: String(!!createOrderDto.tableId),
         },
         data: {
           itemCount: createOrderDto.items.length,
         },
       },
       async () => {
-        addBreadcrumb('Starting order creation', 'order', {
+        addBreadcrumb("Starting order creation", "order", {
           type: createOrderDto.type,
           itemCount: createOrderDto.items.length,
         });
@@ -247,10 +272,14 @@ export class OrdersService {
             include: {
               orderItems: {
                 include: {
-                  product: { select: { id: true, name: true, price: true, image: true } },
+                  product: {
+                    select: { id: true, name: true, price: true, image: true },
+                  },
                   modifiers: {
                     include: {
-                      modifier: { select: { id: true, name: true, priceAdjustment: true } },
+                      modifier: {
+                        select: { id: true, name: true, priceAdjustment: true },
+                      },
                     },
                   },
                 },
@@ -260,10 +289,14 @@ export class OrdersService {
             },
           });
           if (existing) {
-            addBreadcrumb('Idempotency hit — returning existing order', 'order', {
-              orderId: existing.id,
-              orderNumber: existing.orderNumber,
-            });
+            addBreadcrumb(
+              "Idempotency hit — returning existing order",
+              "order",
+              {
+                orderId: existing.id,
+                orderNumber: existing.orderNumber,
+              },
+            );
             return existing;
           }
         }
@@ -280,7 +313,9 @@ export class OrdersService {
           });
 
           if (!table) {
-            throw new BadRequestException('Invalid table or table does not belong to your tenant');
+            throw new BadRequestException(
+              "Invalid table or table does not belong to your tenant",
+            );
           }
 
           // HummyTummy Phase 3: capture the table's branch so the order
@@ -297,228 +332,251 @@ export class OrdersService {
           // and orphan the items. SEATED reservations also block —
           // those mean the rezervationist already physically seated the
           // guest, walk-in on the same table is nonsense.
-          await this.assertNoReservationOverlap(tenantId, createOrderDto.tableId);
+          await this.assertNoReservationOverlap(
+            tenantId,
+            createOrderDto.tableId,
+          );
         }
 
-    // Validate all products exist and belong to tenant
-    const productIds = createOrderDto.items.map((item) => item.productId);
-    const products = await this.prisma.product.findMany({
-      where: {
-        id: { in: productIds },
-        tenantId,
-      },
-    });
-
-    if (products.length !== productIds.length) {
-      throw new BadRequestException('One or more products are invalid or do not belong to your tenant');
-    }
-
-    // Check product availability
-    const unavailableProducts = products.filter((p) => !p.isAvailable);
-    if (unavailableProducts.length > 0) {
-      throw new BadRequestException(
-        `Products not available: ${unavailableProducts.map((p) => p.name).join(', ')}`
-      );
-    }
-
-    // Validate modifiers if present
-    const allModifierIds = createOrderDto.items.flatMap((item) =>
-      (item.modifiers || []).map((m) => m.modifierId)
-    );
-
-    const modifiers = allModifierIds.length > 0
-      ? await this.prisma.modifier.findMany({
+        // Validate all products exist and belong to tenant
+        const productIds = createOrderDto.items.map((item) => item.productId);
+        const products = await this.prisma.product.findMany({
           where: {
-            id: { in: allModifierIds },
+            id: { in: productIds },
             tenantId,
-            isAvailable: true,
           },
-          select: { id: true, name: true, priceAdjustment: true, groupId: true },
-        })
-      : [];
+        });
 
-    const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
+        if (products.length !== productIds.length) {
+          throw new BadRequestException(
+            "One or more products are invalid or do not belong to your tenant",
+          );
+        }
 
-    // Validate all modifiers exist
-    for (const modifierId of allModifierIds) {
-      if (!modifierMap.has(modifierId)) {
-        throw new BadRequestException(`Modifier ${modifierId} not found or unavailable`);
-      }
-    }
+        // Check product availability
+        const unavailableProducts = products.filter((p) => !p.isAvailable);
+        if (unavailableProducts.length > 0) {
+          throw new BadRequestException(
+            `Products not available: ${unavailableProducts.map((p) => p.name).join(", ")}`,
+          );
+        }
 
-    // Validate each modifier is allowed on the product the client attached
-    // it to. Without this check, a malicious client could attach a $100
-    // "add caviar" modifier (defined for a steak) to a $2 drink, since the
-    // modifier exists somewhere in the tenant and passes isAvailable. The
-    // ProductModifierGroup junction is the source of truth for "which
-    // groups apply to which product"; cross-reference each modifier's
-    // groupId against that mapping.
-    if (allModifierIds.length > 0) {
-      const productGroupLinks = await this.prisma.productModifierGroup.findMany({
-        where: { productId: { in: productIds } },
-        select: { productId: true, groupId: true },
-      });
-      // Map productId → Set<groupId> for O(1) lookup per modifier.
-      const allowedGroupsByProduct = new Map<string, Set<string>>();
-      for (const link of productGroupLinks) {
-        const s = allowedGroupsByProduct.get(link.productId) ?? new Set<string>();
-        s.add(link.groupId);
-        allowedGroupsByProduct.set(link.productId, s);
-      }
-      for (const item of createOrderDto.items) {
-        const allowed = allowedGroupsByProduct.get(item.productId) ?? new Set<string>();
-        for (const m of item.modifiers ?? []) {
-          const modifier = modifierMap.get(m.modifierId);
-          if (!modifier) continue;   // already caught above
-          if (!allowed.has(modifier.groupId)) {
+        // Validate modifiers if present
+        const allModifierIds = createOrderDto.items.flatMap((item) =>
+          (item.modifiers || []).map((m) => m.modifierId),
+        );
+
+        const modifiers =
+          allModifierIds.length > 0
+            ? await this.prisma.modifier.findMany({
+                where: {
+                  id: { in: allModifierIds },
+                  tenantId,
+                  isAvailable: true,
+                },
+                select: {
+                  id: true,
+                  name: true,
+                  priceAdjustment: true,
+                  groupId: true,
+                },
+              })
+            : [];
+
+        const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
+
+        // Validate all modifiers exist
+        for (const modifierId of allModifierIds) {
+          if (!modifierMap.has(modifierId)) {
             throw new BadRequestException(
-              `Modifier "${modifier.name}" is not allowed on this product`,
+              `Modifier ${modifierId} not found or unavailable`,
             );
           }
         }
-      }
-    }
 
-    // Build product price map from DB (never trust client-supplied prices)
-    const productMap = new Map(products.map((p) => [p.id, p]));
+        // Validate each modifier is allowed on the product the client attached
+        // it to. Without this check, a malicious client could attach a $100
+        // "add caviar" modifier (defined for a steak) to a $2 drink, since the
+        // modifier exists somewhere in the tenant and passes isAvailable. The
+        // ProductModifierGroup junction is the source of truth for "which
+        // groups apply to which product"; cross-reference each modifier's
+        // groupId against that mapping.
+        if (allModifierIds.length > 0) {
+          const productGroupLinks =
+            await this.prisma.productModifierGroup.findMany({
+              where: { productId: { in: productIds } },
+              select: { productId: true, groupId: true },
+            });
+          // Map productId → Set<groupId> for O(1) lookup per modifier.
+          const allowedGroupsByProduct = new Map<string, Set<string>>();
+          for (const link of productGroupLinks) {
+            const s =
+              allowedGroupsByProduct.get(link.productId) ?? new Set<string>();
+            s.add(link.groupId);
+            allowedGroupsByProduct.set(link.productId, s);
+          }
+          for (const item of createOrderDto.items) {
+            const allowed =
+              allowedGroupsByProduct.get(item.productId) ?? new Set<string>();
+            for (const m of item.modifiers ?? []) {
+              const modifier = modifierMap.get(m.modifierId);
+              if (!modifier) continue; // already caught above
+              if (!allowed.has(modifier.groupId)) {
+                throw new BadRequestException(
+                  `Modifier "${modifier.name}" is not allowed on this product`,
+                );
+              }
+            }
+          }
+        }
 
-    // Calculate totals with tax
-    let totalAmount = 0;
-    let totalTaxAmount = 0;
-    const orderItems = createOrderDto.items.map((item) => {
-      const product = productMap.get(item.productId);
-      const serverPrice = Number(product?.price ?? 0);
-      const taxRate = product?.taxRate ?? 10;
+        // Build product price map from DB (never trust client-supplied prices)
+        const productMap = new Map(products.map((p) => [p.id, p]));
 
-      // Calculate modifier total for this item
-      let modifierTotal = 0;
-      const itemModifiers = (item.modifiers || []).map((mod) => {
-        const modifier = modifierMap.get(mod.modifierId);
-        const priceAdjustment = Number(modifier?.priceAdjustment || 0);
-        modifierTotal += priceAdjustment * mod.quantity;
-        return {
-          modifierId: mod.modifierId,
-          quantity: mod.quantity,
-          priceAdjustment,
-        };
-      });
+        // Calculate totals with tax
+        let totalAmount = 0;
+        let totalTaxAmount = 0;
+        const orderItems = createOrderDto.items.map((item) => {
+          const product = productMap.get(item.productId);
+          const serverPrice = Number(product?.price ?? 0);
+          const taxRate = product?.taxRate ?? 10;
 
-      const subtotal = item.quantity * (serverPrice + modifierTotal);
-      totalAmount += subtotal;
+          // Calculate modifier total for this item
+          let modifierTotal = 0;
+          const itemModifiers = (item.modifiers || []).map((mod) => {
+            const modifier = modifierMap.get(mod.modifierId);
+            const priceAdjustment = Number(modifier?.priceAdjustment || 0);
+            modifierTotal += priceAdjustment * mod.quantity;
+            return {
+              modifierId: mod.modifierId,
+              quantity: mod.quantity,
+              priceAdjustment,
+            };
+          });
 
-      // Calculate tax for this line item (prices are KDV-inclusive)
-      let itemTaxAmount = 0;
-      if (this.taxCalculationService) {
-        const tax = this.taxCalculationService.extractTax(subtotal, taxRate);
-        itemTaxAmount = tax.taxAmount;
-        totalTaxAmount += itemTaxAmount;
-      }
+          const subtotal = item.quantity * (serverPrice + modifierTotal);
+          totalAmount += subtotal;
 
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: serverPrice,
-        subtotal,
-        modifierTotal,
-        taxRate,
-        taxAmount: itemTaxAmount,
-        notes: item.notes,
-        modifiers: itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
-      };
-    });
+          // Calculate tax for this line item (prices are KDV-inclusive)
+          let itemTaxAmount = 0;
+          if (this.taxCalculationService) {
+            const tax = this.taxCalculationService.extractTax(
+              subtotal,
+              taxRate,
+            );
+            itemTaxAmount = tax.taxAmount;
+            totalTaxAmount += itemTaxAmount;
+          }
 
-    // Cap the discount at the order total — discount > total would mint a
-    // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
-    // blocks negative discounts but not over-discounts, and a free-form
-    // admin field can hit this even on legit flows (typo, copy/paste).
-    const requestedDiscount = createOrderDto.discount || 0;
-    if (requestedDiscount > totalAmount) {
-      throw new BadRequestException(
-        `Discount (${requestedDiscount}) cannot exceed order total (${totalAmount}).`,
-      );
-    }
-    const discount = requestedDiscount;
-    const finalAmount = totalAmount - discount;
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: serverPrice,
+            subtotal,
+            modifierTotal,
+            taxRate,
+            taxAmount: itemTaxAmount,
+            notes: item.notes,
+            modifiers:
+              itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
+          };
+        });
 
-    // Recalculate tax after discount (proportional)
-    const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
-    const adjustedTaxAmount = Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
+        // Cap the discount at the order total — discount > total would mint a
+        // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
+        // blocks negative discounts but not over-discounts, and a free-form
+        // admin field can hit this even on legit flows (typo, copy/paste).
+        const requestedDiscount = createOrderDto.discount || 0;
+        if (requestedDiscount > totalAmount) {
+          throw new BadRequestException(
+            `Discount (${requestedDiscount}) cannot exceed order total (${totalAmount}).`,
+          );
+        }
+        const discount = requestedDiscount;
+        const finalAmount = totalAmount - discount;
 
-    // Create order with items — wrapped in a retry so two near-simultaneous
-    // POSTs that happen to mint the same orderNumber don't both 500 out.
-    const createdOrder = await this.createWithOrderNumberRetry((orderNumber) => {
-      const createData: any = {
-        orderNumber,
-        type: createOrderDto.type,
-        status: OrderStatus.PENDING,
-        requiresApproval: false, // POS orders don't require approval
-        totalAmount,
-        discount,
-        finalAmount,
-        taxAmount: adjustedTaxAmount,
-        notes: createOrderDto.notes,
-        customerName: createOrderDto.customerName,
-        userId,
-        tenantId,
-        idempotencyKey: createOrderDto.idempotencyKey,
-        orderItems: {
-          create: orderItems,
-        },
-      };
+        // Recalculate tax after discount (proportional)
+        const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
+        const adjustedTaxAmount =
+          Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
 
-      if (createOrderDto.tableId) {
-        createData.tableId = createOrderDto.tableId;
-      }
-      // Inherit the table's branch onto the order so the new branch-scoped
-      // reports (and KDS routing) pick it up. Null is fine — pre-Branch
-      // tables keep null which falls into tenant-wide queries.
-      if (tableBranchId) {
-        createData.branchId = tableBranchId;
-      }
-
-      return this.prisma.order.create({
-      data: createData,
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                image: true,
+        // Create order with items — wrapped in a retry so two near-simultaneous
+        // POSTs that happen to mint the same orderNumber don't both 500 out.
+        const createdOrder = await this.createWithOrderNumberRetry(
+          (orderNumber) => {
+            const createData: any = {
+              orderNumber,
+              type: createOrderDto.type,
+              status: OrderStatus.PENDING,
+              requiresApproval: false, // POS orders don't require approval
+              totalAmount,
+              discount,
+              finalAmount,
+              taxAmount: adjustedTaxAmount,
+              notes: createOrderDto.notes,
+              customerName: createOrderDto.customerName,
+              userId,
+              tenantId,
+              idempotencyKey: createOrderDto.idempotencyKey,
+              orderItems: {
+                create: orderItems,
               },
-            },
-            modifiers: {
+            };
+
+            if (createOrderDto.tableId) {
+              createData.tableId = createOrderDto.tableId;
+            }
+            // Inherit the table's branch onto the order so the new branch-scoped
+            // reports (and KDS routing) pick it up. Null is fine — pre-Branch
+            // tables keep null which falls into tenant-wide queries.
+            if (tableBranchId) {
+              createData.branchId = tableBranchId;
+            }
+
+            return this.prisma.order.create({
+              data: createData,
               include: {
-                modifier: {
+                orderItems: {
+                  include: {
+                    product: {
+                      select: {
+                        id: true,
+                        name: true,
+                        price: true,
+                        image: true,
+                      },
+                    },
+                    modifiers: {
+                      include: {
+                        modifier: {
+                          select: {
+                            id: true,
+                            name: true,
+                            priceAdjustment: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                table: {
                   select: {
                     id: true,
-                    name: true,
-                    priceAdjustment: true,
+                    number: true,
+                    section: true,
+                  },
+                },
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
-            },
+            });
           },
-        },
-        table: {
-          select: {
-            id: true,
-            number: true,
-            section: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      });
-    });
+        );
 
         // Keep table.status in sync with order presence. updateStatus
         // already flips OCCUPIED on transitions into active states; the
@@ -561,14 +619,27 @@ export class OrdersService {
         }
 
         // Emit new order to kitchen via WebSocket
-        this.kdsGateway.emitNewOrder(tenantId, createdOrder.branchId, createdOrder);
+        this.kdsGateway.emitNewOrder(
+          tenantId,
+          createdOrder.branchId,
+          createdOrder,
+        );
 
         // Auto-deduct ingredients if configured (respects deductOnStatus setting)
         if (this.stockDeductionService) {
           try {
-            const deductResult = await this.stockDeductionService.deductForOrder(createdOrder.id, tenantId, OrderStatus.PENDING);
+            const deductResult =
+              await this.stockDeductionService.deductForOrder(
+                createdOrder.id,
+                tenantId,
+                OrderStatus.PENDING,
+              );
             if (deductResult?.lowStockAlerts?.length > 0) {
-              this.kdsGateway.emitLowStockAlert(tenantId, createdOrder.branchId, deductResult.lowStockAlerts);
+              this.kdsGateway.emitLowStockAlert(
+                tenantId,
+                createdOrder.branchId,
+                deductResult.lowStockAlerts,
+              );
             }
           } catch (error: any) {
             this.logger.error(
@@ -578,7 +649,10 @@ export class OrdersService {
           }
         }
 
-        addBreadcrumb('Order created successfully', 'order', { orderId: createdOrder.id, orderNumber: createdOrder.orderNumber });
+        addBreadcrumb("Order created successfully", "order", {
+          orderId: createdOrder.id,
+          orderNumber: createdOrder.orderNumber,
+        });
 
         // Send SMS to customer if phone available
         if (createdOrder.customerPhone && this.smsNotificationService) {
@@ -589,12 +663,12 @@ export class OrdersService {
         }
 
         return createdOrder;
-      }
+      },
     );
   }
 
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     tableId?: string,
     statuses?: OrderStatus[],
     startDate?: Date,
@@ -602,7 +676,12 @@ export class OrdersService {
     take: number = 100,
     skip: number = 0,
   ) {
-    const where: any = { tenantId };
+    // v3.0.0 — branchScope spreads `{ tenantId, branchId }`. Pre-v3
+    // this filtered by tenantId only; the v3 audit flagged the leak
+    // where a MANAGER in branch A could enumerate branch B's order
+    // history via GET /orders. The (tenantId, branchId) compound is
+    // also a covering index entry on the Order table.
+    const where: any = { ...branchScope(scope) };
 
     if (tableId) {
       where.tableId = tableId;
@@ -626,7 +705,6 @@ export class OrdersService {
         where.createdAt.lte = endDate;
       }
     }
-
 
     const orders = await this.prisma.order.findMany({
       where,
@@ -670,20 +748,19 @@ export class OrdersService {
         },
         payments: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: Math.min(take, 500),
       skip,
     });
 
-
     return orders;
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(scope: BranchScope, id: string) {
     const order = await this.prisma.order.findFirst({
       where: {
         id,
-        tenantId,
+        ...branchScope(scope),
       },
       include: {
         orderItems: {
@@ -734,13 +811,58 @@ export class OrdersService {
     return order;
   }
 
-  async update(id: string, updateOrderDto: UpdateOrderDto, tenantId: string) {
-    // Check if order exists and belongs to tenant
-    const order = await this.findOne(id, tenantId);
+  /**
+   * Tenant-only order lookup for SYSTEM callers (PaymentsService
+   * cross-flow checks, webhook settlement, schedulers). HTTP handlers
+   * must use `findOne(scope, id)` — the @CurrentScope() path is the
+   * canonical branch-isolation boundary; this method intentionally
+   * bypasses it because payment flows can legitimately reach across
+   * the branch axis (e.g. a checkout endpoint settling an order whose
+   * branch matches the caller's scope already via prior validation).
+   *
+   * Only call from server-internal code paths. Never expose to an
+   * HTTP handler — the lint rule `controller-needs-scope-or-skip` is
+   * the runtime gate for that.
+   */
+  async findOneByTenant(id: string, tenantId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, tenantId },
+      include: {
+        orderItems: {
+          include: {
+            product: {
+              select: { id: true, name: true, price: true, image: true },
+            },
+            modifiers: {
+              include: {
+                modifier: {
+                  select: { id: true, name: true, priceAdjustment: true },
+                },
+              },
+            },
+          },
+        },
+        table: { select: { id: true, number: true, section: true } },
+        user: { select: { id: true, firstName: true, lastName: true } },
+        payments: true,
+      },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+    return order;
+  }
+
+  async update(scope: BranchScope, id: string, updateOrderDto: UpdateOrderDto) {
+    // Check if order exists and belongs to scope
+    const order = await this.findOne(scope, id);
 
     // Don't allow updates to paid or cancelled orders
-    if (order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Cannot update paid or cancelled orders');
+    if (
+      order.status === OrderStatus.PAID ||
+      order.status === OrderStatus.CANCELLED
+    ) {
+      throw new BadRequestException("Cannot update paid or cancelled orders");
     }
 
     const updateData: any = {
@@ -751,23 +873,26 @@ export class OrdersService {
     // If items are provided, update the order items
     if (updateOrderDto.items && updateOrderDto.items.length > 0) {
       // Validate all products exist and belong to tenant
+      // (Product/Modifier are tenant-scoped catalog rows, not branch-scoped.)
       const productIds = updateOrderDto.items.map((item) => item.productId);
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: productIds },
-          tenantId,
+          tenantId: scope.tenantId,
         },
       });
 
       if (products.length !== productIds.length) {
-        throw new BadRequestException('One or more products are invalid or do not belong to your tenant');
+        throw new BadRequestException(
+          "One or more products are invalid or do not belong to your tenant",
+        );
       }
 
       // Check product availability
       const unavailableProducts = products.filter((p) => !p.isAvailable);
       if (unavailableProducts.length > 0) {
         throw new BadRequestException(
-          `Products not available: ${unavailableProducts.map((p) => p.name).join(', ')}`
+          `Products not available: ${unavailableProducts.map((p) => p.name).join(", ")}`,
         );
       }
 
@@ -783,7 +908,7 @@ export class OrdersService {
           ? await this.prisma.modifier.findMany({
               where: {
                 id: { in: allModifierIds },
-                tenantId,
+                tenantId: scope.tenantId,
                 isAvailable: true,
               },
             })
@@ -791,7 +916,9 @@ export class OrdersService {
       const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
       for (const modifierId of allModifierIds) {
         if (!modifierMap.has(modifierId)) {
-          throw new BadRequestException(`Modifier ${modifierId} not found or unavailable`);
+          throw new BadRequestException(
+            `Modifier ${modifierId} not found or unavailable`,
+          );
         }
       }
 
@@ -838,11 +965,15 @@ export class OrdersService {
           taxRate,
           taxAmount: itemTaxAmount,
           notes: item.notes,
-          modifiers: itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
+          modifiers:
+            itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
         };
       });
 
-      const rawDiscount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
+      const rawDiscount =
+        updateOrderDto.discount !== undefined
+          ? updateOrderDto.discount
+          : Number(order.discount);
       // Cap discount at totalAmount — same protection as the
       // create() path. Shrinking the item set during update could
       // leave a stored discount > new totalAmount, which would mint
@@ -852,7 +983,8 @@ export class OrdersService {
 
       // Recalculate tax after discount (proportional)
       const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
-      const adjustedTaxAmount = Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
+      const adjustedTaxAmount =
+        Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
 
       updateData.orderItems = {
         create: orderItems,
@@ -893,41 +1025,40 @@ export class OrdersService {
       // serializes all concurrent waiters and the self-pay creator
       // against the same order.
       await tx.$queryRaw`
-        SELECT id FROM orders WHERE id = ${id} AND "tenantId" = ${tenantId} FOR UPDATE
+        SELECT id FROM orders WHERE id = ${id} AND "tenantId" = ${scope.tenantId} AND "branchId" = ${scope.branchId} FOR UPDATE
       `;
       // Re-verify status inside the transaction: a concurrent cancel /
       // pay between the findOne above and this write could otherwise let
       // us layer new items onto a PAID/CANCELLED order (corrupting the
       // audit trail). The terminal statuses are guarded at line 468 but
-      // only against the stale snapshot.
+      // only against the stale snapshot. Compound scope WHERE also
+      // doubles as defense-in-depth against a regression that drops
+      // the findOne(scope, id) pre-check.
       const stillEditable = await tx.order.count({
         where: {
           id,
-          tenantId,
+          ...branchScope(scope),
           status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
         },
       });
       if (stillEditable === 0) {
-        throw new BadRequestException('Cannot update paid or cancelled orders');
+        throw new BadRequestException("Cannot update paid or cancelled orders");
       }
       // Discount-only updates: both the allocation and self-pay
       // guards run INSIDE the tx so a webhook landing between the
       // pre-tx read and the order.update can't slip past. Mirrors
       // the items-rewrite branch below.
-      if (
-        updateOrderDto.discount !== undefined &&
-        !updateData.orderItems
-      ) {
+      if (updateOrderDto.discount !== undefined && !updateData.orderItems) {
         const allocCount = await tx.orderItemPayment.count({
-          where: { tenantId, orderItem: { orderId: id } },
+          where: { tenantId: scope.tenantId, orderItem: { orderId: id } },
         });
         if (allocCount > 0) {
           throw new ConflictException(
-            'Cannot change the order discount once any per-item payment has been collected. ' +
-              'Refund the existing payment(s) first, then re-apply the discount.',
+            "Cannot change the order discount once any per-item payment has been collected. " +
+              "Refund the existing payment(s) first, then re-apply the discount.",
           );
         }
-        await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
+        await this.ensureNoInFlightSelfPayIntent(tx, id, scope.tenantId);
       }
       if (updateData.orderItems) {
         // The whole-order rewrite path drops every existing OrderItem
@@ -942,13 +1073,13 @@ export class OrdersService {
         // dedicated `DELETE /orders/:orderId/items/:itemId` endpoint
         // which preserves untouched allocations.
         const paidItemCount = await tx.orderItemPayment.count({
-          where: { tenantId, orderItem: { orderId: id } },
+          where: { tenantId: scope.tenantId, orderItem: { orderId: id } },
         });
         if (paidItemCount > 0) {
           throw new ConflictException(
-            'Cannot rewrite the full item set when partial per-item payments exist. ' +
-              'Use DELETE /orders/:orderId/items/:itemId to drop a single unpaid item, ' +
-              'or refund the payment(s) first.',
+            "Cannot rewrite the full item set when partial per-item payments exist. " +
+              "Use DELETE /orders/:orderId/items/:itemId to drop a single unpaid item, " +
+              "or refund the payment(s) first.",
           );
         }
         // Block when a customer is mid-PayTR on this order — the
@@ -956,61 +1087,69 @@ export class OrdersService {
         // current OrderItem ids; deleteMany would orphan them and
         // the webhook would fail with "item no longer exists" AFTER
         // PayTR already charged the card.
-        await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
+        await this.ensureNoInFlightSelfPayIntent(tx, id, scope.tenantId);
         await tx.orderItem.deleteMany({ where: { orderId: id } });
       }
       return tx.order.update({
-      where: { id },
-      data: updateData,
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                image: true,
+        where: { id },
+        data: updateData,
+        include: {
+          orderItems: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  image: true,
+                },
               },
             },
           },
-        },
-        table: {
-          select: {
-            id: true,
-            number: true,
-            section: true,
+          table: {
+            select: {
+              id: true,
+              number: true,
+              section: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
           },
         },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
       });
     });
 
     // Always emit to kitchen via WebSocket when order is updated
     // This ensures KDS updates even when only discount/notes/customerName change
-    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder.branchId, updatedOrder);
+    this.kdsGateway.emitOrderUpdated(
+      scope.tenantId,
+      updatedOrder.branchId,
+      updatedOrder,
+    );
 
     // Mesh-side consumers (kds-routing, webhooks-outbound) see the change via
     // the outbox. Distinct event type so consumers can opt into "any update"
     // vs. "completion" vs. "cancellation" without parsing payload bodies.
-    this.emitOrderEvent('order.updated.v1', updatedOrder);
+    this.emitOrderEvent("order.updated.v1", updatedOrder);
 
     return updatedOrder;
   }
 
-  async updateStatus(id: string, updateStatusDto: UpdateOrderStatusDto, tenantId: string) {
+  async updateStatus(
+    scope: BranchScope,
+    id: string,
+    updateStatusDto: UpdateOrderStatusDto,
+  ) {
     // Use transaction to prevent race conditions on status transitions
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
-      // Check if order exists and belongs to tenant
+      // Check if order exists and belongs to scope (tenant + branch)
       const order = await tx.order.findFirst({
-        where: { id, tenantId },
+        where: { id, ...branchScope(scope) },
         include: {
           orderItems: { include: { product: true } },
           table: true,
@@ -1022,9 +1161,12 @@ export class OrdersService {
       }
 
       // Prevent status updates for orders awaiting approval (must use approve endpoint)
-      if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+      if (
+        order.requiresApproval &&
+        order.status === OrderStatus.PENDING_APPROVAL
+      ) {
         throw new BadRequestException(
-          'Order requires approval before status can be changed. Please approve the order first.'
+          "Order requires approval before status can be changed. Please approve the order first.",
         );
       }
 
@@ -1037,20 +1179,23 @@ export class OrdersService {
       // the payment(s) explicitly instead, which also frees the items.
       if (updateStatusDto.status === OrderStatus.CANCELLED) {
         const paidItemCount = await tx.orderItemPayment.count({
-          where: { tenantId, orderItem: { orderId: id } },
+          where: { tenantId: scope.tenantId, orderItem: { orderId: id } },
         });
         if (paidItemCount > 0) {
           throw new ConflictException(
-            'Cannot cancel an order with partial per-item payments. Refund the corresponding payment(s) first.',
+            "Cannot cancel an order with partial per-item payments. Refund the corresponding payment(s) first.",
           );
         }
       }
 
       // Build update data with status timestamps
       const statusUpdateData: any = { status: updateStatusDto.status };
-      if (updateStatusDto.status === OrderStatus.PREPARING) statusUpdateData.preparingAt = new Date();
-      if (updateStatusDto.status === OrderStatus.READY) statusUpdateData.readyAt = new Date();
-      if (updateStatusDto.status === OrderStatus.CANCELLED) statusUpdateData.cancelledAt = new Date();
+      if (updateStatusDto.status === OrderStatus.PREPARING)
+        statusUpdateData.preparingAt = new Date();
+      if (updateStatusDto.status === OrderStatus.READY)
+        statusUpdateData.readyAt = new Date();
+      if (updateStatusDto.status === OrderStatus.CANCELLED)
+        statusUpdateData.cancelledAt = new Date();
 
       // Conditional write: include the observed `order.status` in the
       // where filter so two concurrent transitions can't both pass the
@@ -1112,24 +1257,44 @@ export class OrdersService {
     });
 
     // Reverse ingredient deductions on cancellation
-    if (updateStatusDto.status === OrderStatus.CANCELLED && this.stockDeductionService) {
+    if (
+      updateStatusDto.status === OrderStatus.CANCELLED &&
+      this.stockDeductionService
+    ) {
       try {
-        await this.stockDeductionService.reverseForOrder(id, tenantId);
+        await this.stockDeductionService.reverseForOrder(id, scope.tenantId);
       } catch (error: any) {
         this.logger.error(
           `CRITICAL: Stock reversal failed for cancelled order ${id}. Manual stock adjustment may be needed. Error: ${error.message}`,
           error.stack,
         );
-        this.kdsGateway.emitLowStockAlert(tenantId, updatedOrder.branchId, [`Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`]);
+        this.kdsGateway.emitLowStockAlert(
+          scope.tenantId,
+          updatedOrder.branchId,
+          [
+            `Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`,
+          ],
+        );
       }
     }
 
     // Auto-deduct ingredients on status change (respects deductOnStatus setting)
-    if (this.stockDeductionService && updateStatusDto.status !== OrderStatus.CANCELLED) {
+    if (
+      this.stockDeductionService &&
+      updateStatusDto.status !== OrderStatus.CANCELLED
+    ) {
       try {
-        const deductResult = await this.stockDeductionService.deductForOrder(id, tenantId, updateStatusDto.status);
+        const deductResult = await this.stockDeductionService.deductForOrder(
+          id,
+          scope.tenantId,
+          updateStatusDto.status,
+        );
         if (deductResult?.lowStockAlerts?.length > 0) {
-          this.kdsGateway.emitLowStockAlert(tenantId, updatedOrder.branchId, deductResult.lowStockAlerts);
+          this.kdsGateway.emitLowStockAlert(
+            scope.tenantId,
+            updatedOrder.branchId,
+            deductResult.lowStockAlerts,
+          );
         }
       } catch (error: any) {
         this.logger.error(
@@ -1140,27 +1305,36 @@ export class OrdersService {
     }
 
     // Emit status change via WebSocket
-    this.kdsGateway.emitOrderStatusChange(tenantId, updatedOrder.branchId, id, updateStatusDto.status);
+    this.kdsGateway.emitOrderStatusChange(
+      scope.tenantId,
+      updatedOrder.branchId,
+      id,
+      updateStatusDto.status,
+    );
 
     // Sync status to delivery platform (if applicable)
-    this.deliveryStatusSync?.syncStatusToPlatform(id, updateStatusDto.status).catch((err) => {
-      this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
-    });
+    this.deliveryStatusSync
+      ?.syncStatusToPlatform(id, updateStatusDto.status)
+      .catch((err) => {
+        this.logger.error(
+          `Delivery platform sync failed for order ${id}: ${err.message}`,
+        );
+      });
 
     // Send SMS to customer on key status changes
     if (updatedOrder.customerPhone && this.smsNotificationService) {
       if (updateStatusDto.status === OrderStatus.PREPARING) {
-        this.smsNotificationService.notifyOrderPreparing(tenantId, {
+        this.smsNotificationService.notifyOrderPreparing(scope.tenantId, {
           customerPhone: updatedOrder.customerPhone,
           orderNumber: updatedOrder.orderNumber,
         });
       } else if (updateStatusDto.status === OrderStatus.READY) {
-        this.smsNotificationService.notifyOrderReady(tenantId, {
+        this.smsNotificationService.notifyOrderReady(scope.tenantId, {
           customerPhone: updatedOrder.customerPhone,
           orderNumber: updatedOrder.orderNumber,
         });
       } else if (updateStatusDto.status === OrderStatus.CANCELLED) {
-        this.smsNotificationService.notifyOrderCancelled(tenantId, {
+        this.smsNotificationService.notifyOrderCancelled(scope.tenantId, {
           customerPhone: updatedOrder.customerPhone,
           orderNumber: updatedOrder.orderNumber,
         });
@@ -1178,39 +1352,44 @@ export class OrdersService {
     const status = updateStatusDto.status as OrderStatus;
     const eventType =
       status === OrderStatus.PAID || status === OrderStatus.SERVED
-        ? 'order.completed.v1'
+        ? "order.completed.v1"
         : status === OrderStatus.CANCELLED
-          ? 'order.cancelled.v1'
-          : 'order.updated.v1';
+          ? "order.cancelled.v1"
+          : "order.updated.v1";
     this.emitOrderEvent(eventType as any, updatedOrder);
 
     return updatedOrder;
   }
 
-  async remove(id: string, tenantId: string) {
-    // Check if order exists and belongs to tenant
-    const order = await this.findOne(id, tenantId);
+  async remove(scope: BranchScope, id: string) {
+    // Check if order exists and belongs to scope
+    const order = await this.findOne(scope, id);
 
     // Only allow deletion of pending or cancelled orders
-    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.CANCELLED) {
-      throw new BadRequestException('Can only delete pending or cancelled orders');
+    if (
+      order.status !== OrderStatus.PENDING &&
+      order.status !== OrderStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        "Can only delete pending or cancelled orders",
+      );
     }
 
-    // Compound WHERE: tenantId IDOR guard + status still in the
-    // delete-eligible set. If a concurrent state change (a waiter
-    // moves the order to PREPARING between our findOne and this
-    // delete) the count=0 result tells us to refuse the delete
+    // Compound WHERE: scope (tenantId, branchId) IDOR guard + status
+    // still in the delete-eligible set. If a concurrent state change
+    // (a waiter moves the order to PREPARING between our findOne and
+    // this delete) the count=0 result tells us to refuse the delete
     // rather than dropping a now-active kitchen order on the floor.
     const result = await this.prisma.order.deleteMany({
       where: {
         id,
-        tenantId,
+        ...branchScope(scope),
         status: { in: [OrderStatus.PENDING, OrderStatus.CANCELLED] },
       },
     });
     if (result.count === 0) {
       throw new BadRequestException(
-        'Order status changed concurrently — cannot delete.',
+        "Order status changed concurrently — cannot delete.",
       );
     }
     return { id };
@@ -1229,21 +1408,29 @@ export class OrdersService {
    *    are recomputed from the surviving items so the rest of the bill
    *    settles cleanly. Discount stays put.
    */
-  async removeItem(orderId: string, itemId: string, tenantId: string) {
+  async removeItem(scope: BranchScope, orderId: string, itemId: string) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
-        where: { id: orderId, tenantId },
+        where: { id: orderId, ...branchScope(scope) },
         include: { orderItems: true },
       });
       if (!order) {
         throw new NotFoundException(`Order ${orderId} not found`);
       }
-      if (order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) {
-        throw new BadRequestException('Cannot modify a paid or cancelled order');
-      }
-      if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+      if (
+        order.status === OrderStatus.PAID ||
+        order.status === OrderStatus.CANCELLED
+      ) {
         throw new BadRequestException(
-          'Order requires approval before items can be modified.',
+          "Cannot modify a paid or cancelled order",
+        );
+      }
+      if (
+        order.requiresApproval &&
+        order.status === OrderStatus.PENDING_APPROVAL
+      ) {
+        throw new BadRequestException(
+          "Order requires approval before items can be modified.",
         );
       }
 
@@ -1253,7 +1440,7 @@ export class OrdersService {
       }
       if (order.orderItems.length === 1) {
         throw new BadRequestException(
-          'Cannot remove the last item from an order; cancel the order instead.',
+          "Cannot remove the last item from an order; cancel the order instead.",
         );
       }
 
@@ -1262,14 +1449,19 @@ export class OrdersService {
       });
       if (allocations > 0) {
         throw new ConflictException(
-          'This item has been partially paid for. Refund the corresponding payment(s) first.',
+          "This item has been partially paid for. Refund the corresponding payment(s) first.",
         );
       }
 
       // Also block when this specific item is reserved by a PENDING
       // self-pay intent — deleting it would orphan the intent's
       // itemsByOrder snapshot and the webhook would fail post-charge.
-      await this.ensureNoInFlightSelfPayIntent(tx, orderId, tenantId, itemId);
+      await this.ensureNoInFlightSelfPayIntent(
+        tx,
+        orderId,
+        scope.tenantId,
+        itemId,
+      );
 
       await tx.orderItem.delete({ where: { id: itemId } });
 
@@ -1288,7 +1480,9 @@ export class OrdersService {
       const discount = new Prisma.Decimal(order.discount);
       const cappedDiscount = discount.gt(newTotal) ? newTotal : discount;
       const newFinal = newTotal.sub(cappedDiscount);
-      const discountRatio = newTotal.gt(0) ? cappedDiscount.div(newTotal) : new Prisma.Decimal(0);
+      const discountRatio = newTotal.gt(0)
+        ? cappedDiscount.div(newTotal)
+        : new Prisma.Decimal(0);
       const adjustedTax = grossTax
         .mul(new Prisma.Decimal(1).sub(discountRatio))
         .toDecimalPlaces(2);
@@ -1309,7 +1503,10 @@ export class OrdersService {
   }
 
   async deductStockForOrder(orderId: string, tenantId: string) {
-    const order = await this.findOne(orderId, tenantId);
+    // System path — tenant-only (called from background jobs, settlement
+    // flows where no BranchScope exists; the order's own branchId
+    // propagates to the StockMovement.create below).
+    const order = await this.findOneByTenant(orderId, tenantId);
 
     return this.prisma.$transaction(async (tx) => {
       for (const item of order.orderItems) {
@@ -1321,11 +1518,13 @@ export class OrdersService {
           // v2.8.98 — currentStock is Decimal; route through Prisma.Decimal
           // arithmetic so fractional units (kg cuts, pours) compose
           // correctly and the JS Number precision ceiling is bypassed.
-          const newStock = new Prisma.Decimal(product.currentStock).sub(item.quantity);
+          const newStock = new Prisma.Decimal(product.currentStock).sub(
+            item.quantity,
+          );
 
           if (newStock.lt(0)) {
             throw new BadRequestException(
-              `Insufficient stock for product: ${product.name}`
+              `Insufficient stock for product: ${product.name}`,
             );
           }
 
@@ -1357,12 +1556,14 @@ export class OrdersService {
     });
   }
 
-  async approveOrder(orderId: string, userId: string, tenantId: string) {
+  async approveOrder(scope: BranchScope, orderId: string) {
+    const tenantId = scope.tenantId;
+    const userId = scope.userId;
     // Find the order
     const order = await this.prisma.order.findFirst({
       where: {
         id: orderId,
-        tenantId,
+        ...branchScope(scope),
       },
       include: {
         orderItems: {
@@ -1379,21 +1580,27 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     if (order.status !== OrderStatus.PENDING_APPROVAL) {
-      throw new BadRequestException('Order is not pending approval');
+      throw new BadRequestException("Order is not pending approval");
     }
 
-    // Compound WHERE on the original PENDING_APPROVAL status + tenantId.
+    // Compound WHERE on the original PENDING_APPROVAL status + scope.
     // Without it, two waiters racing Approve vs Reject from two tablets
     // could each pass the status check above against PENDING_APPROVAL,
     // then the loser (say, Reject which sets CANCELLED) writes first and
     // the winner's Approve overwrites — landing the order at PENDING
-    // with cancelledAt set from the reject path. Corrupt state.
+    // with cancelledAt set from the reject path. Corrupt state. v3.0.0
+    // adds branchId to the compound so a cross-branch coercion of
+    // orderId also fails the claim.
     const claim = await this.prisma.order.updateMany({
-      where: { id: orderId, tenantId, status: OrderStatus.PENDING_APPROVAL },
+      where: {
+        id: orderId,
+        ...branchScope(scope),
+        status: OrderStatus.PENDING_APPROVAL,
+      },
       data: {
         status: OrderStatus.PENDING,
         requiresApproval: false,
@@ -1403,7 +1610,7 @@ export class OrdersService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Order status changed concurrently — refresh and retry.',
+        "Order status changed concurrently — refresh and retry.",
       );
     }
     const updatedOrder = await this.prisma.order.findUniqueOrThrow({
@@ -1446,17 +1653,28 @@ export class OrdersService {
     // Emit as new order for kitchen and POS systems
     this.kdsGateway.emitNewOrder(tenantId, updatedOrder.branchId, updatedOrder);
     // Also emit update event for any listening clients
-    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder.branchId, updatedOrder);
+    this.kdsGateway.emitOrderUpdated(
+      tenantId,
+      updatedOrder.branchId,
+      updatedOrder,
+    );
 
     // CRITICAL: Notify customer if this is a QR menu order
     if (updatedOrder.sessionId) {
-      this.kdsGateway.emitCustomerOrderApproved(updatedOrder.sessionId, updatedOrder);
+      this.kdsGateway.emitCustomerOrderApproved(
+        updatedOrder.sessionId,
+        updatedOrder,
+      );
     }
 
     // Sync approval to delivery platform (accepts the order on the platform)
-    this.deliveryStatusSync?.syncStatusToPlatform(orderId, OrderStatus.PENDING).catch((err) => {
-      this.logger.error(`Delivery platform sync failed for order ${orderId}: ${err.message}`);
-    });
+    this.deliveryStatusSync
+      ?.syncStatusToPlatform(orderId, OrderStatus.PENDING)
+      .catch((err) => {
+        this.logger.error(
+          `Delivery platform sync failed for order ${orderId}: ${err.message}`,
+        );
+      });
 
     // Send SMS to customer
     if (updatedOrder.customerPhone && this.smsNotificationService) {
@@ -1469,49 +1687,61 @@ export class OrdersService {
     return updatedOrder;
   }
 
-  async transferTableOrders(dto: TransferTableOrdersDto, tenantId: string) {
+  async transferTableOrders(scope: BranchScope, dto: TransferTableOrdersDto) {
+    const tenantId = scope.tenantId;
     const { sourceTableId, targetTableId, allowMerge = true } = dto;
 
     // Validate: source and target cannot be the same
     if (sourceTableId === targetTableId) {
-      throw new BadRequestException('Source and target tables cannot be the same');
+      throw new BadRequestException(
+        "Source and target tables cannot be the same",
+      );
     }
 
-    // Validate source table exists and belongs to tenant
+    // v3.0.0 — source AND target must live in the caller's branch.
+    // A waiter in branch A can't shove an order onto a sister-branch
+    // table; refuse before any state change.
     const sourceTable = await this.prisma.table.findFirst({
-      where: { id: sourceTableId, tenantId },
+      where: { id: sourceTableId, ...branchScope(scope) },
     });
 
     if (!sourceTable) {
-      throw new NotFoundException('Source table not found');
+      throw new NotFoundException("Source table not found in current branch");
     }
 
-    // Validate target table exists and belongs to tenant
     const targetTable = await this.prisma.table.findFirst({
-      where: { id: targetTableId, tenantId },
+      where: { id: targetTableId, ...branchScope(scope) },
     });
 
     if (!targetTable) {
-      throw new NotFoundException('Target table not found');
+      throw new NotFoundException("Target table not found in current branch");
     }
 
     // Cannot transfer to a RESERVED table
     if (targetTable.status === TableStatus.RESERVED) {
-      throw new BadRequestException('Cannot transfer orders to a reserved table');
+      throw new BadRequestException(
+        "Cannot transfer orders to a reserved table",
+      );
     }
 
     // Check if target table has active orders (occupied)
     if (targetTable.status === TableStatus.OCCUPIED && !allowMerge) {
-      throw new BadRequestException('Target table has active orders. Set allowMerge to true to merge orders.');
+      throw new BadRequestException(
+        "Target table has active orders. Set allowMerge to true to merge orders.",
+      );
     }
 
     // Find active orders on source table (exclude PAID, CANCELLED, PENDING_APPROVAL)
     const activeOrders = await this.prisma.order.findMany({
       where: {
         tableId: sourceTableId,
-        tenantId,
+        ...branchScope(scope),
         status: {
-          notIn: [OrderStatus.PAID, OrderStatus.CANCELLED, OrderStatus.PENDING_APPROVAL],
+          notIn: [
+            OrderStatus.PAID,
+            OrderStatus.CANCELLED,
+            OrderStatus.PENDING_APPROVAL,
+          ],
         },
       },
       include: {
@@ -1535,7 +1765,7 @@ export class OrdersService {
     });
 
     if (activeOrders.length === 0) {
-      throw new BadRequestException('No active orders found on source table');
+      throw new BadRequestException("No active orders found on source table");
     }
 
     // Perform the transfer in a transaction
@@ -1549,8 +1779,8 @@ export class OrdersService {
       // shared with other order/table mutators so deadlocks can't
       // form across paths.
       const [firstLockId, secondLockId] = [sourceTableId, targetTableId].sort();
-      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${firstLockId} AND "tenantId" = ${tenantId} FOR UPDATE`;
-      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${secondLockId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${firstLockId} AND "tenantId" = ${scope.tenantId} AND "branchId" = ${scope.branchId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${secondLockId} AND "tenantId" = ${scope.tenantId} AND "branchId" = ${scope.branchId} FOR UPDATE`;
 
       // Re-verify the source still has the active orders we read
       // outside the lock — a concurrent payment / cancel between the
@@ -1560,7 +1790,7 @@ export class OrdersService {
       const stillActiveIds = await tx.order.findMany({
         where: {
           id: { in: activeOrders.map((o) => o.id) },
-          tenantId,
+          ...branchScope(scope),
           tableId: sourceTableId,
           status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
         },
@@ -1568,17 +1798,17 @@ export class OrdersService {
       });
       if (stillActiveIds.length === 0) {
         throw new BadRequestException(
-          'All source-table orders changed status while waiting for the table lock — refresh and retry.',
+          "All source-table orders changed status while waiting for the table lock — refresh and retry.",
         );
       }
 
-      // Compound WHERE on tenantId — defence-in-depth so a regression
+      // Compound WHERE on scope — defence-in-depth so a regression
       // in the pre-validation above can't be amplified by an
-      // unconditional updateMany.
+      // unconditional updateMany. v3.0.0 adds branchId.
       await tx.order.updateMany({
         where: {
           id: { in: stillActiveIds.map((o) => o.id) },
-          tenantId,
+          ...branchScope(scope),
         },
         data: {
           tableId: targetTableId,
@@ -1591,20 +1821,20 @@ export class OrdersService {
       const remainingOnSource = await tx.order.count({
         where: {
           tableId: sourceTableId,
-          tenantId,
+          ...branchScope(scope),
           status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
         },
       });
       if (remainingOnSource === 0) {
         await tx.table.updateMany({
-          where: { id: sourceTableId, tenantId },
+          where: { id: sourceTableId, ...branchScope(scope) },
           data: { status: TableStatus.AVAILABLE },
         });
       }
 
       // Update target table to OCCUPIED
       await tx.table.updateMany({
-        where: { id: targetTableId, tenantId },
+        where: { id: targetTableId, ...branchScope(scope) },
         data: { status: TableStatus.OCCUPIED },
       });
 
@@ -1649,8 +1879,16 @@ export class OrdersService {
     return {
       message: `Successfully transferred ${result.length} order(s) from table ${sourceTable.number} to table ${targetTable.number}`,
       transferredOrders: result,
-      sourceTable: { id: sourceTableId, number: sourceTable.number, newStatus: TableStatus.AVAILABLE },
-      targetTable: { id: targetTableId, number: targetTable.number, newStatus: TableStatus.OCCUPIED },
+      sourceTable: {
+        id: sourceTableId,
+        number: sourceTable.number,
+        newStatus: TableStatus.AVAILABLE,
+      },
+      targetTable: {
+        id: targetTableId,
+        number: targetTable.number,
+        newStatus: TableStatus.OCCUPIED,
+      },
     };
   }
 
@@ -1659,7 +1897,8 @@ export class OrdersService {
    * Tables with active orders (PENDING, PREPARING, READY, SERVED) should be OCCUPIED.
    * Tables with no active orders should be AVAILABLE (unless RESERVED).
    */
-  async syncTableStatuses(tenantId: string) {
+  async syncTableStatuses(scope: BranchScope) {
+    const tenantId = scope.tenantId;
     const activeStatuses = [
       OrderStatus.PENDING,
       OrderStatus.PREPARING,
@@ -1667,17 +1906,20 @@ export class OrdersService {
       OrderStatus.SERVED,
     ];
 
-    // Get all tables for this tenant
+    // v3.0.0 — sync is now branch-scoped: an ADMIN/MANAGER kicking sync
+    // for branch A only sees branch A tables and branch A active orders.
+    // Pre-v3 this was tenant-wide; an admin clicking "sync" from one
+    // branch would cascade into recomputing every branch's tables.
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { ...branchScope(scope) },
       select: { id: true, number: true, status: true },
     });
 
     // Single aggregation query: count active orders per table (eliminates N+1)
     const activeOrderCounts = await this.prisma.order.groupBy({
-      by: ['tableId'],
+      by: ["tableId"],
       where: {
-        tenantId,
+        ...branchScope(scope),
         status: { in: activeStatuses },
         tableId: { not: null },
       },
@@ -1688,7 +1930,12 @@ export class OrdersService {
       activeOrderCounts.map((r) => [r.tableId, r._count.id]),
     );
 
-    const updates: { tableId: string; tableNumber: string; oldStatus: string; newStatus: string }[] = [];
+    const updates: {
+      tableId: string;
+      tableNumber: string;
+      oldStatus: string;
+      newStatus: string;
+    }[] = [];
 
     for (const table of tables) {
       // Skip reserved tables
@@ -1697,7 +1944,8 @@ export class OrdersService {
       }
 
       const activeCount = activeCountMap.get(table.id) || 0;
-      const expectedStatus = activeCount > 0 ? TableStatus.OCCUPIED : TableStatus.AVAILABLE;
+      const expectedStatus =
+        activeCount > 0 ? TableStatus.OCCUPIED : TableStatus.AVAILABLE;
 
       if (table.status !== expectedStatus) {
         await this.prisma.table.update({
@@ -1758,10 +2006,12 @@ export class OrdersService {
       },
     });
 
-    const windowEnd = new Date(now.getTime() + RESERVATION_HOLD_WINDOW_MINUTES * 60_000);
+    const windowEnd = new Date(
+      now.getTime() + RESERVATION_HOLD_WINDOW_MINUTES * 60_000,
+    );
     for (const r of candidates) {
-      const [sh, sm] = r.startTime.split(':').map(Number);
-      const [eh, em] = r.endTime.split(':').map(Number);
+      const [sh, sm] = r.startTime.split(":").map(Number);
+      const [eh, em] = r.endTime.split(":").map(Number);
       const start = new Date(r.date);
       start.setHours(sh, sm, 0, 0);
       const end = new Date(r.date);

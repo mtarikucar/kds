@@ -1,6 +1,11 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import Redis from 'ioredis';
-import { randomBytes } from 'node:crypto';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
+import Redis from "ioredis";
+import { randomBytes } from "node:crypto";
 
 /**
  * Cross-replica entitlement cache invalidation via Redis pub/sub.
@@ -27,12 +32,14 @@ import { randomBytes } from 'node:crypto';
  *   propagation. Logged at warn level on connect failure, not on each
  *   message (would spam logs during Redis incidents).
  */
-const CHANNEL = 'hummytummy:entitlements:invalidate';
+const CHANNEL = "hummytummy:entitlements:invalidate";
 
 @Injectable()
-export class EntitlementInvalidationBus implements OnModuleInit, OnModuleDestroy {
+export class EntitlementInvalidationBus
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(EntitlementInvalidationBus.name);
-  private readonly senderId = randomBytes(8).toString('hex');
+  private readonly senderId = randomBytes(8).toString("hex");
   private pub: Redis | null = null;
   private sub: Redis | null = null;
   private localHandler: ((tenantId: string) => void) | null = null;
@@ -40,7 +47,9 @@ export class EntitlementInvalidationBus implements OnModuleInit, OnModuleDestroy
   async onModuleInit(): Promise<void> {
     const url = process.env.REDIS_URL;
     if (!url) {
-      this.logger.warn('REDIS_URL not set — running without cross-replica cache invalidation');
+      this.logger.warn(
+        "REDIS_URL not set — running without cross-replica cache invalidation",
+      );
       return;
     }
     try {
@@ -54,16 +63,26 @@ export class EntitlementInvalidationBus implements OnModuleInit, OnModuleDestroy
       // on a subscribed connection.
       this.sub = new Redis(url, { lazyConnect: false });
       await this.sub.subscribe(CHANNEL);
-      this.sub.on('message', (_channel, msg) => this.onMessage(msg));
+      this.sub.on("message", (_channel, msg) => this.onMessage(msg));
       this.logger.log(`subscribed to ${CHANNEL} (sender=${this.senderId})`);
     } catch (e) {
-      this.logger.warn(`Redis connect failed; cache invalidation is local-only: ${(e as Error).message}`);
+      this.logger.warn(
+        `Redis connect failed; cache invalidation is local-only: ${(e as Error).message}`,
+      );
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    try { await this.sub?.quit(); } catch { /* ignore */ }
-    try { await this.pub?.quit(); } catch { /* ignore */ }
+    try {
+      await this.sub?.quit();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await this.pub?.quit();
+    } catch {
+      /* ignore */
+    }
   }
 
   /**
@@ -82,7 +101,10 @@ export class EntitlementInvalidationBus implements OnModuleInit, OnModuleDestroy
   async publish(tenantId: string): Promise<void> {
     if (!this.pub) return;
     try {
-      await this.pub.publish(CHANNEL, JSON.stringify({ tenantId, senderId: this.senderId }));
+      await this.pub.publish(
+        CHANNEL,
+        JSON.stringify({ tenantId, senderId: this.senderId }),
+      );
     } catch (e) {
       // Don't propagate — the local invalidate already happened; this is a
       // best-effort fan-out. Log once at the connection level rather than
@@ -92,7 +114,10 @@ export class EntitlementInvalidationBus implements OnModuleInit, OnModuleDestroy
 
   private onMessage(raw: string): void {
     try {
-      const parsed = JSON.parse(raw) as { tenantId?: string; senderId?: string };
+      const parsed = JSON.parse(raw) as {
+        tenantId?: string;
+        senderId?: string;
+      };
       if (!parsed.tenantId) return;
       // Ignore our own publishes — the local invalidate already ran.
       if (parsed.senderId === this.senderId) return;

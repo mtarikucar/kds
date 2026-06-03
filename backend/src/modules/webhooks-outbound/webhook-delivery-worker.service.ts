@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
-import { WebhookOutboundService } from './webhook-outbound.service';
-import { assertPublicHttpUrl, UnsafeUrlError } from '../../common/net/url-safety';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
+import { WebhookOutboundService } from "./webhook-outbound.service";
+import {
+  assertPublicHttpUrl,
+  UnsafeUrlError,
+} from "../../common/net/url-safety";
 
 /**
  * Drains pending webhook deliveries and POSTs them.
@@ -15,7 +18,13 @@ import { assertPublicHttpUrl, UnsafeUrlError } from '../../common/net/url-safety
 @Injectable()
 export class WebhookDeliveryWorkerService {
   private readonly logger = new Logger(WebhookDeliveryWorkerService.name);
-  private static readonly BACKOFF_MS = [30_000, 2 * 60_000, 10 * 60_000, 60 * 60_000, 6 * 60 * 60_000];
+  private static readonly BACKOFF_MS = [
+    30_000,
+    2 * 60_000,
+    10 * 60_000,
+    60 * 60_000,
+    6 * 60 * 60_000,
+  ];
   private static readonly AUTO_PAUSE_AFTER = 20;
 
   constructor(
@@ -31,7 +40,7 @@ export class WebhookDeliveryWorkerService {
     // we'd also race the auto-pause threshold from both sides.
     await withAdvisoryLock(
       this.prisma,
-      'webhooks.delivery.tick',
+      "webhooks.delivery.tick",
       () => this.tickOnce(),
       this.logger,
     );
@@ -42,16 +51,16 @@ export class WebhookDeliveryWorkerService {
     try {
       const due = await this.prisma.webhookDelivery.findMany({
         where: {
-          status: 'pending',
+          status: "pending",
           OR: [{ nextAttemptAt: { lte: new Date() } }, { nextAttemptAt: null }],
         },
         take: 50,
-        orderBy: { nextAttemptAt: 'asc' },
+        orderBy: { nextAttemptAt: "asc" },
         include: { subscription: true },
       });
 
       for (const d of due) {
-        if (d.subscription.status !== 'active') continue;
+        if (d.subscription.status !== "active") continue;
         await this.attempt(d);
       }
     } catch (e) {
@@ -67,13 +76,16 @@ export class WebhookDeliveryWorkerService {
     // delivery `failed` with an actionable message instead.
     const payload = await this.loadPayload(d.eventId);
     if (payload == null) {
-      this.logger.warn(`webhook ${d.id}: source outbox event ${d.eventId} no longer exists; marking failed`);
+      this.logger.warn(
+        `webhook ${d.id}: source outbox event ${d.eventId} no longer exists; marking failed`,
+      );
       await this.prisma.webhookDelivery.update({
         where: { id: d.id },
         data: {
-          status: 'failed',
+          status: "failed",
           lastStatusCode: 0,
-          lastResponseSnippet: 'source event purged before delivery — payload unavailable',
+          lastResponseSnippet:
+            "source event purged before delivery — payload unavailable",
         },
       });
       return;
@@ -97,13 +109,16 @@ export class WebhookDeliveryWorkerService {
       const rawSecret = await this.outbound.unsealSecret(d.subscription);
       signature = WebhookOutboundService.sign(rawSecret, ts, body);
     } catch (e) {
-      this.logger.warn(`webhook ${d.id}: cannot unseal secret: ${(e as Error).message}`);
+      this.logger.warn(
+        `webhook ${d.id}: cannot unseal secret: ${(e as Error).message}`,
+      );
       await this.prisma.webhookDelivery.update({
         where: { id: d.id },
         data: {
-          status: 'failed',
+          status: "failed",
           lastStatusCode: 0,
-          lastResponseSnippet: 'subscription predates KMS encryption — tenant must re-subscribe',
+          lastResponseSnippet:
+            "subscription predates KMS encryption — tenant must re-subscribe",
         },
       });
       return;
@@ -118,12 +133,13 @@ export class WebhookDeliveryWorkerService {
     try {
       await assertPublicHttpUrl(d.url);
     } catch (e) {
-      const msg = e instanceof UnsafeUrlError ? e.message : 'invalid webhook URL';
+      const msg =
+        e instanceof UnsafeUrlError ? e.message : "invalid webhook URL";
       this.logger.warn(`webhook ${d.id}: URL safety check failed: ${msg}`);
       await this.prisma.webhookDelivery.update({
         where: { id: d.id },
         data: {
-          status: 'failed',
+          status: "failed",
           attempts: d.attempts + 1,
           lastStatusCode: 0,
           lastResponseSnippet: `URL rejected by SSRF guard: ${msg}`,
@@ -134,13 +150,13 @@ export class WebhookDeliveryWorkerService {
 
     try {
       const res = await fetch(d.url, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'HummyTummy-Webhook/1',
-          'X-HummyTummy-Event-Id': d.eventId,
-          'X-HummyTummy-Event-Type': d.eventType,
-          'X-HummyTummy-Signature': signature,
+          "Content-Type": "application/json",
+          "User-Agent": "HummyTummy-Webhook/1",
+          "X-HummyTummy-Event-Id": d.eventId,
+          "X-HummyTummy-Event-Type": d.eventType,
+          "X-HummyTummy-Signature": signature,
         },
         body,
         // Cap one delivery at 15s. Without this a slow-loris sink would
@@ -148,20 +164,28 @@ export class WebhookDeliveryWorkerService {
         // delivery in this and the next tick.
         signal: AbortSignal.timeout(15_000),
       });
-      const text = await res.text().catch(() => '');
+      const text = await res.text().catch(() => "");
       const success = res.status >= 200 && res.status < 300;
       const attempts = d.attempts + 1;
       await this.prisma.webhookDelivery.update({
         where: { id: d.id },
         data: {
-          status: success ? 'delivered' : attempts >= WebhookDeliveryWorkerService.BACKOFF_MS.length ? 'failed' : 'pending',
+          status: success
+            ? "delivered"
+            : attempts >= WebhookDeliveryWorkerService.BACKOFF_MS.length
+              ? "failed"
+              : "pending",
           attempts,
           lastStatusCode: res.status,
           lastResponseSnippet: text.slice(0, 500),
           deliveredAt: success ? new Date() : null,
           nextAttemptAt: success
             ? null
-            : new Date(Date.now() + (WebhookDeliveryWorkerService.BACKOFF_MS[attempts - 1] ?? 6 * 60 * 60_000)),
+            : new Date(
+                Date.now() +
+                  (WebhookDeliveryWorkerService.BACKOFF_MS[attempts - 1] ??
+                    6 * 60 * 60_000),
+              ),
         },
       });
 
@@ -173,7 +197,11 @@ export class WebhookDeliveryWorkerService {
       if (success) {
         await this.prisma.tenantWebhookSubscription.update({
           where: { id: d.subscriptionId },
-          data: { lastDeliveryAt: new Date(), lastDeliveryCode: res.status, consecutiveFailures: 0 },
+          data: {
+            lastDeliveryAt: new Date(),
+            lastDeliveryCode: res.status,
+            consecutiveFailures: 0,
+          },
         });
       } else {
         const updated = await this.prisma.tenantWebhookSubscription.update({
@@ -185,12 +213,15 @@ export class WebhookDeliveryWorkerService {
           },
           select: { id: true, consecutiveFailures: true },
         });
-        if (updated.consecutiveFailures >= WebhookDeliveryWorkerService.AUTO_PAUSE_AFTER) {
+        if (
+          updated.consecutiveFailures >=
+          WebhookDeliveryWorkerService.AUTO_PAUSE_AFTER
+        ) {
           // Use updateMany with the status guard so a concurrent worker
           // that already paused us doesn't trip a no-op log line race.
           const r = await this.prisma.tenantWebhookSubscription.updateMany({
-            where: { id: d.subscriptionId, status: 'active' },
-            data: { status: 'paused' },
+            where: { id: d.subscriptionId, status: "active" },
+            data: { status: "paused" },
           });
           if (r.count > 0) {
             this.logger.warn(
@@ -205,12 +236,17 @@ export class WebhookDeliveryWorkerService {
       await this.prisma.webhookDelivery.update({
         where: { id: d.id },
         data: {
-          status: attempts >= WebhookDeliveryWorkerService.BACKOFF_MS.length ? 'failed' : 'pending',
+          status:
+            attempts >= WebhookDeliveryWorkerService.BACKOFF_MS.length
+              ? "failed"
+              : "pending",
           attempts,
           lastStatusCode: 0,
           lastResponseSnippet: (e as Error).message.slice(0, 500),
           nextAttemptAt: new Date(
-            Date.now() + (WebhookDeliveryWorkerService.BACKOFF_MS[attempts - 1] ?? 6 * 60 * 60_000),
+            Date.now() +
+              (WebhookDeliveryWorkerService.BACKOFF_MS[attempts - 1] ??
+                6 * 60 * 60_000),
           ),
         },
       });

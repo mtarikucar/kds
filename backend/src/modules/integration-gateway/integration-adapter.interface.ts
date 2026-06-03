@@ -2,12 +2,22 @@
 // event shapes via the type parameter, but the registry deals with the
 // generic form so the gateway code is provider-agnostic.
 
-export type IntegrationKind = 'delivery' | 'payment' | 'fiscal' | 'voip' | 'accounting' | 'sms' | 'whatsapp';
+export type IntegrationKind =
+  | "delivery"
+  | "payment"
+  | "fiscal"
+  | "voip"
+  | "accounting"
+  | "sms"
+  | "whatsapp";
 
-export interface IntegrationAdapter<TConfig = Record<string, unknown>, TEvent = unknown> {
+export interface IntegrationAdapter<
+  TConfig = Record<string, unknown>,
+  TEvent = unknown,
+> {
   readonly id: string;
   readonly kind: IntegrationKind;
-  readonly configSchema: Record<string, unknown>;       // JSON Schema
+  readonly configSchema: Record<string, unknown>; // JSON Schema
 
   init(config: TConfig): Promise<void>;
   healthCheck(): Promise<{ ok: boolean; details?: Record<string, unknown> }>;

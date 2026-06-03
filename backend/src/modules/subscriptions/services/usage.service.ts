@@ -1,7 +1,13 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { EntitlementService } from '../../entitlements/entitlement.service';
-import { EntitlementInvalidationBus } from '../../entitlements/entitlement-invalidation.bus';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+  Optional,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { EntitlementService } from "../../entitlements/entitlement.service";
+import { EntitlementInvalidationBus } from "../../entitlements/entitlement-invalidation.bus";
 
 /**
  * v2.8.88 — usage snapshot.
@@ -29,6 +35,7 @@ export interface UsageDimension {
 export interface UsageSnapshot {
   users: UsageDimension;
   branches: UsageDimension;
+  tables: UsageDimension;
   products: UsageDimension;
   monthlyOrders: UsageDimension;
   computedAt: string;
@@ -37,7 +44,10 @@ export interface UsageSnapshot {
 @Injectable()
 export class UsageService implements OnModuleInit {
   private readonly logger = new Logger(UsageService.name);
-  private readonly cache = new Map<string, { snapshot: UsageSnapshot; expiresAt: number }>();
+  private readonly cache = new Map<
+    string,
+    { snapshot: UsageSnapshot; expiresAt: number }
+  >();
   private readonly cacheTtlMs = 60_000;
 
   constructor(
@@ -54,7 +64,9 @@ export class UsageService implements OnModuleInit {
   onModuleInit(): void {
     // Same listener shape EntitlementService uses; the bus filters by
     // senderId so we never re-publish to ourselves.
-    this.invalidationBus?.registerListener((tenantId) => this.invalidate(tenantId));
+    this.invalidationBus?.registerListener((tenantId) =>
+      this.invalidate(tenantId),
+    );
   }
 
   async getSnapshot(tenantId: string): Promise<UsageSnapshot> {
@@ -68,7 +80,7 @@ export class UsageService implements OnModuleInit {
       where: { id: tenantId },
       select: { id: true },
     });
-    if (!tenant) throw new NotFoundException('Tenant not found');
+    if (!tenant) throw new NotFoundException("Tenant not found");
 
     // Bound the order count to the current calendar month — matches
     // the existing PlanFeatureGuard.checkLimit MONTHLY_ORDERS logic
@@ -78,9 +90,20 @@ export class UsageService implements OnModuleInit {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const [userCount, branchCount, productCount, orderCount, entSet] = await Promise.all([
-      this.prisma.user.count({ where: { tenantId, status: 'ACTIVE' } }),
-      this.prisma.branch.count({ where: { tenantId } }),
+    const [
+      userCount,
+      branchCount,
+      tableCount,
+      productCount,
+      orderCount,
+      entSet,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { tenantId, status: "ACTIVE" } }),
+      // v3.0.0 — count only active branches; archived rows are
+      // soft-deleted and don't count toward the cap (same predicate
+      // PlanFeatureGuard.checkLimit uses for BRANCHES).
+      this.prisma.branch.count({ where: { tenantId, status: "active" } }),
+      this.prisma.table.count({ where: { tenantId } }),
       this.prisma.product.count({ where: { tenantId } }),
       this.prisma.order.count({
         where: { tenantId, createdAt: { gte: startOfMonth } },
@@ -91,16 +114,27 @@ export class UsageService implements OnModuleInit {
     // Engine limits use the `limit.<name>` prefix. Use the engine value
     // when present; fall back to the plan row if the engine hasn't
     // populated yet (mirrors getEffectiveFeatures fallback).
-    const maxUsers = this.resolveLimit(entSet.limits, 'maxUsers');
-    const maxBranches = this.resolveLimit(entSet.limits, 'maxBranches');
-    const maxProducts = this.resolveLimit(entSet.limits, 'maxProducts');
-    const maxMonthlyOrders = this.resolveLimit(entSet.limits, 'maxMonthlyOrders');
+    const maxUsers = this.resolveLimit(entSet.limits, "maxUsers");
+    const maxBranches = this.resolveLimit(entSet.limits, "maxBranches");
+    const maxTables = this.resolveLimit(entSet.limits, "maxTables");
+    const maxProducts = this.resolveLimit(entSet.limits, "maxProducts");
+    const maxMonthlyOrders = this.resolveLimit(
+      entSet.limits,
+      "maxMonthlyOrders",
+    );
 
-    // Plan-only fallback for limits the engine doesn't know about (e.g.
-    // maxBranches isn't a column on SubscriptionPlan — it lives in the
-    // extra_branch add-on grants). Read plan row if engine empty.
+    // Plan-only fallback for the engine-missing case (mid-projector
+    // race for brand-new tenants). The engine path is authoritative
+    // post-v3.0.0 — `maxBranches` now lives on SubscriptionPlan, so the
+    // pre-v3 "branches default 1, no plan column" assumption no longer
+    // holds.
     let snapshot: UsageSnapshot;
-    if (maxUsers === undefined || maxProducts === undefined || maxMonthlyOrders === undefined) {
+    if (
+      maxUsers === undefined ||
+      maxTables === undefined ||
+      maxProducts === undefined ||
+      maxMonthlyOrders === undefined
+    ) {
       const t = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
         include: { currentPlan: true },
@@ -108,8 +142,15 @@ export class UsageService implements OnModuleInit {
       const plan = t?.currentPlan;
       snapshot = {
         users: { current: userCount, max: maxUsers ?? plan?.maxUsers ?? 0 },
-        branches: { current: branchCount, max: maxBranches ?? 1 },
-        products: { current: productCount, max: maxProducts ?? plan?.maxProducts ?? 0 },
+        branches: {
+          current: branchCount,
+          max: maxBranches ?? plan?.maxBranches ?? 1,
+        },
+        tables: { current: tableCount, max: maxTables ?? plan?.maxTables ?? 0 },
+        products: {
+          current: productCount,
+          max: maxProducts ?? plan?.maxProducts ?? 0,
+        },
         monthlyOrders: {
           current: orderCount,
           max: maxMonthlyOrders ?? plan?.maxMonthlyOrders ?? 0,
@@ -122,6 +163,7 @@ export class UsageService implements OnModuleInit {
         // Branches default 1 when no grant — every tenant has at least
         // a single implicit "main" branch concept.
         branches: { current: branchCount, max: maxBranches ?? 1 },
+        tables: { current: tableCount, max: maxTables },
         products: { current: productCount, max: maxProducts },
         monthlyOrders: { current: orderCount, max: maxMonthlyOrders },
         computedAt: new Date().toISOString(),
@@ -145,7 +187,7 @@ export class UsageService implements OnModuleInit {
     name: string,
   ): number | undefined {
     const v = engineLimits[`limit.${name}`];
-    return typeof v === 'number' ? v : undefined;
+    return typeof v === "number" ? v : undefined;
   }
 
   /** Called by the entitlement invalidation bus on add-on / plan changes. */

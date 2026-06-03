@@ -1,5 +1,5 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
-import { ErrorCode } from '../interfaces/error-response.interface';
+import { HttpException, HttpStatus } from "@nestjs/common";
+import { ErrorCode } from "../interfaces/error-response.interface";
 
 /**
  * Custom exception for business logic errors
@@ -66,7 +66,7 @@ export class InsufficientPermissionsException extends BusinessException {
 export class InvalidCredentialsException extends BusinessException {
   constructor() {
     super(
-      'Invalid email or password',
+      "Invalid email or password",
       ErrorCode.INVALID_CREDENTIALS,
       HttpStatus.UNAUTHORIZED,
     );

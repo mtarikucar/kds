@@ -9,15 +9,19 @@
 // it MUST match the value shape. New shapes can be added by extending the
 // fold without breaking existing callers.
 
-export type EntitlementKeyKind = 'feature' | 'limit' | 'integration';
+export type EntitlementKeyKind = "feature" | "limit" | "integration";
 
-export type EntitlementValue = boolean | number | string[] | Record<string, unknown>;
+export type EntitlementValue =
+  | boolean
+  | number
+  | string[]
+  | Record<string, unknown>;
 
 /** One grant from one source. The DB row maps 1:1 onto this. */
 export interface EntitlementGrant {
   tenantId: string;
   branchId: string | null;
-  scope: 'tenant' | 'branch' | 'device';
+  scope: "tenant" | "branch" | "device";
   key: string;
   value: EntitlementValue;
   /** Precise origin: "plan:PRO", "addon:kds-extra-screen:abc", "override:admin", "grace:past-due". */
@@ -43,10 +47,10 @@ export const EMPTY_ENTITLEMENT_SET: EntitlementSet = Object.freeze({
 
 /** Inspect a key without parsing it twice. */
 export function classify(key: string): EntitlementKeyKind | null {
-  const dot = key.indexOf('.');
+  const dot = key.indexOf(".");
   if (dot <= 0) return null;
   const prefix = key.slice(0, dot);
-  if (prefix === 'feature' || prefix === 'limit' || prefix === 'integration') {
+  if (prefix === "feature" || prefix === "limit" || prefix === "integration") {
     return prefix;
   }
   return null;

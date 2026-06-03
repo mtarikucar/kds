@@ -286,7 +286,7 @@
     "description": "The modern restaurant management platform. Streamline operations, delight customers.",
     "contact": "Contact",
     "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
-    "phone": "+90 546 678 04 95",
+    "phone": "+90 850 840 73 03",
     "product": "Product",
     "company": "Company",
     "support": "Support",
@@ -502,8 +502,10 @@
     "title": "Contact",
     "subtitle": "Get in touch for questions, requests, and feedback.",
     "backToHome": "Back to home",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "Email"
+      "email": "Email",
+      "phone": "Phone"
     },
     "sections": {
       "general": {

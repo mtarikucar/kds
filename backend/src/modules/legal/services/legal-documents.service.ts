@@ -91,23 +91,26 @@ export class LegalDocumentsService {
     // attempt's updateMany flips the first attempt's newly-inserted row
     // back to false before its own insert.
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        await tx.legalDocument.updateMany({
-          where: { kind: dto.kind, locale: dto.locale, isCurrent: true },
-          data: { isCurrent: false },
-        });
-        return tx.legalDocument.create({
-          data: {
-            kind: dto.kind,
-            version: dto.version,
-            locale: dto.locale,
-            title: dto.title,
-            bodyMarkdown: dto.bodyMarkdown,
-            effectiveAt,
-            isCurrent: true,
-          },
-        });
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await tx.legalDocument.updateMany({
+            where: { kind: dto.kind, locale: dto.locale, isCurrent: true },
+            data: { isCurrent: false },
+          });
+          return tx.legalDocument.create({
+            data: {
+              kind: dto.kind,
+              version: dto.version,
+              locale: dto.locale,
+              title: dto.title,
+              bodyMarkdown: dto.bodyMarkdown,
+              effectiveAt,
+              isCurrent: true,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
     } catch (err) {
       // The pre-check above runs OUTSIDE the transaction, so two concurrent
       // publishes for the same (kind, version, locale) can both pass it.
@@ -118,7 +121,7 @@ export class LegalDocumentsService {
       // surfaced the conflict.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
         throw new BadRequestException(
           `Version ${dto.version} already exists for ${dto.kind}/${dto.locale}. Use a new version number.`,

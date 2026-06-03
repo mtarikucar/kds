@@ -1,12 +1,17 @@
-import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CameraStatus } from '../enums/analytics.enum';
-import { CreateCameraDto, UpdateCameraDto, CameraResponseDto } from '../dto';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CameraStatus } from "../enums/analytics.enum";
+import { CreateCameraDto, UpdateCameraDto, CameraResponseDto } from "../dto";
 import {
   decryptString,
   encryptString,
-} from '../../../common/helpers/encryption.helper';
+} from "../../../common/helpers/encryption.helper";
 
 /**
  * Replace `user:pass` in an RTSP/ONVIF URL with `***:***` so responses
@@ -15,7 +20,7 @@ import {
  */
 function redactStreamUrl(url: string): string {
   try {
-    return url.replace(/(:\/\/)[^:/@]+:[^@]+@/, '$1***:***@');
+    return url.replace(/(:\/\/)[^:/@]+:[^@]+@/, "$1***:***@");
   } catch {
     return url;
   }
@@ -30,7 +35,10 @@ export class CameraService {
   /**
    * Create a new camera
    */
-  async createCamera(tenantId: string, dto: CreateCameraDto): Promise<CameraResponseDto> {
+  async createCamera(
+    tenantId: string,
+    dto: CreateCameraDto,
+  ): Promise<CameraResponseDto> {
     // Check for duplicate name
     const existing = await this.prisma.camera.findFirst({
       where: {
@@ -40,7 +48,9 @@ export class CameraService {
     });
 
     if (existing) {
-      throw new ConflictException(`Camera with name "${dto.name}" already exists`);
+      throw new ConflictException(
+        `Camera with name "${dto.name}" already exists`,
+      );
     }
 
     // v3.0.0 — every operational row carries branchId. Derive from the
@@ -65,10 +75,12 @@ export class CameraService {
         // Encrypted at rest; the edge device's config fetch decrypts on
         // the fly. Only the redacted form flows back to the admin UI.
         streamUrl: encryptString(dto.streamUrl),
-        streamType: dto.streamType || 'RTSP',
+        streamType: dto.streamType || "RTSP",
         rotationY: dto.rotationY ?? 0,
         fov: dto.fov ?? 90,
-        calibrationData: dto.calibrationData as Prisma.InputJsonValue | undefined,
+        calibrationData: dto.calibrationData as
+          | Prisma.InputJsonValue
+          | undefined,
         edgeDeviceId: dto.edgeDeviceId,
         status: CameraStatus.OFFLINE,
       },
@@ -84,7 +96,7 @@ export class CameraService {
   async getCameras(tenantId: string): Promise<CameraResponseDto[]> {
     const cameras = await this.prisma.camera.findMany({
       where: { tenantId },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
 
     return cameras.map(this.mapToResponseDto);
@@ -93,7 +105,10 @@ export class CameraService {
   /**
    * Get a single camera by ID
    */
-  async getCameraById(tenantId: string, cameraId: string): Promise<CameraResponseDto> {
+  async getCameraById(
+    tenantId: string,
+    cameraId: string,
+  ): Promise<CameraResponseDto> {
     const camera = await this.prisma.camera.findFirst({
       where: {
         id: cameraId,
@@ -114,7 +129,7 @@ export class CameraService {
   async updateCamera(
     tenantId: string,
     cameraId: string,
-    dto: UpdateCameraDto
+    dto: UpdateCameraDto,
   ): Promise<CameraResponseDto> {
     const camera = await this.prisma.camera.findFirst({
       where: {
@@ -138,7 +153,9 @@ export class CameraService {
       });
 
       if (existing) {
-        throw new ConflictException(`Camera with name "${dto.name}" already exists`);
+        throw new ConflictException(
+          `Camera with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -148,13 +165,19 @@ export class CameraService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.streamUrl !== undefined && { streamUrl: encryptString(dto.streamUrl) }),
+        ...(dto.streamUrl !== undefined && {
+          streamUrl: encryptString(dto.streamUrl),
+        }),
         ...(dto.streamType !== undefined && { streamType: dto.streamType }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.rotationY !== undefined && { rotationY: dto.rotationY }),
         ...(dto.fov !== undefined && { fov: dto.fov }),
-        ...(dto.calibrationData !== undefined && { calibrationData: dto.calibrationData as Prisma.InputJsonValue }),
-        ...(dto.edgeDeviceId !== undefined && { edgeDeviceId: dto.edgeDeviceId }),
+        ...(dto.calibrationData !== undefined && {
+          calibrationData: dto.calibrationData as Prisma.InputJsonValue,
+        }),
+        ...(dto.edgeDeviceId !== undefined && {
+          edgeDeviceId: dto.edgeDeviceId,
+        }),
       },
     });
     if (claim.count === 0) {
@@ -163,7 +186,9 @@ export class CameraService {
     // v2.8.94 — defense-in-depth: compound WHERE matches the upstream
     // claim. If the claim regresses, the re-fetch must not silently
     // expose a cross-tenant row.
-    const updated = await this.prisma.camera.findFirstOrThrow({ where: { id: cameraId, tenantId } });
+    const updated = await this.prisma.camera.findFirstOrThrow({
+      where: { id: cameraId, tenantId },
+    });
 
     this.logger.log(`Updated camera ${cameraId}`);
     return this.mapToResponseDto(updated);
@@ -202,7 +227,7 @@ export class CameraService {
     cameraId: string,
     tenantId: string,
     status: CameraStatus,
-    errorMessage?: string
+    errorMessage?: string,
   ): Promise<void> {
     const res = await this.prisma.camera.updateMany({
       where: { id: cameraId, tenantId },
@@ -220,7 +245,10 @@ export class CameraService {
   /**
    * Get cameras by status
    */
-  async getCamerasByStatus(tenantId: string, status: CameraStatus): Promise<CameraResponseDto[]> {
+  async getCamerasByStatus(
+    tenantId: string,
+    status: CameraStatus,
+  ): Promise<CameraResponseDto[]> {
     const cameras = await this.prisma.camera.findMany({
       where: {
         tenantId,
@@ -237,7 +265,7 @@ export class CameraService {
   async updateCalibration(
     tenantId: string,
     cameraId: string,
-    calibrationData: Record<string, unknown>
+    calibrationData: Record<string, unknown>,
   ): Promise<CameraResponseDto> {
     const camera = await this.prisma.camera.findFirst({
       where: {
@@ -264,7 +292,9 @@ export class CameraService {
     // v2.8.94 — defense-in-depth: compound WHERE matches the upstream
     // claim. If the claim regresses, the re-fetch must not silently
     // expose a cross-tenant row.
-    const updated = await this.prisma.camera.findFirstOrThrow({ where: { id: cameraId, tenantId } });
+    const updated = await this.prisma.camera.findFirstOrThrow({
+      where: { id: cameraId, tenantId },
+    });
 
     this.logger.log(`Updated calibration for camera ${cameraId}`);
     return this.mapToResponseDto(updated);
@@ -281,7 +311,7 @@ export class CameraService {
     calibrating: number;
   }> {
     const statusCounts = await this.prisma.camera.groupBy({
-      by: ['status'],
+      by: ["status"],
       where: { tenantId },
       _count: true,
     });
@@ -334,17 +364,19 @@ export class CameraService {
   }): CameraResponseDto {
     // The stored streamUrl is encrypted (AES-GCM). We decrypt so we
     // can build the redacted form but never return the plaintext.
-    const decrypted = camera.streamUrl ? decryptString(camera.streamUrl) : '';
+    const decrypted = camera.streamUrl ? decryptString(camera.streamUrl) : "";
     return {
       id: camera.id,
       name: camera.name,
       description: camera.description || undefined,
       streamUrl: redactStreamUrl(decrypted),
-      streamType: camera.streamType as CameraResponseDto['streamType'],
-      status: camera.status as CameraResponseDto['status'],
+      streamType: camera.streamType as CameraResponseDto["streamType"],
+      status: camera.status as CameraResponseDto["status"],
       rotationY: camera.rotationY ?? undefined,
       fov: camera.fov ?? undefined,
-      calibrationData: camera.calibrationData as Record<string, unknown> | undefined,
+      calibrationData: camera.calibrationData as
+        | Record<string, unknown>
+        | undefined,
       lastSeenAt: camera.lastSeenAt || undefined,
       errorMessage: camera.errorMessage || undefined,
       createdAt: camera.createdAt,

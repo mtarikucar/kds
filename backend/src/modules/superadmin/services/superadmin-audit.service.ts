@@ -1,12 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
 import {
   AuditFilterDto,
   AuditExportDto,
   ExportFormat,
   AuditAction,
   EntityType,
-} from '../dto/audit-filter.dto';
+} from "../dto/audit-filter.dto";
 
 /**
  * Escape a cell for CSV output. Wraps in double quotes and doubles any
@@ -15,7 +15,7 @@ import {
  * (CSV injection). Tenant names and emails are attacker-controllable.
  */
 function escapeCsvCell(value: unknown): string {
-  const s = value == null ? '' : String(value);
+  const s = value == null ? "" : String(value);
   const needsPrefix = /^[=+\-@\t\r]/.test(s);
   const safe = needsPrefix ? `'${s}` : s;
   return `"${safe.replace(/"/g, '""')}"`;
@@ -98,7 +98,7 @@ export class SuperAdminAuditService {
     const [logs, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -150,7 +150,7 @@ export class SuperAdminAuditService {
 
     const logs = await this.prisma.auditLog.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 10000, // Limit export to 10k records
     });
 
@@ -160,40 +160,40 @@ export class SuperAdminAuditService {
 
     // CSV format
     const headers = [
-      'ID',
-      'Action',
-      'Entity Type',
-      'Entity ID',
-      'Actor ID',
-      'Actor Email',
-      'Target Tenant ID',
-      'Target Tenant Name',
-      'Created At',
+      "ID",
+      "Action",
+      "Entity Type",
+      "Entity ID",
+      "Actor ID",
+      "Actor Email",
+      "Target Tenant ID",
+      "Target Tenant Name",
+      "Created At",
     ];
 
     const rows = logs.map((log) => [
       log.id,
       log.action,
       log.entityType,
-      log.entityId || '',
+      log.entityId || "",
       log.actorId,
       log.actorEmail,
-      log.targetTenantId || '',
-      log.targetTenantName || '',
+      log.targetTenantId || "",
+      log.targetTenantName || "",
       log.createdAt.toISOString(),
     ]);
 
     const csv = [
-      headers.map(escapeCsvCell).join(','),
-      ...rows.map((row) => row.map(escapeCsvCell).join(',')),
-    ].join('\n');
+      headers.map(escapeCsvCell).join(","),
+      ...rows.map((row) => row.map(escapeCsvCell).join(",")),
+    ].join("\n");
 
     return csv;
   }
 
   async getRecentActivity(limit: number = 10) {
     return this.prisma.auditLog.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
     });
   }

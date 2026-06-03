@@ -6,14 +6,14 @@ import {
   SubscribeMessage,
   ConnectedSocket,
   MessageBody,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as Sentry from '@sentry/node';
-import { PrismaService } from '../../prisma/prisma.service';
-import { UserRole } from '../../common/constants/roles.enum';
-import { BranchGuard } from '../auth/guards/branch.guard';
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { Injectable, Logger } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as Sentry from "@sentry/node";
+import { PrismaService } from "../../prisma/prisma.service";
+import { UserRole } from "../../common/constants/roles.enum";
+import { BranchGuard } from "../auth/guards/branch.guard";
 
 /**
  * Single realtime bus for kitchen, POS, personnel and customer events.
@@ -48,11 +48,13 @@ import { BranchGuard } from '../auth/guards/branch.guard';
     // second entry) still matches — bare split keeps the space and
     // silently fails the origin check.
     origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean)
-      : ['http://localhost:5173'],
+      ? process.env.CORS_ORIGIN.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : ["http://localhost:5173"],
     credentials: true,
   },
-  namespace: '/kds',
+  namespace: "/kds",
 })
 export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -83,7 +85,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const token =
         client.handshake.auth.token ||
-        client.handshake.headers.authorization?.split(' ')[1];
+        client.handshake.headers.authorization?.split(" ")[1];
       const sessionId =
         client.handshake.auth.sessionId || client.handshake.query.sessionId;
 
@@ -106,9 +108,11 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // only as a terse "authentication error: ..." warn line with no stack,
       // making post-mortems guesswork. Sentry keeps the full trace so we can
       // tell a bad token apart from a Prisma outage.
-      this.logger.warn(`Client ${client.id} authentication error: ${error.message}`);
+      this.logger.warn(
+        `Client ${client.id} authentication error: ${error.message}`,
+      );
       Sentry.captureException(error, {
-        tags: { source: 'kds-gateway', phase: 'handleConnection' },
+        tags: { source: "kds-gateway", phase: "handleConnection" },
         extra: { socketId: client.id },
       });
       client.disconnect();
@@ -118,9 +122,11 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async tryStaffAuth(client: Socket, token: string): Promise<boolean> {
     let payload: any;
     try {
-      payload = this.jwtService.verify(token, { algorithms: ['HS256'] });
+      payload = this.jwtService.verify(token, { algorithms: ["HS256"] });
     } catch (err: any) {
-      this.logger.warn(`Staff JWT verify failed for ${client.id}: ${err.message}`);
+      this.logger.warn(
+        `Staff JWT verify failed for ${client.id}: ${err.message}`,
+      );
       return false;
     }
 
@@ -128,7 +134,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // with type='marketing' / 'superadmin' against the shared secret; without
     // this check they would silently authenticate into the tenant realtime
     // stream. JwtStrategy applies the same policy for HTTP (jwt.strategy.ts).
-    if (payload.type && payload.type !== 'user') {
+    if (payload.type && payload.type !== "user") {
       this.logger.warn(
         `Staff JWT rejected for ${client.id}: unsupported token type '${payload.type}'`,
       );
@@ -138,7 +144,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const tenantId = payload.tenantId;
     const role = payload.role as UserRole | undefined;
     if (!tenantId || !role) {
-      this.logger.warn(`Staff JWT rejected for ${client.id}: missing tenantId/role`);
+      this.logger.warn(
+        `Staff JWT rejected for ${client.id}: missing tenantId/role`,
+      );
       return false;
     }
 
@@ -150,9 +158,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // WAITER who tries to listen for branch B's kitchen feed gets
     // refused at the same layer as their HTTP attempt would be.
     const branchId =
-      typeof client.handshake.auth?.branchId === 'string'
+      typeof client.handshake.auth?.branchId === "string"
         ? client.handshake.auth.branchId
-        : '';
+        : "";
     const primaryBranchId: string | null = payload.primaryBranchId ?? null;
     const allowedBranchIds: string[] = Array.isArray(payload.allowedBranchIds)
       ? payload.allowedBranchIds
@@ -178,18 +186,20 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.primaryBranchId = primaryBranchId;
     client.data.allowedBranchIds = allowedBranchIds;
     client.data.role = role;
-    client.data.userType = 'staff';
+    client.data.userType = "staff";
     client.data.tokenExp = payload.exp;
 
     // Auto-disconnect at JWT expiry so a long-running KDS terminal that
     // hasn't refreshed its token can't keep streaming kitchen events
     // forever. The frontend retries with the new token on reconnect.
-    if (payload.exp && typeof payload.exp === 'number') {
+    if (payload.exp && typeof payload.exp === "number") {
       const msToExpiry = payload.exp * 1000 - Date.now();
       if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
         setTimeout(() => {
           if (client.connected) {
-            this.logger.log(`Staff client ${client.id} token expired; disconnecting.`);
+            this.logger.log(
+              `Staff client ${client.id} token expired; disconnecting.`,
+            );
             client.disconnect(true);
           }
         }, msToExpiry).unref?.();
@@ -229,14 +239,14 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * tells the SPA the cache invalidation it kicked off in parallel
    * will see fresh data on the next mount.
    */
-  @SubscribeMessage('switchBranch')
+  @SubscribeMessage("switchBranch")
   async handleSwitchBranch(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { branchId?: string },
   ): Promise<{ ok: boolean; code?: string }> {
-    const target = String(payload?.branchId ?? '');
-    if (client.data?.userType !== 'staff') {
-      return { ok: false, code: 'NOT_STAFF' };
+    const target = String(payload?.branchId ?? "");
+    if (client.data?.userType !== "staff") {
+      return { ok: false, code: "NOT_STAFF" };
     }
     const role = client.data.role as UserRole;
     const tenantId = client.data.tenantId as string;
@@ -252,7 +262,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         allowedBranchIds,
       )
     ) {
-      return { ok: false, code: 'FORBIDDEN' };
+      return { ok: false, code: "FORBIDDEN" };
     }
 
     const prev = client.data.branchId as string;
@@ -283,7 +293,10 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { ok: true };
   }
 
-  private async tryCustomerAuth(client: Socket, sessionId: string): Promise<boolean> {
+  private async tryCustomerAuth(
+    client: Socket,
+    sessionId: string,
+  ): Promise<boolean> {
     const session = await this.prisma.customerSession.findUnique({
       where: { sessionId },
       select: {
@@ -300,14 +313,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return false;
     }
     if (!session.isActive || new Date() > session.expiresAt) {
-      this.logger.warn(`Customer session rejected for ${client.id}: expired/inactive`);
+      this.logger.warn(
+        `Customer session rejected for ${client.id}: expired/inactive`,
+      );
       return false;
     }
 
     client.data.sessionId = session.sessionId;
     client.data.tenantId = session.tenantId;
     client.data.customerId = session.customerId;
-    client.data.userType = 'customer';
+    client.data.userType = "customer";
     client.data.sessionExpiresAt = session.expiresAt;
 
     client.join(`customer-session-${session.sessionId}`);
@@ -334,7 +349,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // few seconds would otherwise hammer the DB. At most one write per minute
     // per session (in-process; acceptable staleness for presence tracking).
     const now = Date.now();
-    const lastWrite = this.customerActivityLastWrite.get(session.sessionId) ?? 0;
+    const lastWrite =
+      this.customerActivityLastWrite.get(session.sessionId) ?? 0;
     if (now - lastWrite > KdsGateway.ACTIVITY_DEBOUNCE_MS) {
       // Iter-81 cap-aware write. If the map is at the cap we evict the
       // oldest insertion-ordered entry first — Maps preserve insertion
@@ -344,7 +360,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // sockets (a customer that connects, does nothing for 60s, and
       // disconnects without the gateway noticing — rare but possible
       // on long mobile-network timeouts).
-      if (this.customerActivityLastWrite.size >= KdsGateway.ACTIVITY_MAP_HARD_CAP) {
+      if (
+        this.customerActivityLastWrite.size >= KdsGateway.ACTIVITY_MAP_HARD_CAP
+      ) {
         const oldest = this.customerActivityLastWrite.keys().next().value;
         if (oldest) this.customerActivityLastWrite.delete(oldest);
       }
@@ -362,7 +380,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.logger.log(
-      `Customer ${client.id} connected (session=${session.sessionId}, customer=${session.customerId ?? 'anonymous'})`,
+      `Customer ${client.id} connected (session=${session.sessionId}, customer=${session.customerId ?? "anonymous"})`,
     );
     return true;
   }
@@ -421,16 +439,20 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('order:new', this.toOrderEvent(order));
-    this.logger.debug(`order:new ${order.orderNumber} → kitchen/pos-${tenantId}`);
+      .emit("order:new", this.toOrderEvent(order));
+    this.logger.debug(
+      `order:new ${order.orderNumber} → kitchen/pos-${tenantId}`,
+    );
   }
 
   emitOrderUpdated(tenantId: string, branchId: string, order: any) {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('order:updated', this.toOrderEvent(order));
-    this.logger.debug(`order:updated ${order.orderNumber} → kitchen/pos-${tenantId}`);
+      .emit("order:updated", this.toOrderEvent(order));
+    this.logger.debug(
+      `order:updated ${order.orderNumber} → kitchen/pos-${tenantId}`,
+    );
   }
 
   /**
@@ -457,55 +479,79 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     },
     initiatedByUserId?: string | null,
   ) {
-    this.server
-      .to(`pos-${tenantId}-${branchId}`)
-      .emit('payment:success', {
-        paymentId: payment.id,
-        orderId: payment.orderId,
-        method: payment.method,
-        amount: payment.amount,
-        receiptSnapshot: payment.receiptSnapshot,
-        // The initiator's userId (null for webhook / customer self-pay).
-        // Clients echo their own userId and skip the auto-print branch
-        // when this matches — their createPayment mutation's onSuccess
-        // already fired a local print, so a second print on the same
-        // tablet would duplicate the fiş and pop the cash drawer twice.
-        initiatedByUserId: initiatedByUserId ?? null,
-        timestamp: new Date(),
-      });
+    this.server.to(`pos-${tenantId}-${branchId}`).emit("payment:success", {
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      method: payment.method,
+      amount: payment.amount,
+      receiptSnapshot: payment.receiptSnapshot,
+      // The initiator's userId (null for webhook / customer self-pay).
+      // Clients echo their own userId and skip the auto-print branch
+      // when this matches — their createPayment mutation's onSuccess
+      // already fired a local print, so a second print on the same
+      // tablet would duplicate the fiş and pop the cash drawer twice.
+      initiatedByUserId: initiatedByUserId ?? null,
+      timestamp: new Date(),
+    });
     this.logger.debug(`payment:success ${payment.id} → pos-${tenantId}`);
   }
 
-  emitOrderStatusChange(tenantId: string, branchId: string, orderId: string, status: string) {
+  emitOrderStatusChange(
+    tenantId: string,
+    branchId: string,
+    orderId: string,
+    status: string,
+  ) {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('order:status-changed', { orderId, status, timestamp: new Date() });
+      .emit("order:status-changed", { orderId, status, timestamp: new Date() });
     this.logger.debug(`order:status-changed ${orderId} → ${status}`);
   }
 
-  emitOrderItemStatusChange(tenantId: string, branchId: string, orderItemId: string, status: string) {
+  emitOrderItemStatusChange(
+    tenantId: string,
+    branchId: string,
+    orderItemId: string,
+    status: string,
+  ) {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('order:item-status-changed', { orderItemId, status, timestamp: new Date() });
+      .emit("order:item-status-changed", {
+        orderItemId,
+        status,
+        timestamp: new Date(),
+      });
     this.logger.debug(`order:item-status-changed ${orderItemId} → ${status}`);
   }
 
-  emitTableMerge(tenantId: string, branchId: string, payload: { groupId: string; tableNumbers: any[] }) {
+  emitTableMerge(
+    tenantId: string,
+    branchId: string,
+    payload: { groupId: string; tableNumbers: any[] },
+  ) {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('table:merged', payload);
-    this.logger.debug(`table:merged group=${payload.groupId} → kitchen/pos-${tenantId}`);
+      .emit("table:merged", payload);
+    this.logger.debug(
+      `table:merged group=${payload.groupId} → kitchen/pos-${tenantId}`,
+    );
   }
 
-  emitTableUnmerge(tenantId: string, branchId: string, payload: { tableNumber: any; groupId: string }) {
+  emitTableUnmerge(
+    tenantId: string,
+    branchId: string,
+    payload: { tableNumber: any; groupId: string },
+  ) {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('table:unmerged', payload);
-    this.logger.debug(`table:unmerged table=${payload.tableNumber} → kitchen/pos-${tenantId}`);
+      .emit("table:unmerged", payload);
+    this.logger.debug(
+      `table:unmerged table=${payload.tableNumber} → kitchen/pos-${tenantId}`,
+    );
   }
 
   // ========================================
@@ -518,7 +564,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitCustomerOrderCreated(sessionId: string, order: any) {
-    this.emitToCustomerSession(sessionId, 'customer:order-created', {
+    this.emitToCustomerSession(sessionId, "customer:order-created", {
       orderId: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
@@ -531,7 +577,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitCustomerOrderApproved(sessionId: string, order: any) {
-    this.emitToCustomerSession(sessionId, 'customer:order-approved', {
+    this.emitToCustomerSession(sessionId, "customer:order-approved", {
       orderId: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
@@ -540,7 +586,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitCustomerOrderStatusUpdate(sessionId: string, order: any) {
-    this.emitToCustomerSession(sessionId, 'customer:order-status-updated', {
+    this.emitToCustomerSession(sessionId, "customer:order-status-updated", {
       orderId: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
@@ -548,8 +594,13 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  emitLoyaltyPointsEarned(sessionId: string, customerId: string, points: number, newBalance: number) {
-    this.emitToCustomerSession(sessionId, 'customer:loyalty-earned', {
+  emitLoyaltyPointsEarned(
+    sessionId: string,
+    customerId: string,
+    points: number,
+    newBalance: number,
+  ) {
+    this.emitToCustomerSession(sessionId, "customer:loyalty-earned", {
       customerId,
       pointsEarned: points,
       newBalance,
@@ -557,7 +608,12 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  emitNewOrderWithCustomer(tenantId: string, branchId: string, order: any, sessionId?: string) {
+  emitNewOrderWithCustomer(
+    tenantId: string,
+    branchId: string,
+    order: any,
+    sessionId?: string,
+  ) {
     this.emitNewOrder(tenantId, branchId, order);
     if (sessionId) this.emitCustomerOrderCreated(sessionId, order);
   }
@@ -571,7 +627,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     this.emitOrderStatusChange(tenantId, branchId, orderId, status);
     if (sessionId) {
-      this.emitToCustomerSession(sessionId, 'customer:order-status-updated', {
+      this.emitToCustomerSession(sessionId, "customer:order-status-updated", {
         orderId,
         status,
         timestamp: new Date(),
@@ -598,7 +654,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('table:orders-transferred', { ...data, timestamp: new Date() });
+      .emit("table:orders-transferred", { ...data, timestamp: new Date() });
     this.logger.debug(
       `table:orders-transferred ${data.transferredCount} order(s) ${data.sourceTableNumber}->${data.targetTableNumber}`,
     );
@@ -609,7 +665,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========================================
 
   emitBillRequest(tenantId: string, branchId: string, billRequest: any) {
-    this.server.to(`pos-${tenantId}-${branchId}`).emit('bill-request:new', {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit("bill-request:new", {
       id: billRequest.id,
       tableId: billRequest.tableId,
       table: billRequest.table,
@@ -621,7 +677,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitBillRequestUpdated(tenantId: string, branchId: string, billRequest: any) {
-    this.server.to(`pos-${tenantId}-${branchId}`).emit('bill-request:updated', {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit("bill-request:updated", {
       id: billRequest.id,
       tableId: billRequest.tableId,
       table: billRequest.table,
@@ -641,7 +697,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========================================
 
   emitWaiterRequest(tenantId: string, branchId: string, waiterRequest: any) {
-    this.server.to(`pos-${tenantId}-${branchId}`).emit('waiter-request:new', {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit("waiter-request:new", {
       id: waiterRequest.id,
       tableId: waiterRequest.tableId,
       table: waiterRequest.table,
@@ -653,21 +709,27 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  emitWaiterRequestUpdated(tenantId: string, branchId: string, waiterRequest: any) {
-    this.server.to(`pos-${tenantId}-${branchId}`).emit('waiter-request:updated', {
-      id: waiterRequest.id,
-      tableId: waiterRequest.tableId,
-      table: waiterRequest.table,
-      sessionId: waiterRequest.sessionId,
-      message: waiterRequest.message,
-      status: waiterRequest.status,
-      acknowledgedById: waiterRequest.acknowledgedById,
-      acknowledgedBy: waiterRequest.acknowledgedBy,
-      acknowledgedAt: waiterRequest.acknowledgedAt,
-      completedAt: waiterRequest.completedAt,
-      createdAt: waiterRequest.createdAt,
-      timestamp: new Date(),
-    });
+  emitWaiterRequestUpdated(
+    tenantId: string,
+    branchId: string,
+    waiterRequest: any,
+  ) {
+    this.server
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("waiter-request:updated", {
+        id: waiterRequest.id,
+        tableId: waiterRequest.tableId,
+        table: waiterRequest.table,
+        sessionId: waiterRequest.sessionId,
+        message: waiterRequest.message,
+        status: waiterRequest.status,
+        acknowledgedById: waiterRequest.acknowledgedById,
+        acknowledgedBy: waiterRequest.acknowledgedBy,
+        acknowledgedAt: waiterRequest.acknowledgedAt,
+        completedAt: waiterRequest.completedAt,
+        createdAt: waiterRequest.createdAt,
+        timestamp: new Date(),
+      });
   }
 
   // ========================================
@@ -677,13 +739,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitAttendanceUpdate(tenantId: string, branchId: string, data: any) {
     this.server
       .to(`personnel-${tenantId}-${branchId}`)
-      .emit('personnel:attendance-update', { ...data, timestamp: new Date() });
+      .emit("personnel:attendance-update", { ...data, timestamp: new Date() });
   }
 
   emitSwapRequestUpdate(tenantId: string, branchId: string, data: any) {
     this.server
       .to(`personnel-${tenantId}-${branchId}`)
-      .emit('personnel:swap-request-update', { ...data, timestamp: new Date() });
+      .emit("personnel:swap-request-update", {
+        ...data,
+        timestamp: new Date(),
+      });
   }
 
   // ========================================
@@ -694,7 +759,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit('stock:low-stock-alert', { items, timestamp: new Date() });
-    this.logger.debug(`stock:low-stock-alert ${items.length} items → kitchen/pos-${tenantId}`);
+      .emit("stock:low-stock-alert", { items, timestamp: new Date() });
+    this.logger.debug(
+      `stock:low-stock-alert ${items.length} items → kitchen/pos-${tenantId}`,
+    );
   }
 }

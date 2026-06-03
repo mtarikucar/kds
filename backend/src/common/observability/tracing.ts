@@ -30,25 +30,39 @@ export async function bootstrapTracing(): Promise<void> {
     // optional peer-deps — production installs that enable OTel run
     // `npm install` on the listed packages and the dynamic require picks
     // them up at boot.
-    const dynRequire = new Function('mod', 'return require(mod)') as (m: string) => any;
-    const { NodeSDK } = dynRequire('@opentelemetry/sdk-node');
-    const { getNodeAutoInstrumentations } = dynRequire('@opentelemetry/auto-instrumentations-node');
-    const { OTLPTraceExporter } = dynRequire('@opentelemetry/exporter-trace-otlp-http');
-    const { Resource } = dynRequire('@opentelemetry/resources');
-    const { SemanticResourceAttributes } = dynRequire('@opentelemetry/semantic-conventions');
+    const dynRequire = new Function("mod", "return require(mod)") as (
+      m: string,
+    ) => any;
+    const { NodeSDK } = dynRequire("@opentelemetry/sdk-node");
+    const { getNodeAutoInstrumentations } = dynRequire(
+      "@opentelemetry/auto-instrumentations-node",
+    );
+    const { OTLPTraceExporter } = dynRequire(
+      "@opentelemetry/exporter-trace-otlp-http",
+    );
+    const { Resource } = dynRequire("@opentelemetry/resources");
+    const { SemanticResourceAttributes } = dynRequire(
+      "@opentelemetry/semantic-conventions",
+    );
 
     const sdk = new NodeSDK({
       resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: process.env.OTEL_SERVICE_NAME ?? 'hummytummy-backend',
-        [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV ?? 'development',
+        [SemanticResourceAttributes.SERVICE_NAME]:
+          process.env.OTEL_SERVICE_NAME ?? "hummytummy-backend",
+        [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]:
+          process.env.NODE_ENV ?? "development",
       }),
       traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
       instrumentations: [
         getNodeAutoInstrumentations({
           // HTTP request body / response body capture is too verbose for
           // production — disable so the spans stay compact.
-          '@opentelemetry/instrumentation-http': { enabled: true, ignoreIncomingRequestHook: (req: any) => req.url === '/healthz/live' },
-          '@opentelemetry/instrumentation-fs': { enabled: false },
+          "@opentelemetry/instrumentation-http": {
+            enabled: true,
+            ignoreIncomingRequestHook: (req: any) =>
+              req.url === "/healthz/live",
+          },
+          "@opentelemetry/instrumentation-fs": { enabled: false },
         }),
       ],
     });
@@ -65,16 +79,16 @@ export async function bootstrapTracing(): Promise<void> {
         await sdk.shutdown();
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.warn('[OTel] shutdown failed', e);
+        console.warn("[OTel] shutdown failed", e);
       }
     };
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.warn(
-      '[OTel] tracing requested but SDK not installed; run: ' +
-        'npm i @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources @opentelemetry/semantic-conventions',
+      "[OTel] tracing requested but SDK not installed; run: " +
+        "npm i @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources @opentelemetry/semantic-conventions",
       e,
     );
   }
@@ -95,9 +109,11 @@ export async function withSpan<T>(
 ): Promise<T> {
   if (!process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return fn();
   try {
-    const dynRequire = new Function('mod', 'return require(mod)') as (m: string) => any;
-    const api = dynRequire('@opentelemetry/api');
-    const tracer = api.trace.getTracer('hummytummy');
+    const dynRequire = new Function("mod", "return require(mod)") as (
+      m: string,
+    ) => any;
+    const api = dynRequire("@opentelemetry/api");
+    const tracer = api.trace.getTracer("hummytummy");
     return await tracer.startActiveSpan(name, async (span) => {
       try {
         for (const [k, v] of Object.entries(attrs)) span.setAttribute(k, v);

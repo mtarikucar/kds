@@ -4,7 +4,7 @@ import {
   ValidationOptions,
   ValidatorConstraint,
   ValidatorConstraintInterface,
-} from 'class-validator';
+} from "class-validator";
 
 /**
  * Class-level constraint that passes when at least one of the named
@@ -26,19 +26,19 @@ import {
  *     a property) so its message is surfaced via `constraints[0]` on
  *     the parent target rather than against an individual field.
  */
-@ValidatorConstraint({ name: 'AtLeastOneOf', async: false })
+@ValidatorConstraint({ name: "AtLeastOneOf", async: false })
 class AtLeastOneOfConstraint implements ValidatorConstraintInterface {
   validate(_value: unknown, args: ValidationArguments): boolean {
     const keys = args.constraints[0] as string[];
     const obj = args.object as Record<string, unknown>;
     return keys.some((k) => {
       const v = obj[k];
-      return typeof v === 'string' && v.trim().length > 0;
+      return typeof v === "string" && v.trim().length > 0;
     });
   }
 
   defaultMessage(args: ValidationArguments): string {
-    const keys = (args.constraints[0] as string[]).join(', ');
+    const keys = (args.constraints[0] as string[]).join(", ");
     return `At least one of [${keys}] must be provided`;
   }
 }
@@ -49,7 +49,7 @@ export function AtLeastOneOf(
 ): ClassDecorator {
   return function (target: Function) {
     registerDecorator({
-      name: 'AtLeastOneOf',
+      name: "AtLeastOneOf",
       target: target,
       propertyName: undefined as unknown as string, // class-level
       options: validationOptions,

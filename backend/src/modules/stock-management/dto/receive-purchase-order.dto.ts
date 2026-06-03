@@ -1,37 +1,49 @@
-import { IsString, IsOptional, IsNumber, IsArray, ArrayMinSize, ValidateNested, Min, IsDateString } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+  ArrayMinSize,
+  ValidateNested,
+  Min,
+  IsDateString,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ReceiveLineItemDto {
-  @ApiProperty({ description: 'Purchase order item ID' })
+  @ApiProperty({ description: "Purchase order item ID" })
   @IsString()
   purchaseOrderItemId: string;
 
-  @ApiProperty({ description: 'Quantity received', minimum: 0 })
+  @ApiProperty({ description: "Quantity received", minimum: 0 })
   @IsNumber()
   @Min(0)
   quantityReceived: number;
 
-  @ApiPropertyOptional({ description: 'Batch number' })
+  @ApiPropertyOptional({ description: "Batch number" })
   @IsString()
   @IsOptional()
   batchNumber?: string;
 
-  @ApiPropertyOptional({ description: 'Expiry date for this batch' })
+  @ApiPropertyOptional({ description: "Expiry date for this batch" })
   @IsDateString()
   @IsOptional()
   expiryDate?: string;
 }
 
 export class ReceivePurchaseOrderDto {
-  @ApiProperty({ type: [ReceiveLineItemDto], description: 'Items being received' })
+  @ApiProperty({
+    type: [ReceiveLineItemDto],
+    description: "Items being received",
+  })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ReceiveLineItemDto)
   items: ReceiveLineItemDto[];
 
-  @ApiPropertyOptional({ description: 'Notes about the receiving' })
+  @ApiPropertyOptional({ description: "Notes about the receiving" })
   @IsString()
   @IsOptional()
   notes?: string;
