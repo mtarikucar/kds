@@ -1,6 +1,7 @@
 import { Controller, Get, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
 import { EntitlementService } from "./entitlement.service";
 
 /**
@@ -17,6 +18,10 @@ export class EntitlementsController {
   constructor(private readonly entitlements: EntitlementService) {}
 
   @Get("me")
+  // Tenant-level (branchId is optional, read off the JWT — not the
+  // X-Branch-Id header). The dashboard hits this on every page load before a
+  // branch is necessarily selected, so it must bypass the global BranchGuard.
+  @SkipBranchScope()
   @ApiOperation({
     summary: "Effective entitlement set for the authenticated tenant",
   })

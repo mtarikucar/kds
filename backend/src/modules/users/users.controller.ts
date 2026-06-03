@@ -23,6 +23,7 @@ import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
 import { UpdateOnboardingDto } from "./dto/update-onboarding.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
 // v2.8.92: route user-limit checks through the canonical PlanFeatureGuard
 // + modern `@CheckLimit(LimitType.USERS)` pair. Pre-v2.8.92 this
 // controller used the legacy SubscriptionLimitsGuard + free-form
@@ -123,12 +124,14 @@ export class UsersController {
 
   // Profile endpoints (all authenticated users)
   @Get("me/profile")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Get current user profile" })
   getMyProfile(@CurrentUser("id") userId: string) {
     return this.usersService.getMyProfile(userId);
   }
 
   @Patch("me/profile")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Update current user profile" })
   updateMyProfile(
     @CurrentUser("id") userId: string,
@@ -138,6 +141,7 @@ export class UsersController {
   }
 
   @Patch("me/email")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Update user email (requires password)" })
   updateMyEmail(
     @CurrentUser("id") userId: string,
@@ -178,12 +182,14 @@ export class UsersController {
 
   // Onboarding endpoints
   @Get("me/onboarding")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Get current user onboarding data" })
   getMyOnboarding(@CurrentUser("id") userId: string) {
     return this.usersService.getOnboarding(userId);
   }
 
   @Patch("me/onboarding")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Update current user onboarding data" })
   updateMyOnboarding(
     @CurrentUser("id") userId: string,
