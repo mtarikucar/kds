@@ -1199,10 +1199,19 @@ export class SubscriptionService {
         reservationSystem: plan.reservationSystem,
         personnelManagement: plan.personnelManagement,
         deliveryIntegration: plan.deliveryIntegration,
+        // v3.0.7 — posAccess joined the engine's FEATURE_COLUMNS in v3.0.0 but
+        // this engine-empty fallback was never updated, so a fresh tenant
+        // (projector not run yet) resolved posAccess=undefined → the POS UI
+        // (<FeatureGate feature="posAccess">) and sidebar item were hidden even
+        // on BUSINESS. Must mirror PlanProjectorService.FEATURE_COLUMNS exactly.
+        posAccess: plan.posAccess,
       };
       const limits: Record<string, number> = {
         maxUsers: plan.maxUsers,
         maxTables: plan.maxTables,
+        // v3.0.7 — likewise missing from the fallback vs the projector's
+        // LIMIT_COLUMNS, so checkLimit('maxBranches') resolved undefined.
+        maxBranches: plan.maxBranches,
         maxProducts: plan.maxProducts,
         maxCategories: plan.maxCategories,
         maxMonthlyOrders: plan.maxMonthlyOrders,
