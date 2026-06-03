@@ -484,7 +484,17 @@ restore_image_ids() {
     return 1
   fi
 
-  dc up -d --force-recreate backend frontend landing marketing
+  # marketing:current only exists after the first successful swap. On a deploy
+  # that aborts before the swap (e.g. the migration doctor), the tag isn't
+  # present yet, and recreating the service would make compose try to pull a
+  # non-existent :current and fail the whole rollback. Recreate the core trio
+  # unconditionally (prior behaviour); fold marketing in only when it resolves.
+  if docker image inspect "$MARKETING_IMG:current" >/dev/null 2>&1; then
+    dc up -d --force-recreate backend frontend landing marketing
+  else
+    warn "marketing :current absent (pre-first-deploy) — rolling back core services only"
+    dc up -d --force-recreate backend frontend landing
+  fi
   sleep 5
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC" || warn "Post-rollback API not healthy"
 
