@@ -62,13 +62,16 @@ REDIS_CONTAINER=""
 BACKEND_CONTAINER=""
 FRONTEND_CONTAINER=""
 LANDING_CONTAINER=""
+MARKETING_CONTAINER=""
 BACKEND_IMG=""
 FRONTEND_IMG=""
 LANDING_IMG=""
+MARKETING_IMG=""
 API_LOCAL_URL=""
 API_PUBLIC_URL=""
 FRONTEND_PUBLIC_URL=""
 LANDING_PUBLIC_URL=""
+MARKETING_PUBLIC_URL=""
 HEALTH_BUDGET_SEC=300
 BACKUP_RETENTION_DAYS=14
 STATE_FILE=""
@@ -100,13 +103,16 @@ configure_env() {
     BACKEND_CONTAINER="kds_backend_prod"
     FRONTEND_CONTAINER="kds_frontend_prod"
     LANDING_CONTAINER="kds_landing_prod"
+    MARKETING_CONTAINER="kds_marketing_prod"
     BACKEND_IMG="$ghcr_base/backend"
     FRONTEND_IMG="$ghcr_base/frontend"
     LANDING_IMG="$ghcr_base/landing"
+    MARKETING_IMG="$ghcr_base/marketing"
     API_LOCAL_URL="http://localhost:3000/api/health"
     API_PUBLIC_URL="https://hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://hummytummy.com"
     LANDING_PUBLIC_URL="https://hummytummy.com/landing"
+    MARKETING_PUBLIC_URL="https://marketing.hummytummy.com"
     HEALTH_BUDGET_SEC=300
     BACKUP_RETENTION_DAYS=14
     BACKUP_PREFIX="prod"
@@ -118,13 +124,16 @@ configure_env() {
     BACKEND_CONTAINER="kds_backend_staging"
     FRONTEND_CONTAINER="kds_frontend_staging"
     LANDING_CONTAINER="kds_landing_staging"
+    MARKETING_CONTAINER="kds_marketing_staging"
     BACKEND_IMG="$ghcr_base/backend-staging"
     FRONTEND_IMG="$ghcr_base/frontend-staging"
     LANDING_IMG="$ghcr_base/landing-staging"
+    MARKETING_IMG="$ghcr_base/marketing-staging"
     API_LOCAL_URL="http://localhost:3002/api/health"
     API_PUBLIC_URL="https://staging.hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://staging.hummytummy.com"
     LANDING_PUBLIC_URL="https://staging.hummytummy.com/landing"
+    MARKETING_PUBLIC_URL=""
     # Bumped from the original 180s → 300s (route-mapping past 180s on
     # cold boots) → 600s. Run 26431353670 showed the HummyTummy-sized
     # image still hadn't responded to /api/health at the 300s mark.
@@ -225,7 +234,7 @@ backup_database() {
 snapshot_image_ids() {
   : > "$STATE_FILE"
   local saved=0
-  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER"; do
+  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER" "MARKETING $MARKETING_CONTAINER"; do
     local role="${entry%% *}"
     local container="${entry##* }"
     local sha
@@ -238,7 +247,7 @@ snapshot_image_ids() {
       warn "$container not running — no prior SHA to snapshot"
     fi
   done
-  log "Snapshot complete: $saved/3 containers (file: $STATE_FILE)"
+  log "Snapshot complete: $saved/4 containers (file: $STATE_FILE)"
 }
 
 pull_versioned_images() {
@@ -248,7 +257,7 @@ pull_versioned_images() {
     echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   fi
 
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$MARKETING_IMG"; do
     log "docker pull $img:$VERSION"
     docker pull "$img:$VERSION"
   done
@@ -389,10 +398,12 @@ swap_backend() {
 swap_app_containers() {
   retag_to_current "$FRONTEND_IMG"
   retag_to_current "$LANDING_IMG"
-  dc up -d --force-recreate frontend landing
+  retag_to_current "$MARKETING_IMG"
+  dc up -d --force-recreate frontend landing marketing
   sleep 3
   verify_running_image "$FRONTEND_CONTAINER" "$FRONTEND_IMG"
   verify_running_image "$LANDING_CONTAINER"  "$LANDING_IMG"
+  verify_running_image "$MARKETING_CONTAINER" "$MARKETING_IMG"
 }
 
 verify_and_promote() {
@@ -403,6 +414,8 @@ verify_and_promote() {
   # Landing probe is best-effort — its URL layout has changed in the
   # past and we don't want a 301 to fail the deploy.
   wait_until_healthy "$LANDING_PUBLIC_URL"  30 || warn "Landing probe non-200 (likely a redirect)"
+  # Marketing probe is prod-only + best-effort (staging has no subdomain).
+  [ -n "$MARKETING_PUBLIC_URL" ] && { wait_until_healthy "$MARKETING_PUBLIC_URL" 30 || warn "Marketing probe non-200"; }
 
   # SSL cert expiry — warn at 14d, error at 3d.
   local host="${API_PUBLIC_URL#https://}"; host="${host%%/*}"
@@ -424,7 +437,7 @@ verify_and_promote() {
   fi
 
   # :current already moved by swap_*. Image immutability proof:
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$MARKETING_IMG"; do
     local cur_sha ver_sha
     cur_sha=$(docker image inspect "$img:current" --format '{{.Id}}' 2>/dev/null || echo "")
     ver_sha=$(docker image inspect "$img:$VERSION" --format '{{.Id}}' 2>/dev/null || echo "")
@@ -460,13 +473,18 @@ restore_image_ids() {
     docker tag "$LANDING_PREV_IMAGE"  "$LANDING_IMG:current"  || warn "landing retag failed"
     restored=$((restored + 1))
   fi
+  if [ -n "${MARKETING_PREV_IMAGE:-}" ]; then
+    log "Pinning marketing :current → ${MARKETING_PREV_IMAGE}"
+    docker tag "$MARKETING_PREV_IMAGE" "$MARKETING_IMG:current" || warn "marketing retag failed"
+    restored=$((restored + 1))
+  fi
 
   if [ "$restored" -eq 0 ]; then
     err "Snapshot is empty — manual recovery required"
     return 1
   fi
 
-  dc up -d --force-recreate backend frontend landing
+  dc up -d --force-recreate backend frontend landing marketing
   sleep 5
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC" || warn "Post-rollback API not healthy"
 
