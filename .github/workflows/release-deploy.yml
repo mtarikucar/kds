@@ -119,7 +119,6 @@ jobs:
             MARKETING_INGEST_TOKEN
             ENCRYPTION_MASTER_KEY
             INTEGRATION_KEY
-            NETGSM_USERCODE NETGSM_PASSWORD NETGSM_MSGHEADER
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
           )
@@ -129,6 +128,7 @@ jobs:
             EMAIL_HOST EMAIL_USER EMAIL_PASSWORD EMAIL_FROM
             GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
             DESKTOP_RELEASE_API_KEY
+            NETGSM_USERCODE NETGSM_PASSWORD NETGSM_MSGHEADER
           )
 
           missing=()
@@ -390,9 +390,12 @@ jobs:
           EMAIL_FROM=${EMAIL_FROM}
           ADMIN_EMAIL=contact@hummytummy.com
 
-          # Customer OTP SMS (NetGSM). The backend REFUSES to boot in production
-          # without a configured provider (sms.service.ts) — there is no silent
-          # mock fallback in prod unless ALLOW_MOCK_SMS_IN_PROD=true.
+          # Customer OTP SMS (NetGSM). PLACEHOLDER: creds not ready, so SMS is
+          # bypassed for launch — ALLOW_MOCK_SMS_IN_PROD=true lets the backend
+          # boot with OTP delivery mocked/silent. Once the NETGSM_* repo secrets
+          # are set, the provider auto-activates (mockMode off) and real SMS
+          # flows on the next deploy — no code change; ALLOW_MOCK becomes a no-op.
+          ALLOW_MOCK_SMS_IN_PROD=true
           SMS_PROVIDER=netgsm
           NETGSM_USERCODE=${NETGSM_USERCODE}
           NETGSM_PASSWORD=${NETGSM_PASSWORD}
