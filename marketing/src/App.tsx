@@ -12,6 +12,10 @@ import OffersPage from './pages/marketing/OffersPage';
 import ReportsPage from './pages/marketing/ReportsPage';
 import CommissionsPage from './pages/marketing/CommissionsPage';
 import MarketingUsersPage from './pages/marketing/MarketingUsersPage';
+import InstallationsPage from './pages/marketing/InstallationsPage';
+import CallsPage from './pages/marketing/CallsPage';
+import PerformancePage from './pages/marketing/PerformancePage';
+import TargetsPage from './pages/marketing/TargetsPage';
 
 /**
  * Standalone marketing console at the ROOT of marketing.hummytummy.com. This is
@@ -35,10 +39,14 @@ export default function App() {
           <Route path="/offers" element={<OffersPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/commissions" element={<CommissionsPage />} />
+          <Route path="/installations" element={<InstallationsPage />} />
+          <Route path="/calls" element={<CallsPage />} />
+          <Route path="/performance" element={<PerformancePage />} />
         </Route>
         <Route element={<MarketingProtectedRoute requiredRole={MarketingRole.SALES_MANAGER} />}>
           <Route element={<MarketingLayout />}>
             <Route path="/users" element={<MarketingUsersPage />} />
+            <Route path="/targets" element={<TargetsPage />} />
           </Route>
         </Route>
       </Route>

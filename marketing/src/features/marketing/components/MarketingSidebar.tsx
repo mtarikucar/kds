@@ -10,6 +10,10 @@ import {
   CurrencyDollarIcon,
   UsersIcon,
   ArrowRightOnRectangleIcon,
+  WrenchScrewdriverIcon,
+  PhoneIcon,
+  PresentationChartLineIcon,
+  FlagIcon,
 } from '@heroicons/react/24/outline';
 import { useMarketingAuthStore } from '../../../store/marketingAuthStore';
 
@@ -21,10 +25,14 @@ const navItems = [
   { path: '/offers', labelKey: 'nav.offers', icon: DocumentTextIcon },
   { path: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon },
   { path: '/commissions', labelKey: 'nav.commissions', icon: CurrencyDollarIcon },
+  { path: '/installations', labelKey: 'nav.installations', icon: WrenchScrewdriverIcon },
+  { path: '/calls', labelKey: 'nav.calls', icon: PhoneIcon },
+  { path: '/performance', labelKey: 'nav.performance', icon: PresentationChartLineIcon },
 ];
 
 const managerOnlyItems = [
   { path: '/users', labelKey: 'nav.users', icon: UsersIcon },
+  { path: '/targets', labelKey: 'nav.targets', icon: FlagIcon },
 ];
 
 export default function MarketingSidebar() {
