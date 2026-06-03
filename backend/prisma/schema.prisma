@@ -3643,6 +3643,27 @@ model InstallationTask {
   @@map("installation_tasks")
 }
 
+/// Phase-4 sales targets/quotas. A manager sets a per-rep, per-period (YYYY-MM)
+/// target for a metric; the performance service compares it to the actual
+/// computed from marketing-owned data (won leads, commission amount, connected
+/// calls). marketingUserId / setById are soft references to MarketingUser.
+model SalesTarget {
+  id              String   @id @default(uuid())
+  marketingUserId String
+  period          String // YYYY-MM
+  metric          String // WON_LEADS, COMMISSION_AMOUNT, CONNECTED_CALLS
+  targetValue     Decimal  @db.Decimal(14, 2)
+  setById         String
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([marketingUserId, period, metric])
+  @@index([period])
+  @@index([marketingUserId, period])
+  @@map("sales_targets")
+}
+
 /// Phase-1 marketing-decoupling provisioning ledger. Written by CORE's
 /// TenantProvisioningService when a marketing Lead is converted into a paying
 /// tenant. It is (a) the durable idempotency anchor — one row per lead, unique

@@ -56,6 +56,10 @@ import { InstallationJobService } from './installations/installation-job.service
 import { InstallationCrewService } from './installations/installation-crew.service';
 import { InstallationConsumer } from './installations/installation.consumer';
 
+// Phase 4 sales targets/quotas + performance-vs-target.
+import { SalesTargetController } from './controllers/sales-target.controller';
+import { SalesTargetService } from './services/sales-target.service';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -110,6 +114,7 @@ import { InstallationConsumer } from './installations/installation.consumer';
     MarketingDistributionController,
     SalesCallController,
     InstallationController,
+    SalesTargetController,
   ],
   providers: [
     // Services
@@ -140,6 +145,8 @@ import { InstallationConsumer } from './installations/installation.consumer';
     InstallationJobService,
     InstallationCrewService,
     InstallationConsumer,
+    // Phase 4 sales targets/quotas + performance.
+    SalesTargetService,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,
