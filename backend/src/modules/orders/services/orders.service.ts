@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   forwardRef,
   Optional,
@@ -318,6 +319,25 @@ export class OrdersService {
           if (!table) {
             throw new BadRequestException(
               "Invalid table or table does not belong to your tenant",
+            );
+          }
+
+          // v3.0.1 audit fix (round 2) — explicit cross-branch table
+          // guard. BranchGuard only proves `X-Branch-Id` is in the
+          // caller's allow-list; it does NOT cross-check the request
+          // body's `tableId` against the resolved scope. A waiter
+          // pinned to B1 could otherwise POST a body with a tableId
+          // belonging to B2 (same tenant) and the order would land on
+          // B2's books, bypassing the branch isolation contract. The
+          // round-1 fix only stamped scope.branchId on tableless
+          // orders; this round adds the equality assertion for the
+          // tableId path. Without it, the idempotency lookup
+          // (scope-keyed) and the create stamp (table-keyed) also
+          // diverge — see the round-2 audit note on P2002→500.
+          if (table.branchId && table.branchId !== scope.branchId) {
+            throw new ForbiddenException(
+              "Table belongs to a different branch than the request scope. " +
+                "Switch to that branch (X-Branch-Id) and retry.",
             );
           }
 

@@ -608,10 +608,12 @@ model Order {
   // and survives later edits to items/modifiers. Owned by ReceiptSnapshotBuilder.
   kitchenTicketSnapshot Json?
 
-  // Client-generated UUID for double-tap / retry deduplication. The
-  // partial unique index on (tenantId, idempotencyKey) is added by the
-  // companion migration — Prisma's @@unique would also dedupe NULLs
-  // (Postgres treats them as distinct), so the partial index is the
+  // Client-generated UUID for double-tap / retry deduplication. v3.0.1
+  // widens the partial unique index to (tenantId, branchId, idempotencyKey)
+  // — see migration 20260603100000 — so two POS tablets on two branches
+  // templating the same key (deterministic chain-tablet pattern) can't
+  // silently merge unrelated orders. Prisma's @@unique would also dedupe
+  // NULLs (Postgres treats them as distinct), so the partial index is the
   // mechanism that actually enforces the guarantee for keyed requests.
   idempotencyKey String?
 
@@ -4313,6 +4315,24 @@ model LocalBridgeAgent {
 // flow. Shipment carries carrier-side state. InstallationRequest and Warranty
 // hang off completed orders.
 
+// Regulatory sale tier (TR law). Drives the storefront CTA AND the
+// authoritative checkout guard in QuoteService.quote(): only DIRECT_SALE
+// products can be added to a cart / priced / paid. Defaulted (never null);
+// app code still treats an absent value as DIRECT_SALE for back-compat.
+//   DIRECT_SALE      — Tier 3: normal sale; seller-responsibility docs apply.
+//   QUOTE_ONLY       — Tier 1: YN ÖKC / yazarkasa / fiscal devices. No direct
+//                      sale; "Teklif Al" → authorized dealer/service + GİB.
+//   PARTNER_REDIRECT — Tier 2: bank POS / payment terminal. Hummytummy is NOT
+//                      a payment institution; redirect to a licensed bank/PSP.
+//   RECOMMENDED_ONLY — Tier 4: e.g. uncertified scale (metrology). Shown as
+//                      recommended equipment only; no buy/quote CTA.
+enum HardwareSaleMode {
+  DIRECT_SALE
+  QUOTE_ONLY
+  PARTNER_REDIRECT
+  RECOMMENDED_ONLY
+}
+
 model HardwareProduct {
   id              String   @id @default(uuid())
   sku             String   @unique
@@ -4358,6 +4378,19 @@ model HardwareProduct {
   // Lifecycle inside the catalog: published rows are sold in the public store;
   // draft is admin-only; archived hides from the store but keeps history.
   status          String   @default("draft")
+  // Regulatory tier — see HardwareSaleMode enum above. Defaults to category
+  // mapping at create time (CatalogService); existing rows backfill to
+  // DIRECT_SALE then a data step sets yazarkasa→QUOTE_ONLY etc.
+  saleMode        HardwareSaleMode @default(DIRECT_SALE)
+  // Tier 2 (PARTNER_REDIRECT) target the storefront links out to.
+  // Shape: { partnerName: string, partnerUrl: string, disclaimer?: string }
+  partnerRedirect Json?
+  // Tier 3 (DIRECT_SALE) seller-responsibility compliance docs, shown on the
+  // product detail page and enforced (minimally) at publish time. Shape:
+  //   { invoiceIssued?: bool, warrantyCertUrl?: string, distributorName?: string,
+  //     ceConformityUrl?: string, turkishManualUrl?: string, serviceInfo?: string,
+  //     returnTermsUrl?: string }
+  complianceDocs  Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

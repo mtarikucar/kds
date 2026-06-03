@@ -16,6 +16,19 @@
 -- still in place and could match a duplicate. We use
 -- DROP INDEX IF EXISTS + CREATE UNIQUE INDEX IF NOT EXISTS so the
 -- migration is idempotent against partially-applied state.
+--
+-- ⚠ Lock window — Prisma wraps each migration in BEGIN/COMMIT, so
+-- concurrent writers never observe the both-absent state. But
+-- CREATE UNIQUE INDEX (non-CONCURRENTLY) takes ACCESS EXCLUSIVE on
+-- `orders` for the index build duration; on a multi-million-row prod
+-- table this can be tens of seconds during which POST /orders blocks.
+-- For the cutover window, run during a low-traffic period OR rewrite
+-- as a two-phase migration:
+--   1. CREATE UNIQUE INDEX CONCURRENTLY (outside any tx)
+--   2. DROP INDEX CONCURRENTLY (outside any tx)
+-- Prisma can't express CONCURRENTLY in a migration; if needed, run
+-- the SQL manually against prod and use `prisma migrate resolve
+-- --applied <name>` to register it.
 
 DROP INDEX IF EXISTS "orders_tenantId_idempotencyKey_unique";
 
