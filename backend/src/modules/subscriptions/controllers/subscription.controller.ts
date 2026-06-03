@@ -14,6 +14,7 @@ import { SubscriptionService } from "../services/subscription.service";
 import { BillingService } from "../services/billing.service";
 import { UsageService } from "../services/usage.service";
 import { Public } from "../../auth/decorators/public.decorator";
+import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
@@ -29,6 +30,12 @@ import { CancelSubscriptionDto } from "../dto/cancel-subscription.dto";
  */
 @ApiTags("subscriptions")
 @ApiBearerAuth()
+// Subscriptions are tenant-level (one per tenant, not per branch). Exempt the
+// whole controller from the global BranchGuard so the plan/billing pages load
+// before a branch is selected (e.g. right after login, or for a tenant whose
+// branches were wiped). Without this the dashboard's /subscriptions/* calls
+// 400 with "X-Branch-Id header required". Same fix-class as entitlements/me.
+@SkipBranchScope()
 @Controller("subscriptions")
 export class SubscriptionController {
   constructor(

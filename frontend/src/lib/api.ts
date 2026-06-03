@@ -9,18 +9,43 @@ import { API_URL } from './env';
  * prefixes to fly without an X-Branch-Id header; everything else
  * gets fail-fast if branchScopeStore hasn't resolved a branchId.
  */
-const TENANT_WIDE_PATH_PREFIXES = [
+export const TENANT_WIDE_PATH_PREFIXES = [
   '/auth/',
   '/billing/',
   '/branches',
   '/me',
   '/marketing/',
+  // Subscriptions, plan usage and invoices are tenant-level (one per tenant,
+  // not per branch) — the backend marks both controllers @SkipBranchScope.
+  // Covers /subscriptions/{plans,current,effective-features,usage/snapshot,
+  // tenant/invoices,:id/*} and /invoices/:id/download.
+  '/subscriptions/',
+  '/invoices/',
   '/superadmin/',
 ];
 
-function isTenantWidePath(url: string | undefined): boolean {
+/**
+ * Exported for unit testing. Segment-aware matching:
+ *   - A directory prefix (trailing '/') may appear anywhere — '/auth/' can't
+ *     collide with '/authorize'.
+ *   - A bare segment prefix ('/me', '/branches') must END on a path boundary,
+ *     so '/me' matches '/users/me' and '/v1/entitlements/me' but NOT
+ *     '/menu/categories'.
+ * The previous `url.includes('/me')` matched '/menu/*' (since '/menu' starts
+ * with '/me'), shipping every branch-scoped menu request WITHOUT an
+ * X-Branch-Id header → the backend 400'd the entire menu (categories,
+ * products, images).
+ */
+export function isTenantWidePath(url: string | undefined): boolean {
   if (!url) return false;
-  return TENANT_WIDE_PATH_PREFIXES.some((p) => url.includes(p));
+  const path = url.split('?')[0];
+  return TENANT_WIDE_PATH_PREFIXES.some((p) => {
+    const idx = path.indexOf(p);
+    if (idx === -1) return false;
+    if (p.endsWith('/')) return true;
+    const after = path.charAt(idx + p.length);
+    return after === '' || after === '/';
+  });
 }
 
 const API_BASE_URL = API_URL;
