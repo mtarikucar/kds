@@ -206,15 +206,20 @@ export class SubscriptionService {
       throw new BadRequestException("Invalid billing cycle");
     }
 
-    // Trial is a LIFETIME-PER-TENANT benefit. `Tenant.trialUsed` is the
-    // canonical gate — once any plan has been trialed (including the
-    // BUSINESS trial auto-started at registration), no further trials
-    // are available regardless of which paid plan the caller targets.
-    // We still write `usedTrialPlanIds` further down for audit, but the
-    // eligibility check is per-tenant, not per-plan.
-    const hasUsedAnyTrial = tenant.trialUsed === true;
+    // v3.0.1 round-5 audit fix — trial eligibility is now PER-PLAN, the
+    // same shape `getEffectiveFeatures` returns to the SPA. Pre-fix
+    // `tenant.trialUsed` was a lifetime gate, so once any plan had been
+    // trialed (including the auto-started BUSINESS trial at registration)
+    // every subsequent trial was denied — but the SPA showed "14 gün
+    // ücretsiz dene" CTAs on every plan the tenant hadn't yet tried, so
+    // users clicked through trial flows the backend silently refused.
+    // The schema's `usedTrialPlanIds[]` is the canonical per-plan
+    // registry (its model-side comment notes the legacy `trialUsed`
+    // bool is "Kept for backward-compat"); we now match.
+    const usedTrialPlanIds = (tenant.usedTrialPlanIds ?? []) as string[];
+    const hasUsedThisPlanTrial = usedTrialPlanIds.includes(plan.id);
     const canUseTrial =
-      !hasUsedAnyTrial &&
+      !hasUsedThisPlanTrial &&
       plan.trialDays > 0 &&
       plan.name !== SubscriptionPlanType.FREE;
     const isTrialPeriod = canUseTrial;
@@ -359,18 +364,20 @@ export class SubscriptionService {
       throw new BadRequestException("Plan does not offer a trial");
     }
 
-    // Lifetime-per-tenant eligibility check (mirrors PaymentsService) so
-    // direct callers don't bypass the once-per-tenant rule.
+    // v3.0.1 round-5 — per-plan eligibility (same shape `getEffectiveFeatures`
+    // exposes). Pre-fix was lifetime-per-tenant; see the matching comment
+    // in createSubscription for the UX-vs-backend mismatch this resolves.
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { trialUsed: true },
+      select: { usedTrialPlanIds: true },
     });
     if (!tenant) {
       throw new NotFoundException("Tenant not found");
     }
-    if (tenant.trialUsed === true) {
+    const usedTrialPlanIds = (tenant.usedTrialPlanIds ?? []) as string[];
+    if (usedTrialPlanIds.includes(plan.id)) {
       throw new BadRequestException(
-        "Tenant has already used their trial. Trials are once per account.",
+        "Tenant has already used the trial for this plan. Trials are once per plan.",
       );
     }
 

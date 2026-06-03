@@ -145,6 +145,41 @@ export class PaymentsService {
    *                       (= order.finalAmount; passed explicitly so
    *                       callers reuse a Decimal already in scope)
    */
+  /**
+   * v3.0.1 round-5 audit fix — full-order pre-check that refuses a
+   * waiter-side payment while a customer is mid-PayTR self-pay flow
+   * on the SAME order. Pre-fix only `payByItems` consulted
+   * PendingSelfPayment; `create()` and `splitBill()` happily booked
+   * a Payment for the whole order while a customer's intent was live.
+   * The customer's PayTR callback would then settle, throw
+   * `settlement_error` in customer-self-pay.service when the order had
+   * zero remaining, and the customer was charged with no booking
+   * (Sentry → manual refund).
+   *
+   * Item-level reservation logic lives in `payByItems` because that
+   * flow allows partial settlement; here we just refuse outright when
+   * ANY non-expired PENDING intent references this order.
+   */
+  private async assertNoConflictingSelfPayIntent(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const pending = await tx.pendingSelfPayment.findFirst({
+      where: { tenantId, status: "PENDING", expiresAt: { gt: now } },
+      select: { itemsByOrder: true, expiresAt: true },
+    });
+    if (!pending) return;
+    const buckets = pending.itemsByOrder as Array<{ orderId: string }>;
+    if (!Array.isArray(buckets)) return;
+    if (buckets.some((b) => b?.orderId === orderId)) {
+      throw new ConflictException(
+        "A customer is currently paying for this order via PayTR — wait for that intent to finalize (up to 15 minutes) before collecting at the POS.",
+      );
+    }
+  }
+
   private async finalizeFullyPaid(
     tx: Prisma.TransactionClient,
     order: {
@@ -576,6 +611,12 @@ export class PaymentsService {
                 "Order requires approval before payment can be processed. Please approve the order first.",
               );
             }
+
+            // v3.0.1 round-5 — refuse if a customer is mid-PayTR self-pay
+            // flow on this order. See assertNoConflictingSelfPayIntent's
+            // doc block for the customer-charged-with-no-booking bug
+            // this closes.
+            await this.assertNoConflictingSelfPayIntent(tx, orderId, tenantId);
 
             // PosSettings.requireServedForDineInPayment gates dine-in
             // payments on order.status === SERVED — opt-in for tenants
@@ -1054,6 +1095,12 @@ export class PaymentsService {
       if (!order) {
         throw new NotFoundException("Order not found");
       }
+
+      // v3.0.1 round-5 — same conflicting-self-pay-intent gate as
+      // create(). A waiter splitting the bill while a customer is
+      // mid-PayTR on this order would otherwise race the customer's
+      // settlement and trigger the manual-refund path.
+      await this.assertNoConflictingSelfPayIntent(tx, orderId, tenantId);
 
       // Decimal-clean tolerance check. The earlier JS-Number implementation
       // accumulated rounding error: a 0.005-per-line drift over 20 split

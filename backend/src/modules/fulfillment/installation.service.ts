@@ -94,6 +94,7 @@ export class InstallationService {
     const updated = await this.prisma.installationRequest.findFirstOrThrow({
       where: { id: requestId, tenantId },
     });
+    await this.syncOrderInstallation(updated.hwOrderId);
     await this.outbox
       .append({
         type: "installation.scheduled.v1",
@@ -133,6 +134,7 @@ export class InstallationService {
     const updated = await this.prisma.installationRequest.findFirstOrThrow({
       where: { id: requestId, tenantId },
     });
+    await this.syncOrderInstallation(updated.hwOrderId);
     await this.outbox
       .append({
         type: "installation.completed.v1",
@@ -177,6 +179,7 @@ export class InstallationService {
     const updated = await this.prisma.installationRequest.findFirstOrThrow({
       where: { id: requestId, tenantId: row.tenantId },
     });
+    await this.syncOrderInstallation(updated.hwOrderId);
     await this.outbox
       .append({
         type: "installation.cancelled.v1",
@@ -185,6 +188,37 @@ export class InstallationService {
       })
       .catch(() => undefined);
     return updated;
+  }
+
+  /**
+   * Recompute the parent HardwareOrder.installation flag from the aggregate
+   * state of its InstallationRequest rows, so the order-level lifecycle
+   * (null | requested | scheduled | done | declined) advances past
+   * 'requested' instead of being stamped once at checkout and never moving.
+   * Best-effort: a stale flag must never fail an installation state change.
+   */
+  private async syncOrderInstallation(hwOrderId: string | null | undefined) {
+    if (!hwOrderId) return;
+    try {
+      const reqs = await this.prisma.installationRequest.findMany({
+        where: { hwOrderId },
+        select: { status: true },
+      });
+      if (reqs.length === 0) return;
+      const statuses = reqs.map((r) => r.status);
+      let flag: string;
+      if (statuses.every((s) => s === "done")) flag = "done";
+      else if (statuses.every((s) => s === "cancelled")) flag = "declined";
+      else if (statuses.some((s) => s === "scheduled" || s === "in_progress"))
+        flag = "scheduled";
+      else flag = "requested";
+      await this.prisma.hardwareOrder.update({
+        where: { id: hwOrderId },
+        data: { installation: flag },
+      });
+    } catch {
+      // Non-fatal: the order flag is a convenience denormalization.
+    }
   }
 
   /**

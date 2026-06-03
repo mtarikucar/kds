@@ -488,13 +488,22 @@ export class SubscriptionSchedulerService {
 
   /**
    * Sweep abandoned PayTR checkouts. Every hour:
-   *  - Drop `PendingPlanChange` rows whose TTL has elapsed (default 1h).
+   *  - Drop `PendingPlanChange` rows that are past TTL **and** past the
+   *    PayTR late-callback grace window (24h after expiry).
    *  - Move `Subscription` rows still in `PENDING` after a grace window
    *    (24h) to `EXPIRED` so they don't pile up in the table forever.
    *
-   * The grace is wider than the PendingPlanChange TTL because PayTR can
-   * deliver a successful callback hours after the user closed the tab,
-   * and we want to honour it.
+   * v3.0.1 round-5 audit fix — pre-fix `PendingPlanChange.deleteMany`
+   * dropped any row past its 1h TTL immediately. PayTR can deliver a
+   * successful callback hours-to-24h after the user closed the tab
+   * (the recovery sweeper runs hourly + retries for ~24h before giving
+   * up). A late upgrade callback that arrived after we had already
+   * dropped the PendingPlanChange found nothing at
+   * paytr-settlement.service.ts:155, so applySuccess silently treated
+   * the charge as a same-plan renewal: the customer paid the upgrade
+   * price and got no plan change. Now we wait `addDays(-1)` past the
+   * row's expiresAt before deletion — same window the Subscription
+   * PENDING→EXPIRED transition already honours.
    */
   @Cron(CronExpression.EVERY_HOUR, { name: "paytr-orphan-cleanup" })
   async handlePaytrOrphanCleanup() {
@@ -503,7 +512,12 @@ export class SubscriptionSchedulerService {
       const subscriptionGrace = addDays(now, -1);
 
       const expiredPending = await this.prisma.pendingPlanChange.deleteMany({
-        where: { expiresAt: { lte: now } },
+        // Keep the row alive for 24h past its TTL so a late PayTR
+        // callback can still find it. The settlement path looks the
+        // row up by (tenantId, expiresAt > now) — those filters are
+        // already gone once the row is past TTL, but the row's
+        // presence is the data the upgrade-vs-renewal branch needs.
+        where: { expiresAt: { lte: subscriptionGrace } },
       });
 
       const expiredPendingSubs = await this.prisma.subscription.updateMany({
