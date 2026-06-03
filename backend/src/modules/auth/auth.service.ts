@@ -657,38 +657,21 @@ export class AuthService {
 
     const tokenHash = this.hashToken(refreshToken);
 
-    // Atomic claim: only one in-flight refresh call wins the rotation.
-    // The previous flow read the row, checked revokedAt, then updated
-    // separately — two parallel refreshes with the same cookie could
-    // both pass that check and both mint a fresh pair (TOCTOU). The
-    // conditional updateMany on `revokedAt: null` serializes them, and
-    // the loser sees count===0 and falls into the replay branch below.
-    const claimed = await this.prisma.refreshToken.updateMany({
-      where: {
-        tokenHash,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      data: { revokedAt: new Date() },
-    });
-
+    // v3.0.1 round-6 audit fix — check `payload.ver` against
+    // `user.tokenVersion` BEFORE the atomic rotation claim. Pre-fix
+    // the version check ran AFTER the claim had already revoked the
+    // presented token, so a stale-ver token replayed after a password
+    // reset would (a) burn the row and (b) revoke the entire refresh
+    // family — a DoS vector against the legitimate session via one
+    // pre-rotation token. Verifying ver first lets a stale token fail
+    // cleanly without touching any other refresh row; the actual race
+    // protection still lives in the conditional `updateMany` below.
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
     });
 
     if (!stored || stored.expiresAt <= new Date()) {
       throw new UnauthorizedException("Invalid refresh token");
-    }
-
-    if (claimed.count === 0) {
-      // The token was already revoked (legitimate rotation, logout, or
-      // replay of a rotated-out token). Treat as a theft signal and
-      // revoke the whole family so a stolen token can't keep minting.
-      await this.prisma.refreshToken.updateMany({
-        where: { userId: stored.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-      throw new UnauthorizedException("Refresh token reuse detected");
     }
 
     const user = await this.prisma.user.findUnique({
@@ -713,18 +696,42 @@ export class AuthService {
       throw new UnauthorizedException("Your restaurant account is not active");
     }
 
-    // Refresh tokens must also respect tokenVersion revocation. Previously
-    // a password reset bumped tokenVersion and expired the ACCESS tokens,
-    // but a stolen refresh token could still mint fresh access tokens with
-    // the new version stamp. Reject the refresh if the stamp in the token
-    // predates the current version.
+    // ver check before the rotation claim. A stale-ver replay returns
+    // a clean 401 without burning the row or family-revoking the
+    // user's other refresh tokens. The genuine "newly-revoked token
+    // arriving milliseconds before the user logs back in" case is
+    // indistinguishable from a replay — but the legitimate post-
+    // password-reset path already issues a fresh refresh, so the
+    // legitimate flow doesn't depend on the stale row succeeding.
     const refreshVer = (payload as any).ver ?? 0;
     if (refreshVer !== user.tokenVersion) {
+      throw new UnauthorizedException("Token has been revoked");
+    }
+
+    // Atomic claim: only one in-flight refresh call wins the rotation.
+    // The previous flow read the row, checked revokedAt, then updated
+    // separately — two parallel refreshes with the same cookie could
+    // both pass that check and both mint a fresh pair (TOCTOU). The
+    // conditional updateMany on `revokedAt: null` serializes them, and
+    // the loser sees count===0 and falls into the replay branch below.
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    if (claimed.count === 0) {
+      // The token was already revoked (legitimate rotation, logout, or
+      // replay of a rotated-out token). Treat as a theft signal and
+      // revoke the whole family so a stolen token can't keep minting.
       await this.prisma.refreshToken.updateMany({
-        where: { userId: user.id, revokedAt: null },
+        where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      throw new UnauthorizedException("Token has been revoked");
+      throw new UnauthorizedException("Refresh token reuse detected");
     }
 
     const { tenant: _t, tokenVersion: _ver, ...userForToken } = user;

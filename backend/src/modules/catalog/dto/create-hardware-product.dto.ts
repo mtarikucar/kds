@@ -13,6 +13,12 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+import { MaxJsonBytes } from "../../../common/dto/max-json-bytes.validator";
+
+// Cap on every free-form JSON column: generous for legit metadata, but stops
+// a multi-MB blob being persisted and then serialized on every public
+// storefront load (toPublicView). Mirrors the description/images caps.
+const JSON_FIELD_MAX_BYTES = 16_384;
 
 // Categories the seed + frontend storefront actually use, plus a few
 // generic buckets. Kept in sync with frontend/src/features/hardware-store/
@@ -121,6 +127,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   specs?: Record<string, unknown>;
 
   @ApiProperty({
@@ -130,6 +137,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   compat?: Record<string, unknown>;
 
   // v2.8.87 — structured rich detail used by the product/service detail
@@ -153,6 +161,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   details?: Record<string, unknown>;
 
   // v2.8.87 — service-only metadata. Shape:
@@ -172,6 +181,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   serviceMeta?: Record<string, unknown>;
 
   @ApiProperty({
@@ -246,6 +256,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   shippingProfile?: Record<string, unknown>;
 
   @ApiProperty({ required: false, enum: STATUSES, default: "draft" })
@@ -277,6 +288,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   partnerRedirect?: Record<string, unknown>;
 
   // Tier 3 (DIRECT_SALE) seller-responsibility compliance docs. Shape:
@@ -290,5 +302,6 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   complianceDocs?: Record<string, unknown>;
 }

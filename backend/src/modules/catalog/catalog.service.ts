@@ -164,7 +164,7 @@ export class CatalogService {
             images: input.images ?? [],
             shippingProfile: input.shippingProfile as any,
             status: input.status ?? "draft",
-            saleMode: saleMode as any,
+            saleMode,
             partnerRedirect: input.partnerRedirect as any,
             complianceDocs: input.complianceDocs as any,
           },
@@ -244,7 +244,7 @@ export class CatalogService {
         images: input.images,
         shippingProfile: input.shippingProfile as any,
         status: input.status,
-        saleMode: saleMode as any,
+        saleMode,
         partnerRedirect: input.partnerRedirect as any,
         complianceDocs: input.complianceDocs as any,
       },
@@ -253,11 +253,16 @@ export class CatalogService {
 
   /**
    * Resolve the regulatory tier to persist.
-   *  - explicit `provided` always wins (validated upstream by the DTO);
+   *  - explicit `provided` wins (validated upstream by the DTO), EXCEPT the
+   *    scale rule below;
    *  - else `existing` (update with unchanged category);
    *  - else the category default.
-   * Scale (terazi) is metrology-regulated: a DIRECT_SALE scale with no
-   * compliance docs falls back to RECOMMENDED_ONLY rather than being sold.
+   * Scale (terazi) is metrology-regulated: it may only be DIRECT_SALE with
+   * compliance docs on file. If the caller EXPLICITLY asks for a DIRECT_SALE
+   * scale without docs we reject loudly (so the admin learns why); if
+   * DIRECT_SALE only arrives via the category default/existing value we
+   * silently fall back to RECOMMENDED_ONLY rather than sell an uncertified
+   * device.
    */
   private finalSaleMode(
     category: string,
@@ -275,6 +280,13 @@ export class CatalogService {
       mode === "DIRECT_SALE" &&
       !this.hasComplianceDocs(complianceDocs)
     ) {
+      if (provided === "DIRECT_SALE") {
+        // Explicit choice with no docs — give the admin a reason instead of
+        // silently downgrading their selection.
+        throw new BadRequestException(
+          "A scale can only be DIRECT_SALE with compliance docs (calibration / conformity / commercial-use). Attach complianceDocs or leave it as RECOMMENDED_ONLY.",
+        );
+      }
       mode = "RECOMMENDED_ONLY";
     }
     return mode;
@@ -364,8 +376,17 @@ export class CatalogService {
    * Decoupling note: we write the shared `leads` row directly via Prisma
    * rather than importing the marketing module (which doesn't export its
    * leads service). The lead is unassigned, so it lands in the manager's
-   * lead pool on the marketing board. When marketing splits to its own DB
-   * this should become an outbox event instead of a direct write.
+   * lead pool on the marketing board.
+   *
+   * Known follow-ups (pinned to the v3.1 marketing-DB split, see
+   * marketing-decoupling.arch.spec KNOWN_VIOLATIONS): this direct write should
+   * become a `marketing.lead.hardware_quote` outbox event consumed by the
+   * marketing LeadIngestService, which would also run the auto-assigner
+   * (this path deliberately leaves the lead in the unassigned pool until
+   * then) — moving both the decoupling and the auto-assignment off the
+   * core module in one change. Until WON, the quote has no automated
+   * InstallationJob: a fiscal-device install must not be auto-provisioned
+   * ahead of the dealer/GİB process, so the rep creates it manually.
    */
   async requestQuote(
     tenantId: string,
@@ -418,18 +439,36 @@ export class CatalogService {
         notes: input.notes ?? null,
       },
     };
-    const lead = await this.prisma.lead.create({
-      data: {
+    const notes = input.notes ? `${summary}\n\n${input.notes}` : summary;
+    // Idempotency: a double-submit / retry / second tab must not pile up
+    // duplicate leads for the same device. A deterministic externalRef
+    // (`hwq:<tenant>:<sku>`, namespaced so it can't collide with CRM refs)
+    // is @unique, so the upsert collapses repeat requests for the same SKU
+    // into one lead — refreshing the contact + snapshot — while different
+    // devices and different tenants stay distinct. We intentionally do NOT
+    // touch `status`, so a rep's in-progress work survives a resubmit.
+    const externalRef = `hwq:${tenantId}:${product.sku}`;
+    const lead = await this.prisma.lead.upsert({
+      where: { externalRef },
+      create: {
         businessName: tenant?.name || input.contactPerson,
         contactPerson: input.contactPerson,
         phone: input.phone,
         email: input.email,
         businessType: "OTHER",
         source: "HARDWARE_QUOTE",
-        notes: input.notes ? `${summary}\n\n${input.notes}` : summary,
+        notes,
         // Soft-FK to the originating tenant; lets reports + dealer
         // dashboards filter without joining through fuzzy `businessName`.
         originTenantId: tenantId,
+        productSnapshot: productSnapshot as any,
+        externalRef,
+      },
+      update: {
+        contactPerson: input.contactPerson,
+        phone: input.phone,
+        email: input.email,
+        notes,
         productSnapshot: productSnapshot as any,
       },
       select: { id: true, status: true, source: true, createdAt: true },

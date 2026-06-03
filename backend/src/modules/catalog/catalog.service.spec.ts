@@ -173,6 +173,13 @@ describe('CatalogService — saleMode (regulatory tiers)', () => {
     expect(captured.saleMode).toBe('RECOMMENDED_ONLY');
   });
 
+  it('rejects an EXPLICIT DIRECT_SALE scale with no compliance docs (loud, not silent)', async () => {
+    await expect(
+      svc.create({ sku: 'sc-x2', category: 'scale', ...base, saleMode: 'DIRECT_SALE' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('keeps a scale DIRECT_SALE when compliance docs are present', async () => {
     await svc.create({
       sku: 'sc-y',
@@ -250,7 +257,8 @@ describe('CatalogService — requestQuote', () => {
       hardwareProduct: { findUnique: jest.fn() },
       tenant: { findUnique: jest.fn().mockResolvedValue({ name: 'Acme Cafe' }) },
       lead: {
-        create: jest.fn(async ({ data }: any) => ({ id: 'l1', status: 'NEW', ...data })),
+        // requestQuote upserts on a deterministic externalRef for idempotency.
+        upsert: jest.fn(async ({ create }: any) => ({ id: 'l1', status: 'NEW', ...create })),
       },
     };
     svc = new CatalogService(prisma);
@@ -275,18 +283,21 @@ describe('CatalogService — requestQuote', () => {
     await expect(
       svc.requestQuote('t1', { sku: 'yk-x', contactPerson: 'Ali' }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.lead.create).not.toHaveBeenCalled();
+    expect(prisma.lead.upsert).not.toHaveBeenCalled();
   });
 
-  it('creates a HARDWARE_QUOTE lead for a quote-only SKU with tenant + SKU context', async () => {
+  it('upserts a HARDWARE_QUOTE lead for a quote-only SKU with tenant + SKU context + dedup ref', async () => {
     prisma.hardwareProduct.findUnique.mockResolvedValue(row());
     const out: any = await svc.requestQuote('t1', { sku: 'yk-x', qty: 2, contactPerson: 'Ali' });
     expect(out.ok).toBe(true);
-    const data = prisma.lead.create.mock.calls[0][0].data;
-    expect(data.source).toBe('HARDWARE_QUOTE');
-    expect(data.businessName).toBe('Acme Cafe');
-    expect(data.contactPerson).toBe('Ali');
-    expect(data.notes).toContain('yk-x');
-    expect(data.notes).toContain('× 2');
+    const arg = prisma.lead.upsert.mock.calls[0][0];
+    // Deterministic dedup key so resubmits collapse into one lead.
+    expect(arg.where.externalRef).toBe('hwq:t1:yk-x');
+    expect(arg.create.source).toBe('HARDWARE_QUOTE');
+    expect(arg.create.businessName).toBe('Acme Cafe');
+    expect(arg.create.contactPerson).toBe('Ali');
+    expect(arg.create.externalRef).toBe('hwq:t1:yk-x');
+    expect(arg.create.notes).toContain('yk-x');
+    expect(arg.create.notes).toContain('× 2');
   });
 });

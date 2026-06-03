@@ -75,10 +75,17 @@ export class CreateCheckoutIntentDto {
   // Optional gateway return URL. The frontend supplies the page it wants
   // the buyer redirected to after the iframe closes. If absent the
   // adapter falls back to a default OK/FAIL URL.
+  //
+  // This value becomes PayTR's post-payment OK/FAIL redirect target, so it
+  // must be an absolute http(s) URL — reject javascript:/data:/protocol-
+  // relative forms that would turn the payment return into an open redirect.
   @ApiPropertyOptional({ maxLength: 512 })
   @IsOptional()
   @IsString()
   @MaxLength(512)
+  @Matches(/^https?:\/\/\S+$/i, {
+    message: "returnUrl must be an absolute http(s) URL",
+  })
   returnUrl?: string;
 
   // v2.8.99.3 — optional branch reference for hardware-store checkouts.

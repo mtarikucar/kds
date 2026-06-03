@@ -65,10 +65,15 @@ export class TenantCatalogController {
   //
   // v3.0.1 round-4 audit fix — throttled. A compromised manager token can
   // otherwise fire unbounded leads at the marketing board (the DTO caps
-  // qty ≤ 999 but not request frequency). Picked the `short` tier
-  // (3 requests / 10 sec) because legitimate admins place at most one
-  // quote request per few seconds; bursty hardware-shopping sessions
-  // still fit comfortably.
+  // qty ≤ 999 but not request frequency). 3 req / 10 s is the effective cap:
+  // a few-per-second admin still fits, a script does not.
+  //
+  // NOTE on tier names: NestJS merges @Throttle overrides per-named-tier
+  // against the globals (app.module: short=1s/10, medium=10s/50, long=60s/100).
+  // We override `short`→10s/3 and `long`→60s/20; the un-overridden `medium`
+  // (10s/50) stays active but is looser, so `short` is the binding limit.
+  // The `short` ttl is INTENTIONALLY 10s here (not the global 1s) — do not
+  // "restore" it to 1000 or the quote-spam guard loosens 10×.
   @Post("quote-request")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Throttle({ short: { ttl: 10_000, limit: 3 }, long: { ttl: 60_000, limit: 20 } })
