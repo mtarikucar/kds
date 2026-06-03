@@ -50,6 +50,12 @@ import { SalesCallService } from './services/sales-call.service';
 import { TelephonyProviderRegistry } from './telephony/telephony-provider.registry';
 import { NetgsmLiteAdapter } from './telephony/netgsm-lite.adapter';
 
+// Phase 3 installation ops — crews, jobs, scheduling, tasks, ops dashboard.
+import { InstallationController } from './installations/installation.controller';
+import { InstallationJobService } from './installations/installation-job.service';
+import { InstallationCrewService } from './installations/installation-crew.service';
+import { InstallationConsumer } from './installations/installation.consumer';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -103,6 +109,7 @@ import { NetgsmLiteAdapter } from './telephony/netgsm-lite.adapter';
     MarketingNotificationsController,
     MarketingDistributionController,
     SalesCallController,
+    InstallationController,
   ],
   providers: [
     // Services
@@ -128,6 +135,11 @@ import { NetgsmLiteAdapter } from './telephony/netgsm-lite.adapter';
     SalesCallService,
     TelephonyProviderRegistry,
     NetgsmLiteAdapter,
+    // Phase 3 installation ops: crews, jobs, and the auto-create consumer
+    // (reacts to marketing.lead.converted.v1).
+    InstallationJobService,
+    InstallationCrewService,
+    InstallationConsumer,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,

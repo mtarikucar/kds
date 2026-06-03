@@ -3580,6 +3580,69 @@ model SalesCall {
   @@map("sales_calls")
 }
 
+/// Phase-3 installation ops (inside the marketing context). A crew is an
+/// install team with a per-day job capacity used for availability checks.
+model InstallationCrew {
+  id            String   @id @default(uuid())
+  name          String
+  active        Boolean  @default(true)
+  dailyCapacity Int      @default(1)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([active])
+  @@map("installation_crews")
+}
+
+/// An installation job, auto-created on lead→customer conversion
+/// (marketing.lead.converted.v1) and scheduled to a crew. tenantId is a soft
+/// (no-FK) reference to the core tenant; leadId/crewId are soft references to
+/// the marketing-owned Lead / InstallationCrew. Site/contact are snapshotted
+/// from the lead so the job never reads core tables.
+model InstallationJob {
+  id              String    @id @default(uuid())
+  tenantId        String
+  leadId          String?
+  crewId          String?
+  status          String    @default("REQUESTED") // REQUESTED, SCHEDULED, IN_PROGRESS, DONE, CANCELLED, NO_SHOW
+  scheduledDate   DateTime? @db.Date
+  scheduledWindow String? // MORNING, AFTERNOON, FULL_DAY
+  siteAddress     String?
+  siteCity        String?
+  contactName     String?
+  contactPhone    String?
+  notes           String?   @db.Text
+  requestedAt     DateTime  @default(now())
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tasks InstallationTask[]
+
+  @@index([status])
+  @@index([crewId, scheduledDate])
+  @@index([tenantId])
+  @@index([scheduledDate])
+  @@map("installation_jobs")
+}
+
+/// A checklist item within an installation job.
+model InstallationTask {
+  id        String          @id @default(uuid())
+  jobId     String
+  job       InstallationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  title     String
+  done      Boolean         @default(false)
+  position  Int             @default(0)
+  createdAt DateTime        @default(now())
+
+  @@index([jobId])
+  @@map("installation_tasks")
+}
+
 /// Phase-1 marketing-decoupling provisioning ledger. Written by CORE's
 /// TenantProvisioningService when a marketing Lead is converted into a paying
 /// tenant. It is (a) the durable idempotency anchor — one row per lead, unique

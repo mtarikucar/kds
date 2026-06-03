@@ -12,6 +12,8 @@ export const MarketingEventTypes = {
   LeadConverted: "marketing.lead.converted.v1",
   CommissionCredited: "marketing.commission.credited.v1",
   CallLogged: "marketing.call.logged.v1",
+  InstallationScheduled: "marketing.installation.scheduled.v1",
+  InstallationCompleted: "marketing.installation.completed.v1",
 } as const;
 
 export type MarketingEventType =
@@ -44,5 +46,20 @@ export interface MarketingCallLoggedPayload {
   leadId: string | null;
   status: string;
   durationSec: number | null;
+  occurredAt: string;
+}
+
+export interface MarketingInstallationScheduledPayload {
+  jobId: string;
+  tenantId: string;
+  crewId: string;
+  scheduledDate: string; // YYYY-MM-DD
+  occurredAt: string;
+}
+
+export interface MarketingInstallationCompletedPayload {
+  jobId: string;
+  tenantId: string;
+  crewId: string | null;
   occurredAt: string;
 }
