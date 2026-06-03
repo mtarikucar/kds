@@ -573,4 +573,121 @@ describe('AuthService', () => {
       await expect(service.getProfile('nonexistent')).rejects.toThrow(UnauthorizedException);
     });
   });
+
+  // Regression: a new Google/Apple signup must get the SAME provisioning as
+  // email register() — a BUSINESS trial + an auto-created Main branch + seeded
+  // featureOverrides. The old social path provisioned FREE + no branch, which
+  // made the dashboard prompt "create a branch" against the MULTI_LOCATION gate
+  // and surface "Bu özellik aboneliğinizde yok" on a brand-new account (the
+  // trial never started). This pins the two paths in lockstep.
+  describe('createSocialAuthUser (social signup provisioning parity)', () => {
+    const businessPlan = {
+      id: 'plan-business',
+      name: 'BUSINESS',
+      trialDays: 14,
+      monthlyPrice: 2990,
+      currency: 'TRY',
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: true,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      reservationSystem: true,
+      personnelManagement: true,
+      deliveryIntegration: true,
+    };
+
+    const armHappyPath = () => {
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(businessPlan as any);
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-1' } as any);
+      prisma.subscription.create.mockResolvedValue({ id: 'sub-1' } as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'g@test.com',
+        firstName: 'G',
+        lastName: 'U',
+        role: UserRole.ADMIN,
+        tenantId: 'tenant-1',
+      } as any);
+      // allocateSubdomain runs its own tenant.findUnique loop — stub it so the
+      // test exercises only the provisioning we care about.
+      jest
+        .spyOn(service as any, 'allocateSubdomain')
+        .mockResolvedValue('g-restaurant');
+      mockJwtService.sign.mockReturnValue('signed-token');
+    };
+
+    it('provisions a BUSINESS trial + Main branch + ADMIN for a new social user', async () => {
+      armHappyPath();
+
+      const result = await (service as any).createSocialAuthUser({
+        email: 'g@test.com',
+        firstName: 'G',
+        lastName: 'U',
+        googleId: 'google-123',
+        authProvider: 'google',
+      });
+
+      // BUSINESS trial subscription (bug was: FREE / none → trial never started)
+      expect(prisma.subscription.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            planId: 'plan-business',
+            status: 'TRIALING',
+            isTrialPeriod: true,
+          }),
+        }),
+      );
+      // A Main branch (bug was: none → MULTI_LOCATION gate blocked first branch)
+      expect(prisma.branch.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Main', status: 'active' }),
+        }),
+      );
+      // Tenant seeded with the trial markers + the plan's featureOverrides
+      expect(prisma.tenant.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            currentPlanId: 'plan-business',
+            trialUsed: true,
+            featureOverrides: expect.objectContaining({ multiLocation: true }),
+          }),
+        }),
+      );
+      // ADMIN pinned to the Main branch
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: UserRole.ADMIN,
+            primaryBranchId: 'branch-main',
+            authProvider: 'google',
+            emailVerified: true,
+          }),
+        }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('throws when the BUSINESS plan is unseeded (never silently under-provisions)', async () => {
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(null as any);
+      jest
+        .spyOn(service as any, 'allocateSubdomain')
+        .mockResolvedValue('x-restaurant');
+
+      await expect(
+        (service as any).createSocialAuthUser({
+          email: 'x@test.com',
+          firstName: 'X',
+          lastName: 'Y',
+          googleId: 'gid',
+          authProvider: 'google',
+        }),
+      ).rejects.toThrow();
+      // No tenant is created on the failure path.
+      expect(prisma.tenant.create).not.toHaveBeenCalled();
+    });
+  });
 });

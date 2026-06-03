@@ -1583,21 +1583,45 @@ export class AuthService {
       .replace(/^-|-$/g, "");
     const subdomain = await this.allocateSubdomain(baseSubdomain);
 
-    // Get FREE plan
-    const freePlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: "FREE" },
+    // Social signups get the SAME provisioning as email registration: a
+    // 14-day BUSINESS trial + an auto-created Main branch + seeded
+    // featureOverrides. Diverging here (the old FREE-plan, no-branch path)
+    // shipped the "trial never started / 'Bu özellik aboneliğinizde yok' when
+    // creating the first branch" bug for Google/Apple signups — a fresh tenant
+    // landed with no branch and a plan that gates MULTI_LOCATION. Keep this in
+    // lockstep with register()'s ADMIN scenario.
+    const businessPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { name: "BUSINESS" },
     });
-
-    if (!freePlan) {
-      throw new ResourceNotFoundException("FREE subscription plan");
+    if (!businessPlan) {
+      throw new ResourceNotFoundException("BUSINESS subscription plan");
+    }
+    if (businessPlan.trialDays <= 0) {
+      throw new ResourceNotFoundException(
+        "BUSINESS plan has no trialDays configured — re-seed plans",
+      );
     }
 
     const now = new Date();
-    const currentPeriodEnd = new Date(now);
-    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
+    const trialEnd = addDays(now, businessPlan.trialDays);
 
-    // Tenant + subscription + user in one transaction so a failure midway
-    // does not leave orphaned rows.
+    // Seed the plan's flag set so PlanFeatureGuard's fallback resolves while
+    // the entitlement projector warms up — see register() for the full story.
+    const planFeatureOverrides = {
+      advancedReports: !!businessPlan.advancedReports,
+      multiLocation: !!businessPlan.multiLocation,
+      customBranding: !!businessPlan.customBranding,
+      apiAccess: !!businessPlan.apiAccess,
+      prioritySupport: !!businessPlan.prioritySupport,
+      inventoryTracking: !!businessPlan.inventoryTracking,
+      kdsIntegration: !!businessPlan.kdsIntegration,
+      reservationSystem: !!businessPlan.reservationSystem,
+      personnelManagement: !!businessPlan.personnelManagement,
+      deliveryIntegration: !!businessPlan.deliveryIntegration,
+    };
+
+    // Tenant + subscription + Main branch + user in one transaction so a
+    // failure midway does not leave orphaned rows.
     let user;
     try {
       user = await this.prisma.$transaction(async (tx) => {
@@ -1605,24 +1629,43 @@ export class AuthService {
           data: {
             name: restaurantName,
             subdomain,
-            currentPlanId: freePlan.id,
+            currentPlanId: businessPlan.id,
+            trialUsed: true,
+            trialStartedAt: now,
+            trialEndsAt: trialEnd,
+            usedTrialPlanIds: [businessPlan.id],
+            featureOverrides: planFeatureOverrides,
           },
         });
         await tx.subscription.create({
           data: {
             tenantId: tenant.id,
-            planId: freePlan.id,
-            status: "ACTIVE",
+            planId: businessPlan.id,
+            status: "TRIALING",
             billingCycle: "MONTHLY",
             paymentProvider: PaymentProvider.PAYTR,
             startDate: now,
             currentPeriodStart: now,
-            currentPeriodEnd,
-            isTrialPeriod: false,
-            amount: 0,
-            currency: freePlan.currency,
+            currentPeriodEnd: trialEnd,
+            isTrialPeriod: true,
+            trialStart: now,
+            trialEnd,
+            amount: businessPlan.monthlyPrice,
+            currency: businessPlan.currency,
             cancelAtPeriodEnd: false,
           },
+        });
+        // Every new tenant ships with a Main branch (matches register()), so
+        // the dashboard never prompts "create a branch" against the
+        // MULTI_LOCATION gate.
+        const mainBranch = await tx.branch.create({
+          data: {
+            tenantId: tenant.id,
+            name: "Main",
+            status: "active",
+            timezone: "UTC",
+          },
+          select: { id: true },
         });
         return tx.user.create({
           data: {
@@ -1632,6 +1675,7 @@ export class AuthService {
             lastName,
             role: UserRole.ADMIN,
             tenantId: tenant.id,
+            primaryBranchId: mainBranch.id,
             googleId,
             appleId,
             authProvider,

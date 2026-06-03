@@ -262,8 +262,14 @@ function App() {
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>
-          <Route index element={<Navigate to="/admin/settings/subscription" replace />} />
-          <Route path="subscription" element={<SubscriptionSettingsPage />} />
+          <Route index element={<Navigate to="/admin/settings/pos" replace />} />
+          {/* v3.0.5: the "Abonelik" tab was removed from Settings — it
+              duplicated the top-level Plan & Erişim page (/admin/plan). The
+              billing detail page (invoices / cancel / reactivate / scheduled
+              downgrade) now lives standalone at /subscription/manage, linked
+              from Plan & Erişim. This old settings URL redirects there so any
+              existing bookmark keeps working. */}
+          <Route path="subscription" element={<Navigate to="/subscription/manage" replace />} />
           <Route path="pos" element={<POSSettingsPage />} />
           <Route path="qr-menu" element={<QRMenuSettingsPage />} />
           <Route path="reports" element={<ReportsSettingsPage />} />
@@ -305,7 +311,7 @@ function App() {
 
         {/* Legacy redirects */}
         <Route path="/admin/pos-settings" element={<Navigate to="/admin/settings/pos" replace />} />
-        <Route path="/subscription/manage" element={<Navigate to="/admin/settings/subscription" replace />} />
+        <Route path="/subscription/manage" element={<SubscriptionSettingsPage />} />
 
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />

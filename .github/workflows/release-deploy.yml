@@ -370,7 +370,7 @@ jobs:
 
           MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
 
-          CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
+          CORS_ORIGIN=https://hummytummy.com,https://marketing.hummytummy.com,https://landing.hummytummy.com,https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com
 
           PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
