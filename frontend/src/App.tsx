@@ -278,13 +278,22 @@ function App() {
               <BrandingSettingsPage />
             </FeatureGate>
           } />
-          <Route path="desktop" element={<DesktopAppSettingsPage />} />
+          {/* v3.0.6: desktop app moved to a standalone sidebar destination
+              (/admin/desktop). Redirect the old Settings sub-tab URL. */}
+          <Route path="desktop" element={<Navigate to="/admin/desktop" replace />} />
           {/* v2.8.91: settings sub-pages now wrapped in FeatureGate so
               direct URL hits show UpsellCard instead of an empty page +
               403 toast on every backend call. */}
           <Route path="integrations" element={
             <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
               <IntegrationsSettingsPage />
+            </FeatureGate>
+          } />
+          {/* v3.0.6: webhooks moved from the top-level sidebar (/admin/webhooks)
+              into Settings — enterprise/developer feature, same apiAccess gate. */}
+          <Route path="webhooks" element={
+            <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
+              <WebhooksPage />
             </FeatureGate>
           } />
           <Route path="reservations" element={
@@ -340,11 +349,9 @@ function App() {
         } />
         <Route path="/admin/health" element={<HealthPage />} />
         <Route path="/admin/bridges" element={<BridgesPage />} />
-        <Route path="/admin/webhooks" element={
-          <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
-            <WebhooksPage />
-          </FeatureGate>
-        } />
+        {/* v3.0.6: webhooks now lives under Settings (/admin/settings/webhooks).
+            Redirect the old top-level URL so existing links keep working. */}
+        <Route path="/admin/webhooks" element={<Navigate to="/admin/settings/webhooks" replace />} />
         <Route path="/admin/fiscal-recovery" element={
           <FeatureGate integration={{ domain: 'fiscal' }} fallback={<UpsellCard addOnCode="fiscal_hugin" />}>
             <FiscalRecoveryPage />
@@ -357,6 +364,9 @@ function App() {
         } />
         {/* v2.8.88: top-level Plan & Erişim page — plan + quota + active add-ons. */}
         <Route path="/admin/plan" element={<PlanAndAccessPage />} />
+        {/* v3.0.6: Desktop app as a standalone sidebar destination (moved out of
+            the Settings sub-tabs), mirroring Plan & Erişim. */}
+        <Route path="/admin/desktop" element={<DesktopAppSettingsPage />} />
       </Route>
 
       {/* SuperAdmin Routes */}

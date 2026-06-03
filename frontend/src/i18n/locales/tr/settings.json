@@ -120,6 +120,7 @@
   "users": "Kullanıcılar",
   "subscription": "Abonelik",
   "desktopApp": "Masaüstü Uygulaması",
+  "webhooks": "Webhook'lar",
   "desktopAppMenuDesc": "Masaüstü uygulamasını indir ve yönet",
   "desktopAppDesc": "Daha iyi performans ve çevrimdışı destek için HummyTummy KDS masaüstü uygulamasını indirin",
   "selectPlatform": "Platformunuzu Seçin",

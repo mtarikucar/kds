@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, Monitor, Plug, Download, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt } from 'lucide-react';
+import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt } from 'lucide-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import type { PlanFeatures } from '../../types';
 
@@ -39,11 +39,20 @@ const SettingsLayout = () => {
       label: t('nav.branding'),
       gate: { feature: 'customBranding' },
     },
-    { to: '/admin/settings/desktop', icon: Download, label: t('desktopApp') },
     {
       to: '/admin/settings/integrations',
       icon: Plug,
       label: t('integrationsLabel'),
+      gate: { feature: 'apiAccess' },
+    },
+    {
+      // v3.0.6: Webhooks moved here from a top-level sidebar item — it's an
+      // enterprise/developer feature (apiAccess-gated), so it belongs in
+      // Settings next to Integrations rather than the main nav. Desktop app
+      // went the other way (Settings tab → standalone /admin/desktop sidebar).
+      to: '/admin/settings/webhooks',
+      icon: Webhook,
+      label: t('webhooks'),
       gate: { feature: 'apiAccess' },
     },
     {
