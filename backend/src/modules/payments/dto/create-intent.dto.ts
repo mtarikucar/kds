@@ -5,14 +5,17 @@ import {
   IsIn,
   IsString,
   IsUUID,
-} from 'class-validator';
+  IsOptional,
+  MaxLength,
+  Matches,
+} from "class-validator";
 
 export class CreateIntentDto {
   @IsString()
   planId: string;
 
-  @IsIn(['MONTHLY', 'YEARLY'])
-  billingCycle: 'MONTHLY' | 'YEARLY';
+  @IsIn(["MONTHLY", "YEARLY"])
+  billingCycle: "MONTHLY" | "YEARLY";
 
   /**
    * IDs of the three current legal documents (KVKK + Mesafeli Satış +
@@ -26,6 +29,20 @@ export class CreateIntentDto {
   @IsArray()
   @ArrayMinSize(3)
   @ArrayMaxSize(3)
-  @IsUUID('all', { each: true })
+  @IsUUID("all", { each: true })
   acceptedDocumentIds!: string[];
+
+  /**
+   * Optional marketer referral code (e.g. "AHMET42"), captured from the
+   * `?ref=CODE` link → `ht_ref` first-party cookie → checkout request body.
+   * Resolved server-side (via ReferralDirectoryPort) to the owning marketer
+   * and snapshotted onto the payment row so the post-settlement commission
+   * consumer credits the right rep. An unknown/inactive code is silently
+   * ignored — it NEVER blocks checkout.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  @Matches(/^[A-Za-z0-9_-]+$/, { message: "referralCode must be alphanumeric" })
+  referralCode?: string;
 }

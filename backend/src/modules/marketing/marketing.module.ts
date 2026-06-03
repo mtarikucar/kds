@@ -41,6 +41,9 @@ import { MarketingGuard } from './guards/marketing.guard';
 import { MarketingRolesGuard } from './guards/marketing-roles.guard';
 import { IngestTokenGuard } from './guards/ingest-token.guard';
 
+// Event consumers (Step C decoupling: settlement → commission crediting).
+import { SettlementCommissionConsumer } from './events/settlement-commission.consumer';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -111,6 +114,9 @@ import { IngestTokenGuard } from './guards/ingest-token.guard';
     MarketingDistributionService,
     // Cron jobs (offer expiry, notification TTL, follow-up reminders).
     MarketingSchedulerService,
+    // Event consumer: credits SIGNUP/RENEWAL/UPSELL commissions off
+    // payment.succeeded.v1 (subscribes via DomainEventBus on init).
+    SettlementCommissionConsumer,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,

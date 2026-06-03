@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { isKnownEventType } from './event-types';
+import { Injectable, Logger } from "@nestjs/common";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { isKnownEventType } from "./event-types";
 
 /**
  * The write side of the outbox. Producers call `append` inside the same
@@ -48,7 +48,10 @@ export class OutboxService {
    * single-statement insert is still atomic on the row, but the caller is
    * responsible for ensuring the business state actually got written.
    */
-  async append(opts: AppendOptions, tx?: Pick<PrismaService, 'outboxEvent'>): Promise<string> {
+  async append(
+    opts: AppendOptions,
+    tx?: Pick<PrismaService, "outboxEvent">,
+  ): Promise<string> {
     // Unknown event-type warning: catches typos at the producer→consumer
     // boundary. Dynamic prefixes (e.g. `integration.webhook.<provider>.…`)
     // are allowlisted via DYNAMIC_EVENT_TYPE_PREFIXES so the warning only
@@ -66,7 +69,10 @@ export class OutboxService {
     // notification, double commission, double settlement). Catch typos
     // at the producer; for fire-and-forget event types (e.g. metric
     // emits) the fallback is fine and there's no warning.
-    if (!opts.idempotencyKey && DEDUP_REQUIRED_PREFIXES.some((p) => opts.type.startsWith(p))) {
+    if (
+      !opts.idempotencyKey &&
+      DEDUP_REQUIRED_PREFIXES.some((p) => opts.type.startsWith(p))
+    ) {
       this.logger.warn(
         `outbox.append: ${opts.type} emitted without an idempotencyKey; UUIDv7 fallback is per-call, so retries will produce duplicate rows. Pass a deterministic key (e.g. {tenantId}:{aggregateId}:{action}).`,
       );
@@ -80,7 +86,7 @@ export class OutboxService {
         tenantId: opts.tenantId ?? null,
         payload: opts.payload as any,
         idempotencyKey: opts.idempotencyKey ?? id,
-        status: 'queued',
+        status: "queued",
         nextAttemptAt: new Date(),
       },
     });
@@ -92,9 +98,13 @@ export class OutboxService {
 // impact (double-charge, double-notify, double-credit). Producers of
 // these events SHOULD pass a deterministic idempotencyKey.
 const DEDUP_REQUIRED_PREFIXES = [
-  'subscription.',
-  'payment.',
-  'addon.',
-  'commission.',
-  'settlement.',
+  "subscription.",
+  "payment.",
+  "addon.",
+  "commission.",
+  "settlement.",
+  // Marketing context events (lead converted, commission credited) — a
+  // duplicate would double-notify / double-project, so producers must pass a
+  // deterministic idempotencyKey.
+  "marketing.",
 ];

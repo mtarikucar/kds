@@ -6,6 +6,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 // loop in particular fires the duplicate-check + create pair on
 // every replica, producing one notification per replica per lead.
 import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
+import { MarketingLeadsService } from './marketing-leads.service';
 
 /**
  * Background jobs that keep marketing data tidy:
@@ -32,7 +33,32 @@ const NOTIFICATION_TTL_DAYS = 30;
 export class MarketingSchedulerService {
   private readonly logger = new Logger(MarketingSchedulerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly leads: MarketingLeadsService,
+  ) {}
+
+  // Step D saga safety net: finalize conversions that provisioned a tenant
+  // (via the core port) but failed to commit their marketing-side state and
+  // were never retried. Advisory-locked so only one replica sweeps.
+  @Cron(CronExpression.EVERY_HOUR, { name: 'marketing-orphan-reconcile' })
+  async reconcileOrphanConversions(): Promise<{ reconciled: number }> {
+    let outcome = { reconciled: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'marketing-orphan-reconcile',
+      async () => {
+        outcome = await this.leads.reconcileOrphanProvisionedConversions();
+        if (outcome.reconciled > 0) {
+          this.logger.warn(
+            `orphan-reconcile: finalized ${outcome.reconciled} provisioned conversion(s)`,
+          );
+        }
+      },
+      this.logger,
+    );
+    return outcome;
+  }
 
   @Cron(CronExpression.EVERY_30_MINUTES, { name: 'marketing-offer-expire' })
   async expireOffers(): Promise<{ expired: number }> {
