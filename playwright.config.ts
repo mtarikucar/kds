@@ -101,9 +101,6 @@ export default defineConfig({
         // hash still uses the real MERCHANT_KEY/SALT, so simulatePaytrSuccess
         // exercises the full webhook → state-change chain.
         PAYTR_USE_FAKE_ADAPTER: 'true',
-        // Static token the marketing leads ingest spec presents. Must
-        // match the literal in tests/e2e/specs/marketing/ingest.spec.ts.
-        MARKETING_INGEST_TOKEN: 'e2e-ingest-token-do-not-rotate-pls-32+',
       },
     },
     {

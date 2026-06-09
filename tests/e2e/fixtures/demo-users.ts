@@ -51,9 +51,6 @@ export const PLATFORM_USERS = {
      *  valid 2FA codes via `speakeasy.totp({ secret, encoding: 'base32' })`. */
     totpSecret: 'JBSWY3DPEHPK3PXP',
   },
-  marketing: {
-    email: 'marketing@e2e.local',
-    password: PLATFORM_PASSWORD,
-    role: 'SALES_MANAGER',
-  },
+  // The marketing platform user moved with the marketing panel to the
+  // separate kds-marketing project.
 } as const;

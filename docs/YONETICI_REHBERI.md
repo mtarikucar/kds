@@ -4,6 +4,11 @@ Bu döküman, **Satış Müdürü** (`SALES_MANAGER`) rolüne sahip ekip yöneti
 
 Pazarlamacı tarafının ne gördüğünü merak ediyorsan: `PAZARLAMACI_REHBERI.md` dosyasına bak — bu rehber onu tamamlar.
 
+> **Not (Phase-5 ayrışması):** Marketing/pazarlama paneli ve backend'i bu
+> repodan ayrılarak bağımsız **kds-marketing** projesine taşındı (superadmin
+> Marketers/Commissions ekranları dahil). Kurulum/çalıştırma için
+> kds-marketing reposuna bakın.
+
 ---
 
 ## 1. Senin Rolün Nedir?

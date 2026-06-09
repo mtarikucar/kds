@@ -38,8 +38,9 @@ export const EventTypes = {
   PaymentIntentCreated: "payment.intent_created.v1",
   PaymentRefundCompleted: "payment.refund_completed.v1",
   // Settlement fact — emitted by PayTR settlement on payment success. The
-  // marketing context consumes it to credit SIGNUP/RENEWAL/UPSELL commissions
-  // (see SettlementCommissionConsumer); kept core-owned and self-contained so
+  // marketing context (kds-marketing service since the Phase-5 split)
+  // consumes it to credit SIGNUP/RENEWAL/UPSELL commissions — relayed over
+  // HTTP by MarketingEventRelayService; kept core-owned and self-contained so
   // non-marketing consumers can subscribe without coupling to marketing.
   PaymentSucceeded: "payment.succeeded.v1",
 
@@ -88,10 +89,10 @@ export const KNOWN_EVENT_TYPES: ReadonlySet<string> = new Set(
  */
 const DYNAMIC_EVENT_TYPE_PREFIXES: readonly string[] = [
   "integration.webhook.", // integration.webhook.<provider>.received.v1
-  // Marketing bounded context owns its own event registry
-  // (marketing/events/marketing-event-types.ts). Allowlisted here so the
-  // unregistered-type warning doesn't fire for marketing's own producers;
-  // the canonical names still live with the marketing service for the split.
+  // The marketing bounded context (now the separate kds-marketing service)
+  // owns its own event registry. Allowlisted so any marketing.* event a
+  // core producer ever appends (relayed to the service by
+  // MarketingEventRelayService) doesn't trip the unregistered-type warning.
   "marketing.",
 ];
 

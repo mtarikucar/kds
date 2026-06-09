@@ -14,7 +14,6 @@ const TENANT_WIDE_PATH_PREFIXES = [
   '/billing/',
   '/branches',
   '/me',
-  '/marketing/',
   '/superadmin/',
 ];
 

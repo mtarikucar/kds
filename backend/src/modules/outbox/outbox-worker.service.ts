@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DomainEventBus } from "./domain-event-bus.service";
+import { MarketingEventRelayService } from "./marketing-event-relay.service";
 
 /**
  * Drains queued OutboxEvent rows onto the in-process DomainEventBus.
@@ -47,6 +48,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bus: DomainEventBus,
+    private readonly marketingRelay: MarketingEventRelayService,
   ) {}
 
   onModuleInit(): void {
@@ -186,6 +188,14 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
           idempotencyKey: r.idempotencyKey,
           createdAt: r.createdAt,
         });
+        // Phase-5 split: marketing-bound events (payment.succeeded.v1,
+        // marketing.*) are additionally relayed over HTTP to the
+        // kds-marketing service. A failed relay throws into the catch
+        // below, re-queueing the row with backoff — i.e. delivery to the
+        // marketing service is retried by the same outbox machinery as the
+        // in-process dispatch. Bus listeners are idempotent by contract,
+        // so re-observing the event on a relay retry is safe.
+        await this.marketingRelay.relay(r);
         await this.prisma.outboxEvent.update({
           where: { id: r.id },
           data: {

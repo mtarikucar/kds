@@ -42,17 +42,13 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
         run: |
           set -euo pipefail
           missing=()
           for n in POSTGRES_PASSWORD JWT_SECRET JWT_REFRESH_SECRET \
                    SUPERADMIN_JWT_SECRET SUPERADMIN_JWT_REFRESH_SECRET \
-                   MARKETING_JWT_SECRET MARKETING_JWT_REFRESH_SECRET \
-                   MARKETING_INGEST_TOKEN ENCRYPTION_MASTER_KEY; do
+                   ENCRYPTION_MASTER_KEY; do
             [ -z "${!n}" ] && missing+=("$n")
           done
           if [ ${#missing[@]} -gt 0 ]; then
@@ -166,9 +162,11 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          # kds-marketing service transport (Phase-5 split). Both optional:
+          # core boots without them (referral resolution no-ops, event relay
+          # disabled) until the marketing service is stood up.
+          MARKETING_SERVICE_URL: ${{ vars.MARKETING_SERVICE_URL }}
+          INTERNAL_SERVICE_TOKEN: ${{ secrets.INTERNAL_SERVICE_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -197,9 +195,8 @@ jobs:
           JWT_REFRESH_EXPIRES_IN=30d
           SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
           SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
-          MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
-          MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
-          MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
+          MARKETING_SERVICE_URL=${MARKETING_SERVICE_URL}
+          INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
 
           CORS_ORIGIN=https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost

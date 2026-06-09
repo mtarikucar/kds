@@ -306,7 +306,12 @@ Tüm tenant'ları üst seviyeden yöneten platform-sahibi paneli. Koyu zinc tema
 - Commissions: platform-geneli komisyon işlemleri, toplu onay, CSV export
 - Settings: platform genelinde global ayarlar
 
-### c. Marketing Paneli (`/marketing/*`) — Satış Personeli
+### c. Marketing Paneli — Satış Personeli
+
+> **Not:** Marketing paneli ve backend'i bu repodan ayrılarak bağımsız
+> **kds-marketing** projesine taşındı (Phase-5 ayrışması). Aşağıdaki özellik
+> listesi artık o projede yaşar; core ile entegrasyon
+> `backend/docs/marketing-phase5-split-runbook.md` üzerinden yürür.
 
 Pazarlamacıların kendi lead'lerini takip ettiği CRM. Indigo teması, ayrı login.
 
