@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kds-marketing-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: marketing
+    ports:
+      - '5433:5432'
+    volumes:
+      - marketing_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d marketing']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    container_name: kds-marketing-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Apply the schema migrations, then start the service.
+    command: sh -c "npx prisma migrate deploy && node dist/main"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/marketing?schema=public
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:5179}
+      # ── Secrets: override these in a real deployment (.env next to this file) ──
+      MARKETING_JWT_SECRET: ${MARKETING_JWT_SECRET:-dev-marketing-jwt-secret-change-me-0001}
+      MARKETING_JWT_REFRESH_SECRET: ${MARKETING_JWT_REFRESH_SECRET:-dev-marketing-refresh-secret-change-me}
+      MARKETING_INGEST_TOKEN: ${MARKETING_INGEST_TOKEN:-dev-ingest-token-change-me}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-dev-internal-service-token-change-me}
+      # Core service base URL — the marketing service calls
+      # ${CORE_SERVICE_URL}/api/internal/provisioning/* for lead → tenant
+      # provisioning. Point it at the core deployment.
+      CORE_SERVICE_URL: ${CORE_SERVICE_URL:-http://host.docker.internal:3000}
+      # SMTP (optional — unset = emails are logged, not sent)
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      APP_NAME: ${APP_NAME:-HummyTummy}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    ports:
+      - '3000:3000'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        # Baked into the bundle at build time (Vite).
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    container_name: kds-marketing-frontend
+    depends_on:
+      - backend
+    ports:
+      - '5173:80'
+
+volumes:
+  marketing_pgdata:
