@@ -1,0 +1,110 @@
+name: Marketing Deploy Bootstrap (one-time)
+
+# One-time bootstrap for the standalone kds-marketing service's deploy lane.
+# Run manually (workflow_dispatch) from the ops branch. It:
+#   1. installs the NEW repo's dedicated deploy public key on the server
+#      (public material — safe as a dispatch input),
+#   2. prints the server's SSH host keys (→ SSH_KNOWN_HOSTS secret on the
+#      kds-marketing repo),
+#   3. discovers the marketing.hummytummy.com nginx vhost + current
+#      container/port layout + whether core still serves /api/marketing,
+#   4. prepares /root/kds-marketing and extracts the values the new service
+#      must SHARE with core (INTERNAL_SERVICE_TOKEN, PAYTR_*, EMAIL_*) from
+#      /root/kds/.env.production into /root/kds-marketing/.env.shared —
+#      values never leave the box; only presence booleans are printed.
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_pubkey:
+        description: 'ssh-ed25519 public key for the kds-marketing deploy lane'
+        required: true
+        type: string
+
+env:
+  SERVER_HOST: '38.242.233.166'
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH (existing kds deploy key)
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+      - name: Install kds-marketing deploy key (idempotent)
+        env:
+          PUBKEY: ${{ inputs.deploy_pubkey }}
+        run: |
+          set -euo pipefail
+          case "$PUBKEY" in
+            ssh-ed25519\ *|ssh-rsa\ *) ;;
+            *) echo "::error::input does not look like an SSH public key"; exit 1 ;;
+          esac
+          ssh root@${{ env.SERVER_HOST }} "
+            set -euo pipefail
+            grep -qxF '$PUBKEY' /root/.ssh/authorized_keys || echo '$PUBKEY' >> /root/.ssh/authorized_keys
+            echo 'authorized_keys entries:' \$(wc -l < /root/.ssh/authorized_keys)
+          "
+
+      - name: Host keys (for the new repo's SSH_KNOWN_HOSTS)
+        run: |
+          set -euo pipefail
+          echo '===== SSH_KNOWN_HOSTS BEGIN ====='
+          ssh-keyscan -t ed25519,rsa ${{ env.SERVER_HOST }} 2>/dev/null
+          echo '===== SSH_KNOWN_HOSTS END ====='
+
+      - name: Discover — nginx vhost, ports, containers, core marketing API
+        run: |
+          set -euo pipefail
+          ssh root@${{ env.SERVER_HOST }} 'bash -s' <<'DISCOVER'
+            set -uo pipefail
+            echo '===== NGINX FILES matching marketing.hummytummy.com ====='
+            grep -rl 'marketing\.hummytummy\.com' /etc/nginx 2>/dev/null || echo '(none found)'
+            for f in $(grep -rl 'marketing\.hummytummy\.com' /etc/nginx 2>/dev/null); do
+              echo "----- BEGIN $f -----"
+              cat "$f"
+              echo "----- END $f -----"
+            done
+            echo '===== LISTENING PORTS (3xxx) ====='
+            ss -tlnp | grep -E ':(3[0-9]{3})\s' || true
+            echo '===== CONTAINERS ====='
+            docker ps --format '{{.Names}}\t{{.Image}}\t{{.Ports}}' | sort
+            echo '===== CORE /api/marketing PRE-FLIGHT ====='
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 \
+              -X POST http://localhost:3000/api/marketing/auth/login \
+              -H 'Content-Type: application/json' -d '{}') || code=ERR
+            echo "POST localhost:3000/api/marketing/auth/login -> $code (401/400=old API alive, 404=already removed)"
+            echo '===== /root layout ====='
+            ls -la /root/ | grep -E 'kds' || true
+          DISCOVER
+
+      - name: Prepare /root/kds-marketing + .env.shared (values stay on the box)
+        run: |
+          set -euo pipefail
+          ssh root@${{ env.SERVER_HOST }} 'bash -s' <<'PREPARE'
+            set -euo pipefail
+            mkdir -p /root/kds-marketing
+            chmod 700 /root/kds-marketing
+            src=/root/kds/.env.production
+            dst=/root/kds-marketing/.env.shared
+            : > "$dst.new"
+            for key in INTERNAL_SERVICE_TOKEN PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT \
+                       EMAIL_HOST EMAIL_PORT EMAIL_SECURE EMAIL_USER EMAIL_PASSWORD EMAIL_FROM; do
+              line=$(grep -E "^${key}=" "$src" | tail -1 || true)
+              if [ -n "$line" ]; then
+                echo "$line" >> "$dst.new"
+                echo "shared: $key=present"
+              else
+                echo "shared: $key=MISSING"
+              fi
+            done
+            chmod 600 "$dst.new"
+            mv "$dst.new" "$dst"
+            echo ".env.shared written: $(wc -l < $dst) lines"
+          PREPARE
