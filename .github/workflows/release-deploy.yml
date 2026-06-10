@@ -86,9 +86,6 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
@@ -107,12 +104,12 @@ jobs:
           # secrets — the workflow used to discover that by watching
           # the container fail its health check. Catching it here
           # gives a clean "::error::" listing every missing secret.
+          # (MARKETING_JWT_* / MARKETING_INGEST_TOKEN moved to the
+          # kds-marketing service's own deploy pipeline.)
           required=(
             POSTGRES_PASSWORD
             JWT_SECRET JWT_REFRESH_SECRET
             SUPERADMIN_JWT_SECRET SUPERADMIN_JWT_REFRESH_SECRET
-            MARKETING_JWT_SECRET MARKETING_JWT_REFRESH_SECRET
-            MARKETING_INGEST_TOKEN
             ENCRYPTION_MASTER_KEY
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
@@ -294,9 +291,11 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          # kds-marketing service transport (Phase-5 split). Both optional:
+          # core boots without them (referral resolution no-ops, event relay
+          # disabled) until the marketing service is stood up.
+          MARKETING_SERVICE_URL: ${{ vars.MARKETING_SERVICE_URL }}
+          INTERNAL_SERVICE_TOKEN: ${{ secrets.INTERNAL_SERVICE_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
@@ -330,11 +329,10 @@ jobs:
           JWT_REFRESH_EXPIRES_IN=30d
           SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
           SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
-          MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
-          MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
 
-          MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
+          MARKETING_SERVICE_URL=${MARKETING_SERVICE_URL}
+          INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
 
           CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com

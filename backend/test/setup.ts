@@ -15,8 +15,6 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-must-be-at-least-32-chars-
 process.env.JWT_REFRESH_EXPIRES_IN = '7d';
 process.env.SUPERADMIN_JWT_SECRET = 'test-superadmin-secret-must-be-32-chars-cccccccccc';
 process.env.SUPERADMIN_JWT_REFRESH_SECRET = 'test-superadmin-refresh-secret-32-chars-dddddddd';
-process.env.MARKETING_JWT_SECRET = 'test-marketing-secret-must-be-32-chars-eeeeeeee';
-process.env.MARKETING_JWT_REFRESH_SECRET = 'test-marketing-refresh-32-chars-ffffffffffffffff';
 process.env.ENCRYPTION_MASTER_KEY = 'test-encryption-master-key-32-chars-gggggggggg';
 process.env.IP_HASH_SALT = 'test-ip-hash-salt-32-chars-hhhhhhhhhhhhhhhhhh';
 

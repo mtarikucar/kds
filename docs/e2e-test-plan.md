@@ -1487,6 +1487,10 @@ Read-only aggregations; her biri `advancedReports` feature gate'i altında.
 
 ## Bölüm M — Marketing CRM
 
+> **Not (Phase-5 ayrışması):** Marketing CRM bağımsız **kds-marketing**
+> projesine taşındı; bu bölümdeki senaryolar ve `tests/e2e/specs/marketing/*`
+> spec'leri artık o repoda yaşar.
+
 ### M.1  `marketing/leads`
 
 **Sahip olduğu modeller:** `MarketingLead`, `MarketingLeadActivity`.

@@ -5,13 +5,13 @@ import {
   IS_SUPERADMIN_PUBLIC_KEY,
   IS_SUPERADMIN_ROUTE_KEY,
 } from "../../modules/superadmin/decorators/superadmin.decorator";
-import { IS_MARKETING_ROUTE_KEY } from "../../modules/marketing/decorators/marketing-public.decorator";
 
 /**
  * Shared check used by JwtAuthGuard / RolesGuard / TenantGuard to decide
  * whether the main-app auth pipeline should be skipped for this route.
- * Keeping this in one place avoids drift as new realms (superadmin,
- * marketing, etc.) add their own decorators.
+ * Keeping this in one place avoids drift as new realms (e.g. superadmin)
+ * add their own decorators. (The marketing realm moved to the separate
+ * kds-marketing service; its bypass key left with it.)
  */
 export function shouldBypassGlobalAuth(
   reflector: Reflector,
@@ -21,7 +21,6 @@ export function shouldBypassGlobalAuth(
   return (
     !!reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets) ||
     !!reflector.getAllAndOverride<boolean>(IS_SUPERADMIN_PUBLIC_KEY, targets) ||
-    !!reflector.getAllAndOverride<boolean>(IS_SUPERADMIN_ROUTE_KEY, targets) ||
-    !!reflector.getAllAndOverride<boolean>(IS_MARKETING_ROUTE_KEY, targets)
+    !!reflector.getAllAndOverride<boolean>(IS_SUPERADMIN_ROUTE_KEY, targets)
   );
 }

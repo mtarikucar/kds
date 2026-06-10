@@ -1,5 +1,11 @@
 # KDS Pazarlamacı Rehberi
 
+> **Not (Phase-5 ayrışması):** Marketing/pazarlama paneli ve backend'i bu
+> repodan ayrılarak bağımsız **kds-marketing** projesine taşındı. Bu rehber
+> içerik olarak geçerlidir; kurulum/çalıştırma için kds-marketing reposuna,
+> teknik ayrıntılar için `backend/docs/marketing-phase5-split-runbook.md`
+> dosyasına bakın.
+
 Bu döküman, KDS Restoran Yönetim Sistemi'ni sahaya çıkaran pazarlama ekibi içindir. Sistemi tanımak, sattığın aboneliklerden komisyon kazanmak ve müşteri portföyünü panelden takip etmek için referans olarak kullan.
 
 ---

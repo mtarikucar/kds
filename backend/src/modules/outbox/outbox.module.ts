@@ -3,6 +3,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { DomainEventBus } from "./domain-event-bus.service";
 import { OutboxService } from "./outbox.service";
 import { OutboxWorkerService } from "./outbox-worker.service";
+import { MarketingEventRelayService } from "./marketing-event-relay.service";
 
 /**
  * Outbox + in-process bus ship as a @Global module so every feature can call
@@ -13,7 +14,13 @@ import { OutboxWorkerService } from "./outbox-worker.service";
 @Global()
 @Module({
   imports: [PrismaModule],
-  providers: [DomainEventBus, OutboxService, OutboxWorkerService],
+  providers: [
+    DomainEventBus,
+    OutboxService,
+    OutboxWorkerService,
+    // Phase-5 split: HTTP relay for marketing-bound events (see service doc).
+    MarketingEventRelayService,
+  ],
   exports: [DomainEventBus, OutboxService],
 })
 export class OutboxModule {}
