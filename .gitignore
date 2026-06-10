@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Prisma generated client lives in node_modules (nothing to ignore here),
+# but keep editor/OS noise out:
+.DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo
