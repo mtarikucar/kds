@@ -22,8 +22,17 @@ import {
   CoreProvisioningError,
   CoreProvisioningPlanInvalidError,
   CoreProvisioningSubdomainError,
-  ProvisionTenantForLeadCommand,
 } from "../../core-contracts/provisioning/tenant-provisioning.types";
+import {
+  DescribePlanRequest,
+  DescribePlanResponse,
+  INTERNAL_PROVISIONING_BASE,
+  INTERNAL_PROVISIONING_SEGMENTS,
+  ListProvisionedLeadsRequest,
+  ListProvisionedLeadsResponse,
+  PROVISIONING_ERROR_CODES,
+  ProvisionTenantForLeadRequest,
+} from "../../core-contracts/provisioning/http-contract";
 
 /**
  * Maps the transport-neutral CoreProvisioning* error hierarchy onto HTTP
@@ -41,21 +50,21 @@ export class CoreProvisioningErrorFilter implements ExceptionFilter {
   catch(exception: CoreProvisioningError, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
 
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let code = "CORE_PROVISIONING_ERROR";
+    let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
+    let code: string = PROVISIONING_ERROR_CODES.unknown;
     const extra: Record<string, unknown> = {};
 
     if (exception instanceof CoreProvisioningEmailInUseError) {
       status = HttpStatus.CONFLICT;
-      code = "EMAIL_IN_USE";
+      code = PROVISIONING_ERROR_CODES.emailInUse;
       extra.email = exception.email;
     } else if (exception instanceof CoreProvisioningPlanInvalidError) {
       status = HttpStatus.UNPROCESSABLE_ENTITY;
-      code = "PLAN_INVALID";
+      code = PROVISIONING_ERROR_CODES.planInvalid;
       extra.planId = exception.planId;
     } else if (exception instanceof CoreProvisioningSubdomainError) {
       status = HttpStatus.CONFLICT;
-      code = "SUBDOMAIN_UNAVAILABLE";
+      code = PROVISIONING_ERROR_CODES.subdomainUnavailable;
     }
 
     response.status(status).json({
@@ -80,7 +89,7 @@ export class CoreProvisioningErrorFilter implements ExceptionFilter {
  * not a browser.
  */
 @ApiExcludeController()
-@Controller("internal/provisioning")
+@Controller(INTERNAL_PROVISIONING_BASE)
 @Public()
 @SkipThrottle()
 @UseGuards(InternalServiceTokenGuard)
@@ -89,9 +98,9 @@ export class InternalProvisioningController {
   constructor(private readonly provisioning: TenantProvisioningService) {}
 
   /** CoreProvisioningPort.provisionTenantForLead */
-  @Post("provision-tenant-for-lead")
+  @Post(INTERNAL_PROVISIONING_SEGMENTS.provisionTenantForLead)
   @HttpCode(200)
-  async provisionTenantForLead(@Body() command: ProvisionTenantForLeadCommand) {
+  async provisionTenantForLead(@Body() command: ProvisionTenantForLeadRequest) {
     if (!command?.leadId || !command?.idempotencyKey) {
       throw new BadRequestException("leadId and idempotencyKey are required");
     }
@@ -99,31 +108,54 @@ export class InternalProvisioningController {
   }
 
   /** CoreProvisioningPort.listProvisionedLeads */
-  @Post("list-provisioned-leads")
+  @Post(INTERNAL_PROVISIONING_SEGMENTS.listProvisionedLeads)
   @HttpCode(200)
   async listProvisionedLeads(
-    @Body() body: { createdAfter: string; createdBefore: string },
-  ) {
-    const createdAfter = new Date(body?.createdAfter);
-    const createdBefore = new Date(body?.createdBefore);
-    if (
-      Number.isNaN(createdAfter.getTime()) ||
-      Number.isNaN(createdBefore.getTime())
-    ) {
+    @Body() body: ListProvisionedLeadsRequest,
+  ): Promise<ListProvisionedLeadsResponse> {
+    const createdAfter = parseIsoDate(body?.createdAfter);
+    const createdBefore = parseIsoDate(body?.createdBefore);
+    if (!createdAfter || !createdBefore) {
       throw new BadRequestException(
-        "createdAfter and createdBefore must be ISO-8601 dates",
+        "createdAfter and createdBefore must be ISO-8601 date strings",
       );
     }
-    return this.provisioning.listProvisionedLeads(createdAfter, createdBefore);
+    const leads = await this.provisioning.listProvisionedLeads(
+      createdAfter,
+      createdBefore,
+    );
+    return { leads };
   }
 
-  /** CoreProvisioningPort.describePlan — null body for an unknown plan. */
-  @Post("describe-plan")
+  /**
+   * CoreProvisioningPort.describePlan — always 200 with the
+   * `{ plan: ... | null }` envelope; `plan: null` for an unknown plan
+   * (never an empty body, never a 404).
+   */
+  @Post(INTERNAL_PROVISIONING_SEGMENTS.describePlan)
   @HttpCode(200)
-  async describePlan(@Body() body: { planId: string }) {
+  async describePlan(
+    @Body() body: DescribePlanRequest,
+  ): Promise<DescribePlanResponse> {
     if (!body?.planId) {
       throw new BadRequestException("planId is required");
     }
-    return this.provisioning.describePlan(body.planId);
+    const plan = await this.provisioning.describePlan(body.planId);
+    return { plan };
   }
+}
+
+/**
+ * Conservative ISO-8601 check: `YYYY-MM-DD` with an optional time part.
+ * `new Date(x)` alone is NOT a validator — `new Date(null)` is the epoch and
+ * `new Date(12345)` is a timestamp, so non-string JSON values would slip
+ * through a NaN check and silently become surprising ranges.
+ */
+const ISO_8601 =
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+function parseIsoDate(value: unknown): Date | null {
+  if (typeof value !== "string" || !ISO_8601.test(value)) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

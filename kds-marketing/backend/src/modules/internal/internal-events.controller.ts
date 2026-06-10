@@ -5,6 +5,11 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
+import {
+  DeliverEventResponse,
+  INTERNAL_EVENTS_ROUTE,
+} from '../../core-contracts/internal-http.contract';
 import {
   IsISO8601,
   IsNotEmpty,
@@ -66,15 +71,21 @@ class DeliverEventDto {
  * marketing.lead.converted.v1 does NOT pass through here: its producer
  * (MarketingLeadsService) and consumer (InstallationConsumer) both live in
  * this service, so it stays on the local outbox → bus path.
+ *
+ * `@SkipThrottle()` because every delivery arrives from core's single
+ * egress IP — machine traffic, not a browser; the global 300 req/min
+ * per-IP ThrottlerGuard would throttle a settlement burst into the
+ * sender's retry/DLQ machinery for no reason.
  */
-@Controller('internal/events')
+@Controller(INTERNAL_EVENTS_ROUTE)
+@SkipThrottle()
 @UseGuards(InternalTokenGuard)
 export class InternalEventsController {
   constructor(private readonly outbox: OutboxService) {}
 
   @Post()
   @HttpCode(202)
-  async deliver(@Body() dto: DeliverEventDto): Promise<{ id: string }> {
+  async deliver(@Body() dto: DeliverEventDto): Promise<DeliverEventResponse> {
     const id = await this.outbox.append({
       type: dto.type,
       payload: dto.payload,

@@ -38,7 +38,11 @@ services:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-dev-internal-service-token-change-me}
       # Core service base URL — the marketing service calls
       # ${CORE_SERVICE_URL}/api/internal/provisioning/* for lead → tenant
-      # provisioning. Point it at the core deployment.
+      # provisioning. Point it at the core deployment. The default targets
+      # core's own compose, which publishes its backend on host port 3000
+      # (this stack publishes the marketing backend on 3100 — see `ports`
+      # below — precisely so the two don't collide and this default can't
+      # loop back onto the marketing service itself).
       CORE_SERVICE_URL: ${CORE_SERVICE_URL:-http://host.docker.internal:3000}
       # SMTP (optional — unset = emails are logged, not sent)
       EMAIL_HOST: ${EMAIL_HOST:-}
@@ -48,8 +52,13 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-}
       APP_NAME: ${APP_NAME:-HummyTummy}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    # Host port 3100: the core stack already publishes ITS backend on host
+    # port 3000, and CORE_SERVICE_URL defaults to host.docker.internal:3000 —
+    # publishing this backend on 3000 too would make the marketing service
+    # call itself when both stacks run on one machine. Container port stays
+    # 3000 (PORT env above).
     ports:
-      - '3000:3000'
+      - '3100:3000'
     extra_hosts:
       - 'host.docker.internal:host-gateway'
 
@@ -58,8 +67,9 @@ services:
       context: ./frontend
       target: production
       args:
-        # Baked into the bundle at build time (Vite).
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        # Baked into the bundle at build time (Vite). Points at the
+        # marketing backend's published host port (3100, see above).
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3100/api}
     container_name: kds-marketing-frontend
     depends_on:
       - backend

@@ -4,6 +4,11 @@ import {
   ReferralDirectoryPort,
   ResolvedReferral,
 } from "../../core-contracts/referral/referral-directory.port";
+import {
+  INTERNAL_REFERRAL_RESOLVE_ROUTE,
+  ResolveReferralResponse,
+} from "../../core-contracts/referral/http-contract";
+import { INTERNAL_TOKEN_HEADER } from "../../core-contracts/internal-http.contract";
 
 /**
  * Phase-5 network transport for {@link ReferralDirectoryPort}.
@@ -14,7 +19,8 @@ import {
  *   POST ${MARKETING_SERVICE_URL}/api/internal/referral/resolve
  *   headers: x-internal-token: ${INTERNAL_SERVICE_TOKEN}
  *   body:    { code }
- *   200 →    ResolvedReferral | null  (same DTO as the port)
+ *   200 →    { resolved: ResolvedReferral | null }  (envelope, see
+ *            core-contracts/referral/http-contract)
  *
  * Referral attribution is best-effort by contract ("Must NEVER throw on a
  * bad code"): on network error, timeout, or any non-200, we log a warning
@@ -36,10 +42,10 @@ export class HttpReferralDirectoryClient implements ReferralDirectoryPort {
 
     try {
       const response = await axios.post(
-        `${this.baseUrl}/api/internal/referral/resolve`,
+        `${this.baseUrl}/api/${INTERNAL_REFERRAL_RESOLVE_ROUTE}`,
         { code: trimmed },
         {
-          headers: { "x-internal-token": this.internalToken ?? "" },
+          headers: { [INTERNAL_TOKEN_HEADER]: this.internalToken ?? "" },
           timeout: this.TIMEOUT_MS,
           // Treat every status as "resolved" so non-200s land in the
           // warn-and-null branch below instead of throwing.
@@ -52,11 +58,14 @@ export class HttpReferralDirectoryClient implements ReferralDirectoryPort {
         );
         return null;
       }
-      const body = response.data as ResolvedReferral | null;
-      if (!body || !body.marketingUserId || !body.referralCode) return null;
+      // The wire shape is the `{ resolved }` envelope — unwrap it before
+      // validating the port DTO fields.
+      const body = response.data as ResolveReferralResponse | null;
+      const resolved = body?.resolved ?? null;
+      if (!resolved?.marketingUserId || !resolved.referralCode) return null;
       return {
-        marketingUserId: body.marketingUserId,
-        referralCode: body.referralCode,
+        marketingUserId: resolved.marketingUserId,
+        referralCode: resolved.referralCode,
       };
     } catch (err) {
       this.logger.warn(
