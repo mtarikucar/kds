@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DomainEventBus } from "./domain-event-bus.service";
+import { MarketingEventRelayService } from "./marketing-event-relay.service";
 
 /**
  * Drains queued OutboxEvent rows onto the in-process DomainEventBus.
@@ -37,6 +38,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly PRUNE_INTERVAL_MS = 60 * 60_000; // every hour
   // Cap deletions per batch so a backlog doesn't lock the table.
   private readonly PRUNE_BATCH = 5_000;
+  // How long a marketing-bound row sleeps when MARKETING_SERVICE_URL is
+  // unset ("parked"). Long enough not to spam the local bus with
+  // re-dispatches, short enough that configuring the URL drains the
+  // backlog within half an hour.
+  private readonly UNCONFIGURED_PARK_MS = 30 * 60_000;
 
   private timer: NodeJS.Timeout | null = null;
   private pruneTimer: NodeJS.Timeout | null = null;
@@ -47,6 +53,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bus: DomainEventBus,
+    private readonly marketingRelay: MarketingEventRelayService,
   ) {}
 
   onModuleInit(): void {
@@ -186,6 +193,35 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
           idempotencyKey: r.idempotencyKey,
           createdAt: r.createdAt,
         });
+        // Phase-5 split: marketing-bound events (payment.succeeded.v1,
+        // marketing.*) are additionally relayed over HTTP to the
+        // kds-marketing service. A failed relay throws into the catch
+        // below, re-queueing the row with backoff — i.e. delivery to the
+        // marketing service is retried by the same outbox machinery as the
+        // in-process dispatch. Bus listeners are idempotent by contract,
+        // so re-observing the event on a relay retry is safe.
+        const relayResult = await this.marketingRelay.relay(r);
+        if (relayResult === "skipped-unconfigured") {
+          // MARKETING_SERVICE_URL is unset but this event is marketing-bound.
+          // PARK the row instead of marking it dispatched: keep it pending
+          // with a long nextAttemptAt and hand back the attempt the claim
+          // burned, so it can never DLQ from this path and the eventual
+          // configuration of the URL backfills the backlog. The local bus
+          // re-dispatch on each park cycle is the documented at-least-once
+          // contract — listeners dedupe (e.g. the webhook fan-out's unique
+          // constraint on (eventId, endpointId)).
+          await this.prisma.outboxEvent.update({
+            where: { id: r.id },
+            data: {
+              status: "queued",
+              attempts: r.attempts - 1,
+              nextAttemptAt: new Date(Date.now() + this.UNCONFIGURED_PARK_MS),
+              lastError:
+                "parked: MARKETING_SERVICE_URL is not configured — marketing-bound event held pending until the relay is enabled",
+            },
+          });
+          continue;
+        }
         await this.prisma.outboxEvent.update({
           where: { id: r.id },
           data: {

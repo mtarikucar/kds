@@ -86,9 +86,6 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
           NETGSM_USERCODE: ${{ secrets.NETGSM_USERCODE }}
@@ -111,12 +108,12 @@ jobs:
           # secrets — the workflow used to discover that by watching
           # the container fail its health check. Catching it here
           # gives a clean "::error::" listing every missing secret.
+          # (MARKETING_JWT_* / MARKETING_INGEST_TOKEN moved to the
+          # kds-marketing service's own deploy pipeline.)
           required=(
             POSTGRES_PASSWORD
             JWT_SECRET JWT_REFRESH_SECRET
             SUPERADMIN_JWT_SECRET SUPERADMIN_JWT_REFRESH_SECRET
-            MARKETING_JWT_SECRET MARKETING_JWT_REFRESH_SECRET
-            MARKETING_INGEST_TOKEN
             ENCRYPTION_MASTER_KEY
             INTEGRATION_KEY
             REDIS_PASSWORD
@@ -318,9 +315,11 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          # kds-marketing service transport (Phase-5 split). Both optional:
+          # core boots without them (referral resolution no-ops, event relay
+          # disabled) until the marketing service is stood up.
+          MARKETING_SERVICE_URL: ${{ vars.MARKETING_SERVICE_URL }}
+          INTERNAL_SERVICE_TOKEN: ${{ secrets.INTERNAL_SERVICE_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
           NETGSM_USERCODE: ${{ secrets.NETGSM_USERCODE }}
@@ -358,8 +357,6 @@ jobs:
           JWT_REFRESH_EXPIRES_IN=30d
           SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
           SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
-          MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
-          MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
           # At-rest seed for per-tenant integration envelope keys (EnvKmsProvider
           # + integration-gateway, HKDF-sha256). Required in prod by both the
@@ -368,7 +365,8 @@ jobs:
           # match the key they were encrypted under or they become undecryptable.
           INTEGRATION_KEY=${INTEGRATION_KEY}
 
-          MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
+          MARKETING_SERVICE_URL=${MARKETING_SERVICE_URL}
+          INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
 
           CORS_ORIGIN=https://hummytummy.com,https://marketing.hummytummy.com,https://landing.hummytummy.com,https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com

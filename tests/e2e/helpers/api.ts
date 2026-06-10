@@ -125,24 +125,3 @@ async function doSuperAdminLogin(): Promise<NonNullable<typeof cachedSuperAdmin>
     throw e;
   }
 }
-
-export async function loginAsMarketing(): Promise<{
-  api: APIRequestContext;
-  accessToken: string;
-  user: { id: string; email: string; role: string };
-}> {
-  const { email, password } = PLATFORM_USERS.marketing;
-  const ctx = await request.newContext({ baseURL: API_BASE });
-  const res = await ctx.post('marketing/auth/login', { data: { email, password } });
-  if (!res.ok())
-    throw new Error(`marketing login: ${res.status()} ${await res.text()}`);
-  const body = await res.json();
-  const accessToken: string = body.accessToken;
-  await ctx.dispose();
-
-  const api = await request.newContext({
-    baseURL: API_BASE,
-    extraHTTPHeaders: { Authorization: `Bearer ${accessToken}` },
-  });
-  return { api, accessToken, user: body.user };
-}

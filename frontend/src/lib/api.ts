@@ -14,7 +14,6 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   '/billing/',
   '/branches',
   '/me',
-  '/marketing/',
   // Subscriptions, plan usage and invoices are tenant-level (one per tenant,
   // not per branch) — the backend marks both controllers @SkipBranchScope.
   // Covers /subscriptions/{plans,current,effective-features,usage/snapshot,

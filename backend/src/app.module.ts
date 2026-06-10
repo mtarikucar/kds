@@ -36,7 +36,6 @@ import { ReservationsModule } from "./modules/reservations/reservations.module";
 import { DeliveryPlatformsModule } from "./modules/delivery-platforms/delivery-platforms.module";
 import { PersonnelModule } from "./modules/personnel/personnel.module";
 import { StockManagementModule } from "./modules/stock-management/stock-management.module";
-import { MarketingModule } from "./modules/marketing/marketing.module";
 import { ProvisioningModule } from "./modules/provisioning/provisioning.module";
 import { AccountingModule } from "./modules/accounting/accounting.module";
 import { SmsSettingsModule } from "./modules/sms-settings/sms-settings.module";
@@ -118,9 +117,12 @@ import { RequestLoggerMiddleware } from "./common/middleware/request-logger.midd
     DeliveryPlatformsModule,
     PersonnelModule,
     StockManagementModule,
-    MarketingModule,
-    // Phase-1 marketing decoupling: @Global composition root for the
-    // cross-context ports (CoreProvisioningPort / ReferralDirectoryPort).
+    // Composition root for the cross-context ports
+    // (CoreProvisioningPort / ReferralDirectoryPort). The marketing bounded
+    // context itself was extracted into the separate kds-marketing service
+    // (Phase-5 split); this module now also exposes core's side of
+    // CoreProvisioningPort over /api/internal/provisioning/* and binds the
+    // referral port to an HTTP client when MARKETING_SERVICE_URL is set.
     ProvisioningModule,
     SmsSettingsModule,
     AccountingModule,

@@ -302,11 +302,18 @@ Tüm tenant'ları üst seviyeden yöneten platform-sahibi paneli. Koyu zinc tema
 - Subscriptions: tüm abonelikler — plan değiştir, iptal et, iade et, deneme bitir
 - Audit Logs: tüm platform aksiyonları (kim, ne zaman, hangi tenant, hangi alanı değiştirdi)
 - Legal Documents: KVKK / Mesafeli Satış / İade politikası versiyon yönetimi (audit history)
-- Marketers: pazarlama ekibi yönetimi (rol, status, referans kodu)
-- Commissions: platform-geneli komisyon işlemleri, toplu onay, CSV export
 - Settings: platform genelinde global ayarlar
 
-### c. Marketing Paneli (`/marketing/*`) — Satış Personeli
+> **Not:** Marketers ve Commissions ekranları, marketing paneliyle birlikte
+> bağımsız **kds-marketing** projesine taşındı (Phase-5 ayrışması); pazarlama
+> ekibi ve komisyon yönetimi artık o projede yaşar.
+
+### c. Marketing Paneli — Satış Personeli
+
+> **Not:** Marketing paneli ve backend'i bu repodan ayrılarak bağımsız
+> **kds-marketing** projesine taşındı (Phase-5 ayrışması). Aşağıdaki özellik
+> listesi artık o projede yaşar; core ile entegrasyon
+> `backend/docs/marketing-phase5-split-runbook.md` üzerinden yürür.
 
 Pazarlamacıların kendi lead'lerini takip ettiği CRM. Indigo teması, ayrı login.
 

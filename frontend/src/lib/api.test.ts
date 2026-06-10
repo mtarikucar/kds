@@ -18,7 +18,6 @@ describe('isTenantWidePath', () => {
       '/users/me',
       '/users/me/profile',
       '/v1/entitlements/me',
-      '/marketing/leads',
       '/superadmin/tenants',
       '/subscriptions/plans',
       '/subscriptions/current',

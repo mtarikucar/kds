@@ -3204,6 +3204,18 @@ model ShiftSwapRequest {
 // ========================================
 // MARKETING / SALES REPRESENTATIVE PANEL
 // ========================================
+//
+// ⚠ OWNED BY THE kds-marketing SERVICE (Phase-5 physical split).
+// The marketing bounded context was extracted into the separate
+// kds-marketing project; the models below (MarketingUser, Lead,
+// LeadActivity, MarketingTask, LeadOffer, Commission,
+// MarketingNotification, MarketingDistributionConfig, SalesCall,
+// InstallationCrew, InstallationJob, InstallationTask, SalesTarget)
+// remain here ONLY until ops migrates their tables to the marketing
+// database per backend/docs/marketing-phase5-split-runbook.md (§1).
+// Do NOT add core code that reads/writes these models, and do NOT write
+// a drop migration from this repo — the physical DB split is an ops task.
+// ========================================
 
 model MarketingUser {
   id           String    @id @default(uuid())

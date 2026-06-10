@@ -10,7 +10,6 @@ import {
   SuperAdminUsersController,
   SuperAdminSubscriptionsController,
   SuperAdminAuditController,
-  SuperAdminMarketingController,
   SuperAdminOutboxController,
 } from "./controllers";
 
@@ -22,7 +21,6 @@ import {
   SuperAdminTenantsService,
   SuperAdminUsersService,
   SuperAdminSubscriptionsService,
-  SuperAdminMarketingService,
   SuperAdminOutboxService,
 } from "./services";
 
@@ -82,7 +80,6 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminUsersController,
     SuperAdminSubscriptionsController,
     SuperAdminAuditController,
-    SuperAdminMarketingController,
     SuperAdminOutboxController,
   ],
   providers: [
@@ -92,7 +89,6 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminTenantsService,
     SuperAdminUsersService,
     SuperAdminSubscriptionsService,
-    SuperAdminMarketingService,
     SuperAdminOutboxService,
     SuperAdminGuard,
   ],

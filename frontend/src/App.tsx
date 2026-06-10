@@ -20,8 +20,7 @@ const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminS
 const MarketplaceAdminPage = lazy(() => import('./pages/superadmin/MarketplaceAdminPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
-// Marketing panel is now a standalone app served at marketing.hummytummy.com
-// (see the marketing/ package). Its routes/pages were removed from this SPA.
+// (The marketing panel moved to the separate kds-marketing project.)
 import ProfilePage from './pages/profile/ProfilePage';
 import FAQPage from './pages/help/FAQPage';
 import CustomersPage from './pages/customers/CustomersPage';

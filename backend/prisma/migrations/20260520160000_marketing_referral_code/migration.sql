@@ -2,8 +2,9 @@
 -- share via /?ref=CODE links. The checkout flow resolves the code at
 -- intent-creation time and stamps the snapshot onto the payment so it
 -- survives a later regenerate. All columns nullable so existing rows
--- backfill cleanly; see seed-marketers-referral-backfill.ts for the
--- one-shot population script.
+-- backfill cleanly; the one-shot population script
+-- (seed-marketers-referral-backfill.ts) moved to the standalone
+-- kds-marketing project along with the marketing bounded context.
 
 ALTER TABLE "marketing_users"
   ADD COLUMN "referralCode"          TEXT,
