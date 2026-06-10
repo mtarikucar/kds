@@ -136,19 +136,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing-staging:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing-staging:buildcache,mode=max
 
-      - name: Build & push marketing
-        uses: docker/build-push-action@v5
-        with:
-          context: ./marketing
-          file: ./marketing/Dockerfile
-          target: production
-          push: true
-          tags: ${{ env.GHCR_BASE }}/marketing-staging:${{ steps.commit.outputs.sha }}
-          build-args: |
-            VITE_API_URL=https://staging.hummytummy.com/api
-            VITE_API_BASE_URL=https://staging.hummytummy.com
-          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/marketing-staging:buildcache
-          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/marketing-staging:buildcache,mode=max
 
   deploy:
     name: Deploy staging

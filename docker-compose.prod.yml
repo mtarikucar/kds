@@ -201,39 +201,6 @@ services:
     networks:
       - kds_network
 
-  # Marketing console SPA (Vite + Nginx) — marketing.hummytummy.com.
-  # Host nginx routes :3200 → this SPA, and marketing.hummytummy.com/api →
-  # backend:3000, so the container only serves static files. Mirrors the
-  # frontend service (static, internal port 80), not landing (Next.js).
-  marketing:
-    env_file:
-      - .env.production
-    image: ghcr.io/mtarikucar/kds/marketing:current
-    build:
-      context: ./marketing
-      dockerfile: Dockerfile
-      target: production
-      args:
-        # Same-origin API: the marketing.hummytummy.com nginx vhost proxies
-        # /api → backend:3000, so the SPA calls its own origin (no CORS).
-        # Marketing-specific vars so we don't inherit the frontend's apex URL;
-        # assets (/uploads) still resolve to the apex via VITE_API_BASE_URL.
-        VITE_API_URL: ${MARKETING_VITE_API_URL:-https://marketing.hummytummy.com/api}
-        VITE_API_BASE_URL: ${MARKETING_VITE_API_BASE_URL:-https://hummytummy.com}
-    container_name: kds_marketing_prod
-    restart: always
-    depends_on:
-      - backend
-    ports:
-      - '3200:80'
-    healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:80/healthz']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    networks:
-      - kds_network
 
 volumes:
   postgres_data:

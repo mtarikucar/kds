@@ -62,16 +62,13 @@ REDIS_CONTAINER=""
 BACKEND_CONTAINER=""
 FRONTEND_CONTAINER=""
 LANDING_CONTAINER=""
-MARKETING_CONTAINER=""
 BACKEND_IMG=""
 FRONTEND_IMG=""
 LANDING_IMG=""
-MARKETING_IMG=""
 API_LOCAL_URL=""
 API_PUBLIC_URL=""
 FRONTEND_PUBLIC_URL=""
 LANDING_PUBLIC_URL=""
-MARKETING_PUBLIC_URL=""
 HEALTH_BUDGET_SEC=300
 BACKUP_RETENTION_DAYS=14
 STATE_FILE=""
@@ -103,16 +100,13 @@ configure_env() {
     BACKEND_CONTAINER="kds_backend_prod"
     FRONTEND_CONTAINER="kds_frontend_prod"
     LANDING_CONTAINER="kds_landing_prod"
-    MARKETING_CONTAINER="kds_marketing_prod"
     BACKEND_IMG="$ghcr_base/backend"
     FRONTEND_IMG="$ghcr_base/frontend"
     LANDING_IMG="$ghcr_base/landing"
-    MARKETING_IMG="$ghcr_base/marketing"
     API_LOCAL_URL="http://localhost:3000/api/health"
     API_PUBLIC_URL="https://hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://hummytummy.com"
     LANDING_PUBLIC_URL="https://hummytummy.com/landing"
-    MARKETING_PUBLIC_URL="https://marketing.hummytummy.com"
     HEALTH_BUDGET_SEC=300
     BACKUP_RETENTION_DAYS=14
     BACKUP_PREFIX="prod"
@@ -124,16 +118,13 @@ configure_env() {
     BACKEND_CONTAINER="kds_backend_staging"
     FRONTEND_CONTAINER="kds_frontend_staging"
     LANDING_CONTAINER="kds_landing_staging"
-    MARKETING_CONTAINER="kds_marketing_staging"
     BACKEND_IMG="$ghcr_base/backend-staging"
     FRONTEND_IMG="$ghcr_base/frontend-staging"
     LANDING_IMG="$ghcr_base/landing-staging"
-    MARKETING_IMG="$ghcr_base/marketing-staging"
     API_LOCAL_URL="http://localhost:3002/api/health"
     API_PUBLIC_URL="https://staging.hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://staging.hummytummy.com"
     LANDING_PUBLIC_URL="https://staging.hummytummy.com/landing"
-    MARKETING_PUBLIC_URL=""
     # Bumped from the original 180s → 300s (route-mapping past 180s on
     # cold boots) → 600s. Run 26431353670 showed the HummyTummy-sized
     # image still hadn't responded to /api/health at the 300s mark.
@@ -234,7 +225,7 @@ backup_database() {
 snapshot_image_ids() {
   : > "$STATE_FILE"
   local saved=0
-  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER" "MARKETING $MARKETING_CONTAINER"; do
+  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER"; do
     local role="${entry%% *}"
     local container="${entry##* }"
     local sha
@@ -247,7 +238,7 @@ snapshot_image_ids() {
       warn "$container not running — no prior SHA to snapshot"
     fi
   done
-  log "Snapshot complete: $saved/4 containers (file: $STATE_FILE)"
+  log "Snapshot complete: $saved/3 containers (file: $STATE_FILE)"
 }
 
 pull_versioned_images() {
@@ -257,23 +248,10 @@ pull_versioned_images() {
     echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   fi
 
-  # v3.0.1 round-3 — marketing is the newest service; CI may not have
-  # pushed its image for a given $VERSION yet (e.g. running deploy.sh
-  # manually against a tag that predates the marketing SPA, or the very
-  # first cutover before the marketing CI workflow has run end-to-end).
-  # Backend/frontend/landing are MUST-HAVE — their pull failure must
-  # still abort the deploy. Marketing is OPTIONAL on the forward path,
-  # mirroring the rollback path's skip-when-absent guard added in
-  # 8b483fd. If marketing isn't pulled, the swap step's `docker image
-  # inspect` check already skips its `up -d` call.
   for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
     log "docker pull $img:$VERSION"
     docker pull "$img:$VERSION"
   done
-  log "docker pull $MARKETING_IMG:$VERSION (optional — soft-fails)"
-  if ! docker pull "$MARKETING_IMG:$VERSION"; then
-    warn "marketing image $MARKETING_IMG:$VERSION is not in the registry yet; deploy continues without it. Subsequent CI pushes will populate it."
-  fi
 }
 
 ensure_data_layer() {
@@ -418,12 +396,13 @@ swap_backend() {
 swap_app_containers() {
   retag_to_current "$FRONTEND_IMG"
   retag_to_current "$LANDING_IMG"
-  retag_to_current "$MARKETING_IMG"
-  dc up -d --force-recreate frontend landing marketing
+  # --remove-orphans reaps the retired in-repo marketing SPA container —
+  # marketing.hummytummy.com is served by the standalone kds-marketing
+  # stack (ports 3210/3211) since the v1.0.x cutover.
+  dc up -d --force-recreate --remove-orphans frontend landing
   sleep 3
   verify_running_image "$FRONTEND_CONTAINER" "$FRONTEND_IMG"
   verify_running_image "$LANDING_CONTAINER"  "$LANDING_IMG"
-  verify_running_image "$MARKETING_CONTAINER" "$MARKETING_IMG"
 }
 
 verify_and_promote() {
@@ -434,9 +413,6 @@ verify_and_promote() {
   # Landing probe is best-effort — its URL layout has changed in the
   # past and we don't want a 301 to fail the deploy.
   wait_until_healthy "$LANDING_PUBLIC_URL"  30 || warn "Landing probe non-200 (likely a redirect)"
-  # Marketing probe is prod-only + best-effort (staging has no subdomain).
-  [ -n "$MARKETING_PUBLIC_URL" ] && { wait_until_healthy "$MARKETING_PUBLIC_URL" 30 || warn "Marketing probe non-200"; }
-
   # SSL cert expiry — warn at 14d, error at 3d.
   local host="${API_PUBLIC_URL#https://}"; host="${host%%/*}"
   local exp_str exp_ts now_ts days
@@ -457,7 +433,7 @@ verify_and_promote() {
   fi
 
   # :current already moved by swap_*. Image immutability proof:
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$MARKETING_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
     local cur_sha ver_sha
     cur_sha=$(docker image inspect "$img:current" --format '{{.Id}}' 2>/dev/null || echo "")
     ver_sha=$(docker image inspect "$img:$VERSION" --format '{{.Id}}' 2>/dev/null || echo "")
@@ -493,28 +469,12 @@ restore_image_ids() {
     docker tag "$LANDING_PREV_IMAGE"  "$LANDING_IMG:current"  || warn "landing retag failed"
     restored=$((restored + 1))
   fi
-  if [ -n "${MARKETING_PREV_IMAGE:-}" ]; then
-    log "Pinning marketing :current → ${MARKETING_PREV_IMAGE}"
-    docker tag "$MARKETING_PREV_IMAGE" "$MARKETING_IMG:current" || warn "marketing retag failed"
-    restored=$((restored + 1))
-  fi
-
   if [ "$restored" -eq 0 ]; then
     err "Snapshot is empty — manual recovery required"
     return 1
   fi
 
-  # marketing:current only exists after the first successful swap. On a deploy
-  # that aborts before the swap (e.g. the migration doctor), the tag isn't
-  # present yet, and recreating the service would make compose try to pull a
-  # non-existent :current and fail the whole rollback. Recreate the core trio
-  # unconditionally (prior behaviour); fold marketing in only when it resolves.
-  if docker image inspect "$MARKETING_IMG:current" >/dev/null 2>&1; then
-    dc up -d --force-recreate backend frontend landing marketing
-  else
-    warn "marketing :current absent (pre-first-deploy) — rolling back core services only"
-    dc up -d --force-recreate backend frontend landing
-  fi
+  dc up -d --force-recreate --remove-orphans backend frontend landing
   sleep 5
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC" || warn "Post-rollback API not healthy"
 

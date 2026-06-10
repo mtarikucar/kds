@@ -265,23 +265,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache,mode=max
 
-      - name: Build & push marketing
-        uses: docker/build-push-action@v5
-        with:
-          context: ./marketing
-          file: ./marketing/Dockerfile
-          target: production
-          push: true
-          tags: |
-            ${{ env.GHCR_BASE }}/marketing:${{ steps.version.outputs.VERSION }}
-          # Same-origin API: marketing.hummytummy.com nginx proxies /api →
-          # backend:3000, so the SPA calls its own origin (no CORS). Assets
-          # (/uploads) still resolve to the apex via VITE_API_BASE_URL.
-          build-args: |
-            VITE_API_URL=https://marketing.hummytummy.com/api
-            VITE_API_BASE_URL=https://hummytummy.com
-          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/marketing:buildcache
-          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/marketing:buildcache,mode=max
 
   # -------------------------------------------------------------------
   # Render .env.production from secrets, ship it + the repo HEAD to the
