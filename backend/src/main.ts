@@ -23,6 +23,9 @@ initSentry();
 process.on("unhandledRejection", (reason: any) => {
   console.error("Unhandled Rejection:", reason);
   try {
+    // Lazy require: the handler must work even if module init partially
+    // failed, which a top-level import cannot guarantee.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Sentry = require("@sentry/node");
     Sentry.captureException(
       reason instanceof Error ? reason : new Error(String(reason)),
@@ -33,6 +36,7 @@ process.on("unhandledRejection", (reason: any) => {
 process.on("uncaughtException", (error: Error) => {
   console.error("Uncaught Exception:", error);
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Sentry = require("@sentry/node");
     Sentry.captureException(error);
   } catch {}

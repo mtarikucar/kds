@@ -87,7 +87,10 @@ export class TenantCatalogController {
   // "restore" it to 1000 or the quote-spam guard loosens 10×.
   @Post("quote-request")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @Throttle({ short: { ttl: 10_000, limit: 3 }, long: { ttl: 60_000, limit: 20 } })
+  @Throttle({
+    short: { ttl: 10_000, limit: 3 },
+    long: { ttl: 60_000, limit: 20 },
+  })
   @ApiOperation({
     summary:
       "Request a quote for a QUOTE_ONLY device — creates a lead (ADMIN, MANAGER).",

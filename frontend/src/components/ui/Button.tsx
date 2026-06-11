@@ -51,6 +51,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
         disabled={disabled || isLoading}
+        aria-busy={isLoading || undefined}
         {...props}
       >
         {isLoading ? (
@@ -60,6 +61,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <circle
                 className="opacity-25"

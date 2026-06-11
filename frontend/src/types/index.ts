@@ -423,6 +423,11 @@ export enum OrderType {
   DINE_IN = 'DINE_IN',
   TAKEAWAY = 'TAKEAWAY',
   DELIVERY = 'DELIVERY',
+  // Tableless self-pay orders (backend customer-orders flow defaults to
+  // COUNTER when no table is involved; Z-reports bucket them separately).
+  // Was missing here while the backend wrote it — the kind of drift
+  // scripts/check-contract-drift.mjs now guards against.
+  COUNTER = 'COUNTER',
 }
 
 export enum DeliveryPlatform {

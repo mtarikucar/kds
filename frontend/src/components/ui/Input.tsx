@@ -14,6 +14,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     // Prefer a caller-supplied id; otherwise mint a stable one.
     const autoId = React.useId();
     const inputId = id ?? autoId;
+    const messageId = `${inputId}-message`;
+    const hasMessage = Boolean(error || hint);
     return (
       <div className="w-full">
         {label && (
@@ -27,6 +29,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           ref={ref}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={hasMessage ? messageId : undefined}
           className={cn(
             'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400',
             'shadow-sm transition-all duration-200',
@@ -39,9 +43,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {hint && !error && (
-          <p className="mt-1.5 text-sm text-slate-500">{hint}</p>
+          <p id={messageId} className="mt-1.5 text-sm text-slate-500">
+            {hint}
+          </p>
         )}
-        {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p id={messageId} className="mt-1.5 text-sm text-red-600">
+            {error}
+          </p>
+        )}
       </div>
     );
   }

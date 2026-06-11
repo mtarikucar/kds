@@ -155,6 +155,12 @@ jobs:
           ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           server-host: ${{ env.SERVER_HOST }}
 
+  # Blocking quality gate: lint + typecheck + unit tests + contract drift
+  # (see quality-gates.yml). No image is built from a red suite.
+  quality:
+    name: Quality gates
+    uses: ./.github/workflows/quality-gates.yml
+
   # -------------------------------------------------------------------
   # Build images in parallel and push to GHCR. Production used to ship
   # tar.gz over scp — replaced by registry pull, both for symmetry with
@@ -165,7 +171,7 @@ jobs:
     name: Build & push to GHCR
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: pre-check
+    needs: [pre-check, quality]
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
     steps:

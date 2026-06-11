@@ -1,5 +1,6 @@
 import React, { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 
 // Refcount how many Modal instances currently want body scroll locked.
@@ -38,6 +39,7 @@ const Modal: React.FC<ModalProps> = ({
   // useId per-instance so stacked modals don't both stamp the same
   // `id="modal-title"` (duplicate IDs would break aria-labelledby).
   const titleId = useId();
+  const { t } = useTranslation('common');
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -94,9 +96,10 @@ const Modal: React.FC<ModalProps> = ({
               <h2 id={titleId} className="text-base sm:text-lg md:text-xl font-heading font-semibold text-slate-900">{title}</h2>
               <button
                 onClick={onClose}
+                aria-label={t('app.close')}
                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 sm:p-2 transition-all duration-150"
               >
-                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                <X className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
               </button>
             </div>
           )}

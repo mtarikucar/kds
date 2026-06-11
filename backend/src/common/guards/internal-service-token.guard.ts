@@ -34,7 +34,9 @@ export class InternalServiceTokenGuard implements CanActivate {
       this.logger.error(
         "INTERNAL_SERVICE_TOKEN not configured — rejecting internal service call",
       );
-      throw new ServiceUnavailableException("Internal transport not configured");
+      throw new ServiceUnavailableException(
+        "Internal transport not configured",
+      );
     }
 
     const request = context.switchToHttp().getRequest();

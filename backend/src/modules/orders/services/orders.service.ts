@@ -231,7 +231,10 @@ export class OrdersService {
     return created;
   }
 
-  private async createInner(scope: BranchScope, createOrderDto: CreateOrderDto) {
+  private async createInner(
+    scope: BranchScope,
+    createOrderDto: CreateOrderDto,
+  ) {
     const { tenantId, userId } = scope;
     return withTransaction(
       {

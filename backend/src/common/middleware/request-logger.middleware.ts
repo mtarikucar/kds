@@ -1,14 +1,33 @@
-import { Injectable, NestMiddleware } from "@nestjs/common";
+import { Injectable, NestMiddleware, Optional } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
 import { LoggerService } from "../services/logger.service";
+import { MetricsService } from "../metrics/metrics.service";
+
+/**
+ * Self-observation endpoints whose requests would only add noise to the
+ * http_request_duration_seconds histogram (every Prometheus scrape and
+ * orchestrator probe would dominate the low-latency buckets).
+ */
+const METRICS_EXCLUDED_PATHS = [
+  "/api/metrics",
+  "/api/health",
+  "/api/healthz",
+  "/uploads",
+];
 
 /**
  * Request logger middleware
- * Logs all incoming HTTP requests with details
+ * Logs all incoming HTTP requests with details, and feeds the Prometheus
+ * request-duration histogram (single observation point for both signals).
  */
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
   private readonly logger = new LoggerService("HTTP");
+
+  // Optional so unit tests that construct the middleware bare (and any
+  // module context without MetricsModule) keep working — logging never
+  // depends on metrics being wired.
+  constructor(@Optional() private readonly metrics?: MetricsService) {}
 
   use(req: Request, res: Response, next: NextFunction): void {
     const { method, originalUrl, ip } = req;
@@ -47,6 +66,24 @@ export class RequestLoggerMiddleware implements NestMiddleware {
           responseTime: `${responseTime}ms`,
         },
       );
+
+      if (
+        this.metrics &&
+        !METRICS_EXCLUDED_PATHS.some((p) => originalUrl.startsWith(p))
+      ) {
+        // req.route is populated once Express matched a handler; its
+        // pattern (`/orders/:id`) keeps label cardinality bounded where
+        // the raw URL would not. Unmatched requests (404s) share one
+        // bucket for the same reason.
+        const routePath = (req as any).route?.path;
+        const route = routePath ? `${req.baseUrl}${routePath}` : "unmatched";
+        this.metrics.observeHttpRequest(
+          method,
+          route,
+          statusCode,
+          responseTime / 1000,
+        );
+      }
     });
 
     next();

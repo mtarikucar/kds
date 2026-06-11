@@ -202,8 +202,7 @@ export class CheckoutService {
                   ? meta.preferredDates.map((d) => new Date(d))
                   : [],
               notes:
-                meta.notes ??
-                `Auto-created from checkout (service: ${l.code})`,
+                meta.notes ?? `Auto-created from checkout (service: ${l.code})`,
             },
           });
         }

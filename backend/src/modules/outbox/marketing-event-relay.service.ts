@@ -98,7 +98,9 @@ export class MarketingEventRelayService implements OnModuleInit {
 
   /** True for event types the kds-marketing service consumes. */
   isMarketingBound(type: string): boolean {
-    return type === EventTypes.PaymentSucceeded || type.startsWith("marketing.");
+    return (
+      type === EventTypes.PaymentSucceeded || type.startsWith("marketing.")
+    );
   }
 
   /**
@@ -108,7 +110,10 @@ export class MarketingEventRelayService implements OnModuleInit {
    * makes the worker park the row instead of marking it dispatched).
    */
   async relay(
-    event: Pick<DomainEvent, "type" | "payload" | "idempotencyKey" | "tenantId">,
+    event: Pick<
+      DomainEvent,
+      "type" | "payload" | "idempotencyKey" | "tenantId"
+    >,
   ): Promise<MarketingRelayResult> {
     if (!this.isMarketingBound(event.type)) return "skipped-not-marketing";
     if (!this.baseUrl) return "skipped-unconfigured";
