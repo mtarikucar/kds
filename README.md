@@ -165,6 +165,8 @@ docker-compose logs -f
 - Docker Guide: See `DOCKER_DEPLOYMENT.md`
 - Subscription System: See `SUBSCRIPTION_SYSTEM.md`
 - Multi-Environment Setup: See section below
+- **Architecture Quality Audit**: See [`docs/architecture/QUALITY_AUDIT.md`](docs/architecture/QUALITY_AUDIT.md) — 30-attribute scorecard with evidence and roadmap
+- **Architecture Decision Records**: See [`docs/architecture/adr/`](docs/architecture/adr/)
 
 ## 🌍 Multi-Environment Setup
 

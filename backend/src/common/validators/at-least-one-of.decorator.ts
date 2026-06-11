@@ -47,6 +47,9 @@ export function AtLeastOneOf(
   keys: string[],
   validationOptions?: ValidationOptions,
 ): ClassDecorator {
+  // `Function` is mandated by TS's own ClassDecorator signature —
+  // narrowing it would no longer satisfy the declared return type.
+  // eslint-disable-next-line @typescript-eslint/ban-types
   return function (target: Function) {
     registerDecorator({
       name: "AtLeastOneOf",

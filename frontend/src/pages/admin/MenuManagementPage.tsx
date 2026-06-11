@@ -69,6 +69,7 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
+import { ErrorState } from '../../components/ui/ErrorState';
 import ImageLibraryModal from '../../components/product/ImageLibraryModal';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
@@ -139,8 +140,20 @@ const MenuManagementPage = () => {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const bgRemovalSupported = isBackgroundRemovalSupported();
 
-  const { data: categories, isLoading: categoriesLoading } = useCategories();
-  const { data: products, isLoading: productsLoading } = useProducts();
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    error: categoriesErrorObj,
+    refetch: refetchCategories,
+  } = useCategories();
+  const {
+    data: products,
+    isLoading: productsLoading,
+    isError: productsError,
+    error: productsErrorObj,
+    refetch: refetchProducts,
+  } = useProducts();
   const { data: allImages, isLoading: imagesLoading } = useProductImages();
 
   // Check limits for categories and products
@@ -683,6 +696,18 @@ const MenuManagementPage = () => {
             <div className="flex justify-center py-12">
               <Spinner />
             </div>
+          ) : categoriesError || productsError ? (
+            // A failed menu fetch used to fall through to the "no
+            // categories" empty state — surface the failure instead.
+            <Card>
+              <ErrorState
+                error={categoriesError ? categoriesErrorObj : productsErrorObj}
+                onRetry={() => {
+                  if (categoriesError) refetchCategories();
+                  if (productsError) refetchProducts();
+                }}
+              />
+            </Card>
           ) : sortedCategories.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">

@@ -92,7 +92,7 @@ const LoginPage = () => {
       candidate &&
       typeof candidate === 'string' &&
       candidate.length < 1024 &&
-      /^\/[a-zA-Z0-9_\-\/?#=&%.]*$/.test(candidate) &&
+      /^\/[a-zA-Z0-9_\-/?#=&%.]*$/.test(candidate) &&
       !candidate.startsWith('//') &&
       !candidate.startsWith('/login')
     ) {

@@ -222,7 +222,8 @@ export class CatalogService {
     // Only gate at meaningful moments so routine edits (e.g. a price tweak)
     // on an already-published product aren't blocked: when transitioning into
     // published, or when this update touches the regulated fields.
-    const publishing = input.status === "published" && exists.status !== "published";
+    const publishing =
+      input.status === "published" && exists.status !== "published";
     const touchingRegulated =
       input.saleMode !== undefined ||
       input.partnerRedirect !== undefined ||
