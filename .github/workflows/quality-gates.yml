@@ -13,7 +13,9 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: '18.x'
+  # jsdom 27 (frontend tests) needs require(esm), i.e. Node >= 20.19;
+  # matches backend/landing Dockerfiles which already run node:20.
+  NODE_VERSION: '20.x'
 
 jobs:
   backend-quality:
