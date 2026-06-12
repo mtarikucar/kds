@@ -34,8 +34,23 @@ describe("env validation (typed layer — secrets are owned by common/helpers/en
     ).not.toThrow();
   });
 
-  it("rejects an empty REDIS_URL (set-but-blank is a misconfiguration)", () => {
-    expect(() => validate({ REDIS_URL: "" })).toThrow(/REDIS_URL/);
+  // Regression: a blank OTEL_EXPORTER_OTLP_ENDPOINT= placeholder in the
+  // staging .env crash-looped the backend on 2026-06-11 (health probe
+  // timeout -> rollback). Blank string must mean "unset", matching the
+  // boot validator's `!value || value.trim() === ""` semantics.
+  it("treats blank strings as unset for every optional (VAR= placeholders)", () => {
+    expect(() =>
+      validate({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "",
+        REDIS_URL: "",
+        PORT: "",
+        METRICS_TOKEN: "  ",
+        NODE_ENV: "staging",
+      }),
+    ).not.toThrow();
+  });
+
+  it("still type-checks REDIS_URL when actually set", () => {
     expect(() =>
       validate({ REDIS_URL: "redis://redis:6379/2" }),
     ).not.toThrow();
