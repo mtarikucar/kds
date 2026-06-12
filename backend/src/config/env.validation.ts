@@ -64,7 +64,19 @@ export class EnvironmentVariables {
 export function validate(
   config: Record<string, unknown>,
 ): EnvironmentVariables {
-  const validated = plainToInstance(EnvironmentVariables, config, {
+  // Blank string = unset. .env templates routinely ship `VAR=` placeholders
+  // and dotenv delivers those as "", which @IsOptional() does NOT skip —
+  // a blank OTEL_EXPORTER_OTLP_ENDPOINT= crash-looped staging on
+  // 2026-06-11. The boot validator (common/helpers/env-validation.ts:104)
+  // already treats blank-or-missing identically; this layer must agree.
+  // Presence requirements belong in the boot validator's RULES, not here.
+  const normalized = Object.fromEntries(
+    Object.entries(config).filter(
+      ([, value]) => !(typeof value === "string" && value.trim() === ""),
+    ),
+  );
+
+  const validated = plainToInstance(EnvironmentVariables, normalized, {
     enableImplicitConversion: true,
   });
 
