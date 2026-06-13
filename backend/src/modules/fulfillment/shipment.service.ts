@@ -1,12 +1,14 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Shipment + warranty + installation orchestration for hardware orders.
@@ -18,6 +20,8 @@ import { CatalogService } from "../catalog/catalog.service";
  */
 @Injectable()
 export class ShipmentService {
+  private readonly logger = new Logger(ShipmentService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
@@ -75,7 +79,12 @@ export class ShipmentService {
           trackingNo: input.trackingNo,
         },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "createShipment",
+        }),
+      );
 
     return shipment;
   }
@@ -123,7 +132,12 @@ export class ShipmentService {
         tenantId: order.tenantId,
         payload: { orderId: order.id, shipmentId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "markDelivered",
+        }),
+      );
 
     return updated;
   }

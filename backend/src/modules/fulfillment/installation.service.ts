@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Installation request lifecycle:
@@ -17,6 +19,8 @@ import { OutboxService } from "../outbox/outbox.service";
  */
 @Injectable()
 export class InstallationService {
+  private readonly logger = new Logger(InstallationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
@@ -52,7 +56,12 @@ export class InstallationService {
           hwOrderId: input.hwOrderId,
         },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "create",
+        }),
+      );
     return row;
   }
 
@@ -101,7 +110,12 @@ export class InstallationService {
         tenantId,
         payload: { requestId, scheduledFor, assignedTo },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "schedule",
+        }),
+      );
     return updated;
   }
 
@@ -141,7 +155,12 @@ export class InstallationService {
         tenantId,
         payload: { requestId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "complete",
+        }),
+      );
     return updated;
   }
 
@@ -186,7 +205,12 @@ export class InstallationService {
         tenantId: row.tenantId,
         payload: { requestId, reason },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "cancel",
+        }),
+      );
     return updated;
   }
 
