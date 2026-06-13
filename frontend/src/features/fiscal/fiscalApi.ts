@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 
 export interface FiscalReceiptLine {
   id: string;
@@ -30,18 +31,23 @@ export interface FiscalReceipt {
 }
 
 export const fiscalKeys = {
-  pending: ['fiscal', 'pending'] as const,
+  // branchId appended last (convention); `pendingPrefix` is the branch-agnostic
+  // prefix used for invalidation, which matches every branch's entry.
+  pending: (branchId: string | null) => ['fiscal', 'pending', branchId] as const,
+  pendingPrefix: ['fiscal', 'pending'] as const,
 };
 
-export const useListPendingReceipts = () =>
-  useQuery({
-    queryKey: fiscalKeys.pending,
+export const useListPendingReceipts = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: fiscalKeys.pending(branchId),
     queryFn: async (): Promise<FiscalReceipt[]> => {
       const r = await api.get('/v1/fiscal/pending');
       return r.data;
     },
     refetchInterval: 20_000,
   });
+};
 
 export const useRetryReceipt = () => {
   const qc = useQueryClient();
@@ -51,7 +57,7 @@ export const useRetryReceipt = () => {
       return r.data;
     },
     onSuccess: (out) => {
-      qc.invalidateQueries({ queryKey: fiscalKeys.pending });
+      qc.invalidateQueries({ queryKey: fiscalKeys.pendingPrefix });
       if (out.status === 'issued') toast.success(`Receipt issued (${out.fiscalNo}).`);
       else toast.error(`Retry failed: ${out.lastError ?? 'unknown'}`);
     },

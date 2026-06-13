@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useBranchScopeStore } from '../store/branchScopeStore';
 
 // Customer Analytics Types
 export interface CustomerTierDistribution {
@@ -110,8 +111,9 @@ export interface OrdersByHourReport {
 // Hooks
 
 export function useCustomerAnalytics(params?: { startDate?: string; endDate?: string }) {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['reports', 'customers', params],
+    queryKey: ['reports', 'customers', params, branchId],
     queryFn: async (): Promise<CustomerAnalyticsReport> => {
       const response = await api.get('/reports/customers', { params });
       return response.data;
@@ -120,8 +122,9 @@ export function useCustomerAnalytics(params?: { startDate?: string; endDate?: st
 }
 
 export function useInventoryReport() {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['reports', 'inventory'],
+    queryKey: ['reports', 'inventory', branchId],
     queryFn: async (): Promise<InventoryReport> => {
       const response = await api.get('/reports/inventory');
       return response.data;
@@ -130,8 +133,9 @@ export function useInventoryReport() {
 }
 
 export function useStaffPerformance(params?: { startDate?: string; endDate?: string }) {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['reports', 'staff-performance', params],
+    queryKey: ['reports', 'staff-performance', params, branchId],
     queryFn: async (): Promise<StaffPerformanceReport> => {
       const response = await api.get('/reports/staff-performance', { params });
       return response.data;
@@ -140,8 +144,9 @@ export function useStaffPerformance(params?: { startDate?: string; endDate?: str
 }
 
 export function useOrdersByHour(date?: string) {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['reports', 'orders-by-hour', date],
+    queryKey: ['reports', 'orders-by-hour', date, branchId],
     queryFn: async (): Promise<OrdersByHourReport> => {
       const response = await api.get('/reports/orders-by-hour', { params: { date } });
       return response.data;

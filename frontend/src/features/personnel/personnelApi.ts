@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import i18n from '../../i18n/config';
 import { toast } from 'sonner';
 import type { PaginatedResponse } from '../../types';
@@ -22,8 +23,9 @@ import type {
 // ========================================
 
 export const useMyAttendanceStatus = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<Attendance | { status: string; date: string }>({
-    queryKey: ['personnel', 'attendance', 'my-status'],
+    queryKey: ['personnel', 'attendance', 'my-status', branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/attendance/my-status');
       return response.data;
@@ -33,8 +35,9 @@ export const useMyAttendanceStatus = () => {
 };
 
 export const useAttendanceToday = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<Attendance[]>({
-    queryKey: ['personnel', 'attendance', 'today'],
+    queryKey: ['personnel', 'attendance', 'today', branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/attendance/today');
       return response.data;
@@ -47,8 +50,9 @@ export const useAttendanceList = (
   params?: { startDate?: string; endDate?: string; userId?: string; status?: string; page?: number; limit?: number },
   options?: { enabled?: boolean },
 ) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PaginatedResponse<Attendance>>({
-    queryKey: ['personnel', 'attendance', 'history', params],
+    queryKey: ['personnel', 'attendance', 'history', params, branchId],
     queryFn: async () => {
       const response = await api.get<PaginatedResponse<Attendance>>('/personnel/attendance', { params });
       return response.data;
@@ -58,8 +62,9 @@ export const useAttendanceList = (
 };
 
 export const useAttendanceSummary = (params?: { startDate?: string; endDate?: string; period?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<AttendanceSummary[]>({
-    queryKey: ['personnel', 'attendance', 'summary', params],
+    queryKey: ['personnel', 'attendance', 'summary', params, branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/attendance/summary', { params });
       return response.data;
@@ -140,8 +145,9 @@ export const useEndBreak = () => {
 // ========================================
 
 export const useShiftTemplates = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<ShiftTemplate[]>({
-    queryKey: ['personnel', 'shift-templates'],
+    queryKey: ['personnel', 'shift-templates', branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/shift-templates');
       return response.data;
@@ -212,8 +218,9 @@ interface WeeklyScheduleResponse {
 }
 
 export const useWeeklySchedule = (weekStart?: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<WeeklyScheduleResponse>({
-    queryKey: ['personnel', 'schedule', weekStart],
+    queryKey: ['personnel', 'schedule', weekStart, branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/schedule', { params: { weekStart } });
       return response.data;
@@ -260,8 +267,9 @@ export const useRemoveAssignment = () => {
 // ========================================
 
 export const useSwapRequests = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<ShiftSwapRequest[]>({
-    queryKey: ['personnel', 'swap-requests'],
+    queryKey: ['personnel', 'swap-requests', branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/shift-swap');
       return response.data;
@@ -326,8 +334,9 @@ export const useRejectSwap = () => {
 // ========================================
 
 export const usePerformanceMetrics = (params?: { startDate?: string; endDate?: string; userId?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PerformanceMetrics[]>({
-    queryKey: ['personnel', 'performance', 'metrics', params],
+    queryKey: ['personnel', 'performance', 'metrics', params, branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/performance/metrics', { params });
       return response.data;
@@ -336,8 +345,9 @@ export const usePerformanceMetrics = (params?: { startDate?: string; endDate?: s
 };
 
 export const usePerformanceTrends = (params?: { userId?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PerformanceTrend[]>({
-    queryKey: ['personnel', 'performance', 'trends', params],
+    queryKey: ['personnel', 'performance', 'trends', params, branchId],
     queryFn: async () => {
       const response = await api.get('/personnel/performance/trends', { params });
       return response.data;

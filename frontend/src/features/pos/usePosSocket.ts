@@ -6,6 +6,7 @@ import i18n from '../../i18n/config';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 
 export const usePosSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -71,12 +72,17 @@ export const usePosSocket = () => {
       }
 
       // Pure Socket.IO Push: Directly inject order into React Query cache
-      // No API calls, instant UI updates
+      // No API calls, instant UI updates.
+      // branchId is read fresh at event time (the socket is re-roomed to the
+      // active branch on switch) and appended to every order cache key so the
+      // optimistic write lands in the same branch-scoped entry the POS/KDS
+      // read hooks register (queryKey convention: branchId is last).
+      const branchId = useBranchScopeStore.getState().branchId;
 
       // 1. Add to pending approval cache if requiresApproval
       if (event.requiresApproval) {
-        const pendingOrders = queryClient.getQueryData<any[]>(['orders', 'pending']) || [];
-        queryClient.setQueryData(['orders', 'pending'], [event, ...pendingOrders]);
+        const pendingOrders = queryClient.getQueryData<any[]>(['orders', 'pending', branchId]) || [];
+        queryClient.setQueryData(['orders', 'pending', branchId], [event, ...pendingOrders]);
         console.log('[POS Socket] Added order to pending approval cache');
       }
 
@@ -84,7 +90,7 @@ export const usePosSocket = () => {
       if (event.tableId) {
         // Match POS page query key format with status filter
         const activeStatuses = 'PENDING,PREPARING,READY,SERVED';
-        const tableQueryKey = ['orders', { tableId: event.tableId, status: activeStatuses }];
+        const tableQueryKey = ['orders', { tableId: event.tableId, status: activeStatuses }, branchId];
         const tableOrders = queryClient.getQueryData<any[]>(tableQueryKey) || [];
 
         // Only add if not PENDING_APPROVAL (those stay in separate panel)
@@ -113,22 +119,25 @@ export const usePosSocket = () => {
     const handleOrderUpdated = (event: any) => {
       console.log('[POS Socket] Order updated:', event);
 
-      // Pure Socket.IO Push: Update order in all relevant caches
+      // Pure Socket.IO Push: Update order in all relevant caches.
+      // branchId (read fresh) is appended to every order cache key so writes
+      // hit the same branch-scoped entries the read hooks register.
+      const branchId = useBranchScopeStore.getState().branchId;
 
       // 1. If order was approved (transitioned from PENDING_APPROVAL to PENDING)
       // Remove from pending approval cache and add to table cache
       if (event.status !== 'PENDING_APPROVAL') {
         // Remove from pending approval cache
-        const pendingOrders = queryClient.getQueryData<any[]>(['orders', 'pending']) || [];
+        const pendingOrders = queryClient.getQueryData<any[]>(['orders', 'pending', branchId]) || [];
         const updatedPending = pendingOrders.filter(order => order.id !== event.id);
-        queryClient.setQueryData(['orders', 'pending'], updatedPending);
+        queryClient.setQueryData(['orders', 'pending', branchId], updatedPending);
         console.log('[POS Socket] Removed order from pending approval cache');
 
         // Add/update in table-specific cache
         if (event.tableId) {
           // Match POS page query key format with status filter
           const activeStatuses = 'PENDING,PREPARING,READY,SERVED';
-          const tableQueryKey = ['orders', { tableId: event.tableId, status: activeStatuses }];
+          const tableQueryKey = ['orders', { tableId: event.tableId, status: activeStatuses }, branchId];
           const tableOrders = queryClient.getQueryData<any[]>(tableQueryKey) || [];
 
           const existingIndex = tableOrders.findIndex(order => order.id === event.id);
@@ -146,12 +155,12 @@ export const usePosSocket = () => {
         }
       } else {
         // Still pending approval, just update in pending cache
-        const pendingOrders = queryClient.getQueryData<any[]>(['orders', 'pending']) || [];
+        const pendingOrders = queryClient.getQueryData<any[]>(['orders', 'pending', branchId]) || [];
         const existingIndex = pendingOrders.findIndex(order => order.id === event.id);
         if (existingIndex >= 0) {
           const updated = [...pendingOrders];
           updated[existingIndex] = event;
-          queryClient.setQueryData(['orders', 'pending'], updated);
+          queryClient.setQueryData(['orders', 'pending', branchId], updated);
           console.log('[POS Socket] Updated order in pending approval cache');
         }
       }
@@ -279,15 +288,16 @@ export const usePosSocket = () => {
       console.log('[POS Socket] Table orders transferred:', event);
 
       const { sourceTableId, targetTableId, orders } = event;
+      const branchId = useBranchScopeStore.getState().branchId;
 
       // Remove orders from source table cache
       const sourceActiveStatuses = 'PENDING,PREPARING,READY,SERVED';
-      const sourceQueryKey = ['orders', { tableId: sourceTableId, status: sourceActiveStatuses }];
+      const sourceQueryKey = ['orders', { tableId: sourceTableId, status: sourceActiveStatuses }, branchId];
       queryClient.setQueryData(sourceQueryKey, []);
       console.log('[POS Socket] Cleared source table cache:', sourceTableId);
 
       // Add orders to target table cache
-      const targetQueryKey = ['orders', { tableId: targetTableId, status: sourceActiveStatuses }];
+      const targetQueryKey = ['orders', { tableId: targetTableId, status: sourceActiveStatuses }, branchId];
       const existingTargetOrders = queryClient.getQueryData<any[]>(targetQueryKey) || [];
       queryClient.setQueryData(targetQueryKey, [...orders, ...existingTargetOrders]);
       console.log('[POS Socket] Updated target table cache with', orders.length, 'orders');
