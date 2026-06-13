@@ -120,6 +120,7 @@
   "users": "Foydalanuvchilar",
   "subscription": "Obuna",
   "desktopApp": "Desktop ilova",
+  "webhooks": "Veb-huklar",
   "desktopAppMenuDesc": "Desktop ilovani yuklab olish va boshqarish",
   "desktopAppDesc": "Yaxshiroq ishlash va oflayn qo'llab-quvvatlash uchun HummyTummy KDS desktop ilovasini yuklab oling",
   "selectPlatform": "Platformangizni tanlang",

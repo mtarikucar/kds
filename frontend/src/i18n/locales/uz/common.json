@@ -65,8 +65,19 @@
     "store": "Jihozlar do'koni",
     "bridges": "Mahalliy ko'priklar",
     "webhooks": "Veb-huklar",
+    "desktopApp": "Desktop ilova",
     "fiscalRecovery": "Chek tiklash",
     "callerFeed": "Qo'ng'iroqlar",
+    "hardwareOrders": "Jihoz buyurtmalarim",
+    "planAndAccess": "Tarif va kirish",
+    "sections": {
+      "business": "Operatsiyalar",
+      "menuAndTables": "Menyu va stollar",
+      "operation": "Back-ofis",
+      "multiBranch": "Ko'p filial",
+      "marketplace": "Bozor",
+      "planAndAccess": "Sozlamalar va kirish"
+    },
     "expandSidebar": "Yon panelni kengaytirish",
     "collapseSidebar": "Yon panelni yig'ish"
   },
@@ -153,6 +164,140 @@
       "status": "Holat",
       "created": "Yaratilgan",
       "add": "Filial qo'shish"
+    },
+    "webhooks": {
+      "title": "Veb-huklar",
+      "subtitle": "HTTPS endpoint'ingizni HummyTummy hodisalariga obuna qiling. Yetkazib berishlar vaqt belgisi bilan HMAC-SHA256 orqali imzolanadi. Ketma-ket 20 marta muvaffaqiyatsizlikdan so'ng avtomatik to'xtatiladi.",
+      "newSubscription": "Yangi obuna",
+      "urlPlaceholder": "https://serveringiz.example.com/hummytummy-webhook",
+      "events": "Hodisalar",
+      "create": "Obuna yaratish",
+      "yours": "Obunalaringiz",
+      "noSubscriptions": "Obunalar yo'q.",
+      "col": { "url": "URL", "events": "Hodisalar", "status": "Holat", "lastDelivery": "Oxirgi yetkazish" },
+      "revoke": "Bekor qilish",
+      "createdBanner": "Obuna yaratildi.",
+      "secretWarning": "Quyida imzolash maxfiy kaliti. Hozir nusxalang — uni qayta ko'rsata olmaymiz.",
+      "copiedIt": "Nusxaladim",
+      "failures": "xato"
+    },
+    "bridges": {
+      "title": "Mahalliy ko'priklar",
+      "newBridge": "Yangi ko'prik",
+      "provision": "Tayyorlash",
+      "branch": "Filial",
+      "selectBranch": "— tanlang —",
+      "sku": "SKU",
+      "hostname": "Hostname (ixtiyoriy)",
+      "createdBanner": "Ko'prik tayyorlandi.",
+      "tokenWarning": "Token (bir martalik) — hozir nusxalang va qurilmada sozlang:",
+      "list": "Ko'priklar",
+      "noBridges": "Hali tayyorlangan ko'prik yo'q.",
+      "col": { "branch": "Filial", "sku": "SKU", "hostname": "Hostname", "status": "Holat", "lastSeen": "Oxirgi ulanish" },
+      "confirmRetire": "Bu ko'prik ishdan chiqarilsinmi?",
+      "retire": "Ishdan chiqarish"
+    },
+    "fiscalRecovery": {
+      "title": "Chek tiklash",
+      "subtitle": "Navbatdagi + muvaffaqiyatsiz cheklar. Qayta urinish asl idempotency kalitidan foydalanadi, shuning uchun qurilma ikki marta chek chiqara olmaydi.",
+      "refresh": "Yangilash",
+      "empty": "Kutilayotgan yoki muvaffaqiyatsiz chek yo'q. 🎉",
+      "col": {
+        "created": "Yaratilgan",
+        "provider": "Provayder",
+        "order": "Buyurtma",
+        "status": "Holat",
+        "total": "Jami",
+        "lastError": "Oxirgi xato"
+      },
+      "retry": "Qayta urinish"
+    },
+    "callerFeed": {
+      "title": "Telefon qo'ng'iroqlari",
+      "subtitle": "Kiruvchi caller-ID hodisalari. Har 10 soniyada yangilanadi.",
+      "empty": "Hali qo'ng'iroq hodisasi yo'q. Caller-ID qurilmasini ulang yoki bozordan VoIP integratsiyasini yoqing.",
+      "col": {
+        "time": "Vaqt",
+        "provider": "Provayder",
+        "kind": "Tur",
+        "phone": "Telefon",
+        "customer": "Mijoz",
+        "duration": "Davomiyligi",
+        "order": "Buyurtma"
+      },
+      "view": "Ko'rish",
+      "unmatched": "moslanmagan",
+      "open": "Ochish"
+    },
+    "setupChecklist": {
+      "title": "Restoraningizni sozlang",
+      "items": {
+        "branch": "Kamida bitta filial yarating",
+        "kds": "Oshxona displeyini ulang",
+        "tablet": "Kamida bitta ofitsiant planshetini ulang",
+        "bridge": "Mahalliy ko'prikni (HummyBox) onlayn qiling",
+        "fiscal": "Fiskal provayderni ulang"
+      },
+      "goTo": "{{label}} sahifasiga o'tish →"
+    },
+    "reportsBranchFilter": {
+      "label": "Filial",
+      "all": "Barcha filiallar"
+    },
+    "superAdminMarketplace": {
+      "title": "Bozor boshqaruvi",
+      "tabs": { "addons": "Qo'shimchalar", "products": "Jihozlar" },
+      "addons": {
+        "title": "Qo'shimchalar katalogi",
+        "new": "Yangi qo'shimcha",
+        "edit": "Tahrirlash",
+        "publish": "Nashr qilish",
+        "archive": "Arxivlash",
+        "confirmArchive": "\"{{code}}\" qo'shimchasi arxivlansinmi?",
+        "form": {
+          "newTitle": "Yangi qo'shimcha",
+          "editTitle": "Qo'shimchani tahrirlash",
+          "code": "Kod",
+          "name": "Nomi",
+          "kind": "Tur",
+          "billing": "Hisob-kitob",
+          "priceCents": "Narx (tiyin)",
+          "currency": "Valyuta",
+          "status": "Holat",
+          "deps": "Bog'liqliklar (vergul bilan; plan:PRO yoki qo'shimcha kodi)",
+          "description": "Tavsif",
+          "grants": "Ruxsatlar (JSON)",
+          "cancel": "Bekor qilish",
+          "create": "Yaratish",
+          "save": "Saqlash",
+          "grantsInvalid": "ruxsatlar yaroqli JSON bo'lishi kerak"
+        }
+      },
+      "products": {
+        "title": "Jihozlar katalogi",
+        "new": "Yangi SKU",
+        "receiveStock": "Zaxira qabul qilish",
+        "receiveStockPrompt": "Necha dona qabul qilinsin?",
+        "publish": "Nashr qilish",
+        "archive": "Arxivlash",
+        "confirmArchive": "\"{{sku}}\" SKU arxivlansinmi?",
+        "form": {
+          "title": "Yangi jihoz SKU",
+          "sku": "SKU",
+          "name": "Nomi",
+          "category": "Kategoriya",
+          "brand": "Brend",
+          "model": "Model",
+          "priceCents": "Narx (tiyin)",
+          "rental": "Oylik ijara (tiyin, ixtiyoriy)",
+          "currency": "Valyuta",
+          "warranty": "Kafolat (oy)",
+          "status": "Holat",
+          "description": "Tavsif",
+          "cancel": "Bekor qilish",
+          "create": "Yaratish"
+        }
+      }
     }
   },
   "header": {

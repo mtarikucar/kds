@@ -98,3 +98,6 @@ jobs:
 
       - name: Check mirrored constants
         run: node scripts/check-contract-drift.mjs
+
+      - name: Check i18n locale parity
+        run: node scripts/check-i18n-parity.mjs
