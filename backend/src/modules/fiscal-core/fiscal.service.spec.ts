@@ -120,9 +120,15 @@ describe('FiscalService.issueReceipt', () => {
 
 /**
  * Track 1 branch-scope hardening. fiscal_receipts now carry a branchId so a
- * multi-branch tenant's receipts isolate per branch. The reads (listPending /
- * cancel / retry) go through the canonical `branchScope(scope)` helper, and
- * issueReceipt persists the branch the receipt was issued at.
+ * multi-branch tenant's receipts isolate per branch. issueReceipt persists the
+ * branch the receipt was issued at.
+ *
+ * Recovery reads (listPending / cancel / retry) use an orphan-inclusive scope:
+ * the active branch OR branchId IS NULL. A receipt issued by a device with no
+ * branch (fiscal_devices.branchId NULL → receipt branchId NULL) would
+ * otherwise be invisible to every per-branch recovery panel and stuck forever.
+ * branchId is a globally-unique FK, so including NULL never exposes another
+ * branch's owned receipts — only the unowned orphans.
  */
 describe('FiscalService branch-scope', () => {
   let prisma: MockPrismaClient;
@@ -139,12 +145,16 @@ describe('FiscalService branch-scope', () => {
     svc = new FiscalService(prisma as any, registry as any, outbox as any);
   });
 
-  it('listPending scopes by branchId', async () => {
+  it('listPending scopes to the branch and includes branchless orphan receipts', async () => {
     (prisma.fiscalReceipt.findMany as any).mockResolvedValue([]);
     await svc.listPending(scope);
     const where = (prisma.fiscalReceipt.findMany as any).mock.calls[0][0].where;
-    expect(where.branchId).toBe('b-1');
     expect(where.tenantId).toBe('t-1');
+    expect(where.branchId).toBeUndefined(); // moved into the OR
+    expect(where.OR).toEqual(
+      expect.arrayContaining([{ branchId: 'b-1' }, { branchId: null }]),
+    );
+    expect(where.status).toEqual({ in: ['queued', 'failed'] });
   });
 
   it('issueReceipt persists branchId from the request', async () => {
@@ -214,9 +224,12 @@ describe('FiscalService branch-scope', () => {
 
     await svc.cancelReceipt(scope, 'fr-1', 'duplicate');
     const where = (prisma.fiscalReceipt.findFirst as any).mock.calls[0][0].where;
-    expect(where.branchId).toBe('b-1');
-    expect(where.tenantId).toBe('t-1');
     expect(where.id).toBe('fr-1');
+    expect(where.tenantId).toBe('t-1');
+    expect(where.branchId).toBeUndefined(); // moved into the OR
+    expect(where.OR).toEqual(
+      expect.arrayContaining([{ branchId: 'b-1' }, { branchId: null }]),
+    );
   });
 
   it('retryFailed looks up the row by branch scope', async () => {
@@ -235,9 +248,12 @@ describe('FiscalService branch-scope', () => {
 
     await svc.retryFailed(scope, 'fr-1');
     const where = (prisma.fiscalReceipt.findFirst as any).mock.calls[0][0].where;
-    expect(where.branchId).toBe('b-1');
-    expect(where.tenantId).toBe('t-1');
     expect(where.id).toBe('fr-1');
+    expect(where.tenantId).toBe('t-1');
+    expect(where.branchId).toBeUndefined(); // moved into the OR
+    expect(where.OR).toEqual(
+      expect.arrayContaining([{ branchId: 'b-1' }, { branchId: null }]),
+    );
   });
 
   it('closeDay scopes the device lookup by branchId + tenantId', async () => {
