@@ -21,6 +21,10 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   '/subscriptions/',
   '/invoices/',
   '/superadmin/',
+  // POS settings are one row per tenant (class-level @SkipBranchScope on the
+  // backend), so they must fly without a branch — a wildcard-owner ADMIN with
+  // an unresolved branchId was otherwise fail-fast'd out of the POS settings.
+  '/pos-settings',
 ];
 
 /**
