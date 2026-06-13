@@ -2092,6 +2092,10 @@ model PageView {
   createdAt DateTime @default(now())
 
   @@index([page, createdAt])
+  // Standalone createdAt index: the live-stats aggregates filter on
+  // createdAt alone (views today/week/month), which the [page, createdAt]
+  // composite can't serve (its leading column is `page`).
+  @@index([createdAt])
   @@index([country])
   @@index([city])
   @@index([sessionId])
