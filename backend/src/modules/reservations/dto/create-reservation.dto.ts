@@ -90,6 +90,16 @@ export class CreateReservationDto {
   @IsString()
   @MaxLength(64)
   tableId?: string;
+
+  // Explicit branch selector for multi-branch tenants. Must be declared here
+  // or the global whitelisting ValidationPipe strips it before it reaches
+  // createPublicReservation → resolvePublicBranchId (which already honors it).
+  // Omitted → oldest-active branch (unchanged single-branch behavior).
+  @ApiPropertyOptional({ description: "Branch ID (multi-branch tenants)" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  branchId?: string;
 }
 
 export class CancelPublicReservationDto {

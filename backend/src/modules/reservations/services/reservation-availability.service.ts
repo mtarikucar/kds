@@ -90,6 +90,24 @@ export class ReservationAvailabilityService {
     return defaultBranch.id;
   }
 
+  /**
+   * Public list of a tenant's bookable branches for the reservation branch
+   * picker. Active-only (a suspended branch can't take bookings) and
+   * oldest-first so the first entry matches the default resolvePublicBranchId
+   * falls back to. Projection is intentionally minimal (id + name) — this is
+   * an anonymous, unauthenticated surface, so it must never leak operational
+   * branch fields (address internals, status flags, settings, etc.).
+   */
+  async listPublicBranches(
+    tenantId: string,
+  ): Promise<{ id: string; name: string }[]> {
+    return this.prisma.branch.findMany({
+      where: { tenantId, status: "active" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true },
+    });
+  }
+
   async getAvailableSlots(
     tenantId: string,
     date: string,
