@@ -272,14 +272,14 @@ export class CameraService {
    * Update camera calibration data
    */
   async updateCalibration(
-    tenantId: string,
+    scope: BranchScope,
     cameraId: string,
     calibrationData: Record<string, unknown>,
   ): Promise<CameraResponseDto> {
     const camera = await this.prisma.camera.findFirst({
       where: {
         id: cameraId,
-        tenantId,
+        ...branchScope(scope),
       },
     });
 
@@ -287,9 +287,11 @@ export class CameraService {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
 
-    // Defence-in-depth: tenantId in the WHERE.
+    // Defence-in-depth: full branch scope in the WHERE (matches the
+    // read/update/delete siblings — a branch-A admin must not calibrate
+    // a branch-B camera by guessing its UUID).
     const claim = await this.prisma.camera.updateMany({
-      where: { id: cameraId, tenantId },
+      where: { id: cameraId, ...branchScope(scope) },
       data: {
         calibrationData: calibrationData as Prisma.InputJsonValue,
         status: CameraStatus.CALIBRATING,
@@ -300,9 +302,9 @@ export class CameraService {
     }
     // v2.8.94 — defense-in-depth: compound WHERE matches the upstream
     // claim. If the claim regresses, the re-fetch must not silently
-    // expose a cross-tenant row.
+    // expose a cross-branch row.
     const updated = await this.prisma.camera.findFirstOrThrow({
-      where: { id: cameraId, tenantId },
+      where: { id: cameraId, ...branchScope(scope) },
     });
 
     this.logger.log(`Updated calibration for camera ${cameraId}`);

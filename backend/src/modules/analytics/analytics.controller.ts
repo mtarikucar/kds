@@ -611,15 +611,11 @@ export class AnalyticsController {
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Calibration updated" })
   async updateCameraCalibration(
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() calibrationData: Record<string, unknown>,
   ) {
-    return this.cameraService.updateCalibration(
-      req.tenantId,
-      id,
-      calibrationData,
-    );
+    return this.cameraService.updateCalibration(scope, id, calibrationData);
   }
 
   // ==================== MOCK DATA ENDPOINTS (DEV ONLY) ====================
