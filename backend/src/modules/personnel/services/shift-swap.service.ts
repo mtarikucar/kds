@@ -9,6 +9,10 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { KdsGateway } from "../../kds/kds.gateway";
 import { CreateSwapRequestDto } from "../dto/create-swap-request.dto";
 import { SwapRequestStatus } from "../constants/personnel.enum";
+import {
+  BranchScope,
+  branchScope,
+} from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class ShiftSwapService {
@@ -18,10 +22,11 @@ export class ShiftSwapService {
   ) {}
 
   async createRequest(
-    tenantId: string,
+    scope: BranchScope,
     requesterId: string,
     dto: CreateSwapRequestDto,
   ) {
+    const { tenantId } = scope;
     if (requesterId === dto.targetId) {
       throw new BadRequestException("Cannot swap shifts with yourself");
     }
@@ -40,9 +45,14 @@ export class ShiftSwapService {
       throw new BadRequestException("Target user not found");
     }
 
-    // Validate requester assignment belongs to requester
+    // Validate requester assignment belongs to requester, in the acting
+    // branch — a swap can only be created from assignments in scope.
     const requesterAssignment = await this.prisma.shiftAssignment.findFirst({
-      where: { id: dto.requesterAssignmentId, userId: requesterId, tenantId },
+      where: {
+        id: dto.requesterAssignmentId,
+        userId: requesterId,
+        ...branchScope(scope),
+      },
     });
     if (!requesterAssignment) {
       throw new NotFoundException("Requester shift assignment not found");
@@ -53,9 +63,13 @@ export class ShiftSwapService {
       );
     }
 
-    // Validate target assignment belongs to target
+    // Validate target assignment belongs to target, in the acting branch.
     const targetAssignment = await this.prisma.shiftAssignment.findFirst({
-      where: { id: dto.targetAssignmentId, userId: dto.targetId, tenantId },
+      where: {
+        id: dto.targetAssignmentId,
+        userId: dto.targetId,
+        ...branchScope(scope),
+      },
     });
     if (!targetAssignment) {
       throw new NotFoundException("Target shift assignment not found");
@@ -90,7 +104,11 @@ export class ShiftSwapService {
       },
     });
 
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
+    this.kdsGateway.emitSwapRequestUpdate(
+      scope.tenantId,
+      result.branchId,
+      result,
+    );
     return result;
   }
 
@@ -101,12 +119,12 @@ export class ShiftSwapService {
    */
   async respondAsTarget(
     id: string,
-    tenantId: string,
+    scope: BranchScope,
     userId: string,
     accept: boolean,
   ) {
     const request = await this.prisma.shiftSwapRequest.findFirst({
-      where: { id, tenantId, status: SwapRequestStatus.PENDING },
+      where: { id, ...branchScope(scope), status: SwapRequestStatus.PENDING },
     });
     if (!request) {
       throw new NotFoundException(
@@ -126,7 +144,7 @@ export class ShiftSwapService {
     // PENDING wins. A second concurrent respond returns count=0 and we
     // surface the same "already processed" message as the fast-path find.
     const claim = await this.prisma.shiftSwapRequest.updateMany({
-      where: { id, tenantId, status: SwapRequestStatus.PENDING },
+      where: { id, ...branchScope(scope), status: SwapRequestStatus.PENDING },
       data: {
         status,
         targetApproved: accept,
@@ -140,19 +158,28 @@ export class ShiftSwapService {
     }
 
     const updated = await this.prisma.shiftSwapRequest.findFirstOrThrow({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         requester: { select: { id: true, firstName: true, lastName: true } },
         target: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, updated.branchId, updated);
+    this.kdsGateway.emitSwapRequestUpdate(
+      scope.tenantId,
+      updated.branchId,
+      updated,
+    );
     return updated;
   }
 
-  async approve(id: string, tenantId: string, approvedById: string) {
+  async approve(id: string, scope: BranchScope, approvedById: string) {
+    const { tenantId } = scope;
     const request = await this.prisma.shiftSwapRequest.findFirst({
-      where: { id, tenantId, status: SwapRequestStatus.TARGET_ACCEPTED },
+      where: {
+        id,
+        ...branchScope(scope),
+        status: SwapRequestStatus.TARGET_ACCEPTED,
+      },
       include: {
         requesterAssignment: true,
         requester: { select: { id: true, firstName: true, lastName: true } },
@@ -176,12 +203,16 @@ export class ShiftSwapService {
 
     const result = await this.prisma.$transaction(
       async (tx) => {
+        // Both assignments belong to the request's branch by construction
+        // (createRequest enforces a single-branch swap); scope the lookups
+        // accordingly so a regressed/forged request id can't reach across
+        // branches.
         const [targetAssignment, reqAssignment] = await Promise.all([
           tx.shiftAssignment.findFirst({
-            where: { id: request.targetAssignmentId, tenantId },
+            where: { id: request.targetAssignmentId, ...branchScope(scope) },
           }),
           tx.shiftAssignment.findFirst({
-            where: { id: request.requesterAssignmentId, tenantId },
+            where: { id: request.requesterAssignmentId, ...branchScope(scope) },
           }),
         ]);
 
@@ -288,15 +319,19 @@ export class ShiftSwapService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
+    this.kdsGateway.emitSwapRequestUpdate(
+      scope.tenantId,
+      result.branchId,
+      result,
+    );
     return result;
   }
 
-  async reject(id: string, tenantId: string, approvedById: string) {
+  async reject(id: string, scope: BranchScope, approvedById: string) {
     const request = await this.prisma.shiftSwapRequest.findFirst({
       where: {
         id,
-        tenantId,
+        ...branchScope(scope),
         status: {
           in: [SwapRequestStatus.PENDING, SwapRequestStatus.TARGET_ACCEPTED],
         },
@@ -310,11 +345,11 @@ export class ShiftSwapService {
     }
 
     // Compound WHERE: a concurrent approve/reject from another manager
-    // must not be silently overwritten. Plus tenantId IDOR guard.
+    // must not be silently overwritten. Plus branch-scope IDOR guard.
     const claim = await this.prisma.shiftSwapRequest.updateMany({
       where: {
         id,
-        tenantId,
+        ...branchScope(scope),
         status: {
           in: [SwapRequestStatus.PENDING, SwapRequestStatus.TARGET_ACCEPTED],
         },
@@ -330,20 +365,24 @@ export class ShiftSwapService {
       );
     }
     const result = await this.prisma.shiftSwapRequest.findFirstOrThrow({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         requester: { select: { id: true, firstName: true, lastName: true } },
         target: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
+    this.kdsGateway.emitSwapRequestUpdate(
+      scope.tenantId,
+      result.branchId,
+      result,
+    );
     return result;
   }
 
-  async findAll(tenantId: string) {
+  async findAll(scope: BranchScope) {
     return this.prisma.shiftSwapRequest.findMany({
-      where: { tenantId },
+      where: { ...branchScope(scope) },
       include: {
         requester: { select: { id: true, firstName: true, lastName: true } },
         target: { select: { id: true, firstName: true, lastName: true } },

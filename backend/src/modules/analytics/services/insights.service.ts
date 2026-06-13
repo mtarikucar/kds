@@ -25,6 +25,7 @@ export class InsightsService {
    */
   async getInsights(
     tenantId: string,
+    branchId: string,
     filters: InsightFilterDto = {},
   ): Promise<InsightListResponseDto> {
     const {
@@ -38,6 +39,7 @@ export class InsightsService {
 
     const where = {
       tenantId,
+      branchId,
       ...(type && { type }),
       ...(category && { category }),
       ...(severity && { severity }),
@@ -69,12 +71,14 @@ export class InsightsService {
    */
   async getInsightById(
     tenantId: string,
+    branchId: string,
     insightId: string,
   ): Promise<InsightResponseDto> {
     const insight = await this.prisma.analyticsInsight.findFirst({
       where: {
         id: insightId,
         tenantId,
+        branchId,
       },
     });
 
@@ -90,6 +94,7 @@ export class InsightsService {
    */
   async updateInsightStatus(
     tenantId: string,
+    branchId: string,
     insightId: string,
     userId: string,
     dto: UpdateInsightStatusDto,
@@ -98,6 +103,7 @@ export class InsightsService {
       where: {
         id: insightId,
         tenantId,
+        branchId,
       },
     });
 
@@ -123,7 +129,7 @@ export class InsightsService {
     // not be tenant-blind — a regression of the pre-check would expose
     // cross-tenant writes.
     const claim = await this.prisma.analyticsInsight.updateMany({
-      where: { id: insightId, tenantId },
+      where: { id: insightId, tenantId, branchId },
       data: updateData,
     });
     if (claim.count === 0) {
@@ -140,7 +146,10 @@ export class InsightsService {
   /**
    * Get insight summary counts by status
    */
-  async getInsightSummary(tenantId: string): Promise<{
+  async getInsightSummary(
+    tenantId: string,
+    branchId: string,
+  ): Promise<{
     total: number;
     byStatus: Record<string, number>;
     bySeverity: Record<string, number>;
@@ -148,6 +157,7 @@ export class InsightsService {
   }> {
     const where = {
       tenantId,
+      branchId,
       validFrom: { lte: new Date() },
       OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
     };
@@ -186,10 +196,14 @@ export class InsightsService {
   /**
    * Get actionable insights (NEW or IN_PROGRESS)
    */
-  async getActionableInsights(tenantId: string): Promise<InsightResponseDto[]> {
+  async getActionableInsights(
+    tenantId: string,
+    branchId: string,
+  ): Promise<InsightResponseDto[]> {
     const insights = await this.prisma.analyticsInsight.findMany({
       where: {
         tenantId,
+        branchId,
         status: { in: [InsightStatus.NEW, InsightStatus.IN_PROGRESS] },
         validFrom: { lte: new Date() },
         OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
@@ -206,12 +220,14 @@ export class InsightsService {
    */
   async getInsightsForTables(
     tenantId: string,
+    branchId: string,
     tableIds: string[],
   ): Promise<InsightResponseDto[]> {
     // Note: Prisma doesn't support array contains directly, so we fetch and filter
     const insights = await this.prisma.analyticsInsight.findMany({
       where: {
         tenantId,
+        branchId,
         status: { not: InsightStatus.DISMISSED },
         validFrom: { lte: new Date() },
         OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
@@ -263,6 +279,7 @@ export class InsightsService {
       by: ["tableId"],
       where: {
         tenantId,
+        branchId,
         date: {
           gte: oneWeekAgo,
           lte: now,
@@ -275,7 +292,7 @@ export class InsightsService {
     });
 
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { tenantId, branchId },
       select: { id: true, number: true },
     });
     const tableMap = new Map(tables.map((t) => [t.id, t]));
@@ -297,6 +314,7 @@ export class InsightsService {
         const existingInsight = await this.prisma.analyticsInsight.findFirst({
           where: {
             tenantId,
+            branchId,
             type: InsightType.TABLE_UNDERUTILIZATION,
             affectedTableIds: { has: analytics.tableId },
             status: { not: InsightStatus.DISMISSED },
@@ -344,6 +362,7 @@ export class InsightsService {
     const trafficData = await this.prisma.trafficFlowRecord.findMany({
       where: {
         tenantId,
+        branchId,
         hourBucket: {
           gte: oneWeekAgo,
           lte: now,
@@ -389,6 +408,7 @@ export class InsightsService {
         const existingInsight = await this.prisma.analyticsInsight.findFirst({
           where: {
             tenantId,
+            branchId,
             type: InsightType.TRAFFIC_BOTTLENECK,
             status: { not: InsightStatus.DISMISSED },
             validUntil: { gte: now },

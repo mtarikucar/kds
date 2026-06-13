@@ -12,6 +12,8 @@ describe('CashDrawerService', () => {
   let prisma: MockPrismaClient;
   let svc: CashDrawerService;
 
+  const scope = { tenantId: 't-1', branchId: 'b-1', userId: 'u-1', role: UserRole.MANAGER } as any;
+
   beforeEach(() => {
     prisma = mockPrismaClient();
     svc = new CashDrawerService(prisma as any);
@@ -47,22 +49,22 @@ describe('CashDrawerService', () => {
 
   it('approve refuses non-manager roles with 403', async () => {
     await expect(
-      svc.approve('t-1', 'm-1', { id: 'u-1', role: UserRole.WAITER as any }),
+      svc.approve(scope, 'm-1', { id: 'u-1', role: UserRole.WAITER as any }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
-      svc.reject('t-1', 'm-1', { id: 'u-1', role: UserRole.WAITER as any }, { reason: 'no good' }),
+      svc.reject(scope, 'm-1', { id: 'u-1', role: UserRole.WAITER as any }, { reason: 'no good' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.cashDrawerMovement.updateMany).not.toHaveBeenCalled();
   });
 
-  it('approve flips DRAFT → APPROVED via compound WHERE (tenantId + status=DRAFT)', async () => {
+  it('approve flips DRAFT → APPROVED via compound WHERE (tenantId + branchId + status=DRAFT)', async () => {
     (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
     (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
       id: 'm-1', approvalStatus: 'APPROVED',
     });
-    await svc.approve('t-1', 'm-1', { id: 'mgr-1', role: UserRole.MANAGER });
+    await svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER });
     const args = (prisma.cashDrawerMovement.updateMany as any).mock.calls[0][0];
-    expect(args.where).toEqual({ id: 'm-1', tenantId: 't-1', approvalStatus: 'DRAFT' });
+    expect(args.where).toEqual({ id: 'm-1', tenantId: 't-1', branchId: 'b-1', approvalStatus: 'DRAFT' });
     expect(args.data.approvalStatus).toBe('APPROVED');
     expect(args.data.approvedById).toBe('mgr-1');
   });
@@ -70,7 +72,7 @@ describe('CashDrawerService', () => {
   it('approve surfaces 400 when claim races (count=0)', async () => {
     (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 0 });
     await expect(
-      svc.approve('t-1', 'm-1', { id: 'mgr-1', role: UserRole.ADMIN }),
+      svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.ADMIN }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -80,7 +82,7 @@ describe('CashDrawerService', () => {
       id: 'm-1', approvalStatus: 'REJECTED',
     });
     await svc.reject(
-      't-1',
+      scope,
       'm-1',
       { id: 'mgr-1', role: UserRole.MANAGER },
       { reason: 'till count did not match' },
@@ -88,5 +90,22 @@ describe('CashDrawerService', () => {
     const args = (prisma.cashDrawerMovement.updateMany as any).mock.calls[0][0];
     expect(args.data.approvalStatus).toBe('REJECTED');
     expect(args.data.rejectionReason).toBe('till count did not match');
+  });
+
+  it('listPending scopes by branchId (no cross-branch leak)', async () => {
+    (prisma.cashDrawerMovement.findMany as any).mockResolvedValue([]);
+    await svc.listPending(scope);
+    const where = (prisma.cashDrawerMovement.findMany as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+  });
+
+  it('approve gates the compound WHERE on branchId', async () => {
+    (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({ id: 'm-1' });
+    await svc.approve(scope, 'm-1', { id: 'u-1', role: UserRole.MANAGER as any });
+    const where = (prisma.cashDrawerMovement.updateMany as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
   });
 });

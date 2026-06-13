@@ -4575,6 +4575,9 @@ model FiscalReceipt {
   orderId        String?
   fiscalDeviceId String
   fiscalDevice   FiscalDeviceRecord  @relation(fields: [fiscalDeviceId], references: [id], onDelete: Restrict)
+  // The physical branch the receipt was issued at. Nullable for additive
+  // migration; backfilled from the issuing device (fiscal_devices.branchId).
+  branchId       String?
   providerId     String
   // The fiscal_no / Z-no the device emits — populated after the device acks.
   fiscalNo       String?
@@ -4597,6 +4600,7 @@ model FiscalReceipt {
   @@unique([tenantId, idempotencyKey])
   @@index([orderId])
   @@index([fiscalDeviceId, issuedAt])
+  @@index([tenantId, branchId, status])
   @@map("fiscal_receipts")
 }
 

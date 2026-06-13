@@ -16,6 +16,8 @@ import { RequiresFeature } from "../../subscriptions/decorators/requires-feature
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 import { AttendanceService } from "../services/attendance.service";
 import { ClockInDto } from "../dto/clock-in.dto";
 import {
@@ -92,28 +94,34 @@ export class AttendanceController {
     UserRole.COURIER,
   )
   @ApiOperation({ summary: "Get current user today status" })
-  getMyStatus(@Request() req) {
-    return this.attendanceService.getMyStatus(req.tenantId, req.user.id);
+  getMyStatus(@CurrentScope() scope: BranchScope) {
+    return this.attendanceService.getMyStatus(scope);
   }
 
   @Get("today")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get all staff today attendance" })
-  getTodayAttendance(@Request() req) {
-    return this.attendanceService.getTodayAttendance(req.tenantId);
+  getTodayAttendance(@CurrentScope() scope: BranchScope) {
+    return this.attendanceService.getTodayAttendance(scope);
   }
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get attendance history" })
-  getHistory(@Request() req, @Query() query: AttendanceQueryDto) {
-    return this.attendanceService.getAttendanceHistory(req.tenantId, query);
+  getHistory(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: AttendanceQueryDto,
+  ) {
+    return this.attendanceService.getAttendanceHistory(scope, query);
   }
 
   @Get("summary")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get attendance summary" })
-  getSummary(@Request() req, @Query() query: AttendanceSummaryQueryDto) {
-    return this.attendanceService.getAttendanceSummary(req.tenantId, query);
+  getSummary(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: AttendanceSummaryQueryDto,
+  ) {
+    return this.attendanceService.getAttendanceSummary(scope, query);
   }
 }

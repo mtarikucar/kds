@@ -200,16 +200,26 @@ export class AnalyticsController {
   })
   @ApiQuery({ name: "granularity", required: false, enum: HeatmapGranularity })
   @ApiResponse({ status: 200, description: "Dwell time heatmap data" })
-  async getDwellTimeHeatmap(@Request() req, @Query() query: HeatmapQueryDto) {
+  async getDwellTimeHeatmap(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: HeatmapQueryDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
       now,
     );
-    return this.heatmapService.getDwellTimeHeatmap(req.tenantId, start, end, {
-      granularity: query.granularity,
-    });
+    return this.heatmapService.getDwellTimeHeatmap(
+      req.tenantId,
+      scope.branchId,
+      start,
+      end,
+      {
+        granularity: query.granularity,
+      },
+    );
   }
 
   @Get("traffic/flow")
@@ -234,6 +244,7 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: "Traffic flow paths" })
   async getTrafficFlow(
     @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Query() query: DateRangeDto,
     @Query("limit") limit?: string,
   ) {
@@ -251,6 +262,7 @@ export class AnalyticsController {
       Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 50;
     return this.heatmapService.getTrafficFlowPaths(
       req.tenantId,
+      scope.branchId,
       start,
       end,
       limitNum,
@@ -272,14 +284,23 @@ export class AnalyticsController {
     description: "End date (ISO format)",
   })
   @ApiResponse({ status: 200, description: "Congestion analysis" })
-  async getCongestionAnalysis(@Request() req, @Query() query: DateRangeDto) {
+  async getCongestionAnalysis(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: DateRangeDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
       new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
       now,
     );
-    return this.heatmapService.getCongestionAnalysis(req.tenantId, start, end);
+    return this.heatmapService.getCongestionAnalysis(
+      req.tenantId,
+      scope.branchId,
+      start,
+      end,
+    );
   }
 
   // ==================== TABLE ANALYTICS ENDPOINTS ====================
@@ -299,7 +320,11 @@ export class AnalyticsController {
     description: "End date (ISO format)",
   })
   @ApiResponse({ status: 200, description: "Table utilization data" })
-  async getTableUtilization(@Request() req, @Query() query: DateRangeDto) {
+  async getTableUtilization(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: DateRangeDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
@@ -308,6 +333,7 @@ export class AnalyticsController {
     );
     return this.tableAnalyticsService.getTableUtilization(
       req.tenantId,
+      scope.branchId,
       start,
       end,
     );
@@ -328,7 +354,11 @@ export class AnalyticsController {
     description: "End date (ISO format)",
   })
   @ApiResponse({ status: 200, description: "Utilization trends" })
-  async getUtilizationTrends(@Request() req, @Query() query: DateRangeDto) {
+  async getUtilizationTrends(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: DateRangeDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
@@ -337,6 +367,7 @@ export class AnalyticsController {
     );
     return this.tableAnalyticsService.getUtilizationTrends(
       req.tenantId,
+      scope.branchId,
       start,
       end,
     );
@@ -354,6 +385,7 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: "Underutilized tables" })
   async getUnderutilizedTables(
     @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Query("threshold") threshold?: string,
   ) {
     // Threshold is a utilization-percentage cutoff (0-100). Clamp so a
@@ -366,6 +398,7 @@ export class AnalyticsController {
       : 50;
     return this.tableAnalyticsService.getUnderutilizedTables(
       req.tenantId,
+      scope.branchId,
       thresholdNum,
     );
   }
@@ -385,7 +418,11 @@ export class AnalyticsController {
     description: "End date (ISO format)",
   })
   @ApiResponse({ status: 200, description: "Customer behavior data" })
-  async getCustomerBehavior(@Request() req, @Query() query: DateRangeDto) {
+  async getCustomerBehavior(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: DateRangeDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
@@ -394,6 +431,7 @@ export class AnalyticsController {
     );
     return this.tableAnalyticsService.getCustomerBehavior(
       req.tenantId,
+      scope.branchId,
       start,
       end,
     );
@@ -406,8 +444,16 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get AI-generated insights" })
   @ApiResponse({ status: 200, description: "List of insights" })
-  async getInsights(@Request() req, @Query() filters: InsightFilterDto) {
-    return this.insightsService.getInsights(req.tenantId, filters);
+  async getInsights(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() filters: InsightFilterDto,
+  ) {
+    return this.insightsService.getInsights(
+      req.tenantId,
+      scope.branchId,
+      filters,
+    );
   }
 
   @Get("insights/summary")
@@ -415,8 +461,11 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get insights summary" })
   @ApiResponse({ status: 200, description: "Insights summary counts" })
-  async getInsightsSummary(@Request() req) {
-    return this.insightsService.getInsightSummary(req.tenantId);
+  async getInsightsSummary(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.insightsService.getInsightSummary(req.tenantId, scope.branchId);
   }
 
   @Get("insights/actionable")
@@ -424,8 +473,14 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get actionable insights" })
   @ApiResponse({ status: 200, description: "Actionable insights" })
-  async getActionableInsights(@Request() req) {
-    return this.insightsService.getActionableInsights(req.tenantId);
+  async getActionableInsights(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.insightsService.getActionableInsights(
+      req.tenantId,
+      scope.branchId,
+    );
   }
 
   @Get("insights/:id")
@@ -434,8 +489,12 @@ export class AnalyticsController {
   @ApiOperation({ summary: "Get insight by ID" })
   @ApiParam({ name: "id", description: "Insight ID" })
   @ApiResponse({ status: 200, description: "Insight details" })
-  async getInsightById(@Request() req, @Param("id") id: string) {
-    return this.insightsService.getInsightById(req.tenantId, id);
+  async getInsightById(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.insightsService.getInsightById(req.tenantId, scope.branchId, id);
   }
 
   @Put("insights/:id/status")
@@ -446,11 +505,13 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: "Updated insight" })
   async updateInsightStatus(
     @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() dto: UpdateInsightStatusDto,
   ) {
     return this.insightsService.updateInsightStatus(
       req.tenantId,
+      scope.branchId,
       id,
       req.user.id,
       dto,
@@ -477,8 +538,8 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get all cameras" })
   @ApiResponse({ status: 200, description: "List of cameras" })
-  async getCameras(@Request() req) {
-    return this.cameraService.getCameras(req.tenantId);
+  async getCameras(@CurrentScope() scope: BranchScope) {
+    return this.cameraService.getCameras(scope);
   }
 
   @Get("cameras/health")
@@ -486,8 +547,8 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get camera health summary" })
   @ApiResponse({ status: 200, description: "Camera health summary" })
-  async getCameraHealth(@Request() req) {
-    return this.cameraService.getCameraHealthSummary(req.tenantId);
+  async getCameraHealth(@CurrentScope() scope: BranchScope) {
+    return this.cameraService.getCameraHealthSummary(scope);
   }
 
   @Get("cameras/:id")
@@ -496,8 +557,11 @@ export class AnalyticsController {
   @ApiOperation({ summary: "Get camera by ID" })
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Camera details" })
-  async getCameraById(@Request() req, @Param("id") id: string) {
-    return this.cameraService.getCameraById(req.tenantId, id);
+  async getCameraById(
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.cameraService.getCameraById(scope, id);
   }
 
   @Post("cameras")
@@ -505,8 +569,11 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Create a new camera" })
   @ApiResponse({ status: 201, description: "Camera created" })
-  async createCamera(@Request() req, @Body() dto: CreateCameraDto) {
-    return this.cameraService.createCamera(req.tenantId, dto);
+  async createCamera(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreateCameraDto,
+  ) {
+    return this.cameraService.createCamera(scope, dto);
   }
 
   @Put("cameras/:id")
@@ -516,11 +583,11 @@ export class AnalyticsController {
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Camera updated" })
   async updateCamera(
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() dto: UpdateCameraDto,
   ) {
-    return this.cameraService.updateCamera(req.tenantId, id, dto);
+    return this.cameraService.updateCamera(scope, id, dto);
   }
 
   @Delete("cameras/:id")
@@ -529,8 +596,11 @@ export class AnalyticsController {
   @ApiOperation({ summary: "Delete camera" })
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Camera deleted" })
-  async deleteCamera(@Request() req, @Param("id") id: string) {
-    await this.cameraService.deleteCamera(req.tenantId, id);
+  async deleteCamera(
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    await this.cameraService.deleteCamera(scope, id);
     return { success: true };
   }
 

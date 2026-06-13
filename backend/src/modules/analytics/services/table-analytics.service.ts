@@ -21,12 +21,13 @@ export class TableAnalyticsService {
    */
   async getTableUtilization(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<TableAnalyticsResponseDto> {
     // Get all tables
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { tenantId, branchId },
       select: {
         id: true,
         number: true,
@@ -40,6 +41,7 @@ export class TableAnalyticsService {
       by: ["tableId"],
       where: {
         tenantId,
+        branchId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -65,6 +67,7 @@ export class TableAnalyticsService {
     const revenueData = await this.prisma.tableAnalytics.findMany({
       where: {
         tenantId,
+        branchId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -168,6 +171,7 @@ export class TableAnalyticsService {
    */
   async getUtilizationTrends(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<TableAnalyticsTrendResponseDto> {
@@ -175,6 +179,7 @@ export class TableAnalyticsService {
       by: ["date"],
       where: {
         tenantId,
+        branchId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -195,6 +200,7 @@ export class TableAnalyticsService {
     const revenueData = await this.prisma.tableAnalytics.findMany({
       where: {
         tenantId,
+        branchId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -233,6 +239,7 @@ export class TableAnalyticsService {
 
     const tableComparisons = await this.calculateTableComparisons(
       tenantId,
+      branchId,
       startDate,
       endDate,
       previousStart,
@@ -252,6 +259,7 @@ export class TableAnalyticsService {
    */
   async getCustomerBehavior(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<CustomerBehaviorDto> {
@@ -259,6 +267,7 @@ export class TableAnalyticsService {
     const sessionData = await this.prisma.tableAnalytics.aggregate({
       where: {
         tenantId,
+        branchId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -282,6 +291,7 @@ export class TableAnalyticsService {
     const peakHoursData = await this.prisma.tableAnalytics.findMany({
       where: {
         tenantId,
+        branchId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -328,6 +338,7 @@ export class TableAnalyticsService {
       by: ["tableId"],
       where: {
         tenantId,
+        branchId,
         timestamp: {
           gte: startDate,
           lte: endDate,
@@ -339,7 +350,7 @@ export class TableAnalyticsService {
     });
 
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { tenantId, branchId },
       select: { id: true, capacity: true },
     });
 
@@ -376,6 +387,7 @@ export class TableAnalyticsService {
    */
   async getUnderutilizedTables(
     tenantId: string,
+    branchId: string,
     threshold: number = 50,
   ): Promise<TableUtilizationDto[]> {
     const endDate = new Date();
@@ -383,6 +395,7 @@ export class TableAnalyticsService {
 
     const analytics = await this.getTableUtilization(
       tenantId,
+      branchId,
       startDate,
       endDate,
     );
@@ -463,6 +476,7 @@ export class TableAnalyticsService {
 
   private async calculateTableComparisons(
     tenantId: string,
+    branchId: string,
     currentStart: Date,
     currentEnd: Date,
     previousStart: Date,
@@ -473,6 +487,7 @@ export class TableAnalyticsService {
       by: ["tableId"],
       where: {
         tenantId,
+        branchId,
         date: {
           gte: currentStart,
           lte: currentEnd,
@@ -487,6 +502,7 @@ export class TableAnalyticsService {
     const currentRevenue = await this.prisma.tableAnalytics.findMany({
       where: {
         tenantId,
+        branchId,
         date: {
           gte: currentStart,
           lte: currentEnd,
@@ -511,6 +527,7 @@ export class TableAnalyticsService {
       by: ["tableId"],
       where: {
         tenantId,
+        branchId,
         date: {
           gte: previousStart,
           lte: previousEnd,
@@ -525,6 +542,7 @@ export class TableAnalyticsService {
     const previousRevenue = await this.prisma.tableAnalytics.findMany({
       where: {
         tenantId,
+        branchId,
         date: {
           gte: previousStart,
           lte: previousEnd,
@@ -550,7 +568,7 @@ export class TableAnalyticsService {
 
     // Get table info
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { tenantId, branchId },
       select: { id: true, number: true },
     });
     const tableMap = new Map(tables.map((t) => [t.id, t.number]));

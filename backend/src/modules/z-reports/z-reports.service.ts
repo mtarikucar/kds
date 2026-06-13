@@ -14,6 +14,8 @@ import {
   getTenantMidnight,
 } from "../../common/helpers/timezone.helper";
 import { CreateZReportDto } from "./dto/create-z-report.dto";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { UserRole } from "../../common/constants/roles.enum";
 import { paginated } from "../../common/pagination";
 import PDFDocument from "pdfkit";
 import { format } from "date-fns";
@@ -85,6 +87,7 @@ export class ZReportsService {
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        branchId,
         paidAt: {
           gte: startOfDay,
           lt: endOfDay,
@@ -179,6 +182,7 @@ export class ZReportsService {
     const cancelledOrdersList = await this.prisma.order.findMany({
       where: {
         tenantId,
+        branchId,
         status: "CANCELLED",
         OR: [
           { cancelledAt: { gte: startOfDay, lt: endOfDay } },
@@ -274,6 +278,7 @@ export class ZReportsService {
     const cashMovements = await this.prisma.cashDrawerMovement.findMany({
       where: {
         tenantId,
+        branchId,
         approvalStatus: "APPROVED",
         createdAt: {
           gte: startOfDay,
@@ -351,6 +356,7 @@ export class ZReportsService {
     const openOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        branchId,
         createdAt: { gte: startOfDay, lt: endOfDay },
         status: { notIn: ["PAID", "CANCELLED"] },
       },
@@ -471,10 +477,16 @@ export class ZReportsService {
   }
 
   /**
-   * Get all Z-Reports for a tenant
+   * Get all Z-Reports for the active branch.
+   *
+   * Track-1: Z-Reports are fiscal, per-branch records (the row carries a
+   * NOT-NULL branchId). The list must be scoped to the caller's active
+   * branch — a tenant-wide list would leak every branch's fiscal totals
+   * to an admin who only switched to one branch. Callers pass the
+   * branchId off `@CurrentScope()`.
    */
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     query: {
       page?: number;
       limit?: number;
@@ -486,7 +498,7 @@ export class ZReportsService {
     const limit = query.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: any = { tenantId };
+    const where: any = { ...branchScope(scope) };
 
     if (query.startDate || query.endDate) {
       where.reportDate = {};
@@ -512,11 +524,16 @@ export class ZReportsService {
   }
 
   /**
-   * Get a specific Z-Report
+   * Get a specific Z-Report, scoped to the caller's active branch.
+   *
+   * Track-1: branch-scoped so an admin on branch A cannot fetch branch
+   * B's fiscal report by id. The PDF/email/close paths all funnel
+   * through here, so scoping it once covers every read of a single
+   * report.
    */
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, scope: BranchScope) {
     const report = await this.prisma.zReport.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
 
     if (!report) {
@@ -529,11 +546,11 @@ export class ZReportsService {
   /**
    * Generate PDF for Z-Report
    */
-  async generatePdf(id: string, tenantId: string): Promise<Buffer> {
-    const report = await this.findOne(id, tenantId);
+  async generatePdf(id: string, scope: BranchScope): Promise<Buffer> {
+    const report = await this.findOne(id, scope);
 
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { id: scope.tenantId },
     });
 
     return new Promise((resolve, reject) => {
@@ -643,8 +660,8 @@ export class ZReportsService {
    * updateMany on isFinalized=false ensures two concurrent close clicks
    * can't both win.
    */
-  async closeReport(id: string, tenantId: string, userId?: string) {
-    const report = await this.findOne(id, tenantId);
+  async closeReport(id: string, scope: BranchScope, userId?: string) {
+    const report = await this.findOne(id, scope);
     if ((report as any).isFinalized) {
       throw new BadRequestException("Report is already finalized");
     }
@@ -657,7 +674,7 @@ export class ZReportsService {
     const payloadHash = this.computePayloadHash(report);
 
     const result = await this.prisma.zReport.updateMany({
-      where: { id, tenantId, isFinalized: false },
+      where: { id, ...branchScope(scope), isFinalized: false },
       data: {
         isFinalized: true,
         finalizedAt: new Date(),
@@ -670,7 +687,7 @@ export class ZReportsService {
     if (result.count !== 1) {
       throw new ConflictException("Report was concurrently finalized");
     }
-    return this.findOne(id, tenantId);
+    return this.findOne(id, scope);
   }
 
   /**
@@ -724,13 +741,13 @@ export class ZReportsService {
    */
   async sendReportEmail(
     id: string,
-    tenantId: string,
+    scope: BranchScope,
     toEmails?: string[],
   ): Promise<{ success: boolean; message: string }> {
-    const report = await this.findOne(id, tenantId);
+    const report = await this.findOne(id, scope);
 
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { id: scope.tenantId },
     });
 
     if (!tenant) {
@@ -840,7 +857,7 @@ export class ZReportsService {
       // (B41-B45 pattern). `closeReport` already uses updateMany with
       // tenant scoping; this email-status write must match.
       await this.prisma.zReport.updateMany({
-        where: { id, tenantId },
+        where: { id, ...branchScope(scope) },
         data: {
           emailSent: success,
           emailSentAt: success ? new Date() : null,
@@ -867,8 +884,8 @@ export class ZReportsService {
       this.logger.error(`Failed to send Z-Report email: ${error.message}`);
 
       // Update report with error
-      await this.prisma.zReport.update({
-        where: { id },
+      await this.prisma.zReport.updateMany({
+        where: { id, ...branchScope(scope) },
         data: {
           emailError: error.message,
         },
@@ -936,7 +953,17 @@ export class ZReportsService {
     let emailSent = false;
 
     if (tenant?.reportEmailEnabled && tenant.reportEmails?.length > 0) {
-      const result = await this.sendReportEmail(report.id, tenantId);
+      // Scheduler path: rebuild the branch scope from the resolved
+      // (tenantId, branchId) so the email-status write stays pinned to
+      // the same branch the report belongs to. role/userId are the
+      // acting system context; only tenantId/branchId are load-bearing.
+      const scope: BranchScope = {
+        tenantId,
+        branchId,
+        userId,
+        role: UserRole.ADMIN,
+      };
+      const result = await this.sendReportEmail(report.id, scope);
       emailSent = result.success;
     }
 

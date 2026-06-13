@@ -136,16 +136,16 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
     });
 
     it('falls back to a 7-day default for table utilization', async () => {
-      await ctrl.getTableUtilization(req, {} as any);
-      const [, start, end] = tableAnalyticsService.getTableUtilization.mock.calls[0];
+      await ctrl.getTableUtilization(req, scope, {} as any);
+      const [, , start, end] = tableAnalyticsService.getTableUtilization.mock.calls[0];
       const windowMs = end.getTime() - start.getTime();
       expect(windowMs).toBeGreaterThan(6.9 * 24 * 60 * 60 * 1000);
       expect(windowMs).toBeLessThan(7.1 * 24 * 60 * 60 * 1000);
     });
 
     it('falls back to a 30-day default for utilization trends', async () => {
-      await ctrl.getUtilizationTrends(req, {} as any);
-      const [, start, end] = tableAnalyticsService.getUtilizationTrends.mock.calls[0];
+      await ctrl.getUtilizationTrends(req, scope, {} as any);
+      const [, , start, end] = tableAnalyticsService.getUtilizationTrends.mock.calls[0];
       const windowMs = end.getTime() - start.getTime();
       expect(windowMs).toBeGreaterThan(29.9 * 24 * 60 * 60 * 1000);
       expect(windowMs).toBeLessThan(30.1 * 24 * 60 * 60 * 1000);
@@ -166,40 +166,40 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
 
   describe('Limit clamp on getTrafficFlow', () => {
     it('clamps a hostile limit value to 500', async () => {
-      await ctrl.getTrafficFlow(req, {} as any, '999999');
-      const [, , , limitNum] = heatmapService.getTrafficFlowPaths.mock.calls[0];
+      await ctrl.getTrafficFlow(req, scope, {} as any, '999999');
+      const [, , , , limitNum] = heatmapService.getTrafficFlowPaths.mock.calls[0];
       expect(limitNum).toBe(500);
     });
 
     it('falls back to 50 on a non-numeric limit', async () => {
-      await ctrl.getTrafficFlow(req, {} as any, 'not-a-number');
-      const [, , , limitNum] = heatmapService.getTrafficFlowPaths.mock.calls[0];
+      await ctrl.getTrafficFlow(req, scope, {} as any, 'not-a-number');
+      const [, , , , limitNum] = heatmapService.getTrafficFlowPaths.mock.calls[0];
       expect(limitNum).toBe(50);
     });
 
     it('falls back to 50 on a zero or negative limit', async () => {
-      await ctrl.getTrafficFlow(req, {} as any, '0');
-      const [, , , limitNum] = heatmapService.getTrafficFlowPaths.mock.calls[0];
+      await ctrl.getTrafficFlow(req, scope, {} as any, '0');
+      const [, , , , limitNum] = heatmapService.getTrafficFlowPaths.mock.calls[0];
       expect(limitNum).toBe(50);
     });
   });
 
   describe('Threshold clamp on getUnderutilizedTables', () => {
     it('clamps an over-range threshold to 100', async () => {
-      await ctrl.getUnderutilizedTables(req, '500');
-      const [, threshold] = tableAnalyticsService.getUnderutilizedTables.mock.calls[0];
+      await ctrl.getUnderutilizedTables(req, scope, '500');
+      const [, , threshold] = tableAnalyticsService.getUnderutilizedTables.mock.calls[0];
       expect(threshold).toBe(100);
     });
 
     it('clamps a negative threshold to 0', async () => {
-      await ctrl.getUnderutilizedTables(req, '-30');
-      const [, threshold] = tableAnalyticsService.getUnderutilizedTables.mock.calls[0];
+      await ctrl.getUnderutilizedTables(req, scope, '-30');
+      const [, , threshold] = tableAnalyticsService.getUnderutilizedTables.mock.calls[0];
       expect(threshold).toBe(0);
     });
 
     it('falls back to 50 on a non-numeric threshold (no NaN propagation)', async () => {
-      await ctrl.getUnderutilizedTables(req, 'banana');
-      const [, threshold] = tableAnalyticsService.getUnderutilizedTables.mock.calls[0];
+      await ctrl.getUnderutilizedTables(req, scope, 'banana');
+      const [, , threshold] = tableAnalyticsService.getUnderutilizedTables.mock.calls[0];
       expect(threshold).toBe(50);
     });
   });

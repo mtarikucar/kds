@@ -49,7 +49,9 @@ export class EntitlementGuard implements CanActivate {
     const tenantId: string | undefined = req.user?.tenantId;
     if (!tenantId) throw new ForbiddenException("Authentication required");
 
-    const branchId: string | null = req.user?.branchId ?? null;
+    // BranchGuard resolves the active branch onto req.scope; req.user carries
+    // only primary/active/allowed branch ids, never a single `branchId`.
+    const branchId: string | null = req.scope?.branchId ?? null;
     const set = await this.entitlements.getForTenant(tenantId, branchId);
 
     for (const r of reqs) {

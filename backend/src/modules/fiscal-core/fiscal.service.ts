@@ -10,6 +10,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { FiscalProviderRegistry } from "./fiscal-provider.registry";
 import { FiscalReceiptRequest } from "./fiscal-provider.interface";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 
 /**
  * Domain service for fiscal receipts. Persists every receipt request to
@@ -76,6 +77,10 @@ export class FiscalService {
       data: {
         id: uuidv7(),
         tenantId: req.tenantId,
+        // Branch the receipt was issued at. Prefer the explicit request
+        // branch (POS terminal that produced it); fall back to the
+        // device's home branch for legacy/automated callers.
+        branchId: req.branchId ?? device.branchId ?? null,
         orderId: req.orderId,
         fiscalDeviceId: req.fiscalDeviceId,
         providerId: device.providerId,
@@ -152,12 +157,12 @@ export class FiscalService {
   }
 
   async cancelReceipt(
-    tenantId: string,
+    scope: BranchScope,
     fiscalReceiptId: string,
     reason: string,
   ) {
     const row = await this.prisma.fiscalReceipt.findFirst({
-      where: { id: fiscalReceiptId, tenantId },
+      where: { id: fiscalReceiptId, ...branchScope(scope) },
     });
     if (!row) throw new NotFoundException("Receipt not found");
     if (row.status !== "issued")
@@ -170,9 +175,12 @@ export class FiscalService {
     });
   }
 
-  async closeDay(tenantId: string, fiscalDeviceId: string) {
+  async closeDay(scope: BranchScope, fiscalDeviceId: string) {
+    // closeDay runs a Z report for ONE device, and a device lives in one
+    // branch. Scope the lookup so a branch-A operator can't close the day
+    // on a branch-B device by guessing its id (cross-branch IDOR).
     const device = await this.prisma.fiscalDeviceRecord.findFirst({
-      where: { id: fiscalDeviceId, tenantId },
+      where: { id: fiscalDeviceId, ...branchScope(scope) },
     });
     if (!device) throw new NotFoundException("Fiscal device not found");
     // Mirror issueReceipt's retired-device gate. A retired yazarkasa
@@ -188,7 +196,7 @@ export class FiscalService {
     await this.prisma.fiscalDayClose.create({
       data: {
         id: uuidv7(),
-        tenantId,
+        tenantId: scope.tenantId,
         fiscalDeviceId,
         zNo: report.zNo,
         openedAt: new Date(report.openedAt),
@@ -199,7 +207,7 @@ export class FiscalService {
     await this.outbox
       .append({
         type: "fiscal.day.closed.v1",
-        tenantId,
+        tenantId: scope.tenantId,
         payload: { fiscalDeviceId, zNo: report.zNo },
       })
       .catch(() => undefined);
@@ -207,9 +215,9 @@ export class FiscalService {
   }
 
   /** List receipts in queued/failed state — for the manual recovery panel. */
-  async listPending(tenantId: string, limit = 100) {
+  async listPending(scope: BranchScope, limit = 100) {
     return this.prisma.fiscalReceipt.findMany({
-      where: { tenantId, status: { in: ["queued", "failed"] } },
+      where: { ...branchScope(scope), status: { in: ["queued", "failed"] } },
       include: { lines: true },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -231,9 +239,9 @@ export class FiscalService {
   // yazarkasa drivers do not handle parallel writes gracefully).
   private static readonly RETRY_COOLDOWN_MS = 30_000;
 
-  async retryFailed(tenantId: string, fiscalReceiptId: string) {
+  async retryFailed(scope: BranchScope, fiscalReceiptId: string) {
     const row = await this.prisma.fiscalReceipt.findFirst({
-      where: { id: fiscalReceiptId, tenantId },
+      where: { id: fiscalReceiptId, ...branchScope(scope) },
       include: { lines: true, fiscalDevice: true },
     });
     if (!row) throw new NotFoundException("Receipt not found");
@@ -256,7 +264,8 @@ export class FiscalService {
     const provider = this.registry.get(row.providerId);
     try {
       const result = await provider.issueReceipt({
-        tenantId,
+        tenantId: scope.tenantId,
+        branchId: row.branchId ?? undefined,
         fiscalDeviceId: row.fiscalDeviceId,
         orderId: row.orderId ?? undefined,
         idempotencyKey: row.idempotencyKey, // SAME key — provider dedupes
@@ -294,7 +303,7 @@ export class FiscalService {
             result.status === "issued"
               ? "fiscal.receipt.printed.v1"
               : "fiscal.receipt.failed.v1",
-          tenantId,
+          tenantId: scope.tenantId,
           payload: {
             fiscalReceiptId: updated.id,
             fiscalDeviceId: row.fiscalDeviceId,

@@ -6,7 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  Request,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
@@ -36,35 +35,34 @@ export class ShiftTemplatesController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Create shift template" })
   create(
-    @Request() req,
     @CurrentScope() scope: BranchScope,
     @Body() dto: CreateShiftTemplateDto,
   ) {
-    return this.shiftTemplatesService.create(req.tenantId, scope.branchId, dto);
+    return this.shiftTemplatesService.create(scope, dto);
   }
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "List all shift templates" })
-  findAll(@Request() req) {
-    return this.shiftTemplatesService.findAll(req.tenantId);
+  findAll(@CurrentScope() scope: BranchScope) {
+    return this.shiftTemplatesService.findAll(scope);
   }
 
   @Patch(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Update shift template" })
   update(
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() dto: UpdateShiftTemplateDto,
   ) {
-    return this.shiftTemplatesService.update(id, req.tenantId, dto);
+    return this.shiftTemplatesService.update(scope, id, dto);
   }
 
   @Delete(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Delete shift template" })
-  remove(@Request() req, @Param("id") id: string) {
-    return this.shiftTemplatesService.remove(id, req.tenantId);
+  remove(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.shiftTemplatesService.remove(scope, id);
   }
 }
