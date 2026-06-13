@@ -116,3 +116,126 @@ describe('FiscalService.issueReceipt', () => {
     );
   });
 });
+
+/**
+ * Track 1 branch-scope hardening. fiscal_receipts now carry a branchId so a
+ * multi-branch tenant's receipts isolate per branch. The reads (listPending /
+ * cancel / retry) go through the canonical `branchScope(scope)` helper, and
+ * issueReceipt persists the branch the receipt was issued at.
+ */
+describe('FiscalService branch-scope', () => {
+  let prisma: MockPrismaClient;
+  let registry: jest.Mocked<FiscalProviderRegistry>;
+  let outbox: { append: jest.Mock };
+  let svc: FiscalService;
+
+  const scope = { tenantId: 't-1', branchId: 'b-1', userId: 'u-1', role: 'ADMIN' } as any;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue('outbox') };
+    registry = { get: jest.fn() } as any;
+    svc = new FiscalService(prisma as any, registry as any, outbox as any);
+  });
+
+  it('listPending scopes by branchId', async () => {
+    (prisma.fiscalReceipt.findMany as any).mockResolvedValue([]);
+    await svc.listPending(scope);
+    const where = (prisma.fiscalReceipt.findMany as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+  });
+
+  it('issueReceipt persists branchId from the request', async () => {
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
+      id: 'd-1', tenantId: 't-1', branchId: 'b-1', providerId: 'mock', status: 'online',
+    } as any);
+    prisma.fiscalReceipt.findUnique.mockResolvedValue(null);
+    (prisma.fiscalReceipt.create as any).mockImplementation(async ({ data }: any) => ({
+      id: 'fr-new', ...data,
+    }));
+    (prisma.fiscalReceipt.update as any).mockImplementation(async ({ data }: any) => ({
+      id: 'fr-new', tenantId: 't-1', status: data.status, ...data,
+    }));
+    const adapter = {
+      issueReceipt: jest.fn().mockResolvedValue({ providerId: 'mock', receiptId: 'fr-new', status: 'issued', fiscalNo: '00000001' }),
+    };
+    registry.get.mockReturnValue(adapter as any);
+
+    await svc.issueReceipt({
+      tenantId: 't-1',
+      branchId: 'b-1',
+      fiscalDeviceId: 'd-1',
+      lines: [{ productCode: 'X', name: 'X', qty: 1, unitPriceCents: 1200, vatRate: 20 }],
+      payments: [{ method: 'cash', amountCents: 1200 }],
+      idempotencyKey: 'k-branch',
+    } as any);
+
+    const data = (prisma.fiscalReceipt.create as any).mock.calls[0][0].data;
+    expect(data.branchId).toBe('b-1');
+  });
+
+  it('issueReceipt falls back to the device branch when the request omits one', async () => {
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
+      id: 'd-1', tenantId: 't-1', branchId: 'b-dev', providerId: 'mock', status: 'online',
+    } as any);
+    prisma.fiscalReceipt.findUnique.mockResolvedValue(null);
+    (prisma.fiscalReceipt.create as any).mockImplementation(async ({ data }: any) => ({
+      id: 'fr-new', ...data,
+    }));
+    (prisma.fiscalReceipt.update as any).mockImplementation(async ({ data }: any) => ({
+      id: 'fr-new', tenantId: 't-1', status: data.status, ...data,
+    }));
+    const adapter = {
+      issueReceipt: jest.fn().mockResolvedValue({ providerId: 'mock', receiptId: 'fr-new', status: 'issued', fiscalNo: '00000002' }),
+    };
+    registry.get.mockReturnValue(adapter as any);
+
+    await svc.issueReceipt({
+      tenantId: 't-1',
+      fiscalDeviceId: 'd-1',
+      lines: [{ productCode: 'X', name: 'X', qty: 1, unitPriceCents: 1200, vatRate: 20 }],
+      payments: [{ method: 'cash', amountCents: 1200 }],
+      idempotencyKey: 'k-nobranch',
+    } as any);
+
+    const data = (prisma.fiscalReceipt.create as any).mock.calls[0][0].data;
+    expect(data.branchId).toBe('b-dev');
+  });
+
+  it('cancelReceipt looks up the row by branch scope', async () => {
+    prisma.fiscalReceipt.findFirst.mockResolvedValue({
+      id: 'fr-1', tenantId: 't-1', branchId: 'b-1', providerId: 'mock', status: 'issued',
+    } as any);
+    (prisma.fiscalReceipt.update as any).mockResolvedValue({ id: 'fr-1', status: 'cancelled' });
+    const adapter = { cancelReceipt: jest.fn().mockResolvedValue(undefined) };
+    registry.get.mockReturnValue(adapter as any);
+
+    await svc.cancelReceipt(scope, 'fr-1', 'duplicate');
+    const where = (prisma.fiscalReceipt.findFirst as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+    expect(where.id).toBe('fr-1');
+  });
+
+  it('retryFailed looks up the row by branch scope', async () => {
+    prisma.fiscalReceipt.findFirst.mockResolvedValue({
+      id: 'fr-1', tenantId: 't-1', branchId: 'b-1', providerId: 'mock', status: 'failed',
+      fiscalDeviceId: 'd-1', orderId: null, idempotencyKey: 'k', totalCents: 100,
+      lines: [], updatedAt: new Date(0),
+    } as any);
+    (prisma.fiscalReceipt.update as any).mockImplementation(async ({ data }: any) => ({
+      id: 'fr-1', tenantId: 't-1', ...data,
+    }));
+    const adapter = {
+      issueReceipt: jest.fn().mockResolvedValue({ providerId: 'mock', receiptId: 'fr-1', status: 'issued', fiscalNo: '00000003' }),
+    };
+    registry.get.mockReturnValue(adapter as any);
+
+    await svc.retryFailed(scope, 'fr-1');
+    const where = (prisma.fiscalReceipt.findFirst as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+    expect(where.id).toBe('fr-1');
+  });
+});
