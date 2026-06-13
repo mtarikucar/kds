@@ -16,9 +16,11 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   '/me',
   // Subscriptions, plan usage and invoices are tenant-level (one per tenant,
   // not per branch) — the backend marks both controllers @SkipBranchScope.
-  // Covers /subscriptions/{plans,current,effective-features,usage/snapshot,
-  // tenant/invoices,:id/*} and /invoices/:id/download.
-  '/subscriptions/',
+  // Bare '/subscriptions' (not '/subscriptions/') so the base create route
+  // POST /subscriptions flies too; the bare segment still matches every
+  // /subscriptions/{plans,current,effective-features,usage/snapshot,
+  // tenant/invoices,:id/*} sub-route. Covers /invoices/:id/download.
+  '/subscriptions',
   '/invoices/',
   '/superadmin/',
   // POS settings are one row per tenant (class-level @SkipBranchScope on the
