@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Per-device FIFO command queue with priority.
@@ -70,7 +71,12 @@ export class CommandQueueService {
           tenantId,
           payload: { commandId: row.id, deviceId, kind: row.kind },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "device-mesh",
+            op: "command-enqueue",
+          }),
+        );
       return row;
     } catch (e) {
       if (
@@ -197,7 +203,12 @@ export class CommandQueueService {
           error: input.error,
         },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "device-mesh",
+          op: "command-ack",
+        }),
+      );
 
     return updated;
   }

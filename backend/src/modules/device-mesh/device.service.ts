@@ -8,6 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Device registry + pairing + heartbeat + command queue.
@@ -143,7 +144,12 @@ export class DeviceService {
         tenantId,
         payload: { deviceId: row.id, kind: row.kind, branchId: row.branchId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "device-mesh",
+          op: "slot-created",
+        }),
+      );
 
     // Return the pair code in the slot-creation response — it's not a
     // secret per se, but it gates pairing for 10 minutes. UI shows it on
@@ -280,7 +286,12 @@ export class DeviceService {
         tenantId: row.tenantId,
         payload: { deviceId: row.id, kind: row.kind, branchId: row.branchId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "device-mesh",
+          op: "device-paired",
+        }),
+      );
 
     return {
       deviceId: updated.id,
