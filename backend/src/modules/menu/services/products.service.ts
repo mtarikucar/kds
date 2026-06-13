@@ -254,39 +254,45 @@ export class ProductsService {
     // the WHERE includes `currentStock >= -quantity` so the second
     // racer's update misses the row and we surface InsufficientStock.
     // sister StockService.createMovement uses the same shape (line 60).
-    const claim = await this.prisma.product.updateMany({
-      where: {
-        id,
-        tenantId,
-        ...(quantity < 0 ? { currentStock: { gte: -quantity } } : {}),
-      },
-      data: { currentStock: { increment: quantity } },
-    });
-    if (claim.count === 0) {
-      // Disambiguate "not found" from "insufficient": a fresh read
-      // tells us which 4xx to throw.
-      const fresh = await this.prisma.product.findFirst({
-        where: { id, tenantId },
-        select: { id: true },
+    // The conditional decrement, the post-write re-read, and the
+    // isAvailable sync run in ONE transaction. The decrement's updateMany
+    // row-locks the product until commit, so concurrent updateStock calls
+    // serialize — closing the read→compute→write race where a stale
+    // `isAvailable=false` (computed at currentStock=0) could land AFTER a
+    // concurrent increment back to >0, leaving in-stock product hidden.
+    // Mirrors the sister StockService.createMovement transaction.
+    await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.product.updateMany({
+        where: {
+          id,
+          tenantId,
+          ...(quantity < 0 ? { currentStock: { gte: -quantity } } : {}),
+        },
+        data: { currentStock: { increment: quantity } },
       });
-      if (!fresh)
-        throw new NotFoundException(`Product with ID ${id} not found`);
-      throw new BadRequestException("Insufficient stock");
-    }
-    // Sync isAvailable from the post-increment value. Two concurrent
-    // updateStock calls both run this follow-up; both converge to the
-    // same boolean (currentStock > 0), so the writer interleaving is
-    // idempotent — no need for a transaction here.
-    //
-    // v2.8.98 — `currentStock` is now Prisma.Decimal so the boolean
-    // check goes through `.gt(0)` instead of JS `>`.
-    const post = await this.prisma.product.findUniqueOrThrow({
-      where: { id },
-      select: { currentStock: true },
-    });
-    await this.prisma.product.updateMany({
-      where: { id, tenantId },
-      data: { isAvailable: new Prisma.Decimal(post.currentStock).gt(0) },
+      if (claim.count === 0) {
+        // Disambiguate "not found" from "insufficient": a fresh read
+        // tells us which 4xx to throw.
+        const fresh = await tx.product.findFirst({
+          where: { id, tenantId },
+          select: { id: true },
+        });
+        if (!fresh)
+          throw new NotFoundException(`Product with ID ${id} not found`);
+        throw new BadRequestException("Insufficient stock");
+      }
+      // Sync isAvailable from the post-increment value, re-read inside the
+      // same row-locked transaction so it always matches the committed
+      // currentStock. v2.8.98 — currentStock is Prisma.Decimal, so the
+      // boolean check routes through `.gt(0)`.
+      const post = await tx.product.findUniqueOrThrow({
+        where: { id },
+        select: { currentStock: true },
+      });
+      await tx.product.updateMany({
+        where: { id, tenantId },
+        data: { isAvailable: new Prisma.Decimal(post.currentStock).gt(0) },
+      });
     });
 
     return this.findOne(id, tenantId);
