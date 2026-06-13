@@ -14,6 +14,10 @@ import { OrderItemStatus } from "./dto/update-order-item-status.dto";
 import { KdsGateway } from "./kds.gateway";
 import { DeliveryStatusSyncService } from "../delivery-platforms/services/delivery-status-sync.service";
 import { StockDeductionService } from "../stock-management/services/stock-deduction.service";
+import {
+  BranchScope,
+  branchScope,
+} from "../../common/scoping/branch-scope";
 
 @Injectable()
 export class KdsService {
@@ -30,15 +34,19 @@ export class KdsService {
     private stockDeductionService?: StockDeductionService,
   ) {}
 
-  async getKitchenOrders(tenantId: string) {
+  async getKitchenOrders(scope: BranchScope) {
     // Get orders that are in kitchen workflow (PENDING, PREPARING, READY).
+    // A kitchen display belongs to ONE branch — scope the read by the
+    // compound (tenantId, branchId) predicate so a terminal on branch A
+    // never sees branch B's tickets.
+    //
     // Hard cap at 200 — a kitchen display showing more than that is
     // unusable anyway, and the limit prevents a runaway tenant whose
     // orders accumulated due to misuse (e.g. status never moved) from
     // pulling MB of nested product JSON on every reconnect.
     return this.prisma.order.findMany({
       where: {
-        tenantId,
+        ...branchScope(scope),
         status: {
           in: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.READY],
         },
@@ -76,12 +84,18 @@ export class KdsService {
     });
   }
 
-  async updateOrderStatus(id: string, status: OrderStatus, tenantId: string) {
-    // Verify order exists and belongs to tenant
+  async updateOrderStatus(
+    scope: BranchScope,
+    id: string,
+    status: OrderStatus,
+  ) {
+    // Verify order exists and belongs to this tenant AND branch — a
+    // kitchen display is pinned to one branch, so an id from another
+    // branch must read as not-found rather than be mutable.
     const order = await this.prisma.order.findFirst({
       where: {
         id,
-        tenantId,
+        ...branchScope(scope),
       },
     });
 
@@ -115,7 +129,7 @@ export class KdsService {
     // last write would win silently while only one of the preparingAt /
     // readyAt timestamps got set.
     const claim = await this.prisma.order.updateMany({
-      where: { id, tenantId, status: order.status },
+      where: { id, ...branchScope(scope), status: order.status },
       data: updateData,
     });
     if (claim.count === 0) {
@@ -140,12 +154,12 @@ export class KdsService {
       try {
         const result = await this.stockDeductionService.deductForOrder(
           id,
-          tenantId,
+          scope.tenantId,
           status,
         );
         if (result?.lowStockAlerts?.length) {
           this.kdsGateway.emitLowStockAlert(
-            tenantId,
+            scope.tenantId,
             order.branchId,
             result.lowStockAlerts,
           );
@@ -159,7 +173,12 @@ export class KdsService {
     }
 
     // Emit status change via WebSocket
-    this.kdsGateway.emitOrderStatusChange(tenantId, order.branchId, id, status);
+    this.kdsGateway.emitOrderStatusChange(
+      scope.tenantId,
+      order.branchId,
+      id,
+      status,
+    );
 
     // Sync status to delivery platform (if applicable)
     this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch((err) => {
@@ -172,18 +191,19 @@ export class KdsService {
   }
 
   async updateOrderItemStatus(
+    scope: BranchScope,
     itemId: string,
     status: OrderItemStatus,
-    tenantId: string,
   ) {
     // Iter-91: itemId comes from the URL path; the body no longer carries
     // a duplicate `orderItemId` field that could desync from the URL.
     //
-    // Scope the lookup by tenantId at the DB boundary rather than relying on
-    // a post-fetch check — prevents cross-tenant probing via timing differences
-    // and removes a TOCTOU window.
+    // Scope the lookup by the compound (tenantId, branchId) at the DB
+    // boundary — via the parent `order` relation — rather than relying on
+    // a post-fetch check. Prevents cross-branch/cross-tenant probing via
+    // timing differences and removes a TOCTOU window.
     const orderItem = await this.prisma.orderItem.findFirst({
-      where: { id: itemId, order: { tenantId } },
+      where: { id: itemId, order: { ...branchScope(scope) } },
       include: { order: true },
     });
 
@@ -191,15 +211,16 @@ export class KdsService {
       throw new NotFoundException(`Order item with ID ${itemId} not found`);
     }
 
-    // Compound WHERE on the original status + tenantId — mirrors the
+    // Compound WHERE on the original status + branch scope — mirrors the
     // TOCTOU guard `updateOrderStatus` / `cancelOrder` use. Without it,
     // two KDS terminals clicking the same item at once would both pass
     // the implicit findFirst check and both succeed; whichever wrote
-    // last wins silently. Defence-in-depth IDOR on tenantId too.
+    // last wins silently. Defence-in-depth IDOR on (tenantId, branchId)
+    // too.
     const claim = await this.prisma.orderItem.updateMany({
       where: {
         id: itemId,
-        order: { tenantId },
+        order: { ...branchScope(scope) },
         status: orderItem.status,
       },
       data: { status },
@@ -218,7 +239,7 @@ export class KdsService {
     });
 
     const allItems = await this.prisma.orderItem.findMany({
-      where: { orderId: orderItem.orderId, order: { tenantId } },
+      where: { orderId: orderItem.orderId, order: { ...branchScope(scope) } },
       select: { status: true },
     });
 
@@ -231,15 +252,15 @@ export class KdsService {
         orderItem.order.status !== OrderStatus.PENDING_APPROVAL
       ) {
         await this.updateOrderStatus(
+          scope,
           orderItem.orderId,
           OrderStatus.READY,
-          tenantId,
         );
       }
     }
 
     this.kdsGateway.emitOrderItemStatusChange(
-      tenantId,
+      scope.tenantId,
       updatedOrderItem.order.branchId,
       itemId,
       status,
@@ -248,12 +269,13 @@ export class KdsService {
     return updatedOrderItem;
   }
 
-  async cancelOrder(id: string, tenantId: string) {
-    // Verify order exists and belongs to tenant
+  async cancelOrder(scope: BranchScope, id: string) {
+    // Verify order exists and belongs to this tenant AND branch — an id
+    // from a sibling branch must read as not-found, never be cancellable.
     const order = await this.prisma.order.findFirst({
       where: {
         id,
-        tenantId,
+        ...branchScope(scope),
       },
     });
 
@@ -270,7 +292,7 @@ export class KdsService {
     // PAID between the read and the write) must not be silently overwritten
     // by a stale CANCELLED claim.
     const cancelClaim = await this.prisma.order.updateMany({
-      where: { id, tenantId, status: order.status },
+      where: { id, ...branchScope(scope), status: order.status },
       data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() },
     });
     if (cancelClaim.count === 0) {
@@ -293,7 +315,7 @@ export class KdsService {
     // Reverse ingredient deductions on cancellation
     if (this.stockDeductionService) {
       try {
-        await this.stockDeductionService.reverseForOrder(id, tenantId);
+        await this.stockDeductionService.reverseForOrder(id, scope.tenantId);
       } catch (error: any) {
         this.logger.error(
           `CRITICAL: Stock reversal failed for cancelled order ${id}. Manual stock adjustment may be needed. Error: ${error.message}`,
@@ -304,7 +326,7 @@ export class KdsService {
 
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(
-      tenantId,
+      scope.tenantId,
       order.branchId,
       id,
       OrderStatus.CANCELLED,

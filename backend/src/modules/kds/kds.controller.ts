@@ -5,7 +5,6 @@ import {
   Param,
   Body,
   UseGuards,
-  Request,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -21,6 +20,8 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
+import { CurrentScope } from "../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../common/scoping/branch-scope";
 
 @ApiTags("kds")
 @ApiBearerAuth()
@@ -34,8 +35,8 @@ export class KdsController {
   @ApiOperation({ summary: "Get all kitchen orders (ADMIN, MANAGER, KITCHEN)" })
   @ApiResponse({ status: 200, description: "List of kitchen orders" })
   @ApiResponse({ status: 403, description: "Insufficient permissions" })
-  getKitchenOrders(@Request() req) {
-    return this.kdsService.getKitchenOrders(req.tenantId);
+  getKitchenOrders(@CurrentScope() scope: BranchScope) {
+    return this.kdsService.getKitchenOrders(scope);
   }
 
   @Patch("orders/:id/status")
@@ -47,12 +48,12 @@ export class KdsController {
   updateOrderStatus(
     @Param("id") id: string,
     @Body() updateStatusDto: UpdateOrderStatusDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
     return this.kdsService.updateOrderStatus(
+      scope,
       id,
       updateStatusDto.status,
-      req.tenantId,
     );
   }
 
@@ -67,15 +68,15 @@ export class KdsController {
   updateOrderItemStatus(
     @Param("id") id: string,
     @Body() updateDto: UpdateOrderItemStatusDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
     // Iter-91: the item id comes from the URL path, not the body — the
     // previous DTO duplicated the field in both places and the service
     // trusted the body, which let a client desync URL vs target item.
     return this.kdsService.updateOrderItemStatus(
+      scope,
       id,
       updateDto.status,
-      req.tenantId,
     );
   }
 
@@ -86,7 +87,7 @@ export class KdsController {
   @ApiResponse({ status: 404, description: "Order not found" })
   @ApiResponse({ status: 400, description: "Cannot cancel paid orders" })
   @ApiResponse({ status: 403, description: "Insufficient permissions" })
-  cancelOrder(@Param("id") id: string, @Request() req) {
-    return this.kdsService.cancelOrder(id, req.tenantId);
+  cancelOrder(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.kdsService.cancelOrder(scope, id);
   }
 }
