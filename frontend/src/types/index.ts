@@ -1226,6 +1226,8 @@ export interface CreateReservationDto {
   customerEmail?: string;
   notes?: string;
   tableId?: string;
+  /** Explicit branch for multi-branch tenants; omitted → oldest-active. */
+  branchId?: string;
 }
 
 export interface UpdateReservationDto {

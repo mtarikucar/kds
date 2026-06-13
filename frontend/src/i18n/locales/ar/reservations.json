@@ -198,7 +198,8 @@
       "title": "الحجز غير متوفر",
       "description": "اتصل بالمطعم مباشرة."
     },
-    "successEmailOnlyCancelHint": "تم إرسال التأكيد إلى بريدك. للإلغاء اتصل بالمطعم."
+    "successEmailOnlyCancelHint": "تم إرسال التأكيد إلى بريدك. للإلغاء اتصل بالمطعم.",
+    "branch": "الفرع"
   },
   "lookup": {
     "title": "Check Your Reservation",

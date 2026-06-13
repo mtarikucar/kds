@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import {
   usePublicReservationSettings,
+  usePublicBranches,
   useAvailableSlots,
   useAvailableTables,
   useCreatePublicReservation,
@@ -65,10 +66,26 @@ const PublicReservationContainer: React.FC = () => {
 
   const { data: settings, isLoading: settingsLoading, error: settingsError } =
     usePublicReservationSettings(tenantId || '');
+  // Bookable branches for multi-branch tenants. branchId scopes availability
+  // to one location and is sent with the booking; single-branch tenants get a
+  // 1-entry list and the picker stays hidden (unchanged UX).
+  const { data: branches } = usePublicBranches(tenantId || '');
+  const [branchId, setBranchId] = useState<string | undefined>(undefined);
+
+  // Default to the first (oldest-active) branch once the list loads — matches
+  // the backend's resolvePublicBranchId fallback, so behavior is identical
+  // until the guest actively switches.
+  useEffect(() => {
+    if (!branchId && branches && branches.length > 0) {
+      setBranchId(branches[0].id);
+    }
+  }, [branches, branchId]);
+
   const { data: slots, isLoading: slotsLoading } = useAvailableSlots(
     tenantId || '',
     date,
     guestCount,
+    branchId,
   );
   const { data: tables, isLoading: tablesLoading } = useAvailableTables(
     tenantId || '',
@@ -76,6 +93,7 @@ const PublicReservationContainer: React.FC = () => {
     startTime,
     endTime,
     guestCount,
+    branchId,
   );
   const createReservation = useCreatePublicReservation();
 
@@ -104,6 +122,13 @@ const PublicReservationContainer: React.FC = () => {
   useEffect(() => {
     if (startTime && tableId) form.setValue('tableId', '');
   }, [startTime]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Switching branch changes which slots/tables exist — clear the
+  // downstream time + table picks so a stale selection can't be submitted.
+  useEffect(() => {
+    form.setValue('startTime', '');
+    form.setValue('endTime', '');
+    form.setValue('tableId', '');
+  }, [branchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fields each step gates on. Step 3 (table) is optional so it has
   // no required fields — `trigger([])` passes vacuously.
@@ -159,6 +184,7 @@ const PublicReservationContainer: React.FC = () => {
       ...(values.customerEmail ? { customerEmail: values.customerEmail } : {}),
       ...(values.notes ? { notes: values.notes } : {}),
       ...(values.tableId ? { tableId: values.tableId } : {}),
+      ...(branchId ? { branchId } : {}),
     };
     try {
       const reservation = await createReservation.mutateAsync({ tenantId, data: payload });
@@ -239,11 +265,35 @@ const PublicReservationContainer: React.FC = () => {
 
           <form onSubmit={handleSubmit} noValidate>
             {step === 1 && (
-              <Step1DateAndGuests
-                minDate={minDate}
-                maxDate={maxDate}
-                maxGuests={settings.maxGuestsPerReservation ?? 20}
-              />
+              <div className="space-y-4">
+                {branches && branches.length > 1 && (
+                  <div>
+                    <label
+                      htmlFor="branch-select"
+                      className="block text-sm font-medium text-foreground mb-1.5"
+                    >
+                      {t('public.branch')}
+                    </label>
+                    <select
+                      id="branch-select"
+                      value={branchId ?? ''}
+                      onChange={(e) => setBranchId(e.target.value)}
+                      className="w-full h-12 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <Step1DateAndGuests
+                  minDate={minDate}
+                  maxDate={maxDate}
+                  maxGuests={settings.maxGuestsPerReservation ?? 20}
+                />
+              </div>
             )}
             {step === 2 && (
               <Step2TimeSlots

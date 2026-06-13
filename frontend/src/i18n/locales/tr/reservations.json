@@ -198,7 +198,8 @@
       "title": "Rezervasyon şu an aktif değil",
       "description": "Lütfen doğrudan restoranı arayın."
     },
-    "successEmailOnlyCancelHint": "Onay e-postanızı gönderdik. İptal etmek isterseniz lütfen restoranı arayın — telefonsuz rezervasyonlar için self-iptal henüz aktif değil."
+    "successEmailOnlyCancelHint": "Onay e-postanızı gönderdik. İptal etmek isterseniz lütfen restoranı arayın — telefonsuz rezervasyonlar için self-iptal henüz aktif değil.",
+    "branch": "Şube"
   },
   "lookup": {
     "title": "Rezervasyonunuzu Kontrol Edin",

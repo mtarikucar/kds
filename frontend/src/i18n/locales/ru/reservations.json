@@ -198,7 +198,8 @@
       "title": "Бронирование недоступно",
       "description": "Позвоните в ресторан."
     },
-    "successEmailOnlyCancelHint": "Подтверждение отправлено на email. Для отмены позвоните в ресторан."
+    "successEmailOnlyCancelHint": "Подтверждение отправлено на email. Для отмены позвоните в ресторан.",
+    "branch": "Филиал"
   },
   "lookup": {
     "title": "Check Your Reservation",
