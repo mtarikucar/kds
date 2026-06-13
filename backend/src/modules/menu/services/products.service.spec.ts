@@ -25,6 +25,9 @@ describe('ProductsService.updateStock', () => {
     prisma = mockPrismaClient();
     // The service's findOne goes through prisma.product.findFirst.
     prisma.product.findFirst.mockResolvedValue(baseProduct);
+    // updateStock now runs its writes inside $transaction; drive the mock
+    // so the callback executes against the same deep-mocked client (tx).
+    (prisma.$transaction as any).mockImplementation((cb: any) => cb(prisma));
     svc = new ProductsService(prisma as any);
   });
 
@@ -76,5 +79,24 @@ describe('ProductsService.updateStock', () => {
   it('rejects when stock tracking is disabled on the product', async () => {
     prisma.product.findFirst.mockResolvedValue({ ...baseProduct, stockTracked: false });
     await expect(svc.updateStock('p-1', 5, 't-1')).rejects.toThrow(BadRequestException);
+  });
+
+  it('runs the stock change and isAvailable sync inside one transaction (race-free)', async () => {
+    // The decrement + the isAvailable re-derive must be one atomic, row-locked
+    // unit. Otherwise a concurrent A.decrement→0 (computes false) interleaving
+    // with B.increment→1 (computes true) can let A's stale `false` win the
+    // last write, leaving currentStock>0 marked unavailable.
+    prisma.product.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.product.findUniqueOrThrow.mockResolvedValue({ currentStock: 0 } as any);
+
+    await svc.updateStock('p-1', -10, 't-1');
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // isAvailable derived from the post-update re-read (0 → false), written
+    // within the same transaction as the decrement.
+    expect(prisma.product.updateMany).toHaveBeenCalledWith({
+      where: { id: 'p-1', tenantId: 't-1' },
+      data: { isAvailable: false },
+    });
   });
 });
