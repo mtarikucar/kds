@@ -125,6 +125,49 @@ describe('CameraService branch-scope', () => {
     expect(where.branchId).toBe('b-1');
   });
 
+  it('updateCalibration scopes the lookup, claim, and re-fetch by branchId + tenantId', async () => {
+    (prisma.camera.findFirst as any).mockResolvedValue({
+      id: 'cam-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      name: 'Front',
+      streamUrl: '',
+      streamType: 'RTSP',
+      status: 'OFFLINE',
+    });
+    (prisma.camera.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.camera.findFirstOrThrow as any).mockResolvedValue({
+      id: 'cam-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      name: 'Front',
+      description: null,
+      streamUrl: '',
+      streamType: 'RTSP',
+      status: 'CALIBRATING',
+      rotationY: 0,
+      fov: 90,
+      calibrationData: null,
+      lastSeenAt: null,
+      errorMessage: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    });
+
+    await svc.updateCalibration(scope, 'cam-1', { points: [1, 2, 3] });
+
+    const lookupWhere = (prisma.camera.findFirst as any).mock.calls[0][0].where;
+    expect(lookupWhere.tenantId).toBe('t-1');
+    expect(lookupWhere.branchId).toBe('b-1');
+    const claimWhere = (prisma.camera.updateMany as any).mock.calls[0][0].where;
+    expect(claimWhere.tenantId).toBe('t-1');
+    expect(claimWhere.branchId).toBe('b-1');
+    const refetchWhere = (prisma.camera.findFirstOrThrow as any).mock.calls[0][0]
+      .where;
+    expect(refetchWhere.tenantId).toBe('t-1');
+    expect(refetchWhere.branchId).toBe('b-1');
+  });
+
   it('getCameraHealthSummary scopes the groupBy by branchId + tenantId', async () => {
     (prisma.camera.groupBy as any).mockResolvedValue([]);
 
