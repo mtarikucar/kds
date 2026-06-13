@@ -25,13 +25,19 @@ import { UserRole } from '../../../common/constants/roles.enum';
  */
 describe('OrdersController.findAll query validation (iter-87 + v3 scope)', () => {
   let ordersService: any;
+  let orderTransferService: any;
   let paymentsService: any;
   let ctrl: OrdersController;
 
   beforeEach(() => {
     ordersService = { findAll: jest.fn().mockResolvedValue([]) };
+    orderTransferService = {} as any;
     paymentsService = {} as any;
-    ctrl = new OrdersController(ordersService, paymentsService);
+    ctrl = new OrdersController(
+      ordersService,
+      orderTransferService,
+      paymentsService,
+    );
   });
 
   const scope: BranchScope = {

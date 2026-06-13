@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { OrdersService } from './orders.service';
+import { OrderTransferService } from './order-transfer.service';
 import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
 import { TableStatus } from '../../../common/constants/order-status.enum';
 import { BranchScope } from '../../../common/scoping/branch-scope';
@@ -7,7 +7,8 @@ import { UserRole } from '../../../common/constants/roles.enum';
 
 /**
  * Regression spec for the iter-12 defense-in-depth fix on
- * OrdersService.transferTableOrders. The three writes inside the
+ * OrderTransferService.transferTableOrders (extracted from
+ * OrdersService in the track5 god-file split). The three writes inside the
  * transaction (order.updateMany + source table.updateMany + target
  * table.updateMany) all gained a tenantId predicate; without those,
  * a regression in the pre-validation would let a cross-tenant id slip
@@ -18,9 +19,9 @@ import { UserRole } from '../../../common/constants/roles.enum';
  * branch A can no longer transfer orders onto a sister-branch's table
  * even if a regression in the pre-validation lets a stale id through.
  */
-describe('OrdersService.transferTableOrders (iter-12 defense-in-depth + v3 branch scope)', () => {
+describe('OrderTransferService.transferTableOrders (iter-12 defense-in-depth + v3 branch scope)', () => {
   let prisma: MockPrismaClient;
-  let svc: OrdersService;
+  let svc: OrderTransferService;
   let kdsGateway: any;
 
   beforeEach(() => {
@@ -32,8 +33,7 @@ describe('OrdersService.transferTableOrders (iter-12 defense-in-depth + v3 branc
       emitOrderUpdate: jest.fn(),
       emitTableTransfer: jest.fn(),
     };
-    const receiptSnapshotBuilder = {} as any;
-    svc = new OrdersService(prisma as any, receiptSnapshotBuilder, kdsGateway);
+    svc = new OrderTransferService(prisma as any, kdsGateway);
     // Forward tx work to the same prisma mock so the inside-tx writes
     // show up in the same .mock.calls list.
     (prisma.$transaction as any).mockImplementation(async (work: any) => work(prisma));
