@@ -54,4 +54,30 @@ describe('PaymentsFacadeService + MockPaymentProvider', () => {
   it('returns 404-style throw for unknown provider', async () => {
     await expect(facade.getStatus('does-not-exist', 'whatever')).rejects.toThrow(/Unknown payment provider/);
   });
+
+  it('surfaces a swallowed outbox.append failure without breaking the operation', async () => {
+    // Best-effort emit: a rejected append must NOT fail createIntent, but the
+    // failure must be surfaced (captureSwallowedEmit logs at warn + Sentry).
+    const warnSpy = jest
+      .spyOn((facade as any).logger, 'warn')
+      .mockImplementation(() => undefined);
+    outbox.append.mockRejectedValueOnce(new Error('outbox down'));
+
+    const intent = await facade.createIntent('mock', {
+      tenantId: 't1',
+      externalRef: 'sub:abc',
+      idempotencyKey: 'k-swallow',
+      amountCents: 999,
+      currency: 'TRY',
+      purpose: 'subscription',
+    });
+
+    // Operation still succeeds despite the emit failure.
+    expect(intent.status).toBe('succeeded');
+    // The swallowed emit failure was surfaced, not silently dropped.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('payments-core/intent_created'),
+    );
+    warnSpy.mockRestore();
+  });
 });
