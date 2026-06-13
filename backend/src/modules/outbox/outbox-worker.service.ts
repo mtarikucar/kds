@@ -244,6 +244,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
             lastError: null,
           },
         });
+        this.metrics?.incCounter(
+          "outbox_events_processed_total",
+          "Outbox events processed, labeled by terminal result",
+          { result: "dispatched" },
+        );
       } catch (e) {
         const msg = (e as Error).message?.slice(0, 500) ?? "unknown";
         const final = r.attempts >= this.MAX_ATTEMPTS;
@@ -266,6 +271,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
             `outbox DLQ: event ${r.id} (${r.type}) gave up after ${r.attempts} attempts — ${msg}`,
           );
           this.metrics?.incOutboxDlqDepth();
+          this.metrics?.incCounter(
+            "outbox_events_processed_total",
+            "Outbox events processed, labeled by terminal result",
+            { result: "failed" },
+          );
         } else {
           this.logger.warn(
             `outbox event ${r.id} (${r.type}) will retry after ${r.attempts} attempts: ${msg}`,

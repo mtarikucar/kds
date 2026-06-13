@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   collectDefaultMetrics,
+  Counter,
   Gauge,
   Histogram,
   Registry,
@@ -56,6 +57,48 @@ export class MetricsService {
   /** Increment the DLQ depth by one as a single event gives up. */
   incOutboxDlqDepth(): void {
     this.outboxDlqDepthGauge.inc();
+  }
+
+  /**
+   * Lazily-created domain counters, so any service can record a business
+   * event (`orders_created_total`, `auth_login_failures_total`, …) without
+   * each declaring its own prom-client Counter. The metric NAME set is
+   * developer-controlled (never user input), so cardinality stays bounded.
+   *
+   * The first call for a name fixes its label set; later calls only emit the
+   * known labels (missing → "", extras ignored) so a caller drift can never
+   * throw on a business path — metrics must never break the request.
+   */
+  private readonly counters = new Map<
+    string,
+    { counter: Counter<string>; labelNames: string[] }
+  >();
+
+  /** Increment a named domain counter by one. */
+  incCounter(
+    name: string,
+    help: string,
+    labels: Record<string, string> = {},
+  ): void {
+    let entry = this.counters.get(name);
+    if (!entry) {
+      const labelNames = Object.keys(labels);
+      const counter = new Counter({
+        name,
+        help,
+        labelNames,
+        registers: [this.registry],
+      });
+      entry = { counter, labelNames };
+      this.counters.set(name, entry);
+    }
+    if (entry.labelNames.length === 0) {
+      entry.counter.inc();
+      return;
+    }
+    const values: Record<string, string> = {};
+    for (const k of entry.labelNames) values[k] = labels[k] ?? "";
+    entry.counter.labels(values).inc();
   }
 
   /**
