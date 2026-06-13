@@ -17,6 +17,8 @@ import { KdsGateway } from "../../kds/kds.gateway";
 import { CustomersService } from "../../customers/customers.service";
 import { CustomerSessionService } from "../../customers/customer-session.service";
 import { StockDeductionService } from "../../stock-management/services/stock-deduction.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 import { CreateCustomerOrderDto } from "../dto/create-customer-order.dto";
 import {
   CreateBillRequestDto,
@@ -44,7 +46,49 @@ export class CustomerOrdersService {
     @Optional()
     @Inject(forwardRef(() => StockDeductionService))
     private stockDeductionService?: StockDeductionService,
+    // OutboxModule is @Global. Optional so unit tests construct the service
+    // bare; when absent the durable emit no-ops and only the live kdsGateway
+    // broadcast fires (the pre-v3 behaviour).
+    @Optional()
+    private outbox?: OutboxService,
   ) {}
+
+  /** Prisma.Decimal | number | string → integer cents (no float boundary). */
+  private toIntCents(v: unknown): number | undefined {
+    if (v == null) return undefined;
+    return Number(new Prisma.Decimal(v as Prisma.Decimal.Value).toFixed(2).replace(".", ""));
+  }
+
+  /**
+   * Durable order.created.v1 emit for a customer (QR) order. Customer orders
+   * are created directly here (not via OrdersService), so without this they
+   * fire ONLY the ephemeral kdsGateway broadcast — missing both replay and
+   * the kds-routing physical-device fan-out that normal orders get. Best-effort
+   * (matches OrdersService.emitOrderEvent): the live UI broadcast is the
+   * fast-path; this is the durable backstop.
+   */
+  private emitOrderCreated(order: any): void {
+    if (!this.outbox) return;
+    this.outbox
+      .append({
+        type: "order.created.v1",
+        tenantId: order?.tenantId,
+        payload: {
+          orderId: order?.id,
+          tenantId: order?.tenantId,
+          branchId: order?.branchId ?? null,
+          tableId: order?.tableId ?? null,
+          status: order?.status,
+          totalCents: this.toIntCents(order?.finalAmount),
+        },
+      })
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "customer-orders",
+          op: "order.created.v1",
+        }),
+      );
+  }
 
   private generateOrderNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -235,6 +279,9 @@ export class CustomerOrdersService {
       );
     }
 
+    // Durable backstop first (replay + kds-routing device fan-out), then the
+    // ephemeral live-UI broadcast.
+    this.emitOrderCreated(createdOrder);
     this.kdsGateway.emitNewOrderWithCustomer(
       tenantId,
       createdOrder,
