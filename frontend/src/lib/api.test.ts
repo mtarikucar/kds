@@ -26,6 +26,9 @@ describe('isTenantWidePath', () => {
       '/subscriptions/tenant/invoices',
       '/subscriptions/abc/cancel',
       '/invoices/INV-1/download',
+      // pos-settings is class-level @SkipBranchScope on the backend
+      // (one settings row per tenant) — it must fly without X-Branch-Id.
+      '/pos-settings',
     ]) {
       expect(isTenantWidePath(url), url).toBe(true);
     }
