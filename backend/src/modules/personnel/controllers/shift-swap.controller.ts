@@ -39,8 +39,12 @@ export class ShiftSwapController {
     UserRole.COURIER,
   )
   @ApiOperation({ summary: "Request a shift swap" })
-  createRequest(@Request() req, @Body() dto: CreateSwapRequestDto) {
-    return this.shiftSwapService.createRequest(req.tenantId, req.user.id, dto);
+  createRequest(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreateSwapRequestDto,
+  ) {
+    return this.shiftSwapService.createRequest(scope, req.user.id, dto);
   }
 
   @Patch(":id/target-accept")
@@ -52,13 +56,12 @@ export class ShiftSwapController {
     UserRole.COURIER,
   )
   @ApiOperation({ summary: "Target employee accepts the swap" })
-  targetAccept(@Request() req, @Param("id") id: string) {
-    return this.shiftSwapService.respondAsTarget(
-      id,
-      req.tenantId,
-      req.user.id,
-      true,
-    );
+  targetAccept(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.shiftSwapService.respondAsTarget(id, scope, req.user.id, true);
   }
 
   @Patch(":id/target-reject")
@@ -70,13 +73,12 @@ export class ShiftSwapController {
     UserRole.COURIER,
   )
   @ApiOperation({ summary: "Target employee rejects the swap" })
-  targetReject(@Request() req, @Param("id") id: string) {
-    return this.shiftSwapService.respondAsTarget(
-      id,
-      req.tenantId,
-      req.user.id,
-      false,
-    );
+  targetReject(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.shiftSwapService.respondAsTarget(id, scope, req.user.id, false);
   }
 
   @Patch(":id/approve")
@@ -84,15 +86,23 @@ export class ShiftSwapController {
   @ApiOperation({
     summary: "Approve shift swap (requires target consent first)",
   })
-  approve(@Request() req, @Param("id") id: string) {
-    return this.shiftSwapService.approve(id, req.tenantId, req.user.id);
+  approve(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.shiftSwapService.approve(id, scope, req.user.id);
   }
 
   @Patch(":id/reject")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Reject shift swap" })
-  reject(@Request() req, @Param("id") id: string) {
-    return this.shiftSwapService.reject(id, req.tenantId, req.user.id);
+  reject(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.shiftSwapService.reject(id, scope, req.user.id);
   }
 
   @Get()

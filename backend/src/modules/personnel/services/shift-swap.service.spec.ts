@@ -36,4 +36,139 @@ describe('ShiftSwapService branch-scope (track-1)', () => {
     expect(where.branchId).toBe('b-1');
     expect(where.tenantId).toBe('t-1');
   });
+
+  it('createRequest scopes both assignment lookups by branchId', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue({ id: 'target' });
+    (prisma.shiftAssignment.findFirst as any)
+      .mockResolvedValueOnce({
+        id: 'ra-1',
+        userId: 'u-1',
+        tenantId: 't-1',
+        branchId: 'b-1',
+        status: 'SCHEDULED',
+      })
+      .mockResolvedValueOnce({
+        id: 'ta-1',
+        userId: 'target',
+        tenantId: 't-1',
+        branchId: 'b-1',
+        status: 'SCHEDULED',
+      });
+    (prisma.shiftSwapRequest.create as any).mockResolvedValue({
+      id: 'sw-1',
+      branchId: 'b-1',
+    });
+
+    await svc.createRequest(scope, 'u-1', {
+      targetId: 'target',
+      requesterAssignmentId: 'ra-1',
+      targetAssignmentId: 'ta-1',
+    } as any);
+
+    const reqWhere = (prisma.shiftAssignment.findFirst as any).mock.calls[0][0]
+      .where;
+    expect(reqWhere.branchId).toBe('b-1');
+    expect(reqWhere.tenantId).toBe('t-1');
+    const targetWhere = (prisma.shiftAssignment.findFirst as any).mock
+      .calls[1][0].where;
+    expect(targetWhere.branchId).toBe('b-1');
+    expect(targetWhere.tenantId).toBe('t-1');
+  });
+
+  it('respondAsTarget scopes the request find + claim by branchId', async () => {
+    (prisma.shiftSwapRequest.findFirst as any).mockResolvedValue({
+      id: 'sw-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      targetId: 'u-1',
+      status: 'PENDING',
+    });
+    (prisma.shiftSwapRequest.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.shiftSwapRequest.findFirstOrThrow as any).mockResolvedValue({
+      id: 'sw-1',
+      branchId: 'b-1',
+    });
+
+    await svc.respondAsTarget('sw-1', scope, 'u-1', true);
+
+    const findWhere = (prisma.shiftSwapRequest.findFirst as any).mock.calls[0][0]
+      .where;
+    expect(findWhere.branchId).toBe('b-1');
+    expect(findWhere.tenantId).toBe('t-1');
+    const claimWhere = (prisma.shiftSwapRequest.updateMany as any).mock
+      .calls[0][0].where;
+    expect(claimWhere.branchId).toBe('b-1');
+    expect(claimWhere.tenantId).toBe('t-1');
+  });
+
+  it('approve scopes the request lookup by branchId', async () => {
+    (prisma.shiftSwapRequest.findFirst as any).mockResolvedValue({
+      id: 'sw-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      requesterId: 'r-1',
+      targetId: 't-2',
+      requesterAssignmentId: 'ra-1',
+      targetAssignmentId: 'ta-1',
+      status: 'TARGET_ACCEPTED',
+    });
+    (prisma.$transaction as any).mockImplementation(async (fn: any) => {
+      const tx = {
+        shiftAssignment: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce({
+              id: 'ta-1',
+              date: new Date('2026-01-01'),
+              shiftTemplateId: 'st-t',
+            })
+            .mockResolvedValueOnce({
+              id: 'ra-1',
+              date: new Date('2026-01-01'),
+              shiftTemplateId: 'st-r',
+            }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        shiftSwapRequest: {
+          update: jest
+            .fn()
+            .mockResolvedValue({ id: 'sw-1', branchId: 'b-1' }),
+        },
+      };
+      return fn(tx);
+    });
+
+    await svc.approve('sw-1', scope, 'mgr-1');
+
+    const where = (prisma.shiftSwapRequest.findFirst as any).mock.calls[0][0]
+      .where;
+    expect(where.id).toBe('sw-1');
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+  });
+
+  it('reject scopes the request find + claim by branchId', async () => {
+    (prisma.shiftSwapRequest.findFirst as any).mockResolvedValue({
+      id: 'sw-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'PENDING',
+    });
+    (prisma.shiftSwapRequest.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.shiftSwapRequest.findFirstOrThrow as any).mockResolvedValue({
+      id: 'sw-1',
+      branchId: 'b-1',
+    });
+
+    await svc.reject('sw-1', scope, 'mgr-1');
+
+    const findWhere = (prisma.shiftSwapRequest.findFirst as any).mock.calls[0][0]
+      .where;
+    expect(findWhere.branchId).toBe('b-1');
+    expect(findWhere.tenantId).toBe('t-1');
+    const claimWhere = (prisma.shiftSwapRequest.updateMany as any).mock
+      .calls[0][0].where;
+    expect(claimWhere.branchId).toBe('b-1');
+    expect(claimWhere.tenantId).toBe('t-1');
+  });
 });
