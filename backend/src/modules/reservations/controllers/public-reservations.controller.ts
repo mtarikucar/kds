@@ -48,12 +48,18 @@ export class PublicReservationsController {
     @Param("tenantId") tenantId: string,
     @Query("date") date: string,
     @Query("guestCount") guestCount?: string,
+    // Optional explicit branch selector. Omitted → service falls back to
+    // the tenant's oldest-active branch (same default as createReservation),
+    // so single-branch callers are unaffected. Multi-branch tenants pass
+    // it to scope availability to one location.
+    @Query("branchId") branchId?: string,
   ) {
     const parsed = guestCount ? parseInt(guestCount, 10) : undefined;
     return this.reservationsService.getAvailableSlots(
       tenantId,
       date,
       Number.isFinite(parsed as number) ? parsed : undefined,
+      branchId,
     );
   }
 
@@ -67,6 +73,11 @@ export class PublicReservationsController {
     @Query("startTime") startTime: string,
     @Query("endTime") endTime: string,
     @Query("guestCount") guestCount?: string,
+    // Optional explicit branch selector. Omitted → service falls back to
+    // the tenant's oldest-active branch (same default as createReservation),
+    // so single-branch callers are unaffected. Multi-branch tenants pass
+    // it to scope availability to one location.
+    @Query("branchId") branchId?: string,
   ) {
     const parsed = guestCount ? parseInt(guestCount, 10) : undefined;
     return this.reservationsService.getAvailableTables(
@@ -75,6 +86,7 @@ export class PublicReservationsController {
       startTime,
       endTime,
       Number.isFinite(parsed as number) ? parsed : undefined,
+      branchId,
     );
   }
 

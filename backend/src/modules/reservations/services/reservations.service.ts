@@ -77,6 +77,50 @@ export class ReservationsService {
     return `${prefix}-${String(nextNum).padStart(3, "0")}`;
   }
 
+  /**
+   * Resolve the single branch a PUBLIC (@SkipBranchScope / anonymous)
+   * reservation flow should operate on. There is no @CurrentScope on the
+   * guest-facing endpoints, so the branch is derived rather than asserted.
+   *
+   *  - branchId provided  → validate it exists, belongs to THIS tenant, and
+   *    is active. A foreign / archived / unknown id is rejected so a guest
+   *    can't enumerate another tenant's (or an archived) branch.
+   *  - branchId omitted    → fall back to the tenant's oldest ACTIVE branch
+   *    (the "Main" branch created at bootstrap). `status: 'active'` excludes
+   *    archived branches so a freshly-archived "Main" doesn't trap bookings.
+   *
+   * This is the ONE place the public branch resolution lives — both the
+   * availability reads (getAvailableTables / getAvailableSlots) and the
+   * createPublicReservation walk-in fallback route through it (DRY), so
+   * what the guest sees as "available" matches the branch the booking
+   * actually lands on.
+   */
+  private async resolvePublicBranchId(
+    tenantId: string,
+    branchId?: string,
+  ): Promise<string> {
+    if (branchId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: branchId, tenantId, status: "active" },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new NotFoundException("Branch not found");
+      }
+      return branch.id;
+    }
+
+    const defaultBranch = await this.prisma.branch.findFirst({
+      where: { tenantId, status: "active" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (!defaultBranch) {
+      throw new BadRequestException("No branch configured for this tenant");
+    }
+    return defaultBranch.id;
+  }
+
   async createPublicReservation(tenantId: string, dto: CreateReservationDto) {
     await this.validateTenant(tenantId);
 
@@ -185,31 +229,24 @@ export class ReservationsService {
 
     // Walk-in / no-table reservations still need a branchId (v3.0.0 strict
     // schema). This endpoint is @Public(), so there's no @CurrentScope —
-    // fall back to the tenant's first ACTIVE branch (the "Main" branch
-    // created at tenant bootstrap). Multi-branch tenants that want a
-    // specific branch must pass tableId, since the public DTO doesn't
-    // yet carry an explicit branch selector.
+    // resolvePublicBranchId() honors an explicit branchId on the DTO when
+    // present (validated against THIS tenant + active) and otherwise falls
+    // back to the tenant's oldest ACTIVE branch (the "Main" branch created
+    // at tenant bootstrap). This is the SAME resolver the public
+    // availability reads use, so what the guest saw as available matches
+    // the branch the booking lands on.
     //
-    // v3.0.1 audit follow-up: this fallback dumps every anonymous
-    // walk-in onto whichever branch was created first, which is
-    // surprising for chains with several locations. TODO(v3.1) —
-    // add `branchCode` to the public CreateReservationDto and prefer
-    // that when present; fall back to oldest-active only when the
-    // caller omitted both tableId and branchCode. Track in
+    // v3.0.1 audit follow-up: the no-branchId fallback dumps every
+    // anonymous walk-in onto whichever branch was created first, which is
+    // surprising for chains with several locations. The DTO doesn't yet
+    // carry a branch selector; once it does, resolvePublicBranchId already
+    // honors it (no further change here). Track in
     // backlog/reservations-multi-branch-public.md.
-    //
-    // `status: 'active'` excludes archived branches so a
-    // freshly-archived "Main" doesn't trap incoming bookings.
     if (!resolvedBranchId) {
-      const defaultBranch = await this.prisma.branch.findFirst({
-        where: { tenantId, status: "active" },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      });
-      if (!defaultBranch) {
-        throw new BadRequestException("No branch configured for this tenant");
-      }
-      resolvedBranchId = defaultBranch.id;
+      resolvedBranchId = await this.resolvePublicBranchId(
+        tenantId,
+        (dto as any).branchId,
+      );
     }
 
     const status = settings.requireApproval
@@ -961,8 +998,22 @@ export class ReservationsService {
     });
   }
 
-  async getAvailableSlots(tenantId: string, date: string, guestCount?: number) {
+  async getAvailableSlots(
+    tenantId: string,
+    date: string,
+    guestCount?: number,
+    branchId?: string,
+  ) {
     await this.validateTenant(tenantId);
+
+    // PUBLIC read — no @CurrentScope. Resolve the single branch this
+    // availability view is for (explicit branchId when valid, else the
+    // tenant's oldest-active branch) so we don't leak slot occupancy
+    // aggregated across every branch of a multi-branch tenant.
+    const resolvedBranchId = await this.resolvePublicBranchId(
+      tenantId,
+      branchId,
+    );
 
     const settings = await this.settingsService.getOrCreate(tenantId);
 
@@ -1002,10 +1053,12 @@ export class ReservationsService {
     let currentMinutes = openH * 60 + openM;
     const closeMinutes = closeH * 60 + closeM;
 
-    // Get existing reservations for this date
+    // Get existing reservations for this date (branch-scoped so slot
+    // occupancy reflects only the resolved branch, not the whole tenant).
     const existingReservations = await this.prisma.reservation.findMany({
       where: {
         tenantId,
+        branchId: resolvedBranchId,
         date: new Date(date),
         status: {
           in: [
@@ -1058,19 +1111,31 @@ export class ReservationsService {
     startTime: string,
     endTime: string,
     guestCount?: number,
+    branchId?: string,
   ) {
     await this.validateTenant(tenantId);
 
-    // Get all tables for this tenant
+    // PUBLIC read — no @CurrentScope. Resolve the single branch this
+    // availability view is for (explicit branchId when valid, else the
+    // tenant's oldest-active branch) BEFORE any read, so an anonymous
+    // caller of a multi-branch tenant sees exactly the tables the booking
+    // will target — not every branch's tables.
+    const resolvedBranchId = await this.resolvePublicBranchId(
+      tenantId,
+      branchId,
+    );
+
+    // Get all tables for the resolved branch
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { tenantId, branchId: resolvedBranchId },
       orderBy: [{ section: "asc" }, { number: "asc" }],
     });
 
-    // Get reservations that overlap with the requested time
+    // Get reservations that overlap with the requested time (same branch)
     const existingReservations = await this.prisma.reservation.findMany({
       where: {
         tenantId,
+        branchId: resolvedBranchId,
         date: new Date(date),
         status: {
           in: [
