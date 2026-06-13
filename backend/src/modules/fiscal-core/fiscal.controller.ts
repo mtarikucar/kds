@@ -5,7 +5,6 @@ import {
   Param,
   Post,
   Query,
-  Req,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -66,7 +65,7 @@ export class FiscalController {
 
   @Post("devices/:id/close-day")
   @ApiOperation({ summary: "Close the fiscal day — runs Z report" })
-  closeDay(@Req() req: any, @Param("id") id: string) {
-    return this.fiscal.closeDay(req.user.tenantId, id);
+  closeDay(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.fiscal.closeDay(scope, id);
   }
 }

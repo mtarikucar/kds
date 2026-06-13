@@ -175,9 +175,12 @@ export class FiscalService {
     });
   }
 
-  async closeDay(tenantId: string, fiscalDeviceId: string) {
+  async closeDay(scope: BranchScope, fiscalDeviceId: string) {
+    // closeDay runs a Z report for ONE device, and a device lives in one
+    // branch. Scope the lookup so a branch-A operator can't close the day
+    // on a branch-B device by guessing its id (cross-branch IDOR).
     const device = await this.prisma.fiscalDeviceRecord.findFirst({
-      where: { id: fiscalDeviceId, tenantId },
+      where: { id: fiscalDeviceId, ...branchScope(scope) },
     });
     if (!device) throw new NotFoundException("Fiscal device not found");
     // Mirror issueReceipt's retired-device gate. A retired yazarkasa
@@ -193,7 +196,7 @@ export class FiscalService {
     await this.prisma.fiscalDayClose.create({
       data: {
         id: uuidv7(),
-        tenantId,
+        tenantId: scope.tenantId,
         fiscalDeviceId,
         zNo: report.zNo,
         openedAt: new Date(report.openedAt),
@@ -204,7 +207,7 @@ export class FiscalService {
     await this.outbox
       .append({
         type: "fiscal.day.closed.v1",
-        tenantId,
+        tenantId: scope.tenantId,
         payload: { fiscalDeviceId, zNo: report.zNo },
       })
       .catch(() => undefined);

@@ -86,7 +86,8 @@ describe('FiscalService.issueReceipt', () => {
       id: DEVICE_ID, tenantId: TENANT, providerId: 'mock', status: 'retired',
     } as any);
 
-    await expect(svc.closeDay(TENANT, DEVICE_ID)).rejects.toThrow(/retired/i);
+    const scope = { tenantId: TENANT, branchId: 'b-1', userId: 'u-1', role: 'ADMIN' } as any;
+    await expect(svc.closeDay(scope, DEVICE_ID)).rejects.toThrow(/retired/i);
     expect(registry.get).not.toHaveBeenCalled();
   });
 
@@ -237,5 +238,31 @@ describe('FiscalService branch-scope', () => {
     expect(where.branchId).toBe('b-1');
     expect(where.tenantId).toBe('t-1');
     expect(where.id).toBe('fr-1');
+  });
+
+  it('closeDay scopes the device lookup by branchId + tenantId', async () => {
+    // closeDay runs a Z report for ONE device, which lives in one branch.
+    // The device lookup must be branch-scoped so a branch-A operator can't
+    // close the day on a branch-B device by id (cross-branch IDOR).
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
+      id: 'd-1', tenantId: 't-1', branchId: 'b-1', providerId: 'mock', status: 'online',
+    } as any);
+    (prisma.fiscalDayClose.create as any).mockResolvedValue({ id: 'dc-1' });
+    const adapter = {
+      closeDay: jest.fn().mockResolvedValue({
+        zNo: 'Z-1',
+        openedAt: new Date(0).toISOString(),
+        closedAt: new Date(1000).toISOString(),
+        totals: { cash: 100 },
+      }),
+    };
+    registry.get.mockReturnValue(adapter as any);
+
+    await svc.closeDay(scope, 'd-1');
+
+    const where = (prisma.fiscalDeviceRecord.findFirst as any).mock.calls[0][0].where;
+    expect(where.id).toBe('d-1');
+    expect(where.tenantId).toBe('t-1');
+    expect(where.branchId).toBe('b-1');
   });
 });
