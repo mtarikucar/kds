@@ -174,6 +174,76 @@ export class AuthService {
     // zero active branches cannot accept new staff signups.
     let primaryBranchId: string;
 
+    // Hash the password up front so both scenarios can create the user
+    // inside their own transaction. Scenario 1 must create the user in
+    // the SAME tx as the tenant+subscription+branch — otherwise a crash
+    // between a (committed) tenant tx and a separate user tx would leave
+    // an orphan tenant (no users) holding a consumed subdomain.
+    const hashedPassword = await bcrypt.hash(
+      registerDto.password,
+      this.bcryptCost(),
+    );
+
+    // Determine user status: ADMIN creating restaurant = ACTIVE, others
+    // = PENDING_APPROVAL. Depends only on the scenario, so compute it
+    // here where both transactions can read it.
+    const userStatus = hasRestaurantName ? "ACTIVE" : "PENDING_APPROVAL";
+
+    // Shared user-creation step. Creates the user + (for restricted
+    // roles) the matching userBranchAssignment allow-list row, all on
+    // the provided transaction client. Closes over the finalized
+    // `userRole` (ADMIN for scenario 1, set BEFORE that scenario's tx
+    // runs; WAITER/explicit for scenario 2), `hashedPassword`,
+    // `userStatus`, and `registerDto`. Both scenarios call this so the
+    // user `data`/`select` shapes and the allow-list rule stay in one
+    // place.
+    const createUserWithAssignment = async (
+      tx: Prisma.TransactionClient,
+      txTenantId: string,
+      txPrimaryBranchId: string,
+    ) => {
+      const created = await tx.user.create({
+        data: {
+          email: registerDto.email,
+          password: hashedPassword,
+          firstName: registerDto.firstName,
+          lastName: registerDto.lastName,
+          role: userRole,
+          tenantId: txTenantId,
+          status: userStatus,
+          primaryBranchId: txPrimaryBranchId,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+          primaryBranchId: true,
+        },
+      });
+      // Restricted roles get an explicit allow-list row equal to
+      // their primary branch. BranchGuard short-circuits on
+      // primaryBranchId for these roles, but the row gives admin UI
+      // a uniform place to inspect "which branches does this user
+      // see" without role-conditional branching.
+      if ((HARD_RESTRICTED_ROLES as readonly string[]).includes(userRole!)) {
+        await tx.userBranchAssignment.create({
+          data: {
+            userId: created.id,
+            branchId: txPrimaryBranchId,
+            tenantId: txTenantId,
+          },
+        });
+      }
+      return created;
+    };
+
+    // Populated by whichever scenario runs below.
+    let user: Awaited<ReturnType<typeof createUserWithAssignment>>;
+
     // Scenario 1: Creating a new restaurant (ADMIN only)
     if (hasRestaurantName) {
       // If creating a restaurant, role must be ADMIN (or default to ADMIN)
@@ -300,10 +370,24 @@ export class AuthService {
             },
             select: { id: true },
           });
-          return { tenant: created, mainBranchId: mainBranch.id };
+          // Create the ADMIN user inside the SAME transaction as the
+          // tenant + subscription + branch. If anything here (or the
+          // user create itself) throws, the whole tx rolls back and no
+          // orphan tenant / consumed subdomain is left behind.
+          const createdUser = await createUserWithAssignment(
+            tx,
+            created.id,
+            mainBranch.id,
+          );
+          return {
+            tenant: created,
+            mainBranchId: mainBranch.id,
+            user: createdUser,
+          };
         });
         tenantId = txResult.tenant.id;
         primaryBranchId = txResult.mainBranchId;
+        user = txResult.user;
       } catch (err) {
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -361,63 +445,19 @@ export class AuthService {
         );
       }
       primaryBranchId = firstBranch.id;
+
+      // Scenario 2 joins a pre-existing tenant, so there is no
+      // orphan-tenant risk: the tenant already has rows (its creator).
+      // Create the user (+ allow-list row for restricted roles) in its
+      // own transaction — same shape as before, just routed through the
+      // shared helper. The CHECK constraint
+      // `users_restricted_role_requires_primary_branch` makes the
+      // primaryBranchId for WAITER/KITCHEN/COURIER load-bearing — we
+      // set it on every signup.
+      user = await this.prisma.$transaction((tx) =>
+        createUserWithAssignment(tx, tenantId, primaryBranchId),
+      );
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(
-      registerDto.password,
-      this.bcryptCost(),
-    );
-
-    // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
-    const userStatus = hasRestaurantName ? "ACTIVE" : "PENDING_APPROVAL";
-
-    // Create user + matching allow-list row for restricted roles
-    // atomically. The CHECK constraint
-    // `users_restricted_role_requires_primary_branch` makes the
-    // primaryBranchId for WAITER/KITCHEN/COURIER load-bearing — we
-    // set it on every signup. ADMIN's primaryBranchId is the freshly
-    // minted Main branch (scenario 1) so the owner has a default
-    // active branch from day one.
-    const user = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          email: registerDto.email,
-          password: hashedPassword,
-          firstName: registerDto.firstName,
-          lastName: registerDto.lastName,
-          role: userRole,
-          tenantId,
-          status: userStatus,
-          primaryBranchId,
-        },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          tenantId: true,
-          primaryBranchId: true,
-        },
-      });
-      // Restricted roles get an explicit allow-list row equal to
-      // their primary branch. BranchGuard short-circuits on
-      // primaryBranchId for these roles, but the row gives admin UI
-      // a uniform place to inspect "which branches does this user
-      // see" without role-conditional branching.
-      if ((HARD_RESTRICTED_ROLES as readonly string[]).includes(userRole!)) {
-        await tx.userBranchAssignment.create({
-          data: {
-            userId: created.id,
-            branchId: primaryBranchId,
-            tenantId,
-          },
-        });
-      }
-      return created;
-    });
 
     // Send email verification code automatically after registration
     try {

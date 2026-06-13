@@ -315,6 +315,70 @@ describe('AuthService', () => {
         },
       });
     });
+
+    // Orphan-tenant guard (HIGH). Scenario 1 used to create the tenant +
+    // subscription + branch in one transaction and the user in a SEPARATE
+    // one. A crash between them committed a tenant with NO users and a
+    // consumed subdomain. The fix folds user creation into the SAME
+    // transaction as the tenant. This test pins that:
+    //   1. A failure during user.create rejects the whole register() —
+    //      because user.create now runs inside the tenant's tx, the tx
+    //      rolls back (the real Prisma client never commits the tenant).
+    //   2. Scenario 1 issues exactly ONE prisma.$transaction call — the
+    //      one wrapping tenant + subscription + branch + user — not two.
+    //      A second $transaction call would mean the user is created in a
+    //      detached tx, reopening the orphan window.
+    it('creates tenant + user in ONE transaction (scenario 1 atomicity)', async () => {
+      const registerDto: RegisterDto = {
+        email: 'newadmin@test.com',
+        password: 'password123',
+        firstName: 'John',
+        lastName: 'Doe',
+        restaurantName: 'Atomic Restaurant',
+      };
+
+      prisma.user.findUnique.mockResolvedValue(null); // existence check
+      prisma.tenant.findUnique.mockResolvedValue(null); // subdomain free
+      prisma.subscriptionPlan.findUnique.mockResolvedValue({
+        id: 'plan-business',
+        name: 'BUSINESS',
+        trialDays: 14,
+        monthlyPrice: 2990,
+        currency: 'TRY',
+      } as any);
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-new' } as any);
+      prisma.subscription.create.mockResolvedValue({} as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      // The user create blows up *inside* the transaction (e.g. a DB
+      // CHECK-constraint violation or a process crash mid-write).
+      prisma.user.create.mockRejectedValue(new Error('boom: user write failed'));
+
+      // Count how many distinct $transaction calls register() makes and
+      // surface the rejection from the wrapped callback (so a failure in
+      // user.create propagates out of the transaction, exactly as the
+      // real client would when the tx aborts).
+      const txSpy = prisma.$transaction as jest.Mock;
+      txSpy.mockImplementation(async (arg: any) => {
+        if (typeof arg === 'function') return arg(prisma);
+        return Promise.all(arg);
+      });
+
+      await expect(service.register(registerDto)).rejects.toThrow(
+        'boom: user write failed',
+      );
+
+      // Exactly one transaction wrapped tenant+subscription+branch+user.
+      expect(txSpy).toHaveBeenCalledTimes(1);
+      // The user write was attempted inside that single transaction…
+      expect(prisma.user.create).toHaveBeenCalledTimes(1);
+      // …alongside the tenant create (same tx) — proving they share a
+      // rollback boundary. With the real client, the tenant row never
+      // commits, so no orphan tenant survives.
+      expect(prisma.tenant.create).toHaveBeenCalledTimes(1);
+      // No allow-list row and no token persistence past the failure.
+      expect(prisma.userBranchAssignment.create).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('login', () => {
