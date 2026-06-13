@@ -2,10 +2,12 @@ import {
   Injectable,
   Inject,
   Logger,
+  Optional,
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import { Prisma } from "@prisma/client";
 import { addHours } from "date-fns";
 import { randomBytes } from "crypto";
@@ -53,7 +55,17 @@ export class PaymentsService {
     // resolve a referral code without reading marketing_users directly.
     @Inject(REFERRAL_DIRECTORY_PORT)
     private readonly referralDirectory: ReferralDirectoryPort,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  private countIntent(result: string): void {
+    this.metrics?.incCounter(
+      "payment_intents_total",
+      "Subscription payment intents by outcome (created|paytr_failed)",
+      { result },
+    );
+  }
 
   /**
    * Reserve a SubscriptionPayment row, mint a PayTR iFrame token, and
@@ -330,6 +342,7 @@ export class PaymentsService {
           failureMessage: (err as Error).message,
         },
       });
+      this.countIntent("paytr_failed");
       throw err;
     }
 
@@ -337,6 +350,7 @@ export class PaymentsService {
       where: { id: paymentId },
       data: { paytrToken: token.token },
     });
+    this.countIntent("created");
 
     return {
       provider: "PAYTR",

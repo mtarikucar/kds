@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { v7 as uuidv7 } from "uuid";
@@ -11,6 +12,8 @@ import { OutboxService } from "../outbox/outbox.service";
 import { FiscalProviderRegistry } from "./fiscal-provider.registry";
 import { FiscalReceiptRequest } from "./fiscal-provider.interface";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { MetricsService } from "../../common/metrics/metrics.service";
+import { captureException } from "../../sentry.config";
 
 /**
  * Domain service for fiscal receipts. Persists every receipt request to
@@ -30,7 +33,17 @@ export class FiscalService {
     private readonly prisma: PrismaService,
     private readonly registry: FiscalProviderRegistry,
     private readonly outbox: OutboxService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  private countIssued(status: string): void {
+    this.metrics?.incCounter(
+      "fiscal_receipts_issued_total",
+      "Fiscal receipts by terminal status (issued|failed)",
+      { status },
+    );
+  }
 
   async issueReceipt(req: FiscalReceiptRequest) {
     // Compound WHERE — same defense-in-depth pattern as iter-35
@@ -120,6 +133,7 @@ export class FiscalService {
           lastError: result.status !== "issued" ? result.error : null,
         },
       });
+      this.countIssued(updated.status);
       await this.outbox
         .append({
           type:
@@ -137,6 +151,16 @@ export class FiscalService {
         .catch(() => undefined);
       return updated;
     } catch (e) {
+      // Compliance-critical money path — the provider dispatch threw. This was
+      // logged-only before; surface it to Sentry (correlation id auto-attached)
+      // so a fiscal-device outage is alertable, not silently swallowed.
+      captureException(e as Error, {
+        module: "fiscal-core",
+        op: "issueReceipt",
+        fiscalDeviceId: req.fiscalDeviceId,
+        tenantId: req.tenantId,
+      });
+      this.countIssued("failed");
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
