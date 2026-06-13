@@ -4,13 +4,17 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  BranchScope,
+  branchScope,
+} from "../../../common/scoping/branch-scope";
 import { AssignShiftDto, BulkAssignShiftDto } from "../dto/assign-shift.dto";
 
 @Injectable()
 export class ScheduleService {
   constructor(private prisma: PrismaService) {}
 
-  async getWeeklySchedule(tenantId: string, weekStart?: string) {
+  async getWeeklySchedule(scope: BranchScope, weekStart?: string) {
     const start = weekStart ? new Date(weekStart) : this.getMonday(new Date());
     start.setHours(0, 0, 0, 0);
 
@@ -20,7 +24,7 @@ export class ScheduleService {
 
     const assignments = await this.prisma.shiftAssignment.findMany({
       where: {
-        tenantId,
+        ...branchScope(scope),
         date: { gte: start, lte: end },
       },
       include: {
@@ -32,9 +36,15 @@ export class ScheduleService {
       orderBy: [{ date: "asc" }, { user: { firstName: "asc" } }],
     });
 
-    // Also get all staff for the tenant
+    // Staff roster scoped to the active branch: a user belongs to the
+    // branch via their primaryBranchId, so a branch-pinned manager only
+    // sees the staff they can actually schedule here.
     const staff = await this.prisma.user.findMany({
-      where: { tenantId, status: "ACTIVE" },
+      where: {
+        tenantId: scope.tenantId,
+        primaryBranchId: scope.branchId,
+        status: "ACTIVE",
+      },
       select: { id: true, firstName: true, lastName: true, role: true },
       orderBy: { firstName: "asc" },
     });
@@ -42,7 +52,8 @@ export class ScheduleService {
     return { weekStart: start, weekEnd: end, assignments, staff };
   }
 
-  async assign(tenantId: string, dto: AssignShiftDto) {
+  async assign(scope: BranchScope, dto: AssignShiftDto) {
+    const tenantId = scope.tenantId;
     // Validate user belongs to tenant
     const user = await this.prisma.user.findFirst({
       where: { id: dto.userId, tenantId },
@@ -66,6 +77,9 @@ export class ScheduleService {
           date,
           notes: dto.notes,
           tenantId,
+          // Write-path branchId stays derived from the template — the
+          // assignment lives where the template lives, not necessarily
+          // the actor's active branch.
           branchId: template.branchId,
         },
         include: {
@@ -85,12 +99,12 @@ export class ScheduleService {
     }
   }
 
-  async assignBulk(tenantId: string, dto: BulkAssignShiftDto) {
+  async assignBulk(scope: BranchScope, dto: BulkAssignShiftDto) {
     const successes = [];
     const failures = [];
     for (const assignment of dto.assignments) {
       try {
-        const result = await this.assign(tenantId, assignment);
+        const result = await this.assign(scope, assignment);
         successes.push(result);
       } catch (error: any) {
         failures.push({ error: error.message, assignment });

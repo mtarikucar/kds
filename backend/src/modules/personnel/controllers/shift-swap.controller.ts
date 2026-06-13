@@ -17,6 +17,8 @@ import { RequiresFeature } from "../../subscriptions/decorators/requires-feature
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 import { ShiftSwapService } from "../services/shift-swap.service";
 import { CreateSwapRequestDto } from "../dto/create-swap-request.dto";
 
@@ -96,7 +98,7 @@ export class ShiftSwapController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "List swap requests" })
-  findAll(@Request() req) {
-    return this.shiftSwapService.findAll(req.tenantId);
+  findAll(@CurrentScope() scope: BranchScope) {
+    return this.shiftSwapService.findAll(scope);
   }
 }

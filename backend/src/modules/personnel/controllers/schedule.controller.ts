@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   Query,
-  Request,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
@@ -18,6 +17,8 @@ import { RequiresFeature } from "../../subscriptions/decorators/requires-feature
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 import { ScheduleService } from "../services/schedule.service";
 import { AssignShiftDto, BulkAssignShiftDto } from "../dto/assign-shift.dto";
 import { ScheduleQueryDto } from "../dto/schedule-query.dto";
@@ -39,31 +40,34 @@ export class ScheduleController {
     UserRole.COURIER,
   )
   @ApiOperation({ summary: "Get weekly schedule" })
-  getWeeklySchedule(@Request() req, @Query() query: ScheduleQueryDto) {
-    return this.scheduleService.getWeeklySchedule(
-      req.tenantId,
-      query.weekStart,
-    );
+  getWeeklySchedule(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: ScheduleQueryDto,
+  ) {
+    return this.scheduleService.getWeeklySchedule(scope, query.weekStart);
   }
 
   @Post("assign")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Assign shift to user" })
-  assign(@Request() req, @Body() dto: AssignShiftDto) {
-    return this.scheduleService.assign(req.tenantId, dto);
+  assign(@CurrentScope() scope: BranchScope, @Body() dto: AssignShiftDto) {
+    return this.scheduleService.assign(scope, dto);
   }
 
   @Post("assign-bulk")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Bulk assign shifts" })
-  assignBulk(@Request() req, @Body() dto: BulkAssignShiftDto) {
-    return this.scheduleService.assignBulk(req.tenantId, dto);
+  assignBulk(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: BulkAssignShiftDto,
+  ) {
+    return this.scheduleService.assignBulk(scope, dto);
   }
 
   @Delete(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Remove shift assignment" })
-  remove(@Request() req, @Param("id") id: string) {
-    return this.scheduleService.remove(id, req.tenantId);
+  remove(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.scheduleService.remove(id, scope.tenantId);
   }
 }

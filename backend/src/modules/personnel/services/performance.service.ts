@@ -1,13 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  BranchScope,
+  branchScope,
+} from "../../../common/scoping/branch-scope";
 import { PerformanceQueryDto } from "../dto/performance-query.dto";
 
 @Injectable()
 export class PerformanceService {
   constructor(private prisma: PrismaService) {}
 
-  async getEnhancedMetrics(tenantId: string, query: PerformanceQueryDto) {
+  async getEnhancedMetrics(scope: BranchScope, query: PerformanceQueryDto) {
     const now = new Date();
     const startDate = query.startDate
       ? new Date(query.startDate)
@@ -15,7 +19,7 @@ export class PerformanceService {
     const endDate = query.endDate ? new Date(query.endDate) : now;
 
     const where: any = {
-      tenantId,
+      ...branchScope(scope),
       createdAt: { gte: startDate, lte: endDate },
       status: { in: ["READY", "SERVED", "PAID"] },
     };
@@ -42,7 +46,7 @@ export class PerformanceService {
     // Get attendance data for the same period
     const attendances = await this.prisma.attendance.findMany({
       where: {
-        tenantId,
+        ...branchScope(scope),
         date: { gte: startDate, lte: endDate },
         status: "CLOCKED_OUT",
         ...(query.userId ? { userId: query.userId } : {}),
@@ -156,7 +160,7 @@ export class PerformanceService {
     return metrics.sort((a, b) => b.performanceScore - a.performanceScore);
   }
 
-  async getTrends(tenantId: string, query: PerformanceQueryDto) {
+  async getTrends(scope: BranchScope, query: PerformanceQueryDto) {
     const now = new Date();
     const months = 6;
     const monthNames = [
@@ -193,14 +197,14 @@ export class PerformanceService {
     const results = await Promise.all(
       monthRanges.map(async ({ monthStart, monthEnd }) => {
         const orderWhere: any = {
-          tenantId,
+          ...branchScope(scope),
           createdAt: { gte: monthStart, lte: monthEnd },
           status: { in: ["READY", "SERVED", "PAID"] },
         };
         if (query.userId) orderWhere.userId = query.userId;
 
         const attendanceWhere: any = {
-          tenantId,
+          ...branchScope(scope),
           date: { gte: monthStart, lte: monthEnd },
           status: "CLOCKED_OUT",
         };
