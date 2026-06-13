@@ -10,6 +10,10 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { CreateCashDrawerMovementDto } from "./dto/create-cash-drawer-movement.dto";
 import { RejectCashDrawerMovementDto } from "./dto/reject-cash-drawer-movement.dto";
 import { UserRole } from "../../common/constants/roles.enum";
+import {
+  BranchScope,
+  branchScope,
+} from "../../common/scoping/branch-scope";
 
 /**
  * v2.8.99 — cash drawer movement service.
@@ -78,9 +82,9 @@ export class CashDrawerService {
     });
   }
 
-  async listPending(tenantId: string) {
+  async listPending(scope: BranchScope) {
     return this.prisma.cashDrawerMovement.findMany({
-      where: { tenantId, approvalStatus: "DRAFT" },
+      where: { ...branchScope(scope), approvalStatus: "DRAFT" },
       include: {
         user: { select: { id: true, firstName: true, lastName: true } },
       },
@@ -89,15 +93,15 @@ export class CashDrawerService {
   }
 
   async approve(
-    tenantId: string,
+    scope: BranchScope,
     movementId: string,
     approver: { id: string; role: string },
   ) {
     this.assertCanReview(approver.role);
-    // updateMany with compound WHERE: tenantId IDOR + status=DRAFT gate
-    // so a second-approver race doesn't double-flip the row.
+    // updateMany with compound WHERE: tenant+branch IDOR + status=DRAFT
+    // gate so a second-approver race doesn't double-flip the row.
     const claim = await this.prisma.cashDrawerMovement.updateMany({
-      where: { id: movementId, tenantId, approvalStatus: "DRAFT" },
+      where: { id: movementId, ...branchScope(scope), approvalStatus: "DRAFT" },
       data: {
         approvalStatus: "APPROVED",
         approvedById: approver.id,
@@ -110,19 +114,19 @@ export class CashDrawerService {
       );
     }
     return this.prisma.cashDrawerMovement.findFirstOrThrow({
-      where: { id: movementId, tenantId },
+      where: { id: movementId, ...branchScope(scope) },
     });
   }
 
   async reject(
-    tenantId: string,
+    scope: BranchScope,
     movementId: string,
     approver: { id: string; role: string },
     dto: RejectCashDrawerMovementDto,
   ) {
     this.assertCanReview(approver.role);
     const claim = await this.prisma.cashDrawerMovement.updateMany({
-      where: { id: movementId, tenantId, approvalStatus: "DRAFT" },
+      where: { id: movementId, ...branchScope(scope), approvalStatus: "DRAFT" },
       data: {
         approvalStatus: "REJECTED",
         approvedById: approver.id,
@@ -136,13 +140,13 @@ export class CashDrawerService {
       );
     }
     return this.prisma.cashDrawerMovement.findFirstOrThrow({
-      where: { id: movementId, tenantId },
+      where: { id: movementId, ...branchScope(scope) },
     });
   }
 
-  async findOne(tenantId: string, movementId: string) {
+  async findOne(scope: BranchScope, movementId: string) {
     const movement = await this.prisma.cashDrawerMovement.findFirst({
-      where: { id: movementId, tenantId },
+      where: { id: movementId, ...branchScope(scope) },
       include: {
         user: { select: { id: true, firstName: true, lastName: true } },
         approvedBy: { select: { id: true, firstName: true, lastName: true } },
