@@ -1,5 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { collectDefaultMetrics, Histogram, Registry } from "prom-client";
+import {
+  collectDefaultMetrics,
+  Gauge,
+  Histogram,
+  Registry,
+} from "prom-client";
 
 /**
  * Prometheus metrics for the backend, exposed at GET /api/metrics
@@ -26,8 +31,31 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * Depth of the outbox dead-letter queue (events that exhausted all retries
+   * and need operator triage). Previously this was only discoverable by
+   * grepping logs for "outbox DLQ"; exposing it as a gauge lets a Prometheus
+   * alert fire on `outbox_dlq_depth > 0`. The worker bumps it inline as rows
+   * give up and re-sets it to an authoritative count on each hourly prune.
+   */
+  private readonly outboxDlqDepthGauge = new Gauge({
+    name: "outbox_dlq_depth",
+    help: "Number of outbox events parked in the dead-letter queue (status=failed)",
+    registers: [this.registry],
+  });
+
   constructor() {
     collectDefaultMetrics({ register: this.registry });
+  }
+
+  /** Set the DLQ depth to an authoritative value (e.g. a COUNT(*) result). */
+  setOutboxDlqDepth(depth: number): void {
+    this.outboxDlqDepthGauge.set(depth);
+  }
+
+  /** Increment the DLQ depth by one as a single event gives up. */
+  incOutboxDlqDepth(): void {
+    this.outboxDlqDepthGauge.inc();
   }
 
   /**
