@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import { SalesReport, TopProduct, SalesReportDto } from '../../types';
 
 export const useSalesReport = (params: SalesReportDto) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['reports', 'sales', params],
+    queryKey: ['reports', 'sales', params, branchId],
     queryFn: async (): Promise<SalesReport> => {
       const response = await api.get('/reports/sales', { params });
       return response.data;
@@ -14,8 +16,9 @@ export const useSalesReport = (params: SalesReportDto) => {
 };
 
 export const useTopProducts = (params: SalesReportDto) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['reports', 'top-products', params],
+    queryKey: ['reports', 'top-products', params, branchId],
     queryFn: async (): Promise<TopProduct[]> => {
       const response = await api.get('/reports/top-products', { params });
       return response.data.products || [];

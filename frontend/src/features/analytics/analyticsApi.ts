@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   DateRangeParams,
   HeatmapQueryParams,
@@ -46,8 +47,9 @@ export const analyticsKeys = {
 // ==================== HEATMAP HOOKS ====================
 
 export const useOccupancyHeatmap = (params: HeatmapQueryParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.heatmap('occupancy', params),
+    queryKey: [...analyticsKeys.heatmap('occupancy', params), branchId],
     queryFn: async (): Promise<HeatmapResponse> => {
       const response = await api.get('/analytics/heatmap/occupancy', { params });
       return response.data;
@@ -58,8 +60,9 @@ export const useOccupancyHeatmap = (params: HeatmapQueryParams) => {
 };
 
 export const useTrafficHeatmap = (params: HeatmapQueryParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.heatmap('traffic', params),
+    queryKey: [...analyticsKeys.heatmap('traffic', params), branchId],
     queryFn: async (): Promise<HeatmapResponse> => {
       const response = await api.get('/analytics/heatmap/traffic', { params });
       return response.data;
@@ -70,8 +73,9 @@ export const useTrafficHeatmap = (params: HeatmapQueryParams) => {
 };
 
 export const useDwellTimeHeatmap = (params: HeatmapQueryParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.heatmap('dwell-time', params),
+    queryKey: [...analyticsKeys.heatmap('dwell-time', params), branchId],
     queryFn: async (): Promise<HeatmapResponse> => {
       const response = await api.get('/analytics/heatmap/dwell-time', { params });
       return response.data;
@@ -84,8 +88,9 @@ export const useDwellTimeHeatmap = (params: HeatmapQueryParams) => {
 // ==================== TRAFFIC FLOW HOOKS ====================
 
 export const useTrafficFlow = (params: DateRangeParams & { limit?: number }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.trafficFlow(params),
+    queryKey: [...analyticsKeys.trafficFlow(params), branchId],
     queryFn: async (): Promise<TrafficFlowResponse> => {
       const response = await api.get('/analytics/traffic/flow', { params });
       return response.data;
@@ -96,8 +101,9 @@ export const useTrafficFlow = (params: DateRangeParams & { limit?: number }) => 
 };
 
 export const useCongestionAnalysis = (params: DateRangeParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.congestion(params),
+    queryKey: [...analyticsKeys.congestion(params), branchId],
     queryFn: async (): Promise<CongestionResponse> => {
       const response = await api.get('/analytics/traffic/congestion', { params });
       return response.data;
@@ -110,8 +116,9 @@ export const useCongestionAnalysis = (params: DateRangeParams) => {
 // ==================== TABLE ANALYTICS HOOKS ====================
 
 export const useTableUtilization = (params: DateRangeParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.tableUtilization(params),
+    queryKey: [...analyticsKeys.tableUtilization(params), branchId],
     queryFn: async (): Promise<TableAnalyticsResponse> => {
       const response = await api.get('/analytics/tables/utilization', { params });
       return response.data;
@@ -122,8 +129,9 @@ export const useTableUtilization = (params: DateRangeParams) => {
 };
 
 export const useTableTrends = (params: DateRangeParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.tableTrends(params),
+    queryKey: [...analyticsKeys.tableTrends(params), branchId],
     queryFn: async (): Promise<TableTrendResponse> => {
       const response = await api.get('/analytics/tables/trends', { params });
       return response.data;
@@ -134,8 +142,9 @@ export const useTableTrends = (params: DateRangeParams) => {
 };
 
 export const useUnderutilizedTables = (threshold?: number) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.underutilizedTables(threshold),
+    queryKey: [...analyticsKeys.underutilizedTables(threshold), branchId],
     queryFn: async (): Promise<TableUtilization[]> => {
       const response = await api.get('/analytics/tables/underutilized', {
         params: threshold ? { threshold } : undefined,
@@ -148,8 +157,9 @@ export const useUnderutilizedTables = (threshold?: number) => {
 };
 
 export const useCustomerBehavior = (params: DateRangeParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.customerBehavior(params),
+    queryKey: [...analyticsKeys.customerBehavior(params), branchId],
     queryFn: async (): Promise<CustomerBehavior> => {
       const response = await api.get('/analytics/customer-behavior', { params });
       return response.data;
@@ -176,8 +186,9 @@ export interface InsightFilters {
 }
 
 export const useInsights = (filters?: InsightFilters) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.insightList(filters),
+    queryKey: [...analyticsKeys.insightList(filters), branchId],
     queryFn: async (): Promise<InsightListResponse> => {
       const response = await api.get('/analytics/insights', { params: filters });
       return response.data;
@@ -188,8 +199,9 @@ export const useInsights = (filters?: InsightFilters) => {
 };
 
 export const useInsightSummary = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.insightSummary(),
+    queryKey: [...analyticsKeys.insightSummary(), branchId],
     queryFn: async (): Promise<InsightSummary> => {
       const response = await api.get('/analytics/insights/summary');
       return response.data;
@@ -200,8 +212,9 @@ export const useInsightSummary = () => {
 };
 
 export const useActionableInsights = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.actionableInsights(),
+    queryKey: [...analyticsKeys.actionableInsights(), branchId],
     queryFn: async (): Promise<Insight[]> => {
       const response = await api.get('/analytics/insights/actionable');
       return response.data;
@@ -212,8 +225,9 @@ export const useActionableInsights = () => {
 };
 
 export const useInsight = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.insight(id),
+    queryKey: [...analyticsKeys.insight(id), branchId],
     queryFn: async (): Promise<Insight> => {
       const response = await api.get(`/analytics/insights/${id}`);
       return response.data;
@@ -264,8 +278,9 @@ export const useGenerateInsights = () => {
 // ==================== CAMERA HOOKS ====================
 
 export const useCameras = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.cameras(),
+    queryKey: [...analyticsKeys.cameras(), branchId],
     queryFn: async (): Promise<Camera[]> => {
       const response = await api.get('/analytics/cameras');
       return response.data;
@@ -276,8 +291,9 @@ export const useCameras = () => {
 };
 
 export const useCameraHealth = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.cameraHealth(),
+    queryKey: [...analyticsKeys.cameraHealth(), branchId],
     queryFn: async (): Promise<CameraHealthSummary> => {
       const response = await api.get('/analytics/cameras/health');
       return response.data;
@@ -288,8 +304,9 @@ export const useCameraHealth = () => {
 };
 
 export const useCamera = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: analyticsKeys.camera(id),
+    queryKey: [...analyticsKeys.camera(id), branchId],
     queryFn: async (): Promise<Camera> => {
       const response = await api.get(`/analytics/cameras/${id}`);
       return response.data;

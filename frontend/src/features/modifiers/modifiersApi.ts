@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   ModifierGroup,
   Modifier,
@@ -17,8 +18,9 @@ import {
 // ========================================
 
 export const useModifierGroups = (includeInactive = false) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['modifier-groups', includeInactive],
+    queryKey: ['modifier-groups', includeInactive, branchId],
     queryFn: async (): Promise<ModifierGroup[]> => {
       const response = await api.get('/modifiers/groups', {
         params: { includeInactive },
@@ -29,8 +31,9 @@ export const useModifierGroups = (includeInactive = false) => {
 };
 
 export const useModifierGroup = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['modifier-groups', id],
+    queryKey: ['modifier-groups', id, branchId],
     queryFn: async (): Promise<ModifierGroup> => {
       const response = await api.get(`/modifiers/groups/${id}`);
       return response.data;
@@ -103,8 +106,9 @@ export const useDeleteModifierGroup = () => {
 // ========================================
 
 export const useModifiers = (groupId?: string, includeUnavailable = false) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['modifiers', groupId, includeUnavailable],
+    queryKey: ['modifiers', groupId, includeUnavailable, branchId],
     queryFn: async (): Promise<Modifier[]> => {
       const response = await api.get('/modifiers', {
         params: { groupId, includeUnavailable },
@@ -115,8 +119,9 @@ export const useModifiers = (groupId?: string, includeUnavailable = false) => {
 };
 
 export const useModifier = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['modifiers', id],
+    queryKey: ['modifiers', id, branchId],
     queryFn: async (): Promise<Modifier> => {
       const response = await api.get(`/modifiers/${id}`);
       return response.data;
@@ -192,8 +197,9 @@ export const useDeleteModifier = () => {
 // ========================================
 
 export const useProductModifiers = (productId: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['product-modifiers', productId],
+    queryKey: ['product-modifiers', productId, branchId],
     queryFn: async (): Promise<ModifierGroup[]> => {
       const response = await api.get(`/modifiers/products/${productId}`);
       return response.data;

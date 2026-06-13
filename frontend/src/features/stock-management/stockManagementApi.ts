@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import i18n from '../../i18n/config';
 import { toast } from 'sonner';
 import type {
@@ -21,11 +22,13 @@ import type {
 const BASE = '/stock-management';
 
 // ─── Categories ─────────────────────────────
-export const useStockCategories = () =>
-  useQuery<StockItemCategory[]>({
-    queryKey: ['stockCategories'],
+export const useStockCategories = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockItemCategory[]>({
+    queryKey: ['stockCategories', branchId],
     queryFn: async () => (await api.get(`${BASE}/categories`)).data,
   });
+};
 
 export const useCreateStockCategory = () => {
   const qc = useQueryClient();
@@ -66,30 +69,38 @@ export const useDeleteStockCategory = () => {
 };
 
 // ─── Stock Items ─────────────────────────────
-export const useStockItems = (params?: { search?: string; categoryId?: string; isActive?: boolean; sortBy?: string; sortOrder?: string }) =>
-  useQuery<StockItem[]>({
-    queryKey: ['stockItems', params],
+export const useStockItems = (params?: { search?: string; categoryId?: string; isActive?: boolean; sortBy?: string; sortOrder?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockItem[]>({
+    queryKey: ['stockItems', params, branchId],
     queryFn: async () => (await api.get(`${BASE}/items`, { params })).data,
   });
+};
 
-export const useStockItem = (id: string) =>
-  useQuery<StockItem>({
-    queryKey: ['stockItems', id],
+export const useStockItem = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockItem>({
+    queryKey: ['stockItems', id, branchId],
     queryFn: async () => (await api.get(`${BASE}/items/${id}`)).data,
     enabled: !!id,
   });
+};
 
-export const useLowStockItems = () =>
-  useQuery<any[]>({
-    queryKey: ['stockItems', 'lowStock'],
+export const useLowStockItems = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<any[]>({
+    queryKey: ['stockItems', 'lowStock', branchId],
     queryFn: async () => (await api.get(`${BASE}/items/low-stock`)).data,
   });
+};
 
-export const useExpiringSoon = (days?: number) =>
-  useQuery<StockBatch[]>({
-    queryKey: ['stockItems', 'expiring', days],
+export const useExpiringSoon = (days?: number) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockBatch[]>({
+    queryKey: ['stockItems', 'expiring', days, branchId],
     queryFn: async () => (await api.get(`${BASE}/items/expiring-soon`, { params: { days } })).data,
   });
+};
 
 export const useCreateStockItem = () => {
   const qc = useQueryClient();
@@ -129,25 +140,31 @@ export const useDeleteStockItem = () => {
 };
 
 // ─── Recipes ─────────────────────────────────
-export const useRecipes = () =>
-  useQuery<Recipe[]>({
-    queryKey: ['recipes'],
+export const useRecipes = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<Recipe[]>({
+    queryKey: ['recipes', branchId],
     queryFn: async () => (await api.get(`${BASE}/recipes`)).data,
   });
+};
 
-export const useRecipe = (id: string) =>
-  useQuery<Recipe>({
-    queryKey: ['recipes', id],
+export const useRecipe = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<Recipe>({
+    queryKey: ['recipes', id, branchId],
     queryFn: async () => (await api.get(`${BASE}/recipes/${id}`)).data,
     enabled: !!id,
   });
+};
 
-export const useRecipeByProduct = (productId: string) =>
-  useQuery<Recipe>({
-    queryKey: ['recipes', 'product', productId],
+export const useRecipeByProduct = (productId: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<Recipe>({
+    queryKey: ['recipes', 'product', productId, branchId],
     queryFn: async () => (await api.get(`${BASE}/recipes/by-product/${productId}`)).data,
     enabled: !!productId,
   });
+};
 
 export const useCreateRecipe = () => {
   const qc = useQueryClient();
@@ -193,18 +210,22 @@ export const useCheckRecipeStock = () =>
   });
 
 // ─── Suppliers ───────────────────────────────
-export const useSuppliers = () =>
-  useQuery<Supplier[]>({
-    queryKey: ['suppliers'],
+export const useSuppliers = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<Supplier[]>({
+    queryKey: ['suppliers', branchId],
     queryFn: async () => (await api.get(`${BASE}/suppliers`)).data,
   });
+};
 
-export const useSupplier = (id: string) =>
-  useQuery<Supplier>({
-    queryKey: ['suppliers', id],
+export const useSupplier = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<Supplier>({
+    queryKey: ['suppliers', id, branchId],
     queryFn: async () => (await api.get(`${BASE}/suppliers/${id}`)).data,
     enabled: !!id,
   });
+};
 
 export const useCreateSupplier = () => {
   const qc = useQueryClient();
@@ -268,18 +289,22 @@ export const useRemoveSupplierItem = () => {
 };
 
 // ─── Purchase Orders ─────────────────────────
-export const usePurchaseOrders = (status?: string) =>
-  useQuery<PurchaseOrder[]>({
-    queryKey: ['purchaseOrders', status],
+export const usePurchaseOrders = (status?: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<PurchaseOrder[]>({
+    queryKey: ['purchaseOrders', status, branchId],
     queryFn: async () => (await api.get(`${BASE}/purchase-orders`, { params: { status } })).data,
   });
+};
 
-export const usePurchaseOrder = (id: string) =>
-  useQuery<PurchaseOrder>({
-    queryKey: ['purchaseOrders', id],
+export const usePurchaseOrder = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<PurchaseOrder>({
+    queryKey: ['purchaseOrders', id, branchId],
     queryFn: async () => (await api.get(`${BASE}/purchase-orders/${id}`)).data,
     enabled: !!id,
   });
+};
 
 export const useCreatePurchaseOrder = () => {
   const qc = useQueryClient();
@@ -332,11 +357,13 @@ export const useCancelPurchaseOrder = () => {
 };
 
 // ─── Movements ───────────────────────────────
-export const useIngredientMovements = (params?: { stockItemId?: string; type?: string; startDate?: string; endDate?: string }) =>
-  useQuery<IngredientMovement[]>({
-    queryKey: ['ingredientMovements', params],
+export const useIngredientMovements = (params?: { stockItemId?: string; type?: string; startDate?: string; endDate?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<IngredientMovement[]>({
+    queryKey: ['ingredientMovements', params, branchId],
     queryFn: async () => (await api.get(`${BASE}/movements`, { params })).data,
   });
+};
 
 export const useCreateMovement = () => {
   const qc = useQueryClient();
@@ -352,17 +379,21 @@ export const useCreateMovement = () => {
 };
 
 // ─── Waste Logs ──────────────────────────────
-export const useWasteLogs = (params?: { stockItemId?: string; reason?: string; startDate?: string; endDate?: string }) =>
-  useQuery<WasteLog[]>({
-    queryKey: ['wasteLogs', params],
+export const useWasteLogs = (params?: { stockItemId?: string; reason?: string; startDate?: string; endDate?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<WasteLog[]>({
+    queryKey: ['wasteLogs', params, branchId],
     queryFn: async () => (await api.get(`${BASE}/waste-logs`, { params })).data,
   });
+};
 
-export const useWasteSummary = (params?: { startDate?: string; endDate?: string }) =>
-  useQuery({
-    queryKey: ['wasteLogs', 'summary', params],
+export const useWasteSummary = (params?: { startDate?: string; endDate?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['wasteLogs', 'summary', params, branchId],
     queryFn: async () => (await api.get(`${BASE}/waste-logs/summary`, { params })).data,
   });
+};
 
 export const useCreateWasteLog = () => {
   const qc = useQueryClient();
@@ -378,18 +409,22 @@ export const useCreateWasteLog = () => {
 };
 
 // ─── Stock Counts ────────────────────────────
-export const useStockCounts = (status?: string) =>
-  useQuery<StockCount[]>({
-    queryKey: ['stockCounts', status],
+export const useStockCounts = (status?: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockCount[]>({
+    queryKey: ['stockCounts', status, branchId],
     queryFn: async () => (await api.get(`${BASE}/stock-counts`, { params: { status } })).data,
   });
+};
 
-export const useStockCount = (id: string) =>
-  useQuery<StockCount>({
-    queryKey: ['stockCounts', id],
+export const useStockCount = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockCount>({
+    queryKey: ['stockCounts', id, branchId],
     queryFn: async () => (await api.get(`${BASE}/stock-counts/${id}`)).data,
     enabled: !!id,
   });
+};
 
 export const useCreateStockCount = () => {
   const qc = useQueryClient();
@@ -439,30 +474,38 @@ export const useCancelStockCount = () => {
 };
 
 // ─── Dashboard ───────────────────────────────
-export const useStockDashboard = () =>
-  useQuery<StockDashboard>({
-    queryKey: ['stockDashboard'],
+export const useStockDashboard = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockDashboard>({
+    queryKey: ['stockDashboard', branchId],
     queryFn: async () => (await api.get(`${BASE}/dashboard`)).data,
   });
+};
 
-export const useStockValuation = () =>
-  useQuery<StockValuation>({
-    queryKey: ['stockValuation'],
+export const useStockValuation = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockValuation>({
+    queryKey: ['stockValuation', branchId],
     queryFn: async () => (await api.get(`${BASE}/dashboard/valuation`)).data,
   });
+};
 
-export const useMovementSummary = (params?: { startDate?: string; endDate?: string }) =>
-  useQuery({
-    queryKey: ['movementSummary', params],
+export const useMovementSummary = (params?: { startDate?: string; endDate?: string }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['movementSummary', params, branchId],
     queryFn: async () => (await api.get(`${BASE}/dashboard/movement-summary`, { params })).data,
   });
+};
 
 // ─── Settings ────────────────────────────────
-export const useStockSettings = () =>
-  useQuery<StockSettings>({
-    queryKey: ['stockSettings'],
+export const useStockSettings = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<StockSettings>({
+    queryKey: ['stockSettings', branchId],
     queryFn: async () => (await api.get(`${BASE}/settings`)).data,
   });
+};
 
 export const useUpdateStockSettings = () => {
   const qc = useQueryClient();

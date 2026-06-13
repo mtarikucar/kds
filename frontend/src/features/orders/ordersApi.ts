@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   Order,
   CreateOrderDto,
@@ -20,8 +21,9 @@ import {
 } from '../../types';
 
 export const useOrders = (filters?: OrderFilters) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['orders', filters],
+    queryKey: ['orders', filters, branchId],
     queryFn: async (): Promise<Order[]> => {
       const response = await api.get<Order[]>('/orders', { params: filters });
       return response.data;
@@ -30,8 +32,9 @@ export const useOrders = (filters?: OrderFilters) => {
 };
 
 export const useOrder = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['orders', id],
+    queryKey: ['orders', id, branchId],
     queryFn: async (): Promise<Order> => {
       const response = await api.get(`/orders/${id}`);
       return response.data;
@@ -243,8 +246,9 @@ export const useSplitBill = () => {
 };
 
 export const useGroupBillSummary = (groupId: string | null) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['groupBillSummary', groupId],
+    queryKey: ['groupBillSummary', groupId, branchId],
     queryFn: async (): Promise<GroupBillSummary> => {
       const response = await api.get(`/orders/group-bill-summary/${groupId}`);
       return response.data;
@@ -258,8 +262,9 @@ export const useGroupBillSummary = (groupId: string | null) => {
 // ========================================
 
 export const usePayableItems = (orderId: string | null) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['payableItems', orderId],
+    queryKey: ['payableItems', orderId, branchId],
     queryFn: async (): Promise<PayableItemsSummary> => {
       const response = await api.get(`/orders/${orderId}/payments/payable-items`);
       return response.data;
@@ -313,8 +318,9 @@ export const usePayByItems = () => {
 // ========================================
 
 export const usePendingOrders = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['orders', 'pending'],
+    queryKey: ['orders', 'pending', branchId],
     queryFn: async (): Promise<Order[]> => {
       const response = await api.get<Order[]>('/orders', {
         params: { status: 'PENDING_APPROVAL' },
@@ -353,8 +359,9 @@ export const useApproveOrder = () => {
 // ========================================
 
 export const useWaiterRequests = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['waiterRequests'],
+    queryKey: ['waiterRequests', branchId],
     queryFn: async (): Promise<WaiterRequest[]> => {
       const response = await api.get<WaiterRequest[]>('/customer-orders/waiter-requests/tenant/active');
       return response.data;
@@ -410,8 +417,9 @@ export const useCompleteWaiterRequest = () => {
 // ========================================
 
 export const useBillRequests = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['billRequests'],
+    queryKey: ['billRequests', branchId],
     queryFn: async (): Promise<BillRequest[]> => {
       const response = await api.get<BillRequest[]>('/customer-orders/bill-requests/tenant/active');
       return response.data;

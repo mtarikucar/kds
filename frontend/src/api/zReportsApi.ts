@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useBranchScopeStore } from '../store/branchScopeStore';
 import type { PaginatedResponse } from '../types';
 
 export interface CreateZReportDto {
@@ -54,8 +55,9 @@ export function useZReports(params?: {
   startDate?: string;
   endDate?: string;
 }) {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['z-reports', params],
+    queryKey: ['z-reports', params, branchId],
     queryFn: async (): Promise<ZReportsListResponse> => {
       const response = await api.get('/z-reports', { params });
       return response.data;
@@ -67,8 +69,9 @@ export function useZReports(params?: {
  * Get a specific Z-Report
  */
 export function useZReport(id: string) {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['z-report', id],
+    queryKey: ['z-report', id, branchId],
     queryFn: async (): Promise<ZReport> => {
       const response = await api.get(`/z-reports/${id}`);
       return response.data;

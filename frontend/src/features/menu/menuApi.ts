@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   Category,
   Product,
@@ -14,8 +15,9 @@ import {
 
 // Categories
 export const useCategories = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', branchId],
     queryFn: async (): Promise<Category[]> => {
       const response = await api.get<Category[]>('/menu/categories');
       return response.data;
@@ -24,8 +26,9 @@ export const useCategories = () => {
 };
 
 export const useCategory = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['categories', id],
+    queryKey: ['categories', id, branchId],
     queryFn: async (): Promise<Category> => {
       const response = await api.get(`/menu/categories/${id}`);
       return response.data;
@@ -95,8 +98,9 @@ export const useDeleteCategory = () => {
 
 // Products
 export const useProducts = (filters?: ProductFilters) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['products', filters],
+    queryKey: ['products', filters, branchId],
     queryFn: async (): Promise<Product[]> => {
       const response = await api.get<Product[]>('/menu/products', { params: filters });
       return response.data;
@@ -105,8 +109,9 @@ export const useProducts = (filters?: ProductFilters) => {
 };
 
 export const useProduct = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['products', id],
+    queryKey: ['products', id, branchId],
     queryFn: async (): Promise<Product> => {
       const response = await api.get(`/menu/products/${id}`);
       return response.data;
@@ -177,6 +182,11 @@ export const useDeleteProduct = () => {
 // Reorder Categories (batch update display order)
 export const useReorderCategories = () => {
   const queryClient = useQueryClient();
+  // The optimistic cache writes below target the EXACT categories list key,
+  // which now carries branchId — so they must read/write the same branch-keyed
+  // entry the useCategories() read registers, or the optimistic reorder no-ops.
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  const categoriesKey = ['categories', branchId] as const;
 
   return useMutation({
     mutationFn: async (orderedIds: string[]): Promise<void> => {
@@ -192,8 +202,8 @@ export const useReorderCategories = () => {
     },
     // Optimistic update - immediately update the cache
     onMutate: async (orderedIds: string[]) => {
-      await queryClient.cancelQueries({ queryKey: ['categories'] });
-      const previousCategories = queryClient.getQueryData<Category[]>(['categories']);
+      await queryClient.cancelQueries({ queryKey: categoriesKey });
+      const previousCategories = queryClient.getQueryData<Category[]>(categoriesKey);
 
       if (previousCategories) {
         const updatedCategories = previousCategories.map(category => {
@@ -203,14 +213,14 @@ export const useReorderCategories = () => {
           }
           return category;
         });
-        queryClient.setQueryData(['categories'], updatedCategories);
+        queryClient.setQueryData(categoriesKey, updatedCategories);
       }
 
       return { previousCategories };
     },
     onError: (error: any, _variables, context) => {
       if (context?.previousCategories) {
-        queryClient.setQueryData(['categories'], context.previousCategories);
+        queryClient.setQueryData(categoriesKey, context.previousCategories);
       }
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },

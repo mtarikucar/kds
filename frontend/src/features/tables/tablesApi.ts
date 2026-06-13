@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import { Table, CreateTableDto, UpdateTableDto, MergeTablesDto, UnmergeTableDto, TableGroupInfo } from '../../types';
 
 export const useTables = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['tables'],
+    queryKey: ['tables', branchId],
     queryFn: async (): Promise<Table[]> => {
       const response = await api.get<Table[]>('/tables');
       return response.data;
@@ -15,8 +17,9 @@ export const useTables = () => {
 };
 
 export const useTable = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['tables', id],
+    queryKey: ['tables', id, branchId],
     queryFn: async (): Promise<Table> => {
       const response = await api.get(`/tables/${id}`);
       return response.data;
@@ -164,8 +167,9 @@ export const useUnmergeAll = () => {
 };
 
 export const useTableGroup = (groupId: string | null) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['tableGroup', groupId],
+    queryKey: ['tableGroup', groupId, branchId],
     queryFn: async (): Promise<TableGroupInfo> => {
       const response = await api.get(`/tables/group/${groupId}`);
       return response.data;
