@@ -326,9 +326,14 @@ export const usePosSocket = () => {
     const handleBillRequestNew = (event: any) => {
       console.log('[POS Socket] New bill request received:', event);
 
-      // Add to bill requests cache
-      const billRequests = queryClient.getQueryData<any[]>(['billRequests', 'active']) || [];
-      queryClient.setQueryData(['billRequests', 'active'], [event, ...billRequests]);
+      // Add to bill requests cache. The panels read ['billRequests', branchId]
+      // (useBillRequests); the previous ['billRequests','active'] key was a dead
+      // write nobody read, so new requests never appeared live. branchId is read
+      // fresh (socket re-roomed on switch) so the optimistic insert lands in the
+      // active branch's list.
+      const branchId = useBranchScopeStore.getState().branchId;
+      const billRequests = queryClient.getQueryData<any[]>(['billRequests', branchId]) || [];
+      queryClient.setQueryData(['billRequests', branchId], [event, ...billRequests]);
       console.log('[POS Socket] Added bill request to cache');
 
       // Invalidate tables to update bill request indicator
@@ -349,12 +354,13 @@ export const usePosSocket = () => {
       console.log('[POS Socket] Bill request updated:', event);
 
       // Update or remove from bill requests cache based on status
-      const billRequests = queryClient.getQueryData<any[]>(['billRequests', 'active']) || [];
+      const branchId = useBranchScopeStore.getState().branchId;
+      const billRequests = queryClient.getQueryData<any[]>(['billRequests', branchId]) || [];
 
       if (event.status === 'COMPLETED') {
         // Remove from active requests
         const updated = billRequests.filter(req => req.id !== event.id);
-        queryClient.setQueryData(['billRequests', 'active'], updated);
+        queryClient.setQueryData(['billRequests', branchId], updated);
         console.log('[POS Socket] Removed completed bill request from cache');
       } else {
         // Update the request in cache
@@ -362,7 +368,7 @@ export const usePosSocket = () => {
         if (existingIndex >= 0) {
           const updated = [...billRequests];
           updated[existingIndex] = event;
-          queryClient.setQueryData(['billRequests', 'active'], updated);
+          queryClient.setQueryData(['billRequests', branchId], updated);
           console.log('[POS Socket] Updated bill request in cache');
         }
       }
@@ -378,9 +384,11 @@ export const usePosSocket = () => {
     const handleWaiterRequestNew = (event: any) => {
       console.log('[POS Socket] New waiter request received:', event);
 
-      // Add to waiter requests cache
-      const waiterRequests = queryClient.getQueryData<any[]>(['waiterRequests', 'active']) || [];
-      queryClient.setQueryData(['waiterRequests', 'active'], [event, ...waiterRequests]);
+      // Add to waiter requests cache. Panels read ['waiterRequests', branchId]
+      // (useWaiterRequests); the old ['waiterRequests','active'] write was dead.
+      const branchId = useBranchScopeStore.getState().branchId;
+      const waiterRequests = queryClient.getQueryData<any[]>(['waiterRequests', branchId]) || [];
+      queryClient.setQueryData(['waiterRequests', branchId], [event, ...waiterRequests]);
       console.log('[POS Socket] Added waiter request to cache');
 
       // Invalidate tables to update waiter call indicator
@@ -401,12 +409,13 @@ export const usePosSocket = () => {
       console.log('[POS Socket] Waiter request updated:', event);
 
       // Update or remove from waiter requests cache based on status
-      const waiterRequests = queryClient.getQueryData<any[]>(['waiterRequests', 'active']) || [];
+      const branchId = useBranchScopeStore.getState().branchId;
+      const waiterRequests = queryClient.getQueryData<any[]>(['waiterRequests', branchId]) || [];
 
       if (event.status === 'COMPLETED') {
         // Remove from active requests
         const updated = waiterRequests.filter(req => req.id !== event.id);
-        queryClient.setQueryData(['waiterRequests', 'active'], updated);
+        queryClient.setQueryData(['waiterRequests', branchId], updated);
         console.log('[POS Socket] Removed completed waiter request from cache');
       } else {
         // Update the request in cache
@@ -414,7 +423,7 @@ export const usePosSocket = () => {
         if (existingIndex >= 0) {
           const updated = [...waiterRequests];
           updated[existingIndex] = event;
-          queryClient.setQueryData(['waiterRequests', 'active'], updated);
+          queryClient.setQueryData(['waiterRequests', branchId], updated);
           console.log('[POS Socket] Updated waiter request in cache');
         }
       }
