@@ -36,14 +36,23 @@ export class ScheduleService {
       orderBy: [{ date: "asc" }, { user: { firstName: "asc" } }],
     });
 
-    // Staff roster scoped to the active branch: a user belongs to the
-    // branch via their primaryBranchId, so a branch-pinned manager only
-    // sees the staff they can actually schedule here.
+    // Staff roster scoped to the active branch. A user is schedulable here
+    // if EITHER this is their primaryBranchId OR they're assigned to roam
+    // here via the m:n UserBranchAssignment allow-list (primary elsewhere).
+    // Filtering on primaryBranchId alone hid assignable roamers from the
+    // branch's scheduler.
     const staff = await this.prisma.user.findMany({
       where: {
         tenantId: scope.tenantId,
-        primaryBranchId: scope.branchId,
         status: "ACTIVE",
+        OR: [
+          { primaryBranchId: scope.branchId },
+          {
+            branchAssignments: {
+              some: { tenantId: scope.tenantId, branchId: scope.branchId },
+            },
+          },
+        ],
       },
       select: { id: true, firstName: true, lastName: true, role: true },
       orderBy: { firstName: "asc" },
