@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { OrdersService } from "./services/orders.service";
+import { OrderTransferService } from "./services/order-transfer.service";
 import { PaymentsService } from "./services/payments.service";
 import { ReceiptSnapshotBuilder } from "./services/receipt-snapshot.builder";
 import { OrdersController } from "./controllers/orders.controller";
@@ -23,7 +24,12 @@ import { StockManagementModule } from "../stock-management/stock-management.modu
     AccountingModule,
   ],
   controllers: [OrdersController, PaymentsController],
-  providers: [OrdersService, PaymentsService, ReceiptSnapshotBuilder],
+  providers: [
+    OrdersService,
+    OrderTransferService,
+    PaymentsService,
+    ReceiptSnapshotBuilder,
+  ],
   exports: [OrdersService, PaymentsService, ReceiptSnapshotBuilder],
 })
 export class OrdersModule {}

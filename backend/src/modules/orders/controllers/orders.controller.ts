@@ -20,6 +20,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { OrdersService } from "../services/orders.service";
+import { OrderTransferService } from "../services/order-transfer.service";
 import { PaymentsService } from "../services/payments.service";
 import { CreateOrderDto } from "../dto/create-order.dto";
 import { UpdateOrderDto } from "../dto/update-order.dto";
@@ -46,6 +47,7 @@ import { OrderStatus } from "../../../common/constants/order-status.enum";
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
+    private readonly orderTransferService: OrderTransferService,
     private readonly paymentsService: PaymentsService,
   ) {}
 
@@ -88,7 +90,7 @@ export class OrdersController {
     @Body() dto: TransferTableOrdersDto,
     @CurrentScope() scope: BranchScope,
   ) {
-    return this.ordersService.transferTableOrders(scope, dto);
+    return this.orderTransferService.transferTableOrders(scope, dto);
   }
 
   @Post("sync-table-statuses")
