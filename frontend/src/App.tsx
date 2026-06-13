@@ -99,18 +99,17 @@ import FeatureGate from './components/subscriptions/FeatureGate';
 import UpsellCard from './components/subscriptions/UpsellCard';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useBranchChangeInvalidation } from './hooks/useBranchChangeInvalidation';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
 import { useBranchScopeStore } from './store/branchScopeStore';
 import { UserRole } from './types';
 import { detectSubdomain } from './utils/subdomain';
-import { useQueryClient } from '@tanstack/react-query';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const isAuthenticated = useAuthStore((state) => !!state.accessToken);
   const user = useAuthStore((state) => state.user);
-  const queryClient = useQueryClient();
 
   // v3.0.0 — hydrate the branch scope every time the persisted user
   // changes. Cross-store side effects live HERE (component effect),
@@ -119,18 +118,10 @@ function App() {
     useBranchScopeStore.getState().hydrateFromUser(user);
   }, [user]);
 
-  // v3.0.0 — invalidate every TanStack Query when the active branch
-  // changes so stale data from the previous branch can't show up
-  // for the staleTime window.
-  useEffect(() => {
-    return useBranchScopeStore.subscribe(
-      (s, prev) => {
-        if (s.branchId !== prev.branchId) {
-          queryClient.removeQueries();
-        }
-      },
-    );
-  }, [queryClient]);
+  // v3.0.0 — invalidate every TanStack Query when the active branch changes so
+  // stale data from the previous branch can't show up for the staleTime window.
+  // Extracted to a unit-tested hook (useBranchChangeInvalidation).
+  useBranchChangeInvalidation();
 
   // Detect subdomain access
   const subdomainInfo = useMemo(() => detectSubdomain(), []);
