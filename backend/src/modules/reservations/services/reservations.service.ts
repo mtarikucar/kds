@@ -236,16 +236,14 @@ export class ReservationsService {
     // availability reads use, so what the guest saw as available matches
     // the branch the booking lands on.
     //
-    // v3.0.1 audit follow-up: the no-branchId fallback dumps every
-    // anonymous walk-in onto whichever branch was created first, which is
-    // surprising for chains with several locations. The DTO doesn't yet
-    // carry a branch selector; once it does, resolvePublicBranchId already
-    // honors it (no further change here). Track in
-    // backlog/reservations-multi-branch-public.md.
+    // v3.0.1 audit follow-up (now resolved): a walk-in / no-table booking
+    // honors an explicit dto.branchId (multi-branch picker), falling back to
+    // the oldest-active branch only when none is supplied. The DTO now
+    // declares branchId so the whitelisting ValidationPipe keeps it.
     if (!resolvedBranchId) {
       resolvedBranchId = await this.availability.resolvePublicBranchId(
         tenantId,
-        (dto as any).branchId,
+        dto.branchId,
       );
     }
 

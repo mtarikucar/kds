@@ -104,6 +104,16 @@ export class PublicReservationsController {
   }
 
   @Public()
+  @Get(":tenantId/branches")
+  @ApiOperation({
+    summary:
+      "List a tenant's bookable (active) branches for the public reservation branch picker",
+  })
+  listBranches(@Param("tenantId") tenantId: string) {
+    return this.availabilityService.listPublicBranches(tenantId);
+  }
+
+  @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Get(":tenantId/lookup")
   @ApiOperation({ summary: "Lookup reservation by phone and number" })

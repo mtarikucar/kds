@@ -111,6 +111,29 @@ describe("ReservationAvailabilityService — public availability branch scoping 
     });
   });
 
+  describe("listPublicBranches", () => {
+    it("returns active branches (id+name only) oldest-first, tenant-scoped", async () => {
+      (prisma.branch.findMany as any).mockResolvedValue([
+        { id: "b-1", name: "Kadıköy" },
+        { id: "b-2", name: "Beşiktaş" },
+      ]);
+
+      const res = await svc.listPublicBranches("t-1");
+
+      const args = (prisma.branch.findMany as any).mock.calls[0][0];
+      // Only active branches of THIS tenant are bookable by the public.
+      expect(args.where).toEqual({ tenantId: "t-1", status: "active" });
+      // Oldest-first so the first entry is the same default resolvePublicBranchId picks.
+      expect(args.orderBy).toEqual({ createdAt: "asc" });
+      // Public-safe projection: never leak more than the picker needs.
+      expect(args.select).toEqual({ id: true, name: true });
+      expect(res).toEqual([
+        { id: "b-1", name: "Kadıköy" },
+        { id: "b-2", name: "Beşiktaş" },
+      ]);
+    });
+  });
+
   describe("getAvailableSlots", () => {
     it("scopes the existing-reservation read to the resolved branch", async () => {
       (prisma.branch.findFirst as any).mockResolvedValue({
