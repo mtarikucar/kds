@@ -72,6 +72,7 @@ export class HeatmapService {
     const records = await this.prisma.occupancyRecord.findMany({
       where: {
         tenantId,
+        branchId,
         timestamp: {
           gte: startDate,
           lte: endDate,
@@ -172,6 +173,7 @@ export class HeatmapService {
     const records = await this.prisma.trafficFlowRecord.findMany({
       where: {
         tenantId,
+        branchId,
         hourBucket: {
           gte: startDate,
           lte: endDate,
@@ -235,6 +237,7 @@ export class HeatmapService {
    */
   async getDwellTimeHeatmap(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
     options: HeatmapOptions = {},
@@ -254,6 +257,7 @@ export class HeatmapService {
     const records = await this.prisma.trafficFlowRecord.findMany({
       where: {
         tenantId,
+        branchId,
         hourBucket: {
           gte: startDate,
           lte: endDate,
@@ -322,6 +326,7 @@ export class HeatmapService {
    */
   async getTrafficFlowPaths(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
     limit: number = 50,
@@ -330,6 +335,7 @@ export class HeatmapService {
     const trackingIds = await this.prisma.occupancyRecord.findMany({
       where: {
         tenantId,
+        branchId,
         timestamp: {
           gte: startDate,
           lte: endDate,
@@ -350,6 +356,7 @@ export class HeatmapService {
       const points = await this.prisma.occupancyRecord.findMany({
         where: {
           tenantId,
+          branchId,
           trackingId,
           timestamp: {
             gte: startDate,
@@ -406,6 +413,7 @@ export class HeatmapService {
    */
   async getCongestionAnalysis(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<CongestionResponseDto> {
@@ -413,6 +421,7 @@ export class HeatmapService {
     const records = await this.prisma.trafficFlowRecord.findMany({
       where: {
         tenantId,
+        branchId,
         hourBucket: {
           gte: startDate,
           lte: endDate,
