@@ -13,6 +13,7 @@ import {
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 import { IntegrationAdapter } from "./integration-adapter.interface";
 import { YemeksepetiAdapter } from "./adapters/yemeksepeti.adapter";
 import { GetirAdapter } from "./adapters/getir.adapter";
@@ -110,7 +111,12 @@ export class IntegrationService {
         tenantId,
         payload: { connectionId: row.id, providerId: input.providerId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "integration-gateway",
+          op: "connect",
+        }),
+      );
     return row;
   }
 
@@ -141,7 +147,12 @@ export class IntegrationService {
         tenantId,
         payload: { connectionId, providerId: row.providerId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "integration-gateway",
+          op: "disconnect",
+        }),
+      );
   }
 
   // -- Webhook ingestion -------------------------------------------------
@@ -343,7 +354,12 @@ export class IntegrationService {
         tenantId,
         payload: { webhookEventId: row.id, providerId, type: row.type },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "integration-gateway",
+          op: "webhook-ingest",
+        }),
+      );
 
     return row;
   }

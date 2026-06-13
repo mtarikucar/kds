@@ -14,6 +14,7 @@ import { FiscalReceiptRequest } from "./fiscal-provider.interface";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import { captureException } from "../../sentry.config";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Domain service for fiscal receipts. Persists every receipt request to
@@ -148,7 +149,12 @@ export class FiscalService {
             error: result.error,
           },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "fiscal-core",
+            op: "issueReceipt",
+          }),
+        );
       return updated;
     } catch (e) {
       // Compliance-critical money path — the provider dispatch threw. This was
@@ -175,7 +181,12 @@ export class FiscalService {
           tenantId: req.tenantId,
           payload: { fiscalReceiptId: updated.id, error: (e as Error).message },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "fiscal-core",
+            op: "issueReceipt",
+          }),
+        );
       return updated;
     }
   }
@@ -234,7 +245,12 @@ export class FiscalService {
         tenantId: scope.tenantId,
         payload: { fiscalDeviceId, zNo: report.zNo },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fiscal-core",
+          op: "closeDay",
+        }),
+      );
     return report;
   }
 
@@ -336,7 +352,12 @@ export class FiscalService {
             retried: true,
           },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "fiscal-core",
+            op: "retryFailed",
+          }),
+        );
 
       return updated;
     } catch (e) {

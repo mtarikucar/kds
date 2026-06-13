@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 import { OutboxService } from "../outbox/outbox.service";
 import {
   PaymentIntent,
@@ -47,7 +48,12 @@ export class PaymentsFacadeService {
           externalRef: req.externalRef,
         },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "payments-core",
+          op: "intent_created",
+        }),
+      );
 
     return intent;
   }
@@ -71,7 +77,12 @@ export class PaymentsFacadeService {
         tenantId,
         payload: { providerId, ...refund },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "payments-core",
+          op: "refund",
+        }),
+      );
     return refund;
   }
 
@@ -96,7 +107,12 @@ export class PaymentsFacadeService {
           tenantId: null,
           payload: ev as any,
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "payments-core",
+            op: "ingestWebhook",
+          }),
+        );
     }
   }
 
