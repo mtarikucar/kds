@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  Optional,
   NotFoundException,
   BadRequestException,
   ConflictException,
@@ -8,6 +9,8 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { MetricsService } from "../../../common/metrics/metrics.service";
+import { captureException } from "../../../sentry.config";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { NotificationType } from "../../notifications/dto/create-notification.dto";
 import { CreateReservationDto } from "../dto/create-reservation.dto";
@@ -30,7 +33,40 @@ export class ReservationsService {
     // Email-first / SMS-fallback abstraction. Still calls into the
     // SMS service under the hood when phone is the live channel.
     private reservationNotificationService: ReservationNotificationService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  private countReservation(status: string): void {
+    this.metrics?.incCounter(
+      "reservations_total",
+      "Reservations by lifecycle event (created|confirmed)",
+      { status },
+    );
+  }
+
+  /**
+   * Fire-and-forget customer notify, but with the failure surfaced to Sentry
+   * (correlation id auto-attached) instead of silently lost — the audit
+   * flagged these unawaited notify() calls as dropping send failures.
+   */
+  private notifyCustomer(
+    tenantId: string,
+    event: "created" | "confirmed",
+    payload: Parameters<ReservationNotificationService["notify"]>[2],
+  ): void {
+    this.countReservation(event);
+    void this.reservationNotificationService
+      .notify(tenantId, event, payload)
+      .catch((e) =>
+        captureException(e as Error, {
+          module: "reservations",
+          op: "notifyCustomer",
+          event,
+          tenantId,
+        }),
+      );
+  }
 
   private async validateTenant(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
@@ -427,7 +463,7 @@ export class ReservationsService {
     // Notify customer. Channel chosen at call time: email if the
     // customer left one and the emailOnReservationCreated toggle is on;
     // SMS otherwise (or as fallback when email send fails).
-    this.reservationNotificationService.notify(tenantId, "created", {
+    this.notifyCustomer(tenantId, "created", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,
@@ -641,7 +677,7 @@ export class ReservationsService {
       reservation.date instanceof Date
         ? reservation.date.toISOString().split("T")[0]
         : String(reservation.date);
-    this.reservationNotificationService.notify(scope.tenantId, "confirmed", {
+    this.notifyCustomer(scope.tenantId, "confirmed", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,

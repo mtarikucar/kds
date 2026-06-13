@@ -4,6 +4,7 @@ import * as handlebars from "handlebars";
 import * as fs from "fs";
 import * as path from "path";
 import { maskEmail } from "../../common/helpers/pii-mask.helper";
+import { captureException } from "../../sentry.config";
 
 @Injectable()
 export class MailerService {
@@ -108,6 +109,12 @@ export class MailerService {
       return true;
     } catch (error) {
       this.logger.error("Failed to send admin notification", error);
+      // A dropped admin email is a lost lead — surface it to Sentry instead of
+      // only logging, so an SMTP outage is alertable.
+      captureException(error as Error, {
+        module: "contact",
+        op: "sendAdminNotification",
+      });
       return false;
     }
   }

@@ -27,6 +27,25 @@ describe("MetricsService", () => {
     expect(output).toContain("outbox_dlq_depth 0");
   });
 
+  it("incCounter lazily creates and increments a label-less domain counter", async () => {
+    service.incCounter("orders_created_total", "Orders created");
+    service.incCounter("orders_created_total", "Orders created");
+    const output = await service.metrics();
+    expect(output).toContain("orders_created_total 2");
+  });
+
+  it("incCounter supports labels and is drift-safe (missing label → empty)", async () => {
+    service.incCounter("auth_logins_total", "Logins", { result: "success" });
+    service.incCounter("auth_logins_total", "Logins", { result: "failure" });
+    service.incCounter("auth_logins_total", "Logins", { result: "failure" });
+    // A later caller that forgets the label must not throw; it lands in "".
+    expect(() => service.incCounter("auth_logins_total", "Logins")).not.toThrow();
+
+    const output = await service.metrics();
+    expect(output).toContain('auth_logins_total{result="success"} 1');
+    expect(output).toContain('auth_logins_total{result="failure"} 2');
+  });
+
   it("records http request observations with labels", async () => {
     service.observeHttpRequest("GET", "/api/orders/:id", 200, 0.042);
     service.observeHttpRequest("GET", "/api/orders/:id", 200, 0.061);

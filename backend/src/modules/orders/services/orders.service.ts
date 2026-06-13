@@ -32,6 +32,7 @@ import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
 import { ReservationStatus } from "../../reservations/constants/reservation-status.enum";
 import { OutboxService } from "../../outbox/outbox.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { MetricsService } from "../../../common/metrics/metrics.service";
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -65,6 +66,8 @@ export class OrdersService {
     // no-op (kds-routing falls back to the existing kdsGateway broadcast).
     @Optional()
     private outbox?: OutboxService,
+    @Optional()
+    private metrics?: MetricsService,
   ) {}
 
   /**
@@ -81,6 +84,11 @@ export class OrdersService {
       | "order.cancelled.v1",
     order: any,
   ): void {
+    this.metrics?.incCounter(
+      "orders_lifecycle_total",
+      "Order lifecycle events by type (created|updated|completed|cancelled)",
+      { type },
+    );
     if (!this.outbox) return;
     this.outbox
       .append({

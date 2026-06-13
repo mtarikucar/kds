@@ -57,6 +57,7 @@ describe('PaymentsService', () => {
     let config: any;
     let subscriptions: any;
     let referralDirectory: { resolveReferralCode: jest.Mock };
+    let metrics: { incCounter: jest.Mock };
     let svc: PaymentsService;
 
     const TENANT_ID = '11111111-2222-3333-4444-555555555555';
@@ -91,6 +92,7 @@ describe('PaymentsService', () => {
       referralDirectory = {
         resolveReferralCode: jest.fn().mockResolvedValue(null),
       };
+      metrics = { incCounter: jest.fn() };
       svc = new PaymentsService(
         prisma as any,
         paytr,
@@ -98,6 +100,7 @@ describe('PaymentsService', () => {
         subscriptions,
         consents as any,
         referralDirectory as any,
+        metrics as any,
       );
     });
 
@@ -221,6 +224,11 @@ describe('PaymentsService', () => {
       expect(result.paymentLink).toContain('paytr.com');
       expect(subscriptions.startTrialFromIntent).not.toHaveBeenCalled();
       expect(paytr.getIframeToken).toHaveBeenCalled();
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'payment_intents_total',
+        expect.any(String),
+        { result: 'created' },
+      );
     });
 
     /**

@@ -3,12 +3,14 @@ import {
   Inject,
   forwardRef,
   Logger,
+  Optional,
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import * as bcrypt from "bcryptjs";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { OAuth2Client } from "google-auth-library";
@@ -120,6 +122,9 @@ export class AuthService {
     private emailService: EmailService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
+    // Optional so unit tests constructing AuthService bare keep working and
+    // auth never depends on the metrics registry being wired.
+    @Optional() private metrics?: MetricsService,
   ) {
     // Initialize Google OAuth client
     this.googleClient = new OAuth2Client(
@@ -604,11 +609,21 @@ export class AuthService {
     // (timing-based email enumeration).
     if (!user) {
       await bcrypt.compare(password, DUMMY_BCRYPT_HASH).catch(() => false);
+      this.metrics?.incCounter(
+        "auth_login_failures_total",
+        "Failed login attempts, labeled by reason",
+        { reason: "unknown_user" },
+      );
       return null;
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      this.metrics?.incCounter(
+        "auth_login_failures_total",
+        "Failed login attempts, labeled by reason",
+        { reason: "bad_password" },
+      );
       return null;
     }
 
@@ -731,6 +746,10 @@ export class AuthService {
         where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      this.metrics?.incCounter(
+        "auth_refresh_reuse_total",
+        "Refresh-token reuse (theft signal) detections that family-revoked a user",
+      );
       throw new UnauthorizedException("Refresh token reuse detected");
     }
 
