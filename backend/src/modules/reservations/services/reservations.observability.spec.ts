@@ -17,6 +17,7 @@ function build(notifyImpl: jest.Mock) {
     {} as any, // notificationsService
     {} as any, // settingsService
     { notify: notifyImpl } as any, // reservationNotificationService
+    {} as any, // availability (ReservationAvailabilityService)
     metrics as any,
   );
   return { svc, metrics };

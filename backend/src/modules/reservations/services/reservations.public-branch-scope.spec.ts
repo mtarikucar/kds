@@ -1,4 +1,4 @@
-import { ReservationsService } from "./reservations.service";
+import { ReservationAvailabilityService } from "./reservation-availability.service";
 import {
   mockPrismaClient,
   MockPrismaClient,
@@ -18,9 +18,9 @@ import {
  * when valid, else the oldest-active branch (the same resolution
  * createPublicReservation already uses).
  */
-describe("ReservationsService — public availability branch scoping (Task 8)", () => {
+describe("ReservationAvailabilityService — public availability branch scoping (Task 8)", () => {
   let prisma: MockPrismaClient;
-  let svc: ReservationsService;
+  let svc: ReservationAvailabilityService;
 
   const activeTenant = { id: "t-1", status: "ACTIVE" };
   const enabledSettings = {
@@ -35,23 +35,12 @@ describe("ReservationsService — public availability branch scoping (Task 8)", 
   beforeEach(() => {
     prisma = mockPrismaClient();
 
-    const notificationsService = {
-      notifyAdmins: jest.fn().mockResolvedValue(undefined),
-    } as any;
     const settingsService = {
       getOrCreate: jest.fn().mockResolvedValue(enabledSettings),
       getPublicSettings: jest.fn(),
     } as any;
-    const reservationNotificationService = {
-      notify: jest.fn(),
-    } as any;
 
-    svc = new ReservationsService(
-      prisma as any,
-      notificationsService,
-      settingsService,
-      reservationNotificationService,
-    );
+    svc = new ReservationAvailabilityService(prisma as any, settingsService);
 
     // Tenant is valid+active by default.
     (prisma.tenant.findUnique as any).mockResolvedValue(activeTenant);
