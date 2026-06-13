@@ -15,6 +15,7 @@ import {
   EntitlementValue,
 } from "./entitlement.types";
 import { EntitlementInvalidationBus } from "./entitlement-invalidation.bus";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Read & write side of the entitlement engine.
@@ -207,7 +208,14 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
     this.invalidateLocal(tenantId);
     // Best-effort fan-out. The bus is a no-op when Redis is unconfigured;
     // the 30s TTL keeps eventual consistency intact.
-    this.invalidationBus?.publish(tenantId).catch(() => undefined);
+    this.invalidationBus
+      ?.publish(tenantId)
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "entitlements",
+          op: "invalidationBus",
+        }),
+      );
   }
 
   /** Drop only this replica's cache — used by the bus listener and tests. */

@@ -15,6 +15,7 @@ import { EmailService } from "../../../common/services/email.service";
 import { reserveSubdomain } from "../../../common/helpers/subdomain.helper";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
+import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 
 type PlanFeatureKey =
   | "advancedReports"
@@ -694,7 +695,12 @@ export class SuperAdminTenantsService {
         tenantId,
         payload: { tenantId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "superadmin",
+          op: "tenantOverridesChanged",
+        }),
+      );
 
     return {
       featureOverrides: newFeatureOverrides,
@@ -746,7 +752,12 @@ export class SuperAdminTenantsService {
         tenantId,
         payload: { tenantId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "superadmin",
+          op: "tenantOverridesChanged",
+        }),
+      );
 
     return { featureOverrides: null, limitOverrides: null };
   }
