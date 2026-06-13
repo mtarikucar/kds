@@ -2,6 +2,7 @@ import { Injectable, LoggerService as NestLoggerService } from "@nestjs/common";
 import * as winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { join } from "path";
+import { RequestContext } from "../context/request-context";
 
 /**
  * Custom Winston Logger Service
@@ -122,52 +123,72 @@ export class LoggerService implements NestLoggerService {
    * Log a message
    */
   log(message: string, context?: string) {
-    this.logger.info(message, { context: context || this.context });
+    this.logger.info(
+      message,
+      RequestContext.enrich({ context: context || this.context }),
+    );
   }
 
   /**
    * Log an error
    */
   error(message: string, trace?: string, context?: string) {
-    this.logger.error(message, {
-      context: context || this.context,
-      trace,
-    });
+    this.logger.error(
+      message,
+      RequestContext.enrich({ context: context || this.context, trace }),
+    );
   }
 
   /**
    * Log a warning
    */
   warn(message: string, context?: string) {
-    this.logger.warn(message, { context: context || this.context });
+    this.logger.warn(
+      message,
+      RequestContext.enrich({ context: context || this.context }),
+    );
   }
 
   /**
    * Log debug information
    */
   debug(message: string, context?: string) {
-    this.logger.debug(message, { context: context || this.context });
+    this.logger.debug(
+      message,
+      RequestContext.enrich({ context: context || this.context }),
+    );
   }
 
   /**
    * Log verbose information
    */
   verbose(message: string, context?: string) {
-    this.logger.verbose(message, { context: context || this.context });
+    this.logger.verbose(
+      message,
+      RequestContext.enrich({ context: context || this.context }),
+    );
   }
 
   /**
    * Log HTTP request
    */
   http(message: string, meta?: any) {
-    this.logger.log("http", message, { ...meta, context: this.context });
+    this.logger.log(
+      "http",
+      message,
+      RequestContext.enrich({ ...meta, context: this.context }),
+    );
   }
 
   /**
    * Log with custom level
    */
   logWithLevel(level: string, message: string, meta?: any) {
-    this.logger.log(level, message, { ...meta, context: this.context });
+    this.logger.log(
+      level,
+      message,
+      RequestContext.enrich({ ...meta, context: this.context }),
+    );
   }
 
   /**

@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { RequestContext } from "./common/context/request-context";
 
 /**
  * Initialize Sentry error tracking and performance monitoring
@@ -54,6 +55,13 @@ export function initSentry() {
 
     // Filter out sensitive data
     beforeSend(event, hint) {
+      // Stamp the request-scoped correlation id so a Sentry event joins up
+      // with the access log + structured service logs for the same request.
+      const requestId = RequestContext.getRequestId();
+      if (requestId) {
+        event.tags = { ...event.tags, requestId };
+      }
+
       // Remove sensitive headers
       if (event.request?.headers) {
         delete event.request.headers["authorization"];

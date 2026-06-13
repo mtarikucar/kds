@@ -2,6 +2,7 @@ import { Injectable, NestMiddleware, Optional } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
 import { LoggerService } from "../services/logger.service";
 import { MetricsService } from "../metrics/metrics.service";
+import { RequestContext } from "../context/request-context";
 
 /**
  * Self-observation endpoints whose requests would only add noise to the
@@ -34,59 +35,64 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     const userAgent = req.get("user-agent") || "";
     const startTime = Date.now();
 
-    // Generate unique request ID
-    const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Seed the request-scoped correlation context. An inbound X-Request-Id
+    // is honoured for cross-service tracing; otherwise RequestContext mints a
+    // UUID. Wrapping `next()` makes the correlation id visible to every
+    // service-layer log, Sentry event, and outbox append in this request's
+    // async continuation — not just the two access-log lines here.
+    const inboundId =
+      (req.headers["x-request-id"] as string | undefined) || undefined;
 
-    // Attach request ID to request object for tracking
-    (req as any).requestId = requestId;
+    RequestContext.run({ requestId: inboundId }, () => {
+      const requestId = RequestContext.getRequestId()!;
 
-    // Log request (using HTTP level)
-    this.logger.http(`${method} ${originalUrl}`, {
-      requestId,
-      ip,
-      userAgent,
-    });
+      // Attach request ID to request object + response header for tracking.
+      (req as any).requestId = requestId;
+      res.setHeader("X-Request-Id", requestId);
 
-    // Log response when finished
-    res.on("finish", () => {
-      const { statusCode } = res;
-      const contentLength = res.get("content-length");
-      const responseTime = Date.now() - startTime;
+      // Log request (using HTTP level) — requestId auto-injected via context.
+      this.logger.http(`${method} ${originalUrl}`, { ip, userAgent });
 
-      const level =
-        statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "http";
+      // Log response when finished
+      res.on("finish", () => {
+        const { statusCode } = res;
+        const contentLength = res.get("content-length");
+        const responseTime = Date.now() - startTime;
 
-      this.logger.logWithLevel(
-        level,
-        `${method} ${originalUrl} ${statusCode}`,
-        {
-          requestId,
-          statusCode,
-          contentLength: contentLength || 0,
-          responseTime: `${responseTime}ms`,
-        },
-      );
+        const level =
+          statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "http";
 
-      if (
-        this.metrics &&
-        !METRICS_EXCLUDED_PATHS.some((p) => originalUrl.startsWith(p))
-      ) {
-        // req.route is populated once Express matched a handler; its
-        // pattern (`/orders/:id`) keeps label cardinality bounded where
-        // the raw URL would not. Unmatched requests (404s) share one
-        // bucket for the same reason.
-        const routePath = (req as any).route?.path;
-        const route = routePath ? `${req.baseUrl}${routePath}` : "unmatched";
-        this.metrics.observeHttpRequest(
-          method,
-          route,
-          statusCode,
-          responseTime / 1000,
+        this.logger.logWithLevel(
+          level,
+          `${method} ${originalUrl} ${statusCode}`,
+          {
+            statusCode,
+            contentLength: contentLength || 0,
+            responseTime: `${responseTime}ms`,
+          },
         );
-      }
-    });
 
-    next();
+        if (
+          this.metrics &&
+          !METRICS_EXCLUDED_PATHS.some((p) => originalUrl.startsWith(p))
+        ) {
+          // req.route is populated once Express matched a handler; its
+          // pattern (`/orders/:id`) keeps label cardinality bounded where
+          // the raw URL would not. Unmatched requests (404s) share one
+          // bucket for the same reason.
+          const routePath = (req as any).route?.path;
+          const route = routePath ? `${req.baseUrl}${routePath}` : "unmatched";
+          this.metrics.observeHttpRequest(
+            method,
+            route,
+            statusCode,
+            responseTime / 1000,
+          );
+        }
+      });
+
+      next();
+    });
   }
 }
 
