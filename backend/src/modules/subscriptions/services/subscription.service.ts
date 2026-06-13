@@ -22,6 +22,7 @@ import {
 import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
 import { ChangePlanDto } from "../dto/change-plan.dto";
 import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
+import { foldPlanGrants } from "./effective-features.fold";
 
 @Injectable()
 export class SubscriptionService {
@@ -1184,95 +1185,23 @@ export class SubscriptionService {
       this.logger.debug(
         `getEffectiveFeatures fell back to plan + override + addon fold for tenant=${tenantId} (engine empty)`,
       );
-      const featureOverrides =
-        (tenant.featureOverrides as Record<string, boolean>) || null;
-      const limitOverrides =
-        (tenant.limitOverrides as Record<string, number>) || null;
-      const features: Record<string, boolean> = {
-        advancedReports: plan.advancedReports,
-        multiLocation: plan.multiLocation,
-        customBranding: plan.customBranding,
-        apiAccess: plan.apiAccess,
-        prioritySupport: plan.prioritySupport,
-        inventoryTracking: plan.inventoryTracking,
-        kdsIntegration: plan.kdsIntegration,
-        reservationSystem: plan.reservationSystem,
-        personnelManagement: plan.personnelManagement,
-        deliveryIntegration: plan.deliveryIntegration,
-        // v3.0.7 — posAccess joined the engine's FEATURE_COLUMNS in v3.0.0 but
-        // this engine-empty fallback was never updated, so a fresh tenant
-        // (projector not run yet) resolved posAccess=undefined → the POS UI
-        // (<FeatureGate feature="posAccess">) and sidebar item were hidden even
-        // on BUSINESS. Must mirror PlanProjectorService.FEATURE_COLUMNS exactly.
-        posAccess: plan.posAccess,
-      };
-      const limits: Record<string, number> = {
-        maxUsers: plan.maxUsers,
-        maxTables: plan.maxTables,
-        // v3.0.7 — likewise missing from the fallback vs the projector's
-        // LIMIT_COLUMNS, so checkLimit('maxBranches') resolved undefined.
-        maxBranches: plan.maxBranches,
-        maxProducts: plan.maxProducts,
-        maxCategories: plan.maxCategories,
-        maxMonthlyOrders: plan.maxMonthlyOrders,
-      };
-      const integrations: Record<string, string[]> = {};
-
-      // Fold active add-ons. Each TenantAddOn carries a snapshot of the
-      // MarketplaceAddOn.grants JSON applied at purchase time. The
-      // engine's projector uses the same shape — features OR-true,
-      // limits SUM, integrations array-union — so reproduce it here.
+      // Engine-empty fallback fold extracted to a pure, tested helper
+      // (effective-features.fold.ts) — mirrors PlanProjectorService's
+      // FEATURE_COLUMNS/LIMIT_COLUMNS in one named place.
       const activeAddOns = await this.prisma.tenantAddOn.findMany({
         where: { tenantId, status: "active" },
         include: { addOn: { select: { grants: true } } },
       });
-      for (const ta of activeAddOns) {
-        const grants = (ta.addOn?.grants ?? {}) as Record<string, unknown>;
-        for (const [k, v] of Object.entries(grants)) {
-          if (k.startsWith("feature.")) {
-            const name = k.slice("feature.".length);
-            if (v === true && name in features) features[name] = true;
-          } else if (k.startsWith("limit.")) {
-            const name = k.slice("limit.".length);
-            if (typeof v === "number" && name in limits) {
-              // SUM by qty. Engine treats -1 as "unlimited"; preserve.
-              if (limits[name] === -1 || v === -1) {
-                limits[name] = -1;
-              } else {
-                limits[name] = limits[name] + v * (ta.quantity ?? 1);
-              }
-            }
-          } else if (k.startsWith("integration.")) {
-            const domain = k.slice("integration.".length);
-            const vendors = Array.isArray(v) ? (v as string[]) : [];
-            if (!integrations[domain]) integrations[domain] = [];
-            for (const vendor of vendors) {
-              if (!integrations[domain].includes(vendor)) {
-                integrations[domain].push(vendor);
-              }
-            }
-          }
-        }
-      }
-
-      // Overrides win last (REPLACE semantics matching the engine).
-      if (featureOverrides) {
-        for (const [k, v] of Object.entries(featureOverrides)) {
-          if (k in features) features[k] = v;
-        }
-      }
-      if (limitOverrides) {
-        for (const [k, v] of Object.entries(limitOverrides)) {
-          if (k in limits) limits[k] = v;
-        }
-      }
-
-      return {
-        features,
-        limits,
-        integrations,
-        trialEligiblePlanIds,
-      };
+      const folded = foldPlanGrants(
+        plan,
+        activeAddOns.map((ta) => ({
+          grants: (ta.addOn?.grants ?? null) as Record<string, unknown> | null,
+          quantity: ta.quantity,
+        })),
+        (tenant.featureOverrides as Record<string, boolean>) || null,
+        (tenant.limitOverrides as Record<string, number>) || null,
+      );
+      return { ...folded, trialEligiblePlanIds };
     }
 
     // Engine-resolved path: strip the `feature.` / `limit.` /
