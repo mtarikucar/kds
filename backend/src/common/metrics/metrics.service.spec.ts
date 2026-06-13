@@ -13,6 +13,20 @@ describe("MetricsService", () => {
     expect(output).toContain("nodejs_heap_size_total_bytes");
   });
 
+  it("exposes outbox_dlq_depth and reflects set()/inc()", async () => {
+    service.setOutboxDlqDepth(3);
+    let output = await service.metrics();
+    expect(output).toContain("outbox_dlq_depth 3");
+
+    service.incOutboxDlqDepth();
+    output = await service.metrics();
+    expect(output).toContain("outbox_dlq_depth 4");
+
+    service.setOutboxDlqDepth(0);
+    output = await service.metrics();
+    expect(output).toContain("outbox_dlq_depth 0");
+  });
+
   it("records http request observations with labels", async () => {
     service.observeHttpRequest("GET", "/api/orders/:id", 200, 0.042);
     service.observeHttpRequest("GET", "/api/orders/:id", 200, 0.061);
