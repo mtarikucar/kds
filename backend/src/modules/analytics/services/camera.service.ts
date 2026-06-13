@@ -12,6 +12,10 @@ import {
   decryptString,
   encryptString,
 } from "../../../common/helpers/encryption.helper";
+import {
+  BranchScope,
+  branchScope,
+} from "../../../common/scoping/branch-scope";
 
 /**
  * Replace `user:pass` in an RTSP/ONVIF URL with `***:***` so responses
@@ -36,9 +40,10 @@ export class CameraService {
    * Create a new camera
    */
   async createCamera(
-    tenantId: string,
+    scope: BranchScope,
     dto: CreateCameraDto,
   ): Promise<CameraResponseDto> {
+    const { tenantId } = scope;
     // Check for duplicate name
     const existing = await this.prisma.camera.findFirst({
       where: {
@@ -55,7 +60,9 @@ export class CameraService {
 
     // v3.0.0 — every operational row carries branchId. Derive from the
     // referenced edge device so a camera always lives in the same
-    // branch as its host device.
+    // branch as its host device. The WRITTEN branchId is the device's
+    // home branch (correct write-path derivation), not the acting
+    // scope's branch.
     const edgeDevice = await this.prisma.edgeDevice.findFirst({
       where: { id: dto.edgeDeviceId, tenantId },
       select: { branchId: true },
@@ -93,9 +100,9 @@ export class CameraService {
   /**
    * Get all cameras for a tenant
    */
-  async getCameras(tenantId: string): Promise<CameraResponseDto[]> {
+  async getCameras(scope: BranchScope): Promise<CameraResponseDto[]> {
     const cameras = await this.prisma.camera.findMany({
-      where: { tenantId },
+      where: { ...branchScope(scope) },
       orderBy: { name: "asc" },
     });
 
@@ -106,13 +113,13 @@ export class CameraService {
    * Get a single camera by ID
    */
   async getCameraById(
-    tenantId: string,
+    scope: BranchScope,
     cameraId: string,
   ): Promise<CameraResponseDto> {
     const camera = await this.prisma.camera.findFirst({
       where: {
         id: cameraId,
-        tenantId,
+        ...branchScope(scope),
       },
     });
 
@@ -127,14 +134,15 @@ export class CameraService {
    * Update a camera
    */
   async updateCamera(
-    tenantId: string,
+    scope: BranchScope,
     cameraId: string,
     dto: UpdateCameraDto,
   ): Promise<CameraResponseDto> {
+    const { tenantId } = scope;
     const camera = await this.prisma.camera.findFirst({
       where: {
         id: cameraId,
-        tenantId,
+        ...branchScope(scope),
       },
     });
 
@@ -142,7 +150,8 @@ export class CameraService {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
 
-    // Check for duplicate name if name is being changed
+    // Check for duplicate name if name is being changed. Names are unique
+    // per tenant, so the dedupe stays tenant-scoped.
     if (dto.name && dto.name !== camera.name) {
       const existing = await this.prisma.camera.findFirst({
         where: {
@@ -159,9 +168,9 @@ export class CameraService {
       }
     }
 
-    // Defence-in-depth: tenantId in the WHERE (B41-B45 pattern).
+    // Defence-in-depth: full branch scope in the WHERE (B41-B45 pattern).
     const claim = await this.prisma.camera.updateMany({
-      where: { id: cameraId, tenantId },
+      where: { id: cameraId, ...branchScope(scope) },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
@@ -185,9 +194,9 @@ export class CameraService {
     }
     // v2.8.94 — defense-in-depth: compound WHERE matches the upstream
     // claim. If the claim regresses, the re-fetch must not silently
-    // expose a cross-tenant row.
+    // expose a cross-branch row.
     const updated = await this.prisma.camera.findFirstOrThrow({
-      where: { id: cameraId, tenantId },
+      where: { id: cameraId, ...branchScope(scope) },
     });
 
     this.logger.log(`Updated camera ${cameraId}`);
@@ -197,11 +206,11 @@ export class CameraService {
   /**
    * Delete a camera
    */
-  async deleteCamera(tenantId: string, cameraId: string): Promise<void> {
+  async deleteCamera(scope: BranchScope, cameraId: string): Promise<void> {
     const camera = await this.prisma.camera.findFirst({
       where: {
         id: cameraId,
-        tenantId,
+        ...branchScope(scope),
       },
     });
 
@@ -209,9 +218,9 @@ export class CameraService {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
 
-    // Defence-in-depth: tenantId in the WHERE.
+    // Defence-in-depth: full branch scope in the WHERE.
     await this.prisma.camera.deleteMany({
-      where: { id: cameraId, tenantId },
+      where: { id: cameraId, ...branchScope(scope) },
     });
 
     this.logger.log(`Deleted camera ${cameraId}`);
@@ -303,7 +312,7 @@ export class CameraService {
   /**
    * Get camera health summary
    */
-  async getCameraHealthSummary(tenantId: string): Promise<{
+  async getCameraHealthSummary(scope: BranchScope): Promise<{
     total: number;
     online: number;
     offline: number;
@@ -312,7 +321,7 @@ export class CameraService {
   }> {
     const statusCounts = await this.prisma.camera.groupBy({
       by: ["status"],
-      where: { tenantId },
+      where: { ...branchScope(scope) },
       _count: true,
     });
 

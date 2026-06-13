@@ -538,8 +538,8 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get all cameras" })
   @ApiResponse({ status: 200, description: "List of cameras" })
-  async getCameras(@Request() req) {
-    return this.cameraService.getCameras(req.tenantId);
+  async getCameras(@CurrentScope() scope: BranchScope) {
+    return this.cameraService.getCameras(scope);
   }
 
   @Get("cameras/health")
@@ -547,8 +547,8 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get camera health summary" })
   @ApiResponse({ status: 200, description: "Camera health summary" })
-  async getCameraHealth(@Request() req) {
-    return this.cameraService.getCameraHealthSummary(req.tenantId);
+  async getCameraHealth(@CurrentScope() scope: BranchScope) {
+    return this.cameraService.getCameraHealthSummary(scope);
   }
 
   @Get("cameras/:id")
@@ -557,8 +557,11 @@ export class AnalyticsController {
   @ApiOperation({ summary: "Get camera by ID" })
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Camera details" })
-  async getCameraById(@Request() req, @Param("id") id: string) {
-    return this.cameraService.getCameraById(req.tenantId, id);
+  async getCameraById(
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    return this.cameraService.getCameraById(scope, id);
   }
 
   @Post("cameras")
@@ -566,8 +569,11 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Create a new camera" })
   @ApiResponse({ status: 201, description: "Camera created" })
-  async createCamera(@Request() req, @Body() dto: CreateCameraDto) {
-    return this.cameraService.createCamera(req.tenantId, dto);
+  async createCamera(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreateCameraDto,
+  ) {
+    return this.cameraService.createCamera(scope, dto);
   }
 
   @Put("cameras/:id")
@@ -577,11 +583,11 @@ export class AnalyticsController {
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Camera updated" })
   async updateCamera(
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() dto: UpdateCameraDto,
   ) {
-    return this.cameraService.updateCamera(req.tenantId, id, dto);
+    return this.cameraService.updateCamera(scope, id, dto);
   }
 
   @Delete("cameras/:id")
@@ -590,8 +596,11 @@ export class AnalyticsController {
   @ApiOperation({ summary: "Delete camera" })
   @ApiParam({ name: "id", description: "Camera ID" })
   @ApiResponse({ status: 200, description: "Camera deleted" })
-  async deleteCamera(@Request() req, @Param("id") id: string) {
-    await this.cameraService.deleteCamera(req.tenantId, id);
+  async deleteCamera(
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+  ) {
+    await this.cameraService.deleteCamera(scope, id);
     return { success: true };
   }
 
