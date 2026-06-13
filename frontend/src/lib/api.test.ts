@@ -19,6 +19,9 @@ describe('isTenantWidePath', () => {
       '/users/me/profile',
       '/v1/entitlements/me',
       '/superadmin/tenants',
+      // bare create route: api.post('/subscriptions') — the whole controller
+      // is class-level @SkipBranchScope, so the base path must fly too.
+      '/subscriptions',
       '/subscriptions/plans',
       '/subscriptions/current',
       '/subscriptions/effective-features',
