@@ -191,13 +191,28 @@ export class FiscalService {
     }
   }
 
+  /**
+   * Recovery-read scope: the active branch PLUS branchless orphans. A receipt
+   * issued by a device with no branch (fiscal_devices.branchId NULL → receipt
+   * branchId NULL) would otherwise be invisible to every per-branch recovery
+   * read and stuck forever. Including NULL makes those orphans actionable from
+   * any branch's panel; branchId is a globally-unique FK, so this never
+   * exposes another branch's owned receipts — only the unowned orphans.
+   */
+  private recoveryScope(scope: BranchScope) {
+    return {
+      tenantId: scope.tenantId,
+      OR: [{ branchId: scope.branchId }, { branchId: null }],
+    };
+  }
+
   async cancelReceipt(
     scope: BranchScope,
     fiscalReceiptId: string,
     reason: string,
   ) {
     const row = await this.prisma.fiscalReceipt.findFirst({
-      where: { id: fiscalReceiptId, ...branchScope(scope) },
+      where: { id: fiscalReceiptId, ...this.recoveryScope(scope) },
     });
     if (!row) throw new NotFoundException("Receipt not found");
     if (row.status !== "issued")
@@ -257,7 +272,10 @@ export class FiscalService {
   /** List receipts in queued/failed state — for the manual recovery panel. */
   async listPending(scope: BranchScope, limit = 100) {
     return this.prisma.fiscalReceipt.findMany({
-      where: { ...branchScope(scope), status: { in: ["queued", "failed"] } },
+      where: {
+        ...this.recoveryScope(scope),
+        status: { in: ["queued", "failed"] },
+      },
       include: { lines: true },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -281,7 +299,7 @@ export class FiscalService {
 
   async retryFailed(scope: BranchScope, fiscalReceiptId: string) {
     const row = await this.prisma.fiscalReceipt.findFirst({
-      where: { id: fiscalReceiptId, ...branchScope(scope) },
+      where: { id: fiscalReceiptId, ...this.recoveryScope(scope) },
       include: { lines: true, fiscalDevice: true },
     });
     if (!row) throw new NotFoundException("Receipt not found");
