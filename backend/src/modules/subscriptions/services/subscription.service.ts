@@ -111,7 +111,12 @@ export class SubscriptionService {
     if (!actorUserId) return;
     try {
       await this.prisma.userActivity.create({
-        data: { userId: actorUserId, tenantId, action, metadata: metadata as any },
+        data: {
+          userId: actorUserId,
+          tenantId,
+          action,
+          metadata: metadata as any,
+        },
       });
     } catch (e) {
       this.logger.warn(
@@ -373,15 +378,20 @@ export class SubscriptionService {
       }
 
       this.recordBillingEvent("create");
-      await this.writeBillingAudit(tenantId, actorUserId, "SUBSCRIPTION_CREATED", {
-        subscriptionId: result.id,
-        planId: plan.id,
-        planName: plan.name,
-        billingCycle: dto.billingCycle,
-        amount: amount.toString(),
-        currency: plan.currency,
-        isTrialPeriod,
-      });
+      await this.writeBillingAudit(
+        tenantId,
+        actorUserId,
+        "SUBSCRIPTION_CREATED",
+        {
+          subscriptionId: result.id,
+          planId: plan.id,
+          planName: plan.name,
+          billingCycle: dto.billingCycle,
+          amount: amount.toString(),
+          currency: plan.currency,
+          isTrialPeriod,
+        },
+      );
       return result;
     } catch (err) {
       if (
@@ -997,14 +1007,22 @@ export class SubscriptionService {
     const updated = txResult.updated;
     // Committed cancel (immediate or at-period-end) — recorded after the txn.
     this.recordBillingEvent("cancel");
-    await this.writeBillingAudit(tenantId, actorUserId, "SUBSCRIPTION_CANCELLED", {
-      subscriptionId,
-      planId: subscription.planId,
-      planName: subscription.plan.name,
-      immediate,
-      reason,
-      effectiveAt: (immediate ? now : subscription.currentPeriodEnd)?.toISOString(),
-    });
+    await this.writeBillingAudit(
+      tenantId,
+      actorUserId,
+      "SUBSCRIPTION_CANCELLED",
+      {
+        subscriptionId,
+        planId: subscription.planId,
+        planName: subscription.plan.name,
+        immediate,
+        reason,
+        effectiveAt: (immediate
+          ? now
+          : subscription.currentPeriodEnd
+        )?.toISOString(),
+      },
+    );
 
     // Notifications are user-facing side effects and stay outside the
     // txn — they touch SMTP and can stall for seconds.
