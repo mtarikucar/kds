@@ -6,17 +6,14 @@ import {
   Optional,
   UnauthorizedException,
   BadRequestException,
-  NotFoundException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import * as bcrypt from "bcryptjs";
-import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import * as appleSignin from "apple-signin-auth";
 import * as Sentry from "@sentry/node";
-import { Prisma } from "@prisma/client";
 import { addDays } from "date-fns";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
@@ -28,38 +25,39 @@ import {
   ResetPasswordDto,
   ChangePasswordDto,
 } from "./dto/password-reset.dto";
-import {
-  HARD_RESTRICTED_ROLES,
-  UserRole,
-} from "../../common/constants/roles.enum";
-import {
-  PaymentProvider,
-  TenantStatus,
-} from "../../common/constants/subscription.enum";
+import { UserRole } from "../../common/constants/roles.enum";
+import { TenantStatus } from "../../common/constants/subscription.enum";
 import { EmailService } from "../../common/services/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { NotificationType } from "../notifications/dto/create-notification.dto";
-import {
-  isSubdomainQuarantined,
-  randomSubdomainSuffix,
-} from "../../common/helpers/subdomain.helper";
 import {
   ResourceAlreadyExistsException,
   ResourceNotFoundException,
   InvalidCredentialsException,
   ValidationException,
 } from "../../common/exceptions";
+import { Prisma } from "@prisma/client";
+import { TokenService } from "./services/token.service";
+import { PasswordService } from "./services/password.service";
+import { EmailVerificationService } from "./services/email-verification.service";
+import { AuthProvisioningService } from "./services/auth-provisioning.service";
 
-// Dummy bcrypt hash used to normalize timing between "user not found" and
-// "bad password" paths. bcrypt.compare against this hash takes the same
-// work-factor cost as a real password check, so an attacker cannot use
-// response-time deltas to enumerate which emails are registered.
-// Computed once at module load with cost 12 (matches the default).
-const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
-  "dummy-password-for-timing-normalization",
-  12,
-);
-
+/**
+ * AuthService — thin facade over the extracted auth sub-services:
+ *   - TokenService              (access/refresh mint + rotate + verify)
+ *   - PasswordService           (hash/compare, validateUser, forgot/reset/change)
+ *   - EmailVerificationService  (6-digit code lifecycle)
+ *   - AuthProvisioningService   (tenant + subscription + branch + user creation)
+ *
+ * Public method signatures are unchanged — controller / LocalStrategy /
+ * users.service callers are untouched. The orchestration that must stay
+ * here (register's scenario routing, login auditing, social-auth provider
+ * verification) keeps its exact call order and transaction boundaries.
+ *
+ * Sub-services are injected when available (DI) and otherwise self-constructed
+ * from the primitives so the service stays constructable bare in unit tests
+ * (`new AuthService(prisma, jwt, config, email, notifications, metrics)`).
+ */
 @Injectable()
 export class AuthService {
   // Use NestJS Logger so messages flow through the structured-JSON pipeline
@@ -70,50 +68,10 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private googleClient: OAuth2Client;
 
-  private hashToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
-  }
-
-  /**
-   * bcrypt work factor. 12 is the 2026 baseline; allow tenants to tune via
-   * env so production can bump cost without a code change.
-   */
-  private bcryptCost(): number {
-    const raw = this.configService.get<string>("BCRYPT_COST");
-    const parsed = raw ? parseInt(raw, 10) : NaN;
-    if (Number.isFinite(parsed) && parsed >= 10 && parsed <= 15) {
-      return parsed;
-    }
-    return 12;
-  }
-
-  /**
-   * Find a free subdomain for a new tenant. Falls back to appending a
-   * cryptographically-strong 6-hex suffix when the preferred slug is taken
-   * or quarantined. Uniqueness is ultimately enforced by the DB unique
-   * index (P2002 is caught by the caller); this just picks a candidate.
-   */
-  private async allocateSubdomain(base: string): Promise<string> {
-    const baseClean = base || "restaurant";
-    const preferred = baseClean;
-    const preferredTaken =
-      (await isSubdomainQuarantined(this.prisma, preferred)) ||
-      (await this.prisma.tenant.findUnique({
-        where: { subdomain: preferred },
-      }));
-    if (!preferredTaken) return preferred;
-    // Up to 5 attempts with random suffix — extraordinarily unlikely to collide.
-    for (let i = 0; i < 5; i += 1) {
-      const candidate = `${baseClean}-${randomSubdomainSuffix()}`;
-      const taken =
-        (await isSubdomainQuarantined(this.prisma, candidate)) ||
-        (await this.prisma.tenant.findUnique({
-          where: { subdomain: candidate },
-        }));
-      if (!taken) return candidate;
-    }
-    throw new Error("Could not allocate a free subdomain");
-  }
+  private readonly tokens: TokenService;
+  private readonly passwords: PasswordService;
+  private readonly emailVerification: EmailVerificationService;
+  private readonly provisioning: AuthProvisioningService;
 
   constructor(
     private prisma: PrismaService,
@@ -125,11 +83,77 @@ export class AuthService {
     // Optional so unit tests constructing AuthService bare keep working and
     // auth never depends on the metrics registry being wired.
     @Optional() private metrics?: MetricsService,
+    // Extracted sub-services. @Optional so the facade is still constructable
+    // bare in unit tests; when DI doesn't supply them, build them in-place
+    // from the same primitives (identical wiring to the module providers).
+    @Optional() tokenService?: TokenService,
+    @Optional() passwordService?: PasswordService,
+    @Optional() emailVerificationService?: EmailVerificationService,
+    @Optional() provisioningService?: AuthProvisioningService,
   ) {
     // Initialize Google OAuth client
     this.googleClient = new OAuth2Client(
       this.configService.get<string>("GOOGLE_CLIENT_ID"),
     );
+
+    this.tokens =
+      tokenService ??
+      new TokenService(
+        this.prisma,
+        this.jwtService,
+        this.configService,
+        this.metrics,
+      );
+    this.passwords =
+      passwordService ??
+      new PasswordService(
+        this.prisma,
+        this.configService,
+        this.emailService,
+        this.metrics,
+      );
+    this.emailVerification =
+      emailVerificationService ??
+      new EmailVerificationService(
+        this.prisma,
+        this.emailService,
+        this.notificationsService,
+      );
+    this.provisioning =
+      provisioningService ?? new AuthProvisioningService(this.prisma);
+  }
+
+  /**
+   * Delegate subdomain allocation to the provisioning service. Kept as a
+   * private method so existing tests that `jest.spyOn(service, 'allocateSubdomain')`
+   * continue to work against the facade.
+   */
+  private async allocateSubdomain(base: string): Promise<string> {
+    return this.provisioning.allocateSubdomain(base);
+  }
+
+  private async logUserActivity(
+    userId: string,
+    tenantId: string,
+    action: string,
+    ip?: string,
+    userAgent?: string,
+    metadata?: any,
+  ): Promise<void> {
+    try {
+      await this.prisma.userActivity.create({
+        data: {
+          userId,
+          tenantId,
+          action,
+          ip,
+          userAgent,
+          metadata,
+        },
+      });
+    } catch (error) {
+      this.logger.error("Failed to log user activity", error as any);
+    }
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
@@ -181,7 +205,7 @@ export class AuthService {
     // an orphan tenant (no users) holding a consumed subdomain.
     const hashedPassword = await bcrypt.hash(
       registerDto.password,
-      this.bcryptCost(),
+      this.passwords.bcryptCost(),
     );
 
     // Determine user status: ADMIN creating restaurant = ACTIVE, others
@@ -189,60 +213,17 @@ export class AuthService {
     // here where both transactions can read it.
     const userStatus = hasRestaurantName ? "ACTIVE" : "PENDING_APPROVAL";
 
-    // Shared user-creation step. Creates the user + (for restricted
-    // roles) the matching userBranchAssignment allow-list row, all on
-    // the provided transaction client. Closes over the finalized
-    // `userRole` (ADMIN for scenario 1, set BEFORE that scenario's tx
-    // runs; WAITER/explicit for scenario 2), `hashedPassword`,
-    // `userStatus`, and `registerDto`. Both scenarios call this so the
-    // user `data`/`select` shapes and the allow-list rule stay in one
-    // place.
-    const createUserWithAssignment = async (
-      tx: Prisma.TransactionClient,
-      txTenantId: string,
-      txPrimaryBranchId: string,
-    ) => {
-      const created = await tx.user.create({
-        data: {
-          email: registerDto.email,
-          password: hashedPassword,
-          firstName: registerDto.firstName,
-          lastName: registerDto.lastName,
-          role: userRole,
-          tenantId: txTenantId,
-          status: userStatus,
-          primaryBranchId: txPrimaryBranchId,
-        },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          tenantId: true,
-          primaryBranchId: true,
-        },
-      });
-      // Restricted roles get an explicit allow-list row equal to
-      // their primary branch. BranchGuard short-circuits on
-      // primaryBranchId for these roles, but the row gives admin UI
-      // a uniform place to inspect "which branches does this user
-      // see" without role-conditional branching.
-      if ((HARD_RESTRICTED_ROLES as readonly string[]).includes(userRole!)) {
-        await tx.userBranchAssignment.create({
-          data: {
-            userId: created.id,
-            branchId: txPrimaryBranchId,
-            tenantId: txTenantId,
-          },
-        });
-      }
-      return created;
-    };
-
     // Populated by whichever scenario runs below.
-    let user: Awaited<ReturnType<typeof createUserWithAssignment>>;
+    let user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: any;
+      status: string;
+      tenantId: string;
+      primaryBranchId: string;
+    };
 
     // Scenario 1: Creating a new restaurant (ADMIN only)
     if (hasRestaurantName) {
@@ -267,20 +248,7 @@ export class AuthService {
       // job downgrades the tenant to FREE at trialEnd. We need the
       // BUSINESS plan here, not FREE, so the new tenant boots into a
       // fully-featured workspace from the first dashboard load.
-      const businessPlan = await this.prisma.subscriptionPlan.findUnique({
-        where: { name: "BUSINESS" },
-      });
-      if (!businessPlan) {
-        // Seed misconfigured — refuse to register rather than silently
-        // landing the tenant on FREE without a trial. The user will get
-        // a clear error and ops can re-seed.
-        throw new ResourceNotFoundException("BUSINESS subscription plan");
-      }
-      if (businessPlan.trialDays <= 0) {
-        throw new ResourceNotFoundException(
-          "BUSINESS plan has no trialDays configured — re-seed plans",
-        );
-      }
+      const businessPlan = await this.provisioning.loadBusinessPlanOrThrow();
 
       // Tenant + TRIALING BUSINESS subscription must be created
       // atomically so other modules never observe a tenant without a
@@ -291,100 +259,33 @@ export class AuthService {
       // Seed `featureOverrides` with the BUSINESS plan's flag set so
       // PlanFeatureGuard's fallback path resolves correctly during the
       // first ~30 seconds while the entitlement engine projector is
-      // still warming up. Before this seed the engine returned an
-      // empty grant set on fresh signups; the guard's fallback then
-      // read `currentPlan[feature]` directly but the read often raced
-      // against the fresh subscription write and surfaced as the
-      // "Bu özellik aboneliğinizde yok" 403 every new tenant hit when
-      // they tried to create their first branch. Seeding the JSON
-      // column here gives the guard a deterministic source of truth
-      // until the engine catches up — the nightly reconcile cron then
-      // syncs both representations.
-      const planFeatureOverrides = {
-        advancedReports: !!businessPlan.advancedReports,
-        multiLocation: !!businessPlan.multiLocation,
-        customBranding: !!businessPlan.customBranding,
-        apiAccess: !!businessPlan.apiAccess,
-        prioritySupport: !!businessPlan.prioritySupport,
-        inventoryTracking: !!businessPlan.inventoryTracking,
-        kdsIntegration: !!businessPlan.kdsIntegration,
-        reservationSystem: !!businessPlan.reservationSystem,
-        personnelManagement: !!businessPlan.personnelManagement,
-        deliveryIntegration: !!businessPlan.deliveryIntegration,
-      };
+      // still warming up.
+      const planFeatureOverrides =
+        this.provisioning.buildPlanFeatureOverrides(businessPlan);
 
       try {
-        const txResult = await this.prisma.$transaction(async (tx) => {
-          const created = await tx.tenant.create({
-            data: {
-              name: registerDto.restaurantName,
-              subdomain: finalSubdomain,
-              currentPlanId: businessPlan.id,
-              // Per-tenant trial bookkeeping. `trialUsed=true` is the
-              // canonical lifetime-trial gate read by
-              // PaymentsService.createIntent + SubscriptionService;
-              // once stamped, no further trials regardless of plan.
-              // `usedTrialPlanIds` is kept for audit/reporting.
-              trialUsed: true,
-              trialStartedAt: now,
-              trialEndsAt: trialEnd,
-              usedTrialPlanIds: [businessPlan.id],
-              featureOverrides: planFeatureOverrides,
+        const txResult = await this.prisma.$transaction(async (tx) =>
+          // Tenant + subscription + branch + ADMIN user are all written
+          // inside THIS single transaction. The caller owns the tx so a
+          // user.create failure rolls back the tenant — no orphan tenant
+          // / consumed subdomain.
+          this.provisioning.provisionNewTenantWithAdmin(tx, {
+            restaurantName: registerDto.restaurantName,
+            finalSubdomain,
+            businessPlan,
+            planFeatureOverrides,
+            now,
+            trialEnd,
+            userParams: {
+              email: registerDto.email,
+              hashedPassword,
+              firstName: registerDto.firstName,
+              lastName: registerDto.lastName,
+              userRole: userRole!,
+              userStatus,
             },
-          });
-          await tx.subscription.create({
-            data: {
-              tenantId: created.id,
-              planId: businessPlan.id,
-              status: "TRIALING",
-              billingCycle: "MONTHLY",
-              // PayTR is the only configured provider; this row is the
-              // trial — no charge moves until the post-trial checkout.
-              paymentProvider: PaymentProvider.PAYTR,
-              startDate: now,
-              currentPeriodStart: now,
-              // During trial, currentPeriodEnd == trialEnd. After
-              // expireTrials downgrades to FREE, the FREE write path
-              // resets these fields.
-              currentPeriodEnd: trialEnd,
-              isTrialPeriod: true,
-              trialStart: now,
-              trialEnd,
-              amount: businessPlan.monthlyPrice,
-              currency: businessPlan.currency,
-              cancelAtPeriodEnd: false,
-            },
-          });
-          // v3.0.0 — every new tenant ships with a Main branch.
-          // Bundled into the same tx as tenant + subscription so other
-          // modules never observe a tenant without one. The DB CHECK
-          // constraint on users requires WAITER/KITCHEN/COURIER to
-          // carry a primaryBranchId, so the tenant being usable
-          // depends on this row existing.
-          const mainBranch = await tx.branch.create({
-            data: {
-              tenantId: created.id,
-              name: "Main",
-              status: "active",
-              timezone: "UTC",
-            },
-            select: { id: true },
-          });
-          // Create the ADMIN user inside the SAME transaction as the
-          // tenant + subscription + branch. If anything here (or the
-          // user create itself) throws, the whole tx rolls back and no
-          // orphan tenant / consumed subdomain is left behind.
-          const createdUser = await createUserWithAssignment(
-            tx,
-            created.id,
-            mainBranch.id,
-          );
-          return {
-            tenant: created,
-            mainBranchId: mainBranch.id,
-            user: createdUser,
-          };
-        });
+          }),
+        );
         tenantId = txResult.tenant.id;
         primaryBranchId = txResult.mainBranchId;
         user = txResult.user;
@@ -455,7 +356,19 @@ export class AuthService {
       // primaryBranchId for WAITER/KITCHEN/COURIER load-bearing — we
       // set it on every signup.
       user = await this.prisma.$transaction((tx) =>
-        createUserWithAssignment(tx, tenantId, primaryBranchId),
+        this.provisioning.createUserWithAssignment(
+          tx,
+          tenantId,
+          primaryBranchId,
+          {
+            email: registerDto.email,
+            hashedPassword,
+            firstName: registerDto.firstName,
+            lastName: registerDto.lastName,
+            userRole: userRole!,
+            userStatus,
+          },
+        ),
       );
     }
 
@@ -602,85 +515,8 @@ export class AuthService {
     return this.generateTokens(user, ip, userAgent);
   }
 
-  private async logUserActivity(
-    userId: string,
-    tenantId: string,
-    action: string,
-    ip?: string,
-    userAgent?: string,
-    metadata?: any,
-  ): Promise<void> {
-    try {
-      await this.prisma.userActivity.create({
-        data: {
-          userId,
-          tenantId,
-          action,
-          ip,
-          userAgent,
-          metadata,
-        },
-      });
-    } catch (error) {
-      this.logger.error("Failed to log user activity", error as any);
-    }
-  }
-
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        password: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        tenantId: true,
-        tenant: { select: { status: true } },
-      },
-    });
-
-    // Defer all account-state disclosure until after a successful password
-    // check, so the endpoint cannot be used to enumerate registered emails.
-    // When there is no matching user we STILL run bcrypt.compare against a
-    // throwaway hash so the response time does not leak registration state
-    // (timing-based email enumeration).
-    if (!user) {
-      await bcrypt.compare(password, DUMMY_BCRYPT_HASH).catch(() => false);
-      this.metrics?.incCounter(
-        "auth_login_failures_total",
-        "Failed login attempts, labeled by reason",
-        { reason: "unknown_user" },
-      );
-      return null;
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      this.metrics?.incCounter(
-        "auth_login_failures_total",
-        "Failed login attempts, labeled by reason",
-        { reason: "bad_password" },
-      );
-      return null;
-    }
-
-    if (user.status === "PENDING_APPROVAL") {
-      throw new UnauthorizedException(
-        "Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.",
-      );
-    }
-    if (user.status !== "ACTIVE") {
-      throw new UnauthorizedException("User account is inactive");
-    }
-    if (user.tenant?.status !== TenantStatus.ACTIVE) {
-      throw new UnauthorizedException("Your restaurant account is not active");
-    }
-
-    const { password: _, tenant: __, ...result } = user;
-    return result;
+    return this.passwords.validateUser(email, password);
   }
 
   /**
@@ -696,105 +532,7 @@ export class AuthService {
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    let payload: any;
-    try {
-      payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>("JWT_REFRESH_SECRET"),
-        algorithms: ["HS256"],
-      });
-    } catch (_err) {
-      throw new UnauthorizedException("Invalid refresh token");
-    }
-
-    if (payload.type && payload.type !== "user") {
-      throw new UnauthorizedException("Invalid token type");
-    }
-
-    const tokenHash = this.hashToken(refreshToken);
-
-    // v3.0.1 round-6 audit fix — check `payload.ver` against
-    // `user.tokenVersion` BEFORE the atomic rotation claim. Pre-fix
-    // the version check ran AFTER the claim had already revoked the
-    // presented token, so a stale-ver token replayed after a password
-    // reset would (a) burn the row and (b) revoke the entire refresh
-    // family — a DoS vector against the legitimate session via one
-    // pre-rotation token. Verifying ver first lets a stale token fail
-    // cleanly without touching any other refresh row; the actual race
-    // protection still lives in the conditional `updateMany` below.
-    const stored = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!stored || stored.expiresAt <= new Date()) {
-      throw new UnauthorizedException("Invalid refresh token");
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: stored.userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        tenantId: true,
-        tokenVersion: true,
-        tenant: { select: { status: true } },
-      },
-    });
-
-    if (!user || user.status !== "ACTIVE") {
-      throw new UnauthorizedException("User not found or inactive");
-    }
-    if (user.tenant?.status !== TenantStatus.ACTIVE) {
-      throw new UnauthorizedException("Your restaurant account is not active");
-    }
-
-    // ver check before the rotation claim. A stale-ver replay returns
-    // a clean 401 without burning the row or family-revoking the
-    // user's other refresh tokens. The genuine "newly-revoked token
-    // arriving milliseconds before the user logs back in" case is
-    // indistinguishable from a replay — but the legitimate post-
-    // password-reset path already issues a fresh refresh, so the
-    // legitimate flow doesn't depend on the stale row succeeding.
-    const refreshVer = (payload as any).ver ?? 0;
-    if (refreshVer !== user.tokenVersion) {
-      throw new UnauthorizedException("Token has been revoked");
-    }
-
-    // Atomic claim: only one in-flight refresh call wins the rotation.
-    // The previous flow read the row, checked revokedAt, then updated
-    // separately — two parallel refreshes with the same cookie could
-    // both pass that check and both mint a fresh pair (TOCTOU). The
-    // conditional updateMany on `revokedAt: null` serializes them, and
-    // the loser sees count===0 and falls into the replay branch below.
-    const claimed = await this.prisma.refreshToken.updateMany({
-      where: {
-        tokenHash,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      data: { revokedAt: new Date() },
-    });
-
-    if (claimed.count === 0) {
-      // The token was already revoked (legitimate rotation, logout, or
-      // replay of a rotated-out token). Treat as a theft signal and
-      // revoke the whole family so a stolen token can't keep minting.
-      await this.prisma.refreshToken.updateMany({
-        where: { userId: stored.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-      this.metrics?.incCounter(
-        "auth_refresh_reuse_total",
-        "Refresh-token reuse (theft signal) detections that family-revoked a user",
-      );
-      throw new UnauthorizedException("Refresh token reuse detected");
-    }
-
-    const { tenant: _t, tokenVersion: _ver, ...userForToken } = user;
-    return this.generateTokens(userForToken, ip, userAgent);
+    return this.tokens.refreshToken(refreshToken, ip, userAgent);
   }
 
   async logout(
@@ -824,92 +562,11 @@ export class AuthService {
   }
 
   private async generateTokens(
-    // Loose input shape — `generateTokens` populates primaryBranchId
-    // and allowedBranchIds itself from the DB, so callers can pass
-    // a plain Prisma row select without first having to read the
-    // branch context. The returned AuthResponseDto.user is the full
-    // UserResponseDto with both fields surfaced.
     user: Omit<UserResponseDto, "primaryBranchId" | "allowedBranchIds">,
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    // Read tokenVersion + branch context in a single round trip. JWT
-    // carries primaryBranchId + activeBranchId (defaults to the home
-    // branch) + the resolved allowedBranchIds list so BranchGuard can
-    // decide without a DB hit. List freshness: max one JWT lifetime
-    // (15 min) since allow-list changes only land at next token mint.
-    const row = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      select: {
-        tokenVersion: true,
-        primaryBranchId: true,
-        branchAssignments: { select: { branchId: true } },
-      },
-    });
-    const primaryBranchId = row?.primaryBranchId ?? null;
-    const allowedBranchIds = (row?.branchAssignments ?? []).map(
-      (a) => a.branchId,
-    );
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-      type: "user" as const,
-      ver: row?.tokenVersion ?? 0,
-      primaryBranchId,
-      // activeBranchId mirrors primaryBranchId at issuance — the SPA
-      // pins a different value per-request via X-Branch-Id without
-      // minting a fresh token.
-      activeBranchId: primaryBranchId,
-      allowedBranchIds,
-    };
-
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>("JWT_SECRET"),
-      expiresIn: this.configService.get<string>("JWT_EXPIRES_IN") || "15m",
-      algorithm: "HS256",
-    });
-
-    const refreshExpiresIn =
-      this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "30d";
-    // jti makes the refresh token unique even when two issuances land in
-    // the same second (same iat → same payload → same JWT bytes → same
-    // tokenHash → P2002 on the unique constraint). The access token
-    // doesn't need it because it isn't persisted server-side.
-    const refreshToken = this.jwtService.sign(
-      { ...payload, jti: randomBytes(8).toString("hex") },
-      {
-        secret: this.configService.get<string>("JWT_REFRESH_SECRET"),
-        expiresIn: refreshExpiresIn,
-        algorithm: "HS256",
-      },
-    );
-
-    // Persist the hash so we can revoke/rotate server-side.
-    const decoded: any = this.jwtService.decode(refreshToken);
-    const expiresAt = new Date(decoded.exp * 1000);
-    await this.prisma.refreshToken.create({
-      data: {
-        tokenHash: this.hashToken(refreshToken),
-        userId: user.id,
-        expiresAt,
-        ip,
-        userAgent,
-      },
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        ...user,
-        // Surface the branch claims to the SPA so its branchScopeStore
-        // can hydrate on login without a separate /me round-trip.
-        primaryBranchId,
-        allowedBranchIds,
-      },
-    };
+    return this.tokens.generateTokens(user, ip, userAgent);
   }
 
   async getProfile(userId: string): Promise<UserResponseDto> {
@@ -945,43 +602,7 @@ export class AuthService {
   async forgotPassword(
     forgotPasswordDto: ForgotPasswordDto,
   ): Promise<{ message: string }> {
-    const { email } = forgotPasswordDto;
-
-    // Find user
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    // Don't reveal if user exists or not (security best practice)
-    if (!user) {
-      return {
-        message:
-          "If an account with that email exists, a password reset link has been sent.",
-      };
-    }
-
-    // Generate high-entropy reset token (sent via email in raw form, stored hashed)
-    const rawToken = randomBytes(32).toString("hex");
-    const resetTokenHash = this.hashToken(rawToken);
-    const resetTokenExpiry = new Date();
-    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // Token valid for 1 hour
-
-    // Store only the hash so a DB leak does not yield usable tokens
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetTokenHash,
-        resetTokenExpiry,
-      },
-    });
-
-    // Send password reset email with the raw token
-    await this.emailService.sendPasswordResetEmail(user.email, rawToken);
-
-    return {
-      message:
-        "If an account with that email exists, a password reset link has been sent.",
-    };
+    return this.passwords.forgotPassword(forgotPasswordDto);
   }
 
   /**
@@ -990,75 +611,7 @@ export class AuthService {
   async resetPassword(
     resetPasswordDto: ResetPasswordDto,
   ): Promise<{ message: string }> {
-    const { token, newPassword } = resetPasswordDto;
-
-    // Lookup by the hash of the incoming token (constant-time-ish via unique index)
-    const resetTokenHash = this.hashToken(token);
-    const user = await this.prisma.user.findFirst({
-      where: {
-        resetTokenHash,
-        resetTokenExpiry: {
-          gt: new Date(), // Token not expired
-        },
-      },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new BadRequestException("Invalid or expired reset token");
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
-
-    // Atomic consume: the update filters on `resetTokenHash` too, so two
-    // concurrent requests with the same token can't both succeed. The first
-    // transaction nulls the hash; the second one's updateMany sees zero
-    // affected rows and we reject it as already-used. Without this guard
-    // the race window between findFirst and update allowed the same token
-    // to mint two password changes in parallel.
-    //
-    // We also revoke refresh tokens in the same transaction so a stolen
-    // token can't mint fresh access tokens after the reset.
-    const [updateResult] = await this.prisma.$transaction([
-      this.prisma.user.updateMany({
-        where: { id: user.id, resetTokenHash },
-        data: {
-          password: hashedPassword,
-          resetTokenHash: null,
-          resetTokenExpiry: null,
-          tokenVersion: { increment: 1 },
-        },
-      }),
-      this.prisma.refreshToken.updateMany({
-        where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-    ]);
-
-    if (updateResult.count === 0) {
-      // Lost the race: another request already consumed this token.
-      throw new BadRequestException("Invalid or expired reset token");
-    }
-
-    // Audit: reset-password successfully consumed a valid token. We had
-    // to refetch tenantId because the initial findFirst only selected id
-    // (to keep the constant-time guarantee tight).
-    const tenantOnly = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      select: { tenantId: true },
-    });
-    if (tenantOnly) {
-      await this.logUserActivity(
-        user.id,
-        tenantOnly.tenantId,
-        "PASSWORD_RESET",
-      );
-    }
-
-    return {
-      message: "Password has been reset successfully",
-    };
+    return this.passwords.resetPassword(resetPasswordDto);
   }
 
   /**
@@ -1068,64 +621,7 @@ export class AuthService {
     userId: string,
     changePasswordDto: ChangePasswordDto,
   ): Promise<{ message: string }> {
-    const { currentPassword, newPassword } = changePasswordDto;
-
-    // Get user with password
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    // Verify current password
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      user.password,
-    );
-
-    if (!isPasswordValid) {
-      throw new BadRequestException("Current password is incorrect");
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
-
-    // Update password + bump tokenVersion + revoke refresh tokens so all
-    // prior sessions (including on other devices) are force-logged-out.
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          password: hashedPassword,
-          tokenVersion: { increment: 1 },
-        },
-      }),
-      this.prisma.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-    ]);
-
-    // Audit trail for incident response: who changed their password
-    // when. Failure is swallowed because losing an audit entry shouldn't
-    // block a successful password change.
-    await this.logUserActivity(userId, user.tenantId, "PASSWORD_CHANGED");
-
-    return {
-      message: "Password changed successfully",
-    };
-  }
-
-  /**
-   * Generate a 6-digit verification code (uniformly distributed via crypto RNG).
-   * Scope is per-user, so no cross-user uniqueness loop is needed.
-   */
-  private generateVerificationCode(): string {
-    // 1,000,000 values → 0-999,999, formatted as 6 digits
-    const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
-    return n.toString().padStart(6, "0");
+    return this.passwords.changePassword(userId, changePasswordDto);
   }
 
   /**
@@ -1135,69 +631,7 @@ export class AuthService {
   async sendEmailVerification(
     userId: string,
   ): Promise<{ message: string; codeExpiry: Date }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    if (user.emailVerified) {
-      return {
-        message: "Email is already verified",
-        codeExpiry: null,
-      };
-    }
-
-    // Generate 6-digit verification code
-    const verificationCode = this.generateVerificationCode();
-    const codeExpires = new Date();
-    codeExpires.setHours(codeExpires.getHours() + 1); // Code valid for 1 hour
-
-    // Store only the hash so a DB leak does not yield usable codes
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerificationCodeHash: this.hashToken(verificationCode),
-        emailVerificationCodeExpires: codeExpires,
-      },
-    });
-
-    // Send verification email with raw code
-    await this.emailService.sendEmailVerificationCode(
-      user.email,
-      verificationCode,
-      `${user.firstName} ${user.lastName}`,
-    );
-
-    // Send in-app notification (without code - code is only in email)
-    try {
-      await this.notificationsService.createAndSend({
-        title: "E-posta Doğrulaması Gereklidir",
-        message:
-          "E-posta adresinize gönderilen 6 haneli doğrulama kodunu kullanarak hesabınızı doğrulamanız gerekmektedir. Lütfen e-posta kutunuzu kontrol ediniz.",
-        type: NotificationType.WARNING,
-        userId: user.id,
-        tenantId: user.tenantId,
-        data: {
-          action: "EMAIL_VERIFICATION_REQUIRED",
-          expiresAt: codeExpires.toISOString(),
-        },
-        expiresAt: codeExpires.toISOString(),
-      });
-    } catch (error) {
-      // Log error but don't fail if notification sending fails
-      this.logger.error(
-        "Failed to send verification notification",
-        error as any,
-      );
-    }
-
-    return {
-      message: "Verification code sent successfully to your email",
-      codeExpiry: codeExpires,
-    };
+    return this.emailVerification.sendEmailVerification(userId);
   }
 
   /**
@@ -1207,88 +641,14 @@ export class AuthService {
     email: string,
     code: string,
   ): Promise<{ message: string; verified: boolean }> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    // Constant-time hash comparison + atomic single-use consumption.
-    // The previous implementation read the user, did a plain `!==` on
-    // the hash (timing-attackable; an attacker can probe digit-by-digit
-    // by measuring response time), and then ran a separate UPDATE. Two
-    // concurrent /verify-email calls could both pass the check and
-    // both run the update — letting a stolen code be redeemed twice
-    // (matters less for email-verify than reset-password, but the
-    // pattern should be consistent). `updateMany` with the hash as part
-    // of the WHERE clause makes the consumption atomic; the first
-    // request wins, the second sees `count === 0`.
-    const submitted = this.hashToken(code);
-    const submittedOk =
-      !!user?.emailVerificationCodeHash &&
-      Buffer.byteLength(user.emailVerificationCodeHash) ===
-        Buffer.byteLength(submitted) &&
-      timingSafeEqual(
-        Buffer.from(user.emailVerificationCodeHash),
-        Buffer.from(submitted),
-      );
-
-    // Return the same error for "no user" and "bad code" so the endpoint cannot
-    // be used to enumerate which emails are registered.
-    if (
-      !user ||
-      !user.emailVerificationCodeExpires ||
-      user.emailVerificationCodeExpires <= new Date() ||
-      !submittedOk
-    ) {
-      throw new BadRequestException("Invalid or expired verification code");
-    }
-
-    // Atomic claim: filter by the current hash so a concurrent verify
-    // with the same code can't double-consume. `count === 0` means we
-    // lost the race (or the row was mutated mid-flight) → reject.
-    const consumed = await this.prisma.user.updateMany({
-      where: {
-        id: user.id,
-        emailVerificationCodeHash: user.emailVerificationCodeHash,
-      },
-      data: {
-        emailVerified: true,
-        emailVerificationCodeHash: null,
-        emailVerificationCodeExpires: null,
-      },
-    });
-    if (consumed.count === 0) {
-      throw new BadRequestException("Invalid or expired verification code");
-    }
-
-    // Send success notification
-    try {
-      await this.notificationsService.createAndSend({
-        title: "Email Başarıyla Doğrulandı",
-        message:
-          "Email adresiniz başarıyla doğrulandı. Artık tüm özelliklere erişebilirsiniz.",
-        type: NotificationType.SUCCESS,
-        userId: user.id,
-        tenantId: user.tenantId,
-      });
-    } catch (error) {
-      // Log error but don't fail if notification sending fails
-      this.logger.error(
-        "Failed to send verification success notification",
-        error as any,
-      );
-    }
-
-    return {
-      message: "Email verified successfully",
-      verified: true,
-    };
+    return this.emailVerification.verifyEmailWithCode(email, code);
   }
 
   /**
    * Mirror the tenant-status guard the password path enforces at
-   * `validateUser` (auth.service.ts:437-439). The four social-auth
-   * branches previously checked only `user.status`, letting a member
-   * of a suspended/deleted tenant in via Google or Apple.
+   * `validateUser`. The four social-auth branches previously checked only
+   * `user.status`, letting a member of a suspended/deleted tenant in via
+   * Google or Apple.
    */
   private async assertTenantActive(tenantId: string): Promise<void> {
     const tenant = await this.prisma.tenant.findUnique({
@@ -1616,8 +976,11 @@ export class AuthService {
   }
 
   /**
-   * Create a new user from social auth (Google/Apple)
-   * Auto-creates tenant and subscribes to FREE plan
+   * Create a new user from social auth (Google/Apple). Delegates provisioning
+   * to AuthProvisioningService (tenant + BUSINESS trial + Main branch + ADMIN
+   * user in one transaction) and mints tokens for the created user. Kept as a
+   * private method so existing tests calling it via `(service as any)` and
+   * spying on `allocateSubdomain` continue to work.
    */
   private async createSocialAuthUser(data: {
     email: string;
@@ -1627,159 +990,7 @@ export class AuthService {
     appleId?: string;
     authProvider: string;
   }): Promise<AuthResponseDto> {
-    const { email, firstName, lastName, googleId, appleId, authProvider } =
-      data;
-
-    // Generate restaurant name from email or name
-    const restaurantName =
-      firstName && firstName !== "User"
-        ? `${firstName}'s Restaurant`
-        : `Restaurant ${email.split("@")[0]}`;
-
-    const baseSubdomain = restaurantName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    const subdomain = await this.allocateSubdomain(baseSubdomain);
-
-    // Social signups get the SAME provisioning as email registration: a
-    // 14-day BUSINESS trial + an auto-created Main branch + seeded
-    // featureOverrides. Diverging here (the old FREE-plan, no-branch path)
-    // shipped the "trial never started / 'Bu özellik aboneliğinizde yok' when
-    // creating the first branch" bug for Google/Apple signups — a fresh tenant
-    // landed with no branch and a plan that gates MULTI_LOCATION. Keep this in
-    // lockstep with register()'s ADMIN scenario.
-    const businessPlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: "BUSINESS" },
-    });
-    if (!businessPlan) {
-      throw new ResourceNotFoundException("BUSINESS subscription plan");
-    }
-    if (businessPlan.trialDays <= 0) {
-      throw new ResourceNotFoundException(
-        "BUSINESS plan has no trialDays configured — re-seed plans",
-      );
-    }
-
-    const now = new Date();
-    const trialEnd = addDays(now, businessPlan.trialDays);
-
-    // Seed the plan's flag set so PlanFeatureGuard's fallback resolves while
-    // the entitlement projector warms up — see register() for the full story.
-    const planFeatureOverrides = {
-      advancedReports: !!businessPlan.advancedReports,
-      multiLocation: !!businessPlan.multiLocation,
-      customBranding: !!businessPlan.customBranding,
-      apiAccess: !!businessPlan.apiAccess,
-      prioritySupport: !!businessPlan.prioritySupport,
-      inventoryTracking: !!businessPlan.inventoryTracking,
-      kdsIntegration: !!businessPlan.kdsIntegration,
-      reservationSystem: !!businessPlan.reservationSystem,
-      personnelManagement: !!businessPlan.personnelManagement,
-      deliveryIntegration: !!businessPlan.deliveryIntegration,
-    };
-
-    // Tenant + subscription + Main branch + user in one transaction so a
-    // failure midway does not leave orphaned rows.
-    let user;
-    try {
-      user = await this.prisma.$transaction(async (tx) => {
-        const tenant = await tx.tenant.create({
-          data: {
-            name: restaurantName,
-            subdomain,
-            currentPlanId: businessPlan.id,
-            trialUsed: true,
-            trialStartedAt: now,
-            trialEndsAt: trialEnd,
-            usedTrialPlanIds: [businessPlan.id],
-            featureOverrides: planFeatureOverrides,
-          },
-        });
-        await tx.subscription.create({
-          data: {
-            tenantId: tenant.id,
-            planId: businessPlan.id,
-            status: "TRIALING",
-            billingCycle: "MONTHLY",
-            paymentProvider: PaymentProvider.PAYTR,
-            startDate: now,
-            currentPeriodStart: now,
-            currentPeriodEnd: trialEnd,
-            isTrialPeriod: true,
-            trialStart: now,
-            trialEnd,
-            amount: businessPlan.monthlyPrice,
-            currency: businessPlan.currency,
-            cancelAtPeriodEnd: false,
-          },
-        });
-        // Every new tenant ships with a Main branch (matches register()), so
-        // the dashboard never prompts "create a branch" against the
-        // MULTI_LOCATION gate.
-        const mainBranch = await tx.branch.create({
-          data: {
-            tenantId: tenant.id,
-            name: "Main",
-            status: "active",
-            timezone: "UTC",
-          },
-          select: { id: true },
-        });
-        return tx.user.create({
-          data: {
-            email,
-            password: "",
-            firstName,
-            lastName,
-            role: UserRole.ADMIN,
-            tenantId: tenant.id,
-            primaryBranchId: mainBranch.id,
-            googleId,
-            appleId,
-            authProvider,
-            emailVerified: true,
-          },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            tenantId: true,
-          },
-        });
-      });
-    } catch (err) {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === "P2002"
-      ) {
-        throw new ResourceAlreadyExistsException(
-          "Tenant",
-          "subdomain",
-          subdomain,
-        );
-      }
-      throw err;
-    }
-
-    // Track new social auth registration in Sentry — email + name omitted
-    // (PII scrub policy). restaurantName is business metadata not PII.
-    Sentry.captureMessage("New user registered via social auth", {
-      level: "info",
-      tags: {
-        event: "user.register.social",
-        provider: authProvider,
-        role: user.role,
-      },
-      extra: {
-        userId: user.id,
-        tenantId: user.tenantId,
-        restaurantName,
-      },
-    });
-
+    const user = await this.provisioning.createSocialAuthUser(data);
     return this.generateTokens(user);
   }
 }

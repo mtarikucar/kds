@@ -5,6 +5,10 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { TokenService } from "./services/token.service";
+import { PasswordService } from "./services/password.service";
+import { EmailVerificationService } from "./services/email-verification.service";
+import { AuthProvisioningService } from "./services/auth-provisioning.service";
 import { LocalStrategy } from "./strategies/local.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -31,6 +35,13 @@ import { NotificationsModule } from "../notifications/notifications.module";
   controllers: [AuthController],
   providers: [
     AuthService,
+    // Extracted auth sub-services. TokenService + PasswordService take
+    // @Optional MetricsService; EmailVerificationService is wired through
+    // the same NotificationsModule forwardRef the AuthService used.
+    TokenService,
+    PasswordService,
+    EmailVerificationService,
+    AuthProvisioningService,
     LocalStrategy,
     JwtStrategy,
     {
