@@ -13,11 +13,7 @@ import { BaseAdapter } from "./base.adapter";
 @Injectable()
 export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super(
-      "GetirAdapter",
-      "https://food-external-api.getir.com",
-      configService,
-    );
+    super("GetirAdapter", "https://food-external-api.getir.com", configService);
     this.overrideBaseURL(this.configService.get<string>("GETIR_API_BASE_URL"));
   }
 

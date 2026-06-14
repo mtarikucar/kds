@@ -13,11 +13,7 @@ import { BaseAdapter } from "./base.adapter";
 @Injectable()
 export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super(
-      "TrendyolAdapter",
-      "https://api.trendyol.com/yemek",
-      configService,
-    );
+    super("TrendyolAdapter", "https://api.trendyol.com/yemek", configService);
     this.overrideBaseURL(
       this.configService.get<string>("TRENDYOL_API_BASE_URL"),
     );
