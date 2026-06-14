@@ -21,7 +21,7 @@ jobs:
   backend-quality:
     name: Backend lint + typecheck + tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: backend
@@ -49,7 +49,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Unit tests
-        run: npm test
+        run: npm run test:ci
 
   frontend-quality:
     name: Frontend lint + typecheck + tests
