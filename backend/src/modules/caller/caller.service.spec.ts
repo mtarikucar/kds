@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CallerService } from './caller.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
@@ -70,5 +71,51 @@ describe('CallerService.ingest', () => {
     // Critically — no DB write fires for the bogus tenant.
     expect((prisma.callerEvent.create as any).mock.calls.length).toBe(0);
     expect(outbox.append).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Wave-C replay dedup. Webhooks are at-least-once: a provider re-delivering
+   * the same (providerId, callId, kind) for a tenant must land the event
+   * exactly once. The DB UNIQUE index makes that authoritative; the second
+   * create throws P2002, which the service swallows as an idempotent no-op —
+   * no duplicate row, and critically no second outbox emit (which would
+   * double-fire the UI popup + customer matcher).
+   */
+  it('ingests a duplicate (providerId,callId,kind) exactly once (P2002 → no-op)', async () => {
+    prisma.customer.findFirst.mockResolvedValue(null);
+    const ev = {
+      providerId: 'twilio', callId: 'call-dup', kind: 'incoming' as const,
+      e164: '+905551112233', occurredAt: new Date().toISOString(),
+    };
+
+    // First delivery succeeds.
+    (prisma.callerEvent.create as any).mockResolvedValueOnce({ id: 'row-1', ...ev, tenantId: 't1' });
+    const first = await svc.ingest('t1', ev);
+    expect(first).not.toBeNull();
+    expect(outbox.append).toHaveBeenCalledTimes(1);
+
+    // Second (replay) delivery collides on the unique index → P2002.
+    (prisma.callerEvent.create as any).mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002', clientVersion: 'test',
+        meta: { target: ['tenantId', 'providerId', 'callId', 'kind'] },
+      }),
+    );
+    const second = await svc.ingest('t1', ev);
+
+    // Idempotent: no row returned, and NO additional outbox emit.
+    expect(second).toBeNull();
+    expect(outbox.append).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows non-P2002 create errors', async () => {
+    prisma.customer.findFirst.mockResolvedValue(null);
+    (prisma.callerEvent.create as any).mockRejectedValueOnce(new Error('db down'));
+    await expect(
+      svc.ingest('t1', {
+        providerId: 'twilio', callId: 'call-x', kind: 'incoming',
+        occurredAt: new Date().toISOString(),
+      }),
+    ).rejects.toThrow('db down');
   });
 });
