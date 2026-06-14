@@ -67,9 +67,7 @@ export function sanitizePage(pagination?: {
   const rawOffset = pagination?.offset;
 
   const take =
-    typeof rawLimit === "number" &&
-    Number.isInteger(rawLimit) &&
-    rawLimit >= 1
+    typeof rawLimit === "number" && Number.isInteger(rawLimit) && rawLimit >= 1
       ? Math.min(rawLimit, LIST_QUERY_HARD_MAX)
       : undefined;
 

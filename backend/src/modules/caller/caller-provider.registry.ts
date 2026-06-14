@@ -50,10 +50,7 @@ export class CallerProviderRegistry {
    * Returns null when the providerId isn't a known generic provider (the
    * controller then keeps the events=[] no-op for forward-compat).
    */
-  resolve(
-    providerId: string,
-    ctx: HmacCallerContext,
-  ): CallerProvider | null {
+  resolve(providerId: string, ctx: HmacCallerContext): CallerProvider | null {
     if (!this.supports(providerId)) return null;
     const secret = this.secretFor(providerId, ctx.tenantId);
     return new HmacCallerAdapter(providerId, secret, ctx);
