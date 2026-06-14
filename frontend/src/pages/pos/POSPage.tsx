@@ -39,6 +39,7 @@ import {
 import { useCartPersistence } from './useCartPersistence';
 import { usePosTourSync } from './usePosTourSync';
 import { runReceiptSideEffects } from './posReceipt';
+import { buildOrderData } from './buildOrderData';
 import type { POSView, CartItem } from './posTypes';
 
 const POSPage = () => {
@@ -447,32 +448,14 @@ const POSPage = () => {
       return;
     }
 
-    // Determine order type based on mode
-    const orderType = isTablelessMode && !selectedTable ? OrderType.TAKEAWAY : OrderType.DINE_IN;
-
-    const orderData = {
-      type: orderType,
-      tableId: selectedTable?.id,
-      customerName: customerName || undefined,
-      notes: orderNotes || undefined,
+    const orderData = buildOrderData({
+      isTablelessMode,
+      selectedTable,
+      customerName,
+      orderNotes,
       discount,
-      items: cartItems.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-        notes: item.notes,
-        modifiers: item.modifiers?.map(m => ({
-          modifierId: m.modifierId,
-          quantity: m.quantity,
-        })),
-      })),
-      // Stable per-click idempotency key. Backend dedupes by
-      // (tenantId, idempotencyKey) so a double-tap on a slow network
-      // returns the existing order instead of creating a duplicate.
-      // Generated here (in the click handler) — NOT in render — so it
-      // doesn't change between Axios's first request and any 401-refresh
-      // retry of the same logical action.
-      idempotencyKey: crypto.randomUUID(),
-    };
+      cartItems,
+    });
 
     // Update existing order if currentOrderId exists, otherwise create new
     if (currentOrderId) {
@@ -530,32 +513,14 @@ const POSPage = () => {
       return;
     }
 
-    // Determine order type based on mode
-    const orderType = isTablelessMode && !selectedTable ? OrderType.TAKEAWAY : OrderType.DINE_IN;
-
-    const orderData = {
-      type: orderType,
-      tableId: selectedTable?.id,
-      customerName: customerName || undefined,
-      notes: orderNotes || undefined,
+    const orderData = buildOrderData({
+      isTablelessMode,
+      selectedTable,
+      customerName,
+      orderNotes,
       discount,
-      items: cartItems.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-        notes: item.notes,
-        modifiers: item.modifiers?.map(m => ({
-          modifierId: m.modifierId,
-          quantity: m.quantity,
-        })),
-      })),
-      // Stable per-click idempotency key. Backend dedupes by
-      // (tenantId, idempotencyKey) so a double-tap on a slow network
-      // returns the existing order instead of creating a duplicate.
-      // Generated here (in the click handler) — NOT in render — so it
-      // doesn't change between Axios's first request and any 401-refresh
-      // retry of the same logical action.
-      idempotencyKey: crypto.randomUUID(),
-    };
+      cartItems,
+    });
 
     // Update existing order if currentOrderId exists, otherwise create new
     if (currentOrderId) {
