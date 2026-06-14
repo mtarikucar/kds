@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ZReportsService } from './z-reports.service';
+import { ZReportAggregator } from './services/z-report-aggregator.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 import { getTenantMidnight } from '../../common/helpers/timezone.helper';
 
@@ -20,7 +21,7 @@ describe('ZReportsService.generateAndSendReport (iter-35)', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     email = { sendEmail: jest.fn().mockResolvedValue(true) };
-    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any);
+    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any, new ZReportAggregator());
   });
 
   it('uses getTenantMidnight to build reportDate (tenant timezone, not server)', async () => {
@@ -98,7 +99,7 @@ describe('ZReportsService.generateReport (track-1 branch scope)', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     email = { sendEmail: jest.fn().mockResolvedValue(true) };
-    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any);
+    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any, new ZReportAggregator());
 
     // No existing report for the date -> proceed into aggregation.
     prisma.zReport.findFirst.mockResolvedValue(null);
@@ -275,7 +276,7 @@ describe('ZReportsService.generateReport (characterization — aggregation total
   beforeEach(() => {
     prisma = mockPrismaClient();
     email = { sendEmail: jest.fn().mockResolvedValue(true) };
-    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any);
+    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any, new ZReportAggregator());
 
     prisma.zReport.findFirst.mockResolvedValue(null);
     prisma.tenant.findUnique.mockResolvedValue({
