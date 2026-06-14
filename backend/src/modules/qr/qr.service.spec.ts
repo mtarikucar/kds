@@ -13,6 +13,8 @@ jest.mock('qrcode', () => ({
 
 import * as QRCode from 'qrcode';
 import { QrService } from './qr.service';
+import { BranchScope } from '../../common/scoping/branch-scope';
+import { UserRole } from '../../common/constants/roles.enum';
 
 const toDataURL = QRCode.toDataURL as jest.Mock;
 
@@ -21,6 +23,14 @@ describe('QrService', () => {
   let svc: QrService;
 
   const tenantId = 't-1';
+  const branchId = 'b-1';
+  // getQrCodes is now branch-scoped — it takes the full BranchScope.
+  const scope: BranchScope = {
+    tenantId,
+    branchId,
+    userId: 'u-1',
+    role: UserRole.MANAGER,
+  };
 
   // A complete-enough settings row. The service reads primaryColor +
   // enableTableQR off it.
@@ -183,7 +193,8 @@ describe('QrService', () => {
       (prisma.tenant.findUnique as any).mockResolvedValue(null);
 
       await expect(
-        svc.getQrCodes(tenantId, 'https://hummytummy.com'),
+        svc.getQrCodes(
+        scope, 'https://hummytummy.com'),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -197,19 +208,38 @@ describe('QrService', () => {
       (prisma.table.findMany as any).mockResolvedValue(tables);
 
       await expect(
-        svc.getQrCodes(tenantId, 'https://hummytummy.com'),
+        svc.getQrCodes(
+        scope, 'https://hummytummy.com'),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('scopes the table lookup to the tenant', async () => {
+    it('branch-scopes the table lookup to (tenantId, branchId) — closes the read leak', async () => {
       (prisma.tenant.findUnique as any).mockResolvedValue(tenant());
       (prisma.table.findMany as any).mockResolvedValue([]);
       (prisma.qrMenuSettings.findFirst as any).mockResolvedValue(settingsRow());
 
-      await svc.getQrCodes(tenantId, 'https://hummytummy.com');
+      await svc.getQrCodes(scope, 'https://hummytummy.com');
 
       const where = (prisma.table.findMany as any).mock.calls[0][0].where;
+      // Load-bearing: branchId MUST be present or the QR sheet lists every
+      // branch's tables (and emits per-table deep links into other branches).
       expect(where.tenantId).toBe(tenantId);
+      expect(where.branchId).toBe(branchId);
+    });
+
+    it('keeps QrMenuSettings tenant-wide (branchId:null) — NOT branch-scoped', async () => {
+      (prisma.tenant.findUnique as any).mockResolvedValue(tenant());
+      (prisma.table.findMany as any).mockResolvedValue([]);
+      (prisma.qrMenuSettings.findFirst as any).mockResolvedValue(settingsRow());
+
+      await svc.getQrCodes(scope, 'https://hummytummy.com');
+
+      // getSettings looks up the tenant-wide row; the per-branch branchId
+      // must NOT leak into the settings predicate (settings are tenant-wide).
+      const settingsWhere = (prisma.qrMenuSettings.findFirst as any).mock
+        .calls[0][0].where;
+      expect(settingsWhere.tenantId).toBe(tenantId);
+      expect(settingsWhere.branchId).toBeNull();
     });
 
     it('builds a subdomain-based tenant URL in production', async () => {
@@ -218,7 +248,7 @@ describe('QrService', () => {
       (prisma.qrMenuSettings.findFirst as any).mockResolvedValue(settingsRow());
 
       const result = await svc.getQrCodes(
-        tenantId,
+        scope,
         'https://hummytummy.com',
       );
 
@@ -232,7 +262,7 @@ describe('QrService', () => {
       (prisma.qrMenuSettings.findFirst as any).mockResolvedValue(settingsRow());
 
       const result = await svc.getQrCodes(
-        tenantId,
+        scope,
         'https://staging.hummytummy.com',
       );
 
@@ -245,7 +275,8 @@ describe('QrService', () => {
       (prisma.table.findMany as any).mockResolvedValue([]);
       (prisma.qrMenuSettings.findFirst as any).mockResolvedValue(settingsRow());
 
-      const result = await svc.getQrCodes(tenantId, 'http://localhost:3000');
+      const result = await svc.getQrCodes(
+        scope, 'http://localhost:3000');
 
       const tenantQr = result.qrCodes.find((q: any) => q.type === 'TENANT');
       expect(tenantQr.url).toBe(`http://localhost:3000/qr-menu/${tenantId}`);
@@ -258,7 +289,8 @@ describe('QrService', () => {
       (prisma.table.findMany as any).mockResolvedValue([]);
       (prisma.qrMenuSettings.findFirst as any).mockResolvedValue(settingsRow());
 
-      const result = await svc.getQrCodes(tenantId, 'https://hummytummy.com');
+      const result = await svc.getQrCodes(
+        scope, 'https://hummytummy.com');
 
       const tenantQr = result.qrCodes.find((q: any) => q.type === 'TENANT');
       expect(tenantQr.url).toBe(`https://hummytummy.com/qr-menu/${tenantId}`);
@@ -273,7 +305,8 @@ describe('QrService', () => {
         settingsRow({ enableTableQR: false }),
       );
 
-      const result = await svc.getQrCodes(tenantId, 'https://hummytummy.com');
+      const result = await svc.getQrCodes(
+        scope, 'https://hummytummy.com');
 
       expect(result.qrCodes.some((q: any) => q.type === 'TABLE')).toBe(false);
     });
@@ -287,7 +320,8 @@ describe('QrService', () => {
         settingsRow({ enableTableQR: true }),
       );
 
-      const result = await svc.getQrCodes(tenantId, 'https://hummytummy.com');
+      const result = await svc.getQrCodes(
+        scope, 'https://hummytummy.com');
 
       const tableQr = result.qrCodes.find((q: any) => q.type === 'TABLE');
       expect(tableQr.tableId).toBe('tbl-1');
@@ -302,7 +336,8 @@ describe('QrService', () => {
         settingsRow({ primaryColor: '#abcdef' }),
       );
 
-      await svc.getQrCodes(tenantId, 'https://hummytummy.com');
+      await svc.getQrCodes(
+        scope, 'https://hummytummy.com');
 
       const opts = toDataURL.mock.calls[0][1];
       expect(opts.color.dark).toBe('#abcdef');

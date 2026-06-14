@@ -74,9 +74,20 @@ describe('TablesController — handler forwarding', () => {
     expect(svc.findAll).toHaveBeenCalledWith(scope, undefined);
   });
 
-  it('getPublicTables forwards ONLY the tenantId (public, no scope)', () => {
+  it('getPublicTables forwards tenantId + branchId (public, no scope)', () => {
+    ctrl.getPublicTables('tenant-9', 'branch-3');
+    expect(svc.findAvailableForCustomers).toHaveBeenCalledWith(
+      'tenant-9',
+      'branch-3',
+    );
+  });
+
+  it('getPublicTables forwards undefined branchId when the query param is omitted', () => {
     ctrl.getPublicTables('tenant-9');
-    expect(svc.findAvailableForCustomers).toHaveBeenCalledWith('tenant-9');
+    expect(svc.findAvailableForCustomers).toHaveBeenCalledWith(
+      'tenant-9',
+      undefined,
+    );
   });
 
   it('findOne forwards scope + id', () => {

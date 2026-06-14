@@ -6,6 +6,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateQrSettingsDto } from "./dto/create-qr-settings.dto";
 import { UpdateQrSettingsDto } from "./dto/update-qr-settings.dto";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import * as QRCode from "qrcode";
 
 // Cap on per-request QR generation. Each PNG takes ~500ms of synchronous
@@ -94,7 +95,8 @@ export class QrService {
     return { count: deleted.count };
   }
 
-  async getQrCodes(tenantId: string, baseUrl: string) {
+  async getQrCodes(scope: BranchScope, baseUrl: string) {
+    const tenantId = scope.tenantId;
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
@@ -106,8 +108,13 @@ export class QrService {
     const hasValidSubdomain =
       !!tenant.subdomain && SUBDOMAIN_REGEX.test(tenant.subdomain);
 
+    // Branch-scoped: physical tables belong to one branch, so the table
+    // QR sheet must only list THIS branch's tables. Pre-fix this filtered
+    // by tenantId only, so a MANAGER printing QR codes for branch A got
+    // every branch's tables (and per-table deep links into branches they
+    // can't manage). QrMenuSettings stays tenant-wide (see getSettings).
     const tables = await this.prisma.table.findMany({
-      where: { tenantId },
+      where: { ...branchScope(scope) },
       orderBy: { number: "asc" },
       take: MAX_TABLES_PER_REQUEST + 1,
     });

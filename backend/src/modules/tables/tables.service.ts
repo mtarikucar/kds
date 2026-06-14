@@ -13,6 +13,7 @@ import { UpdateTableStatusDto } from "./dto/update-table-status.dto";
 import { MergeTablesDto, UnmergeTableDto } from "./dto/merge-tables.dto";
 import { OrderStatus } from "../../common/constants/order-status.enum";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { ReservationAvailabilityService } from "../reservations/services/reservation-availability.service";
 import { randomUUID } from "crypto";
 
 /**
@@ -47,6 +48,12 @@ export class TablesService {
   constructor(
     private prisma: PrismaService,
     private kdsGateway: KdsGateway,
+    // Shared public branch resolver (validates branch ∈ tenant + active,
+    // else oldest-active fallback). The customer-facing table listing is
+    // anonymous (@Public / @SkipBranchScope) so the branch is derived the
+    // same way the public reservation flow derives it — keeping "tables a
+    // guest can pick" consistent with the branch a booking lands on.
+    private reservationAvailability: ReservationAvailabilityService,
   ) {}
 
   async create(scope: BranchScope, createTableDto: CreateTableDto) {
@@ -216,10 +223,29 @@ export class TablesService {
     }));
   }
 
-  async findAvailableForCustomers(tenantId: string) {
+  /**
+   * Public, customer-facing table listing for a single branch.
+   *
+   * This is an anonymous (@Public / @SkipBranchScope) read, so there is
+   * no @CurrentScope — the branch is derived rather than asserted via
+   * `resolvePublicBranchId` (explicit `branchId` when it belongs to the
+   * tenant and is active, else the tenant's oldest-active branch). Pre-fix
+   * this filtered by `tenantId` only, so GET /tables/public/:tenantId
+   * leaked EVERY branch's tables to anonymous callers; a multi-branch
+   * tenant's downtown floor plan showed up in the suburb's QR menu. The
+   * branchId clause closes that leak.
+   */
+  async findAvailableForCustomers(tenantId: string, branchId?: string) {
+    const resolvedBranchId =
+      await this.reservationAvailability.resolvePublicBranchId(
+        tenantId,
+        branchId,
+      );
+
     return this.prisma.table.findMany({
       where: {
         tenantId,
+        branchId: resolvedBranchId,
         status: {
           in: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
         },

@@ -1,4 +1,6 @@
 import { QrController } from './qr.controller';
+import { BranchScope } from '../../common/scoping/branch-scope';
+import { UserRole } from '../../common/constants/roles.enum';
 
 /**
  * Thin-controller spec for QrController. Settings handlers forward
@@ -10,6 +12,15 @@ describe('QrController', () => {
   let svc: Record<string, jest.Mock>;
   let ctrl: QrController;
   const OLD_ENV = process.env.FRONTEND_URL;
+
+  // getQrCodes is branch-scoped now; it forwards the resolved BranchScope
+  // (not req.tenantId) so the table QR sheet is one branch's tables only.
+  const scope: BranchScope = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'u1',
+    role: UserRole.MANAGER,
+  };
 
   beforeEach(() => {
     svc = {
@@ -51,10 +62,18 @@ describe('QrController', () => {
   });
 
   describe('getQrCodes baseUrl derivation', () => {
+    it('forwards the BranchScope (not req.tenantId) to the service', () => {
+      process.env.FRONTEND_URL = 'https://app.example.com';
+      ctrl.getQrCodes({ tenantId: 't1' } as any, scope);
+      // Load-bearing: the service must receive the full scope so its
+      // table.findMany is branch-filtered — passing tenantId alone was the leak.
+      expect(svc.getQrCodes).toHaveBeenCalledWith(scope, 'https://app.example.com');
+    });
+
     it('uses FRONTEND_URL env when set', () => {
       process.env.FRONTEND_URL = 'https://app.example.com';
-      ctrl.getQrCodes({ tenantId: 't1' } as any);
-      expect(svc.getQrCodes).toHaveBeenCalledWith('t1', 'https://app.example.com');
+      ctrl.getQrCodes({ tenantId: 't1' } as any, scope);
+      expect(svc.getQrCodes).toHaveBeenCalledWith(scope, 'https://app.example.com');
     });
 
     it('maps a :3000 dev host to :5173 (Vite)', () => {
@@ -63,8 +82,8 @@ describe('QrController', () => {
         protocol: 'http',
         get: (h: string) => (h === 'host' ? 'localhost:3000' : undefined),
       };
-      ctrl.getQrCodes(req as any);
-      expect(svc.getQrCodes).toHaveBeenCalledWith('t1', 'http://localhost:5173');
+      ctrl.getQrCodes(req as any, scope);
+      expect(svc.getQrCodes).toHaveBeenCalledWith(scope, 'http://localhost:5173');
     });
 
     it('falls back to localhost:5173 for a bare localhost host', () => {
@@ -73,8 +92,8 @@ describe('QrController', () => {
         protocol: 'http',
         get: (h: string) => (h === 'host' ? 'localhost' : undefined),
       };
-      ctrl.getQrCodes(req as any);
-      expect(svc.getQrCodes).toHaveBeenCalledWith('t1', 'http://localhost:5173');
+      ctrl.getQrCodes(req as any, scope);
+      expect(svc.getQrCodes).toHaveBeenCalledWith(scope, 'http://localhost:5173');
     });
 
     it('uses same protocol+host for a production domain', () => {
@@ -83,8 +102,8 @@ describe('QrController', () => {
         protocol: 'https',
         get: (h: string) => (h === 'host' ? 'menu.example.com' : undefined),
       };
-      ctrl.getQrCodes(req as any);
-      expect(svc.getQrCodes).toHaveBeenCalledWith('t1', 'https://menu.example.com');
+      ctrl.getQrCodes(req as any, scope);
+      expect(svc.getQrCodes).toHaveBeenCalledWith(scope, 'https://menu.example.com');
     });
   });
 });
