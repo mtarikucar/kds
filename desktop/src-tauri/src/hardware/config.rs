@@ -10,7 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -145,9 +145,8 @@ pub fn config_path() -> ConfigResult<PathBuf> {
     let mut path = dirs::home_dir().ok_or(ConfigError::NoConfigDir)?;
     path.push(".kds");
     if !path.exists() {
-        fs::create_dir_all(&path).map_err(|e| {
-            ConfigError::WriteFailed(path.clone(), e.to_string())
-        })?;
+        fs::create_dir_all(&path)
+            .map_err(|e| ConfigError::WriteFailed(path.clone(), e.to_string()))?;
     }
     path.push("hardware.json");
     Ok(path)
@@ -156,29 +155,49 @@ pub fn config_path() -> ConfigResult<PathBuf> {
 /// Load the hardware config from disk. Missing file = empty default config
 /// (a fresh install on a new terminal). Corrupt file = error so the user
 /// sees the problem rather than silently losing their pairings.
+///
+/// Production wrapper over [`load_from`] using the real `~/.kds/hardware.json`
+/// path. The path is resolved here (and nowhere deeper) so the actual load
+/// logic can be unit-tested against a temp directory via [`load_from`].
 pub fn load() -> ConfigResult<HardwareConfig> {
-    let path = config_path()?;
+    load_from(config_path()?)
+}
+
+/// Path-injected variant of [`load`]. Reads the hardware config from an
+/// explicit file path so tests can run on a temp dir without touching the
+/// user's real `~/.kds`. Missing file = empty default; corrupt JSON = error.
+pub fn load_from<P: AsRef<Path>>(path: P) -> ConfigResult<HardwareConfig> {
+    let path = path.as_ref();
     if !path.exists() {
         return Ok(HardwareConfig::default());
     }
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| ConfigError::ReadFailed(path.clone(), e.to_string()))?;
+    let raw = fs::read_to_string(path)
+        .map_err(|e| ConfigError::ReadFailed(path.to_path_buf(), e.to_string()))?;
     serde_json::from_str(&raw).map_err(|e| ConfigError::InvalidJson(e.to_string()))
 }
 
 /// Persist the hardware config to disk atomically: write to a temp file
 /// in the same directory, then rename. If the rename succeeds the file
 /// is consistent on disk; if it fails the previous file is untouched.
+///
+/// Production wrapper over [`save_to`] using the real `~/.kds/hardware.json`
+/// path.
 pub fn save(config: &HardwareConfig) -> ConfigResult<()> {
-    let path = config_path()?;
+    save_to(config_path()?, config)
+}
+
+/// Path-injected variant of [`save`]. Writes the config atomically to an
+/// explicit file path (temp-write + rename) so tests can assert round-trips
+/// on a temp dir without clobbering the user's real config.
+pub fn save_to<P: AsRef<Path>>(path: P, config: &HardwareConfig) -> ConfigResult<()> {
+    let path = path.as_ref();
     let tmp = path.with_extension("json.tmp");
 
     let json = serde_json::to_string_pretty(config)
         .map_err(|e| ConfigError::InvalidJson(e.to_string()))?;
-    fs::write(&tmp, json)
-        .map_err(|e| ConfigError::WriteFailed(tmp.clone(), e.to_string()))?;
-    fs::rename(&tmp, &path)
-        .map_err(|e| ConfigError::WriteFailed(path.clone(), e.to_string()))?;
+    fs::write(&tmp, json).map_err(|e| ConfigError::WriteFailed(tmp.clone(), e.to_string()))?;
+    fs::rename(&tmp, path)
+        .map_err(|e| ConfigError::WriteFailed(path.to_path_buf(), e.to_string()))?;
     Ok(())
 }
 
@@ -238,5 +257,63 @@ mod tests {
         let cfg: HardwareConfig = serde_json::from_str(json).unwrap();
         assert!(cfg.devices.is_empty());
         assert_eq!(cfg.default_printer_port.as_deref(), Some("/dev/lp0"));
+    }
+
+    #[test]
+    fn load_from_missing_file_returns_default() {
+        // Fresh terminal: no hardware.json yet. load_from must yield an empty
+        // default config, not an error — the user just hasn't paired anything.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hardware.json");
+        let cfg = load_from(&path).expect("missing file -> default, not error");
+        assert!(cfg.devices.is_empty());
+        assert!(cfg.default_printer_port.is_none());
+    }
+
+    #[test]
+    fn save_to_then_load_from_round_trips_on_temp_dir() {
+        // The load/save logic, now path-injected, runs entirely on a temp dir
+        // — no dependency on the real ~/.kds. This is the test the hard-coded
+        // path previously made impossible.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hardware.json");
+
+        let cfg = HardwareConfig {
+            devices: vec![sample_device()],
+            default_printer_port: Some("/dev/usb/lp0".to_string()),
+        };
+        save_to(&path, &cfg).expect("save to temp dir");
+        assert!(path.exists(), "save_to must create the file");
+
+        let reloaded = load_from(&path).expect("load back");
+        assert_eq!(reloaded.devices.len(), 1);
+        assert_eq!(reloaded.devices[0].id, "dev-1");
+        assert_eq!(
+            reloaded.default_printer_port.as_deref(),
+            Some("/dev/usb/lp0")
+        );
+    }
+
+    #[test]
+    fn save_to_is_atomic_and_leaves_no_tmp_file() {
+        // The temp-write+rename must not leave the .json.tmp scratch behind.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hardware.json");
+        save_to(&path, &HardwareConfig::default()).unwrap();
+
+        let tmp = path.with_extension("json.tmp");
+        assert!(!tmp.exists(), "atomic rename must consume the tmp file");
+    }
+
+    #[test]
+    fn load_from_corrupt_json_is_an_error() {
+        // A corrupt file must surface as InvalidJson so the user sees the
+        // problem rather than silently losing pairings.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hardware.json");
+        fs::write(&path, b"{ not valid json ").unwrap();
+
+        let err = load_from(&path).expect_err("corrupt JSON must error");
+        assert!(matches!(err, ConfigError::InvalidJson(_)));
     }
 }
