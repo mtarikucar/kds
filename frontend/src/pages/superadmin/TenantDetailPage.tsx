@@ -14,6 +14,16 @@ import {
   useUpdateTenantOverrides,
   useResetTenantOverrides,
 } from '../../features/superadmin/api/superAdminApi';
+import {
+  FeatureOverrideState,
+  buildFeatureOverridesPayload,
+  buildLimitOverridesPayload,
+  cycleFeatureOverrideState,
+  getEffectiveFeature as resolveEffectiveFeature,
+  getEffectiveLimit as resolveEffectiveLimit,
+  initFeatureStates,
+  initLimitValues,
+} from './tenantOverrides.helpers';
 
 const statusStyles = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -41,8 +51,6 @@ const LIMIT_LABELS: Record<string, string> = {
   maxMonthlyOrders: 'Max Monthly Orders',
 };
 
-type FeatureOverrideState = 'default' | 'on' | 'off';
-
 export default function TenantDetailPage() {
   const { t } = useTranslation('superadmin');
   const { id } = useParams<{ id: string }>();
@@ -69,27 +77,8 @@ export default function TenantDetailPage() {
   useEffect(() => {
     if (!overridesData) return;
 
-    const fStates: Record<string, FeatureOverrideState> = {};
-    for (const key of Object.keys(FEATURE_LABELS)) {
-      if (overridesData.featureOverrides?.[key] === true) {
-        fStates[key] = 'on';
-      } else if (overridesData.featureOverrides?.[key] === false) {
-        fStates[key] = 'off';
-      } else {
-        fStates[key] = 'default';
-      }
-    }
-    setFeatureStates(fStates);
-
-    const lValues: Record<string, string> = {};
-    for (const key of Object.keys(LIMIT_LABELS)) {
-      if (overridesData.limitOverrides?.[key] !== undefined && overridesData.limitOverrides?.[key] !== null) {
-        lValues[key] = String(overridesData.limitOverrides[key]);
-      } else {
-        lValues[key] = '';
-      }
-    }
-    setLimitValues(lValues);
+    setFeatureStates(initFeatureStates(Object.keys(FEATURE_LABELS), overridesData));
+    setLimitValues(initLimitValues(Object.keys(LIMIT_LABELS), overridesData));
     setHasOverrideChanges(false);
   }, [overridesData]);
 
@@ -143,8 +132,7 @@ export default function TenantDetailPage() {
   const cycleFeatureState = (key: string) => {
     setFeatureStates((prev) => {
       const current = prev[key] || 'default';
-      const next: FeatureOverrideState =
-        current === 'default' ? 'on' : current === 'on' ? 'off' : 'default';
+      const next: FeatureOverrideState = cycleFeatureOverrideState(current);
       return { ...prev, [key]: next };
     });
     setHasOverrideChanges(true);
@@ -156,21 +144,8 @@ export default function TenantDetailPage() {
   };
 
   const handleSaveOverrides = () => {
-    const featureOverrides: Record<string, boolean | null> = {};
-    for (const [key, state] of Object.entries(featureStates)) {
-      if (state === 'on') featureOverrides[key] = true;
-      else if (state === 'off') featureOverrides[key] = false;
-      else featureOverrides[key] = null; // Remove override
-    }
-
-    const limitOverrides: Record<string, number | null> = {};
-    for (const [key, value] of Object.entries(limitValues)) {
-      if (value === '' || value === undefined) {
-        limitOverrides[key] = null; // Remove override
-      } else {
-        limitOverrides[key] = Number(value);
-      }
-    }
+    const featureOverrides = buildFeatureOverridesPayload(featureStates);
+    const limitOverrides = buildLimitOverridesPayload(limitValues);
 
     updateOverridesMutation.mutate(
       { tenantId: tenant.id, data: { featureOverrides, limitOverrides } },
@@ -185,18 +160,11 @@ export default function TenantDetailPage() {
     });
   };
 
-  const getEffectiveFeature = (key: string): boolean => {
-    const state = featureStates[key];
-    if (state === 'on') return true;
-    if (state === 'off') return false;
-    return overridesData?.planDefaults?.features?.[key] ?? false;
-  };
+  const getEffectiveFeature = (key: string): boolean =>
+    resolveEffectiveFeature(key, featureStates, overridesData);
 
-  const getEffectiveLimit = (key: string): number => {
-    const val = limitValues[key];
-    if (val !== '' && val !== undefined) return Number(val);
-    return overridesData?.planDefaults?.limits?.[key] ?? 0;
-  };
+  const getEffectiveLimit = (key: string): number =>
+    resolveEffectiveLimit(key, limitValues, overridesData);
 
   return (
     <div className="space-y-6">

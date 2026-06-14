@@ -3,20 +3,10 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useSuperAdminLogin } from '../../features/superadmin/api/superAdminApi';
-
-// One-shot read of the deeplink path stashed by superAdminApi.ts's 401
-// interceptor (warm-session expiry → hard reload → state lost).
-// Cleared on read so a later visit to /superadmin/login doesn't reuse
-// a stale target.
-function readAndClearReturnPath(): string | null {
-  try {
-    const value = window.sessionStorage.getItem('superAdminPostLoginReturn');
-    if (value) window.sessionStorage.removeItem('superAdminPostLoginReturn');
-    return value;
-  } catch {
-    return null;
-  }
-}
+import {
+  readAndClearReturnPath,
+  resolvePostLoginTarget,
+} from './superAdminLogin.helpers';
 
 export default function SuperAdminLoginPage() {
   const { t } = useTranslation('superadmin');
@@ -30,15 +20,7 @@ export default function SuperAdminLoginPage() {
   const postLoginTarget = useMemo(() => {
     const candidate =
       typeof window !== 'undefined' ? readAndClearReturnPath() : null;
-    if (
-      candidate &&
-      /^\/[^/]/.test(candidate) &&
-      candidate.startsWith('/superadmin/') &&
-      !candidate.startsWith('/superadmin/login')
-    ) {
-      return candidate;
-    }
-    return '/superadmin/dashboard';
+    return resolvePostLoginTarget(candidate);
   }, []);
 
   if (isAuthenticated) {
