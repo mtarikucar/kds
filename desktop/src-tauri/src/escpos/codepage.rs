@@ -146,7 +146,10 @@ mod tests {
         // A real receipt line: "Adana Kebap" (no Turkish chars in this name)
         assert_eq!(utf8_to_cp857("Adana Kebap"), b"Adana Kebap".to_vec());
         // "Künefe" — has ü
-        assert_eq!(utf8_to_cp857("Künefe"), vec![b'K', 0x81, b'n', b'e', b'f', b'e']);
+        assert_eq!(
+            utf8_to_cp857("Künefe"),
+            vec![b'K', 0x81, b'n', b'e', b'f', b'e']
+        );
         // "Şiş" — has Ş and ş
         assert_eq!(utf8_to_cp857("Şiş"), vec![0x9E, b'i', 0x9F]);
     }
@@ -187,6 +190,10 @@ mod tests {
         // Verify the count matches char count.
         assert_eq!(bytes.len(), input.chars().count());
         // No '?' fallback should fire — every Turkish letter is mapped.
-        assert!(!bytes.contains(&b'?'), "unexpected '?' fallback in: {:?}", bytes);
+        assert!(
+            !bytes.contains(&b'?'),
+            "unexpected '?' fallback in: {:?}",
+            bytes
+        );
     }
 }

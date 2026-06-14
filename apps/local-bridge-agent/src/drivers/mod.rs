@@ -137,7 +137,11 @@ mod tests {
         assert_eq!(outcome.status, "done");
         assert_eq!(outcome.result["handled_by"], "escpos");
         assert_eq!(outcome.result["cmd_id"], "c-1");
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "driver invoked exactly once");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "driver invoked exactly once"
+        );
     }
 
     #[tokio::test]

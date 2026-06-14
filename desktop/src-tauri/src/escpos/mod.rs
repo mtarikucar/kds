@@ -58,7 +58,7 @@ impl PrinterCommand {
                 bytes
             }
             PrinterCommand::Feed(lines) => vec![0x1B, 0x64, *lines], // ESC d n
-            PrinterCommand::Cut => vec![0x1D, 0x56, 0x00], // GS V 0
+            PrinterCommand::Cut => vec![0x1D, 0x56, 0x00],           // GS V 0
             PrinterCommand::Align(alignment) => vec![0x1B, 0x61, *alignment], // ESC a n
             PrinterCommand::TextSize(width, height) => {
                 let size = ((width - 1) << 4) | (height - 1);
@@ -89,10 +89,14 @@ impl PrinterCommand {
                 ];
                 let len = data.len() + 3;
                 bytes.extend_from_slice(&[
-                    0x1D, 0x28, 0x6B,
+                    0x1D,
+                    0x28,
+                    0x6B,
                     (len & 0xFF) as u8,
                     ((len >> 8) & 0xFF) as u8,
-                    0x31, 0x50, 0x30,
+                    0x31,
+                    0x50,
+                    0x30,
                 ]);
                 bytes.extend_from_slice(data.as_bytes());
                 bytes.extend_from_slice(&[0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
@@ -143,7 +147,9 @@ mod tests {
         // payload through utf8_to_cp857.
         let bytes = PrinterCommand::Barcode("ABC123".to_string()).to_bytes();
         // Last 7 bytes = "ABC123" + NULL terminator
-        assert_eq!(&bytes[bytes.len() - 7..], &[b'A', b'B', b'C', b'1', b'2', b'3', 0x00]);
+        assert_eq!(
+            &bytes[bytes.len() - 7..],
+            &[b'A', b'B', b'C', b'1', b'2', b'3', 0x00]
+        );
     }
 }
-
