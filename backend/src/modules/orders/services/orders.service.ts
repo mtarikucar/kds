@@ -34,6 +34,8 @@ import { OutboxService } from "../../outbox/outbox.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 import { MetricsService } from "../../../common/metrics/metrics.service";
 import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
+import { toIntCents } from "../../../common/money/to-int-cents";
+import { ORDER_DETAIL_INCLUDE, buildFindAllWhere } from "./order-query.builder";
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -116,39 +118,10 @@ export class OrdersService {
           // false and `totalCents` came out undefined. Normalise via
           // String() → integer cents to dodge the IEEE-754 conversion that
           // would otherwise lose precision on large orders.
-          totalCents: this.toIntCents(order?.finalAmount),
+          totalCents: toIntCents(order?.finalAmount),
         },
       })
       .catch(captureSwallowedEmit(this.logger, { module: "orders", op: type }));
-  }
-
-  /**
-   * Convert any of {number, Prisma.Decimal, string} → integer cents.
-   *
-   * Why this exists: Prisma.Decimal columns deserialise to Decimal objects
-   * whose `*100 → Math.round` path goes through IEEE-754, dropping precision
-   * for large amounts and quietly losing the kuruş on edge values. The
-   * Decimal API exposes `.toFixed(2)` which renders the canonical 2-dp
-   * string; we then strip the decimal point and parse, never crossing the
-   * float boundary.
-   */
-  private toIntCents(v: unknown): number | undefined {
-    if (v == null) return undefined;
-    // Decimal has a toFixed; number doesn't. Detect by feature instead of
-    // by `instanceof Decimal` so the helper works in test fixtures that
-    // pass plain numbers.
-    const asDecimal = v as { toFixed?: (n: number) => string };
-    if (typeof asDecimal.toFixed === "function" && typeof v !== "number") {
-      const fixed = asDecimal.toFixed!(2); // "123.45"
-      const cents = Number(fixed.replace(".", "")); // 12345
-      return Number.isFinite(cents) ? cents : undefined;
-    }
-    if (typeof v === "number") return Math.round(v * 100);
-    if (typeof v === "string") {
-      const cents = Math.round(parseFloat(v) * 100);
-      return Number.isFinite(cents) ? cents : undefined;
-    }
-    return undefined;
   }
 
   /**
@@ -695,78 +668,20 @@ export class OrdersService {
     take: number = 100,
     skip: number = 0,
   ) {
-    // v3.0.0 — branchScope spreads `{ tenantId, branchId }`. Pre-v3
-    // this filtered by tenantId only; the v3 audit flagged the leak
-    // where a MANAGER in branch A could enumerate branch B's order
-    // history via GET /orders. The (tenantId, branchId) compound is
-    // also a covering index entry on the Order table.
-    const where: any = { ...branchScope(scope) };
-
-    if (tableId) {
-      where.tableId = tableId;
-    }
-
-    if (statuses && statuses.length > 0) {
-      // Support both single status and multiple statuses
-      if (statuses.length === 1) {
-        where.status = statuses[0];
-      } else {
-        where.status = { in: statuses };
-      }
-    }
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = startDate;
-      }
-      if (endDate) {
-        where.createdAt.lte = endDate;
-      }
-    }
+    // WHERE assembly (branch-scope + optional tableId/status/date window)
+    // moved VERBATIM into the pure buildFindAllWhere builder — no behaviour
+    // change, just isolates the read-path shape from the query execution.
+    const where = buildFindAllWhere(
+      scope,
+      tableId,
+      statuses,
+      startDate,
+      endDate,
+    );
 
     const orders = await this.prisma.order.findMany({
       where,
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                image: true,
-              },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: {
-                    id: true,
-                    name: true,
-                    priceAdjustment: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        table: {
-          select: {
-            id: true,
-            number: true,
-            section: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        payments: true,
-      },
+      include: ORDER_DETAIL_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: Math.min(take, 500),
       skip,
@@ -781,46 +696,7 @@ export class OrdersService {
         id,
         ...branchScope(scope),
       },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                image: true,
-              },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: {
-                    id: true,
-                    name: true,
-                    priceAdjustment: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        table: {
-          select: {
-            id: true,
-            number: true,
-            section: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        payments: true,
-      },
+      include: ORDER_DETAIL_INCLUDE,
     });
 
     if (!order) {
@@ -846,25 +722,7 @@ export class OrdersService {
   async findOneByTenant(id: string, tenantId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id, tenantId },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: { id: true, name: true, price: true, image: true },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: { id: true, name: true, priceAdjustment: true },
-                },
-              },
-            },
-          },
-        },
-        table: { select: { id: true, number: true, section: true } },
-        user: { select: { id: true, firstName: true, lastName: true } },
-        payments: true,
-      },
+      include: ORDER_DETAIL_INCLUDE,
     });
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);

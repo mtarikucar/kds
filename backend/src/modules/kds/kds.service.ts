@@ -18,6 +18,7 @@ import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
+import { toIntCents } from "../../common/money/to-int-cents";
 
 @Injectable()
 export class KdsService {
@@ -74,33 +75,10 @@ export class KdsService {
           branchId: order?.branchId ?? null,
           tableId: order?.tableId ?? null,
           status: order?.status,
-          totalCents: this.toIntCents(order?.finalAmount),
+          totalCents: toIntCents(order?.finalAmount),
         },
       })
       .catch(captureSwallowedEmit(this.logger, { module: "kds", op: type }));
-  }
-
-  /**
-   * Convert any of {number, Prisma.Decimal, string} → integer cents.
-   * Mirrors OrdersService.toIntCents: Prisma.Decimal columns deserialise to
-   * Decimal objects whose `.toFixed(2)` renders the canonical 2-dp string;
-   * we strip the decimal point and parse, never crossing the IEEE-754 float
-   * boundary that would otherwise drop the kuruş on large amounts.
-   */
-  private toIntCents(v: unknown): number | undefined {
-    if (v == null) return undefined;
-    const asDecimal = v as { toFixed?: (n: number) => string };
-    if (typeof asDecimal.toFixed === "function" && typeof v !== "number") {
-      const fixed = asDecimal.toFixed!(2);
-      const cents = Number(fixed.replace(".", ""));
-      return Number.isFinite(cents) ? cents : undefined;
-    }
-    if (typeof v === "number") return Math.round(v * 100);
-    if (typeof v === "string") {
-      const cents = Math.round(parseFloat(v) * 100);
-      return Number.isFinite(cents) ? cents : undefined;
-    }
-    return undefined;
   }
 
   async getKitchenOrders(scope: BranchScope) {
