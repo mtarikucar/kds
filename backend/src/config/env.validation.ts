@@ -8,6 +8,7 @@ import {
   IsUrl,
   Max,
   Min,
+  ValidateIf,
   validateSync,
 } from "class-validator";
 
@@ -52,7 +53,12 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   REDIS_URL?: string;
 
+  // OTel is opt-in. Treat an empty string as not-configured (staging/dev
+  // leave it blank): @IsOptional skips undefined/null but NOT "", so a blank
+  // value would otherwise fail @IsUrl and crash-loop boot. Only URL-validate
+  // a non-empty value.
   @IsOptional()
+  @ValidateIf((o) => o.OTEL_EXPORTER_OTLP_ENDPOINT !== "")
   @IsUrl({ require_tld: false })
   OTEL_EXPORTER_OTLP_ENDPOINT?: string;
 

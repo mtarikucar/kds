@@ -34,6 +34,13 @@ describe("env validation (typed layer — secrets are owned by common/helpers/en
     ).not.toThrow();
   });
 
+  it("treats an empty OTEL_EXPORTER_OTLP_ENDPOINT as not-configured (opt-in)", () => {
+    // OTel is opt-in; staging/dev leave the endpoint blank. An empty string
+    // must NOT crash boot the way a malformed URL does — this exact value
+    // crash-looped the staging backend container (env validation rejected "").
+    expect(() => validate({ OTEL_EXPORTER_OTLP_ENDPOINT: "" })).not.toThrow();
+  });
+
   it("rejects an empty REDIS_URL (set-but-blank is a misconfiguration)", () => {
     expect(() => validate({ REDIS_URL: "" })).toThrow(/REDIS_URL/);
     expect(() =>
