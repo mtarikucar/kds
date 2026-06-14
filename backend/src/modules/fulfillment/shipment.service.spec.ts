@@ -71,4 +71,89 @@ describe('ShipmentService', () => {
     await expect(svc.markDelivered('s-1', 'other-tenant')).rejects.toThrow(/Shipment not found/);
     expect(prisma.shipment.update).not.toHaveBeenCalled();
   });
+
+  /**
+   * Extended coverage: the shipment-row status derivation, the
+   * `fulfillment` ship-from state, multi-line inventory accounting,
+   * the no-accounting-on-refusal guard, and markDelivered's
+   * shipment-missing NotFound path. None were previously pinned.
+   */
+  describe('createShipment — shipment row + accounting', () => {
+    function wireOrder(items: any[], status = 'paid') {
+      prisma.hardwareOrder.findUnique.mockResolvedValue({
+        id: 'o-1',
+        status,
+        tenantId: 't1',
+        items,
+      } as any);
+      (prisma.hardwareOrder.update as any).mockResolvedValue({ id: 'o-1', tenantId: 't1' });
+    }
+
+    it('creates the shipment row as in_transit with shippedAt set when a trackingNo is given', async () => {
+      wireOrder([{ productId: 'p-1', qty: 1 }]);
+      let shipData: any = null;
+      (prisma.shipment.create as any).mockImplementation(async ({ data }: any) => {
+        shipData = data;
+        return { id: 's-1', ...data };
+      });
+
+      await svc.createShipment('o-1', { carrier: 'aras', trackingNo: 'AR-1' });
+
+      expect(shipData.status).toBe('in_transit');
+      expect(shipData.shippedAt).toBeInstanceOf(Date);
+      expect(shipData.trackingNo).toBe('AR-1');
+    });
+
+    it('creates the shipment row as pending with null shippedAt when no trackingNo', async () => {
+      wireOrder([{ productId: 'p-1', qty: 1 }]);
+      let shipData: any = null;
+      (prisma.shipment.create as any).mockImplementation(async ({ data }: any) => {
+        shipData = data;
+        return { id: 's-1', ...data };
+      });
+
+      await svc.createShipment('o-1', { carrier: 'manual' });
+
+      expect(shipData.status).toBe('pending');
+      expect(shipData.shippedAt).toBeNull();
+    });
+
+    it('allows shipping from status=fulfillment (partial-fulfillment resume)', async () => {
+      wireOrder([{ productId: 'p-1', qty: 1 }], 'fulfillment');
+      (prisma.shipment.create as any).mockImplementation(async ({ data }: any) => ({ id: 's-1', ...data }));
+
+      await expect(
+        svc.createShipment('o-1', { carrier: 'manual', trackingNo: 'X' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('marks every line shipped (per-line inventory accounting)', async () => {
+      wireOrder([
+        { productId: 'p-1', qty: 2 },
+        { productId: 'p-2', qty: 5 },
+      ]);
+      (prisma.shipment.create as any).mockImplementation(async ({ data }: any) => ({ id: 's-1', ...data }));
+
+      await svc.createShipment('o-1', { carrier: 'manual', trackingNo: 'X' });
+
+      expect(catalog.markShipped).toHaveBeenCalledTimes(2);
+      expect(catalog.markShipped).toHaveBeenCalledWith('p-1', 2);
+      expect(catalog.markShipped).toHaveBeenCalledWith('p-2', 5);
+    });
+
+    it('does not run inventory accounting when the order is missing', async () => {
+      prisma.hardwareOrder.findUnique.mockResolvedValue(null as any);
+      await expect(
+        svc.createShipment('missing', { carrier: 'manual' }),
+      ).rejects.toThrow(/Hardware order not found/);
+      expect(catalog.markShipped).not.toHaveBeenCalled();
+      expect(prisma.shipment.create).not.toHaveBeenCalled();
+    });
+  });
+
+  it('markDelivered throws NotFound when the order matches but the shipment row is gone', async () => {
+    prisma.hardwareOrder.findFirst.mockResolvedValue({ id: 'o-1', tenantId: 't1' } as any);
+    prisma.shipment.findUnique.mockResolvedValue(null as any);
+    await expect(svc.markDelivered('s-1')).rejects.toThrow(/Shipment not found/);
+  });
 });

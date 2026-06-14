@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGetHardwareOrder, type ShippingAddress } from './storeApi';
+import { formatAddress } from './formatAddress';
 
 /**
  * v2.8.84 — single hardware order view.
@@ -182,23 +183,4 @@ function AddressBox({
       </div>
     </div>
   );
-}
-
-function formatAddress(raw: ShippingAddress | string): string[] {
-  if (typeof raw === 'string') {
-    return raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-  }
-  const lines: string[] = [];
-  const push = (v: string | undefined) => {
-    if (v && v.trim()) lines.push(v.trim());
-  };
-  push(raw.recipientName);
-  push(raw.line1);
-  push(raw.line2);
-  const district = [raw.district, raw.city].filter(Boolean).join(', ');
-  if (district) lines.push(district);
-  push(raw.postalCode);
-  push(raw.country);
-  push(raw.phone);
-  return lines;
 }

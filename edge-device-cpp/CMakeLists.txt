@@ -132,26 +132,38 @@ endif()
 
 set(SOURCES
     src/main.cpp
+    src/args.cpp
     src/config.cpp
     src/camera/rtsp_client.cpp
     src/camera/frame_buffer.cpp
     src/detection/yolo_tensorrt.cpp
+    src/detection/yolo_postprocess.cpp
     src/detection/tracker.cpp
     src/calibration/homography.cpp
     src/communication/websocket_client.cpp
+    src/communication/socketio_router.cpp
     src/utils/logger.cpp
     src/utils/nms.cpp
 )
 
 set(HEADERS
+    src/args.hpp
     src/config.hpp
     src/camera/rtsp_client.hpp
+    src/camera/frame.hpp
+    src/camera/frame_source.hpp
+    src/camera/frame_dispatcher.hpp
     src/camera/frame_buffer.hpp
     src/detection/yolo_tensorrt.hpp
+    src/detection/inference_engine.hpp
+    src/detection/yolo_postprocess.hpp
     src/detection/tracker.hpp
     src/detection/types.hpp
     src/calibration/homography.hpp
     src/communication/websocket_client.hpp
+    src/communication/transport.hpp
+    src/communication/socketio_router.hpp
+    src/communication/reconnect_policy.hpp
     src/communication/types.hpp
     src/utils/logger.hpp
     src/utils/nms.hpp

@@ -10,8 +10,13 @@ import { ConfigService } from "@nestjs/config";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import { Prisma } from "@prisma/client";
 import { addHours } from "date-fns";
-import { randomBytes } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
+import { CLOCK, Clock, SystemClock } from "../../common/time/clock";
+import {
+  ID_GENERATOR,
+  IdGenerator,
+  SystemIdGenerator,
+} from "../../common/ids/id-generator";
 import {
   REFERRAL_DIRECTORY_PORT,
   ReferralDirectoryPort,
@@ -57,7 +62,23 @@ export class PaymentsService {
     private readonly referralDirectory: ReferralDirectoryPort,
     // Optional so unit tests constructing the service bare keep working.
     @Optional() private readonly metrics?: MetricsService,
-  ) {}
+    // Testability primitives. @Optional with a self-constructed default so the
+    // existing positional constructions in the unit specs (which stop at the
+    // referralDirectory / metrics arg) keep compiling AND keep their exact
+    // runtime behaviour: SystemClock/SystemIdGenerator delegate straight to
+    // Date.now() / crypto, so a bare-constructed service is byte-identical to
+    // the pre-DI inline code. Production injects the global CommonModule
+    // providers, which a unit test can override with a fixed clock + id to make
+    // merchantOid generation deterministic.
+    @Optional() @Inject(CLOCK) clock?: Clock,
+    @Optional() @Inject(ID_GENERATOR) idGenerator?: IdGenerator,
+  ) {
+    this.clock = clock ?? new SystemClock();
+    this.idGenerator = idGenerator ?? new SystemIdGenerator();
+  }
+
+  private readonly clock: Clock;
+  private readonly idGenerator: IdGenerator;
 
   private countIntent(result: string): void {
     this.metrics?.incCounter(
@@ -370,8 +391,12 @@ export class PaymentsService {
    */
   private generateMerchantOid(tenantId: string): string {
     const tenantHex = tenantId.replace(/-/g, "").slice(0, 12);
-    const ts = Date.now().toString(36);
-    const rand = randomBytes(3).toString("hex");
+    // Injected clock + id source (defaulting to the real platform clock /
+    // crypto). nowMs() === Date.now() and randomHex(3) ===
+    // randomBytes(3).toString("hex"), so production output is unchanged; a
+    // fixed-clock + fixed-id test makes this byte-for-byte deterministic.
+    const ts = this.clock.nowMs().toString(36);
+    const rand = this.idGenerator.randomHex(3);
     return `SUB${tenantHex}${ts}${rand}`;
   }
 

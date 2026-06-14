@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import {
@@ -18,6 +18,12 @@ import { formatCurrency } from '../../lib/currency';
 const ChangePlanPage = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // The plans page passes the user's choice via ?newPlanId & ?billingCycle.
+  const preselectedPlanId = searchParams.get('newPlanId');
+  const preselectedCycle = searchParams.get('billingCycle');
+  // Apply that preselection exactly once (don't re-open the modal on cancel).
+  const preselectionApplied = useRef(false);
 
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(BillingCycle.MONTHLY);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -32,12 +38,38 @@ const ChangePlanPage = () => {
     currentSubscription?.id || ''
   );
 
-  // Initialize billing cycle from current subscription
+  // Initialize billing cycle from current subscription — unless the plans page
+  // already passed an explicit cycle, which takes precedence.
   useEffect(() => {
+    if (
+      preselectedCycle === BillingCycle.MONTHLY ||
+      preselectedCycle === BillingCycle.YEARLY
+    ) {
+      return;
+    }
     if (currentSubscription?.billingCycle) {
       setBillingCycle(currentSubscription.billingCycle);
     }
-  }, [currentSubscription?.billingCycle]);
+  }, [currentSubscription?.billingCycle, preselectedCycle]);
+
+  // Honor the plan the user already picked on the plans page: pre-select it +
+  // its billing cycle and open the confirmation directly, so they don't have to
+  // re-choose the same plan here. Runs once, when plans + subscription load.
+  useEffect(() => {
+    if (preselectionApplied.current) return;
+    if (!plans || !currentSubscription || !preselectedPlanId) return;
+    preselectionApplied.current = true;
+    const plan = plans.find((p) => p.id === preselectedPlanId);
+    if (!plan || plan.id === currentSubscription.planId) return;
+    if (
+      preselectedCycle === BillingCycle.MONTHLY ||
+      preselectedCycle === BillingCycle.YEARLY
+    ) {
+      setBillingCycle(preselectedCycle);
+    }
+    setSelectedPlan(plan);
+    setShowConfirmModal(true);
+  }, [plans, currentSubscription, preselectedPlanId, preselectedCycle]);
 
   // Calculate savings percentage for each plan
   const calculateSavingsPercent = (plan: Plan): number => {

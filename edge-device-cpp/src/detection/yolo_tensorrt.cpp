@@ -1,6 +1,6 @@
 #include "yolo_tensorrt.hpp"
+#include "yolo_postprocess.hpp"
 #include "../utils/logger.hpp"
-#include "../utils/nms.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -376,77 +376,21 @@ cv::Mat YoloTensorRT::preprocess(const cv::Mat& frame) {
 
 std::vector<Detection> YoloTensorRT::postprocess(const std::vector<float>& output,
                                                    const cv::Size& original_size) {
-    std::vector<Detection> detections;
+    // Delegate to the pure (GPU-free, unit-tested) decoder. The TensorRT class
+    // only supplies the geometry + thresholds it learned from the engine.
+    LetterboxParams lb;
+    lb.input_width = input_width_;
+    lb.input_height = input_height_;
+    lb.original = original_size;
 
-    // Calculate scale factors for letterbox
-    float scale = std::min(static_cast<float>(input_width_) / original_size.width,
-                           static_cast<float>(input_height_) / original_size.height);
-    float x_offset = (input_width_ - original_size.width * scale) / 2.0f;
-    float y_offset = (input_height_ - original_size.height * scale) / 2.0f;
+    PostprocessParams pp;
+    pp.confidence_threshold = config_.confidence_threshold;
+    pp.nms_threshold = config_.nms_threshold;
+    pp.num_classes = num_classes_;
+    pp.num_detections = num_detections_;
+    pp.person_class_id = 0;  // COCO person
 
-    // YOLOv8 output format: (1, 84, 8400) -> transposed to (8400, 84)
-    // Each detection: [x_center, y_center, width, height, class_scores...]
-    int num_features = num_classes_ + 4;
-
-    for (int i = 0; i < num_detections_; ++i) {
-        // Get class scores and find best class
-        float max_score = 0.0f;
-        int max_class = 0;
-
-        for (int c = 0; c < num_classes_; ++c) {
-            // Output is in format [batch, features, detections]
-            // Access: output[feature * num_detections + detection]
-            float score = output[(4 + c) * num_detections_ + i];
-            if (score > max_score) {
-                max_score = score;
-                max_class = c;
-            }
-        }
-
-        // Filter by confidence
-        if (max_score < config_.confidence_threshold) {
-            continue;
-        }
-
-        // Only keep person detections (class 0 in COCO)
-        if (max_class != 0) {
-            continue;
-        }
-
-        // Get box coordinates
-        float cx = output[0 * num_detections_ + i];
-        float cy = output[1 * num_detections_ + i];
-        float w = output[2 * num_detections_ + i];
-        float h = output[3 * num_detections_ + i];
-
-        // Convert from center format to corner format
-        float x1 = cx - w / 2.0f;
-        float y1 = cy - h / 2.0f;
-
-        // Remove letterbox offset and scale to original image
-        x1 = (x1 - x_offset) / scale;
-        y1 = (y1 - y_offset) / scale;
-        w = w / scale;
-        h = h / scale;
-
-        // Clip to image bounds
-        x1 = std::max(0.0f, std::min(x1, static_cast<float>(original_size.width)));
-        y1 = std::max(0.0f, std::min(y1, static_cast<float>(original_size.height)));
-        w = std::min(w, static_cast<float>(original_size.width) - x1);
-        h = std::min(h, static_cast<float>(original_size.height) - y1);
-
-        Detection det;
-        det.bbox = cv::Rect2f(x1, y1, w, h);
-        det.confidence = max_score;
-        det.class_id = max_class;
-
-        detections.push_back(det);
-    }
-
-    // Apply NMS
-    detections = nms(detections, config_.nms_threshold);
-
-    return detections;
+    return decode_yolo_output(output, lb, pp);
 }
 
 #endif

@@ -220,99 +220,14 @@ void WebSocketClient::on_message(ConnectionHdl /*hdl*/, MessagePtr msg) {
     }
 
     LOG_DEBUG("Received message: {}", payload);
-    handle_socketio_message(payload);
-}
-
-void WebSocketClient::handle_socketio_message(const std::string& payload) {
-    // Socket.IO Engine.IO packet format:
-    // First character(s) indicate packet type
-    // 0: open, 1: close, 2: ping, 3: pong, 4: message
-
-    if (payload.empty()) {
-        return;
-    }
-
-    char packet_type = payload[0];
-
-    switch (packet_type) {
-        case '0': {
-            // Open packet - contains session info
-            LOG_DEBUG("Socket.IO open packet received");
-            break;
-        }
-        case '2': {
-            // Ping - respond with pong
-            send_raw("3");
-            break;
-        }
-        case '4': {
-            // Message packet
-            // Format: 4<namespace>[<id>]<event>,<data>
-            // Example: 42/analytics-edge,["edge:config",{"data":{...}}]
-
-            if (payload.length() > 1 && payload[1] == '2') {
-                // Event message
-                // Find the namespace and data
-                size_t comma_pos = payload.find(',', 2);
-                if (comma_pos != std::string::npos) {
-                    std::string json_str = payload.substr(comma_pos + 1);
-
-                    try {
-                        auto arr = nlohmann::json::parse(json_str);
-                        if (arr.is_array() && arr.size() >= 2) {
-                            std::string event = arr[0].get<std::string>();
-                            nlohmann::json data = arr[1];
-
-                            LOG_DEBUG("Received event: {}", event);
-
-                            // Handle specific events
-                            if (event == "edge:config" && config_callback_) {
-                                if (data.contains("data")) {
-                                    auto config = EdgeDeviceConfig::from_json(data["data"]);
-                                    config_callback_(config);
-                                }
-                            } else if (event == "edge:command" && command_callback_) {
-                                if (data.contains("data")) {
-                                    auto cmd = EdgeDeviceCommand::from_json(data["data"]);
-                                    command_callback_(cmd);
-                                }
-                            } else if (event == "edge:calibration" && calibration_callback_) {
-                                if (data.contains("data")) {
-                                    calibration_callback_(data["data"]);
-                                }
-                            }
-                        }
-                    } catch (const nlohmann::json::exception& e) {
-                        LOG_ERROR("Failed to parse message JSON: {}", e.what());
-                    }
-                }
-            } else if (payload.length() > 1 && payload[1] == '3') {
-                // Ack message (response to emitted event)
-                LOG_DEBUG("Received ack: {}", payload);
-            }
-            break;
-        }
-        default:
-            LOG_DEBUG("Unknown packet type: {}", packet_type);
-            break;
-    }
+    // Delegate Socket.IO/Engine.IO framing + event routing to the pure router.
+    router_.handle_message(payload);
 }
 
 bool WebSocketClient::emit(const std::string& event, const nlohmann::json& data) {
-    if (!connected_) {
-        LOG_WARN("Cannot emit - not connected");
-        return false;
-    }
-
-    // Build Socket.IO message
-    // Format: 42<namespace>,["event",data]
-    nlohmann::json msg_array = nlohmann::json::array();
-    msg_array.push_back(event);
-    msg_array.push_back(data);
-
-    std::string message = "42/analytics-edge," + msg_array.dump();
-
-    return send_raw(message);
+    // Forward to the router, which builds the Socket.IO frame and sends it
+    // back through *this (ITransport::send_raw).
+    return router_.emit(event, data);
 }
 
 bool WebSocketClient::send_raw(const std::string& message) {

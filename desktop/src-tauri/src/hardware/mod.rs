@@ -15,6 +15,10 @@
 
 pub mod config;
 pub mod connection;
+// `events` emits to the Tauri frontend, so it's only compiled when the `app`
+// feature (and thus the `tauri` dependency) is enabled. The hardware-logic
+// unit tests build with `--no-default-features`, where Tauri is absent.
+#[cfg(feature = "app")]
 pub mod events;
 pub mod status;
 
@@ -81,10 +85,7 @@ pub async fn upsert_device(
 }
 
 /// Drop a device row + its status. Used by the `remove_device` Tauri command.
-pub async fn remove_device(
-    manager: &HardwareManager,
-    device_id: &str,
-) -> Result<(), String> {
+pub async fn remove_device(manager: &HardwareManager, device_id: &str) -> Result<(), String> {
     let mut guard = manager.write().await;
     guard.config.devices.retain(|d| d.id != device_id);
     guard.statuses.remove(device_id);
@@ -99,9 +100,6 @@ pub async fn list_statuses(manager: &HardwareManager) -> Vec<DeviceStatus> {
     out
 }
 
-pub async fn get_status(
-    manager: &HardwareManager,
-    device_id: &str,
-) -> Option<DeviceStatus> {
+pub async fn get_status(manager: &HardwareManager, device_id: &str) -> Option<DeviceStatus> {
     manager.read().await.statuses.get(device_id).cloned()
 }

@@ -46,6 +46,104 @@ describe('PaymentsService', () => {
   });
 
   /**
+   * Testability adoption (wave-t1/be-clock-id-infra). merchantOid used to be
+   * non-deterministic — it folded in Date.now() and crypto.randomBytes() — so
+   * the legacy spec above can only assert *shape* (alphanumeric, prefix,
+   * distinctness), never the exact value. By injecting a fixed Clock + a stub
+   * IdGenerator we pin both ambient inputs and assert the OID byte-for-byte.
+   * This is the proof that the DI refactor made the generator deterministic
+   * while leaving the production code path (SystemClock/SystemIdGenerator
+   * defaults) byte-identical to the old inline implementation.
+   */
+  describe('merchantOid is deterministic under injected clock + id', () => {
+    // (1700000000000).toString(36) === 'loyw3v28' — see the generator: it
+    // base36-encodes nowMs(). Pinning the clock pins this segment.
+    const FIXED_MS = 1_700_000_000_000;
+    const FIXED_HEX = 'abc123'; // what the stub IdGenerator.randomHex returns
+
+    const fixedClock = {
+      now: () => new Date(FIXED_MS),
+      nowMs: () => FIXED_MS,
+    };
+    const fixedIdGen = {
+      uuid: () => 'fixed-uuid',
+      randomHex: (_bytes: number) => FIXED_HEX,
+    };
+
+    function svcWithFixedTime() {
+      return new PaymentsService(
+        null as any,
+        null as any,
+        null as any,
+        null as any,
+        null as any,
+        null as any,
+        null as any, // metrics (@Optional)
+        fixedClock as any,
+        fixedIdGen as any,
+      );
+    }
+
+    function oid(tenantId: string): string {
+      return (svcWithFixedTime() as any).generateMerchantOid(tenantId);
+    }
+
+    it('produces the exact expected OID for a known tenant', () => {
+      const id = oid('11111111-2222-3333-4444-555555555555');
+      // SUB + tenantHex(12) + base36(FIXED_MS) + FIXED_HEX
+      expect(id).toBe('SUB111111112222loyw3v28abc123');
+    });
+
+    it('is stable across repeated calls (no hidden randomness left)', () => {
+      const t = '11111111-2222-3333-4444-555555555555';
+      const a = oid(t);
+      const b = oid(t);
+      expect(a).toBe(b);
+    });
+
+    it('still satisfies the PayTR alphanumeric + prefix contract', () => {
+      const id = oid('aabbccdd-eeff-0011-2233-445566778899');
+      expect(id).toMatch(/^[A-Za-z0-9]+$/);
+      expect(id.startsWith('SUB')).toBe(true);
+    });
+
+    it('threads the injected randomHex output into the OID suffix', () => {
+      const id = oid('11111111-2222-3333-4444-555555555555');
+      expect(id.endsWith(FIXED_HEX)).toBe(true);
+    });
+  });
+
+  /**
+   * Behaviour-preservation guard: a service constructed WITHOUT the new
+   * clock/id args (the legacy positional shape used elsewhere) must still
+   * generate valid OIDs via the self-constructed SystemClock/SystemIdGenerator
+   * defaults — proving the @Optional fallback keeps the old construction sites
+   * working and byte-compatible with the pre-DI code path.
+   */
+  describe('merchantOid falls back to real clock/id when not injected', () => {
+    const svc = new PaymentsService(
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+    );
+
+    it('produces a valid OID with the default (real) collaborators', () => {
+      const id = (svc as any).generateMerchantOid(
+        '11111111-2222-3333-4444-555555555555',
+      );
+      expect(id).toMatch(/^SUB[A-Za-z0-9]+$/);
+      // 6 hex chars of real randomness on the end → distinct across calls.
+      const id2 = (svc as any).generateMerchantOid(
+        '11111111-2222-3333-4444-555555555555',
+      );
+      expect(id).not.toBe(id2);
+    });
+  });
+
+  /**
    * Behavioural tests for createIntent. The PayTR HTTP path is verified
    * by the e2e suite — here we lock down the three short-circuits
    * (INTERNATIONAL fallback, trial activation, FREE-plan reject) and

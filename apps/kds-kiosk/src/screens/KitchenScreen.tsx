@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ackCommand, claimNextCommand, heartbeat } from '../api/mesh';
 import type { DeviceToken } from '../store/deviceToken';
+import { ageOf, applyCommand, type OrderTicket } from './kitchenLogic';
 
 /**
  * Main kitchen view.
@@ -14,13 +15,6 @@ import type { DeviceToken } from '../store/deviceToken';
  * fine because every active order is re-fetched on the next show_order
  * command (the cloud re-sends each on reconnect).
  */
-interface OrderTicket {
-  orderId: string;
-  shownAt: number;
-  // Free-form payload — the cloud sends order metadata here.
-  meta?: Record<string, unknown>;
-}
-
 export default function KitchenScreen({ token, onLogout }: { token: DeviceToken; onLogout: () => void }) {
   const [tickets, setTickets] = useState<OrderTicket[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -47,17 +41,7 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
         if (stop) return;
         consecutiveErrors = 0;
         if (!cmd) return;
-        const orderId = (cmd.payload?.orderId as string | undefined) ?? '';
-        if (cmd.kind === 'show_order' && orderId) {
-          if (!ticketsRef.current.find((t) => t.orderId === orderId)) {
-            setTickets((prev) => [
-              ...prev,
-              { orderId, shownAt: Date.now(), meta: cmd.payload },
-            ]);
-          }
-        } else if (cmd.kind === 'clear_order' && orderId) {
-          setTickets((prev) => prev.filter((t) => t.orderId !== orderId));
-        }
+        setTickets((prev) => applyCommand(prev, cmd, Date.now()));
         if (stop) return;
         await ackCommand(token, cmd.id, { status: 'done', result: {} });
       } catch (e: any) {
@@ -116,7 +100,7 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
             <article key={t.orderId} style={styles.ticket}>
               <header style={styles.ticketHeader}>
                 <span style={styles.orderId}>#{t.orderId.slice(-6)}</span>
-                <span style={styles.age}>{ageOf(t.shownAt)}</span>
+                <span style={styles.age}>{ageOf(t.shownAt, Date.now())}</span>
               </header>
               <pre style={styles.payload}>{JSON.stringify(t.meta ?? {}, null, 2).slice(0, 600)}</pre>
             </article>
@@ -125,13 +109,6 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
       )}
     </main>
   );
-}
-
-function ageOf(shownAt: number): string {
-  const sec = Math.floor((Date.now() - shownAt) / 1000);
-  if (sec < 60) return `${sec}s`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
-  return `${Math.floor(sec / 3600)}h`;
 }
 
 const styles: Record<string, React.CSSProperties> = {

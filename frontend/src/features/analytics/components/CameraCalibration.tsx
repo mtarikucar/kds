@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { scalePointerToCanvas } from './calibrationGeometry';
 
 // Types
 interface CalibrationPoint {
@@ -92,11 +93,7 @@ export function CameraCalibration({
       if (!canvas) return;
 
       const rect = canvas.getBoundingClientRect();
-      const scaleX = CANVAS_WIDTH / rect.width;
-      const scaleY = CANVAS_HEIGHT / rect.height;
-
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
+      const { x, y } = scalePointerToCanvas(e.clientX, e.clientY, rect, CANVAS_WIDTH, CANVAS_HEIGHT);
 
       setImagePoints([...imagePoints, { x, y }]);
     },
@@ -112,11 +109,7 @@ export function CameraCalibration({
       if (!canvas) return;
 
       const rect = canvas.getBoundingClientRect();
-      const scaleX = floorPlanWidth / rect.width;
-      const scaleZ = floorPlanHeight / rect.height;
-
-      const x = (e.clientX - rect.left) * scaleX;
-      const z = (e.clientY - rect.top) * scaleZ;
+      const { x, y: z } = scalePointerToCanvas(e.clientX, e.clientY, rect, floorPlanWidth, floorPlanHeight);
 
       setFloorPoints([...floorPoints, { x, z }]);
     },

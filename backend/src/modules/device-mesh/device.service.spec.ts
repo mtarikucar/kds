@@ -219,3 +219,122 @@ describe('DeviceService pairing', () => {
     expect(await svc.authenticateToken('any')).toBeNull();
   });
 });
+
+/**
+ * heartbeat() flips the device to `online`, bumps lastSeenAt, and (when the
+ * payload carries telemetry) writes a deviceLog row stamped with the device's
+ * own tenantId. The deviceLog.create call is inline Prisma — mockable here —
+ * so these assertions prove the path is testable rather than e2e-only.
+ */
+describe('DeviceService heartbeat', () => {
+  let prisma: MockPrismaClient;
+  let outbox: { append: jest.Mock };
+  let svc: DeviceService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
+    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+  });
+
+  it('flips device to online and bumps lastSeenAt with no telemetry log on empty payload', async () => {
+    (prisma.device.update as any).mockResolvedValue({});
+
+    const out = await svc.heartbeat('dev-1', {});
+
+    // The status/lastSeenAt update WHERE targets the device id and the
+    // data sets status=online with a fresh lastSeenAt.
+    const updateArg = (prisma.device.update as any).mock.calls[0][0];
+    expect(updateArg.where).toEqual({ id: 'dev-1' });
+    expect(updateArg.data.status).toBe('online');
+    expect(updateArg.data.lastSeenAt).toBeInstanceOf(Date);
+
+    // Empty payload => no deviceLog row written.
+    expect((prisma.deviceLog.create as any).mock.calls.length).toBe(0);
+
+    // Response echoes ok + an ISO timestamp.
+    expect(out.ok).toBe(true);
+    expect(out.ts).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+  });
+
+  it('writes a deviceLog stamped with the device own tenantId when payload has telemetry', async () => {
+    (prisma.device.update as any).mockResolvedValue({});
+    // The inline tenantId lookup the service does before writing the log.
+    (prisma.device.findUnique as any).mockResolvedValue({ tenantId: 'tenant-xyz' });
+    let logData: any = null;
+    (prisma.deviceLog.create as any).mockImplementation(async ({ data }: any) => {
+      logData = data;
+      return { id: data.id };
+    });
+
+    await svc.heartbeat('dev-1', { batteryPct: 88, queueDepth: 3, agentVersion: '1.2.3' });
+
+    // tenantId must come from the device row, NOT from the request — a
+    // device cannot forge logs against another tenant.
+    expect(logData.tenantId).toBe('tenant-xyz');
+    expect(logData.deviceId).toBe('dev-1');
+    expect(logData.category).toBe('heartbeat');
+    expect(logData.level).toBe('info');
+    expect(logData.payload).toEqual({ batteryPct: 88, queueDepth: 3, agentVersion: '1.2.3' });
+    // tenantId lookup selects only tenantId — defense against over-fetch.
+    const findArg = (prisma.device.findUnique as any).mock.calls[0][0];
+    expect(findArg.where).toEqual({ id: 'dev-1' });
+    expect(findArg.select).toEqual({ tenantId: true });
+  });
+
+  it('swallows a deviceLog write failure — heartbeat still succeeds', async () => {
+    (prisma.device.update as any).mockResolvedValue({});
+    (prisma.device.findUnique as any).mockResolvedValue({ tenantId: 't1' });
+    (prisma.deviceLog.create as any).mockRejectedValue(new Error('log table down'));
+
+    // The .catch(() => undefined) on the deviceLog write means a logging
+    // outage must not break the device's liveness signal.
+    const out = await svc.heartbeat('dev-1', { batteryPct: 10 });
+    expect(out.ok).toBe(true);
+  });
+});
+
+/**
+ * sweepStale() flips online devices whose lastSeenAt is older than the 45s
+ * grace window to offline. The cutoff math is the load-bearing bit: a device
+ * exactly at the boundary must stay online; only strictly-older rows match.
+ */
+describe('DeviceService sweepStale', () => {
+  let prisma: MockPrismaClient;
+  let outbox: { append: jest.Mock };
+  let svc: DeviceService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
+    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+  });
+
+  it('updates only online devices older than the 45s grace window and returns the count', async () => {
+    let whereArg: any = null;
+    let dataArg: any = null;
+    (prisma.device.updateMany as any).mockImplementation(async ({ where, data }: any) => {
+      whereArg = where;
+      dataArg = data;
+      return { count: 4 };
+    });
+
+    const before = Date.now();
+    const count = await svc.sweepStale();
+    const after = Date.now();
+
+    expect(count).toBe(4);
+    // Scoped to currently-online devices only.
+    expect(whereArg.status).toBe('online');
+    expect(dataArg).toEqual({ status: 'offline' });
+    // Cutoff = now - 45s. The lt bound must land inside [before-45s, after-45s].
+    const cutoff = whereArg.lastSeenAt.lt.getTime();
+    expect(cutoff).toBeGreaterThanOrEqual(before - 45_000);
+    expect(cutoff).toBeLessThanOrEqual(after - 45_000);
+  });
+
+  it('returns 0 when nothing is stale', async () => {
+    (prisma.device.updateMany as any).mockResolvedValue({ count: 0 });
+    expect(await svc.sweepStale()).toBe(0);
+  });
+});

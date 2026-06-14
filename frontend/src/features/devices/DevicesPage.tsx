@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import QRCode from 'react-qr-code';
 import { useCreateDeviceSlot, useListDevices, useRetireDevice, type DeviceKind, type Device } from './devicesApi';
 import DeviceCommandsDrawer from './DeviceCommandsDrawer';
+import { statusPillColor, visibleDevices } from './devicesView';
 
 /**
  * Tenant-facing devices page.
@@ -34,7 +35,7 @@ export default function DevicesPage() {
   const createSlot = useCreateDeviceSlot();
   const retire = useRetireDevice();
 
-  const visible = includeRetired ? devices : devices.filter((d) => d.status !== 'retired');
+  const visible = visibleDevices(devices, includeRetired);
 
   return (
     <div className="space-y-4 p-6">
@@ -163,19 +164,8 @@ function PairCodeCell({ code, expiresAt }: { code: string; expiresAt?: string | 
 }
 
 function StatusPill({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    online: 'bg-green-100 text-green-800',
-    offline: 'bg-gray-100 text-gray-700',
-    error: 'bg-red-100 text-red-800',
-    busy: 'bg-amber-100 text-amber-800',
-    maintenance: 'bg-blue-100 text-blue-800',
-    paired: 'bg-emerald-50 text-emerald-700',
-    unprovisioned: 'bg-yellow-100 text-yellow-800',
-    claimed: 'bg-purple-100 text-purple-800',
-    retired: 'bg-gray-100 text-gray-500',
-  };
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100 text-gray-700'}`}>
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${statusPillColor(status)}`}>
       {status}
     </span>
   );

@@ -14,7 +14,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Mutex};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PendingCommand {
     pub id: String,
     pub kind: String,
