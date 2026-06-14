@@ -258,3 +258,229 @@ describe('KdsService metrics', () => {
     ).resolves.toBeDefined();
   });
 });
+
+/**
+ * Track 3 — durable outbox events for KDS-originated status transitions.
+ *
+ * KdsService writes order status directly and broadcasts an EPHEMERAL
+ * kdsGateway WebSocket signal — but a crash right after the status commit
+ * loses that signal, so outbox consumers (kds-routing physical-device
+ * fan-out, marketing relay) never see KDS-originated transitions. These
+ * specs pin that, AFTER the committed write, KdsService also appends a
+ * durable order.updated/completed/cancelled.v1 with the OrdersService
+ * payload shape (orderId/tenantId/branchId/tableId/status/totalCents via
+ * the integer-cents convention) — AND that the live WS broadcast still
+ * fires alongside it (the durable emit augments, never replaces, the UI
+ * signal).
+ */
+describe('KdsService durable outbox events', () => {
+  let prisma: MockPrismaClient;
+  let gateway: {
+    emitOrderStatusChange: jest.Mock;
+    emitOrderItemStatusChange: jest.Mock;
+    emitLowStockAlert: jest.Mock;
+  };
+  let outbox: { append: jest.Mock };
+  let svc: KdsService;
+
+  const scope = {
+    tenantId: 't-1',
+    branchId: 'b-1',
+    userId: 'u-1',
+    role: 'KITCHEN',
+  } as any;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    gateway = {
+      emitOrderStatusChange: jest.fn(),
+      emitOrderItemStatusChange: jest.fn(),
+      emitLowStockAlert: jest.fn(),
+    };
+    outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
+    // ctor arg order: (prisma, kdsGateway, deliveryStatusSync?,
+    // stockDeductionService?, metrics?, outbox?)
+    svc = new KdsService(
+      prisma as any,
+      gateway as any,
+      undefined,
+      undefined,
+      undefined,
+      outbox as any,
+    );
+  });
+
+  it('updateOrderStatus → READY appends a durable order.updated.v1 AND still WS-broadcasts', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'PREPARING',
+      requiresApproval: false,
+    });
+    (prisma.order.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.order.findUniqueOrThrow as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      tableId: 'tbl-9',
+      status: 'READY',
+      // Prisma.Decimal-like: exposes toFixed (non-number) so toIntCents
+      // routes through the string path, never the IEEE-754 float boundary.
+      finalAmount: { toFixed: (n: number) => (123.45).toFixed(n) },
+      orderItems: [],
+    });
+
+    await svc.updateOrderStatus(scope, 'o-1', 'READY' as any);
+
+    // Live WS broadcast must STILL fire alongside the durable emit.
+    expect(gateway.emitOrderStatusChange).toHaveBeenCalledWith(
+      't-1',
+      'b-1',
+      'o-1',
+      'READY',
+    );
+    // Durable append: matching OrdersService event payload shape +
+    // integer-cents money convention.
+    expect(outbox.append).toHaveBeenCalledWith({
+      type: 'order.updated.v1',
+      tenantId: 't-1',
+      payload: {
+        orderId: 'o-1',
+        tenantId: 't-1',
+        branchId: 'b-1',
+        tableId: 'tbl-9',
+        status: 'READY',
+        totalCents: 12345,
+      },
+    });
+  });
+
+  it('updateOrderStatus → SERVED appends order.completed.v1', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'READY',
+      requiresApproval: false,
+    });
+    (prisma.order.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.order.findUniqueOrThrow as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      tableId: null,
+      status: 'SERVED',
+      finalAmount: null,
+      orderItems: [],
+    });
+
+    await svc.updateOrderStatus(scope, 'o-1', 'SERVED' as any);
+
+    expect(outbox.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'order.completed.v1',
+        tenantId: 't-1',
+        payload: expect.objectContaining({
+          orderId: 'o-1',
+          status: 'SERVED',
+          tableId: null,
+          // null finalAmount → totalCents undefined (mirrors OrdersService).
+          totalCents: undefined,
+        }),
+      }),
+    );
+  });
+
+  it('cancelOrder appends a durable order.cancelled.v1 AND still WS-broadcasts', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'PENDING',
+    });
+    (prisma.order.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.order.findUniqueOrThrow as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      tableId: 'tbl-3',
+      status: 'CANCELLED',
+      finalAmount: '50.00',
+      orderItems: [],
+    });
+
+    await svc.cancelOrder(scope, 'o-1');
+
+    expect(gateway.emitOrderStatusChange).toHaveBeenCalledWith(
+      't-1',
+      'b-1',
+      'o-1',
+      'CANCELLED',
+    );
+    expect(outbox.append).toHaveBeenCalledWith({
+      type: 'order.cancelled.v1',
+      tenantId: 't-1',
+      payload: {
+        orderId: 'o-1',
+        tenantId: 't-1',
+        branchId: 'b-1',
+        tableId: 'tbl-3',
+        status: 'CANCELLED',
+        // string finalAmount → integer cents.
+        totalCents: 5000,
+      },
+    });
+  });
+
+  it('does not throw and still WS-broadcasts when no OutboxService is injected (optional dep)', async () => {
+    const bare = new KdsService(prisma as any, gateway as any);
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'PENDING',
+      requiresApproval: false,
+    });
+    (prisma.order.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.order.findUniqueOrThrow as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'PREPARING',
+      orderItems: [],
+    });
+
+    await expect(
+      bare.updateOrderStatus(scope, 'o-1', 'PREPARING' as any),
+    ).resolves.toBeDefined();
+    // The durable emit no-ops without an outbox, but the live WS broadcast
+    // must still fire so the KDS UI keeps updating.
+    expect(gateway.emitOrderStatusChange).toHaveBeenCalled();
+  });
+
+  it('swallows an outbox append rejection without breaking the status write', async () => {
+    outbox.append.mockRejectedValueOnce(new Error('outbox down'));
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'PREPARING',
+      requiresApproval: false,
+    });
+    (prisma.order.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.order.findUniqueOrThrow as any).mockResolvedValue({
+      id: 'o-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      status: 'READY',
+      finalAmount: null,
+      orderItems: [],
+    });
+
+    await expect(
+      svc.updateOrderStatus(scope, 'o-1', 'READY' as any),
+    ).resolves.toBeDefined();
+    expect(outbox.append).toHaveBeenCalled();
+  });
+});

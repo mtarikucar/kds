@@ -8,10 +8,16 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { OrdersModule } from "../orders/orders.module";
 import { DeliveryPlatformsModule } from "../delivery-platforms/delivery-platforms.module";
 import { StockManagementModule } from "../stock-management/stock-management.module";
+import { OutboxModule } from "../outbox/outbox.module";
 
 @Module({
   imports: [
     PrismaModule,
+    // OutboxModule is @Global, so OutboxService is resolvable without this
+    // import — listed explicitly to make KdsService's durable-event
+    // dependency legible (it appends order.updated/completed/cancelled.v1
+    // for KDS-originated status transitions).
+    OutboxModule,
     forwardRef(() => OrdersModule),
     forwardRef(() => DeliveryPlatformsModule),
     forwardRef(() => StockManagementModule),

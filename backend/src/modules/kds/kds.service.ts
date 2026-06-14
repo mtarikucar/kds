@@ -16,6 +16,8 @@ import { DeliveryStatusSyncService } from "../delivery-platforms/services/delive
 import { StockDeductionService } from "../stock-management/services/stock-deduction.service";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import { MetricsService } from "../../common/metrics/metrics.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 @Injectable()
 export class KdsService {
@@ -32,7 +34,74 @@ export class KdsService {
     private stockDeductionService?: StockDeductionService,
     // Optional so unit tests constructing the service bare keep working.
     @Optional() private readonly metrics?: MetricsService,
+    // OutboxModule is @Global — Optional() because unit tests construct the
+    // service directly without an outbox mock. When absent the durable emit
+    // silently no-ops; the live kdsGateway WebSocket broadcast (below) still
+    // fires, so the KDS UI keeps updating. Mesh-side consumers (kds-routing
+    // physical-device fan-out, marketing relay) only see KDS-originated
+    // transitions when the outbox is wired in production.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
+
+  /**
+   * Durable outbox emit for a KDS-originated order status transition.
+   *
+   * KdsService writes order status directly + broadcasts an ephemeral
+   * kdsGateway WebSocket signal — but a crash right after the status commit
+   * would lose that signal, so outbox consumers (kds-routing physical-device
+   * fan-out, marketing relay) would miss the transition entirely. This
+   * appends a durable `order.updated.v1 / order.completed.v1 /
+   * order.cancelled.v1` AFTER the committed write, mirroring the
+   * OrdersService.emitOrderEvent payload shape (orderId/tenantId/branchId/
+   * tableId/status/totalCents via the integer-cents convention).
+   *
+   * Best-effort: failures are routed through captureSwallowedEmit so they
+   * log at warn + capture to Sentry but never undo the committed status —
+   * the live WS broadcast remains the source of truth for the UI.
+   */
+  private emitOrderEvent(
+    type: "order.updated.v1" | "order.completed.v1" | "order.cancelled.v1",
+    order: any,
+  ): void {
+    if (!this.outbox) return;
+    this.outbox
+      .append({
+        type,
+        tenantId: order?.tenantId,
+        payload: {
+          orderId: order?.id,
+          tenantId: order?.tenantId,
+          branchId: order?.branchId ?? null,
+          tableId: order?.tableId ?? null,
+          status: order?.status,
+          totalCents: this.toIntCents(order?.finalAmount),
+        },
+      })
+      .catch(captureSwallowedEmit(this.logger, { module: "kds", op: type }));
+  }
+
+  /**
+   * Convert any of {number, Prisma.Decimal, string} → integer cents.
+   * Mirrors OrdersService.toIntCents: Prisma.Decimal columns deserialise to
+   * Decimal objects whose `.toFixed(2)` renders the canonical 2-dp string;
+   * we strip the decimal point and parse, never crossing the IEEE-754 float
+   * boundary that would otherwise drop the kuruş on large amounts.
+   */
+  private toIntCents(v: unknown): number | undefined {
+    if (v == null) return undefined;
+    const asDecimal = v as { toFixed?: (n: number) => string };
+    if (typeof asDecimal.toFixed === "function" && typeof v !== "number") {
+      const fixed = asDecimal.toFixed!(2);
+      const cents = Number(fixed.replace(".", ""));
+      return Number.isFinite(cents) ? cents : undefined;
+    }
+    if (typeof v === "number") return Math.round(v * 100);
+    if (typeof v === "string") {
+      const cents = Math.round(parseFloat(v) * 100);
+      return Number.isFinite(cents) ? cents : undefined;
+    }
+    return undefined;
+  }
 
   async getKitchenOrders(scope: BranchScope) {
     // Get orders that are in kitchen workflow (PENDING, PREPARING, READY).
@@ -175,6 +244,20 @@ export class KdsService {
       id,
       status,
     );
+
+    // Durable outbox emit AFTER the committed status write, alongside (NOT
+    // instead of) the live WS broadcast above. Mirrors OrdersService.updateStatus
+    // event-type mapping: PAID/SERVED are the terminal non-cancel statuses →
+    // "completed", CANCELLED → "cancelled", everything else → "updated". The
+    // kds-routing mesh consumer dispatches a clear_order command on the
+    // terminal transitions.
+    const eventType =
+      status === OrderStatus.PAID || status === OrderStatus.SERVED
+        ? "order.completed.v1"
+        : status === OrderStatus.CANCELLED
+          ? "order.cancelled.v1"
+          : "order.updated.v1";
+    this.emitOrderEvent(eventType, updatedOrder);
 
     // Sync status to delivery platform (if applicable)
     this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch((err) => {
@@ -348,6 +431,12 @@ export class KdsService {
       id,
       OrderStatus.CANCELLED,
     );
+
+    // Durable outbox emit AFTER the committed cancel, alongside the live WS
+    // broadcast above — a crash post-commit would otherwise lose the
+    // KDS-originated cancellation and the kds-routing mesh would never clear
+    // the screen / the marketing relay would never see it.
+    this.emitOrderEvent("order.cancelled.v1", updatedOrder);
 
     // Sync cancellation to delivery platform (if applicable)
     this.deliveryStatusSync
