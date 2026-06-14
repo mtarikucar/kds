@@ -1,5 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { CreatePayIntentDto } from "../dto/pay-intent.dto";
+import { MetricsService } from "../../../common/metrics/metrics.service";
 import { SelfPayQueryService } from "./self-pay-query.service";
 import { SelfPayIntentService } from "./self-pay-intent.service";
 import { SelfPayWebhookService } from "./self-pay-webhook.service";
@@ -30,6 +31,8 @@ export class CustomerSelfPayService {
     private readonly intentService: SelfPayIntentService,
     private readonly webhookService: SelfPayWebhookService,
     private readonly sweeperService: SelfPaySweeperService,
+    // Optional so unit tests constructing the facade bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   expireStaleIntents(): Promise<void> {
@@ -58,20 +61,34 @@ export class CustomerSelfPayService {
     return this.queryService.getPayStatus(sessionId, merchantOid);
   }
 
-  handleWebhookSuccess(
+  async handleWebhookSuccess(
     merchantOid: string,
     paytrPaymentType?: string,
   ): Promise<void> {
-    return this.webhookService.handleWebhookSuccess(
+    await this.webhookService.handleWebhookSuccess(
       merchantOid,
       paytrPaymentType,
     );
+    // Track 2 — record the settlement for Prometheus. After the delegated
+    // settlement resolves, optional + ?.-guarded so it can never break the
+    // money path. `result` is the developer-controlled success|failure enum,
+    // so label cardinality stays bounded.
+    this.recordSettled("success");
   }
 
-  handleWebhookFailure(
+  async handleWebhookFailure(
     merchantOid: string,
     reason: string | undefined,
   ): Promise<void> {
-    return this.webhookService.handleWebhookFailure(merchantOid, reason);
+    await this.webhookService.handleWebhookFailure(merchantOid, reason);
+    this.recordSettled("failure");
+  }
+
+  private recordSettled(result: "success" | "failure"): void {
+    this.metrics?.incCounter(
+      "self_pay_settled_total",
+      "Customer self-pay settlements by result (success|failure)",
+      { result },
+    );
   }
 }

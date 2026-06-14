@@ -4,9 +4,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import { CreateCashDrawerMovementDto } from "./dto/create-cash-drawer-movement.dto";
 import { RejectCashDrawerMovementDto } from "./dto/reject-cash-drawer-movement.dto";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -36,7 +38,11 @@ import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 export class CashDrawerService {
   private readonly logger = new Logger(CashDrawerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   private static readonly AUTO_APPROVED_TYPES = new Set([
     "OPENING",
@@ -61,7 +67,7 @@ export class CashDrawerService {
 
     const requiresReview = CashDrawerService.REVIEW_TYPES.has(dto.type);
 
-    return this.prisma.cashDrawerMovement.create({
+    const movement = await this.prisma.cashDrawerMovement.create({
       data: {
         tenantId,
         branchId,
@@ -77,6 +83,26 @@ export class CashDrawerService {
         approvedAt: requiresReview ? null : new Date(),
       },
     });
+
+    // Track 2 — record the committed movement for Prometheus. After the
+    // write, optional + ?.-guarded so it can never break the business write.
+    // `op` collapses the developer-controlled movement types into a bounded
+    // operational label (OPENING→open, CLOSING→close, the cash/adjustment
+    // types → movement), so cardinality stays low.
+    this.metrics?.incCounter(
+      "cash_drawer_ops_total",
+      "Cash drawer operations by op (open|close|movement|approve)",
+      { op: CashDrawerService.opLabel(dto.type) },
+    );
+
+    return movement;
+  }
+
+  /** Collapse a movement type into the bounded ops-counter label. */
+  private static opLabel(type: string): "open" | "close" | "movement" {
+    if (type === "OPENING") return "open";
+    if (type === "CLOSING") return "close";
+    return "movement";
   }
 
   async listPending(scope: BranchScope) {
@@ -110,6 +136,12 @@ export class CashDrawerService {
         "Movement is no longer DRAFT — refresh and retry.",
       );
     }
+    // Track 2 — record the committed approval (after the claim won the race).
+    this.metrics?.incCounter(
+      "cash_drawer_ops_total",
+      "Cash drawer operations by op (open|close|movement|approve)",
+      { op: "approve" },
+    );
     return this.prisma.cashDrawerMovement.findFirstOrThrow({
       where: { id: movementId, ...branchScope(scope) },
     });

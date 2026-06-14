@@ -108,4 +108,60 @@ describe('CashDrawerService', () => {
     expect(where.branchId).toBe('b-1');
     expect(where.tenantId).toBe('t-1');
   });
+
+  // ── Track 2 domain counter: cash_drawer_ops_total ──────────────────
+  describe('cash_drawer_ops_total counter', () => {
+    let metrics: { incCounter: jest.Mock };
+
+    beforeEach(() => {
+      metrics = { incCounter: jest.fn() };
+      svc = new CashDrawerService(prisma as any, metrics as any);
+    });
+
+    const opByType: Array<[string, string]> = [
+      ['OPENING', 'open'],
+      ['CLOSING', 'close'],
+      ['CASH_IN', 'movement'],
+      ['CASH_OUT', 'movement'],
+      ['ADJUSTMENT', 'movement'],
+    ];
+    for (const [type, op] of opByType) {
+      it(`create(${type}) records op=${op}`, async () => {
+        (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
+        await svc.create('t-1', 'b-1', 'u-1', { type: type as any, amount: 10 });
+        expect(metrics.incCounter).toHaveBeenCalledWith(
+          'cash_drawer_ops_total',
+          expect.any(String),
+          { op },
+        );
+      });
+    }
+
+    it('approve records op=approve after a winning claim', async () => {
+      (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({ id: 'm-1' });
+      await svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER });
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'cash_drawer_ops_total',
+        expect.any(String),
+        { op: 'approve' },
+      );
+    });
+
+    it('approve does NOT record when the claim loses the race (count=0)', async () => {
+      (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 0 });
+      await expect(
+        svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(metrics.incCounter).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when no MetricsService is injected (optional dep)', async () => {
+      const bare = new CashDrawerService(prisma as any);
+      (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
+      await expect(
+        bare.create('t-1', 'b-1', 'u-1', { type: 'OPENING' as any, amount: 1 }),
+      ).resolves.toBeDefined();
+    });
+  });
 });

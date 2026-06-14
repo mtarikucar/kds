@@ -1072,4 +1072,105 @@ describe("CustomerSelfPayService (characterization)", () => {
       expect(arg.data.failureReason).toBe("paytr_reported_failure");
     });
   });
+
+  // ────────────────────────────────────────────────────────────────
+  // Track 2 domain counter: self_pay_settled_total
+  // ────────────────────────────────────────────────────────────────
+  describe("self_pay_settled_total counter", () => {
+    let metrics: { incCounter: jest.Mock };
+
+    beforeEach(() => {
+      // Rebuild the facade with a metrics mock injected as the optional
+      // 5th ctor arg, reusing the real collaborator graph from the outer
+      // beforeEach (which shares the same mocked Prisma).
+      metrics = { incCounter: jest.fn() };
+      const reservationService = new SelfPayReservationService(prisma as any);
+      const queryService = new SelfPayQueryService(
+        prisma as any,
+        paymentsService as any,
+        customerSessionService as any,
+        reservationService,
+      );
+      const intentSvc = new SelfPayIntentService(
+        prisma as any,
+        paymentsService as any,
+        paytrAdapter as any,
+        customerSessionService as any,
+        config as any,
+        reservationService,
+      );
+      const webhookService = new SelfPayWebhookService(
+        prisma as any,
+        paymentsService as any,
+      );
+      const sweeperService = new SelfPaySweeperService(prisma as any);
+      svc = new CustomerSelfPayService(
+        queryService,
+        intentSvc,
+        webhookService,
+        sweeperService,
+        metrics as any,
+      );
+    });
+
+    it("records result=success after a settled webhook success", async () => {
+      (prisma.pendingSelfPayment.findUnique as any).mockResolvedValue({
+        id: "intent-1",
+        merchantOid: "SPx",
+        status: "PENDING",
+        tenantId: TENANT_ID,
+        sessionId: SESSION_ID,
+        customerPhone: null,
+        itemsByOrder: [
+          { orderId: "order-A", items: [{ orderItemId: "oi-1", quantity: 1 }] },
+        ],
+      });
+      (prisma.orderItem.findMany as any).mockResolvedValue([
+        { id: "oi-1", quantity: 2, orderItemPayments: [] },
+      ]);
+      (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+
+      await svc.handleWebhookSuccess("SPx", "card");
+
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        "self_pay_settled_total",
+        expect.any(String),
+        { result: "success" },
+      );
+    });
+
+    it("records result=failure after a webhook failure", async () => {
+      (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+      await svc.handleWebhookFailure("SPx", "insufficient_funds");
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        "self_pay_settled_total",
+        expect.any(String),
+        { result: "failure" },
+      );
+    });
+
+    it("does not throw when no MetricsService is injected (optional dep)", async () => {
+      // Build a facade WITHOUT the optional metrics arg.
+      const webhookService = new SelfPayWebhookService(
+        prisma as any,
+        paymentsService as any,
+      );
+      const bare = new CustomerSelfPayService(
+        {} as any,
+        {} as any,
+        webhookService,
+        {} as any,
+      );
+      (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+      await expect(
+        bare.handleWebhookFailure("SPx", "x"),
+      ).resolves.toBeUndefined();
+    });
+  });
 });

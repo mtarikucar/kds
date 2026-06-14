@@ -1,6 +1,12 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
@@ -35,6 +41,8 @@ export class CheckoutService {
     private readonly quoteSvc: QuoteService,
     private readonly catalog: CatalogService,
     private readonly tenantMarketplace: TenantMarketplaceService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   /** Re-price the cart at confirm time so the user can't tamper with totals. */
@@ -295,6 +303,18 @@ export class CheckoutService {
         });
       }
     });
+
+    // Track 2 — record the committed provisioning for Prometheus. After the
+    // $transaction commits, optional + ?.-guarded so it can never break the
+    // provisioning write. `result` is the developer-controlled paid-vs-comped
+    // distinction (paymentRef present → "paid", null → super-admin "comped"),
+    // so label cardinality stays bounded. The idempotent-replay early return
+    // above never reaches here, so cached hits aren't double-counted.
+    this.metrics?.incCounter(
+      "checkout_provisions_total",
+      "Checkout cart provisions by result (paid|comped)",
+      { result: paymentRef ? "paid" : "comped" },
+    );
 
     return { quote, hardwareOrderId, addOnIds };
   }

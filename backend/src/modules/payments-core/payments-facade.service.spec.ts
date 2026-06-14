@@ -1,6 +1,7 @@
 import { PaymentsFacadeService } from './payments-facade.service';
 import { PaymentProviderRegistry } from './payment-provider.registry';
 import { MockPaymentProvider } from './adapters/mock-payment-provider';
+import { PaymentProvider } from './payment-provider.interface';
 
 /**
  * The façade is a thin dispatch over the registry. We exercise the
@@ -53,6 +54,105 @@ describe('PaymentsFacadeService + MockPaymentProvider', () => {
 
   it('returns 404-style throw for unknown provider', async () => {
     await expect(facade.getStatus('does-not-exist', 'whatever')).rejects.toThrow(/Unknown payment provider/);
+  });
+
+  // ── Track 2 domain counters ────────────────────────────────────────
+  describe('payment_intents_outcome_total counter', () => {
+    let metrics: { incCounter: jest.Mock };
+
+    beforeEach(() => {
+      metrics = { incCounter: jest.fn() };
+      // metrics is the optional last ctor arg.
+      facade = new PaymentsFacadeService(registry, outbox as any, metrics as any);
+    });
+
+    it('records outcome=success on a successful createIntent', async () => {
+      await facade.createIntent('mock', {
+        tenantId: 't1',
+        externalRef: 'sub:abc',
+        idempotencyKey: 'k-success',
+        amountCents: 100,
+        currency: 'TRY',
+        purpose: 'subscription',
+      });
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'payment_intents_outcome_total',
+        expect.any(String),
+        { outcome: 'success' },
+      );
+    });
+
+    it('records outcome=failed when the provider returns a failed intent', async () => {
+      // A provider whose createIntent resolves to status "failed".
+      const failingProvider: PaymentProvider = {
+        id: 'failing',
+        modes: ['online'],
+        createIntent: jest.fn().mockResolvedValue({
+          providerId: 'failing',
+          intentId: 'i-1',
+          status: 'failed',
+          amountCents: 100,
+          currency: 'TRY',
+        }),
+        status: jest.fn(),
+        refund: jest.fn(),
+        parseWebhook: jest.fn(),
+        healthCheck: jest.fn(),
+      };
+      registry.register(failingProvider);
+
+      await facade.createIntent('failing', {
+        tenantId: 't1',
+        externalRef: 'sub:abc',
+        idempotencyKey: 'k-failed',
+        amountCents: 100,
+        currency: 'TRY',
+        purpose: 'subscription',
+      });
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'payment_intents_outcome_total',
+        expect.any(String),
+        { outcome: 'failed' },
+      );
+    });
+
+    it('records outcome=refunded on refund', async () => {
+      const intent = await facade.createIntent('mock', {
+        tenantId: 't1',
+        externalRef: 'sub:abc',
+        idempotencyKey: 'k-ref',
+        amountCents: 100,
+        currency: 'TRY',
+        purpose: 'subscription',
+      });
+      metrics.incCounter.mockClear();
+
+      await facade.refund(
+        'mock',
+        { intentId: intent.intentId, idempotencyKey: 'r1' },
+        't1',
+      );
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'payment_intents_outcome_total',
+        expect.any(String),
+        { outcome: 'refunded' },
+      );
+    });
+  });
+
+  it('does not throw when no MetricsService is injected (optional dep)', async () => {
+    // facade built without metrics in the top-level beforeEach.
+    const bare = new PaymentsFacadeService(registry, outbox as any);
+    await expect(
+      bare.createIntent('mock', {
+        tenantId: 't1',
+        externalRef: 'sub:abc',
+        idempotencyKey: 'k-bare',
+        amountCents: 100,
+        currency: 'TRY',
+        purpose: 'subscription',
+      }),
+    ).resolves.toBeDefined();
   });
 
   it('surfaces a swallowed outbox.append failure without breaking the operation', async () => {
