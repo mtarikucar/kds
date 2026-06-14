@@ -17,13 +17,23 @@ import {
   mockPrismaClient,
   MockPrismaClient,
 } from "../../../common/test/prisma-mock.service";
+import { SelfPayReservationService } from "./self-pay-reservation.service";
+import { SelfPayQueryService } from "./self-pay-query.service";
+import { SelfPayIntentService } from "./self-pay-intent.service";
+import { SelfPayWebhookService } from "./self-pay-webhook.service";
+import { SelfPaySweeperService } from "./self-pay-sweeper.service";
 
 /**
  * CHARACTERIZATION spec for the (previously untested) customer self-pay
  * money path. These tests pin the CURRENT observable behaviour of the
- * 1053-LOC service before the mechanical extraction refactor, so that
- * every $transaction boundary, idempotency key, dedup hash, TOCTOU
- * compound-WHERE, and origin allowlist is preserved byte-for-byte.
+ * service, so that every $transaction boundary, idempotency key, dedup
+ * hash, TOCTOU compound-WHERE, and origin allowlist is preserved
+ * byte-for-byte through the extraction refactor.
+ *
+ * The CustomerSelfPayService is now a thin facade; the spec builds the
+ * real collaborator graph (reservation → query/intent/webhook/sweeper)
+ * with the SAME mocked Prisma / PaytrAdapter / PaymentsService so the
+ * SAME assertions exercise the SAME code through the facade.
  *
  * Prisma is mocked with jest-mock-extended. `$transaction(fn)` is wired
  * to invoke its callback with the same mock so the FOR-UPDATE lock loop
@@ -46,6 +56,9 @@ describe("CustomerSelfPayService (characterization)", () => {
   let customerSessionService: { requireSession: jest.Mock };
   let config: { get: jest.Mock };
   let svc: CustomerSelfPayService;
+  // The intent collaborator — exposed so tests can reach its private
+  // resolveReturnUrls helper (moved here from the old monolith).
+  let intentService: SelfPayIntentService;
 
   /**
    * Wire $transaction to run its callback against the same mock, and
@@ -97,12 +110,34 @@ describe("CustomerSelfPayService (characterization)", () => {
       }),
     };
     config = makeConfig();
-    svc = new CustomerSelfPayService(
+
+    // Build the real collaborator graph the way customer-orders.module
+    // wires it, sharing the single mocked Prisma + stubs.
+    const reservationService = new SelfPayReservationService(prisma as any);
+    const queryService = new SelfPayQueryService(
+      prisma as any,
+      paymentsService as any,
+      customerSessionService as any,
+      reservationService,
+    );
+    intentService = new SelfPayIntentService(
       prisma as any,
       paymentsService as any,
       paytrAdapter as any,
       customerSessionService as any,
       config as any,
+      reservationService,
+    );
+    const webhookService = new SelfPayWebhookService(
+      prisma as any,
+      paymentsService as any,
+    );
+    const sweeperService = new SelfPaySweeperService(prisma as any);
+    svc = new CustomerSelfPayService(
+      queryService,
+      intentService,
+      webhookService,
+      sweeperService,
     );
   });
 
@@ -115,7 +150,7 @@ describe("CustomerSelfPayService (characterization)", () => {
     // resolveReturnUrls is private; exercise it through the read of the
     // private method via bracket access (characterization of pure logic).
     const call = (origin?: string) =>
-      (svc as any).resolveReturnUrls(origin) as {
+      (intentService as any).resolveReturnUrls(origin) as {
         okUrl: string;
         failUrl: string;
       };
