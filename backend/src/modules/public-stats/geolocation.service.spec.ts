@@ -4,6 +4,15 @@ import { GeolocationService } from "./geolocation.service";
 jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+/** Minimal ConfigService stub honouring the (key, default) signature. */
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    get: jest.fn((key: string, def?: unknown) =>
+      key in overrides ? overrides[key] : def,
+    ),
+  } as any;
+}
+
 /**
  * GeolocationService resolves a visitor IP to country/city via the ip-api.com
  * HTTP provider. These specs lock the non-trivial behaviours:
@@ -146,6 +155,50 @@ describe("GeolocationService", () => {
       expect(first).toBeNull();
       expect(second).toBeNull();
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("CACHE_TTL config", () => {
+    it("defaults to 24h when GEOLOCATION_CACHE_TTL_MS is unset (no env -> default; behavior unchanged)", async () => {
+      // Constructed with an empty config -> default 24h used. An entry is
+      // still fresh just under 24h and re-fetched just after.
+      svc = new GeolocationService(makeConfig());
+      mockedAxios.get.mockResolvedValue({ data: sampleGeo });
+      const nowSpy = jest.spyOn(Date, "now");
+
+      nowSpy.mockReturnValue(0);
+      await svc.lookup("8.8.8.8");
+
+      // 23h -> still cached (default TTL is 24h).
+      nowSpy.mockReturnValue(23 * 60 * 60 * 1000);
+      await svc.lookup("8.8.8.8");
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+
+      // 25h -> stale, re-fetched.
+      nowSpy.mockReturnValue(25 * 60 * 60 * 1000);
+      await svc.lookup("8.8.8.8");
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+
+      nowSpy.mockRestore();
+    });
+
+    it("honours a GEOLOCATION_CACHE_TTL_MS override (shorter TTL re-queries sooner)", async () => {
+      const override = 60 * 1000; // 1 minute
+      svc = new GeolocationService(
+        makeConfig({ GEOLOCATION_CACHE_TTL_MS: override }),
+      );
+      mockedAxios.get.mockResolvedValue({ data: sampleGeo });
+      const nowSpy = jest.spyOn(Date, "now");
+
+      nowSpy.mockReturnValue(0);
+      await svc.lookup("8.8.8.8");
+
+      // 2 minutes later: with the 1-min override the entry is stale.
+      nowSpy.mockReturnValue(2 * 60 * 1000);
+      await svc.lookup("8.8.8.8");
+
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
     });
   });
 

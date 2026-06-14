@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { LoyaltyService } from "./loyalty.service";
@@ -21,10 +22,18 @@ export class ReferralService {
   private readonly REFERRED_BONUS = 50;
   private readonly DAILY_TENANT_CAP = 200;
 
+  // Collision-retry budget for unique referral-code generation. Default 10;
+  // override via REFERRAL_CODE_MAX_ATTEMPTS.
+  private readonly codeMaxAttempts: number;
+
   constructor(
     private prisma: PrismaService,
     private loyaltyService: LoyaltyService,
-  ) {}
+    private readonly config?: ConfigService,
+  ) {
+    this.codeMaxAttempts =
+      this.config?.get<number>("REFERRAL_CODE_MAX_ATTEMPTS", 10) ?? 10;
+  }
 
   async generateReferralCode(
     customerId: string,
@@ -37,7 +46,7 @@ export class ReferralService {
     if (!customer) throw new BadRequestException("Customer not found");
     if (customer.referralCode) return customer.referralCode;
 
-    const maxAttempts = 10;
+    const maxAttempts = this.codeMaxAttempts;
     for (let i = 0; i < maxAttempts; i++) {
       const namePart = customer.name
         .toUpperCase()

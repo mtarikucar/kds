@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -25,13 +26,20 @@ import { OutboxService } from "../outbox/outbox.service";
 @Injectable()
 export class LocalBridgeService {
   private readonly logger = new Logger(LocalBridgeService.name);
-  private static readonly TOKEN_TTL_MS = 30 * 24 * 3600 * 1000;
+  // Bearer-token lifetime. Default 30d; override via LOCAL_BRIDGE_TOKEN_TTL_MS.
+  private readonly tokenTtlMs: number;
   private static readonly HEARTBEAT_GRACE_MS = 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
-  ) {}
+    private readonly config?: ConfigService,
+  ) {
+    this.tokenTtlMs = this.config?.get<number>(
+      "LOCAL_BRIDGE_TOKEN_TTL_MS",
+      30 * 24 * 3600 * 1000,
+    ) ?? 30 * 24 * 3600 * 1000;
+  }
 
   private newToken(): string {
     return uuidv7() + "." + randomBytes(32).toString("base64url");
@@ -86,9 +94,7 @@ export class LocalBridgeService {
     // clean rejection instead of issuing a duplicate bearer.
     const token = this.newToken();
     const newTokenHash = this.hash(token);
-    const tokenExpiresAt = new Date(
-      Date.now() + LocalBridgeService.TOKEN_TTL_MS,
-    );
+    const tokenExpiresAt = new Date(Date.now() + this.tokenTtlMs);
 
     const claim = await this.prisma.localBridgeAgent.updateMany({
       where: { provisioningTokenHash, status: "claiming" },

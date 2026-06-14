@@ -13,7 +13,11 @@ import { BaseAdapter } from "./base.adapter";
 @Injectable()
 export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super("YemeksepetiAdapter", "https://middleware-api.yemeksepeti.com");
+    super(
+      "YemeksepetiAdapter",
+      "https://middleware-api.yemeksepeti.com",
+      configService,
+    );
     this.overrideBaseURL(
       this.configService.get<string>("YEMEKSEPETI_API_BASE_URL"),
     );

@@ -2,6 +2,15 @@ import { ReferralService } from './referral.service';
 import { LoyaltyService } from './loyalty.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
+/** Minimal ConfigService stub honouring the (key, default) signature. */
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    get: jest.fn((key: string, def?: unknown) =>
+      key in overrides ? overrides[key] : def,
+    ),
+  } as any;
+}
+
 /**
  * Iter-80 regression for ReferralService listing surfaces.
  *
@@ -26,7 +35,7 @@ describe('ReferralService.getReferralStats (iter-80)', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     loyalty = {} as any;
-    svc = new ReferralService(prisma as any, loyalty);
+    svc = new ReferralService(prisma as any, loyalty, makeConfig());
     // findFirst for the customer existence check.
     (prisma.customer.findFirst as any).mockResolvedValue({ referralCode: 'ALICE12AB' });
     // $transaction([findMany, count, aggregate]) — pass through as a
@@ -81,5 +90,57 @@ describe('ReferralService.getReferralStats (iter-80)', () => {
     // can't silently route through the unbounded listing without
     // first re-implementing pagination + role gates + maskPhone.
     expect((svc as any).getTenantReferrals).toBeUndefined();
+  });
+});
+
+describe('ReferralService.generateReferralCode maxAttempts config', () => {
+  let prisma: MockPrismaClient;
+  let loyalty: jest.Mocked<LoyaltyService>;
+
+  /**
+   * Drive generateReferralCode into perpetual collision: the customer has no
+   * code yet (first findFirst), and every post-update read returns a null
+   * code so neither early-return fires and the loop exhausts its budget.
+   */
+  function wirePerpetualCollision() {
+    let call = 0;
+    (prisma.customer.findFirst as any).mockImplementation(async () => {
+      call += 1;
+      // First call = existence/gate check (no existing code yet).
+      if (call === 1) return { name: 'Alice', referralCode: null };
+      // Subsequent calls = post-update reads; never the code we wrote.
+      return { referralCode: null };
+    });
+    (prisma.customer.updateMany as any).mockResolvedValue({ count: 0 });
+  }
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    loyalty = {} as any;
+  });
+
+  it('defaults to 10 attempts when REFERRAL_CODE_MAX_ATTEMPTS is unset (behavior unchanged)', async () => {
+    const svc = new ReferralService(prisma as any, loyalty, makeConfig());
+    wirePerpetualCollision();
+
+    await expect(svc.generateReferralCode('c-1', 't-1')).rejects.toThrow(
+      /Failed to generate unique referral code/,
+    );
+    // One updateMany per attempt -> the default budget of 10.
+    expect((prisma.customer.updateMany as any).mock.calls).toHaveLength(10);
+  });
+
+  it('honours a REFERRAL_CODE_MAX_ATTEMPTS override', async () => {
+    const svc = new ReferralService(
+      prisma as any,
+      loyalty,
+      makeConfig({ REFERRAL_CODE_MAX_ATTEMPTS: 3 }),
+    );
+    wirePerpetualCollision();
+
+    await expect(svc.generateReferralCode('c-1', 't-1')).rejects.toThrow(
+      /Failed to generate unique referral code/,
+    );
+    expect((prisma.customer.updateMany as any).mock.calls).toHaveLength(3);
   });
 });
