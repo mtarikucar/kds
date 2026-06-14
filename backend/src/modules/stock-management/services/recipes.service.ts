@@ -130,12 +130,20 @@ export class RecipesService {
     });
     if (!product) throw new BadRequestException("Product not found");
 
-    // Check if recipe already exists for this product within this tenant
-    const existing = await this.prisma.recipe.findFirst({
-      where: { productId: dto.productId, tenantId },
+    // v3 branch-scope: a product carries one recipe PER BRANCH (the
+    // unique key is now [productId, branchId]). Branch A and branch B may
+    // each define their own recipe for the same product — so the
+    // "already exists" guard must include branchId, otherwise the second
+    // branch would be wrongly rejected.
+    const existing = await this.prisma.recipe.findUnique({
+      where: {
+        productId_branchId: { productId: dto.productId, branchId },
+      },
     });
     if (existing)
-      throw new ConflictException("A recipe already exists for this product");
+      throw new ConflictException(
+        "A recipe already exists for this product in this branch",
+      );
 
     // Verify all stock items exist
     const stockItemIds = dto.ingredients.map((i) => i.stockItemId);

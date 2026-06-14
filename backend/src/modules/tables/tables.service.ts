@@ -50,11 +50,14 @@ export class TablesService {
   ) {}
 
   async create(scope: BranchScope, createTableDto: CreateTableDto) {
-    // Check if table number already exists for this tenant
+    // v3 branch-scope: table numbers are unique PER BRANCH, not per
+    // tenant — branch A and branch B may both own table #1. Check against
+    // the compound (tenantId, branchId, number) key.
     const existingTable = await this.prisma.table.findUnique({
       where: {
-        tenantId_number: {
+        tenantId_branchId_number: {
           tenantId: scope.tenantId,
+          branchId: scope.branchId,
           number: createTableDto.number,
         },
       },
@@ -278,10 +281,12 @@ export class TablesService {
 
     // If table number is being updated, check for conflicts
     if (updateTableDto.number) {
+      // v3 branch-scope: collision is per (tenantId, branchId, number).
       const existingTable = await this.prisma.table.findUnique({
         where: {
-          tenantId_number: {
+          tenantId_branchId_number: {
             tenantId: scope.tenantId,
+            branchId: scope.branchId,
             number: updateTableDto.number,
           },
         },

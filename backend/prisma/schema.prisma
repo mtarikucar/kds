@@ -395,7 +395,11 @@ model Product {
   stockMovements   StockMovement[]
   modifierGroups   ProductModifierGroup[] // Many-to-many for modifiers
   menuItemMappings MenuItemMapping[]
-  recipe           Recipe? // Ingredient-level recipe for stock deduction
+  // v3 branch-scope: a product may carry one recipe PER BRANCH (the
+  // unique key on Recipe is now [productId, branchId]), so this is a
+  // one-to-many back-relation. Branch-scoped reads must filter by branchId
+  // to get the single recipe for a given branch.
+  recipes          Recipe[] // Ingredient-level recipe(s) for stock deduction
 
   @@index([tenantId])
   @@index([categoryId])
@@ -566,7 +570,7 @@ model Table {
   // auto-hold pointer, while this list is the full backlog/history).
   reservations     Reservation[]     @relation("ReservationAssignedTable")
 
-  @@unique([tenantId, number])
+  @@unique([tenantId, branchId, number])
   // v3.0.0 — compound unique enables (tableId, branchId) FK
   // back-references from Reservation/Order so a row can never
   // point at a table from a different branch at the DB layer.
@@ -2004,7 +2008,7 @@ model ZReport {
   branchId            String
   branch              Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, reportNumber])
+  @@unique([tenantId, branchId, reportNumber])
   @@index([tenantId])
   @@index([reportDate])
   @@index([closedById])
@@ -2285,7 +2289,7 @@ model Camera {
   branchId  String
   branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, name])
+  @@unique([tenantId, branchId, name])
   @@index([tenantId])
   @@index([status])
   @@index([edgeDeviceId])
@@ -2356,7 +2360,7 @@ model TrafficFlowRecord {
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, hourBucket, cellX, cellZ])
+  @@unique([tenantId, branchId, hourBucket, cellX, cellZ])
   @@index([tenantId, hourBucket])
   @@index([cellX, cellZ])
   @@index([tenantId, branchId])
@@ -2493,7 +2497,7 @@ model AnalyticsHeatmapCache {
   branchId  String
   branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, startTime, endTime, granularity, metric])
+  @@unique([tenantId, branchId, startTime, endTime, granularity, metric])
   @@index([tenantId, metric])
   @@index([expiresAt])
   @@index([tenantId, branchId])
@@ -2739,7 +2743,7 @@ model StockItem {
   branchId            String
   branch              Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, sku])
+  @@unique([tenantId, branchId, sku])
   @@index([tenantId])
   @@index([categoryId])
   @@index([isActive])
@@ -2783,7 +2787,7 @@ model Recipe {
   notes String?
   yield Int     @default(1) // How many portions this recipe makes
 
-  productId String  @unique
+  productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   tenantId String
@@ -2798,6 +2802,7 @@ model Recipe {
   branchId    String
   branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([productId, branchId])
   @@index([tenantId])
   @@index([tenantId, branchId])
   @@map("recipes")
@@ -3153,7 +3158,7 @@ model ShiftAssignment {
   branchId              String
   branch                Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  @@unique([userId, date])
+  @@unique([userId, date, branchId])
   @@index([tenantId])
   @@index([tenantId, date])
   @@index([userId])

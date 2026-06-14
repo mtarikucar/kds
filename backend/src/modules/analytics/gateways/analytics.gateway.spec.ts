@@ -179,4 +179,38 @@ describe('AnalyticsGateway', () => {
       expect(result.error).toMatch(/not registered/i);
     });
   });
+
+  /**
+   * v3 branch-isolation FOUNDATION: TrafficFlowRecord cells are unique PER
+   * BRANCH (@@unique([tenantId, branchId, hourBucket, cellX, cellZ])). The
+   * upsert target MUST include branchId so two branches streaming into the
+   * same cell/hour maintain independent aggregates instead of clobbering
+   * one another.
+   */
+  describe('updateTrafficFlow (v3 per-branch upsert key)', () => {
+    it('keys the upsert on the compound (tenantId, branchId, hourBucket, cellX, cellZ)', async () => {
+      (prisma.trafficFlowRecord.upsert as any).mockResolvedValue({});
+      const ts = new Date('2026-01-01T13:37:00Z');
+
+      await (gateway as any).updateTrafficFlow(
+        'tenant-1',
+        'branch-9',
+        [{ gridX: 2, gridZ: 5 }],
+        ts,
+      );
+
+      const args = (prisma.trafficFlowRecord.upsert as any).mock.calls[0][0];
+      const key = args.where.tenantId_branchId_hourBucket_cellX_cellZ;
+      expect(key).toBeDefined();
+      expect(key.tenantId).toBe('tenant-1');
+      expect(key.branchId).toBe('branch-9');
+      expect(key.cellX).toBe(2);
+      expect(key.cellZ).toBe(5);
+      // hourBucket is rounded down to the hour (minutes/seconds/ms zeroed).
+      expect(key.hourBucket.getMinutes()).toBe(0);
+      expect(key.hourBucket.getSeconds()).toBe(0);
+      // The insert payload also carries the branchId.
+      expect(args.create.branchId).toBe('branch-9');
+    });
+  });
 });

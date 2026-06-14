@@ -130,6 +130,31 @@ describe("StockItemsService", () => {
       const arg = (prisma.stockItem.create as any).mock.calls[0][0];
       expect(arg.data.sku).toBe("TOM-1");
     });
+
+    /**
+     * v3 branch-isolation FOUNDATION: SKU uniqueness moved from
+     * @@unique([tenantId, sku]) to @@unique([tenantId, branchId, sku]).
+     * The write carries branchId so the SAME SKU can coexist in two
+     * different branches under one tenant — the per-branch key is what the
+     * DB enforces, and the service writes exactly that branchId.
+     */
+    it("writes the SAME SKU under DIFFERENT branchIds (per-branch uniqueness)", async () => {
+      (prisma.stockItem.create as any).mockResolvedValue({ id: "si-x" });
+
+      await svc.create({ name: "Coke", sku: "COKE" } as any, TENANT, "branch-A");
+      await svc.create({ name: "Coke", sku: "COKE" } as any, TENANT, "branch-B");
+
+      const callA = (prisma.stockItem.create as any).mock.calls[0][0].data;
+      const callB = (prisma.stockItem.create as any).mock.calls[1][0].data;
+      expect(callA.sku).toBe("COKE");
+      expect(callB.sku).toBe("COKE");
+      // Same tenant + SKU, distinct branchId — only the compound key keeps
+      // these from colliding.
+      expect(callA.tenantId).toBe(TENANT);
+      expect(callB.tenantId).toBe(TENANT);
+      expect(callA.branchId).toBe("branch-A");
+      expect(callB.branchId).toBe("branch-B");
+    });
   });
 
   describe("update — TOCTOU + SKU normalization", () => {

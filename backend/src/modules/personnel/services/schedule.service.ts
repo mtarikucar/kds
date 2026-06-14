@@ -96,9 +96,15 @@ export class ScheduleService {
         },
       });
     } catch (error: any) {
+      // v3 branch-scope: the unique key is now [userId, date, branchId],
+      // so this P2002 only fires when the user is already assigned for the
+      // SAME date IN THE SAME branch — a user CAN now hold a shift in two
+      // different branches on the same date. ShiftAssignment carries no
+      // other unique constraint, so a P2002 here unambiguously maps to the
+      // per-(user, date, branch) collision below.
       if (error.code === "P2002") {
         throw new BadRequestException(
-          "User already has a shift assigned for this date",
+          "User already has a shift assigned for this date in this branch",
         );
       }
       throw error;

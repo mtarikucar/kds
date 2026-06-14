@@ -31,7 +31,10 @@ describe('RecipesService (iter-93)', () => {
     beforeEach(() => {
       prisma = {
         product: { findFirst: jest.fn().mockResolvedValue({ id: 'p1', tenantId: 't1', name: 'Burger' }) },
-        recipe: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
+        // v3 branch-scope: the existing-recipe guard now keys on the
+        // compound (productId, branchId) via findUnique, so the mock must
+        // expose findUnique (null = no recipe yet for this product+branch).
+        recipe: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
         stockItem: { findMany: jest.fn() },
       };
       svc = new RecipesService(prisma);
@@ -89,6 +92,63 @@ describe('RecipesService (iter-93)', () => {
         'b1',
       );
       expect(prisma.recipe.create).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * v3 branch-isolation FOUNDATION: a product carries one recipe PER
+     * BRANCH (@@unique([productId, branchId])). The existing-recipe guard
+     * keys on the compound (productId, branchId).
+     */
+    it('existing-recipe guard keys on the compound (productId, branchId)', async () => {
+      prisma.stockItem.findMany.mockResolvedValue([{ id: 'flour' }]);
+      prisma.recipe.create.mockResolvedValue({ id: 'r1' });
+
+      await svc.create(
+        { productId: 'p1', ingredients: [validIngredient('flour', 100)] } as any,
+        't1',
+        'b1',
+      );
+
+      expect(prisma.recipe.findUnique).toHaveBeenCalledWith({
+        where: { productId_branchId: { productId: 'p1', branchId: 'b1' } },
+      });
+    });
+
+    it('same product in a DIFFERENT branch is ALLOWED (per-branch recipe)', async () => {
+      // Branch b1 already has a recipe for p1; branch b2 has none. The
+      // compound-key guard returns null for b2, so the create proceeds.
+      prisma.recipe.findUnique.mockImplementation(async ({ where }: any) => {
+        return where.productId_branchId.branchId === 'b1'
+          ? { id: 'r-b1', productId: 'p1', branchId: 'b1' }
+          : null;
+      });
+      prisma.stockItem.findMany.mockResolvedValue([{ id: 'flour' }]);
+      prisma.recipe.create.mockResolvedValue({ id: 'r-b2' });
+
+      await svc.create(
+        { productId: 'p1', ingredients: [validIngredient('flour', 100)] } as any,
+        't1',
+        'b2',
+      );
+
+      expect(prisma.recipe.create).toHaveBeenCalledTimes(1);
+      const created = prisma.recipe.create.mock.calls[0][0].data;
+      expect(created.branchId).toBe('b2');
+      expect(created.productId).toBe('p1');
+    });
+
+    it('same product in the SAME branch is rejected', async () => {
+      const { ConflictException } = require('@nestjs/common');
+      prisma.recipe.findUnique.mockResolvedValue({ id: 'r-b1', productId: 'p1', branchId: 'b1' });
+
+      await expect(
+        svc.create(
+          { productId: 'p1', ingredients: [validIngredient('flour', 100)] } as any,
+          't1',
+          'b1',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.recipe.create).not.toHaveBeenCalled();
     });
   });
 

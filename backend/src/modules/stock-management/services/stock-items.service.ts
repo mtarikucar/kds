@@ -57,8 +57,10 @@ export class StockItemsService {
 
   async create(dto: CreateStockItemDto, tenantId: string, branchId: string) {
     return this.prisma.stockItem.create({
-      // Empty-string SKU collides on the @@unique([tenantId, sku])
-      // constraint while null is allowed to repeat. Normalise here.
+      // v3 branch-scope: SKU uniqueness is the compound
+      // @@unique([tenantId, branchId, sku]) — branch A and branch B may
+      // each carry SKU "COKE". Empty-string SKU still collides within a
+      // branch while null is allowed to repeat, so normalise to null here.
       data: { ...dto, sku: dto.sku ? dto.sku : null, tenantId, branchId },
       include: { category: true },
     });
