@@ -92,13 +92,13 @@ export class SubscriptionController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async createSubscription(@Request() req, @Body() dto: CreateSubscriptionDto) {
     return this.subscriptionService.createSubscription(req.user.tenantId, dto);
   }
 
   @Patch(":id")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async updateSubscription(
     @Param("id") id: string,
     @Body() dto: UpdateSubscriptionDto,
@@ -112,7 +112,7 @@ export class SubscriptionController {
   }
 
   @Post(":id/change-plan")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async changePlan(
     @Param("id") id: string,
     @Body() dto: ChangePlanDto,
@@ -131,7 +131,7 @@ export class SubscriptionController {
   }
 
   @Delete(":id/scheduled-downgrade")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async cancelScheduledDowngrade(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.cancelScheduledDowngrade(
       id,
@@ -140,7 +140,7 @@ export class SubscriptionController {
   }
 
   @Post(":id/cancel")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async cancelSubscription(
     @Param("id") id: string,
     @Body() body: CancelSubscriptionDto,
@@ -155,7 +155,7 @@ export class SubscriptionController {
   }
 
   @Post(":id/reactivate")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async reactivateSubscription(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.reactivateSubscription(
       id,
