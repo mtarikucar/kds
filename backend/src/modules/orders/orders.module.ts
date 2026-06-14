@@ -1,6 +1,7 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { OrdersService } from "./services/orders.service";
 import { OrderTransferService } from "./services/order-transfer.service";
+import { OrderPricingCalculator } from "./services/order-pricing.calculator";
 import { PaymentsService } from "./services/payments.service";
 import { PaymentMathCalculator } from "./services/payment-math.calculator";
 import { PaymentFinalizer } from "./services/payment-finalizer.service";
@@ -29,6 +30,10 @@ import { StockManagementModule } from "../stock-management/stock-management.modu
   providers: [
     OrdersService,
     OrderTransferService,
+    // Pure line-item pricing math extracted from OrdersService
+    // createInner()/update() (wave-d2 split). Zero deps; OrdersService stays
+    // the thin facade owning every $transaction + discount policy.
+    OrderPricingCalculator,
     PaymentsService,
     // Refactor split of payments.service.ts: pure per-item math
     // (PaymentMathCalculator, zero deps) + the finalization cluster

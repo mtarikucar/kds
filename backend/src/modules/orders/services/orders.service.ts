@@ -28,6 +28,7 @@ import { SmsNotificationService } from "../../sms-settings/sms-notification.serv
 import { TaxCalculationService } from "../../accounting/services/tax-calculation.service";
 import { withTransaction, addBreadcrumb } from "../../../common/utils/tracing";
 import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
+import { OrderPricingCalculator } from "./order-pricing.calculator";
 import { ReservationStatus } from "../../reservations/constants/reservation-status.enum";
 import { OutboxService } from "../../outbox/outbox.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
@@ -68,7 +69,17 @@ export class OrdersService {
     private outbox?: OutboxService,
     @Optional()
     private metrics?: MetricsService,
-  ) {}
+    // Pure line-item pricing math extracted from createInner()/update()
+    // (wave-d2 split). @Optional with a zero-dep fallback so existing tests
+    // that construct OrdersService directly (without listing the calculator
+    // as a provider) keep the identical pricing behaviour.
+    @Optional()
+    pricingCalculator?: OrderPricingCalculator,
+  ) {
+    this.pricingCalculator = pricingCalculator ?? new OrderPricingCalculator();
+  }
+
+  private pricingCalculator: OrderPricingCalculator;
 
   /**
    * Best-effort outbox emit so the new device-mesh KDS routing (and any
@@ -465,54 +476,17 @@ export class OrdersService {
         // Build product price map from DB (never trust client-supplied prices)
         const productMap = new Map(products.map((p) => [p.id, p]));
 
-        // Calculate totals with tax
-        let totalAmount = 0;
-        let totalTaxAmount = 0;
-        const orderItems = createOrderDto.items.map((item) => {
-          const product = productMap.get(item.productId);
-          const serverPrice = Number(product?.price ?? 0);
-          const taxRate = product?.taxRate ?? 10;
-
-          // Calculate modifier total for this item
-          let modifierTotal = 0;
-          const itemModifiers = (item.modifiers || []).map((mod) => {
-            const modifier = modifierMap.get(mod.modifierId);
-            const priceAdjustment = Number(modifier?.priceAdjustment || 0);
-            modifierTotal += priceAdjustment * mod.quantity;
-            return {
-              modifierId: mod.modifierId,
-              quantity: mod.quantity,
-              priceAdjustment,
-            };
-          });
-
-          const subtotal = item.quantity * (serverPrice + modifierTotal);
-          totalAmount += subtotal;
-
-          // Calculate tax for this line item (prices are KDV-inclusive)
-          let itemTaxAmount = 0;
-          if (this.taxCalculationService) {
-            const tax = this.taxCalculationService.extractTax(
-              subtotal,
-              taxRate,
-            );
-            itemTaxAmount = tax.taxAmount;
-            totalTaxAmount += itemTaxAmount;
-          }
-
-          return {
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: serverPrice,
-            subtotal,
-            modifierTotal,
-            taxRate,
-            taxAmount: itemTaxAmount,
-            notes: item.notes,
-            modifiers:
-              itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
-          };
-        });
+        // Calculate totals with tax — pure line-item pricing math extracted
+        // VERBATIM into OrderPricingCalculator (wave-d2 split). Identical
+        // server-side price + modifier + KDV-inclusive tax computation; the
+        // discount POLICY (throw-on-over-discount) stays inline below.
+        const { orderItems, totalAmount, totalTaxAmount } =
+          this.pricingCalculator.priceItems(
+            createOrderDto.items,
+            productMap,
+            modifierMap,
+            this.taxCalculationService,
+          );
 
         // Cap the discount at the order total — discount > total would mint a
         // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
@@ -970,50 +944,16 @@ export class OrdersService {
       // Build product price map from DB (never trust client-supplied prices)
       const productMap = new Map(products.map((p) => [p.id, p]));
 
-      // Calculate new totals using server-side prices
-      let totalAmount = 0;
-      let totalTaxAmount = 0;
-      const orderItems = updateOrderDto.items.map((item) => {
-        const product = productMap.get(item.productId);
-        const serverPrice = Number(product?.price ?? 0);
-        const taxRate = product?.taxRate ?? 10;
-
-        let modifierTotal = 0;
-        const itemModifiers = (item.modifiers || []).map((mod) => {
-          const modifier = modifierMap.get(mod.modifierId);
-          const priceAdjustment = Number(modifier?.priceAdjustment || 0);
-          modifierTotal += priceAdjustment * mod.quantity;
-          return {
-            modifierId: mod.modifierId,
-            quantity: mod.quantity,
-            priceAdjustment,
-          };
-        });
-
-        const subtotal = item.quantity * (serverPrice + modifierTotal);
-        totalAmount += subtotal;
-
-        // Calculate tax for this line item (prices are KDV-inclusive)
-        let itemTaxAmount = 0;
-        if (this.taxCalculationService) {
-          const tax = this.taxCalculationService.extractTax(subtotal, taxRate);
-          itemTaxAmount = tax.taxAmount;
-          totalTaxAmount += itemTaxAmount;
-        }
-
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: serverPrice,
-          subtotal,
-          modifierTotal,
-          taxRate,
-          taxAmount: itemTaxAmount,
-          notes: item.notes,
-          modifiers:
-            itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
-        };
-      });
+      // Calculate new totals using server-side prices — same pure line-item
+      // pricing math as createInner(), extracted into OrderPricingCalculator
+      // (wave-d2 split). The discount POLICY (cap via Math.min) stays inline.
+      const { orderItems, totalAmount, totalTaxAmount } =
+        this.pricingCalculator.priceItems(
+          updateOrderDto.items,
+          productMap,
+          modifierMap,
+          this.taxCalculationService,
+        );
 
       const rawDiscount =
         updateOrderDto.discount !== undefined
