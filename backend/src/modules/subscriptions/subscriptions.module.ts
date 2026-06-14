@@ -15,6 +15,7 @@ import { SubscriptionSchedulerService } from "./services/subscription-scheduler.
 import { NotificationService } from "./services/notification.service";
 import { InvoicePdfService } from "./services/invoice-pdf.service";
 import { UsageService } from "./services/usage.service";
+import { DowngradeUsageGuardService } from "./services/downgrade-usage-guard.service";
 
 // Controllers
 import { SubscriptionController } from "./controllers/subscription.controller";
@@ -56,6 +57,7 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
     InvoicePdfService,
     SubscriptionSchedulerService,
     UsageService,
+    DowngradeUsageGuardService,
 
     // Guards
     SubscriptionGuard,

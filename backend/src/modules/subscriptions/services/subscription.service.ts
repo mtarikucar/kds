@@ -25,6 +25,7 @@ import { ChangePlanDto } from "../dto/change-plan.dto";
 import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
 import { foldPlanGrants } from "./effective-features.fold";
 import { MetricsService } from "../../../common/metrics/metrics.service";
+import { DowngradeUsageGuardService } from "./downgrade-usage-guard.service";
 
 @Injectable()
 export class SubscriptionService {
@@ -48,7 +49,28 @@ export class SubscriptionService {
     // Optional so unit tests constructing the service bare keep working and
     // so a context without MetricsModule never fails to resolve.
     @Optional() private readonly metrics?: MetricsService,
+    // Downgrade usage-limit guard extracted from this service. @Optional()
+    // so the bare unit-test constructors (which predate it) keep resolving;
+    // when DI omits it, `downgradeGuard` below lazily builds one over the
+    // same PrismaService so the extracted query runs identically.
+    @Optional()
+    private readonly injectedDowngradeGuard?: DowngradeUsageGuardService,
   ) {}
+
+  /**
+   * Resolve the downgrade usage-limit guard. Prefers the DI-provided
+   * collaborator; falls back to a Prisma-backed instance so unit tests that
+   * construct SubscriptionService without the guard still exercise the real
+   * (extracted-verbatim) check rather than a stub.
+   */
+  private get downgradeGuard(): DowngradeUsageGuardService {
+    if (!this.injectedDowngradeGuard) {
+      this.lazyDowngradeGuard ??= new DowngradeUsageGuardService(this.prisma);
+      return this.lazyDowngradeGuard;
+    }
+    return this.injectedDowngradeGuard;
+  }
+  private lazyDowngradeGuard?: DowngradeUsageGuardService;
 
   /**
    * Track 2 — record a committed subscription billing transition for
@@ -648,6 +670,11 @@ export class SubscriptionService {
     };
   }
 
+  /**
+   * Thin facade over the extracted DowngradeUsageGuardService. Behavior and
+   * call sites (changePlan, applyScheduledDowngrade) are unchanged — the
+   * usage-count queries and violation-message formatting moved verbatim.
+   */
   private async assertDowngradeAllowed(
     tenantId: string,
     newPlan: {
@@ -657,40 +684,7 @@ export class SubscriptionService {
       maxCategories: number;
     },
   ) {
-    const usage = await this.getCurrentUsage(tenantId);
-    const violations: string[] = [];
-    if (newPlan.maxUsers !== -1 && usage.users > newPlan.maxUsers) {
-      violations.push(`Users: ${usage.users}/${newPlan.maxUsers}`);
-    }
-    if (newPlan.maxTables !== -1 && usage.tables > newPlan.maxTables) {
-      violations.push(`Tables: ${usage.tables}/${newPlan.maxTables}`);
-    }
-    if (newPlan.maxProducts !== -1 && usage.products > newPlan.maxProducts) {
-      violations.push(`Products: ${usage.products}/${newPlan.maxProducts}`);
-    }
-    if (
-      newPlan.maxCategories !== -1 &&
-      usage.categories > newPlan.maxCategories
-    ) {
-      violations.push(
-        `Categories: ${usage.categories}/${newPlan.maxCategories}`,
-      );
-    }
-    if (violations.length > 0) {
-      throw new BadRequestException(
-        `Cannot downgrade: current usage exceeds new plan limits. Please reduce: ${violations.join(", ")}`,
-      );
-    }
-  }
-
-  private async getCurrentUsage(tenantId: string) {
-    const [users, tables, products, categories] = await Promise.all([
-      this.prisma.user.count({ where: { tenantId, status: "ACTIVE" } }),
-      this.prisma.table.count({ where: { tenantId } }),
-      this.prisma.product.count({ where: { tenantId } }),
-      this.prisma.category.count({ where: { tenantId } }),
-    ]);
-    return { users, tables, products, categories };
+    return this.downgradeGuard.assertDowngradeAllowed(tenantId, newPlan);
   }
 
   /**
