@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import axios from "axios";
 import { EventTypes } from "./event-types";
 import { DomainEvent } from "./domain-event-bus.service";
+import { stripCorrelationMeta } from "./outbox.service";
 import {
   DeliverEventRequest,
   INTERNAL_EVENTS_ROUTE,
@@ -120,7 +121,9 @@ export class MarketingEventRelayService implements OnModuleInit {
 
     const body: DeliverEventRequest = {
       type: event.type,
-      payload: event.payload as Record<string, unknown>,
+      payload: stripCorrelationMeta(
+        event.payload as Record<string, unknown>,
+      ) as Record<string, unknown>,
       idempotencyKey: event.idempotencyKey,
       tenantId: event.tenantId ?? undefined,
     };

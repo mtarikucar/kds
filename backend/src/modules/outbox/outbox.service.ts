@@ -122,6 +122,23 @@ export class OutboxService {
   }
 }
 
+/**
+ * Remove the internal `_meta` correlation envelope before a payload crosses a
+ * trust boundary (outbound webhooks, the marketing-SaaS relay). `_meta` exists
+ * only for internal request→log→outbox tracing; it must never reach an external
+ * receiver or be folded into an HMAC-signed body.
+ */
+export function stripCorrelationMeta<T extends Record<string, unknown>>(
+  payload: T | null | undefined,
+): T | null | undefined {
+  if (!payload || typeof payload !== "object" || !("_meta" in payload)) {
+    return payload;
+  }
+  const { _meta: _omit, ...rest } = payload;
+  void _omit;
+  return rest as T;
+}
+
 // v2.8.97 — event types where a duplicate row has tangible downstream
 // impact (double-charge, double-notify, double-credit). Producers of
 // these events SHOULD pass a deterministic idempotencyKey.

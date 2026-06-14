@@ -4,6 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { WebhookOutboundService } from "./webhook-outbound.service";
+import { stripCorrelationMeta } from "../outbox/outbox.service";
 import {
   assertPublicHttpUrl,
   UnsafeUrlError,
@@ -90,7 +91,11 @@ export class WebhookDeliveryWorkerService {
     // policy), `loadPayload` returns null — sending {"payload":null} to
     // the receiver is silent data loss they can't detect. Mark this
     // delivery `failed` with an actionable message instead.
-    const payload = await this.loadPayload(d.eventId);
+    // Strip the internal _meta correlation envelope so it never reaches the
+    // external receiver / the HMAC-signed body.
+    const payload = stripCorrelationMeta(
+      (await this.loadPayload(d.eventId)) as Record<string, unknown> | null,
+    );
     if (payload == null) {
       this.logger.warn(
         `webhook ${d.id}: source outbox event ${d.eventId} no longer exists; marking failed`,
