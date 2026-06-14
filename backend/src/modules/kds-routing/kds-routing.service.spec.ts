@@ -144,4 +144,164 @@ describe('KdsRoutingService.onOrderEvent', () => {
       expect(take).toBe(50);
     });
   });
+
+  /**
+   * Extended coverage: the device-query filters (kind/status/branch), the
+   * v2.8.98 same-order show_order debounce (recentByDevice skip), the
+   * priority assignment, and the error re-throw contract for the outbox
+   * worker. None of these branches were previously pinned.
+   */
+  describe('device query filters', () => {
+    it('filters by kds_screen kind + paired/online/offline status', async () => {
+      let where: any = null;
+      (prisma.device.findMany as any).mockImplementation(async (args: any) => {
+        where = args.where;
+        return [];
+      });
+
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-f',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1', branchId: 'b-1' },
+      });
+
+      expect(where.kind).toBe('kds_screen');
+      expect(where.status).toEqual({ in: ['online', 'offline', 'paired'] });
+    });
+
+    it('adds the branchId filter only when the payload carries a branchId', async () => {
+      const wheres: any[] = [];
+      (prisma.device.findMany as any).mockImplementation(async (args: any) => {
+        wheres.push(args.where);
+        return [];
+      });
+
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-with-branch',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1', branchId: 'b-9' },
+      });
+      await handler!({
+        id: 'evt-no-branch',
+        tenantId: 't1',
+        payload: { orderId: 'o-2', tenantId: 't1' },
+      });
+
+      expect(wheres[0].branchId).toBe('b-9');
+      expect('branchId' in wheres[1]).toBe(false);
+    });
+  });
+
+  describe('v2.8.98 same-order show_order debounce', () => {
+    it('skips devices that already have a recent queued/inflight show_order for the same order', async () => {
+      prisma.device.findMany.mockResolvedValue([
+        { id: 'd-1' },
+        { id: 'd-2' },
+      ] as any);
+      // d-1 has a recent show_order → must be skipped; d-2 has none.
+      prisma.deviceCommand.findMany.mockResolvedValue([
+        { deviceId: 'd-1' },
+      ] as any);
+
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-debounce',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+
+      // Only d-2 gets enqueued.
+      expect(commands.enqueue).toHaveBeenCalledTimes(1);
+      expect((commands.enqueue as any).mock.calls[0][1]).toBe('d-2');
+    });
+
+    it('queries deviceCommand recency scoped to orderId via the JSON path filter', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      prisma.deviceCommand.findMany.mockResolvedValue([] as any);
+
+      const handler = getHandler('order.updated.v1');
+      const before = Date.now();
+      await handler!({
+        id: 'evt-rec',
+        tenantId: 't1',
+        payload: { orderId: 'o-42', tenantId: 't1' },
+      });
+
+      const arg = (prisma.deviceCommand.findMany as any).mock.calls[0][0];
+      expect(arg.where.kind).toBe('show_order');
+      expect(arg.where.status).toEqual({ in: ['queued', 'inflight'] });
+      expect(arg.where.payload).toEqual({ path: ['orderId'], equals: 'o-42' });
+      // 5s window: cutoff is roughly now-5000.
+      const cutoffMs = arg.where.createdAt.gte.getTime();
+      expect(cutoffMs).toBeLessThanOrEqual(before - 4000);
+      expect(cutoffMs).toBeGreaterThanOrEqual(before - 6000);
+    });
+
+    it('does NOT run the debounce query for clear_order events', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      const handler = getHandler('order.cancelled.v1');
+      await handler!({
+        id: 'evt-clear',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+
+      expect(prisma.deviceCommand.findMany).not.toHaveBeenCalled();
+      expect(commands.enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it('tolerates a null deviceCommand result (dedup is opt-in, not load-bearing)', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      prisma.deviceCommand.findMany.mockResolvedValue(null as any);
+
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-null',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+
+      // No skip → enqueue still fires.
+      expect(commands.enqueue).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('command priority + error contract', () => {
+    it('assigns priority 5 to show_order', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      prisma.deviceCommand.findMany.mockResolvedValue([] as any);
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-p',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+      expect((commands.enqueue as any).mock.calls[0][2].priority).toBe(5);
+    });
+
+    it('assigns priority 3 to clear_order', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      const handler = getHandler('order.completed.v1');
+      await handler!({
+        id: 'evt-p2',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+      expect((commands.enqueue as any).mock.calls[0][2].priority).toBe(3);
+    });
+
+    it('re-throws so the outbox worker can retry', async () => {
+      prisma.device.findMany.mockRejectedValue(new Error('db down'));
+      const handler = getHandler('order.created.v1');
+      await expect(
+        handler!({
+          id: 'evt-err',
+          tenantId: 't1',
+          payload: { orderId: 'o-1', tenantId: 't1' },
+        }),
+      ).rejects.toThrow('db down');
+    });
+  });
 });
