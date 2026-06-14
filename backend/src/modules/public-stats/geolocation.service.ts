@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import axios from "axios";
 import { maskIp } from "../../common/helpers/pii-mask.helper";
 
@@ -30,11 +31,10 @@ export class GeolocationService {
   private static readonly MAX_CACHE_SIZE = 50_000;
 
   constructor(private readonly config?: ConfigService) {
-    this.CACHE_TTL =
-      this.config?.get<number>(
-        "GEOLOCATION_CACHE_TTL_MS",
-        24 * 60 * 60 * 1000,
-      ) ?? 24 * 60 * 60 * 1000;
+    this.CACHE_TTL = numericEnv(
+      this.config?.get("GEOLOCATION_CACHE_TTL_MS"),
+      24 * 60 * 60 * 1000,
+    );
   }
 
   private isLocalIp(ip: string): boolean {

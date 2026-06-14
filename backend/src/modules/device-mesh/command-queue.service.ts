@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import { Prisma } from "@prisma/client";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -34,9 +35,10 @@ export class CommandQueueService {
     private readonly outbox: OutboxService,
     private readonly config?: ConfigService,
   ) {
-    this.defaultTtlMs =
-      this.config?.get<number>("DEVICE_COMMAND_TTL_MS", 30 * 60 * 1000) ??
-      30 * 60 * 1000;
+    this.defaultTtlMs = numericEnv(
+      this.config?.get("DEVICE_COMMAND_TTL_MS"),
+      30 * 60 * 1000,
+    );
   }
 
   async enqueue(

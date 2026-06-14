@@ -6,6 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { LoyaltyService } from "./loyalty.service";
@@ -31,8 +32,10 @@ export class ReferralService {
     private loyaltyService: LoyaltyService,
     private readonly config?: ConfigService,
   ) {
-    this.codeMaxAttempts =
-      this.config?.get<number>("REFERRAL_CODE_MAX_ATTEMPTS", 10) ?? 10;
+    this.codeMaxAttempts = numericEnv(
+      this.config?.get("REFERRAL_CODE_MAX_ATTEMPTS"),
+      10,
+    );
   }
 
   async generateReferralCode(

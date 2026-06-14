@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import { createHash, randomBytes } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -45,12 +46,14 @@ export class DeviceService {
     private readonly outbox: OutboxService,
     private readonly config?: ConfigService,
   ) {
-    this.pairCodeTtlMs =
-      this.config?.get<number>("DEVICE_PAIR_CODE_TTL_MS", 10 * 60 * 1000) ??
-      10 * 60 * 1000;
-    this.tokenTtlMs =
-      this.config?.get<number>("DEVICE_TOKEN_TTL_MS", 24 * 3600 * 1000) ??
-      24 * 3600 * 1000;
+    this.pairCodeTtlMs = numericEnv(
+      this.config?.get("DEVICE_PAIR_CODE_TTL_MS"),
+      10 * 60 * 1000,
+    );
+    this.tokenTtlMs = numericEnv(
+      this.config?.get("DEVICE_TOKEN_TTL_MS"),
+      24 * 3600 * 1000,
+    );
   }
 
   /** Cryptographic, human-typable pair code. 6 chars in [A-Z0-9]. */

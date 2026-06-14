@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import { createHash, randomBytes } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -35,10 +36,10 @@ export class LocalBridgeService {
     private readonly outbox: OutboxService,
     private readonly config?: ConfigService,
   ) {
-    this.tokenTtlMs = this.config?.get<number>(
-      "LOCAL_BRIDGE_TOKEN_TTL_MS",
+    this.tokenTtlMs = numericEnv(
+      this.config?.get("LOCAL_BRIDGE_TOKEN_TTL_MS"),
       30 * 24 * 3600 * 1000,
-    ) ?? 30 * 24 * 3600 * 1000;
+    );
   }
 
   private newToken(): string {

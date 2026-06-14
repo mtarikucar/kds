@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../../common/config/numeric-env.util";
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export abstract class BaseAdapter {
@@ -19,7 +20,7 @@ export abstract class BaseAdapter {
     // DELIVERY_PLATFORM_HTTP_TIMEOUT_MS. An explicit `timeout` arg (rare)
     // still wins so a subclass can hard-pin a value if it ever needs to.
     const resolvedTimeout =
-      timeout ?? config?.get<number>("DELIVERY_PLATFORM_HTTP_TIMEOUT_MS", 10_000) ?? 10_000;
+      timeout ?? numericEnv(config?.get("DELIVERY_PLATFORM_HTTP_TIMEOUT_MS"), 10_000);
     this.httpClient = axios.create({
       baseURL: defaultBaseURL,
       timeout: resolvedTimeout,
