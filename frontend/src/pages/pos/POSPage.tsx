@@ -31,12 +31,12 @@ import { useResponsive } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
-import { useAuthStore } from '../../store/authStore';
 import {
   calculateSubtotal,
   canProceedToPayment as computeCanProceedToPayment,
   paymentBlockedReason as computePaymentBlockedReason,
 } from './posCart';
+import { useCartPersistence } from './useCartPersistence';
 
 // View state type
 type POSView = 'table-selection' | 'order';
@@ -55,56 +55,10 @@ const POSPage = () => {
 
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   // Cart persisted in localStorage so an accidental tab close / refresh
-  // doesn't wipe an in-progress order.
-  //
-  // v2.8.97 — the key is now `pos_cart::<tenantId>::<userId>` so a
-  // logout-then-different-login on the same device cannot see the
-  // previous user's stale cart. Pre-fix the bare `pos_cart` key was
-  // shared across logins; queryClient.clear() on login (added in
-  // v2.8.91) only flushes React Query, not localStorage. The 12h TTL
-  // is unchanged.
-  const CART_TTL_MS = 12 * 60 * 60 * 1000;
-  const user = useAuthStore((s) => s.user);
-  const cartStorageKey = user
-    ? `pos_cart::${user.tenantId}::${user.id}`
-    : null;
-  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    if (!cartStorageKey) return [];
-    try {
-      // One-time legacy migration: drop the pre-v2.8.97 unscoped key
-      // so an upgraded build starts clean instead of cross-user
-      // surfacing.
-      localStorage.removeItem('pos_cart');
-      const saved = localStorage.getItem(cartStorageKey);
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      // Backwards-compat: older runs persisted a bare array. Treat those
-      // as expired (no timestamp = age unknown) so we don't carry over
-      // arbitrarily-old carts on first upgrade.
-      if (!parsed || !Array.isArray(parsed.items) || typeof parsed.savedAt !== 'number') {
-        localStorage.removeItem(cartStorageKey);
-        return [];
-      }
-      if (Date.now() - parsed.savedAt > CART_TTL_MS) {
-        localStorage.removeItem(cartStorageKey);
-        return [];
-      }
-      return parsed.items as CartItem[];
-    } catch {
-      return [];
-    }
-  });
-  useEffect(() => {
-    if (!cartStorageKey) return;
-    try {
-      localStorage.setItem(
-        cartStorageKey,
-        JSON.stringify({ items: cartItems, savedAt: Date.now() }),
-      );
-    } catch {
-      // Storage unavailable (private mode, quota exceeded) — drop silently.
-    }
-  }, [cartItems, cartStorageKey]);
+  // doesn't wipe an in-progress order. The per-user key shape
+  // (`pos_cart::<tenantId>::<userId>`, v2.8.97), the 12h TTL, and the
+  // legacy-key migration all live in useCartPersistence (unit-tested).
+  const { cartItems, setCartItems } = useCartPersistence<CartItem>();
   const [discount, setDiscount] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
