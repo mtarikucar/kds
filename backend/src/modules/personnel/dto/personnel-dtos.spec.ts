@@ -5,6 +5,10 @@ import { ClockInDto } from "./clock-in.dto";
 import { CreateShiftTemplateDto } from "./create-shift-template.dto";
 import { AssignShiftDto, BulkAssignShiftDto } from "./assign-shift.dto";
 import { AttendanceQueryDto } from "./attendance-query.dto";
+import { PerformanceQueryDto } from "./performance-query.dto";
+import { ScheduleQueryDto } from "./schedule-query.dto";
+import { CreateSwapRequestDto } from "./create-swap-request.dto";
+import { UpdateShiftTemplateDto } from "./update-shift-template.dto";
 import { AttendanceStatus } from "../constants/personnel.enum";
 
 /**
@@ -110,5 +114,61 @@ describe("AttendanceQueryDto", () => {
     const dto = plainToInstance(AttendanceQueryDto, { startDate: "" });
     expect(await errs(dto)).toEqual([]);
     expect(dto.startDate).toBeUndefined();
+  });
+});
+
+describe("PerformanceQueryDto", () => {
+  it("accepts ISO dates + a userId and rejects a bad date", async () => {
+    expect(
+      await errs(
+        plainToInstance(PerformanceQueryDto, {
+          startDate: "2026-06-01",
+          endDate: "2026-06-30",
+          userId: "u1",
+        }),
+      ),
+    ).toEqual([]);
+    const bad = plainToInstance(PerformanceQueryDto, { startDate: "soon" });
+    expect((await errs(bad)).some((m) => /startDate/.test(m))).toBe(true);
+  });
+});
+
+describe("ScheduleQueryDto", () => {
+  it("rejects a non-ISO weekStart", async () => {
+    const dto = plainToInstance(ScheduleQueryDto, { weekStart: "monday" });
+    expect((await errs(dto)).some((m) => /weekStart/.test(m))).toBe(true);
+  });
+
+  it("accepts an ISO weekStart", async () => {
+    expect(
+      await errs(plainToInstance(ScheduleQueryDto, { weekStart: "2026-06-15" })),
+    ).toEqual([]);
+  });
+});
+
+describe("CreateSwapRequestDto", () => {
+  it("requires the three id strings", async () => {
+    const dto = plainToInstance(CreateSwapRequestDto, {});
+    const msgs = await errs(dto);
+    expect(msgs.some((m) => /targetId/.test(m))).toBe(true);
+    expect(msgs.some((m) => /requesterAssignmentId/.test(m))).toBe(true);
+    expect(msgs.some((m) => /targetAssignmentId/.test(m))).toBe(true);
+  });
+
+  it("accepts a complete swap request", async () => {
+    const dto = plainToInstance(CreateSwapRequestDto, {
+      targetId: "u2",
+      requesterAssignmentId: "a1",
+      targetAssignmentId: "a2",
+    });
+    expect(await errs(dto)).toEqual([]);
+  });
+});
+
+describe("UpdateShiftTemplateDto", () => {
+  it("is a partial of the create DTO (empty patch ok, invalid time rejected)", async () => {
+    expect(await errs(plainToInstance(UpdateShiftTemplateDto, {}))).toEqual([]);
+    const bad = plainToInstance(UpdateShiftTemplateDto, { startTime: "99:99" });
+    expect((await errs(bad)).some((m) => /startTime/.test(m))).toBe(true);
   });
 });
