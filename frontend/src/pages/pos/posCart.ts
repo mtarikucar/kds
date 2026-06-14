@@ -61,6 +61,48 @@ export function calculateTotal(items: PosCartItem[], discount: number): number {
 }
 
 /**
+ * Stable identity key for a cart line: product id is implicit (caller already
+ * matched on it); this keys the *modifier set* so the same product with
+ * different modifiers stays a separate line. Modifier ids are sorted so order
+ * of selection doesn't matter. Pure extraction of the inline `modifierKey`.
+ */
+function modifierKeyOf(modifiers: { modifierId: string }[]): string {
+  return modifiers
+    .map((m) => m.modifierId)
+    .sort()
+    .join('-');
+}
+
+/**
+ * Add `quantity` of `product` (with `modifiers`) to `prev`, returning the new
+ * cart array. If a line already exists for the same product AND the same
+ * modifier set, its quantity is incremented; otherwise a new line is appended.
+ * Pure extraction of POSPage.addItemToCart's setCartItems updater so the
+ * dedup/merge rule (modifier-order-insensitive) is unit-testable.
+ */
+export function mergeCartItem(
+  prev: CartItem[],
+  product: Product,
+  quantity: number,
+  modifiers: SelectedModifier[],
+): CartItem[] {
+  const key = modifierKeyOf(modifiers);
+  const existingItem = prev.find(
+    (item) =>
+      item.id === product.id && modifierKeyOf(item.modifiers || []) === key,
+  );
+
+  if (existingItem) {
+    return prev.map((item) =>
+      item === existingItem
+        ? { ...item, quantity: item.quantity + quantity }
+        : item,
+    );
+  }
+  return [...prev, { ...product, quantity, modifiers }];
+}
+
+/**
  * Two-step-checkout payment eligibility. Pure extraction of POSPage's
  * canProceedToPayment memo (~L242-259).
  *

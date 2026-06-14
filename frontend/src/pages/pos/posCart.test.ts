@@ -8,8 +8,10 @@ import {
   resolvePaymentTarget,
   hasRemainingUnpaidOrders,
   mapOrderItemsToCart,
+  mergeCartItem,
   type PosCartItem,
 } from './posCart';
+import type { CartItem } from './posTypes';
 import { OrderType, OrderStatus, type Order, type OrderItem, type Product } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 
@@ -340,5 +342,60 @@ describe('mapOrderItemsToCart', () => {
 
   it('returns [] when there are no items', () => {
     expect(mapOrderItemsToCart({} as Pick<Order, 'orderItems' | 'items'>)).toEqual([]);
+  });
+});
+
+const product = (id: string): Product => ({ id, name: id, price: 10 } as Product);
+const sel = (modifierId: string): SelectedModifier =>
+  ({ modifierId, quantity: 1, priceAdjustment: 0 } as SelectedModifier);
+
+describe('mergeCartItem', () => {
+  it('appends a new line to an empty cart', () => {
+    const out = mergeCartItem([], product('p1'), 2, []);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'p1', quantity: 2, modifiers: [] });
+  });
+
+  it('increments quantity for the same product with no modifiers', () => {
+    const start: CartItem[] = [{ ...product('p1'), quantity: 1, modifiers: [] }];
+    const out = mergeCartItem(start, product('p1'), 3, []);
+    expect(out).toHaveLength(1);
+    expect(out[0].quantity).toBe(4);
+  });
+
+  it('keeps the same product with a DIFFERENT modifier set as a separate line', () => {
+    const start: CartItem[] = [{ ...product('p1'), quantity: 1, modifiers: [sel('m1')] }];
+    const out = mergeCartItem(start, product('p1'), 1, [sel('m2')]);
+    expect(out).toHaveLength(2);
+  });
+
+  it('merges the same product with the SAME modifier set regardless of selection order', () => {
+    const start: CartItem[] = [
+      { ...product('p1'), quantity: 1, modifiers: [sel('m1'), sel('m2')] },
+    ];
+    // modifiers supplied in reverse order — sorted key makes them equal
+    const out = mergeCartItem(start, product('p1'), 2, [sel('m2'), sel('m1')]);
+    expect(out).toHaveLength(1);
+    expect(out[0].quantity).toBe(3);
+  });
+
+  it('treats a missing modifiers array on an existing line as the empty set', () => {
+    const start: CartItem[] = [{ ...product('p1'), quantity: 1 }];
+    const out = mergeCartItem(start, product('p1'), 1, []);
+    expect(out).toHaveLength(1);
+    expect(out[0].quantity).toBe(2);
+  });
+
+  it('does not mutate the input array', () => {
+    const start: CartItem[] = [{ ...product('p1'), quantity: 1, modifiers: [] }];
+    const snapshot = JSON.parse(JSON.stringify(start));
+    mergeCartItem(start, product('p1'), 5, []);
+    expect(start).toEqual(snapshot);
+  });
+
+  it('keeps different products as separate lines', () => {
+    const start: CartItem[] = [{ ...product('p1'), quantity: 1, modifiers: [] }];
+    const out = mergeCartItem(start, product('p2'), 1, []);
+    expect(out.map((i) => i.id)).toEqual(['p1', 'p2']);
   });
 });

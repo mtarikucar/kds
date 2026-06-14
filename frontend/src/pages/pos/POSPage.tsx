@@ -36,6 +36,7 @@ import {
   paymentBlockedReason as computePaymentBlockedReason,
   resolvePaymentTarget,
   hasRemainingUnpaidOrders,
+  mergeCartItem,
 } from './posCart';
 import { useCartPersistence } from './useCartPersistence';
 import { usePosTourSync } from './usePosTourSync';
@@ -235,23 +236,9 @@ const POSPage = () => {
   };
 
   const addItemToCart = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
-    setCartItems((prev) => {
-      // Create a unique key based on product ID and selected modifiers
-      const modifierKey = modifiers.map(m => m.modifierId).sort().join('-');
-      const existingItem = prev.find(
-        (item) => item.id === product.id &&
-          (item.modifiers?.map(m => m.modifierId).sort().join('-') || '') === modifierKey
-      );
-
-      if (existingItem) {
-        return prev.map((item) =>
-          item === existingItem
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [...prev, { ...product, quantity, modifiers }];
-    });
+    // Dedup/merge rule (same product + same modifier set → increment) lives in
+    // posCart.mergeCartItem (unit-tested).
+    setCartItems((prev) => mergeCartItem(prev, product, quantity, modifiers));
   };
 
   const handleAddItemWithModifiers = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
