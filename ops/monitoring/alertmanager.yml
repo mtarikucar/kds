@@ -1,0 +1,62 @@
+# Alertmanager configuration for the kds monitoring stack.
+#
+# This is a MINIMAL, opt-in template. The receiver endpoints/secrets below are
+# the OPERATOR'S to set — the __PLACEHOLDER__ tokens are rendered from the
+# matching env vars at container start by the alertmanager service entrypoint
+# in docker-compose.monitoring.yml (a simple `sed`). Replace/extend the
+# receiver with your real Slack/PagerDuty/email/webhook target before relying
+# on it. (Alertmanager does not expand env vars inside its own config, hence
+# the render step.)
+
+global:
+  resolve_timeout: 5m
+  # SMTP settings used by the email receiver below. All rendered from env so the
+  # repo never carries credentials. Leave the email receiver unused if you only
+  # want the webhook.
+  smtp_from: "__ALERT_EMAIL_FROM__"
+  smtp_smarthost: "__ALERT_SMTP_SMARTHOST__"
+  smtp_auth_username: "__ALERT_SMTP_USERNAME__"
+  smtp_auth_password: "__ALERT_SMTP_PASSWORD__"
+  smtp_require_tls: true
+
+# How alerts are grouped, throttled and routed.
+route:
+  # Group alerts that share an alertname + severity so a burst of the same
+  # condition collapses into one notification.
+  group_by: ["alertname", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: default-receiver
+  routes:
+    # Page critical alerts faster: shorter wait + more frequent re-notify.
+    - matchers:
+        - severity = "critical"
+      receiver: default-receiver
+      group_wait: 10s
+      repeat_interval: 1h
+
+# Suppress lower-severity noise while a critical alert for the same component
+# is already firing.
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ["component"]
+
+receivers:
+  - name: default-receiver
+    # Generic webhook placeholder — point this at your own bridge (Slack
+    # Incoming Webhook proxy, Opsgenie/PagerDuty Events API relay, a small
+    # internal handler, etc.). The URL is the operator's to provide via the
+    # ALERT_WEBHOOK_URL env var.
+    webhook_configs:
+      - url: "__ALERT_WEBHOOK_URL__"
+        send_resolved: true
+    # Email path is provided as a commented-out template so the config stays
+    # valid even before SMTP is configured. Uncomment and set ALERT_EMAIL_TO
+    # (and the global smtp_* vars above) to enable it.
+    # email_configs:
+    #   - to: "__ALERT_EMAIL_TO__"
+    #     send_resolved: true

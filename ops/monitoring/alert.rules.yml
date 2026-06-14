@@ -1,0 +1,128 @@
+# Prometheus alerting rules for the kds backend.
+#
+# Every PromQL expression below references a metric that is actually produced
+# by backend/src/common/metrics/metrics.service.ts (and the prom-client
+# defaults / scrape-synthesized `up`). Specifically:
+#   - outbox_dlq_depth                       Gauge   (setOutboxDlqDepth/incOutboxDlqDepth)
+#   - delivery_dlq_depth                     Gauge   (setDeliveryDlqDepth/incDeliveryDlqDepth)
+#   - http_request_duration_seconds_count    Histogram counter, labels:
+#                                            method, route, status_code
+#   - payment_intents_total                  Counter labels: result (created|paytr_failed)
+#   - webhook_delivery_total                 Counter labels: result (success|failure)
+#   - up                                     synthesized by Prometheus per target
+#
+# NOTE on the status label: the histogram label is `status_code` (see
+# MetricsService.observeHttpRequest -> labels(method, route, status_code)),
+# NOT `status`. The 5xx rule matches on status_code=~"5..".
+
+groups:
+  - name: kds-backend-reliability
+    rules:
+      # A non-empty outbox dead-letter queue means events exhausted all retries
+      # and need operator triage. Gauge is re-set authoritatively on each prune,
+      # so a 5m window avoids flapping on a transient single failure that the
+      # worker immediately requeues.
+      - alert: OutboxDLQNonEmpty
+        expr: outbox_dlq_depth > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: outbox
+        annotations:
+          summary: "Outbox dead-letter queue is non-empty"
+          description: >-
+            outbox_dlq_depth has been {{ $value }} (> 0) for 5m on
+            {{ $labels.instance }}. Events have exhausted all retries and will
+            not be delivered without operator action. Inspect the outbox table
+            for status=failed rows and requeue or discard them.
+
+      # Delivery-platform DLQ: log rows whose retries are exhausted
+      # (nextRetryAt=null) and that the RetryScheduler will never re-claim.
+      # 10m window — delivery integrations are flakier than the internal outbox.
+      - alert: DeliveryDLQNonEmpty
+        expr: delivery_dlq_depth > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: delivery
+        annotations:
+          summary: "Delivery-platform dead-letter queue is non-empty"
+          description: >-
+            delivery_dlq_depth has been {{ $value }} (> 0) for 10m on
+            {{ $labels.instance }}. Delivery log rows have exhausted their
+            retry budget. Operator requeue/delete is required.
+
+      # 5xx error ratio across all routes. Numerator and denominator both come
+      # from the same histogram's _count series so the ratio is well-defined.
+      # `or vector(0)` keeps the numerator from going absent (and the whole
+      # expression from disappearing) when there are zero 5xx in the window.
+      - alert: HighHttp5xxRate
+        expr: >-
+          (
+            sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[5m]))
+            or vector(0)
+          )
+          /
+          sum(rate(http_request_duration_seconds_count[5m]))
+          > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          component: http
+        annotations:
+          summary: "Backend 5xx error rate above 5%"
+          description: >-
+            More than 5% of HTTP requests have returned 5xx for 10m
+            (current ratio {{ $value | humanizePercentage }}). Check backend
+            logs / Sentry for the failing routes.
+
+      # Target down: Prometheus failed to scrape /api/metrics. `up` is 0 for a
+      # target it cannot reach. 2m tolerates a single missed scrape + a deploy
+      # rollover without paging.
+      - alert: BackendDown
+        expr: up{job="kds-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: backend
+        annotations:
+          summary: "kds backend is unreachable from Prometheus"
+          description: >-
+            Prometheus has not been able to scrape {{ $labels.instance }}
+            (job kds-backend) for 2m. The backend may be down, the metrics
+            endpoint may be misconfigured, or the METRICS_TOKEN may be wrong.
+
+  - name: kds-money-paths
+    rules:
+      # Money path: subscription payment intents that PayTR rejected. The
+      # counter is payment_intents_total{result="paytr_failed"} (see
+      # PaymentsService.countIntent). Any sustained non-zero failure rate over
+      # 15m is worth a human look — settlement money is on the line.
+      - alert: PaytrPaymentFailures
+        expr: sum(rate(payment_intents_total{result="paytr_failed"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: critical
+          component: payments
+        annotations:
+          summary: "PayTR subscription payment failures detected"
+          description: >-
+            payment_intents_total{result="paytr_failed"} is incrementing
+            (rate {{ $value }}/s over 15m). Subscription billing via PayTR is
+            failing — verify PayTR credentials/connectivity and check the
+            payments logs for failureCode/failureMessage.
+
+      # Money path: outbound webhook deliveries that failed. Sustained failures
+      # mean tenant integrations are not receiving events (and may auto-pause).
+      - alert: WebhookDeliveryFailures
+        expr: sum(rate(webhook_delivery_total{result="failure"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+          component: webhooks
+        annotations:
+          summary: "Outbound webhook delivery failures detected"
+          description: >-
+            webhook_delivery_total{result="failure"} is incrementing
+            (rate {{ $value }}/s over 15m). Tenant webhook endpoints are
+            rejecting or timing out; affected subscriptions may auto-pause.
