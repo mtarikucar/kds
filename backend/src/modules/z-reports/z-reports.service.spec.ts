@@ -19,7 +19,7 @@ describe('ZReportsService.generateAndSendReport (iter-35)', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     email = { sendEmail: jest.fn().mockResolvedValue(true) };
-    svc = new ZReportsService(prisma as any, email);
+    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any);
   });
 
   it('uses getTenantMidnight to build reportDate (tenant timezone, not server)', async () => {
@@ -97,7 +97,7 @@ describe('ZReportsService.generateReport (track-1 branch scope)', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     email = { sendEmail: jest.fn().mockResolvedValue(true) };
-    svc = new ZReportsService(prisma as any, email);
+    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any);
 
     // No existing report for the date -> proceed into aggregation.
     prisma.zReport.findFirst.mockResolvedValue(null);
