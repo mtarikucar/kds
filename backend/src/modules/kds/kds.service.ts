@@ -15,6 +15,7 @@ import { KdsGateway } from "./kds.gateway";
 import { DeliveryStatusSyncService } from "../delivery-platforms/services/delivery-status-sync.service";
 import { StockDeductionService } from "../stock-management/services/stock-deduction.service";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { MetricsService } from "../../common/metrics/metrics.service";
 
 @Injectable()
 export class KdsService {
@@ -29,6 +30,8 @@ export class KdsService {
     @Optional()
     @Inject(forwardRef(() => StockDeductionService))
     private stockDeductionService?: StockDeductionService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async getKitchenOrders(scope: BranchScope) {
@@ -180,6 +183,17 @@ export class KdsService {
       );
     });
 
+    // Track 2 — record the committed ticket status transition for
+    // Prometheus. After the committed status write + side effects, optional
+    // + ?.-guarded so it can never break the business write. `status` is
+    // the developer-controlled OrderStatus enum (never user input), so
+    // cardinality stays bounded.
+    this.metrics?.incCounter(
+      "kds_ticket_status_total",
+      "KDS ticket status transitions by status",
+      { status },
+    );
+
     return updatedOrder;
   }
 
@@ -257,6 +271,16 @@ export class KdsService {
       updatedOrderItem.order.branchId,
       itemId,
       status,
+    );
+
+    // Track 2 — record the committed item status transition for Prometheus.
+    // After the committed item write + side effects, optional + ?.-guarded
+    // so it can never break the business write. `status` is the
+    // developer-controlled OrderItemStatus enum (never user input).
+    this.metrics?.incCounter(
+      "kds_ticket_item_status_total",
+      "KDS ticket item status transitions by status",
+      { status },
     );
 
     return updatedOrderItem;
