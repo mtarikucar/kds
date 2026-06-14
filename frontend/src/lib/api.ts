@@ -27,6 +27,11 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   // backend), so they must fly without a branch — a wildcard-owner ADMIN with
   // an unresolved branchId was otherwise fail-fast'd out of the POS settings.
   '/pos-settings',
+  // Delivery-platforms DLQ admin is tenant-wide (class-level @SkipBranchScope,
+  // tenant-fenced by req.user.tenantId) — dead-letters span all branches, so
+  // these routes must fly without a branch header. Bare (no trailing slash)
+  // covers /delivery-platforms/dlq, /dlq/summary, /dlq/requeue.
+  '/delivery-platforms/dlq',
 ];
 
 /**
