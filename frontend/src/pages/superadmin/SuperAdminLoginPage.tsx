@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useSuperAdminLogin } from '../../features/superadmin/api/superAdminApi';
 
@@ -18,6 +19,7 @@ function readAndClearReturnPath(): string | null {
 }
 
 export default function SuperAdminLoginPage() {
+  const { t } = useTranslation('superadmin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { isAuthenticated, requires2FA, requires2FASetup } = useSuperAdminAuthStore();
@@ -61,27 +63,27 @@ export default function SuperAdminLoginPage() {
             <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
               <span className="text-white text-lg font-semibold">K</span>
             </div>
-            <span className="text-zinc-900 text-xl font-semibold tracking-tight">KDS Admin</span>
+            <span className="text-zinc-900 text-xl font-semibold tracking-tight">{t('brand')}</span>
           </div>
         </div>
 
         {/* Card */}
         <div className="bg-white rounded-2xl border border-zinc-200 p-8">
           <div className="text-center mb-6">
-            <h1 className="text-xl font-semibold text-zinc-900">Welcome back</h1>
-            <p className="text-sm text-zinc-500 mt-1">Sign in to your admin account</p>
+            <h1 className="text-xl font-semibold text-zinc-900">{t('login.welcomeBack')}</h1>
+            <p className="text-sm text-zinc-500 mt-1">{t('login.subtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {loginMutation.isError && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-lg">
-                {(loginMutation.error as any)?.response?.data?.message || 'Invalid credentials'}
+                {(loginMutation.error as any)?.response?.data?.message || t('login.invalidCredentials')}
               </div>
             )}
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1.5">
-                Email
+                {t('login.email')}
               </label>
               <input
                 id="email"
@@ -92,13 +94,13 @@ export default function SuperAdminLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-white border border-zinc-300 rounded-lg text-zinc-900 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-shadow"
-                placeholder="admin@example.com"
+                placeholder={t('login.emailPlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-zinc-700 mb-1.5">
-                Password
+                {t('login.password')}
               </label>
               <input
                 id="password"
@@ -118,13 +120,13 @@ export default function SuperAdminLoginPage() {
               disabled={loginMutation.isPending}
               className="w-full bg-zinc-900 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loginMutation.isPending ? 'Signing in...' : 'Sign in'}
+              {loginMutation.isPending ? t('login.signingIn') : t('login.signIn')}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-zinc-400 mt-6">
-          KDS Platform Administration
+          {t('platformAdministration')}
         </p>
       </div>
     </div>

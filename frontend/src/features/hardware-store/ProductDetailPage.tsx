@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import {
   useGetProductBySku,
   useRequestQuote,
@@ -47,21 +48,22 @@ const COMPLIANCE_LABELS_TR: Record<string, string> = {
 };
 
 export default function ProductDetailPage() {
+  const { t } = useTranslation('hardware');
   const { sku } = useParams<{ sku: string }>();
   const navigate = useNavigate();
   const { data: product, isLoading, error } = useGetProductBySku(sku);
 
   if (isLoading) {
-    return <div className="p-6 text-sm text-gray-500">Yükleniyor…</div>;
+    return <div className="p-6 text-sm text-gray-500">{t('productDetail.loading')}</div>;
   }
   if (error || !product) {
     return (
       <div className="space-y-3 p-6">
         <div className="rounded border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          Ürün bulunamadı veya erişim yok.
+          {t('productDetail.notFound')}
         </div>
         <Link to="/admin/store" className="text-sm text-blue-600 hover:underline">
-          ← Mağazaya dön
+          {t('productDetail.backToStore')}
         </Link>
       </div>
     );
@@ -70,7 +72,7 @@ export default function ProductDetailPage() {
   return (
     <div className="space-y-6 p-6">
       <Link to="/admin/store" className="inline-block text-sm text-blue-600 hover:underline">
-        ← Mağazaya dön
+        {t('productDetail.backToStore')}
       </Link>
 
       {product.category === 'service' ? (
@@ -89,6 +91,7 @@ function HardwareDetail({
   product: HardwareProduct;
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const { t } = useTranslation('hardware');
   const addHardware = useCartStore((s) => s.addHardware);
   const [acquisition, setAcquisition] = useState<'sell' | 'rent'>('sell');
   const [activeTab, setActiveTab] = useState<
@@ -128,7 +131,7 @@ function HardwareDetail({
   function add() {
     if (isOos) return;
     addHardware(product, { qty: 1, acquisition });
-    toast.success(`${product.name} sepete eklendi`);
+    toast.success(t('productDetail.addedToCart', { name: product.name }));
     navigate('/admin/store');
   }
 
@@ -146,7 +149,7 @@ function HardwareDetail({
               type="button"
               onClick={() => setZoomed(true)}
               className="block w-full cursor-zoom-in overflow-hidden rounded-xl border bg-white"
-              aria-label="Resmi büyüt"
+              aria-label={t('productDetail.zoomImage')}
             >
               <img
                 src={usableImages[0]}
@@ -157,7 +160,7 @@ function HardwareDetail({
             </button>
           ) : (
             <div className="flex aspect-[4/3] w-full items-center justify-center rounded-xl border border-dashed bg-gray-50 text-sm text-gray-400">
-              Görsel yok
+              {t('productDetail.noImage')}
             </div>
           )}
         </div>
@@ -169,7 +172,7 @@ function HardwareDetail({
             )}
             {showGib && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                GİB onaylı
+                {t('productDetail.gibCertified')}
               </span>
             )}
             <span
@@ -177,11 +180,11 @@ function HardwareDetail({
                 isOos ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
               }`}
             >
-              {STATUS_LABEL_TR[product.stockStatus] ?? product.stockStatus}
+              {t(`productDetail.stockStatus.${product.stockStatus}`, STATUS_LABEL_TR[product.stockStatus] ?? product.stockStatus)}
             </span>
             {showLowStock && (
               <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-orange-700">
-                Son {product.available} adet
+                {t('productDetail.lastUnits', { count: product.available })}
               </span>
             )}
           </div>
@@ -198,7 +201,7 @@ function HardwareDetail({
                   acquisition === 'sell' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                Satın al
+                {t('productDetail.buy')}
               </button>
               <button
                 type="button"
@@ -207,7 +210,7 @@ function HardwareDetail({
                   acquisition === 'rent' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                Kirala
+                {t('productDetail.rent')}
               </button>
             </div>
           )}
@@ -217,32 +220,32 @@ function HardwareDetail({
             <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-white p-5">
               <div className="text-3xl font-semibold text-gray-900">
                 {acquisition === 'rent' && product.rentalMonthlyCents
-                  ? `${fmt(product.rentalMonthlyCents)}/ay`
+                  ? t('productDetail.perMonth', { price: fmt(product.rentalMonthlyCents) })
                   : fmt(product.priceCents)}
               </div>
               {acquisition === 'sell' && product.rentalMonthlyCents && (
                 <div className="mt-1 text-xs text-gray-500">
-                  veya {fmt(product.rentalMonthlyCents)}/ay kira
+                  {t('productDetail.orRentPerMonth', { price: fmt(product.rentalMonthlyCents) })}
                 </div>
               )}
-              <div className="mt-1 text-xs text-gray-500">{product.warrantyMonths} ay garanti</div>
+              <div className="mt-1 text-xs text-gray-500">{t('productDetail.warranty', { count: product.warrantyMonths })}</div>
               <button
                 type="button"
                 onClick={add}
                 disabled={isOos}
                 className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isOos ? 'Stokta yok' : 'Sepete ekle'}
+                {isOos ? t('productDetail.outOfStock') : t('productDetail.addToCart')}
               </button>
             </div>
           ) : mode === 'QUOTE_ONLY' ? (
             <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5">
               <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
               <div className="text-xs text-amber-800">
-                Liste fiyatı — kesin fiyat ve kurulum teklifte netleşir.
+                {t('productDetail.quoteListPrice')}
               </div>
               <p className="text-sm text-amber-900">
-                {SALE_MODE_DISCLAIMER_TR.QUOTE_ONLY} (GİB aktivasyonu dahil).
+                {SALE_MODE_DISCLAIMER_TR.QUOTE_ONLY} {t('productDetail.quoteGibIncluded')}
               </p>
               <QuoteRequestForm sku={product.sku} />
             </div>
@@ -259,12 +262,12 @@ function HardwareDetail({
                   className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-indigo-700"
                 >
                   {partner?.partnerName
-                    ? `${partner.partnerName} ile devam et`
-                    : 'Banka/Ödeme kuruluşuna git'}
+                    ? t('productDetail.partnerContinueWith', { name: partner.partnerName })
+                    : t('productDetail.partnerGoToProvider')}
                 </a>
               ) : (
                 <p className="text-sm text-indigo-700">
-                  Yönlendirme için destek ekibiyle iletişime geçin.
+                  {t('productDetail.partnerNoUrl')}
                 </p>
               )}
               {partner?.disclaimer && (
@@ -275,9 +278,7 @@ function HardwareDetail({
             <div className="space-y-2 rounded-xl border bg-slate-50 p-5">
               <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
               <p className="text-sm text-slate-700">
-                Bu ekipman yalnızca önerilen ekipman olarak listelenmiştir; doğrudan satışı
-                yapılmamaktadır. Ticari kullanım için uygunluk/kalibrasyon ve servis belgeleri
-                tedarikçiden talep edilmelidir.
+                {t('productDetail.recommendedOnlyBody')}
               </p>
             </div>
           )}
@@ -286,13 +287,13 @@ function HardwareDetail({
 
       <Tabs
         tabs={[
-          { key: 'description', label: 'Açıklama' },
-          { key: 'specs', label: 'Özellikler' },
-          { key: 'compat', label: 'Uyumluluk' },
-          { key: 'requirements', label: 'Gereklilikler' },
-          { key: 'faq', label: 'SSS' },
+          { key: 'description', label: t('productDetail.tabs.description') },
+          { key: 'specs', label: t('productDetail.tabs.specs') },
+          { key: 'compat', label: t('productDetail.tabs.compat') },
+          { key: 'requirements', label: t('productDetail.tabs.requirements') },
+          { key: 'faq', label: t('productDetail.tabs.faq') },
           ...(showCompliance
-            ? [{ key: 'compliance', label: 'Yasal & Garanti' }]
+            ? [{ key: 'compliance', label: t('productDetail.tabs.compliance') }]
             : []),
         ]}
         active={activeTab}
@@ -300,7 +301,7 @@ function HardwareDetail({
       >
         {activeTab === 'description' && (
           <p className="whitespace-pre-line text-sm text-gray-700">
-            {product.description || 'Bu ürün için açıklama yok.'}
+            {product.description || t('productDetail.noDescription')}
           </p>
         )}
         {activeTab === 'specs' && <SpecsBlock specs={product.specs ?? null} />}
@@ -326,7 +327,7 @@ function HardwareDetail({
             type="button"
             onClick={() => setZoomed(false)}
             className="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-            aria-label="Kapat"
+            aria-label={t('productDetail.close')}
           >
             ✕
           </button>
@@ -343,6 +344,7 @@ function ServiceDetail({
   product: HardwareProduct;
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const { t } = useTranslation('hardware');
   const addService = useCartStore((s) => s.addService);
   const { data: branches = [] } = useListBranches();
   const meta = (product.serviceMeta ?? {}) as {
@@ -374,7 +376,7 @@ function ServiceDetail({
 
   function add() {
     if (!branchValid) {
-      toast.error('Lütfen bir şube seçin');
+      toast.error(t('productDetail.service.selectBranchError'));
       return;
     }
     const preferredDates = [date1, date2, date3].filter(Boolean);
@@ -383,16 +385,16 @@ function ServiceDetail({
       preferredDates: preferredDates.length > 0 ? preferredDates : undefined,
       notes: notes.trim() || undefined,
     });
-    toast.success(`${product.name} sepete eklendi`);
+    toast.success(t('productDetail.addedToCart', { name: product.name }));
     navigate('/admin/store');
   }
 
   const serviceTypeLabel =
     meta.serviceType === 'remote'
-      ? 'Uzaktan'
+      ? t('productDetail.service.remote')
       : meta.serviceType === 'consultation'
-        ? 'Danışmanlık'
-        : 'Sahada';
+        ? t('productDetail.service.consultation')
+        : t('productDetail.service.onsite');
 
   return (
     <>
@@ -404,12 +406,12 @@ function ServiceDetail({
             </span>
             {meta.durationHours && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                {meta.durationHours} saat
+                {t('productDetail.service.hours', { count: meta.durationHours })}
               </span>
             )}
             {requiresBranch && (
               <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                Şube gerekli
+                {t('productDetail.service.branchRequired')}
               </span>
             )}
           </div>
@@ -417,7 +419,7 @@ function ServiceDetail({
           {product.description && <p className="mt-3 text-gray-700">{product.description}</p>}
           {meta.geoCoverage && meta.geoCoverage.length > 0 && (
             <div className="mt-4 rounded-lg bg-white/70 p-3 text-sm">
-              <span className="font-medium text-gray-700">Hizmet bölgeleri:</span>{' '}
+              <span className="font-medium text-gray-700">{t('productDetail.service.serviceAreas')}</span>{' '}
               <span className="text-gray-600">{meta.geoCoverage.join(', ')}</span>
             </div>
           )}
@@ -426,19 +428,19 @@ function ServiceDetail({
         <aside className="space-y-3">
           <div className="rounded-xl border bg-white p-5">
             <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
-            <div className="mt-1 text-xs text-gray-500">Tek seferlik, KDV hariç</div>
+            <div className="mt-1 text-xs text-gray-500">{t('productDetail.service.oneTimeExclVat')}</div>
 
             {requiresBranch && (
               <div className="mt-4">
                 <label className="block text-xs font-medium text-gray-700">
-                  Şube <span className="text-rose-600">*</span>
+                  {t('productDetail.service.branch')} <span className="text-rose-600">*</span>
                 </label>
                 <select
                   value={branchId}
                   onChange={(e) => setBranchId(e.target.value)}
                   className="mt-1 w-full rounded border px-3 py-2 text-sm"
                 >
-                  <option value="">— Şube seçin —</option>
+                  <option value="">{t('productDetail.service.selectBranch')}</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -450,7 +452,7 @@ function ServiceDetail({
 
             {meta.serviceType === 'onsite' && (
               <div className="mt-4 space-y-2">
-                <div className="text-xs font-medium text-gray-700">Tercih ettiğiniz tarihler (opsiyonel)</div>
+                <div className="text-xs font-medium text-gray-700">{t('productDetail.service.preferredDates')}</div>
                 <div className="grid grid-cols-3 gap-2">
                   <input
                     type="date"
@@ -472,19 +474,19 @@ function ServiceDetail({
                   />
                 </div>
                 <p className="text-[11px] text-gray-500">
-                  En uygun gün için ekibimiz aramadan önce 3 tarih alabilir.
+                  {t('productDetail.service.preferredDatesNote')}
                 </p>
               </div>
             )}
 
             <div className="mt-4">
-              <label className="block text-xs font-medium text-gray-700">Not (opsiyonel)</label>
+              <label className="block text-xs font-medium text-gray-700">{t('productDetail.service.note')}</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={500}
                 rows={3}
-                placeholder="Önemli bir detay, ulaşım bilgisi, vb."
+                placeholder={t('productDetail.service.notePlaceholder')}
                 className="mt-1 w-full rounded border px-3 py-2 text-sm"
               />
             </div>
@@ -495,7 +497,7 @@ function ServiceDetail({
               disabled={!branchValid}
               className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Sepete ekle
+              {t('productDetail.service.addToCart')}
             </button>
           </div>
         </aside>
@@ -503,10 +505,10 @@ function ServiceDetail({
 
       <Tabs
         tabs={[
-          { key: 'includes', label: 'Neler dahil' },
-          { key: 'steps', label: 'Süreç' },
-          { key: 'requirements', label: 'Şartlar' },
-          { key: 'faq', label: 'SSS' },
+          { key: 'includes', label: t('productDetail.service.tabs.includes') },
+          { key: 'steps', label: t('productDetail.service.tabs.steps') },
+          { key: 'requirements', label: t('productDetail.service.tabs.requirements') },
+          { key: 'faq', label: t('productDetail.service.tabs.faq') },
         ]}
         active={activeTab}
         onChange={(k) => setActiveTab(k as typeof activeTab)}
@@ -533,10 +535,11 @@ function Tabs({
   onChange: (k: string) => void;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation('hardware');
   return (
     <section>
       <div className="border-b">
-        <nav className="-mb-px flex flex-wrap gap-1" aria-label="Detay sekmeleri">
+        <nav className="-mb-px flex flex-wrap gap-1" aria-label={t('productDetail.tabs.tabsAria')}>
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -559,8 +562,9 @@ function Tabs({
 }
 
 function BulletList({ items }: { items?: string[] }) {
+  const { t } = useTranslation('hardware');
   if (!items || items.length === 0) {
-    return <p className="text-sm text-gray-500">Henüz girilmedi.</p>;
+    return <p className="text-sm text-gray-500">{t('productDetail.notEnteredYet')}</p>;
   }
   return (
     <ul className="space-y-2">
@@ -575,8 +579,9 @@ function BulletList({ items }: { items?: string[] }) {
 }
 
 function StepsList({ steps }: { steps?: { title: string; body: string }[] }) {
+  const { t } = useTranslation('hardware');
   if (!steps || steps.length === 0) {
-    return <p className="text-sm text-gray-500">Henüz girilmedi.</p>;
+    return <p className="text-sm text-gray-500">{t('productDetail.notEnteredYet')}</p>;
   }
   return (
     <ol className="space-y-3">
@@ -591,8 +596,9 @@ function StepsList({ steps }: { steps?: { title: string; body: string }[] }) {
 }
 
 function FaqList({ faq }: { faq?: { q: string; a: string }[] }) {
+  const { t } = useTranslation('hardware');
   if (!faq || faq.length === 0) {
-    return <p className="text-sm text-gray-500">Henüz girilmedi.</p>;
+    return <p className="text-sm text-gray-500">{t('productDetail.notEnteredYet')}</p>;
   }
   return (
     <div className="space-y-3">
@@ -607,9 +613,10 @@ function FaqList({ faq }: { faq?: { q: string; a: string }[] }) {
 }
 
 function SpecsBlock({ specs }: { specs: Record<string, unknown> | null }) {
-  if (!specs) return <p className="text-sm text-gray-500">Özellik girilmedi.</p>;
+  const { t } = useTranslation('hardware');
+  if (!specs) return <p className="text-sm text-gray-500">{t('productDetail.noSpecs')}</p>;
   const entries = Object.entries(specs).filter(([k]) => k !== 'headlineSpecs');
-  if (entries.length === 0) return <p className="text-sm text-gray-500">Özellik girilmedi.</p>;
+  if (entries.length === 0) return <p className="text-sm text-gray-500">{t('productDetail.noSpecs')}</p>;
   return (
     <dl className="divide-y rounded-lg border">
       {entries.map(([k, v]) => (
@@ -623,9 +630,10 @@ function SpecsBlock({ specs }: { specs: Record<string, unknown> | null }) {
 }
 
 function CompatBlock({ compat }: { compat: Record<string, unknown> | null }) {
-  if (!compat) return <p className="text-sm text-gray-500">Uyumluluk bilgisi yok.</p>;
+  const { t } = useTranslation('hardware');
+  if (!compat) return <p className="text-sm text-gray-500">{t('productDetail.noCompat')}</p>;
   const entries = Object.entries(compat).filter(([k]) => k !== 'gibCertified' && k !== 'sourceUrl');
-  if (entries.length === 0) return <p className="text-sm text-gray-500">Uyumluluk bilgisi yok.</p>;
+  if (entries.length === 0) return <p className="text-sm text-gray-500">{t('productDetail.noCompat')}</p>;
   return (
     <dl className="space-y-3">
       {entries.map(([k, v]) => (
@@ -671,6 +679,7 @@ function localizeDetails(raw: unknown): {
 // (source=HARDWARE_QUOTE) for a rep to run the dealer/installation + GİB
 // process. Prefills from the signed-in tenant user.
 function QuoteRequestForm({ sku }: { sku: string }) {
+  const { t } = useTranslation('hardware');
   const user = useAuthStore((s) => s.user);
   const requestQuote = useRequestQuote();
   const [done, setDone] = useState(false);
@@ -685,8 +694,7 @@ function QuoteRequestForm({ sku }: { sku: string }) {
   if (done) {
     return (
       <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-        Teklif talebiniz alındı. Ekibimiz yetkili bayi/servis süreci için en kısa sürede
-        sizinle iletişime geçecek.
+        {t('productDetail.quoteForm.done')}
       </div>
     );
   }
@@ -694,7 +702,7 @@ function QuoteRequestForm({ sku }: { sku: string }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!contactPerson.trim()) {
-      toast.error('Lütfen yetkili kişi adını girin.');
+      toast.error(t('productDetail.quoteForm.contactPersonRequired'));
       return;
     }
     await requestQuote.mutateAsync({
@@ -706,7 +714,7 @@ function QuoteRequestForm({ sku }: { sku: string }) {
       notes: notes.trim() || undefined,
     });
     setDone(true);
-    toast.success('Teklif talebiniz gönderildi.');
+    toast.success(t('productDetail.quoteForm.sent'));
   }
 
   const inputCls = 'w-full rounded border px-2 py-1.5 text-sm';
@@ -714,7 +722,7 @@ function QuoteRequestForm({ sku }: { sku: string }) {
     <form onSubmit={submit} className="space-y-2">
       <input
         className={inputCls}
-        placeholder="Yetkili kişi *"
+        placeholder={t('productDetail.quoteForm.contactPerson')}
         value={contactPerson}
         onChange={(e) => setContactPerson(e.target.value)}
         maxLength={120}
@@ -723,7 +731,7 @@ function QuoteRequestForm({ sku }: { sku: string }) {
       <div className="flex gap-2">
         <input
           className={inputCls}
-          placeholder="Telefon"
+          placeholder={t('productDetail.quoteForm.phone')}
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           maxLength={40}
@@ -735,20 +743,20 @@ function QuoteRequestForm({ sku }: { sku: string }) {
           max={999}
           value={qty}
           onChange={(e) => setQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
-          aria-label="Adet"
+          aria-label={t('productDetail.quoteForm.qtyAria')}
         />
       </div>
       <input
         className={inputCls}
         type="email"
-        placeholder="E-posta"
+        placeholder={t('productDetail.quoteForm.email')}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         maxLength={200}
       />
       <textarea
         className={inputCls}
-        placeholder="Not (opsiyonel)"
+        placeholder={t('productDetail.quoteForm.notePlaceholder')}
         rows={2}
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
@@ -759,7 +767,7 @@ function QuoteRequestForm({ sku }: { sku: string }) {
         disabled={requestQuote.isPending}
         className="w-full rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {requestQuote.isPending ? 'Gönderiliyor…' : 'Teklif Al'}
+        {requestQuote.isPending ? t('productDetail.quoteForm.sending') : t('productDetail.quoteForm.getQuote')}
       </button>
     </form>
   );
@@ -768,8 +776,9 @@ function QuoteRequestForm({ sku }: { sku: string }) {
 // Seller-responsibility compliance docs (Tier 3 / DIRECT_SALE). Renders URL
 // values as links, boolean true as a check, everything else as text.
 function ComplianceBlock({ entries }: { entries: [string, unknown][] }) {
+  const { t } = useTranslation('hardware');
   if (!entries.length) {
-    return <p className="text-sm text-gray-500">Belge girilmedi.</p>;
+    return <p className="text-sm text-gray-500">{t('productDetail.noDocs')}</p>;
   }
   return (
     <dl className="divide-y rounded-lg border">
@@ -784,10 +793,10 @@ function ComplianceBlock({ entries }: { entries: [string, unknown][] }) {
           <dd className="text-sm text-gray-900">
             {typeof v === 'string' && /^(https?:\/\/|\/)/.test(v) ? (
               <a href={v} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                Belgeyi görüntüle →
+                {t('productDetail.viewDocument')}
               </a>
             ) : v === true ? (
-              'Var ✓'
+              t('productDetail.present')
             ) : (
               String(v)
             )}

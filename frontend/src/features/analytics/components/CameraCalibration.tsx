@@ -39,7 +39,7 @@ export function CameraCalibration({
   onCancel,
 }: CameraCalibrationProps) {
   const queryClient = useQueryClient();
-  const { t } = useTranslation('common');
+  const { t } = useTranslation('analytics');
 
   // State
   const [step, setStep] = useState<CalibrationStep>('image-points');
@@ -60,7 +60,12 @@ export function CameraCalibration({
   const CANVAS_HEIGHT = 480;
 
   // Point labels for corners
-  const POINT_LABELS = ['Top-Left', 'Top-Right', 'Bottom-Right', 'Bottom-Left'];
+  const POINT_LABELS = [
+    t('calibration.pointLabels.topLeft'),
+    t('calibration.pointLabels.topRight'),
+    t('calibration.pointLabels.bottomRight'),
+    t('calibration.pointLabels.bottomLeft'),
+  ];
 
   // Capture current frame from video
   const captureFrame = useCallback(() => {
@@ -304,9 +309,7 @@ export function CameraCalibration({
 
       if (!response.ok) {
         throw new Error(
-          t('cameras.calibration.saveFailed', {
-            defaultValue: 'Failed to save calibration',
-          }),
+          t('calibration.saveFailed'),
         );
       }
 
@@ -319,11 +322,7 @@ export function CameraCalibration({
     },
     onError: (err) => {
       setError(
-        err instanceof Error
-          ? err.message
-          : t('cameras.calibration.saveFailed', {
-              defaultValue: 'Failed to save calibration',
-            }),
+        err instanceof Error ? err.message : t('calibration.saveFailed'),
       );
     },
   });
@@ -343,11 +342,8 @@ export function CameraCalibration({
         return (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-2">Step 1: Select Camera Points</h4>
-              <p className="text-sm text-blue-700">
-                Click on 4 corners of a rectangular area in the camera view. Start from the
-                top-left corner and go clockwise.
-              </p>
+              <h4 className="font-medium text-blue-900 mb-2">{t('calibration.step1.heading')}</h4>
+              <p className="text-sm text-blue-700">{t('calibration.step1.instructions')}</p>
             </div>
 
             <div className="relative border rounded-lg overflow-hidden">
@@ -370,21 +366,21 @@ export function CameraCalibration({
 
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-600">
-                Points selected: {imagePoints.length} / {REQUIRED_POINTS}
+                {t('calibration.pointsSelected', { count: imagePoints.length, total: REQUIRED_POINTS })}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={captureFrame}
                   className="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
                 >
-                  Capture Frame
+                  {t('calibration.captureFrame')}
                 </button>
                 <button
                   onClick={removeLastPoint}
                   disabled={imagePoints.length === 0}
                   className="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50"
                 >
-                  Undo
+                  {t('calibration.undo')}
                 </button>
               </div>
             </div>
@@ -395,17 +391,14 @@ export function CameraCalibration({
         return (
           <div className="space-y-4">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-medium text-green-900 mb-2">Step 2: Select Floor Plan Points</h4>
-              <p className="text-sm text-green-700">
-                Click on the corresponding 4 points on the floor plan grid. Match the same order as
-                the camera points (top-left, top-right, bottom-right, bottom-left).
-              </p>
+              <h4 className="font-medium text-green-900 mb-2">{t('calibration.step2.heading')}</h4>
+              <p className="text-sm text-green-700">{t('calibration.step2.instructions')}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Camera preview (read-only) */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Camera View</label>
+                <label className="text-sm font-medium text-slate-700">{t('calibration.step2.cameraView')}</label>
                 <canvas
                   width={CANVAS_WIDTH}
                   height={CANVAS_HEIGHT}
@@ -415,7 +408,7 @@ export function CameraCalibration({
 
               {/* Floor plan */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Floor Plan</label>
+                <label className="text-sm font-medium text-slate-700">{t('calibration.step2.floorPlan')}</label>
                 <canvas
                   ref={floorCanvasRef}
                   width={400}
@@ -428,14 +421,14 @@ export function CameraCalibration({
 
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-600">
-                Points selected: {floorPoints.length} / {REQUIRED_POINTS}
+                {t('calibration.pointsSelected', { count: floorPoints.length, total: REQUIRED_POINTS })}
               </span>
               <button
                 onClick={removeLastPoint}
                 disabled={floorPoints.length === 0}
                 className="px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50"
               >
-                Undo
+                {t('calibration.undo')}
               </button>
             </div>
           </div>
@@ -445,16 +438,13 @@ export function CameraCalibration({
         return (
           <div className="space-y-4">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <h4 className="font-medium text-amber-900 mb-2">Step 3: Review Calibration</h4>
-              <p className="text-sm text-amber-700">
-                Verify that the camera and floor plan points are correctly aligned. The
-                transformation will map positions from the camera view to the floor plan.
-              </p>
+              <h4 className="font-medium text-amber-900 mb-2">{t('calibration.step3.heading')}</h4>
+              <p className="text-sm text-amber-700">{t('calibration.step3.instructions')}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Camera Points</label>
+                <label className="text-sm font-medium text-slate-700">{t('calibration.step3.cameraPoints')}</label>
                 <ul className="text-sm text-slate-600 space-y-1">
                   {imagePoints.map((point, index) => (
                     <li key={index} className="flex items-center gap-2">
@@ -469,7 +459,7 @@ export function CameraCalibration({
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Floor Plan Points</label>
+                <label className="text-sm font-medium text-slate-700">{t('calibration.step3.floorPlanPoints')}</label>
                 <ul className="text-sm text-slate-600 space-y-1">
                   {floorPoints.map((point, index) => (
                     <li key={index} className="flex items-center gap-2">
@@ -510,11 +500,8 @@ export function CameraCalibration({
                 />
               </svg>
             </div>
-            <h4 className="text-lg font-medium text-slate-900 mb-2">Calibration Complete</h4>
-            <p className="text-sm text-slate-600">
-              The camera has been successfully calibrated. Position data will now be mapped to the
-              floor plan coordinates.
-            </p>
+            <h4 className="text-lg font-medium text-slate-900 mb-2">{t('calibration.complete.heading')}</h4>
+            <p className="text-sm text-slate-600">{t('calibration.complete.message')}</p>
           </div>
         );
     }
@@ -523,7 +510,7 @@ export function CameraCalibration({
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-medium text-slate-900">Camera Calibration</h3>
+        <h3 className="text-lg font-medium text-slate-900">{t('calibration.title')}</h3>
         <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -561,7 +548,7 @@ export function CameraCalibration({
             onClick={step === 'image-points' ? resetCalibration : prevStep}
             className="px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
           >
-            {step === 'image-points' ? 'Reset' : 'Back'}
+            {step === 'image-points' ? t('calibration.reset') : t('calibration.back')}
           </button>
 
           <div className="flex gap-2">
@@ -571,7 +558,7 @@ export function CameraCalibration({
                 disabled={saveCalibrationMutation.isPending}
                 className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
               >
-                {saveCalibrationMutation.isPending ? 'Saving...' : 'Save Calibration'}
+                {saveCalibrationMutation.isPending ? t('calibration.saving') : t('calibration.save')}
               </button>
             ) : (
               <button
@@ -582,7 +569,7 @@ export function CameraCalibration({
                 }
                 className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50"
               >
-                Next
+                {t('calibration.next')}
               </button>
             )}
           </div>

@@ -1,0 +1,41 @@
+{
+  "page": {
+    "title": "Yerel Köprüler"
+  },
+  "provisioned": {
+    "title": "Köprü hazırlandı.",
+    "tokenIntro": "Jeton (tek kullanımlık) — şimdi kopyalayın ve cihazda yapılandırın:",
+    "copied": "Kopyaladım"
+  },
+  "create": {
+    "title": "Yeni köprü",
+    "branch": "Şube",
+    "branchSelect": "— seçin —",
+    "sku": "SKU",
+    "skuLite": "HummyBox Lite",
+    "skuPro": "HummyBox Pro",
+    "skuByo": "Kendi cihazın",
+    "hostname": "Ana bilgisayar adı (isteğe bağlı)",
+    "submit": "Hazırla"
+  },
+  "list": {
+    "title": "Köprüler",
+    "loading": "Yükleniyor…",
+    "empty": "Henüz köprü hazırlanmadı.",
+    "col": {
+      "branch": "Şube",
+      "sku": "SKU",
+      "hostname": "Ana bilgisayar adı",
+      "status": "Durum",
+      "lastSeen": "Son görülme"
+    },
+    "retire": "Kullanımdan kaldır",
+    "retireConfirm": "Bu köprü kullanımdan kaldırılsın mı?"
+  },
+  "status": {
+    "online": "çevrimiçi",
+    "offline": "çevrimdışı",
+    "claiming": "talep ediliyor",
+    "retired": "kullanımdan kaldırıldı"
+  }
+}

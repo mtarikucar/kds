@@ -22,6 +22,11 @@ import enPersonnel from './locales/en/personnel.json';
 import enStock from './locales/en/stock.json';
 import enHelp from './locales/en/help.json';
 import enPlan from './locales/en/plan.json';
+import enWebhooks from './locales/en/webhooks.json';
+import enBridges from './locales/en/bridges.json';
+import enSuperadmin from './locales/en/superadmin.json';
+import enHardware from './locales/en/hardware.json';
+import enAnalytics from './locales/en/analytics.json';
 
 import trCommon from './locales/tr/common.json';
 import trAuth from './locales/tr/auth.json';
@@ -41,6 +46,11 @@ import trPersonnel from './locales/tr/personnel.json';
 import trStock from './locales/tr/stock.json';
 import trHelp from './locales/tr/help.json';
 import trPlan from './locales/tr/plan.json';
+import trWebhooks from './locales/tr/webhooks.json';
+import trBridges from './locales/tr/bridges.json';
+import trSuperadmin from './locales/tr/superadmin.json';
+import trHardware from './locales/tr/hardware.json';
+import trAnalytics from './locales/tr/analytics.json';
 
 import ruCommon from './locales/ru/common.json';
 import ruAuth from './locales/ru/auth.json';
@@ -60,6 +70,11 @@ import ruPersonnel from './locales/ru/personnel.json';
 import ruStock from './locales/ru/stock.json';
 import ruHelp from './locales/ru/help.json';
 import ruPlan from './locales/ru/plan.json';
+import ruWebhooks from './locales/ru/webhooks.json';
+import ruBridges from './locales/ru/bridges.json';
+import ruSuperadmin from './locales/ru/superadmin.json';
+import ruHardware from './locales/ru/hardware.json';
+import ruAnalytics from './locales/ru/analytics.json';
 
 import uzCommon from './locales/uz/common.json';
 import uzAuth from './locales/uz/auth.json';
@@ -79,6 +94,11 @@ import uzPersonnel from './locales/uz/personnel.json';
 import uzStock from './locales/uz/stock.json';
 import uzHelp from './locales/uz/help.json';
 import uzPlan from './locales/uz/plan.json';
+import uzWebhooks from './locales/uz/webhooks.json';
+import uzBridges from './locales/uz/bridges.json';
+import uzSuperadmin from './locales/uz/superadmin.json';
+import uzHardware from './locales/uz/hardware.json';
+import uzAnalytics from './locales/uz/analytics.json';
 
 import arCommon from './locales/ar/common.json';
 import arAuth from './locales/ar/auth.json';
@@ -98,6 +118,11 @@ import arPersonnel from './locales/ar/personnel.json';
 import arStock from './locales/ar/stock.json';
 import arHelp from './locales/ar/help.json';
 import arPlan from './locales/ar/plan.json';
+import arWebhooks from './locales/ar/webhooks.json';
+import arBridges from './locales/ar/bridges.json';
+import arSuperadmin from './locales/ar/superadmin.json';
+import arHardware from './locales/ar/hardware.json';
+import arAnalytics from './locales/ar/analytics.json';
 
 // Define resources
 const resources = {
@@ -120,6 +145,11 @@ const resources = {
     stock: enStock,
     help: enHelp,
     plan: enPlan,
+    webhooks: enWebhooks,
+    bridges: enBridges,
+    superadmin: enSuperadmin,
+    hardware: enHardware,
+    analytics: enAnalytics,
   },
   tr: {
     common: trCommon,
@@ -140,6 +170,11 @@ const resources = {
     stock: trStock,
     help: trHelp,
     plan: trPlan,
+    webhooks: trWebhooks,
+    bridges: trBridges,
+    superadmin: trSuperadmin,
+    hardware: trHardware,
+    analytics: trAnalytics,
   },
   ru: {
     common: ruCommon,
@@ -160,6 +195,11 @@ const resources = {
     stock: ruStock,
     help: ruHelp,
     plan: ruPlan,
+    webhooks: ruWebhooks,
+    bridges: ruBridges,
+    superadmin: ruSuperadmin,
+    hardware: ruHardware,
+    analytics: ruAnalytics,
   },
   uz: {
     common: uzCommon,
@@ -180,6 +220,11 @@ const resources = {
     stock: uzStock,
     help: uzHelp,
     plan: uzPlan,
+    webhooks: uzWebhooks,
+    bridges: uzBridges,
+    superadmin: uzSuperadmin,
+    hardware: uzHardware,
+    analytics: uzAnalytics,
   },
   ar: {
     common: arCommon,
@@ -200,6 +245,11 @@ const resources = {
     stock: arStock,
     help: arHelp,
     plan: arPlan,
+    webhooks: arWebhooks,
+    bridges: arBridges,
+    superadmin: arSuperadmin,
+    hardware: arHardware,
+    analytics: arAnalytics,
   },
 };
 
@@ -284,7 +334,7 @@ i18next
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock', 'help'],
+    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock', 'help', 'webhooks', 'bridges', 'superadmin', 'hardware', 'analytics'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

@@ -1,0 +1,41 @@
+{
+  "page": {
+    "title": "Webhooks",
+    "intro": "Subscribe an HTTPS endpoint to HummyTummy events. Deliveries are signed with HMAC-SHA256 + timestamp. Auto-paused after 20 consecutive failures."
+  },
+  "create": {
+    "title": "New subscription",
+    "urlPlaceholder": "https://your-server.example.com/hummytummy-webhook",
+    "eventsLabel": "Events:",
+    "submit": "Create subscription"
+  },
+  "list": {
+    "title": "Your subscriptions",
+    "loading": "Loading…",
+    "empty": "No subscriptions.",
+    "col": {
+      "url": "URL",
+      "events": "Events",
+      "status": "Status",
+      "lastDelivery": "Last delivery"
+    },
+    "failCount": "{{count}} fail",
+    "revoke": "Revoke"
+  },
+  "status": {
+    "active": "active",
+    "paused": "paused"
+  },
+  "secret": {
+    "created": "Subscription created.",
+    "copiedIntro": "Signing secret copied to your clipboard.",
+    "saveNow": "Save it now — we cannot show it again.",
+    "autoHiding": "Auto-hiding in {{seconds}}s.",
+    "show": "Show",
+    "hide": "Hide",
+    "copyAgain": "Copy again",
+    "saved": "I've saved it",
+    "toastCopied": "Secret copied to clipboard",
+    "toastCopiedShort": "Copied"
+  }
+}

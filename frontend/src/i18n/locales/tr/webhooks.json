@@ -1,0 +1,41 @@
+{
+  "page": {
+    "title": "Webhook'lar",
+    "intro": "Bir HTTPS uç noktasını HummyTummy olaylarına abone edin. Teslimatlar HMAC-SHA256 + zaman damgası ile imzalanır. 20 ardışık başarısızlıktan sonra otomatik olarak duraklatılır."
+  },
+  "create": {
+    "title": "Yeni abonelik",
+    "urlPlaceholder": "https://sunucunuz.example.com/hummytummy-webhook",
+    "eventsLabel": "Olaylar:",
+    "submit": "Abonelik oluştur"
+  },
+  "list": {
+    "title": "Abonelikleriniz",
+    "loading": "Yükleniyor…",
+    "empty": "Abonelik yok.",
+    "col": {
+      "url": "URL",
+      "events": "Olaylar",
+      "status": "Durum",
+      "lastDelivery": "Son teslimat"
+    },
+    "failCount": "{{count}} başarısız",
+    "revoke": "İptal et"
+  },
+  "status": {
+    "active": "etkin",
+    "paused": "duraklatıldı"
+  },
+  "secret": {
+    "created": "Abonelik oluşturuldu.",
+    "copiedIntro": "İmzalama sırrı panonuza kopyalandı.",
+    "saveNow": "Şimdi kaydedin — tekrar gösteremeyiz.",
+    "autoHiding": "{{seconds}} saniye içinde otomatik gizleniyor.",
+    "show": "Göster",
+    "hide": "Gizle",
+    "copyAgain": "Tekrar kopyala",
+    "saved": "Kaydettim",
+    "toastCopied": "Sır panoya kopyalandı",
+    "toastCopiedShort": "Kopyalandı"
+  }
+}

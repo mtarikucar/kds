@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FileText, Plus, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -38,6 +39,7 @@ const PUBLISH_KINDS: LegalDocumentKind[] = [
  *     on their next page load.
  */
 export default function LegalDocumentsPage() {
+  const { t } = useTranslation('superadmin');
   const { data: docs, isLoading } = useListLegalDocuments();
   const publishMutation = usePublishLegalDocument();
   const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
@@ -55,11 +57,9 @@ export default function LegalDocumentsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Yasal Belgeler</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('legal.title')}</h1>
           <p className="text-sm text-slate-600 mt-1">
-            KVKK / Mesafeli Satış / İade ve diğer yasal metinleri yönetin. Yeni
-            versiyon yayınladığınızda eski versiyon devre dışı kalır ama silinmez —
-            mevcut Consent kayıtları geçerliliğini korur.
+            {t('legal.subtitle')}
           </p>
         </div>
         <button
@@ -67,15 +67,15 @@ export default function LegalDocumentsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          Yeni versiyon yayınla
+          {t('legal.publishNewVersion')}
         </button>
       </div>
 
-      {isLoading && <div className="text-slate-500">Yükleniyor...</div>}
+      {isLoading && <div className="text-slate-500">{t('legal.loading')}</div>}
 
       {!isLoading && Object.keys(docsByKind).length === 0 && (
         <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500">
-          Henüz yasal belge yok. Yeni versiyon yayınlayın ya da seed'i çalıştırın.
+          {t('legal.empty')}
         </div>
       )}
 
@@ -84,18 +84,18 @@ export default function LegalDocumentsPage() {
           <header className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
             <FileText className="w-4 h-4 text-slate-600" />
             <h2 className="font-semibold text-slate-900">
-              {KIND_LABELS[kind as LegalDocumentKind] ?? kind}
+              {t(`legal.kindLabels.${kind}`, KIND_LABELS[kind as LegalDocumentKind] ?? kind)}
             </h2>
-            <span className="text-xs text-slate-500">({items.length} versiyon)</span>
+            <span className="text-xs text-slate-500">{t('legal.versionCount', { count: items.length })}</span>
           </header>
           <table className="w-full text-sm">
             <thead className="text-xs text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-2 text-left">Versiyon</th>
-                <th className="px-4 py-2 text-left">Dil</th>
-                <th className="px-4 py-2 text-left">Yürürlük</th>
-                <th className="px-4 py-2 text-left">Durum</th>
-                <th className="px-4 py-2 text-right">İşlem</th>
+                <th className="px-4 py-2 text-left">{t('legal.col.version')}</th>
+                <th className="px-4 py-2 text-left">{t('legal.col.language')}</th>
+                <th className="px-4 py-2 text-left">{t('legal.col.effective')}</th>
+                <th className="px-4 py-2 text-left">{t('legal.col.status')}</th>
+                <th className="px-4 py-2 text-right">{t('legal.col.action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -110,10 +110,10 @@ export default function LegalDocumentsPage() {
                     <td className="px-4 py-2">
                       {d.isCurrent ? (
                         <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          Aktif
+                          {t('legal.active')}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">Geçmiş</span>
+                        <span className="text-xs text-slate-400">{t('legal.past')}</span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-right">
@@ -123,7 +123,7 @@ export default function LegalDocumentsPage() {
                         }
                         className="text-primary-600 hover:text-primary-700 text-sm"
                       >
-                        {expandedDocId === d.id ? 'Gizle' : 'Önizle'}
+                        {expandedDocId === d.id ? t('legal.hide') : t('legal.preview')}
                       </button>
                     </td>
                   </tr>
@@ -164,6 +164,7 @@ interface PublishModalProps {
 }
 
 function PublishModal({ onClose, onPublished, publishMutation }: PublishModalProps) {
+  const { t } = useTranslation('superadmin');
   const [form, setForm] = useState({
     kind: 'KVKK' as LegalDocumentKind,
     version: '',
@@ -188,7 +189,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Yeni versiyon yayınla</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{t('legal.publishNewVersion')}</h2>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
             <X className="w-5 h-5" />
           </button>
@@ -197,7 +198,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Tür</span>
+              <span className="text-xs font-medium text-slate-700">{t('legal.modal.kind')}</span>
               <select
                 value={form.kind}
                 onChange={(e) => setForm({ ...form, kind: e.target.value as LegalDocumentKind })}
@@ -205,13 +206,13 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
               >
                 {PUBLISH_KINDS.map((k) => (
                   <option key={k} value={k}>
-                    {KIND_LABELS[k]}
+                    {t(`legal.kindLabels.${k}`, KIND_LABELS[k])}
                   </option>
                 ))}
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Versiyon</span>
+              <span className="text-xs font-medium text-slate-700">{t('legal.modal.version')}</span>
               <input
                 value={form.version}
                 onChange={(e) => setForm({ ...form, version: e.target.value })}
@@ -220,7 +221,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Dil</span>
+              <span className="text-xs font-medium text-slate-700">{t('legal.modal.language')}</span>
               <input
                 value={form.locale}
                 onChange={(e) => setForm({ ...form, locale: e.target.value })}
@@ -231,35 +232,35 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
           </div>
 
           <label className="block">
-            <span className="text-xs font-medium text-slate-700">Başlık</span>
+            <span className="text-xs font-medium text-slate-700">{t('legal.modal.title')}</span>
             <input
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="KVKK Aydınlatma Metni"
+              placeholder={t('legal.modal.titlePlaceholder')}
               className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
             />
           </label>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-slate-700">İçerik (Markdown)</span>
+              <span className="text-xs font-medium text-slate-700">{t('legal.modal.content')}</span>
               <button
                 onClick={() => setShowPreview((p) => !p)}
                 className="text-xs text-primary-600 hover:text-primary-700"
               >
-                {showPreview ? 'Düzenleyiciye dön' : 'Önizleme'}
+                {showPreview ? t('legal.modal.backToEditor') : t('legal.modal.previewToggle')}
               </button>
             </div>
             {showPreview ? (
               <div className="border border-slate-300 rounded-md p-4 prose prose-sm prose-slate max-w-none min-h-[400px]">
-                <ReactMarkdown>{form.bodyMarkdown || '*(boş)*'}</ReactMarkdown>
+                <ReactMarkdown>{form.bodyMarkdown || t('legal.modal.empty')}</ReactMarkdown>
               </div>
             ) : (
               <textarea
                 value={form.bodyMarkdown}
                 onChange={(e) => setForm({ ...form, bodyMarkdown: e.target.value })}
                 rows={20}
-                placeholder="# Başlık&#10;&#10;Madde 1. ..."
+                placeholder={t('legal.modal.contentPlaceholder')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono"
               />
             )}
@@ -271,14 +272,14 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
             onClick={onClose}
             className="px-4 py-2 text-slate-700 hover:bg-slate-200 rounded-md text-sm"
           >
-            Vazgeç
+            {t('legal.modal.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit || publishMutation.isPending}
             className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium"
           >
-            {publishMutation.isPending ? 'Yayınlanıyor...' : 'Yayınla'}
+            {publishMutation.isPending ? t('legal.modal.publishing') : t('legal.modal.publish')}
           </button>
         </footer>
       </div>

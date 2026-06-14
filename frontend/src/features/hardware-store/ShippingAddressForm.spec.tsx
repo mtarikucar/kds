@@ -1,7 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import i18next from 'i18next';
 import ShippingAddressForm from './ShippingAddressForm';
 import type { Branch } from '../branches/branchesApi';
+import trHardware from '../../i18n/locales/tr/hardware.json';
+import enHardware from '../../i18n/locales/en/hardware.json';
+
+// This form is Turkish-canonical: the backend formatAddress contract and
+// every assertion below reads the Turkish field labels / validation copy.
+// The shared test setup boots i18next in `en` with a small namespace
+// allow-list, so we register the `hardware` namespace and switch to `tr`
+// here to render the form in its canonical locale.
+beforeAll(async () => {
+  i18next.addResourceBundle('tr', 'hardware', trHardware, true, true);
+  i18next.addResourceBundle('en', 'hardware', enHardware, true, true);
+  await i18next.changeLanguage('tr');
+});
 
 /**
  * v2.8.84 — shipping address form regression.

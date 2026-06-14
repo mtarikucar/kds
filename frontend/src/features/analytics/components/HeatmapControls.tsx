@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { HeatmapLegend, HeatmapColorScheme } from './HeatmapLegend';
 
 export type HeatmapType = 'occupancy' | 'traffic' | 'dwell-time' | 'none';
@@ -12,19 +13,19 @@ interface HeatmapControlsProps {
   isLoading?: boolean;
 }
 
-const HEATMAP_TYPES: Array<{ value: HeatmapType; label: string; description: string }> = [
-  { value: 'none', label: 'None', description: 'Hide heatmap' },
-  { value: 'occupancy', label: 'Occupancy', description: 'Show customer density' },
-  { value: 'traffic', label: 'Traffic Flow', description: 'Show movement patterns' },
-  { value: 'dwell-time', label: 'Dwell Time', description: 'Show time spent in areas' },
+const HEATMAP_TYPES: Array<{ value: HeatmapType; labelKey: string; descriptionKey: string }> = [
+  { value: 'none', labelKey: 'heatmap.types.none.label', descriptionKey: 'heatmap.types.none.description' },
+  { value: 'occupancy', labelKey: 'heatmap.types.occupancy.label', descriptionKey: 'heatmap.types.occupancy.description' },
+  { value: 'traffic', labelKey: 'heatmap.types.traffic.label', descriptionKey: 'heatmap.types.traffic.description' },
+  { value: 'dwell-time', labelKey: 'heatmap.types.dwellTime.label', descriptionKey: 'heatmap.types.dwellTime.description' },
 ];
 
-const COLOR_SCHEMES: Array<{ value: HeatmapColorScheme; label: string }> = [
-  { value: 'heat', label: 'Heat (Red)' },
-  { value: 'viridis', label: 'Viridis (Green-Purple)' },
-  { value: 'plasma', label: 'Plasma (Yellow-Purple)' },
-  { value: 'coolwarm', label: 'Cool-Warm (Blue-Red)' },
-  { value: 'blues', label: 'Blues' },
+const COLOR_SCHEMES: Array<{ value: HeatmapColorScheme; labelKey: string }> = [
+  { value: 'heat', labelKey: 'heatmap.schemes.heat' },
+  { value: 'viridis', labelKey: 'heatmap.schemes.viridis' },
+  { value: 'plasma', labelKey: 'heatmap.schemes.plasma' },
+  { value: 'coolwarm', labelKey: 'heatmap.schemes.coolwarm' },
+  { value: 'blues', labelKey: 'heatmap.schemes.blues' },
 ];
 
 export function HeatmapControls({
@@ -36,13 +37,14 @@ export function HeatmapControls({
   onOpacityChange,
   isLoading = false,
 }: HeatmapControlsProps) {
+  const { t } = useTranslation('analytics');
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
-      <h3 className="font-medium text-slate-900">Heatmap Settings</h3>
+      <h3 className="font-medium text-slate-900">{t('heatmap.settings')}</h3>
 
       {/* Heatmap Type Selection */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-slate-700">Visualization Type</label>
+        <label className="text-sm font-medium text-slate-700">{t('heatmap.visualizationType')}</label>
         <div className="grid grid-cols-2 gap-2">
           {HEATMAP_TYPES.map((type) => (
             <button
@@ -55,8 +57,8 @@ export function HeatmapControls({
                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
               } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <span className="block font-medium">{type.label}</span>
-              <span className="block text-xs opacity-70">{type.description}</span>
+              <span className="block font-medium">{t(type.labelKey)}</span>
+              <span className="block text-xs opacity-70">{t(type.descriptionKey)}</span>
             </button>
           ))}
         </div>
@@ -66,7 +68,7 @@ export function HeatmapControls({
         <>
           {/* Color Scheme Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Color Scheme</label>
+            <label className="text-sm font-medium text-slate-700">{t('heatmap.colorScheme')}</label>
             <select
               value={colorScheme}
               onChange={(e) => onColorSchemeChange(e.target.value as HeatmapColorScheme)}
@@ -74,7 +76,7 @@ export function HeatmapControls({
             >
               {COLOR_SCHEMES.map((scheme) => (
                 <option key={scheme.value} value={scheme.value}>
-                  {scheme.label}
+                  {t(scheme.labelKey)}
                 </option>
               ))}
             </select>
@@ -83,7 +85,7 @@ export function HeatmapControls({
           {/* Opacity Slider */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">
-              Opacity: {Math.round(opacity * 100)}%
+              {t('heatmap.opacity', { percent: Math.round(opacity * 100) })}
             </label>
             <input
               type="range"
@@ -102,13 +104,13 @@ export function HeatmapControls({
               colorScheme={colorScheme}
               title={
                 heatmapType === 'occupancy'
-                  ? 'Customer Density'
+                  ? t('heatmap.legend.customerDensity')
                   : heatmapType === 'traffic'
-                    ? 'Traffic Volume'
-                    : 'Dwell Time'
+                    ? t('heatmap.legend.trafficVolume')
+                    : t('heatmap.legend.dwellTime')
               }
-              minLabel="Low"
-              maxLabel="High"
+              minLabel={t('heatmap.legend.low')}
+              maxLabel={t('heatmap.legend.high')}
             />
           </div>
         </>
@@ -132,7 +134,7 @@ export function HeatmapControls({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          Loading heatmap data...
+          {t('heatmap.loadingData')}
         </div>
       )}
     </div>
