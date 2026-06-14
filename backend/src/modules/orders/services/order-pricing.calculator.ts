@@ -34,7 +34,13 @@ export interface PricedOrderItem {
   taxRate: number;
   taxAmount: number;
   notes: string | undefined;
-  modifiers?: { create: Array<{ modifierId: string; quantity: number; priceAdjustment: number }> };
+  modifiers?: {
+    create: Array<{
+      modifierId: string;
+      quantity: number;
+      priceAdjustment: number;
+    }>;
+  };
 }
 
 export interface PricingResult {
