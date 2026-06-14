@@ -66,6 +66,50 @@ describe('CommandQueueService', () => {
     });
   });
 
+  /**
+   * claimNext atomically transitions the next queued command to `inflight`
+   * via a single raw `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP
+   * LOCKED LIMIT 1)`. The raw SQL is a tagged template; under jest the
+   * $queryRaw mock receives the template-strings array plus the
+   * interpolated deviceId as a value, so we can assert BOTH that the
+   * device id is bound as a parameter (not string-spliced — SQLi guard)
+   * and that the lock/skip semantics are present in the SQL text.
+   */
+  describe('claimNext (raw atomic claim)', () => {
+    it('binds deviceId as a parameter and returns the first claimed row', async () => {
+      const claimed = {
+        id: 'cmd-1', tenantId: 't', kind: 'print', payload: {}, priority: 0, attempts: 1, idempotencyKey: 'k',
+      };
+      let strings: TemplateStringsArray | null = null;
+      let values: any[] = [];
+      (prisma.$queryRaw as any).mockImplementation(async (s: TemplateStringsArray, ...v: any[]) => {
+        strings = s;
+        values = v;
+        return [claimed];
+      });
+
+      const out = await svc.claimNext('dev-42');
+
+      expect(out).toEqual(claimed);
+      // deviceId is bound as a parameter, never interpolated into the SQL.
+      expect(values).toContain('dev-42');
+      // The SQL carries the concurrency-safe claim shape.
+      const sql = (strings as unknown as string[]).join('?');
+      expect(sql).toMatch(/UPDATE "device_commands"/);
+      expect(sql).toMatch(/'inflight'/);
+      expect(sql).toMatch(/FOR UPDATE SKIP LOCKED/);
+      expect(sql).toMatch(/LIMIT 1/);
+      // Only queued + non-expired rows are eligible.
+      expect(sql).toMatch(/"status" = 'queued'/);
+      expect(sql).toMatch(/"expiresAt" IS NULL OR "expiresAt" > NOW/);
+    });
+
+    it('returns null when the queue is empty (zero rows)', async () => {
+      (prisma.$queryRaw as any).mockResolvedValue([]);
+      expect(await svc.claimNext('dev-42')).toBeNull();
+    });
+  });
+
   it('enqueue dedupes on (deviceId, idempotencyKey)', async () => {
     prisma.device.findFirst.mockResolvedValue({ id: 'dev', status: 'online' } as any);
 

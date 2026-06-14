@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Pencil, Trash2, X, Tag } from 'lucide-react';
 import { usePlans, useCreatePlan, useUpdatePlan, useDeletePlan } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionPlan } from '../../features/superadmin/types';
+import { discountedMonthlyPrice } from './plans.helpers';
 
 export default function PlansPage() {
   const { t } = useTranslation('superadmin');
@@ -101,7 +102,7 @@ export default function PlansPage() {
                     ₺{Number(plan.monthlyPrice).toLocaleString()}{t('plans.perMonth')}
                   </p>
                   <p className="text-2xl font-semibold text-emerald-600">
-                    ₺{(Number(plan.monthlyPrice) * (1 - plan.discountPercentage / 100)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    ₺{discountedMonthlyPrice(plan.monthlyPrice, plan.discountPercentage).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                     <span className="text-sm font-normal text-zinc-500">{t('plans.perMonth')}</span>
                   </p>
                 </>

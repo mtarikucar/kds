@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { FileText, Plus, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import {
-  LegalDocument,
   LegalDocumentKind,
   useListLegalDocuments,
   usePublishLegalDocument,
 } from '../../features/legal/legalApi';
+import { canSubmitPublish, groupDocsByKind } from './legalDocuments.helpers';
 
 const KIND_LABELS: Record<LegalDocumentKind, string> = {
   KVKK: 'KVKK Aydınlatma Metni',
@@ -45,13 +45,7 @@ export default function LegalDocumentsPage() {
   const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
 
-  const docsByKind = useMemo(() => {
-    const acc: Record<string, LegalDocument[]> = {};
-    for (const d of docs ?? []) {
-      (acc[d.kind] ??= []).push(d);
-    }
-    return acc;
-  }, [docs]);
+  const docsByKind = useMemo(() => groupDocsByKind(docs), [docs]);
 
   return (
     <div className="space-y-6">
@@ -174,10 +168,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
   });
   const [showPreview, setShowPreview] = useState(false);
 
-  const canSubmit =
-    form.version.match(/^\d+\.\d+(\.\d+)?$/) &&
-    form.title.trim().length > 0 &&
-    form.bodyMarkdown.trim().length > 0;
+  const canSubmit = canSubmitPublish(form);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;

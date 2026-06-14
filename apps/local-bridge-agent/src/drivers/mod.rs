@@ -69,3 +69,144 @@ impl Registry {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc as StdArc;
+
+    /// A fake driver standing in for real hardware. Records how many times it
+    /// was invoked so we can assert routing without touching a printer/POS.
+    struct FakeDriver {
+        kind: &'static str,
+        calls: StdArc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl LocalDriver for FakeDriver {
+        fn kind(&self) -> &str {
+            self.kind
+        }
+        async fn execute(&self, cmd: &PendingCommand) -> Result<CommandOutcome> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(CommandOutcome {
+                status: "done".to_string(),
+                result: json!({ "handled_by": self.kind, "cmd_id": cmd.id }),
+                error: None,
+            })
+        }
+    }
+
+    fn registry_with(drivers: Vec<Box<dyn LocalDriver>>) -> Registry {
+        let mut map: HashMap<String, Box<dyn LocalDriver>> = HashMap::new();
+        for d in drivers {
+            map.insert(d.kind().to_string(), d);
+        }
+        Registry { drivers: map }
+    }
+
+    fn cmd_with_target(id: &str, target: Option<&str>) -> PendingCommand {
+        let payload = match target {
+            Some(t) => json!({ "target": t }),
+            None => json!({}),
+        };
+        PendingCommand {
+            id: id.to_string(),
+            kind: "print_receipt".to_string(),
+            payload,
+            priority: 0,
+            attempts: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn dispatch_routes_to_matching_driver() {
+        let calls = StdArc::new(AtomicUsize::new(0));
+        let reg = registry_with(vec![Box::new(FakeDriver {
+            kind: "escpos",
+            calls: calls.clone(),
+        })]);
+
+        let outcome = reg
+            .dispatch(&cmd_with_target("c-1", Some("escpos")))
+            .await
+            .expect("matching driver dispatches ok");
+
+        assert_eq!(outcome.status, "done");
+        assert_eq!(outcome.result["handled_by"], "escpos");
+        assert_eq!(outcome.result["cmd_id"], "c-1");
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "driver invoked exactly once");
+    }
+
+    #[tokio::test]
+    async fn dispatch_picks_the_correct_driver_among_several() {
+        let escpos_calls = StdArc::new(AtomicUsize::new(0));
+        let hugin_calls = StdArc::new(AtomicUsize::new(0));
+        let reg = registry_with(vec![
+            Box::new(FakeDriver {
+                kind: "escpos",
+                calls: escpos_calls.clone(),
+            }),
+            Box::new(FakeDriver {
+                kind: "hugin",
+                calls: hugin_calls.clone(),
+            }),
+        ]);
+
+        reg.dispatch(&cmd_with_target("c-2", Some("hugin")))
+            .await
+            .unwrap();
+
+        assert_eq!(hugin_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            escpos_calls.load(Ordering::SeqCst),
+            0,
+            "the non-targeted driver must not run"
+        );
+    }
+
+    #[tokio::test]
+    async fn dispatch_errors_for_unknown_target() {
+        let reg = registry_with(vec![Box::new(FakeDriver {
+            kind: "escpos",
+            calls: StdArc::new(AtomicUsize::new(0)),
+        })]);
+
+        let err = reg
+            .dispatch(&cmd_with_target("c-3", Some("does-not-exist")))
+            .await
+            .expect_err("unknown target must surface as an error, not silent success");
+        assert!(err.to_string().contains("no driver installed"));
+        assert!(err.to_string().contains("does-not-exist"));
+    }
+
+    #[tokio::test]
+    async fn dispatch_errors_when_target_missing() {
+        // Missing `target` defaults to "" which matches no driver.
+        let reg = registry_with(vec![Box::new(FakeDriver {
+            kind: "escpos",
+            calls: StdArc::new(AtomicUsize::new(0)),
+        })]);
+        let res = reg.dispatch(&cmd_with_target("c-4", None)).await;
+        assert!(res.is_err(), "no target -> no driver -> error");
+    }
+
+    #[test]
+    fn installed_kinds_lists_registered_drivers() {
+        let reg = registry_with(vec![
+            Box::new(FakeDriver {
+                kind: "escpos",
+                calls: StdArc::new(AtomicUsize::new(0)),
+            }),
+            Box::new(FakeDriver {
+                kind: "hugin",
+                calls: StdArc::new(AtomicUsize::new(0)),
+            }),
+        ]);
+        let mut kinds = reg.installed_kinds();
+        kinds.sort();
+        assert_eq!(kinds, vec!["escpos".to_string(), "hugin".to_string()]);
+    }
+}

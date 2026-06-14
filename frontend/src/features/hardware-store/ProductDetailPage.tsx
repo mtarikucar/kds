@@ -12,6 +12,14 @@ import {
 import { useCartStore } from './cartStore';
 import { useListBranches } from '../branches/branchesApi';
 import { useAuthStore } from '../../store/authStore';
+import { prettyKey, prettyValue, localizeDetails } from './productDetailHelpers';
+
+// Mirrors the language resolution that localizeDetails used to do
+// internally (document.documentElement.lang with a TR fallback). Kept at
+// the call site so the extracted helper stays pure.
+function currentDetailsLang(): string {
+  return (typeof document !== 'undefined' && document.documentElement.lang) || 'tr';
+}
 
 /**
  * v2.8.87 — SPA product / service detail page at /admin/store/:sku.
@@ -120,7 +128,7 @@ function HardwareDetail({
   const showRental = Boolean(product.rentalMonthlyCents) && mode === 'DIRECT_SALE';
   const showLowStock = (product.available ?? 0) > 0 && (product.available ?? 0) <= 5;
 
-  const details = useMemo(() => localizeDetails(product.details), [product.details]);
+  const details = useMemo(() => localizeDetails(product.details, currentDetailsLang()), [product.details]);
 
   function fmt(cents: number): string {
     // Shared formatter — one decimals policy across card + detail (cents
@@ -364,7 +372,7 @@ function ServiceDetail({
     'includes',
   );
 
-  const details = useMemo(() => localizeDetails(product.details), [product.details]);
+  const details = useMemo(() => localizeDetails(product.details, currentDetailsLang()), [product.details]);
 
   const branchValid = !requiresBranch || Boolean(branchId);
 
@@ -644,34 +652,6 @@ function CompatBlock({ compat }: { compat: Record<string, unknown> | null }) {
       ))}
     </dl>
   );
-}
-
-function prettyKey(k: string): string {
-  return k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
-}
-
-function prettyValue(v: unknown): string {
-  if (v === null || v === undefined) return '—';
-  if (Array.isArray(v)) return v.map((x) => String(x)).join(', ');
-  if (typeof v === 'object') return JSON.stringify(v);
-  return String(v);
-}
-
-function localizeDetails(raw: unknown): {
-  includes?: string[];
-  requirements?: string[];
-  steps?: { title: string; body: string }[];
-  faq?: { q: string; a: string }[];
-} {
-  if (!raw || typeof raw !== 'object') return {};
-  const obj = raw as Record<string, unknown>;
-  // Locale-keyed: { tr: {...}, en: {...} }. Pick the current i18n
-  // language with TR fallback, then fall through to flat.
-  if (obj.tr || obj.en) {
-    const lang = (typeof document !== 'undefined' && document.documentElement.lang) || 'tr';
-    return (obj[lang] as any) ?? (obj.tr as any) ?? (obj.en as any) ?? {};
-  }
-  return obj as any;
 }
 
 // "Teklif Al" form for a QUOTE_ONLY device (yazarkasa / YN ÖKC). Posts to the

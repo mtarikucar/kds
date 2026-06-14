@@ -4,6 +4,7 @@ import { Plus, Search, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { useStockItems, useStockCategories, useCreateStockItem, useUpdateStockItem, useDeleteStockItem } from '../stockManagementApi';
 import { StockUnit, type StockItem } from '../types';
 import StockItemForm from './StockItemForm';
+import { isLowStock } from './isLowStock';
 
 const StockItemsTab = () => {
   const { t } = useTranslation('stock');
@@ -90,7 +91,7 @@ const StockItemsTab = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((item) => {
-                const isLow = Number(item.currentStock) <= Number(item.minStock);
+                const isLow = isLowStock(item);
                 return (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900 flex items-center gap-2">

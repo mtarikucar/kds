@@ -132,6 +132,7 @@ endif()
 
 set(SOURCES
     src/main.cpp
+    src/args.cpp
     src/config.cpp
     src/camera/rtsp_client.cpp
     src/camera/frame_buffer.cpp
@@ -144,6 +145,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    src/args.hpp
     src/config.hpp
     src/camera/rtsp_client.hpp
     src/camera/frame_buffer.hpp

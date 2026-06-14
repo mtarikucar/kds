@@ -108,3 +108,50 @@ async fn main() -> Result<()> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::Parser;
+
+    // `Cli::parse_from` exercises the exact clap configuration used by the
+    // binary at runtime (the `#[derive(Parser)]` + `#[arg(...)]` attributes),
+    // so these assertions pin the CLI surface the systemd unit and operators
+    // depend on. arg[0] is the program name, as clap expects.
+
+    #[test]
+    fn defaults_when_no_flags_given() {
+        let cli = Cli::parse_from(["bridge"]);
+        assert!(cli.config_dir.is_none());
+        assert!(!cli.health);
+    }
+
+    #[test]
+    fn parses_config_dir_flag() {
+        let cli = Cli::parse_from(["bridge", "--config-dir", "/etc/hummy"]);
+        assert_eq!(cli.config_dir.as_deref(), Some("/etc/hummy"));
+        assert!(!cli.health);
+    }
+
+    #[test]
+    fn health_flag_is_a_boolean_switch() {
+        let cli = Cli::parse_from(["bridge", "--health"]);
+        assert!(cli.health);
+        assert!(cli.config_dir.is_none());
+    }
+
+    #[test]
+    fn combined_flags_parse_together() {
+        let cli = Cli::parse_from(["bridge", "--config-dir", "/srv/cfg", "--health"]);
+        assert_eq!(cli.config_dir.as_deref(), Some("/srv/cfg"));
+        assert!(cli.health);
+    }
+
+    #[test]
+    fn unknown_flag_is_rejected() {
+        // try_parse_from returns Err on an unrecognised flag — the binary
+        // would print usage and exit non-zero. Confirms clap is wired strict.
+        let res = Cli::try_parse_from(["bridge", "--nope"]);
+        assert!(res.is_err());
+    }
+}

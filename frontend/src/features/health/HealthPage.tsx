@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useGetHealthOverview } from './healthApi';
+import { pillClass, formatAge } from './healthFormat';
 
 /**
  * Tenant-wide health dashboard. One card per branch with the composite
@@ -55,19 +56,4 @@ export default function HealthPage() {
       )}
     </div>
   );
-}
-
-function pillClass(pill: 'green' | 'yellow' | 'red'): string {
-  const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
-  if (pill === 'green') return `${base} bg-green-100 text-green-800`;
-  if (pill === 'yellow') return `${base} bg-amber-100 text-amber-800`;
-  return `${base} bg-red-100 text-red-800`;
-}
-
-function formatAge(min: number | null): string {
-  if (min == null) return '—';
-  if (min < 1) return '<1m';
-  if (min < 60) return `${Math.round(min)}m`;
-  if (min < 24 * 60) return `${Math.round(min / 60)}h`;
-  return `${Math.round(min / (24 * 60))}d`;
 }

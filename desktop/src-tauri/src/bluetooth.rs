@@ -339,8 +339,12 @@ mod tests {
 
     #[test]
     fn test_printer_command_bytes() {
+        // Initialize now emits ESC @ (reset) followed by ESC t 13 (select
+        // CP-857 / Turkish) — see crate::escpos. The old assertion of just
+        // [0x1B, 0x40] predates the CP-857 fix and was stale; assert the
+        // actual current byte sequence so this test reflects reality.
         let cmd = PrinterCommand::Initialize;
-        assert_eq!(cmd.to_bytes(), vec![0x1B, 0x40]);
+        assert_eq!(cmd.to_bytes(), vec![0x1B, 0x40, 0x1B, 0x74, 13]);
 
         let cmd = PrinterCommand::Text("Hello".to_string());
         assert_eq!(cmd.to_bytes(), "Hello".as_bytes().to_vec());

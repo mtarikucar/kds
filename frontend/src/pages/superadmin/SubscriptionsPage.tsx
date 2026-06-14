@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSubscriptions, useExtendSubscription, useCancelSubscription, usePlans } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionListItem } from '../../features/superadmin/types';
+import { isValidExtendDays } from './subscriptions.helpers';
 
 const statusStyles: Record<string, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -29,7 +30,7 @@ export default function SubscriptionsPage() {
 
   const handleExtend = (id: string) => {
     const days = prompt(t('subscriptions.promptExtendDays'));
-    if (days && !isNaN(Number(days))) {
+    if (isValidExtendDays(days)) {
       extendMutation.mutate({ id, days: Number(days) });
     }
   };
