@@ -101,3 +101,6 @@ jobs:
 
       - name: Check i18n locale parity
         run: node scripts/check-i18n-parity.mjs
+
+      - name: Check i18n value drift (no NEW English placeholders)
+        run: node scripts/check-i18n-value-drift.mjs --gate-new scripts/i18n-value-drift-baseline.json
