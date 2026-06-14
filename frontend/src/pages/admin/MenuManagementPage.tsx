@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import {
@@ -73,35 +72,14 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import ImageLibraryModal from '../../components/product/ImageLibraryModal';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
-
-// Schema factories for i18n support
-const createCategorySchema = (t: (key: string) => string) => z.object({
-  name: z.string().min(1, t('menu.validation.nameRequired')),
-  description: z.string().optional(),
-  displayOrder: z.number().optional(),
-});
-
-const createProductSchema = (t: (key: string) => string) => z.object({
-  name: z.string().min(1, t('menu.validation.nameRequired')),
-  description: z.string().optional(),
-  price: z.number().min(0, t('menu.validation.pricePositive')),
-  categoryId: z.string().min(1, t('menu.validation.categoryRequired')),
-  currentStock: z.number().min(0, t('menu.validation.stockPositive')).optional(),
-  image: z.string().url(t('menu.validation.invalidUrl')).optional().or(z.literal('')),
-  imageIds: z.array(z.string()).optional(),
-  isAvailable: z.boolean().optional(),
-});
-
-type CategoryFormData = z.infer<ReturnType<typeof createCategorySchema>>;
-type ProductFormData = z.infer<ReturnType<typeof createProductSchema>>;
-
-// Helper function to reorder items in an array
-const reorder = <T,>(list: T[], startIndex: number, endIndex: number): T[] => {
-  const result = Array.from(list);
-  const [removed] = result.splice(startIndex, 1);
-  result.splice(endIndex, 0, removed);
-  return result;
-};
+import {
+  createCategorySchema,
+  createProductSchema,
+  type CategoryFormData,
+  type ProductFormData,
+} from './menuManagement/menuSchemas';
+import { reorder } from './menuManagement/reorder';
+import { getImageUrl } from './menuManagement/imageUrl';
 
 const MenuManagementPage = () => {
   const { t } = useTranslation(['menu', 'common', 'subscriptions']);
@@ -490,11 +468,6 @@ const MenuManagementPage = () => {
   };
 
   // Image library helpers
-  const getImageUrl = (url: string) => {
-    if (url.startsWith('http')) return url;
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${url}`;
-  };
-
   const filteredImages = allImages?.filter((img) =>
     img.filename.toLowerCase().includes(imageSearchTerm.toLowerCase())
   ) || [];
@@ -1205,9 +1178,7 @@ const MenuManagementPage = () => {
                     <div key={image.id} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200">
                         <img
-                          src={image.url.startsWith('http://') || image.url.startsWith('https://')
-                            ? image.url
-                            : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                          src={getImageUrl(image.url)}
                           alt={image.filename}
                           className="w-full h-full object-cover"
                         />
