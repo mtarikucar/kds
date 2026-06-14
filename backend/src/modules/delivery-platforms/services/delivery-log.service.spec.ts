@@ -280,7 +280,7 @@ describe('DeliveryLogService', () => {
   });
 
   describe('requeueDeadLetters', () => {
-    it('sets nextRetryAt=now so the EXISTING RetryScheduler re-claims, without resetting attempts by default', async () => {
+    it('sets nextRetryAt=now AND decrements retryCount so the EXISTING RetryScheduler actually re-claims (one more attempt), without a full reset by default', async () => {
       (prisma.deliveryPlatformLog.updateMany as any).mockResolvedValue({ count: 2 });
       const before = Date.now();
 
@@ -295,10 +295,28 @@ describe('DeliveryLogService', () => {
       });
       expect(arg.data.nextRetryAt).toBeInstanceOf(Date);
       expect(arg.data.nextRetryAt.getTime()).toBeGreaterThanOrEqual(before);
-      // resetAttempts defaults FALSE — a poison-pill row keeps its exhausted
-      // counter so it re-DLQs after one more failed tick instead of looping.
-      expect(arg.data.retryCount).toBeUndefined();
+      // REGRESSION: a bare nextRetryAt bump was a silent no-op because the
+      // dead-letter row keeps retryCount >= maxRetries while getFailedOperations
+      // only claims retryCount < maxRetries. Default requeue must decrement so
+      // the row is claimable for exactly one more attempt (maxRetries-1), then
+      // re-DLQs if it fails again — bounded, not looping.
+      expect(arg.data.retryCount).toEqual({ decrement: 1 });
       expect(out).toEqual({ requeued: 2, requested: 2 });
+    });
+
+    it('getFailedOperations claims by the dynamic maxRetries boundary (not a literal 3) so a default-requeued dead-letter is re-claimed', async () => {
+      (prisma.deliveryPlatformLog.findMany as any).mockResolvedValue([]);
+
+      await svc.getFailedOperations();
+
+      const arg = (prisma.deliveryPlatformLog.findMany as any).mock.calls[0][0];
+      // retryCount < maxRetries (column reference), mirroring deadLetterWhere's
+      // retryCount >= maxRetries — so claimable and dead-letter are exact
+      // complements regardless of a non-default maxRetries.
+      expect(arg.where.retryCount).toEqual({
+        lt: prisma.deliveryPlatformLog.fields.maxRetries,
+      });
+      expect(arg.where).toMatchObject({ success: false });
     });
 
     it('optionally resets retryCount to 0 when caller passes resetAttempts', async () => {

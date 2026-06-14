@@ -134,7 +134,11 @@ export class DeliveryLogService {
     return this.prisma.deliveryPlatformLog.findMany({
       where: {
         success: false,
-        retryCount: { lt: 3 },
+        // Claimable = not yet exhausted. Mirror the dead-letter predicate's
+        // dynamic `retryCount >= maxRetries` (deadLetterWhere) so a row with a
+        // non-default maxRetries — and a requeued dead-letter (see
+        // requeueDeadLetters) — is correctly (re-)claimed.
+        retryCount: { lt: this.prisma.deliveryPlatformLog.fields.maxRetries },
         nextRetryAt: { lte: new Date() },
       },
       orderBy: { createdAt: "asc" },
@@ -298,8 +302,11 @@ export class DeliveryLogService {
    * WHERE keeps the dead-letter predicate so a row that's since been requeued
    * or succeeded isn't touched twice. `resetAttempts=true` is an escape hatch
    * (infra-side outage) that zeroes retryCount for a full retry budget;
-   * default FALSE so a poison-pill row keeps its exhausted counter and
-   * re-DLQs after one more failed tick instead of looping forever.
+   * default FALSE only DECREMENTS the exhausted counter by one (retryCount =
+   * maxRetries-1), so the row is claimable for EXACTLY one more attempt and, if
+   * it fails again, incrementRetry parks it straight back in the DLQ — bounded,
+   * never looping. (A plain nextRetryAt bump without lowering retryCount would
+   * be a silent no-op: getFailedOperations only claims retryCount < maxRetries.)
    */
   async requeueDeadLetters(
     ids: string[],
@@ -326,7 +333,8 @@ export class DeliveryLogService {
       },
       data: {
         nextRetryAt: new Date(),
-        ...(opts.resetAttempts ? { retryCount: 0 } : {}),
+        // Make the row claimable again: full reset, or one more attempt.
+        retryCount: opts.resetAttempts ? 0 : { decrement: 1 },
       },
     });
     this.logger.log(
