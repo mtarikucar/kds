@@ -37,15 +37,8 @@ import {
   paymentBlockedReason as computePaymentBlockedReason,
 } from './posCart';
 import { useCartPersistence } from './useCartPersistence';
-
-// View state type
-type POSView = 'table-selection' | 'order';
-
-interface CartItem extends Product {
-  quantity: number;
-  notes?: string;
-  modifiers?: SelectedModifier[];
-}
+import { usePosTourSync } from './usePosTourSync';
+import type { POSView, CartItem } from './posTypes';
 
 const POSPage = () => {
   const { t } = useTranslation('pos');
@@ -147,23 +140,8 @@ const POSPage = () => {
 
   // Onboarding tour preview: force into 'order' view (takeaway shape) while
   // tour steps targeting menu-panel/order-cart are active, then restore the
-  // previous view. Snapshot prev view in a ref so we don't loop on view changes.
-  const posTourPreview = useUiStore((s) => s.posTourPreview);
-  const prevTourViewRef = useRef<POSView | null>(null);
-  useEffect(() => {
-    if (posTourPreview) {
-      if (prevTourViewRef.current === null) {
-        prevTourViewRef.current = currentView;
-      }
-      setSelectedTable(null);
-      setCurrentView('order');
-    } else if (prevTourViewRef.current !== null) {
-      setCurrentView(prevTourViewRef.current);
-      setSelectedTable(null);
-      prevTourViewRef.current = null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posTourPreview]);
+  // previous view. Logic lives in usePosTourSync.
+  usePosTourSync(currentView, setCurrentView, setSelectedTable);
 
   // Fetch active orders for selected table (exclude pending approval, paid, and cancelled)
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
