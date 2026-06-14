@@ -32,6 +32,7 @@ import { KdsGateway } from "../../kds/kds.gateway";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 import { PaymentMathCalculator } from "./payment-math.calculator";
 import { PaymentFinalizer } from "./payment-finalizer.service";
+import { PaymentValidator } from "./payment-validator.service";
 
 // v2.8.97 — single source of truth for the cross-payment-path rounding
 // tolerance. Both the single-payment overpayment check and the
@@ -57,6 +58,11 @@ export class PaymentsService {
   // finalizer methods all take `tx` as their first param.
   private readonly math: PaymentMathCalculator;
   private readonly finalizer: PaymentFinalizer;
+  // PASS 3 — pure, stateless validation seams (order-state guards, split
+  // total tolerance, item membership/dedup) lifted out of the three
+  // orchestrators. Same optional-trailing-param construction pattern as
+  // math/finalizer so positional-construction unit specs keep working.
+  private readonly validator: PaymentValidator;
 
   constructor(
     private prisma: PrismaService,
@@ -78,6 +84,8 @@ export class PaymentsService {
     paymentMathCalculator?: PaymentMathCalculator,
     @Optional()
     paymentFinalizer?: PaymentFinalizer,
+    @Optional()
+    paymentValidator?: PaymentValidator,
   ) {
     this.math = paymentMathCalculator ?? new PaymentMathCalculator();
     this.finalizer =
@@ -90,6 +98,7 @@ export class PaymentsService {
         this.accountingSettingsService,
         this.kdsGateway,
       );
+    this.validator = paymentValidator ?? new PaymentValidator();
   }
 
   /**
@@ -373,25 +382,12 @@ export class PaymentsService {
               throw new NotFoundException("Order not found");
             }
 
-            // Check if order is already paid (inside transaction to prevent race condition)
-            if (order.status === OrderStatus.PAID) {
-              throw new BadRequestException("Order is already paid");
-            }
-
-            // Check if order is cancelled
-            if (order.status === OrderStatus.CANCELLED) {
-              throw new BadRequestException("Cannot pay for a cancelled order");
-            }
-
-            // Prevent payment for orders awaiting approval (check BEFORE creating payment)
-            if (
-              order.requiresApproval &&
-              order.status === OrderStatus.PENDING_APPROVAL
-            ) {
-              throw new BadRequestException(
-                "Order requires approval before payment can be processed. Please approve the order first.",
-              );
-            }
+            // PASS 3 — order-state guards (PAID / CANCELLED /
+            // requiresApproval+PENDING_APPROVAL) moved verbatim into
+            // PaymentValidator. Same exception types/messages/order, run
+            // here inside the tx on the freshly-locked order, BEFORE the
+            // self-pay guard and any payment write.
+            this.validator.assertOrderPayable(order);
 
             // v3.0.1 round-5 — refuse if a customer is mid-PayTR self-pay
             // flow on this order. See assertNoConflictingSelfPayIntent's
@@ -883,36 +879,12 @@ export class PaymentsService {
       // settlement and trigger the manual-refund path.
       await this.assertNoConflictingSelfPayIntent(tx, orderId, tenantId);
 
-      // Decimal-clean tolerance check. The earlier JS-Number implementation
-      // accumulated rounding error: a 0.005-per-line drift over 20 split
-      // entries could slip a real overpayment through (or block a legit
-      // exact-cent split). Stay in Decimal until the final compare.
-      const orderAmount = new Prisma.Decimal(order.finalAmount);
-      const alreadyPaid = order.payments.reduce<Prisma.Decimal>(
-        (sum, p) => sum.add(new Prisma.Decimal(p.amount)),
-        new Prisma.Decimal(0),
-      );
-      const remaining = orderAmount.sub(alreadyPaid);
-
-      const totalSplitAmount = dto.payments.reduce<Prisma.Decimal>(
-        (sum, p) => sum.add(new Prisma.Decimal(p.amount)),
-        new Prisma.Decimal(0),
-      );
-
-      // Split total must match the remaining amount within 1 kuruş — both
-      // directions. The original implementation only rejected overpayment,
-      // which let a 100.00 TL bill be settled as [50.00, 49.99] and silently
-      // marked PAID with 0.01 TL outstanding — systematic revenue loss when
-      // it happens at scale.
-      const diff = totalSplitAmount.sub(remaining).abs();
-      if (diff.gt(PAYMENT_TOLERANCE)) {
-        const direction = totalSplitAmount.gt(remaining)
-          ? "exceeds"
-          : "is below";
-        throw new BadRequestException(
-          `Split total (${totalSplitAmount.toFixed(2)}) ${direction} remaining amount (${remaining.toFixed(2)})`,
-        );
-      }
+      // PASS 3 — the Decimal-clean split-total tolerance check (remaining
+      // = finalAmount − sum(completed payments); ±0.01 both directions)
+      // moved verbatim into PaymentValidator. It throws the byte-identical
+      // BadRequestException; `orderAmount` is reused below for the
+      // fully-paid compare + the finalizeFullyPaid closing amount.
+      const { orderAmount } = this.validator.validateSplitTotal(order, dto);
 
       // Per-entry idempotency. Use the explicit key from the DTO when the
       // client supplied one; otherwise derive a stable key from the batch
@@ -1192,45 +1164,17 @@ export class PaymentsService {
             if (!order) {
               throw new NotFoundException("Order not found");
             }
-            if (order.status === OrderStatus.PAID) {
-              throw new BadRequestException("Order is already paid");
-            }
-            if (order.status === OrderStatus.CANCELLED) {
-              throw new BadRequestException("Cannot pay for a cancelled order");
-            }
-            if (
-              order.requiresApproval &&
-              order.status === OrderStatus.PENDING_APPROVAL
-            ) {
-              throw new BadRequestException(
-                "Order requires approval before payment can be processed. Please approve the order first.",
-              );
-            }
+            // PASS 3 — same order-state guards as create(), moved verbatim
+            // into PaymentValidator (byte-identical exceptions/order).
+            this.validator.assertOrderPayable(order);
 
-            // Validate that every entry references a real OrderItem on this order.
-            const itemsById = new Map(
-              order.orderItems.map((i) => [i.id, i] as const),
+            // PASS 3 — item membership + duplicate-id validation moved
+            // verbatim into PaymentValidator. Returns the id→OrderItem map
+            // reused below for the quantity validation and allocation math.
+            const itemsById = this.validator.resolveItemsById(
+              order.orderItems,
+              dto.items,
             );
-            for (const entry of dto.items) {
-              const item = itemsById.get(entry.orderItemId);
-              if (!item) {
-                throw new BadRequestException(
-                  `OrderItem ${entry.orderItemId} does not belong to this order`,
-                );
-              }
-            }
-
-            // Reject duplicate orderItemIds in the same request — would
-            // make residual-allocation rounding ambiguous.
-            const seen = new Set<string>();
-            for (const entry of dto.items) {
-              if (seen.has(entry.orderItemId)) {
-                throw new BadRequestException(
-                  `Duplicate orderItemId ${entry.orderItemId} in items list — combine into one entry`,
-                );
-              }
-              seen.add(entry.orderItemId);
-            }
 
             // Sum already-paid quantities per OrderItem (only COMPLETED payments count).
             const paidAgg = await tx.orderItemPayment.groupBy({
