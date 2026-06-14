@@ -27,6 +27,7 @@ import { UpdateModifierGroupDto } from "../dto/update-modifier-group.dto";
 import { CreateModifierDto } from "../dto/create-modifier.dto";
 import { UpdateModifierDto } from "../dto/update-modifier.dto";
 import { AssignModifiersToProductDto } from "../dto/assign-modifiers.dto";
+import { ListQueryDto } from "../../../common/dto/list-query.dto";
 
 @ApiTags("Modifiers")
 @ApiBearerAuth()
@@ -50,14 +51,20 @@ export class ModifiersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get all modifier groups" })
   @ApiQuery({ name: "includeInactive", required: false, type: Boolean })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  @ApiQuery({ name: "offset", required: false, type: Number })
   async findAllGroups(
     @Request() req,
     @Query("includeInactive", new ParseBoolPipe({ optional: true }))
     includeInactive?: boolean,
+    @Query() query?: ListQueryDto,
   ) {
+    // ADDITIVE: optional limit/offset; absent => full list (unchanged
+    // default), bare array response preserved.
     return this.modifiersService.findAllGroups(
       req.user.tenantId,
       includeInactive,
+      { limit: query?.limit, offset: query?.offset },
     );
   }
 
@@ -102,16 +109,22 @@ export class ModifiersController {
   @ApiOperation({ summary: "Get all modifiers" })
   @ApiQuery({ name: "groupId", required: false, type: String })
   @ApiQuery({ name: "includeUnavailable", required: false, type: Boolean })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  @ApiQuery({ name: "offset", required: false, type: Number })
   async findAllModifiers(
     @Request() req,
     @Query("groupId") groupId?: string,
     @Query("includeUnavailable", new ParseBoolPipe({ optional: true }))
     includeUnavailable?: boolean,
+    @Query() query?: ListQueryDto,
   ) {
+    // ADDITIVE: optional limit/offset; absent => full list (unchanged
+    // default), bare array response preserved.
     return this.modifiersService.findAllModifiers(
       req.user.tenantId,
       groupId,
       includeUnavailable,
+      { limit: query?.limit, offset: query?.offset },
     );
   }
 

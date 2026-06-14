@@ -121,4 +121,49 @@ describe('CategoriesService', () => {
       await expect(svc.remove('c-1', 't1')).rejects.toThrow('unexpected');
     });
   });
+
+  // -- Wave-C: ADDITIVE pagination on findAll -------------------------
+
+  describe('findAll — pagination', () => {
+    const rows = [
+      { id: 'a', tenantId: 't1', _count: { products: 0 } },
+      { id: 'b', tenantId: 't1', _count: { products: 0 } },
+      { id: 'c', tenantId: 't1', _count: { products: 0 } },
+    ] as any[];
+
+    beforeEach(() => {
+      (prisma.category.findMany as any).mockImplementation((args: any) => {
+        const skip = args?.skip ?? 0;
+        const end = args?.take == null ? undefined : skip + args.take;
+        return Promise.resolve(rows.slice(skip, end));
+      });
+    });
+
+    it('returns the full list with undefined take/skip when no params (old behavior)', async () => {
+      const result = await svc.findAll('t1');
+
+      const call = (prisma.category.findMany as any).mock.calls[0][0];
+      expect(call.take).toBeUndefined();
+      expect(call.skip).toBeUndefined();
+      expect(result.map((c: any) => c.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('forwards limit/offset as take/skip and slices correctly', async () => {
+      const result = await svc.findAll('t1', { limit: 1, offset: 2 });
+
+      const call = (prisma.category.findMany as any).mock.calls[0][0];
+      expect(call.take).toBe(1);
+      expect(call.skip).toBe(2);
+      expect(result.map((c: any) => c.id)).toEqual(['c']);
+    });
+
+    it('falls back to the full list (no 500) when params are junk', async () => {
+      const result = await svc.findAll('t1', { limit: NaN, offset: -3 } as any);
+
+      const call = (prisma.category.findMany as any).mock.calls[0][0];
+      expect(call.take).toBeUndefined();
+      expect(call.skip).toBeUndefined();
+      expect(result.map((c: any) => c.id)).toEqual(['a', 'b', 'c']);
+    });
+  });
 });

@@ -8,16 +8,19 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiResponse,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { CategoriesService } from "../services/categories.service";
 import { CreateCategoryDto } from "../dto/create-category.dto";
 import { UpdateCategoryDto } from "../dto/update-category.dto";
+import { ListQueryDto } from "../../../common/dto/list-query.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -48,9 +51,24 @@ export class CategoriesController {
 
   @Get()
   @ApiOperation({ summary: "Get all categories" })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "Optional page size (omit for full list)",
+  })
+  @ApiQuery({
+    name: "offset",
+    required: false,
+    description: "Optional rows to skip",
+  })
   @ApiResponse({ status: 200, description: "List of all categories" })
-  findAll(@Request() req) {
-    return this.categoriesService.findAll(req.tenantId);
+  findAll(@Request() req, @Query() query?: ListQueryDto) {
+    // ADDITIVE: optional limit/offset; absent => full list (unchanged
+    // default), bare array response preserved.
+    return this.categoriesService.findAll(req.tenantId, {
+      limit: query?.limit,
+      offset: query?.offset,
+    });
   }
 
   @Get(":id")
