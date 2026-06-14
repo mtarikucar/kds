@@ -2,6 +2,9 @@
 
 #include "../config.hpp"
 #include "types.hpp"
+#include "transport.hpp"
+#include "socketio_router.hpp"
+#include "reconnect_policy.hpp"
 
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
@@ -17,11 +20,14 @@
 
 namespace kds {
 
-// WebSocket client using websocketpp with Socket.IO-like protocol
-class WebSocketClient {
+// WebSocket client using websocketpp with Socket.IO-like protocol.
+// Implements ITransport (the raw send/connect seam) and delegates all
+// Socket.IO framing/routing to a SocketIoRouter — the protocol logic is thus
+// unit-testable against a FakeTransport without a live socket.
+class WebSocketClient : public ITransport {
 public:
     explicit WebSocketClient(const BackendConfig& config);
-    ~WebSocketClient();
+    ~WebSocketClient() override;
 
     // Non-copyable
     WebSocketClient(const WebSocketClient&) = delete;
@@ -33,8 +39,8 @@ public:
     // Disconnect from backend
     void disconnect();
 
-    // Check connection status
-    bool is_connected() const { return connected_; }
+    // Check connection status (ITransport)
+    bool is_connected() const override { return connected_; }
 
     // Send occupancy data
     bool send_occupancy_data(const std::vector<OccupancyData>& detections);
@@ -45,22 +51,26 @@ public:
     // Send health status
     bool send_health_status(const HealthStatusPayload& status);
 
-    // Callbacks for backend events
-    using ConfigCallback = std::function<void(const EdgeDeviceConfig&)>;
-    using CommandCallback = std::function<void(const EdgeDeviceCommand&)>;
-    using CalibrationCallback = std::function<void(const nlohmann::json&)>;
+    // Callbacks for backend events (forwarded to the SocketIoRouter).
+    using ConfigCallback = SocketIoRouter::ConfigCallback;
+    using CommandCallback = SocketIoRouter::CommandCallback;
+    using CalibrationCallback = SocketIoRouter::CalibrationCallback;
 
     void set_config_callback(ConfigCallback callback) {
-        config_callback_ = std::move(callback);
+        router_.set_config_callback(std::move(callback));
     }
 
     void set_command_callback(CommandCallback callback) {
-        command_callback_ = std::move(callback);
+        router_.set_command_callback(std::move(callback));
     }
 
     void set_calibration_callback(CalibrationCallback callback) {
-        calibration_callback_ = std::move(callback);
+        router_.set_calibration_callback(std::move(callback));
     }
+
+    // Raw text send over the live socket (ITransport). Public because the
+    // SocketIoRouter emits through the ITransport seam.
+    bool send_raw(const std::string& message) override;
 
     // Run the client (blocking - call in separate thread)
     void run();
@@ -103,10 +113,8 @@ private:
     mutable std::mutex stats_mutex_;
     Stats stats_;
 
-    // Callbacks
-    ConfigCallback config_callback_;
-    CommandCallback command_callback_;
-    CalibrationCallback calibration_callback_;
+    // Socket.IO framing/routing — pure logic, emits via *this (ITransport).
+    SocketIoRouter router_{*this};
 
     // Internal methods
     void init_client();
@@ -115,10 +123,8 @@ private:
     void on_fail(ConnectionHdl hdl);
     void on_message(ConnectionHdl hdl, MessagePtr msg);
 
-    // Socket.IO-like message handling
-    void handle_socketio_message(const std::string& payload);
+    // Emit a Socket.IO event (thin forwarder to router_.emit()).
     bool emit(const std::string& event, const nlohmann::json& data);
-    bool send_raw(const std::string& message);
 
     // Register with backend
     bool register_device();

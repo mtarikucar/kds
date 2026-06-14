@@ -9,6 +9,9 @@
 
 void run_args_tests();
 void run_config_tests();
+void run_inference_tests();
+void run_transport_tests();
+void run_camera_tests();
 
 int main() {
     std::cout << "[edge-device unit tests]\n";
@@ -18,6 +21,15 @@ int main() {
 
     std::cout << "\n== Config (merge_env / from_env / validate / to_json) ==\n";
     run_config_tests();
+
+    std::cout << "\n== Inference seam (decode_yolo_output / IInferenceEngine) ==\n";
+    run_inference_tests();
+
+    std::cout << "\n== Transport seam (SocketIoRouter / ReconnectPolicy) ==\n";
+    run_transport_tests();
+
+    std::cout << "\n== Frame-source seam (FrameDispatcher) ==\n";
+    run_camera_tests();
 
     const int run = testkit::checks_run();
     const int failed = testkit::checks_failed();

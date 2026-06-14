@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hpp"
+#include "inference_engine.hpp"
 #include "../config.hpp"
 
 #include <opencv2/opencv.hpp>
@@ -30,10 +31,14 @@ private:
 
 #endif
 
-class YoloTensorRT {
+// Concrete TensorRT/CUDA-backed implementation of IInferenceEngine.
+// This is the thin hardware adapter behind the inference seam: it owns the
+// TensorRT runtime/engine/context and CUDA buffers, and delegates the pure
+// output-decoding to decode_yolo_output() (see yolo_postprocess.hpp).
+class YoloTensorRT : public IInferenceEngine {
 public:
     explicit YoloTensorRT(const DetectionConfig& config);
-    ~YoloTensorRT();
+    ~YoloTensorRT() override;
 
     // Non-copyable
     YoloTensorRT(const YoloTensorRT&) = delete;
@@ -52,19 +57,20 @@ public:
     bool save_engine(const std::string& engine_path);
 
     // Run inference on a single frame
-    std::vector<Detection> detect(const cv::Mat& frame);
+    std::vector<Detection> detect(const cv::Mat& frame) override;
 
     // Run inference on a batch of frames
-    std::vector<std::vector<Detection>> detect_batch(const std::vector<cv::Mat>& frames);
+    std::vector<std::vector<Detection>> detect_batch(
+        const std::vector<cv::Mat>& frames) override;
 
     // Check if engine is initialized
-    bool is_initialized() const { return initialized_; }
+    bool is_initialized() const override { return initialized_; }
 
     // Get inference time (last call, in milliseconds)
-    float get_inference_time() const { return inference_time_ms_; }
+    float get_inference_time() const override { return inference_time_ms_; }
 
     // Get input dimensions
-    cv::Size get_input_size() const { return cv::Size(input_width_, input_height_); }
+    cv::Size get_input_size() const override { return cv::Size(input_width_, input_height_); }
 
     // Warm up the engine (run a few inferences)
     void warmup(int iterations = 10);

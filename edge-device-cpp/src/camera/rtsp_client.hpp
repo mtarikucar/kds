@@ -1,10 +1,13 @@
 #pragma once
 
 #include "../config.hpp"
+#include "frame.hpp"
+#include "frame_source.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -19,34 +22,14 @@ typedef struct _GstSample GstSample;
 
 namespace kds {
 
-// Frame data structure
-struct Frame {
-    cv::Mat data;
-    std::chrono::steady_clock::time_point timestamp;
-    uint64_t frame_number;
-
-    bool empty() const { return data.empty(); }
-    int width() const { return data.cols; }
-    int height() const { return data.rows; }
-};
-
-// Camera statistics
-struct CameraStats {
-    std::string state;           // "RUNNING", "STOPPED", "ERROR", "RECONNECTING"
-    std::string url;
-    int reconnect_count = 0;
-    float actual_fps = 0.0f;
-    uint64_t frames_captured = 0;
-    uint64_t frames_dropped = 0;
-    std::string last_error;
-    std::chrono::steady_clock::time_point last_frame_time;
-};
-
-// RTSP client using GStreamer
-class RTSPClient {
+// RTSP client using GStreamer. Implements IFrameSource (the frame-producer
+// seam) so the capture/reconnect policy (FrameDispatcher) can be unit-tested
+// against a FakeFrameSource. The GStreamer pipeline management is the thin
+// hardware adapter behind the seam.
+class RTSPClient : public IFrameSource {
 public:
     explicit RTSPClient(const CameraConfig& config);
-    ~RTSPClient();
+    ~RTSPClient() override;
 
     // Non-copyable
     RTSPClient(const RTSPClient&) = delete;
@@ -62,6 +45,12 @@ public:
     // Get frame with metadata
     bool read_frame(Frame& frame);
 
+    // IFrameSource: pull the next frame (delegates to read_frame()).
+    bool try_pull(Frame& frame) override { return read_frame(frame); }
+
+    // IFrameSource: true while the source is connected/producing.
+    bool is_open() const override { return connected_; }
+
     // Check if camera is running
     bool is_running() const { return running_; }
 
@@ -75,8 +64,8 @@ public:
     using FrameCallback = std::function<void(const Frame&)>;
     void set_frame_callback(FrameCallback callback);
 
-    // Reconnect to camera
-    bool reconnect();
+    // Reconnect to camera (IFrameSource)
+    bool reconnect() override;
 
     // Update camera URL
     void set_url(const std::string& url);
