@@ -30,6 +30,8 @@ import { AccountingSettingsService } from "../../accounting/services/accounting-
 import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
 import { KdsGateway } from "../../kds/kds.gateway";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { PaymentMathCalculator } from "./payment-math.calculator";
+import { PaymentFinalizer } from "./payment-finalizer.service";
 
 // v2.8.97 — single source of truth for the cross-payment-path rounding
 // tolerance. Both the single-payment overpayment check and the
@@ -41,6 +43,20 @@ const PAYMENT_TOLERANCE = new Prisma.Decimal("0.01");
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+
+  // PASS 1 / PASS 2 of the refactor split the pure per-item math and the
+  // post-/in-transaction finalization cluster out of this 2158-LOC class
+  // into PaymentMathCalculator + PaymentFinalizer. Both are normally
+  // DI-injected (registered in orders.module.ts). They are declared as
+  // trailing optional constructor params so the existing unit specs that
+  // construct PaymentsService positionally with the original 9 arguments
+  // keep working — when omitted, the constructor builds equivalent
+  // instances from this class's own (already-injected) dependencies, so
+  // behaviour is byte-identical whether DI wires them or a test omits
+  // them. PaymentsService STILL owns every $transaction boundary; the
+  // finalizer methods all take `tx` as their first param.
+  private readonly math: PaymentMathCalculator;
+  private readonly finalizer: PaymentFinalizer;
 
   constructor(
     private prisma: PrismaService,
@@ -58,7 +74,23 @@ export class PaymentsService {
     @Optional()
     @Inject(forwardRef(() => KdsGateway))
     private kdsGateway?: KdsGateway,
-  ) {}
+    @Optional()
+    paymentMathCalculator?: PaymentMathCalculator,
+    @Optional()
+    paymentFinalizer?: PaymentFinalizer,
+  ) {
+    this.math = paymentMathCalculator ?? new PaymentMathCalculator();
+    this.finalizer =
+      paymentFinalizer ??
+      new PaymentFinalizer(
+        this.prisma,
+        this.receiptSnapshotBuilder,
+        this.loyaltyService,
+        this.salesInvoiceService,
+        this.accountingSettingsService,
+        this.kdsGateway,
+      );
+  }
 
   /**
    * Wrapper around KdsGateway.emitPaymentSuccess that swallows
@@ -76,25 +108,8 @@ export class PaymentsService {
     payment: any,
     initiatedByUserId: string | null = null,
   ): void {
-    if (!this.kdsGateway) return;
-    try {
-      this.kdsGateway.emitPaymentSuccess(
-        tenantId,
-        payment.branchId,
-        {
-          id: payment.id,
-          orderId: payment.orderId,
-          amount: payment.amount,
-          method: payment.method,
-          receiptSnapshot: payment.receiptSnapshot,
-        },
-        initiatedByUserId,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `payment:success emit failed for ${payment?.id}: ${(err as Error).message}`,
-      );
-    }
+    // PASS 2 — delegates to PaymentFinalizer (post-commit socket emit).
+    this.finalizer.safeEmitPaymentSuccess(tenantId, payment, initiatedByUserId);
   }
 
   /**
@@ -111,14 +126,9 @@ export class PaymentsService {
     orderId: string,
     tenantId: string,
   ): Promise<void> {
-    // Restrict the lock to (id, tenantId) so a foreign tenantId can't
-    // squat a row it doesn't own.
-    const rows = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM orders WHERE id = ${orderId} AND "tenantId" = ${tenantId} FOR UPDATE
-    `;
-    if (rows.length === 0) {
-      throw new NotFoundException("Order not found");
-    }
+    // PASS 2 — delegates to PaymentFinalizer. Called as the first DB op
+    // inside each $transaction the facade still owns.
+    return this.finalizer.acquireOrderLock(tx, orderId, tenantId);
   }
 
   /**
@@ -165,19 +175,17 @@ export class PaymentsService {
     orderId: string,
     tenantId: string,
   ): Promise<void> {
-    const now = new Date();
-    const pending = await tx.pendingSelfPayment.findFirst({
-      where: { tenantId, status: "PENDING", expiresAt: { gt: now } },
-      select: { itemsByOrder: true, expiresAt: true },
-    });
-    if (!pending) return;
-    const buckets = pending.itemsByOrder as Array<{ orderId: string }>;
-    if (!Array.isArray(buckets)) return;
-    if (buckets.some((b) => b?.orderId === orderId)) {
-      throw new ConflictException(
-        "A customer is currently paying for this order via PayTR — wait for that intent to finalize (up to 15 minutes) before collecting at the POS.",
-      );
-    }
+    // PASS 2 — the self-pay conflict guard moved into PaymentFinalizer
+    // verbatim (prisma.pendingSelfPayment.findFirst, same ConflictException).
+    // This thin facade wrapper is retained so BOTH call sites in create()
+    // and splitBill() — the two paths the v3.0.1 round-5 audit hardened —
+    // keep calling `this.assertNoConflictingSelfPayIntent(tx, ...)` with
+    // an unchanged signature and unchanged call order inside each $transaction.
+    return this.finalizer.assertNoConflictingSelfPayIntent(
+      tx,
+      orderId,
+      tenantId,
+    );
   }
 
   private async finalizeFullyPaid(
@@ -194,94 +202,15 @@ export class PaymentsService {
     closingAmount: Prisma.Decimal,
     opts: { bumpCustomerStats?: boolean } = { bumpCustomerStats: true },
   ): Promise<void> {
-    // Resolve customer link (use existing customerId from order if already linked).
-    let customerId: string | null = order.customerId;
-    if (!customerId && customerPhone) {
-      let customer = await tx.customer.findFirst({
-        where: { phone: customerPhone, tenantId: order.tenantId },
-      });
-      if (!customer) {
-        customer = await tx.customer.create({
-          data: {
-            phone: customerPhone,
-            name: `Customer ${customerPhone}`,
-            tenantId: order.tenantId,
-          },
-        });
-      }
-      customerId = customer.id;
-    }
-
-    // Never overwrite a customerPhone already stored on the order — a
-    // wrong/typo phone on the closing payment would otherwise clobber
-    // the linkage made at order creation time (or by the customer
-    // self-order flow).
-    const phoneToWrite =
-      customerPhone && !order.customerPhone ? customerPhone : undefined;
-
-    await tx.order.update({
-      where: { id: order.id },
-      data: {
-        status: OrderStatus.PAID,
-        paidAt: new Date(),
-        ...(customerId && customerId !== order.customerId && { customerId }),
-        ...(phoneToWrite && { customerPhone: phoneToWrite }),
-      },
-    });
-
-    // Release the table when no other active orders remain on it.
-    // v2.8.93 — table update uses updateMany with (id, tenantId) compound
-    // WHERE so a wrong/spoofed tableId can never mark another tenant's
-    // table AVAILABLE. The pre-fix used update() with id-only which would
-    // happily mutate any tenant's row that matched on id.
-    if (order.tableId) {
-      const otherActiveOrders = await tx.order.count({
-        where: {
-          tableId: order.tableId,
-          id: { not: order.id },
-          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
-        },
-      });
-      if (otherActiveOrders === 0) {
-        await tx.table.updateMany({
-          where: { id: order.tableId, tenantId: order.tenantId },
-          data: { status: TableStatus.AVAILABLE },
-        });
-      }
-    }
-
-    // Bump customer lifetime stats. Opt-out exists because the prior
-    // splitBill behaviour did NOT touch customer.totalSpent (the
-    // DTO had a customerPhone field but the service never used it).
-    // Keeping the helper opt-in for that path avoids silently
-    // inflating CRM totals on the first deploy after the refactor.
-    if (opts.bumpCustomerStats !== false && customerId) {
-      // v2.8.93 — findFirst with tenantId scope replaces findUnique({id}).
-      // Same risk class as the table update above: a customerId pointing
-      // at another tenant's customer would otherwise let payment
-      // finalization mutate totalOrders/totalSpent on the foreign row.
-      const customer = await tx.customer.findFirst({
-        where: { id: customerId, tenantId: order.tenantId },
-      });
-      if (customer) {
-        const newTotalOrders = customer.totalOrders + 1;
-        const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(
-          closingAmount,
-        );
-        const newAverageOrder = newTotalSpent.div(newTotalOrders);
-        // updateMany propagates the tenantId filter through the write.
-        // Belt-and-suspenders with the findFirst above.
-        await tx.customer.updateMany({
-          where: { id: customerId, tenantId: order.tenantId },
-          data: {
-            totalOrders: newTotalOrders,
-            totalSpent: newTotalSpent,
-            averageOrder: newAverageOrder,
-            lastVisit: new Date(),
-          },
-        });
-      }
-    }
+    // PASS 2 — PAID-transition side-effects moved into PaymentFinalizer
+    // verbatim. Still invoked inside the facade-owned $transaction.
+    return this.finalizer.finalizeFullyPaid(
+      tx,
+      order,
+      customerPhone,
+      closingAmount,
+      opts,
+    );
   }
 
   /**
@@ -295,35 +224,8 @@ export class PaymentsService {
     orderId: string,
     tenantId: string,
   ): Promise<void> {
-    try {
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: {
-          customerId: true,
-          finalAmount: true,
-          status: true,
-          orderNumber: true,
-        },
-      });
-      if (!order?.customerId || order.status !== "PAID") return;
-      // v2.8.96 — pass the Decimal through directly. Pre-fix the
-      // Number(finalAmount.toString()) bounce risked precision loss
-      // (Number_MAX_SAFE for huge aggregates, IEEE-754 drift for
-      // future fractional pointsPerCurrencyUnit). loyalty service
-      // now accepts number | string | Decimal and routes through
-      // Prisma.Decimal arithmetic internally.
-      await this.loyaltyService.earnPointsFromOrder(
-        order.customerId,
-        tenantId,
-        orderId,
-        order.orderNumber ?? "",
-        order.finalAmount as any,
-      );
-    } catch (err: any) {
-      this.logger.warn(
-        `loyalty.earnPointsFromOrder post-commit failed for order=${orderId}: ${err?.message ?? err}`,
-      );
-    }
+    // PASS 2 — post-commit loyalty crediting moved into PaymentFinalizer.
+    return this.finalizer.creditLoyaltyForFinalizedOrder(orderId, tenantId);
   }
 
   /**
@@ -344,44 +246,13 @@ export class PaymentsService {
     tenantId: string,
     paymentInputs: { method: string; transactionId: string | null },
   ): Promise<Prisma.InputJsonValue | typeof Prisma.JsonNull> {
-    try {
-      // Early-exit on tenant lookup miss so we don't burn a wasted
-      // order.findFirst (also keeps test mock sequences stable —
-      // every extra prisma call inside the helper would shift the
-      // `mockResolvedValueOnce` cursor of every payByItems spec).
-      const tenantRow = await tx.tenant.findUnique({
-        where: { id: tenantId },
-        select: { id: true, name: true, currency: true },
-      });
-      if (!tenantRow) return Prisma.JsonNull;
-      const orderForSnap = await tx.order.findFirst({
-        where: { id: orderId, tenantId },
-        include: {
-          orderItems: {
-            include: {
-              product: true,
-              modifiers: { include: { modifier: true } },
-            },
-          },
-          table: true,
-        },
-      });
-      if (!orderForSnap) return Prisma.JsonNull;
-      return this.receiptSnapshotBuilder.buildReceiptSnapshot({
-        tenant: tenantRow,
-        order: ReceiptSnapshotBuilder.toBuilderOrder(orderForSnap),
-        payment: {
-          method: paymentInputs.method,
-          transactionId: paymentInputs.transactionId,
-          paidAt: new Date(),
-        },
-      }) as unknown as Prisma.InputJsonValue;
-    } catch (snapErr) {
-      this.logger.warn(
-        `Failed to build receipt snapshot for order ${orderId}: ${(snapErr as Error).message}`,
-      );
-      return Prisma.JsonNull;
-    }
+    // PASS 2 — receipt-snapshot construction moved into PaymentFinalizer.
+    return this.finalizer.buildReceiptSnapshotForPayment(
+      tx,
+      orderId,
+      tenantId,
+      paymentInputs,
+    );
   }
 
   /**
@@ -403,57 +274,8 @@ export class PaymentsService {
     },
     phone: string,
   ): Promise<void> {
-    let customer = await tx.customer.findFirst({
-      where: { phone, tenantId: payment.tenantId },
-    });
-    if (!customer) {
-      customer = await tx.customer.create({
-        data: {
-          phone,
-          name: `Customer ${phone}`,
-          tenantId: payment.tenantId,
-        },
-      });
-    }
-
-    // Link the payment row to the customer for audit / per-customer
-    // history reads. The Payment.customerId column was added in the
-    // 20260513150000_payment_customer_link migration.
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: { customerId: customer.id },
-    });
-
-    // Has this customer already paid for this order? Count any prior
-    // completed Payment on the same order with the same customerId.
-    // If so we only bump totalSpent (no double-count of totalOrders).
-    const priorOnThisOrder = await tx.payment.count({
-      where: {
-        orderId: payment.orderId,
-        status: PaymentStatus.COMPLETED,
-        customerId: customer.id,
-        id: { not: payment.id },
-      },
-    });
-
-    const amount = new Prisma.Decimal(payment.amount);
-    const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(amount);
-    const newTotalOrders =
-      priorOnThisOrder === 0 ? customer.totalOrders + 1 : customer.totalOrders;
-    const newAverage =
-      newTotalOrders > 0
-        ? newTotalSpent.div(newTotalOrders)
-        : new Prisma.Decimal(0);
-
-    await tx.customer.update({
-      where: { id: customer.id },
-      data: {
-        totalSpent: newTotalSpent,
-        totalOrders: newTotalOrders,
-        averageOrder: newAverage,
-        lastVisit: new Date(),
-      },
-    });
+    // PASS 2 — per-payment CRM linkage moved into PaymentFinalizer.
+    return this.finalizer.linkCustomerForPayment(tx, payment, phone);
   }
 
   /**
@@ -472,54 +294,13 @@ export class PaymentsService {
     tenantId: string,
     paymentId?: string,
   ): Promise<void> {
-    if (!this.salesInvoiceService || !this.accountingSettingsService) return;
-    try {
-      const accSettings =
-        await this.accountingSettingsService.findByTenant(tenantId);
-      if (!accSettings.autoGenerateInvoice) return;
-      let lastErr: unknown;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          if (paymentId) {
-            await this.salesInvoiceService.createFromPayment(
-              paymentId,
-              tenantId,
-            );
-          } else {
-            await this.salesInvoiceService.createFromOrder(orderId, tenantId);
-          }
-          lastErr = undefined;
-          break;
-        } catch (err) {
-          lastErr = err;
-          if (attempt < 3) {
-            await new Promise((r) => setTimeout(r, attempt * 250));
-          }
-        }
-      }
-      if (lastErr) {
-        const msg =
-          lastErr instanceof Error ? lastErr.message : String(lastErr);
-        const stack = lastErr instanceof Error ? lastErr.stack : undefined;
-        this.logger.error(
-          `REVENUE_SYNC_FAILED: auto-invoice for order ${orderId}: ${msg}`,
-          stack,
-        );
-        Sentry.captureException(lastErr, {
-          tags: { event: "REVENUE_SYNC_FAILED", tenantId },
-          extra: { orderId },
-        });
-      }
-    } catch (err: any) {
-      this.logger.error(
-        `Auto-invoice settings lookup failed for order ${orderId}: ${err.message}`,
-        err.stack,
-      );
-      Sentry.captureException(err, {
-        tags: { event: "REVENUE_SYNC_FAILED", tenantId },
-        extra: { orderId, phase: "settings-lookup" },
-      });
-    }
+    // PASS 2 — bounded-retry auto-invoice trigger moved into
+    // PaymentFinalizer. Runs AFTER the outer $transaction commits.
+    return this.finalizer.maybeGenerateAutoInvoice(
+      orderId,
+      tenantId,
+      paymentId,
+    );
   }
 
   async create(
@@ -1295,41 +1076,27 @@ export class PaymentsService {
       totalAmount: Prisma.Decimal | number | string;
     },
   ): Prisma.Decimal {
-    return this.perUnitGross(item).mul(this.discountMultiplier(order));
+    // PASS 1 — delegates to PaymentMathCalculator. Kept public on the
+    // facade because customer-self-pay.service.ts calls
+    // `paymentsService.derivePerUnitNet(...)` to pre-compute the PayTR
+    // charge amount; signature unchanged.
+    return this.math.derivePerUnitNet(item, order);
   }
 
   private perUnitGross(item: {
     quantity: number;
     subtotal: Prisma.Decimal | number | string;
   }): Prisma.Decimal {
-    if (item.quantity <= 0) return new Prisma.Decimal(0);
-    return new Prisma.Decimal(item.subtotal).div(item.quantity);
+    return this.math.perUnitGross(item);
   }
 
-  /**
-   * Order-level discount multiplier so per-item math distributes the
-   * discount pro-rata across line items. `order.discount` is the only
-   * order-level discount today; it applies against `order.totalAmount`
-   * (pre-discount). Returns `1 - discount/totalAmount`, clamped to [0,1].
-   */
   private discountMultiplier(order: {
     discount: Prisma.Decimal | number | string;
     totalAmount: Prisma.Decimal | number | string;
   }): Prisma.Decimal {
-    const totalAmount = new Prisma.Decimal(order.totalAmount);
-    if (totalAmount.lte(0)) return new Prisma.Decimal(1);
-    const ratio = new Prisma.Decimal(order.discount).div(totalAmount);
-    const factor = new Prisma.Decimal(1).sub(ratio);
-    if (factor.lt(0)) return new Prisma.Decimal(0);
-    if (factor.gt(1)) return new Prisma.Decimal(1);
-    return factor;
+    return this.math.discountMultiplier(order);
   }
 
-  /**
-   * Discount-adjusted total for an OrderItem (all units). See the tax
-   * note on `perUnitGross` — `subtotal` is the authoritative total
-   * value of the item (KDV-inclusive, modifier-inclusive).
-   */
   private itemTotalWithDiscount(
     item: { subtotal: Prisma.Decimal | number | string },
     order: {
@@ -1337,9 +1104,7 @@ export class PaymentsService {
       totalAmount: Prisma.Decimal | number | string;
     },
   ): Prisma.Decimal {
-    return new Prisma.Decimal(item.subtotal).mul(
-      this.discountMultiplier(order),
-    );
+    return this.math.itemTotalWithDiscount(item, order);
   }
 
   /**
