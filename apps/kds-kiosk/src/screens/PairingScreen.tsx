@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { pairDevice } from '../api/mesh';
 import type { DeviceToken } from '../store/deviceToken';
+import { normalizePairCode } from './pairingLogic';
 
 /**
  * First-boot screen. The operator scans (or types) the 6-character pair
@@ -23,7 +24,7 @@ export default function PairingScreen({ onPaired }: { onPaired: (token: DeviceTo
     setSubmitting(true);
     setError(null);
     try {
-      const out = await pairDevice(apiUrl, pairCode.trim().toUpperCase());
+      const out = await pairDevice(apiUrl, normalizePairCode(pairCode));
       // Persist ONLY after the server has accepted the pair. The earlier
       // version wrote pre-pair, so a typo or attacker URL became the
       // persisted default even on failure — the next pair attempt's
