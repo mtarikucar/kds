@@ -4,10 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 import { CreateShiftTemplateDto } from "../dto/create-shift-template.dto";
 import { UpdateShiftTemplateDto } from "../dto/update-shift-template.dto";
 

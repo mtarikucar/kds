@@ -9,10 +9,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { KdsGateway } from "../../kds/kds.gateway";
 import { CreateSwapRequestDto } from "../dto/create-swap-request.dto";
 import { SwapRequestStatus } from "../constants/personnel.enum";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class ShiftSwapService {

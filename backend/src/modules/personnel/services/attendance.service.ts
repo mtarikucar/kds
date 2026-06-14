@@ -12,10 +12,7 @@ import {
 } from "../dto/attendance-query.dto";
 import { paginated } from "../../../common/pagination";
 import { getTenantMidnight } from "../../../common/helpers/timezone.helper";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class AttendanceService {

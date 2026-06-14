@@ -38,10 +38,7 @@ export class FiscalController {
     summary: "Queued + failed receipts — drives the manual recovery panel",
   })
   pending(@CurrentScope() scope: BranchScope, @Query("limit") limit?: string) {
-    return this.fiscal.listPending(
-      scope,
-      limit ? parseInt(limit, 10) : 100,
-    );
+    return this.fiscal.listPending(scope, limit ? parseInt(limit, 10) : 100);
   }
 
   @Post("receipts/:id/retry")

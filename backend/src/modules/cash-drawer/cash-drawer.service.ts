@@ -10,10 +10,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { CreateCashDrawerMovementDto } from "./dto/create-cash-drawer-movement.dto";
 import { RejectCashDrawerMovementDto } from "./dto/reject-cash-drawer-movement.dto";
 import { UserRole } from "../../common/constants/roles.enum";
-import {
-  BranchScope,
-  branchScope,
-} from "../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 
 /**
  * v2.8.99 — cash drawer movement service.

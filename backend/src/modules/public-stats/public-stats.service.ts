@@ -176,12 +176,14 @@ export class PublicStatsService {
    */
   private stripTags(v: string | undefined): string | undefined {
     if (v == null) return v;
-    return v
-      // Drop <script>/<style> blocks wholesale so no inert-but-ugly inner
-      // text (e.g. "alert(1)") survives, then strip any remaining tags.
-      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
-      .replace(/<[^>]*>/g, "")
-      .trim();
+    return (
+      v
+        // Drop <script>/<style> blocks wholesale so no inert-but-ugly inner
+        // text (e.g. "alert(1)") survives, then strip any remaining tags.
+        .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+        .replace(/<[^>]*>/g, "")
+        .trim()
+    );
   }
 
   async submitReview(dto: CreateReviewDto, ip: string) {

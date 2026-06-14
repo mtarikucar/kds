@@ -4,10 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 import { AssignShiftDto, BulkAssignShiftDto } from "../dto/assign-shift.dto";
 
 @Injectable()

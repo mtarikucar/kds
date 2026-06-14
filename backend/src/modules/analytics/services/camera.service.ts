@@ -12,10 +12,7 @@ import {
   decryptString,
   encryptString,
 } from "../../../common/helpers/encryption.helper";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 /**
  * Replace `user:pass` in an RTSP/ONVIF URL with `***:***` so responses

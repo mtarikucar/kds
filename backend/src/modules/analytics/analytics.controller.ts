@@ -461,10 +461,7 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: "Get insights summary" })
   @ApiResponse({ status: 200, description: "Insights summary counts" })
-  async getInsightsSummary(
-    @Request() req,
-    @CurrentScope() scope: BranchScope,
-  ) {
+  async getInsightsSummary(@Request() req, @CurrentScope() scope: BranchScope) {
     return this.insightsService.getInsightSummary(req.tenantId, scope.branchId);
   }
 
@@ -494,7 +491,11 @@ export class AnalyticsController {
     @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
   ) {
-    return this.insightsService.getInsightById(req.tenantId, scope.branchId, id);
+    return this.insightsService.getInsightById(
+      req.tenantId,
+      scope.branchId,
+      id,
+    );
   }
 
   @Put("insights/:id/status")

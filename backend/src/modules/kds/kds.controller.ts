@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Param,
-  Body,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, Get, Patch, Param, Body, UseGuards } from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
@@ -50,11 +43,7 @@ export class KdsController {
     @Body() updateStatusDto: UpdateOrderStatusDto,
     @CurrentScope() scope: BranchScope,
   ) {
-    return this.kdsService.updateOrderStatus(
-      scope,
-      id,
-      updateStatusDto.status,
-    );
+    return this.kdsService.updateOrderStatus(scope, id, updateStatusDto.status);
   }
 
   @Patch("order-items/:id/status")
@@ -73,11 +62,7 @@ export class KdsController {
     // Iter-91: the item id comes from the URL path, not the body — the
     // previous DTO duplicated the field in both places and the service
     // trusted the body, which let a client desync URL vs target item.
-    return this.kdsService.updateOrderItemStatus(
-      scope,
-      id,
-      updateDto.status,
-    );
+    return this.kdsService.updateOrderItemStatus(scope, id, updateDto.status);
   }
 
   @Patch("orders/:id/cancel")

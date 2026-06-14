@@ -56,7 +56,9 @@ export class CustomerOrdersService {
   /** Prisma.Decimal | number | string → integer cents (no float boundary). */
   private toIntCents(v: unknown): number | undefined {
     if (v == null) return undefined;
-    return Number(new Prisma.Decimal(v as Prisma.Decimal.Value).toFixed(2).replace(".", ""));
+    return Number(
+      new Prisma.Decimal(v as Prisma.Decimal.Value).toFixed(2).replace(".", ""),
+    );
   }
 
   /**

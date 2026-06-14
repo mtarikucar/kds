@@ -14,10 +14,7 @@ import { OrderItemStatus } from "./dto/update-order-item-status.dto";
 import { KdsGateway } from "./kds.gateway";
 import { DeliveryStatusSyncService } from "../delivery-platforms/services/delivery-status-sync.service";
 import { StockDeductionService } from "../stock-management/services/stock-deduction.service";
-import {
-  BranchScope,
-  branchScope,
-} from "../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 
 @Injectable()
 export class KdsService {
@@ -84,11 +81,7 @@ export class KdsService {
     });
   }
 
-  async updateOrderStatus(
-    scope: BranchScope,
-    id: string,
-    status: OrderStatus,
-  ) {
+  async updateOrderStatus(scope: BranchScope, id: string, status: OrderStatus) {
     // Verify order exists and belongs to this tenant AND branch — a
     // kitchen display is pinned to one branch, so an id from another
     // branch must read as not-found rather than be mutable.

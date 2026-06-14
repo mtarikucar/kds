@@ -1,10 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 import { PerformanceQueryDto } from "../dto/performance-query.dto";
 
 @Injectable()
