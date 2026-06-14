@@ -5,6 +5,7 @@ import { OrderPricingCalculator } from "./services/order-pricing.calculator";
 import { PaymentsService } from "./services/payments.service";
 import { PaymentMathCalculator } from "./services/payment-math.calculator";
 import { PaymentFinalizer } from "./services/payment-finalizer.service";
+import { PaymentValidator } from "./services/payment-validator.service";
 import { ReceiptSnapshotBuilder } from "./services/receipt-snapshot.builder";
 import { OrdersController } from "./controllers/orders.controller";
 import { PaymentsController } from "./controllers/payments.controller";
@@ -42,6 +43,10 @@ import { StockManagementModule } from "../stock-management/stock-management.modu
     // thin facade that owns every $transaction boundary.
     PaymentMathCalculator,
     PaymentFinalizer,
+    // PASS 3 — pure validation seams (order-state guards, split-total
+    // tolerance, item membership/dedup) lifted out of create/splitBill/
+    // payByItems. Zero deps, like PaymentMathCalculator.
+    PaymentValidator,
     ReceiptSnapshotBuilder,
   ],
   exports: [OrdersService, PaymentsService, ReceiptSnapshotBuilder],

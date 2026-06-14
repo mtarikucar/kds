@@ -345,6 +345,57 @@ describe('PaymentsService — characterization (create / splitBill / updateStatu
       ).resolves.toBeDefined();
       expect(prisma.payment.create).toHaveBeenCalled();
     });
+
+    // ── in-tx order-state guards (the block extracted into the validator).
+    // These pin the exact exception + message + that NO payment row is
+    // written when the re-fetched order is in a non-payable state, and
+    // that the PAID/CANCELLED guards fire BEFORE the self-pay guard.
+    it('rejects when the re-fetched order is already PAID', async () => {
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(
+        makeOrder({ status: OrderStatus.PAID }),
+      );
+
+      await expect(
+        svc.create(ORDER_ID, { amount: 100.0, method: 'CASH' as any }, TENANT_ID),
+      ).rejects.toThrow('Order is already paid');
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      // Guard fires before the self-pay intent lookup.
+      expect(prisma.pendingSelfPayment.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the re-fetched order is CANCELLED', async () => {
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(
+        makeOrder({ status: OrderStatus.CANCELLED }),
+      );
+
+      await expect(
+        svc.create(ORDER_ID, { amount: 100.0, method: 'CASH' as any }, TENANT_ID),
+      ).rejects.toThrow('Cannot pay for a cancelled order');
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the order requires approval and is PENDING_APPROVAL', async () => {
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(
+        makeOrder({
+          status: OrderStatus.PENDING_APPROVAL,
+          requiresApproval: true,
+        }),
+      );
+
+      await expect(
+        svc.create(ORDER_ID, { amount: 100.0, method: 'CASH' as any }, TENANT_ID),
+      ).rejects.toThrow('Order requires approval before payment');
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the order vanished between pre-check and tx', async () => {
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        svc.create(ORDER_ID, { amount: 100.0, method: 'CASH' as any }, TENANT_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
   });
 
   // ────────────────────────────────────────────────────────────────────
@@ -525,6 +576,81 @@ describe('PaymentsService — characterization (create / splitBill / updateStatu
           TENANT_ID,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // Pin the OTHER tolerance direction + the exact message wording. The
+    // amount-validation block (orderAmount / remaining / totalSplitAmount
+    // + ±0.01 tolerance compare) is the seam extracted into the validator;
+    // both directions and the message string must stay byte-identical.
+    it('rejects a split whose total EXCEEDS remaining beyond tolerance, with the exact message', async () => {
+      stageOrderForSplit();
+
+      await expect(
+        svc.splitBill(
+          ORDER_ID,
+          {
+            splitType: 'CUSTOM' as any,
+            payments: [
+              { amount: 60.0, method: 'CASH' as any },
+              { amount: 41.0, method: 'CASH' as any },
+            ],
+          },
+          TENANT_ID,
+        ),
+      ).rejects.toThrow(
+        'Split total (101.00) exceeds remaining amount (100.00)',
+      );
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts a split exactly at the +0.01 tolerance edge', async () => {
+      stageOrderForSplit();
+      (prisma.payment.create as unknown as jest.Mock).mockImplementation(
+        async ({ data }: any) => ({
+          id: `pay-${data.amount}`,
+          orderId: ORDER_ID,
+          branchId: BRANCH_ID,
+          ...data,
+          status: PaymentStatus.COMPLETED,
+        }),
+      );
+      // Not fully paid post-insert so finalize/customer paths stay out of it.
+      (prisma.payment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('50.00') },
+      });
+
+      // remaining = 100.00; total = 100.01 == remaining + tolerance → allowed.
+      await expect(
+        svc.splitBill(
+          ORDER_ID,
+          {
+            splitType: 'CUSTOM' as any,
+            payments: [
+              { amount: 50.0, method: 'CASH' as any },
+              { amount: 50.01, method: 'CASH' as any },
+            ],
+          },
+          TENANT_ID,
+        ),
+      ).resolves.toBeDefined();
+      expect(prisma.payment.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a split on a CANCELLED order (pre-tx guard)', async () => {
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(
+        makeOrder({ status: OrderStatus.CANCELLED }),
+      );
+
+      await expect(
+        svc.splitBill(
+          ORDER_ID,
+          {
+            splitType: 'CUSTOM' as any,
+            payments: [{ amount: 100.0, method: 'CASH' as any }],
+          },
+          TENANT_ID,
+        ),
+      ).rejects.toThrow('Cannot pay for a cancelled order');
     });
   });
 
