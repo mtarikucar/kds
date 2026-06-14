@@ -15,7 +15,6 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
-import { UpdateOnboardingDto } from "./dto/update-onboarding.dto";
 import { AuthService } from "../auth/auth.service";
 import { UserRole } from "../../common/constants/roles.enum";
 import { EntitlementService } from "../entitlements/entitlement.service";
@@ -787,62 +786,4 @@ export class UsersService {
     });
   }
 
-  async getOnboarding(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { onboardingData: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    const defaultOnboarding = {
-      hasSeenWelcome: false,
-      tourProgress: {},
-      skipAllTours: false,
-    };
-
-    return user.onboardingData || defaultOnboarding;
-  }
-
-  async updateOnboarding(
-    userId: string,
-    updateOnboardingDto: UpdateOnboardingDto,
-  ) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { onboardingData: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    const currentData = (user.onboardingData as any) || {
-      hasSeenWelcome: false,
-      tourProgress: {},
-      skipAllTours: false,
-    };
-
-    const updatedData = {
-      hasSeenWelcome:
-        updateOnboardingDto.hasSeenWelcome ??
-        currentData.hasSeenWelcome ??
-        false,
-      skipAllTours:
-        updateOnboardingDto.skipAllTours ?? currentData.skipAllTours ?? false,
-      tourProgress: {
-        ...(currentData.tourProgress || {}),
-        ...(updateOnboardingDto.tourProgress || {}),
-      },
-    };
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { onboardingData: updatedData as any },
-    });
-
-    return updatedData;
-  }
 }
