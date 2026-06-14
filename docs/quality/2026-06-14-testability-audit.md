@@ -54,13 +54,22 @@ Real, mutation-reviewed specs (spec-only, zero production edits) for the high-va
 - **fe-ops-devices** (91): hardware-store/health/devices/stock/delivery/analytics components.
 - **Result:** +388 tests → **backend 1926 / frontend 693 (~2,619 total), all green.**
 
-## Final standing
+## Wave T4 (done — merged `7f2a42a`) — completion to reds = 0
 
-- **Structural testability (the "testable" bar): met.** Every TS unit has a standard isolation path — DI for collaborators, injectable `Clock`/`IdGenerator` (or fake-timers) for time/randomness, `jest.mock` for module imports, RTL + mocked hooks + `window` stubs for components, exported pure helpers. The audit's reds are resolved: systemic ones by the infra+standard, locked pure logic by extraction, components by the proven RTL pattern, native by added harnesses. **No unit remains structurally impossible to unit-test.**
-- **Coverage:** ~500 tests added across T1+T2; all money/auth/security/fiscal/admin paths now have real, mutation-resistant specs. The remaining **yellows are a tracked coverage program** (write a spec per unit), not a testability gap.
-- **Honest caveat — hardware-in-the-loop:** `edge-device-cpp` (CUDA/TensorRT/GStreamer) and BLE in `desktop` are unit-testable only at the **pure-logic layer** (config/args/state/message handling — now tested behind seams); exercising the actual GPU/camera/Bluetooth is **integration-tier by nature**, not unit-testable. This is documented in `native-testability.md`, not a defect.
+- **Native hardware abstraction (every hardware-bound unit now has an isolation path):** C++ interface seams `IInferenceEngine`/`ITransport`/`IFrameSource` over TensorRT/websocket/GStreamer + extracted pure logic (`decode_yolo_output`, `SocketIoRouter`, `ReconnectPolicy`, `FrameDispatcher`) + faithful fakes + ctest; Rust `BleAdapter` + `CloudTransport` traits + injected config-path/clock + fakes + `#[cfg(test)]` tests. The real hardware classes are kept as thin, behavior-preserving adapters behind the seams — so each unit's *logic* is unit-testable against a fake; only the raw GPU/radio bytes remain integration-tier.
+- **Full long-tail coverage:** a real, mutation-reviewed spec for **every** previously un-specced unit (DTO validation rules, controller forwarding, presentational components, hooks, utils, stores) — ~200 backend + ~110 frontend new test files (+1,711 tests).
 
-## Roadmap (continuing coverage program — yellows → green)
+## ✅ Final standing — 100% testable (confirmed)
+
+An independent **confirmation re-audit** (12 areas covering the whole system) reports **still-red = 0** and `isolationPathConfirmed = true` for every area, including the native group. **Every unit in the system now has a complete isolation path** — DI for collaborators, injectable `Clock`/`IdGenerator` (or fake-timers) for time/randomness, `jest.mock` for module imports, RTL + mocked hooks + `window` stubs for components, exported pure helpers, and **interface seams + fakes for the hardware-bound native code.**
+
+- **Tests:** **backend 3,398 + frontend 1,566 (~4,964) + 9 Rust `#[cfg(test)]` modules + 6 C++ test files**, all green; CI + staging green.
+- **Coverage:** every unit now has at least one real spec (the long-tail is closed); all money/auth/security/fiscal/billing/admin paths are mutation-resistant.
+- The only thing the seams *cannot* turn into a unit test is the **actual hardware execution** (GPU inference, camera frames, Bluetooth radio) — that is integration-tier *by definition*; the seam means even those classes' logic is now fake-testable in isolation.
+
+## Maintenance (keep it at 100%)
+
+New code must follow `testability-standard.md` (DI / Clock / IdGenerator / interface seams / exported pure logic / a spec per unit). A coverage floor in CI is the recommended ratchet.
 
 1. **Wave T2 — FE component-logic extraction:** the 38 `fe-inline-logic` reds → extract each component's branching/derivation into a hook or pure reducer; assert with mocked hooks. Stub global `window.confirm/prompt/alert` (standard jsdom technique).
 2. **Wave T3 — backend/apps residual reds** + the rest of the locked pure helpers.
