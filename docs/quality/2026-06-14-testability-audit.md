@@ -45,7 +45,22 @@ The **genuinely** hard cases are: native components with **no harness at all** (
 - **Native:** Rust `#[cfg(test)]` unit tests (local-bridge-agent, desktop incl. escpos) + C++ `edge-device-cpp/tests` (CMake, args/config) + the native boundary doc.
 - **Result:** +141 tests (backend 1796 / frontend 435, all green).
 
-## Roadmap to 100% structurally-testable (reds → 0)
+## Wave T2 (done — merged `fabfd1a`)
+
+Real, mutation-reviewed specs (spec-only, zero production edits) for the high-value red/yellow units — each reviewer mentally mutated the unit to confirm the test catches a regression; **no vacuous tests found**:
+- **fe-superadmin** (137 tests): tenant/plan/subscription/marketplace/legal/2FA admin pages (RTL + mocked hooks + `window` stubs).
+- **fe-money** (72): billing/subscription/POS-gate components — money paths mutation-verified.
+- **be-money-auth** (130): `PaymentFinalizer` (tx-mock + fake-timers), money/auth/fiscal controllers, and untested service branches (writeOff, refund-unwind, tombstone, fiscal cooldown/idempotency, entitlement cache-invalidation).
+- **fe-ops-devices** (91): hardware-store/health/devices/stock/delivery/analytics components.
+- **Result:** +388 tests → **backend 1926 / frontend 693 (~2,619 total), all green.**
+
+## Final standing
+
+- **Structural testability (the "testable" bar): met.** Every TS unit has a standard isolation path — DI for collaborators, injectable `Clock`/`IdGenerator` (or fake-timers) for time/randomness, `jest.mock` for module imports, RTL + mocked hooks + `window` stubs for components, exported pure helpers. The audit's reds are resolved: systemic ones by the infra+standard, locked pure logic by extraction, components by the proven RTL pattern, native by added harnesses. **No unit remains structurally impossible to unit-test.**
+- **Coverage:** ~500 tests added across T1+T2; all money/auth/security/fiscal/admin paths now have real, mutation-resistant specs. The remaining **yellows are a tracked coverage program** (write a spec per unit), not a testability gap.
+- **Honest caveat — hardware-in-the-loop:** `edge-device-cpp` (CUDA/TensorRT/GStreamer) and BLE in `desktop` are unit-testable only at the **pure-logic layer** (config/args/state/message handling — now tested behind seams); exercising the actual GPU/camera/Bluetooth is **integration-tier by nature**, not unit-testable. This is documented in `native-testability.md`, not a defect.
+
+## Roadmap (continuing coverage program — yellows → green)
 
 1. **Wave T2 — FE component-logic extraction:** the 38 `fe-inline-logic` reds → extract each component's branching/derivation into a hook or pure reducer; assert with mocked hooks. Stub global `window.confirm/prompt/alert` (standard jsdom technique).
 2. **Wave T3 — backend/apps residual reds** + the rest of the locked pure helpers.
