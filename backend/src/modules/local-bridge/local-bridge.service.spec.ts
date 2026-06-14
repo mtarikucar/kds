@@ -1,6 +1,15 @@
 import { LocalBridgeService } from './local-bridge.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
+/** Minimal ConfigService stub honouring the (key, default) signature. */
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    get: jest.fn((key: string, def?: unknown) =>
+      key in overrides ? overrides[key] : def,
+    ),
+  } as any;
+}
+
 describe('LocalBridgeService', () => {
   let prisma: MockPrismaClient;
   let outbox: { append: jest.Mock };
@@ -9,7 +18,48 @@ describe('LocalBridgeService', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('ok') };
-    svc = new LocalBridgeService(prisma as any, outbox as any);
+    svc = new LocalBridgeService(prisma as any, outbox as any, makeConfig());
+  });
+
+  describe('TOKEN_TTL config', () => {
+    const THIRTY_DAYS_MS = 30 * 24 * 3600 * 1000;
+
+    it('defaults to 30d when LOCAL_BRIDGE_TOKEN_TTL_MS is unset (byte-identical behavior)', async () => {
+      // No env set -> default fed to the stored tokenExpiresAt.
+      const before = Date.now();
+      let captured: any = null;
+      (prisma.localBridgeAgent.updateMany as any).mockImplementation(async ({ data }: any) => {
+        captured = data;
+        return { count: 1 };
+      });
+      (prisma.localBridgeAgent.findFirstOrThrow as any).mockResolvedValue({ id: 'x', tenantId: 't', branchId: 'b' });
+
+      await svc.claim({ provisioningToken: 'x' });
+      const ttl = captured.tokenExpiresAt.getTime() - before;
+      expect(ttl).toBeGreaterThanOrEqual(THIRTY_DAYS_MS - 1000);
+      expect(ttl).toBeLessThanOrEqual(THIRTY_DAYS_MS + 5000);
+    });
+
+    it('honours a LOCAL_BRIDGE_TOKEN_TTL_MS override', async () => {
+      const override = 60 * 60 * 1000; // 1h
+      svc = new LocalBridgeService(
+        prisma as any,
+        outbox as any,
+        makeConfig({ LOCAL_BRIDGE_TOKEN_TTL_MS: override }),
+      );
+      const before = Date.now();
+      let captured: any = null;
+      (prisma.localBridgeAgent.updateMany as any).mockImplementation(async ({ data }: any) => {
+        captured = data;
+        return { count: 1 };
+      });
+      (prisma.localBridgeAgent.findFirstOrThrow as any).mockResolvedValue({ id: 'x', tenantId: 't', branchId: 'b' });
+
+      await svc.claim({ provisioningToken: 'x' });
+      const ttl = captured.tokenExpiresAt.getTime() - before;
+      expect(ttl).toBeGreaterThanOrEqual(override - 1000);
+      expect(ttl).toBeLessThanOrEqual(override + 5000);
+    });
   });
 
   it('createSlot rejects branches in other tenants (compound WHERE returns null)', async () => {

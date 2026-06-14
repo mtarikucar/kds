@@ -164,4 +164,90 @@ describe('WebhookDeliveryWorkerService.tick', () => {
     expect(updated.lastStatusCode).toBe(0);
     expect(updated.lastResponseSnippet).toMatch(/ECONNRESET/);
   });
+
+  // ── Track 2 domain counter: webhook_delivery_total ─────────────────
+  describe('webhook_delivery_total counter', () => {
+    let metrics: { incCounter: jest.Mock };
+
+    beforeEach(() => {
+      metrics = { incCounter: jest.fn() };
+      const outbound: any = { async unsealSecret() { return 'test-raw-secret'; } };
+      svc = new WebhookDeliveryWorkerService(prisma as any, outbound, metrics as any);
+    });
+
+    it('records result=success on a 2xx delivery', async () => {
+      (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
+      (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: { foo: 'bar' } });
+      (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1' });
+      (global as any).fetch = jest.fn().mockResolvedValue({ status: 200, ok: true, text: async () => 'ok' });
+
+      await svc.tickOnce();
+
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'webhook_delivery_total',
+        expect.any(String),
+        { result: 'success' },
+      );
+    });
+
+    it('records result=failure on a non-2xx response', async () => {
+      (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
+      (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: {} });
+      (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1', consecutiveFailures: 1 });
+      (global as any).fetch = jest.fn().mockResolvedValue({ status: 503, ok: false, text: async () => 'busy' });
+
+      await svc.tickOnce();
+
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'webhook_delivery_total',
+        expect.any(String),
+        { result: 'failure' },
+      );
+    });
+
+    it('records result=failure on a network throw', async () => {
+      (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
+      (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: {} });
+      (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      (global as any).fetch = jest.fn().mockRejectedValue(new Error('ECONNRESET'));
+
+      await svc.tickOnce();
+
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'webhook_delivery_total',
+        expect.any(String),
+        { result: 'failure' },
+      );
+    });
+
+    it('records result=failure when the source payload was purged', async () => {
+      (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
+      (prisma.outboxEvent.findUnique as any).mockResolvedValue(null); // purged
+      (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      (global as any).fetch = jest.fn();
+
+      await svc.tickOnce();
+
+      expect((global as any).fetch).not.toHaveBeenCalled();
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'webhook_delivery_total',
+        expect.any(String),
+        { result: 'failure' },
+      );
+    });
+
+    it('does not throw when no MetricsService is injected (optional dep)', async () => {
+      const outbound: any = { async unsealSecret() { return 'test-raw-secret'; } };
+      const bare = new WebhookDeliveryWorkerService(prisma as any, outbound);
+      (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
+      (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: { foo: 'bar' } });
+      (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1' });
+      (global as any).fetch = jest.fn().mockResolvedValue({ status: 200, ok: true, text: async () => 'ok' });
+
+      await expect(bare.tickOnce()).resolves.toBeUndefined();
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 import { useAllUsers, useUserActivity } from '../../features/superadmin/api/superAdminApi';
 import { UserListItem, UserActivity } from '../../features/superadmin/types';
@@ -12,6 +13,7 @@ const roleStyles: Record<string, string> = {
 };
 
 export default function AllUsersPage() {
+  const { t } = useTranslation('superadmin');
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [page, setPage] = useState(1);
@@ -33,8 +35,8 @@ export default function AllUsersPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Users</h1>
-        <p className="text-sm text-zinc-500 mt-1">All users across all tenants</p>
+        <h1 className="text-2xl font-semibold text-zinc-900">{t('users.title')}</h1>
+        <p className="text-sm text-zinc-500 mt-1">{t('users.subtitle')}</p>
       </div>
 
       {/* Tabs */}
@@ -48,7 +50,7 @@ export default function AllUsersPage() {
                 : 'border-transparent text-zinc-500 hover:text-zinc-700'
             }`}
           >
-            All Users
+            {t('users.tabAllUsers')}
           </button>
           <button
             onClick={() => setActiveTab('activity')}
@@ -58,7 +60,7 @@ export default function AllUsersPage() {
                 : 'border-transparent text-zinc-500 hover:text-zinc-700'
             }`}
           >
-            Login Activity
+            {t('users.tabLoginActivity')}
           </button>
         </nav>
       </div>
@@ -76,7 +78,7 @@ export default function AllUsersPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search by name or email..."
+                placeholder={t('users.searchPlaceholder')}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
               />
             </div>
@@ -88,12 +90,12 @@ export default function AllUsersPage() {
               }}
               className="px-4 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
             >
-              <option value="">All Roles</option>
-              <option value="ADMIN">Admin</option>
-              <option value="MANAGER">Manager</option>
-              <option value="WAITER">Waiter</option>
-              <option value="KITCHEN">Kitchen</option>
-              <option value="COURIER">Courier</option>
+              <option value="">{t('users.filters.allRoles')}</option>
+              <option value="ADMIN">{t('users.filters.admin')}</option>
+              <option value="MANAGER">{t('users.filters.manager')}</option>
+              <option value="WAITER">{t('users.filters.waiter')}</option>
+              <option value="KITCHEN">{t('users.filters.kitchen')}</option>
+              <option value="COURIER">{t('users.filters.courier')}</option>
             </select>
           </div>
 
@@ -103,19 +105,19 @@ export default function AllUsersPage() {
               <thead>
                 <tr className="border-b border-zinc-100">
                   <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                    User
+                    {t('users.col.user')}
                   </th>
                   <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                    Tenant
+                    {t('users.col.tenant')}
                   </th>
                   <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                    Role
+                    {t('users.col.role')}
                   </th>
                   <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                    Status
+                    {t('users.col.status')}
                   </th>
                   <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                    Last Login
+                    {t('users.col.lastLogin')}
                   </th>
                 </tr>
               </thead>
@@ -165,7 +167,7 @@ export default function AllUsersPage() {
             {usersData && usersData.meta.totalPages > 1 && (
               <div className="px-5 py-4 border-t border-zinc-100 flex items-center justify-between">
                 <span className="text-sm text-zinc-500">
-                  Page {usersData.meta.page} of {usersData.meta.totalPages}
+                  {t('common.pageOf', { page: usersData.meta.page, totalPages: usersData.meta.totalPages })}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -173,14 +175,14 @@ export default function AllUsersPage() {
                     disabled={usersData.meta.page === 1}
                     className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Previous
+                    {t('common.previous')}
                   </button>
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={usersData.meta.page === usersData.meta.totalPages}
                     className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Next
+                    {t('common.next')}
                   </button>
                 </div>
               </div>
@@ -195,19 +197,19 @@ export default function AllUsersPage() {
             <thead>
               <tr className="border-b border-zinc-100">
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                  User
+                  {t('users.col.user')}
                 </th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                  Tenant
+                  {t('users.col.tenant')}
                 </th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                  Action
+                  {t('users.col.action')}
                 </th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                  IP
+                  {t('users.col.ip')}
                 </th>
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                  Time
+                  {t('users.col.time')}
                 </th>
               </tr>
             </thead>

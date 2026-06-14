@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { isKnownEventType } from "./event-types";
+import { RequestContext } from "../../common/context/request-context";
 
 /**
  * The write side of the outbox. Producers call `append` inside the same
@@ -84,7 +85,7 @@ export class OutboxService {
         id,
         type: opts.type,
         tenantId: opts.tenantId ?? null,
-        payload: opts.payload as any,
+        payload: this.withCorrelationMeta(opts.payload) as any,
         idempotencyKey: opts.idempotencyKey ?? id,
         status: "queued",
         nextAttemptAt: new Date(),
@@ -92,6 +93,50 @@ export class OutboxService {
     });
     return id;
   }
+
+  /**
+   * Stamp the active request's correlation id into a reserved `_meta`
+   * envelope on the payload — the durable half of the "request → log →
+   * outbox" propagation contract. A request that produces an event can then
+   * be traced from the HTTP access log straight into the persisted row.
+   *
+   * OutboxEvent has no dedicated `meta` column, so we fold the id into the
+   * payload JSON under `_meta`. Existing consumers parse `payload` with
+   * `.strip()`-default Zod schemas, so the extra key is invisible to them —
+   * behaviour-preserving for every reader.
+   *
+   * Null-safe: outside any request (cron sweeps, bootstrap) there is no
+   * active context, so the payload is returned untouched. An explicit
+   * `_meta` already on the payload always wins (never clobbered).
+   */
+  private withCorrelationMeta(
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const requestId = RequestContext.getRequestId();
+    if (!requestId) return payload;
+    const existingMeta = payload._meta as Record<string, unknown> | undefined;
+    return {
+      ...payload,
+      _meta: { requestId, ...(existingMeta ?? {}) },
+    };
+  }
+}
+
+/**
+ * Remove the internal `_meta` correlation envelope before a payload crosses a
+ * trust boundary (outbound webhooks, the marketing-SaaS relay). `_meta` exists
+ * only for internal request→log→outbox tracing; it must never reach an external
+ * receiver or be folded into an HMAC-signed body.
+ */
+export function stripCorrelationMeta<T extends Record<string, unknown>>(
+  payload: T | null | undefined,
+): T | null | undefined {
+  if (!payload || typeof payload !== "object" || !("_meta" in payload)) {
+    return payload;
+  }
+  const { _meta: _omit, ...rest } = payload;
+  void _omit;
+  return rest as T;
 }
 
 // v2.8.97 — event types where a duplicate row has tangible downstream

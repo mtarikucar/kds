@@ -1,0 +1,67 @@
+{
+  "heatmap": {
+    "settings": "Isı Haritası Ayarları",
+    "visualizationType": "Görselleştirme Türü",
+    "colorScheme": "Renk Şeması",
+    "opacity": "Opaklık: %{{percent}}",
+    "loadingData": "Isı haritası verileri yükleniyor...",
+    "types": {
+      "none": { "label": "Yok", "description": "Isı haritasını gizle" },
+      "occupancy": { "label": "Doluluk", "description": "Müşteri yoğunluğunu göster" },
+      "traffic": { "label": "Trafik Akışı", "description": "Hareket düzenlerini göster" },
+      "dwellTime": { "label": "Bekleme Süresi", "description": "Alanlarda geçirilen süreyi göster" }
+    },
+    "schemes": {
+      "heat": "Isı (Kırmızı)",
+      "viridis": "Viridis (Yeşil-Mor)",
+      "plasma": "Plazma (Sarı-Mor)",
+      "coolwarm": "Soğuk-Sıcak (Mavi-Kırmızı)",
+      "blues": "Maviler"
+    },
+    "legend": {
+      "customerDensity": "Müşteri Yoğunluğu",
+      "trafficVolume": "Trafik Hacmi",
+      "dwellTime": "Bekleme Süresi",
+      "low": "Düşük",
+      "high": "Yüksek"
+    }
+  },
+  "calibration": {
+    "title": "Kamera Kalibrasyonu",
+    "saveFailed": "Kalibrasyon kaydedilemedi",
+    "pointLabels": {
+      "topLeft": "Sol Üst",
+      "topRight": "Sağ Üst",
+      "bottomRight": "Sağ Alt",
+      "bottomLeft": "Sol Alt"
+    },
+    "step1": {
+      "heading": "Adım 1: Kamera Noktalarını Seçin",
+      "instructions": "Kamera görünümünde dikdörtgen bir alanın 4 köşesine tıklayın. Sol üst köşeden başlayıp saat yönünde ilerleyin."
+    },
+    "step2": {
+      "heading": "Adım 2: Kat Planı Noktalarını Seçin",
+      "instructions": "Kat planı ızgarasında karşılık gelen 4 noktaya tıklayın. Kamera noktalarıyla aynı sırayı izleyin (sol üst, sağ üst, sağ alt, sol alt).",
+      "cameraView": "Kamera Görünümü",
+      "floorPlan": "Kat Planı"
+    },
+    "step3": {
+      "heading": "Adım 3: Kalibrasyonu Gözden Geçir",
+      "instructions": "Kamera ve kat planı noktalarının doğru hizalandığını doğrulayın. Dönüşüm, konumları kamera görünümünden kat planına eşleyecektir.",
+      "cameraPoints": "Kamera Noktaları",
+      "floorPlanPoints": "Kat Planı Noktaları"
+    },
+    "complete": {
+      "heading": "Kalibrasyon Tamamlandı",
+      "message": "Kamera başarıyla kalibre edildi. Konum verileri artık kat planı koordinatlarına eşlenecek."
+    },
+    "pointsSelected": "Seçilen noktalar: {{count}} / {{total}}",
+    "captureFrame": "Kareyi Yakala",
+    "undo": "Geri Al",
+    "reset": "Sıfırla",
+    "back": "Geri",
+    "next": "İleri",
+    "save": "Kalibrasyonu Kaydet",
+    "saving": "Kaydediliyor..."
+  }
+}

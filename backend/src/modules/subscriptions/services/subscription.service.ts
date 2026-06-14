@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { addDays, addMonths, addYears } from "date-fns";
@@ -23,6 +24,7 @@ import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
 import { ChangePlanDto } from "../dto/change-plan.dto";
 import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
 import { foldPlanGrants } from "./effective-features.fold";
+import { MetricsService } from "../../../common/metrics/metrics.service";
 
 @Injectable()
 export class SubscriptionService {
@@ -43,7 +45,27 @@ export class SubscriptionService {
     // overrides only — buying integration_yemeksepeti updated the engine
     // table but the UI never saw the change (it pulls from this method).
     private readonly entitlements: EntitlementService,
+    // Optional so unit tests constructing the service bare keep working and
+    // so a context without MetricsModule never fails to resolve.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  /**
+   * Track 2 — record a committed subscription billing transition for
+   * Prometheus. Always called AFTER the mutating $transaction commits, and
+   * ?.-guarded so a missing collaborator can never break the business write.
+   * `event` is the developer-controlled lifecycle enum (create|change|
+   * cancel|reactivate), so label cardinality stays bounded.
+   */
+  private recordBillingEvent(
+    event: "create" | "change" | "cancel" | "reactivate",
+  ): void {
+    this.metrics?.incCounter(
+      "subscription_billing_total",
+      "Subscription billing lifecycle transitions (create|change|cancel|reactivate)",
+      { event },
+    );
+  }
 
   /**
    * Append a subscription lifecycle event to the outbox.
@@ -293,6 +315,7 @@ export class SubscriptionService {
         );
       }
 
+      this.recordBillingEvent("create");
       return result;
     } catch (err) {
       if (
@@ -468,6 +491,7 @@ export class SubscriptionService {
       // identically. Emit a single canonical "activated" event.
       await this.emitLifecycle(EventTypes.SubscriptionActivated, subscription);
 
+      this.recordBillingEvent("create");
       return subscription;
     } catch (err) {
       if (
@@ -611,6 +635,10 @@ export class SubscriptionService {
         include: { plan: true, scheduledDowngradePlan: true },
       });
 
+    // The downgrade was committed (scheduled for period end); the upgrade
+    // branch above only returns a quote (no mutation), so it isn't counted —
+    // its committed billing change lands later in applyUpgrade.
+    this.recordBillingEvent("change");
     return {
       subscription: updatedSubscription,
       type: "downgrade" as const,
@@ -912,6 +940,8 @@ export class SubscriptionService {
       );
     }
     const updated = txResult.updated;
+    // Committed cancel (immediate or at-period-end) — recorded after the txn.
+    this.recordBillingEvent("cancel");
 
     // Notifications are user-facing side effects and stay outside the
     // txn — they touch SMTP and can stall for seconds.
@@ -1001,6 +1031,7 @@ export class SubscriptionService {
     // Already emitted inside the txn above — preserve the legacy
     // "outer scope `updated` is available" shape for the rest of the
     // function.
+    this.recordBillingEvent("reactivate");
     return updated;
   }
 

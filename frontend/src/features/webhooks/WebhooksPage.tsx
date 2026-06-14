@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useCreateWebhook, useListWebhooks, useRevokeWebhook, type WebhookSubscription } from './webhooksApi';
 
@@ -25,6 +26,7 @@ const COMMON_EVENTS = [
 ];
 
 export default function WebhooksPage() {
+  const { t } = useTranslation('webhooks');
   const { data = [], isLoading } = useListWebhooks();
   const create = useCreateWebhook();
   const revoke = useRevokeWebhook();
@@ -47,25 +49,22 @@ export default function WebhooksPage() {
 
   return (
     <div className="space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Webhooks</h1>
-      <p className="text-sm text-gray-600">
-        Subscribe an HTTPS endpoint to HummyTummy events. Deliveries are signed with HMAC-SHA256 +
-        timestamp. Auto-paused after 20 consecutive failures.
-      </p>
+      <h1 className="text-2xl font-semibold">{t('page.title')}</h1>
+      <p className="text-sm text-gray-600">{t('page.intro')}</p>
 
       {justCreated && justCreated.secret && (
         <SecretReveal secret={justCreated.secret} onDismiss={() => setJustCreated(null)} />
       )}
 
       <section className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">New subscription</h2>
+        <h2 className="text-lg font-medium">{t('create.title')}</h2>
         <input
           className="mt-2 w-full rounded border px-3 py-1.5 text-sm font-mono"
           value={draft.url}
           onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
-          placeholder="https://your-server.example.com/hummytummy-webhook"
+          placeholder={t('create.urlPlaceholder')}
         />
-        <p className="mt-3 text-xs font-medium text-gray-700">Events:</p>
+        <p className="mt-3 text-xs font-medium text-gray-700">{t('create.eventsLabel')}</p>
         <div className="mt-1 flex flex-wrap gap-1">
           {COMMON_EVENTS.map((e) => (
             <button
@@ -84,24 +83,24 @@ export default function WebhooksPage() {
           disabled={!draft.url || create.isPending}
           onClick={submit}
         >
-          Create subscription
+          {t('create.submit')}
         </button>
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Your subscriptions</h2>
+        <h2 className="mb-2 text-lg font-medium">{t('list.title')}</h2>
         {isLoading ? (
-          <div className="text-sm text-gray-500">Loading…</div>
+          <div className="text-sm text-gray-500">{t('list.loading')}</div>
         ) : data.length === 0 ? (
-          <p className="text-sm text-gray-500">No subscriptions.</p>
+          <p className="text-sm text-gray-500">{t('list.empty')}</p>
         ) : (
           <table className="w-full divide-y rounded border text-sm">
             <thead className="bg-gray-50 text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">URL</th>
-                <th className="px-3 py-2 font-medium">Events</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Last delivery</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.url')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.events')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.status')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.lastDelivery')}</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -116,10 +115,12 @@ export default function WebhooksPage() {
                         s.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {s.status}
+                      {t(`status.${s.status}`, s.status)}
                     </span>
                     {s.consecutiveFailures > 0 && (
-                      <span className="ml-2 text-xs text-red-700">{s.consecutiveFailures} fail</span>
+                      <span className="ml-2 text-xs text-red-700">
+                        {t('list.failCount', { count: s.consecutiveFailures })}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs text-gray-600">
@@ -137,7 +138,7 @@ export default function WebhooksPage() {
                       onClick={() => revoke.mutate(s.id)}
                       className="text-xs text-red-600 hover:underline"
                     >
-                      Revoke
+                      {t('list.revoke')}
                     </button>
                   </td>
                 </tr>
@@ -163,6 +164,7 @@ export default function WebhooksPage() {
  *    leave a credential sitting on the screen.
  */
 function SecretReveal({ secret, onDismiss }: { secret: string; onDismiss: () => void }) {
+  const { t } = useTranslation('webhooks');
   const [shown, setShown] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(90);
 
@@ -171,9 +173,9 @@ function SecretReveal({ secret, onDismiss }: { secret: string; onDismiss: () => 
     // (HTTPS); in dev over plain HTTP this throws and we just skip.
     navigator.clipboard
       ?.writeText(secret)
-      .then(() => toast.success('Secret copied to clipboard'))
+      .then(() => toast.success(t('secret.toastCopied')))
       .catch(() => undefined);
-  }, [secret]);
+  }, [secret, t]);
 
   // `onDismiss` is a fresh inline function on every parent render, which
   // would re-fire this effect each time and stack timers. Pin the latest
@@ -196,10 +198,10 @@ function SecretReveal({ secret, onDismiss }: { secret: string; onDismiss: () => 
 
   return (
     <div className="rounded border border-amber-400 bg-amber-50 p-4">
-      <p className="font-medium text-amber-900">Subscription created.</p>
+      <p className="font-medium text-amber-900">{t('secret.created')}</p>
       <p className="mt-1 text-sm text-amber-800">
-        Signing secret copied to your clipboard. <strong>Save it now — we cannot show it again.</strong>{' '}
-        Auto-hiding in {secondsLeft}s.
+        {t('secret.copiedIntro')} <strong>{t('secret.saveNow')}</strong>{' '}
+        {t('secret.autoHiding', { seconds: secondsLeft })}
       </p>
       <div className="mt-2 flex items-center gap-2">
         <code
@@ -212,23 +214,23 @@ function SecretReveal({ secret, onDismiss }: { secret: string; onDismiss: () => 
           className="rounded border bg-white px-3 py-1 text-xs"
           onClick={() => setShown((v) => !v)}
         >
-          {shown ? 'Hide' : 'Show'}
+          {shown ? t('secret.hide') : t('secret.show')}
         </button>
       </div>
       <div className="mt-3 flex gap-2">
         <button
           className="rounded border bg-white px-3 py-1 text-xs"
           onClick={() => {
-            navigator.clipboard?.writeText(secret).then(() => toast.success('Copied'));
+            navigator.clipboard?.writeText(secret).then(() => toast.success(t('secret.toastCopiedShort')));
           }}
         >
-          Copy again
+          {t('secret.copyAgain')}
         </button>
         <button
           className="rounded bg-amber-900 px-3 py-1 text-xs text-white"
           onClick={onDismiss}
         >
-          I've saved it
+          {t('secret.saved')}
         </button>
       </div>
     </div>

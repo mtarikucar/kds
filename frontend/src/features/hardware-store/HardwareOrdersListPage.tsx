@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useListHardwareOrders, type HardwareOrderSummary } from './storeApi';
 
 /**
@@ -10,17 +11,17 @@ import { useListHardwareOrders, type HardwareOrderSummary } from './storeApi';
  * Each row links to /admin/hardware-orders/:id for the detail view.
  */
 
-const STATUS_FILTERS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'Tüm siparişler' },
-  { value: 'pending_payment', label: 'Ödeme bekleniyor' },
-  { value: 'paid', label: 'Ödendi' },
-  { value: 'fulfillment', label: 'Hazırlanıyor' },
-  { value: 'shipped', label: 'Kargoda' },
-  { value: 'delivered', label: 'Teslim edildi' },
-  { value: 'installed', label: 'Kurulum tamamlandı' },
-  { value: 'completed', label: 'Tamamlandı' },
-  { value: 'cancelled', label: 'İptal edildi' },
-  { value: 'refunded', label: 'İade edildi' },
+const STATUS_FILTER_VALUES: string[] = [
+  '',
+  'pending_payment',
+  'paid',
+  'fulfillment',
+  'shipped',
+  'delivered',
+  'installed',
+  'completed',
+  'cancelled',
+  'refunded',
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -37,28 +38,32 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function HardwareOrdersListPage() {
+  const { t } = useTranslation('hardware');
   const [status, setStatus] = useState<string>('');
   const { data: orders = [], isLoading, error } = useListHardwareOrders(status || undefined);
+
+  const statusFilterLabel = (value: string) =>
+    value === '' ? t('ordersList.allOrders') : t(`orderStatus.${value}`, value);
 
   return (
     <div className="space-y-4 p-6">
       <header className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Donanım Siparişleri</h1>
+          <h1 className="text-2xl font-semibold">{t('ordersList.title')}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Verdiğiniz tüm donanım siparişlerini buradan takip edebilirsiniz.
+            {t('ordersList.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-600">Durum:</label>
+          <label className="text-xs text-gray-600">{t('ordersList.statusLabel')}</label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             className="rounded border px-2 py-1 text-sm"
           >
-            {STATUS_FILTERS.map((s) => (
-              <option key={s.value || 'all'} value={s.value}>
-                {s.label}
+            {STATUS_FILTER_VALUES.map((value) => (
+              <option key={value || 'all'} value={value}>
+                {statusFilterLabel(value)}
               </option>
             ))}
           </select>
@@ -66,25 +71,25 @@ export default function HardwareOrdersListPage() {
             to="/admin/store"
             className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Yeni sipariş
+            {t('ordersList.newOrder')}
           </Link>
         </div>
       </header>
 
       {isLoading ? (
-        <div className="text-sm text-gray-500">Yükleniyor…</div>
+        <div className="text-sm text-gray-500">{t('ordersList.loading')}</div>
       ) : error ? (
         <div className="rounded border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          Siparişler yüklenemedi. Sayfayı yenileyin veya destek ile iletişime geçin.
+          {t('ordersList.loadError')}
         </div>
       ) : orders.length === 0 ? (
         <div className="rounded border border-dashed p-8 text-center">
-          <p className="text-sm text-gray-600">Henüz sipariş vermediniz.</p>
+          <p className="text-sm text-gray-600">{t('ordersList.empty')}</p>
           <Link
             to="/admin/store"
             className="mt-3 inline-block rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Mağazaya git
+            {t('ordersList.goToStore')}
           </Link>
         </div>
       ) : (
@@ -92,12 +97,12 @@ export default function HardwareOrdersListPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-4 py-2">Sipariş No</th>
-                <th className="px-4 py-2">Tarih</th>
-                <th className="px-4 py-2">Ürün adedi</th>
-                <th className="px-4 py-2">Tutar</th>
-                <th className="px-4 py-2">Durum</th>
-                <th className="px-4 py-2">Kurulum</th>
+                <th className="px-4 py-2">{t('ordersList.col.orderNo')}</th>
+                <th className="px-4 py-2">{t('ordersList.col.date')}</th>
+                <th className="px-4 py-2">{t('ordersList.col.itemCount')}</th>
+                <th className="px-4 py-2">{t('ordersList.col.amount')}</th>
+                <th className="px-4 py-2">{t('ordersList.col.status')}</th>
+                <th className="px-4 py-2">{t('ordersList.col.installation')}</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -114,6 +119,7 @@ export default function HardwareOrdersListPage() {
 }
 
 function OrderRow({ order }: { order: HardwareOrderSummary }) {
+  const { t } = useTranslation('hardware');
   const date = new Date(order.createdAt).toLocaleDateString('tr-TR', {
     year: 'numeric',
     month: 'short',
@@ -136,16 +142,16 @@ function OrderRow({ order }: { order: HardwareOrderSummary }) {
             STATUS_BADGE[order.status] ?? 'bg-gray-100 text-gray-700'
           }`}
         >
-          {STATUS_FILTERS.find((s) => s.value === order.status)?.label ?? order.status}
+          {t(`orderStatus.${order.status}`, order.status)}
         </span>
       </td>
       <td className="px-4 py-2 text-xs text-gray-600">
         {order.installation === 'requested'
-          ? 'Talep edildi'
+          ? t('installation.requested')
           : order.installation === 'scheduled'
-            ? 'Planlandı'
+            ? t('installation.scheduled')
             : order.installation === 'done'
-              ? 'Tamamlandı'
+              ? t('installation.done')
               : '—'}
       </td>
       <td className="px-4 py-2 text-right">
@@ -153,7 +159,7 @@ function OrderRow({ order }: { order: HardwareOrderSummary }) {
           to={`/admin/hardware-orders/${order.id}`}
           className="text-xs font-medium text-blue-600 hover:underline"
         >
-          Detay →
+          {t('ordersList.detail')}
         </Link>
       </td>
     </tr>

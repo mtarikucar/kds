@@ -4,6 +4,8 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import { Prisma } from "@prisma/client";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -25,12 +27,19 @@ export class CommandQueueService {
   private static readonly MAX_ATTEMPTS = 5;
   // 30 minutes — long enough for slow ESC/POS prints + occasional yazarkasa
   // network blips, short enough that operators see stuck commands cleared.
-  private static readonly DEFAULT_TTL_MS = 30 * 60 * 1000;
+  // Override via DEVICE_COMMAND_TTL_MS.
+  private readonly defaultTtlMs: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
-  ) {}
+    private readonly config?: ConfigService,
+  ) {
+    this.defaultTtlMs = numericEnv(
+      this.config?.get("DEVICE_COMMAND_TTL_MS"),
+      30 * 60 * 1000,
+    );
+  }
 
   async enqueue(
     tenantId: string,
@@ -62,7 +71,7 @@ export class CommandQueueService {
           payload: input.payload as any,
           priority: input.priority ?? 0,
           idempotencyKey,
-          expiresAt: new Date(Date.now() + CommandQueueService.DEFAULT_TTL_MS),
+          expiresAt: new Date(Date.now() + this.defaultTtlMs),
         },
       });
       await this.outbox

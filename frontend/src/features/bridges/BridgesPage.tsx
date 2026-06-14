@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useListBranches } from '../branches/branchesApi';
 import { useCreateBridge, useListBridges, useRetireBridge, type LocalBridge } from './bridgesApi';
 
@@ -12,6 +13,7 @@ import { useCreateBridge, useListBridges, useRetireBridge, type LocalBridge } fr
  * row never returns it; the operator must capture it on creation.
  */
 export default function BridgesPage() {
+  const { t } = useTranslation('bridges');
   const { data: branches = [] } = useListBranches();
   const { data: bridges = [], isLoading } = useListBridges();
   const create = useCreateBridge();
@@ -28,13 +30,13 @@ export default function BridgesPage() {
 
   return (
     <div className="space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Local Bridges</h1>
+      <h1 className="text-2xl font-semibold">{t('page.title')}</h1>
 
       {justCreated?.provisioningToken && (
         <div className="rounded border border-amber-400 bg-amber-50 p-4">
-          <p className="font-medium text-amber-900">Bridge provisioned.</p>
+          <p className="font-medium text-amber-900">{t('provisioned.title')}</p>
           <p className="mt-1 text-sm text-amber-800">
-            Token (single-use) — copy now and configure on the device:
+            {t('provisioned.tokenIntro')}
           </p>
           <pre className="mt-2 rounded bg-white p-2 font-mono text-sm break-all">
             {justCreated.provisioningToken}
@@ -43,22 +45,22 @@ export default function BridgesPage() {
             className="mt-3 rounded bg-amber-900 px-3 py-1 text-xs text-white"
             onClick={() => setJustCreated(null)}
           >
-            I've copied it
+            {t('provisioned.copied')}
           </button>
         </div>
       )}
 
       <section className="rounded border bg-white p-4">
-        <h2 className="text-lg font-medium">New bridge</h2>
+        <h2 className="text-lg font-medium">{t('create.title')}</h2>
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <label className="flex flex-col text-xs text-gray-600">
-            Branch
+            {t('create.branch')}
             <select
               className="mt-1 rounded border px-2 py-1 text-sm"
               value={draft.branchId}
               onChange={(e) => setDraft((d) => ({ ...d, branchId: e.target.value }))}
             >
-              <option value="">— select —</option>
+              <option value="">{t('create.branchSelect')}</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -67,19 +69,19 @@ export default function BridgesPage() {
             </select>
           </label>
           <label className="flex flex-col text-xs text-gray-600">
-            SKU
+            {t('create.sku')}
             <select
               className="mt-1 rounded border px-2 py-1 text-sm"
               value={draft.productSku}
               onChange={(e) => setDraft((d) => ({ ...d, productSku: e.target.value }))}
             >
-              <option value="hummybox-lite">HummyBox Lite</option>
-              <option value="hummybox-pro">HummyBox Pro</option>
-              <option value="">BYO</option>
+              <option value="hummybox-lite">{t('create.skuLite')}</option>
+              <option value="hummybox-pro">{t('create.skuPro')}</option>
+              <option value="">{t('create.skuByo')}</option>
             </select>
           </label>
           <label className="flex flex-col text-xs text-gray-600">
-            Hostname (optional)
+            {t('create.hostname')}
             <input
               className="mt-1 rounded border px-2 py-1 text-sm"
               value={draft.hostname}
@@ -91,26 +93,26 @@ export default function BridgesPage() {
             disabled={!draft.branchId || create.isPending}
             onClick={submit}
           >
-            Provision
+            {t('create.submit')}
           </button>
         </div>
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Bridges</h2>
+        <h2 className="mb-2 text-lg font-medium">{t('list.title')}</h2>
         {isLoading ? (
-          <div className="text-sm text-gray-500">Loading…</div>
+          <div className="text-sm text-gray-500">{t('list.loading')}</div>
         ) : bridges.length === 0 ? (
-          <p className="text-sm text-gray-500">No bridges provisioned yet.</p>
+          <p className="text-sm text-gray-500">{t('list.empty')}</p>
         ) : (
           <table className="w-full divide-y rounded border text-sm">
             <thead className="bg-gray-50 text-left">
               <tr>
-                <th className="px-3 py-2 font-medium">Branch</th>
-                <th className="px-3 py-2 font-medium">SKU</th>
-                <th className="px-3 py-2 font-medium">Hostname</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Last seen</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.branch')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.sku')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.hostname')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.status')}</th>
+                <th className="px-3 py-2 font-medium">{t('list.col.lastSeen')}</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -130,10 +132,10 @@ export default function BridgesPage() {
                     <button
                       className="text-xs text-red-600 hover:underline"
                       onClick={() => {
-                        if (confirm('Retire this bridge?')) retire.mutate(b.id);
+                        if (confirm(t('list.retireConfirm'))) retire.mutate(b.id);
                       }}
                     >
-                      Retire
+                      {t('list.retire')}
                     </button>
                   </td>
                 </tr>
@@ -147,6 +149,7 @@ export default function BridgesPage() {
 }
 
 function StatusPill({ status }: { status: string }) {
+  const { t } = useTranslation('bridges');
   const colors: Record<string, string> = {
     online: 'bg-green-100 text-green-800',
     offline: 'bg-gray-100 text-gray-700',
@@ -155,7 +158,7 @@ function StatusPill({ status }: { status: string }) {
   };
   return (
     <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100 text-gray-700'}`}>
-      {status}
+      {t(`status.${status}`, status)}
     </span>
   );
 }

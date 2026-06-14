@@ -12,7 +12,11 @@ import { BaseAdapter } from "./base.adapter";
 @Injectable()
 export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super("MigrosAdapter", "https://partner-api.migros.com.tr/yemek");
+    super(
+      "MigrosAdapter",
+      "https://partner-api.migros.com.tr/yemek",
+      configService,
+    );
     this.overrideBaseURL(this.configService.get<string>("MIGROS_API_BASE_URL"));
   }
 

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { Fragment } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Menu, Transition } from '@headlessui/react';
 import {
   LayoutDashboard,
@@ -16,17 +17,18 @@ import { useSuperAdminAuthStore } from '../../../store/superAdminAuthStore';
 import { useSuperAdminLogout } from '../api/superAdminApi';
 
 const navigation = [
-  { name: 'Dashboard', href: '/superadmin/dashboard', icon: LayoutDashboard },
-  { name: 'Tenants', href: '/superadmin/tenants', icon: Building2 },
-  { name: 'Users', href: '/superadmin/users', icon: Users },
-  { name: 'Plans', href: '/superadmin/plans', icon: Layers },
-  { name: 'Marketplace', href: '/superadmin/marketplace', icon: Layers },
-  { name: 'Subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
-  { name: 'Audit Logs', href: '/superadmin/audit-logs', icon: FileText },
-  { name: 'Settings', href: '/superadmin/settings', icon: Settings },
+  { nameKey: 'nav.dashboard', href: '/superadmin/dashboard', icon: LayoutDashboard },
+  { nameKey: 'nav.tenants', href: '/superadmin/tenants', icon: Building2 },
+  { nameKey: 'nav.users', href: '/superadmin/users', icon: Users },
+  { nameKey: 'nav.plans', href: '/superadmin/plans', icon: Layers },
+  { nameKey: 'nav.marketplace', href: '/superadmin/marketplace', icon: Layers },
+  { nameKey: 'nav.subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
+  { nameKey: 'nav.auditLogs', href: '/superadmin/audit-logs', icon: FileText },
+  { nameKey: 'nav.settings', href: '/superadmin/settings', icon: Settings },
 ];
 
 export default function SuperAdminSidebar() {
+  const { t } = useTranslation('superadmin');
   const { superAdmin } = useSuperAdminAuthStore();
   const logoutMutation = useSuperAdminLogout();
 
@@ -42,7 +44,7 @@ export default function SuperAdminSidebar() {
           <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">
             <span className="text-white text-sm font-semibold">K</span>
           </div>
-          <span className="text-zinc-900 font-semibold tracking-tight">KDS Admin</span>
+          <span className="text-zinc-900 font-semibold tracking-tight">{t('brand')}</span>
         </div>
       </div>
 
@@ -50,7 +52,7 @@ export default function SuperAdminSidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navigation.map((item) => (
           <NavLink
-            key={item.name}
+            key={item.nameKey}
             to={item.href}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
@@ -61,7 +63,7 @@ export default function SuperAdminSidebar() {
             }
           >
             <item.icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
-            {item.name}
+            {t(item.nameKey)}
           </NavLink>
         ))}
       </nav>
@@ -103,7 +105,7 @@ export default function SuperAdminSidebar() {
                     } flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700`}
                   >
                     <LogOut className="w-4 h-4" />
-                    Sign out
+                    {t('nav.signOut')}
                   </button>
                 )}
               </Menu.Item>

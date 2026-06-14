@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, ChevronRight } from 'lucide-react';
 import { useTenants, useUpdateTenantStatus } from '../../features/superadmin/api/superAdminApi';
 import { TenantFilter, TenantListItem } from '../../features/superadmin/types';
@@ -11,6 +12,7 @@ const statusStyles = {
 };
 
 export default function TenantsPage() {
+  const { t } = useTranslation('superadmin');
   const [filters, setFilters] = useState<TenantFilter>({
     page: 1,
     limit: 20,
@@ -28,7 +30,7 @@ export default function TenantsPage() {
   };
 
   const handleStatusChange = (id: string, status: string) => {
-    if (window.confirm(`Change status to ${status}?`)) {
+    if (window.confirm(t('tenants.confirmStatusChange', { status }))) {
       updateStatusMutation.mutate({ id, status });
     }
   };
@@ -37,8 +39,8 @@ export default function TenantsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Tenants</h1>
-        <p className="text-sm text-zinc-500 mt-1">Manage restaurant tenants</p>
+        <h1 className="text-2xl font-semibold text-zinc-900">{t('tenants.title')}</h1>
+        <p className="text-sm text-zinc-500 mt-1">{t('tenants.subtitle')}</p>
       </div>
 
       {/* Filters */}
@@ -50,7 +52,7 @@ export default function TenantsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tenants..."
+              placeholder={t('tenants.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
             />
           </div>
@@ -61,10 +63,10 @@ export default function TenantsPage() {
           onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value || undefined, page: 1 }))}
           className="px-4 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
         >
-          <option value="">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
-          <option value="DELETED">Deleted</option>
+          <option value="">{t('tenants.filters.allStatus')}</option>
+          <option value="ACTIVE">{t('tenants.filters.active')}</option>
+          <option value="SUSPENDED">{t('tenants.filters.suspended')}</option>
+          <option value="DELETED">{t('tenants.filters.deleted')}</option>
         </select>
       </div>
 
@@ -74,19 +76,19 @@ export default function TenantsPage() {
           <thead>
             <tr className="border-b border-zinc-100">
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Tenant
+                {t('tenants.col.tenant')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Plan
+                {t('tenants.col.plan')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Status
+                {t('tenants.col.status')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Usage
+                {t('tenants.col.usage')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Created
+                {t('tenants.col.created')}
               </th>
               <th className="w-10"></th>
             </tr>
@@ -103,7 +105,7 @@ export default function TenantsPage() {
             ) : data?.data.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-5 py-12 text-center text-sm text-zinc-500">
-                  No tenants found
+                  {t('tenants.noTenantsFound')}
                 </td>
               </tr>
             ) : (
@@ -131,7 +133,7 @@ export default function TenantsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <span className="text-sm text-zinc-500">
-                      {tenant._count.users} users · {tenant._count.orders} orders
+                      {t('tenants.usage', { users: tenant._count.users, orders: tenant._count.orders })}
                     </span>
                   </td>
                   <td className="px-5 py-4">
@@ -157,7 +159,7 @@ export default function TenantsPage() {
         {data && data.meta.totalPages > 1 && (
           <div className="px-5 py-4 border-t border-zinc-100 flex items-center justify-between">
             <span className="text-sm text-zinc-500">
-              Page {data.meta.page} of {data.meta.totalPages}
+              {t('common.pageOf', { page: data.meta.page, totalPages: data.meta.totalPages })}
             </span>
             <div className="flex gap-2">
               <button
@@ -165,14 +167,14 @@ export default function TenantsPage() {
                 disabled={data.meta.page === 1}
                 className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Previous
+                {t('common.previous')}
               </button>
               <button
                 onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
                 disabled={data.meta.page === data.meta.totalPages}
                 className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Next
+                {t('common.next')}
               </button>
             </div>
           </div>

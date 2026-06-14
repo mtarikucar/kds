@@ -32,6 +32,7 @@ import { ReservationStatus } from "../../reservations/constants/reservation-stat
 import { OutboxService } from "../../outbox/outbox.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 import { MetricsService } from "../../../common/metrics/metrics.service";
+import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -107,9 +108,7 @@ export class OrdersService {
           totalCents: this.toIntCents(order?.finalAmount),
         },
       })
-      .catch((e) =>
-        this.logger.warn(`outbox emit ${type} failed: ${(e as Error).message}`),
-      );
+      .catch(captureSwallowedEmit(this.logger, { module: "orders", op: type }));
   }
 
   /**
