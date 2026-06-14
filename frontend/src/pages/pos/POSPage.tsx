@@ -32,6 +32,11 @@ import Spinner from '../../components/ui/Spinner';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
+import {
+  calculateSubtotal,
+  canProceedToPayment as computeCanProceedToPayment,
+  paymentBlockedReason as computePaymentBlockedReason,
+} from './posCart';
 
 // View state type
 type POSView = 'table-selection' | 'order';
@@ -238,40 +243,29 @@ const POSPage = () => {
     return tableOrders.find((o) => o.id === currentOrderId) || null;
   }, [currentOrderId, tableOrders]);
 
-  // Payment eligibility calculation for two-step checkout
-  const canProceedToPayment = useMemo(() => {
-    // Must have an active order to proceed to payment
-    if (!currentOrderId || !currentOrder) return false;
-
-    // Takeaway and delivery orders can always proceed to payment
-    const orderType = currentOrder.type || OrderType.DINE_IN;
-    if (orderType === OrderType.TAKEAWAY || orderType === OrderType.DELIVERY) {
-      return true;
-    }
-
-    // For dine-in, check if SERVED/READY status is required
-    if (posSettings?.requireServedForDineInPayment) {
-      return currentOrder.status === OrderStatus.SERVED || currentOrder.status === OrderStatus.READY;
-    }
-
-    // Setting is off - allow payment anytime
-    return true;
-  }, [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
+  // Payment eligibility calculation for two-step checkout. The gate logic
+  // (order-type + dine-in requireServed) is the pure computeCanProceedToPayment
+  // in posCart.ts; kept inside a useMemo so referential identity is unchanged.
+  const canProceedToPayment = useMemo(
+    () =>
+      computeCanProceedToPayment({
+        currentOrderId,
+        currentOrder,
+        requireServedForDineInPayment: !!posSettings?.requireServedForDineInPayment,
+      }),
+    [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment],
+  );
 
   // Reason why payment is blocked (for user feedback)
-  const paymentBlockedReason = useMemo(() => {
-    if (canProceedToPayment) return null;
-    if (!currentOrderId) return 'noActiveOrder';
-    if (
-      posSettings?.requireServedForDineInPayment &&
-      currentOrder?.type === OrderType.DINE_IN &&
-      currentOrder?.status !== OrderStatus.SERVED &&
-      currentOrder?.status !== OrderStatus.READY
-    ) {
-      return 'dineInPaymentRequiresReadyOrServed';
-    }
-    return null;
-  }, [canProceedToPayment, currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
+  const paymentBlockedReason = useMemo(
+    () =>
+      computePaymentBlockedReason({
+        currentOrderId,
+        currentOrder,
+        requireServedForDineInPayment: !!posSettings?.requireServedForDineInPayment,
+      }),
+    [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment],
+  );
 
   // Load existing orders when an occupied table is selected
   useEffect(() => {
@@ -864,15 +858,10 @@ const POSPage = () => {
     });
   };
 
-  // Calculate totals (including modifier prices)
-  const subtotal = cartItems.reduce((sum, item) => {
-    const itemPrice = Number(item.price);
-    const modifiersTotal = (item.modifiers || []).reduce(
-      (modSum, mod) => modSum + (mod.priceAdjustment * mod.quantity),
-      0
-    );
-    return sum + (itemPrice + modifiersTotal) * item.quantity;
-  }, 0);
+  // Calculate totals (including modifier prices). Money math lives in
+  // posCart.ts so it shares a single tested arithmetic surface with
+  // cartStore.calculateItemTotal and can never drift.
+  const subtotal = calculateSubtotal(cartItems);
   const total = subtotal - discount;
   const hasCartItems = cartItems.length > 0;
 
