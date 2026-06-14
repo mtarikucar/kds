@@ -14,7 +14,10 @@ export const INTENT_TTL_MINUTES = 15;
  * `data.code` first, translates via i18n, and falls back to the
  * English message if the code is unknown.
  */
-export function selfPayError(code: string, message: string): BadRequestException {
+export function selfPayError(
+  code: string,
+  message: string,
+): BadRequestException {
   return new BadRequestException({
     message,
     code,

@@ -152,7 +152,9 @@ export class SelfPayReservationService {
       const nonAllocationPaid = paid.sub(allocPaid);
       if (
         nonAllocationPaid.gt(
-          new Prisma.Decimal(SelfPayReservationService.NON_ALLOCATION_TOLERANCE),
+          new Prisma.Decimal(
+            SelfPayReservationService.NON_ALLOCATION_TOLERANCE,
+          ),
         )
       ) {
         throw selfPayError(
