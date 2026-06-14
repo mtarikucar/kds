@@ -9,6 +9,7 @@ import {
   KmsDecryptInput,
   KmsEncryptInput,
   KmsProvider,
+  KmsRotateCiphertextInput,
 } from "./kms-provider.interface";
 
 /**
@@ -151,6 +152,71 @@ export class EnvKmsProvider implements KmsProvider {
     return Buffer.concat([decipher.update(ct), decipher.final()]).toString(
       "utf8",
     );
+  }
+
+  /**
+   * Re-wrap one ciphertext under the current key version.
+   *
+   * Per-blob primitive for an ops rotation job: walk each row holding a
+   * `secretEnc`, call this, persist the result. Three invariants make it
+   * safe to run against live data:
+   *
+   *   1. Idempotent — if the blob's embedded key version already equals the
+   *      current version, the *same bytes* are returned. No decrypt/encrypt,
+   *      no IV churn, so a re-run (or a half-finished job resumed) is a true
+   *      no-op and the caller can skip the DB write.
+   *
+   *   2. Verify-before-persist — after re-encrypting, the new blob is
+   *      decrypted back and asserted byte-for-byte equal to the original
+   *      plaintext *before* it is returned. A derivation/key misconfig can
+   *      therefore never hand the caller a blob that would overwrite a good
+   *      secret with something undecryptable.
+   *
+   *   3. Fail-closed — a source blob that can't be decrypted (corruption,
+   *      wrong context, retired key) throws; nothing is emitted. The caller
+   *      leaves the existing `secretEnc` untouched.
+   *
+   * Note: re-encryption goes through `encrypt()`, which always stamps the
+   * *current* version, so a v1 blob lands directly at v3 in one hop when the
+   * provider's current version is 3 — no chained intermediate re-wraps.
+   */
+  async rotateCiphertext({
+    context,
+    ciphertext,
+  }: KmsRotateCiphertextInput): Promise<Buffer> {
+    if (ciphertext.length === 0) throw new Error("Empty ciphertext");
+    if (ciphertext[0] !== ENVELOPE_VERSION_V1) {
+      throw new Error(
+        `Unknown KMS envelope version: 0x${ciphertext[0].toString(16)}`,
+      );
+    }
+
+    const blobVersion = ciphertext[1];
+    const target = this.currentVersion();
+
+    // (1) Idempotent: already current — return identical bytes, no work.
+    if (blobVersion === target) {
+      return Buffer.from(ciphertext);
+    }
+
+    // Decrypt with the old embedded version (decrypt() reads byte 1 itself).
+    // Throws on corruption / wrong context / missing old key → fail-closed.
+    const plaintext = await this.decrypt({ context, ciphertext });
+
+    // Re-encrypt under the current version (encrypt() stamps currentVersion()).
+    const rotated = await this.encrypt({ context, plaintext });
+
+    // (2) Verify-before-persist: decrypt the fresh blob back and confirm it
+    // matches the original plaintext. Only then is it safe to return.
+    const verified = await this.decrypt({ context, ciphertext: rotated });
+    if (verified !== plaintext) {
+      throw new Error(
+        "KMS rotateCiphertext verification failed — re-encrypted blob did not " +
+          "round-trip to the original plaintext; refusing to persist.",
+      );
+    }
+
+    return rotated;
   }
 
   async healthCheck() {

@@ -2,6 +2,7 @@ import {
   Injectable,
   Inject,
   NotFoundException,
+  Optional,
   forwardRef,
 } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
@@ -11,6 +12,7 @@ import {
   NotificationType,
 } from "./dto/create-notification.dto";
 import { NotificationsGateway } from "./notifications.gateway";
+import { MetricsService } from "../../common/metrics/metrics.service";
 
 @Injectable()
 export class NotificationsService {
@@ -18,6 +20,8 @@ export class NotificationsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => NotificationsGateway))
     private notificationsGateway: NotificationsGateway,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async create(data: {
@@ -163,9 +167,15 @@ export class NotificationsService {
       },
     });
 
-    // Send via WebSocket in real-time
+    // Send via WebSocket in real-time. `channel` captures which dispatch
+    // branch fired so the Prometheus counter can break throughput down by
+    // delivery path (user|global). undefined → not dispatched (no socket
+    // emit), so we also skip the counter to keep the metric an honest
+    // count of notifications actually sent.
+    let channel: "user" | "global" | undefined;
     if (createNotificationDto.userId) {
       // Send to specific user
+      channel = "user";
       this.notificationsGateway.sendNotificationToUser(
         createNotificationDto.userId,
         notification,
@@ -175,9 +185,23 @@ export class NotificationsService {
       // of the tenant by design (billing, marketing, system-wide).
       // Use the explicit cross-branch helper so the intent is
       // captured at the call site.
+      channel = "global";
       this.notificationsGateway.broadcastToTenantAcrossBranches(
         createNotificationDto.tenantId,
         notification,
+      );
+    }
+
+    // Track 2 — record the dispatched notification for Prometheus. After
+    // the DB write + socket emit, optional + ?.-guarded so it can never
+    // break delivery. Labels are ONLY the developer-controlled
+    // NotificationType enum and the fixed channel set (never user input
+    // like title/message), so cardinality stays bounded.
+    if (channel) {
+      this.metrics?.incCounter(
+        "notifications_sent_total",
+        "Notifications dispatched by type and channel (user|global|admins)",
+        { type: createNotificationDto.type, channel },
       );
     }
 
@@ -250,6 +274,16 @@ export class NotificationsService {
     });
     for (const n of notifications) {
       this.notificationsGateway.sendNotificationToUser(n.userId!, n);
+      // Track 2 — one counter bump per admin row actually dispatched, so
+      // notifications_sent_total stays an honest count. After the DB write
+      // + socket emit, optional + ?.-guarded so it can never break the
+      // fan-out. Label uses the developer-controlled NotificationType
+      // (never user input) and the fixed channel=admins.
+      this.metrics?.incCounter(
+        "notifications_sent_total",
+        "Notifications dispatched by type and channel (user|global|admins)",
+        { type: notificationData.type, channel: "admins" },
+      );
     }
     return notifications;
   }

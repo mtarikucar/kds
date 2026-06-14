@@ -27,6 +27,20 @@ describe("MetricsService", () => {
     expect(output).toContain("outbox_dlq_depth 0");
   });
 
+  it("exposes delivery_dlq_depth and reflects set()/inc()", async () => {
+    service.setDeliveryDlqDepth(2);
+    let output = await service.metrics();
+    expect(output).toContain("delivery_dlq_depth 2");
+
+    service.incDeliveryDlqDepth();
+    output = await service.metrics();
+    expect(output).toContain("delivery_dlq_depth 3");
+
+    service.setDeliveryDlqDepth(0);
+    output = await service.metrics();
+    expect(output).toContain("delivery_dlq_depth 0");
+  });
+
   it("incCounter lazily creates and increments a label-less domain counter", async () => {
     service.incCounter("orders_created_total", "Orders created");
     service.incCounter("orders_created_total", "Orders created");

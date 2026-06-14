@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateProductDto } from "../dto/create-product.dto";
 import { UpdateProductDto } from "../dto/update-product.dto";
+import { sanitizePage } from "../../../common/dto/list-query.dto";
 
 @Injectable()
 export class ProductsService {
@@ -96,11 +97,21 @@ export class ProductsService {
     return this.transformProductResponse(product);
   }
 
-  async findAll(tenantId: string, categoryId?: string) {
+  async findAll(
+    tenantId: string,
+    categoryId?: string,
+    pagination?: { limit?: number; offset?: number },
+  ) {
     const where: any = { tenantId };
     if (categoryId) {
       where.categoryId = categoryId;
     }
+
+    // ADDITIVE pagination (Wave-C). When limit/offset are omitted these
+    // resolve to undefined and Prisma returns the full list — byte-identical
+    // to the pre-pagination behaviour. sanitizePage drops junk/out-of-range
+    // values back to undefined so a malformed query can't 500.
+    const { take, skip } = sanitizePage(pagination);
 
     const products = await this.prisma.product.findMany({
       where,
@@ -132,6 +143,8 @@ export class ProductsService {
         },
       },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+      take,
+      skip,
     });
 
     return products.map((product) => this.transformProductResponse(product));

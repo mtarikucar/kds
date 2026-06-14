@@ -9,6 +9,7 @@ import { UpdateModifierGroupDto } from "../dto/update-modifier-group.dto";
 import { CreateModifierDto } from "../dto/create-modifier.dto";
 import { UpdateModifierDto } from "../dto/update-modifier.dto";
 import { AssignModifiersToProductDto } from "../dto/assign-modifiers.dto";
+import { sanitizePage } from "../../../common/dto/list-query.dto";
 
 @Injectable()
 export class ModifiersService {
@@ -32,7 +33,15 @@ export class ModifiersService {
     });
   }
 
-  async findAllGroups(tenantId: string, includeInactive = false) {
+  async findAllGroups(
+    tenantId: string,
+    includeInactive = false,
+    pagination?: { limit?: number; offset?: number },
+  ) {
+    // ADDITIVE pagination (Wave-C). Omitted limit/offset => undefined =>
+    // Prisma returns the full list (byte-identical default). sanitizePage
+    // collapses junk values to undefined so a bad query can't 500.
+    const { take, skip } = sanitizePage(pagination);
     return this.prisma.modifierGroup.findMany({
       where: {
         tenantId,
@@ -50,6 +59,8 @@ export class ModifiersService {
         },
       },
       orderBy: { displayOrder: "asc" },
+      take,
+      skip,
     });
   }
 
@@ -164,7 +175,12 @@ export class ModifiersService {
     tenantId: string,
     groupId?: string,
     includeUnavailable = false,
+    pagination?: { limit?: number; offset?: number },
   ) {
+    // ADDITIVE pagination (Wave-C). Omitted limit/offset => undefined =>
+    // Prisma returns the full list (byte-identical default). sanitizePage
+    // collapses junk values to undefined so a bad query can't 500.
+    const { take, skip } = sanitizePage(pagination);
     return this.prisma.modifier.findMany({
       where: {
         tenantId,
@@ -181,6 +197,8 @@ export class ModifiersService {
         },
       },
       orderBy: [{ groupId: "asc" }, { displayOrder: "asc" }],
+      take,
+      skip,
     });
   }
 

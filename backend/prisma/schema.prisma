@@ -4665,6 +4665,12 @@ model CallerEvent {
   occurredAt  DateTime
   createdAt   DateTime @default(now())
 
+  // Replay/dedup: providers deliver webhooks at-least-once, so the same
+  // (providerId, callId, kind) for a tenant can arrive multiple times.
+  // This UNIQUE index makes idempotency authoritative at the DB level — the
+  // ingest path catches the P2002 collision and treats the replay as a
+  // no-op. (tenantId leads so it stays a per-tenant constraint.)
+  @@unique([tenantId, providerId, callId, kind], name: "caller_events_replay_key")
   @@index([tenantId, occurredAt(sort: Desc)])
   @@index([tenantId, e164])
   @@index([callId])

@@ -100,3 +100,75 @@ describe('ProductsService.updateStock', () => {
     });
   });
 });
+
+/**
+ * Wave-C ADDITIVE pagination on findAll. Contract:
+ *   - no pagination passed => take/skip undefined => Prisma returns the full
+ *     list (byte-identical to the pre-pagination behaviour);
+ *   - a valid limit/offset is forwarded as take/skip and slices the result;
+ *   - junk params (NaN limit / negative offset) fall back to undefined so the
+ *     query can't 500 and the caller still gets a (full) list.
+ * The response shape stays a bare array (transformed), never an envelope.
+ */
+describe('ProductsService.findAll — pagination', () => {
+  let prisma: MockPrismaClient;
+  let svc: ProductsService;
+
+  // A small deterministic dataset already in displayOrder/name order.
+  const rows = [
+    { id: 'a', tenantId: 't-1', name: 'A', productImages: [], modifierGroups: [] },
+    { id: 'b', tenantId: 't-1', name: 'B', productImages: [], modifierGroups: [] },
+    { id: 'c', tenantId: 't-1', name: 'C', productImages: [], modifierGroups: [] },
+  ] as any[];
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    // Honour take/skip so the slicing assertion exercises real behaviour the
+    // way Prisma would (orderBy is deterministic at the DB layer).
+    prisma.product.findMany.mockImplementation((args: any) => {
+      const skip = args?.skip ?? 0;
+      const end = args?.take == null ? undefined : skip + args.take;
+      return Promise.resolve(rows.slice(skip, end)) as any;
+    });
+    svc = new ProductsService(prisma as any);
+  });
+
+  it('returns the full list with undefined take/skip when no pagination passed (old behavior)', async () => {
+    const result = await svc.findAll('t-1');
+
+    const call = prisma.product.findMany.mock.calls[0][0] as any;
+    expect(call.take).toBeUndefined();
+    expect(call.skip).toBeUndefined();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.map((p: any) => p.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('forwards limit/offset as take/skip and slices correctly', async () => {
+    const result = await svc.findAll('t-1', undefined, { limit: 1, offset: 1 });
+
+    const call = prisma.product.findMany.mock.calls[0][0] as any;
+    expect(call.take).toBe(1);
+    expect(call.skip).toBe(1);
+    expect(result.map((p: any) => p.id)).toEqual(['b']);
+  });
+
+  it('falls back to the full list (no 500) when params are junk', async () => {
+    const result = await svc.findAll('t-1', undefined, {
+      limit: NaN,
+      offset: -10,
+    } as any);
+
+    const call = prisma.product.findMany.mock.calls[0][0] as any;
+    expect(call.take).toBeUndefined();
+    expect(call.skip).toBeUndefined();
+    expect(result.map((p: any) => p.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('still applies the categoryId filter alongside pagination', async () => {
+    await svc.findAll('t-1', 'cat-9', { limit: 2 });
+
+    const call = prisma.product.findMany.mock.calls[0][0] as any;
+    expect(call.where).toEqual({ tenantId: 't-1', categoryId: 'cat-9' });
+    expect(call.take).toBe(2);
+  });
+});

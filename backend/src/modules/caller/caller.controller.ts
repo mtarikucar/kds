@@ -23,6 +23,7 @@ import { RequiresIntegration } from "../subscriptions/decorators/requires-integr
 import { Public } from "../auth/decorators/public.decorator";
 import { CallerService } from "./caller.service";
 import { MockCallerProvider } from "./adapters/mock-caller.provider";
+import { CallerProviderRegistry } from "./caller-provider.registry";
 
 @ApiTags("Caller")
 @Controller("v1/caller")
@@ -30,6 +31,7 @@ export class CallerController {
   constructor(
     private readonly caller: CallerService,
     private readonly mockProvider: MockCallerProvider,
+    private readonly registry: CallerProviderRegistry,
   ) {}
 
   // v2.8.88: ADMIN/MANAGER only. The caller feed exposes inbound phone
@@ -87,6 +89,7 @@ export class CallerController {
     @Param("providerId") providerId: string,
     @Param("tenantId") tenantId: string,
     @Headers("x-signature") signature: string,
+    @Headers("x-timestamp") timestamp: string,
     @Req() req: RawBodyRequest<Request>,
   ) {
     const raw = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
@@ -99,8 +102,16 @@ export class CallerController {
       }
       events = await this.mockProvider.parseWebhook(signature, raw);
     } else {
-      // TODO: registry lookup once more providers are added.
-      events = [];
+      // Generic HMAC path: the registry selects a configured signature-
+      // verifying adapter by providerId and binds it to this tenant +
+      // timestamp. Unknown providers resolve to null → events=[] no-op
+      // (forward-compatible, same as the previous stub). The adapter
+      // verifies the signature + timestamp freshness before any ingest.
+      const provider = this.registry.resolve(providerId, {
+        tenantId,
+        timestamp,
+      });
+      events = provider ? await provider.parseWebhook(signature, raw) : [];
     }
     for (const ev of events) {
       await this.caller.ingest(tenantId, ev);

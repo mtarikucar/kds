@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateCategoryDto } from "../dto/create-category.dto";
 import { UpdateCategoryDto } from "../dto/update-category.dto";
+import { sanitizePage } from "../../../common/dto/list-query.dto";
 
 @Injectable()
 export class CategoriesService {
@@ -24,7 +25,14 @@ export class CategoriesService {
     });
   }
 
-  async findAll(tenantId: string) {
+  async findAll(
+    tenantId: string,
+    pagination?: { limit?: number; offset?: number },
+  ) {
+    // ADDITIVE pagination (Wave-C). Omitted limit/offset => undefined =>
+    // Prisma returns the full list (byte-identical default). sanitizePage
+    // collapses junk values to undefined so a bad query can't 500.
+    const { take, skip } = sanitizePage(pagination);
     return this.prisma.category.findMany({
       where: { tenantId },
       include: {
@@ -35,6 +43,8 @@ export class CategoriesService {
         },
       },
       orderBy: { displayOrder: "asc" },
+      take,
+      skip,
     });
   }
 

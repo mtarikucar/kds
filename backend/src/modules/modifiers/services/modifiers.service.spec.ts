@@ -400,4 +400,101 @@ describe('ModifiersService', () => {
       .calls[0][0].where;
     expect(delWhere).toEqual({ productId: 'p-1', groupId: 'g-1' });
   });
+
+  // ----------------------------------------------------------------
+  // Wave-C: ADDITIVE pagination on findAllGroups / findAllModifiers
+  // ----------------------------------------------------------------
+
+  describe('findAllGroups — pagination', () => {
+    const rows = [{ id: 'g-a' }, { id: 'g-b' }, { id: 'g-c' }] as any[];
+
+    beforeEach(() => {
+      (prisma.modifierGroup.findMany as any).mockImplementation((args: any) => {
+        const skip = args?.skip ?? 0;
+        const end = args?.take == null ? undefined : skip + args.take;
+        return Promise.resolve(rows.slice(skip, end));
+      });
+    });
+
+    it('returns the full list with undefined take/skip when no params (old behavior)', async () => {
+      const result = await svc.findAllGroups(TENANT);
+
+      const call = (prisma.modifierGroup.findMany as any).mock.calls[0][0];
+      expect(call.take).toBeUndefined();
+      expect(call.skip).toBeUndefined();
+      expect(result.map((g: any) => g.id)).toEqual(['g-a', 'g-b', 'g-c']);
+    });
+
+    it('forwards limit/offset and slices correctly (preserving includeInactive)', async () => {
+      const result = await svc.findAllGroups(TENANT, true, {
+        limit: 1,
+        offset: 1,
+      });
+
+      const call = (prisma.modifierGroup.findMany as any).mock.calls[0][0];
+      expect(call.take).toBe(1);
+      expect(call.skip).toBe(1);
+      // includeInactive=true drops the isActive filter — the where keeps only tenant.
+      expect(call.where).toEqual({ tenantId: TENANT });
+      expect(result.map((g: any) => g.id)).toEqual(['g-b']);
+    });
+
+    it('falls back to the full list (no 500) on junk params', async () => {
+      const result = await svc.findAllGroups(TENANT, false, {
+        limit: NaN,
+        offset: -2,
+      } as any);
+
+      const call = (prisma.modifierGroup.findMany as any).mock.calls[0][0];
+      expect(call.take).toBeUndefined();
+      expect(call.skip).toBeUndefined();
+      expect(result.map((g: any) => g.id)).toEqual(['g-a', 'g-b', 'g-c']);
+    });
+  });
+
+  describe('findAllModifiers — pagination', () => {
+    const rows = [{ id: 'm-a' }, { id: 'm-b' }, { id: 'm-c' }] as any[];
+
+    beforeEach(() => {
+      (prisma.modifier.findMany as any).mockImplementation((args: any) => {
+        const skip = args?.skip ?? 0;
+        const end = args?.take == null ? undefined : skip + args.take;
+        return Promise.resolve(rows.slice(skip, end));
+      });
+    });
+
+    it('returns the full list with undefined take/skip when no params (old behavior)', async () => {
+      const result = await svc.findAllModifiers(TENANT);
+
+      const call = (prisma.modifier.findMany as any).mock.calls[0][0];
+      expect(call.take).toBeUndefined();
+      expect(call.skip).toBeUndefined();
+      expect(result.map((m: any) => m.id)).toEqual(['m-a', 'm-b', 'm-c']);
+    });
+
+    it('forwards limit/offset and slices correctly (preserving groupId filter)', async () => {
+      const result = await svc.findAllModifiers(TENANT, 'grp-1', false, {
+        limit: 2,
+        offset: 0,
+      });
+
+      const call = (prisma.modifier.findMany as any).mock.calls[0][0];
+      expect(call.take).toBe(2);
+      expect(call.skip).toBe(0);
+      expect(call.where.groupId).toBe('grp-1');
+      expect(result.map((m: any) => m.id)).toEqual(['m-a', 'm-b']);
+    });
+
+    it('falls back to the full list (no 500) on junk params', async () => {
+      const result = await svc.findAllModifiers(TENANT, undefined, false, {
+        limit: -1,
+        offset: NaN,
+      } as any);
+
+      const call = (prisma.modifier.findMany as any).mock.calls[0][0];
+      expect(call.take).toBeUndefined();
+      expect(call.skip).toBeUndefined();
+      expect(result.map((m: any) => m.id)).toEqual(['m-a', 'm-b', 'm-c']);
+    });
+  });
 });
