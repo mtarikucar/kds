@@ -1,7 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { addMonths, addYears } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { MetricsService } from "../../../common/metrics/metrics.service";
 import { BillingService } from "../../subscriptions/services/billing.service";
 import { NotificationService } from "../../subscriptions/services/notification.service";
 import { captureException } from "../../../sentry.config";
@@ -85,7 +86,28 @@ export class PaytrSettlementService {
     // stuck on the old plan's grants for up to 24h (until
     // reconcileNightly).
     private readonly outbox: OutboxService,
+    // @Optional() so unit tests constructing the service bare (and any
+    // wiring without the metrics provider) keep working — a missing
+    // MetricsService must never break settlement, the last critical
+    // money path. Emitted strictly after the settlement write/emit has
+    // committed, ?.-guarded, with a bounded enum label.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  /**
+   * Record one settled PayTR payment outcome. The label set is a fixed
+   * two-value enum (`success` | `failure`) so cardinality stays bounded;
+   * it is never derived from user input. Called only after the settlement
+   * transaction (success) or the FAILED write (failure) has committed, so
+   * the counter reflects durable outcomes, not attempts.
+   */
+  private countSettlement(result: "success" | "failure"): void {
+    this.metrics?.incCounter(
+      "paytr_settlement_total",
+      "PayTR settlement outcomes by result (success|failure)",
+      { result },
+    );
+  }
 
   async settlePayment(
     merchantOid: string,
@@ -390,6 +412,11 @@ export class PaytrSettlementService {
 
       // Commission crediting moved to the marketing SettlementCommissionConsumer
       // (Step C) — it reacts to the payment.succeeded.v1 emitted in the tx above.
+
+      // After-commit observability: the settlement tx above durably
+      // transitioned PENDING → SUCCEEDED and emitted its outbox events, so
+      // this is a real settled-success outcome. ?.-guarded; never throws.
+      this.countSettlement("success");
       return "OK";
     } catch (err) {
       // Concurrent settle (webhook retry / recovery sweeper) already
@@ -478,6 +505,10 @@ export class PaytrSettlementService {
     this.logger.warn(
       `Settlement failed for oid=${payment.paytrMerchantOid}: ${outcome.failureCode ?? ""} ${outcome.failureMessage ?? ""}`,
     );
+
+    // After-commit observability: the FAILED write above has landed, so
+    // this is a real settled-failure outcome. ?.-guarded; never throws.
+    this.countSettlement("failure");
   }
 
   /**
