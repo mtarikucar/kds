@@ -1,5 +1,6 @@
-import { OrderType, OrderStatus, type Order, type Product } from '../../types';
+import { OrderType, OrderStatus, type Order, type OrderItem, type Product } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
+import type { CartItem } from './posTypes';
 
 /**
  * POS cart pure logic — money math + payment-eligibility gates.
@@ -119,4 +120,63 @@ export function paymentBlockedReason(args: {
     return 'dineInPaymentRequiresReadyOrServed';
   }
   return null;
+}
+
+/**
+ * Resolve which order + amount handlePaymentConfirm should charge. The
+ * AwaitingPayment section pays a specific SERVED/READY order (payingOrderId);
+ * otherwise the active cart order (currentOrderId) is paid. Returns null when
+ * there is nothing chargeable (no order id, or a null amount) — POSPage's
+ * inline guard short-circuited on exactly this. Pure extraction of the
+ * `orderIdToPay`/`amountToPay`/early-return lines (~L605-609).
+ */
+export function resolvePaymentTarget(args: {
+  payingOrderId: string | null;
+  payingOrderAmount: number | null;
+  currentOrderId: string | null;
+  currentOrderAmount: number | null;
+}): { orderId: string; amount: number; wasExistingOrderPayment: boolean } | null {
+  const { payingOrderId, payingOrderAmount, currentOrderId, currentOrderAmount } = args;
+  const orderId = payingOrderId || currentOrderId;
+  const amount = payingOrderId ? payingOrderAmount : currentOrderAmount;
+  if (!orderId || amount === null) return null;
+  return { orderId, amount, wasExistingOrderPayment: !!payingOrderId };
+}
+
+/**
+ * Whether any unpaid order remains on the table after `paidOrderId` is
+ * settled — the guard that decides if the table can be freed to AVAILABLE.
+ * Excludes the just-paid order, PAID orders, and CANCELLED orders. Must run
+ * against freshly-refetched orders (a stale snapshot could free a table that
+ * still has an unpaid bill — the documented race this guards). Pure
+ * extraction of the `remainingOrders` filter (~L626-633).
+ */
+export function hasRemainingUnpaidOrders(
+  orders: Pick<Order, 'id' | 'status'>[],
+  paidOrderId: string,
+): boolean {
+  return orders.some(
+    (order) =>
+      order.id !== paidOrderId &&
+      order.status !== OrderStatus.PAID &&
+      order.status !== OrderStatus.CANCELLED,
+  );
+}
+
+/**
+ * Map an existing order's line items into POS cart items when continuing an
+ * occupied table's order. Spreads the product, carries quantity, and coerces
+ * an empty/null note to undefined. Pure extraction of the OCCUPIED-load
+ * effect's mapping (~L228-233). Reads `orderItems` then falls back to `items`,
+ * matching the original `activeOrder.orderItems || activeOrder.items || []`.
+ */
+export function mapOrderItemsToCart(
+  order: Pick<Order, 'orderItems' | 'items'>,
+): CartItem[] {
+  const items: OrderItem[] = order.orderItems || order.items || [];
+  return items.map((item) => ({
+    ...(item.product as Product),
+    quantity: item.quantity,
+    notes: item.notes || undefined,
+  }));
 }

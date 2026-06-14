@@ -35,6 +35,9 @@ import {
   calculateSubtotal,
   canProceedToPayment as computeCanProceedToPayment,
   paymentBlockedReason as computePaymentBlockedReason,
+  resolvePaymentTarget,
+  hasRemainingUnpaidOrders,
+  mapOrderItemsToCart,
 } from './posCart';
 import { useCartPersistence } from './useCartPersistence';
 import { usePosTourSync } from './usePosTourSync';
@@ -225,12 +228,7 @@ const POSPage = () => {
         setCurrentOrderAmount(Number(activeOrder.finalAmount));
 
         // Populate cart with existing order items
-        const items = activeOrder.orderItems || activeOrder.items || [];
-        const existingItems: CartItem[] = items.map((item) => ({
-          ...(item.product as Product),
-          quantity: item.quantity,
-          notes: item.notes || undefined,
-        }));
+        const existingItems = mapOrderItemsToCart(activeOrder);
 
         setCartItems(existingItems);
         setDiscount(activeOrder.discount || 0);
@@ -238,7 +236,7 @@ const POSPage = () => {
         setOrderNotes(activeOrder.notes || '');
 
         toast.info(
-          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
+          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: existingItems.length })
         );
       } else if (tableOrders.length === 0) {
         // Table is marked occupied but no orders found at all - this is unusual
@@ -568,11 +566,17 @@ const POSPage = () => {
   };
 
   const handlePaymentConfirm = (data: { method: string; transactionId?: string; customerPhone?: string }) => {
-    // Determine which order to pay: SERVED order (payingOrderId) or cart order (currentOrderId)
-    const orderIdToPay = payingOrderId || currentOrderId;
-    const amountToPay = payingOrderId ? payingOrderAmount : currentOrderAmount;
-
-    if (!orderIdToPay || amountToPay === null) return;
+    // Determine which order to pay: SERVED order (payingOrderId) or cart order
+    // (currentOrderId). Returns null (and we bail) when nothing is chargeable.
+    const target = resolvePaymentTarget({
+      payingOrderId,
+      payingOrderAmount,
+      currentOrderId,
+      currentOrderAmount,
+    });
+    if (!target) return;
+    const orderIdToPay = target.orderId;
+    const amountToPay = target.amount;
 
     createPayment(
       {
@@ -615,22 +619,16 @@ const POSPage = () => {
           const freshOrders = refreshed.data ?? tableOrders ?? [];
 
           // Check if this was an existing order payment (from AwaitingPayment section)
-          const wasExistingOrderPayment = !!payingOrderId;
+          const wasExistingOrderPayment = target.wasExistingOrderPayment;
 
           // Reset payment state
           setIsPaymentModalOpen(false);
           setPayingOrderId(null);
           setPayingOrderAmount(null);
 
-          // Always check for remaining unpaid orders before marking table as available
-          const remainingOrders = freshOrders.filter(
-            (order) =>
-              order.id !== orderIdToPay &&
-              order.status !== OrderStatus.PAID &&
-              order.status !== OrderStatus.CANCELLED
-          );
-
-          const hasRemainingOrders = remainingOrders.length > 0;
+          // Always check for remaining unpaid orders before marking table as
+          // available (the documented stale-snapshot race guard).
+          const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders, orderIdToPay);
 
           if (wasExistingOrderPayment) {
             // For existing order payments (READY/SERVED), only mark available if no remaining orders

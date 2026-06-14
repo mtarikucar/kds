@@ -5,9 +5,12 @@ import {
   calculateTotal,
   canProceedToPayment,
   paymentBlockedReason,
+  resolvePaymentTarget,
+  hasRemainingUnpaidOrders,
+  mapOrderItemsToCart,
   type PosCartItem,
 } from './posCart';
-import { OrderType, OrderStatus, type Order } from '../../types';
+import { OrderType, OrderStatus, type Order, type OrderItem, type Product } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 
 const mod = (priceAdjustment: number, quantity = 1): SelectedModifier =>
@@ -200,5 +203,142 @@ describe('posCart payment eligibility gate', () => {
         }),
       ).toBeNull();
     });
+  });
+});
+
+describe('resolvePaymentTarget', () => {
+  it('pays the AwaitingPayment order when payingOrderId is set (existing-order payment)', () => {
+    expect(
+      resolvePaymentTarget({
+        payingOrderId: 'served-1',
+        payingOrderAmount: 42,
+        currentOrderId: 'cart-9',
+        currentOrderAmount: 10,
+      }),
+    ).toEqual({ orderId: 'served-1', amount: 42, wasExistingOrderPayment: true });
+  });
+
+  it('pays the active cart order when there is no payingOrderId', () => {
+    expect(
+      resolvePaymentTarget({
+        payingOrderId: null,
+        payingOrderAmount: null,
+        currentOrderId: 'cart-9',
+        currentOrderAmount: 17,
+      }),
+    ).toEqual({ orderId: 'cart-9', amount: 17, wasExistingOrderPayment: false });
+  });
+
+  it('returns null when there is no order to pay', () => {
+    expect(
+      resolvePaymentTarget({
+        payingOrderId: null,
+        payingOrderAmount: null,
+        currentOrderId: null,
+        currentOrderAmount: null,
+      }),
+    ).toBeNull();
+  });
+
+  it('returns null when the chosen amount is null (cannot charge an unknown total)', () => {
+    expect(
+      resolvePaymentTarget({
+        payingOrderId: 'served-1',
+        payingOrderAmount: null,
+        currentOrderId: 'cart-9',
+        currentOrderAmount: 10,
+      }),
+    ).toBeNull();
+  });
+
+  it('allows a zero amount (0 is a valid total, not "no amount")', () => {
+    expect(
+      resolvePaymentTarget({
+        payingOrderId: null,
+        payingOrderAmount: null,
+        currentOrderId: 'cart-9',
+        currentOrderAmount: 0,
+      }),
+    ).toEqual({ orderId: 'cart-9', amount: 0, wasExistingOrderPayment: false });
+  });
+});
+
+const ord = (id: string, status: OrderStatus): Pick<Order, 'id' | 'status'> => ({ id, status });
+
+describe('hasRemainingUnpaidOrders', () => {
+  it('is false when the only order is the one just paid', () => {
+    expect(hasRemainingUnpaidOrders([ord('o-1', OrderStatus.PENDING)], 'o-1')).toBe(false);
+  });
+
+  it('is true when another unpaid order remains on the table', () => {
+    expect(
+      hasRemainingUnpaidOrders(
+        [ord('o-1', OrderStatus.PAID), ord('o-2', OrderStatus.PENDING)],
+        'o-1',
+      ),
+    ).toBe(true);
+  });
+
+  it('ignores PAID and CANCELLED orders (table can still be freed)', () => {
+    expect(
+      hasRemainingUnpaidOrders(
+        [
+          ord('o-1', OrderStatus.PAID),
+          ord('o-2', OrderStatus.PAID),
+          ord('o-3', OrderStatus.CANCELLED),
+        ],
+        'o-1',
+      ),
+    ).toBe(false);
+  });
+
+  it('is false for an empty order list', () => {
+    expect(hasRemainingUnpaidOrders([], 'o-1')).toBe(false);
+  });
+
+  it('counts a SERVED/READY sibling order as still unpaid', () => {
+    expect(
+      hasRemainingUnpaidOrders(
+        [ord('o-1', OrderStatus.PAID), ord('o-2', OrderStatus.SERVED)],
+        'o-1',
+      ),
+    ).toBe(true);
+  });
+});
+
+const orderItem = (over: Partial<OrderItem>): OrderItem =>
+  ({
+    id: 'oi-1',
+    quantity: 1,
+    notes: null,
+    product: { id: 'p-1', name: 'Burger', price: 10 } as Product,
+    ...over,
+  } as OrderItem);
+
+describe('mapOrderItemsToCart', () => {
+  it('spreads the product, carries quantity, and coerces empty notes to undefined', () => {
+    const cart = mapOrderItemsToCart({
+      orderItems: [orderItem({ quantity: 2, notes: '', product: { id: 'p-7', name: 'Fries', price: 5 } as Product })],
+    } as Pick<Order, 'orderItems' | 'items'>);
+    expect(cart).toEqual([{ id: 'p-7', name: 'Fries', price: 5, quantity: 2, notes: undefined }]);
+  });
+
+  it('keeps a real note', () => {
+    const cart = mapOrderItemsToCart({
+      orderItems: [orderItem({ notes: 'extra cheese' })],
+    } as Pick<Order, 'orderItems' | 'items'>);
+    expect(cart[0].notes).toBe('extra cheese');
+  });
+
+  it('falls back to `items` when `orderItems` is absent (matches the original ||)', () => {
+    const cart = mapOrderItemsToCart({
+      items: [orderItem({ quantity: 3 })],
+    } as Pick<Order, 'orderItems' | 'items'>);
+    expect(cart).toHaveLength(1);
+    expect(cart[0].quantity).toBe(3);
+  });
+
+  it('returns [] when there are no items', () => {
+    expect(mapOrderItemsToCart({} as Pick<Order, 'orderItems' | 'items'>)).toEqual([]);
   });
 });
