@@ -6,6 +6,7 @@ import {
   TrendingDown,
   AlertCircle,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   useDashboardStats,
   useGrowthMetrics,
@@ -24,6 +25,7 @@ function MetricCard({
   change?: number;
   icon: any;
 }) {
+  const { t } = useTranslation('superadmin');
   return (
     <div className="bg-white rounded-xl border border-zinc-200 p-5">
       <div className="flex items-start justify-between">
@@ -44,7 +46,7 @@ function MetricCard({
               >
                 {Math.abs(change)}%
               </span>
-              <span className="text-xs text-zinc-400">vs last month</span>
+              <span className="text-xs text-zinc-400">{t('dashboard.vsLastMonth')}</span>
             </div>
           )}
         </div>
@@ -78,6 +80,7 @@ function AlertBanner({
 }
 
 export default function SuperAdminDashboardPage() {
+  const { t } = useTranslation('superadmin');
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: growth } = useGrowthMetrics();
   const { data: alerts } = useDashboardAlerts();
@@ -95,21 +98,21 @@ export default function SuperAdminDashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Dashboard</h1>
-        <p className="text-sm text-zinc-500 mt-1">Platform overview and key metrics</p>
+        <h1 className="text-2xl font-semibold text-zinc-900">{t('dashboard.title')}</h1>
+        <p className="text-sm text-zinc-500 mt-1">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Alerts */}
       {alerts && (alerts.expiringTrials > 0 || alerts.suspendedTenants > 0 || alerts.failedPayments > 0) && (
         <div className="space-y-2">
           {alerts.expiringTrials > 0 && (
-            <AlertBanner message={`${alerts.expiringTrials} trial(s) expiring soon`} />
+            <AlertBanner message={t('dashboard.alerts.expiringTrials', { count: alerts.expiringTrials })} />
           )}
           {alerts.suspendedTenants > 0 && (
-            <AlertBanner message={`${alerts.suspendedTenants} suspended tenant(s)`} />
+            <AlertBanner message={t('dashboard.alerts.suspendedTenants', { count: alerts.suspendedTenants })} />
           )}
           {alerts.failedPayments > 0 && (
-            <AlertBanner message={`${alerts.failedPayments} failed payment(s)`} type="error" />
+            <AlertBanner message={t('dashboard.alerts.failedPayments', { count: alerts.failedPayments })} type="error" />
           )}
         </div>
       )}
@@ -117,24 +120,24 @@ export default function SuperAdminDashboardPage() {
       {/* Primary Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Total Tenants"
+          label={t('dashboard.metrics.totalTenants')}
           value={stats?.tenants.total || 0}
           change={growth?.tenants.growth}
           icon={Building2}
         />
         <MetricCard
-          label="Active Tenants"
+          label={t('dashboard.metrics.activeTenants')}
           value={stats?.tenants.active || 0}
           icon={Building2}
         />
         <MetricCard
-          label="Total Users"
+          label={t('dashboard.metrics.totalUsers')}
           value={stats?.users.total || 0}
           change={growth?.users.growth}
           icon={Users}
         />
         <MetricCard
-          label="Monthly Revenue"
+          label={t('dashboard.metrics.monthlyRevenue')}
           value={`₺${(stats?.revenue.mrr || 0).toLocaleString()}`}
           icon={CreditCard}
         />
@@ -144,22 +147,22 @@ export default function SuperAdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Subscriptions */}
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900">Subscriptions</h3>
+          <h3 className="text-sm font-medium text-zinc-900">{t('dashboard.subscriptions')}</h3>
           <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-500">Active</span>
+              <span className="text-sm text-zinc-500">{t('dashboard.active')}</span>
               <span className="text-sm font-medium text-zinc-900">
                 {stats?.subscriptions.active || 0}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-500">Trial</span>
+              <span className="text-sm text-zinc-500">{t('dashboard.trial')}</span>
               <span className="text-sm font-medium text-zinc-900">
                 {stats?.subscriptions.trial || 0}
               </span>
             </div>
             <div className="flex items-center justify-between pt-3 border-t border-zinc-100">
-              <span className="text-sm text-zinc-500">Total</span>
+              <span className="text-sm text-zinc-500">{t('dashboard.total')}</span>
               <span className="text-sm font-medium text-zinc-900">
                 {stats?.subscriptions.total || 0}
               </span>
@@ -169,12 +172,12 @@ export default function SuperAdminDashboardPage() {
 
         {/* Orders */}
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900">Orders</h3>
+          <h3 className="text-sm font-medium text-zinc-900">{t('dashboard.orders')}</h3>
           <div className="mt-4">
             <p className="text-3xl font-semibold text-zinc-900">
               {(stats?.orders.total || 0).toLocaleString()}
             </p>
-            <p className="text-sm text-zinc-500 mt-1">Total completed orders</p>
+            <p className="text-sm text-zinc-500 mt-1">{t('dashboard.totalCompletedOrders')}</p>
             {growth && (
               <div className="flex items-center gap-1 mt-3">
                 {growth.orders.growth >= 0 ? (
@@ -187,7 +190,7 @@ export default function SuperAdminDashboardPage() {
                     growth.orders.growth >= 0 ? 'text-emerald-600' : 'text-red-500'
                   }`}
                 >
-                  {Math.abs(growth.orders.growth)}% this month
+                  {t('dashboard.thisMonth', { percent: Math.abs(growth.orders.growth) })}
                 </span>
               </div>
             )}
@@ -196,7 +199,7 @@ export default function SuperAdminDashboardPage() {
 
         {/* Plan Distribution */}
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900">Plan Distribution</h3>
+          <h3 className="text-sm font-medium text-zinc-900">{t('dashboard.planDistribution')}</h3>
           <div className="mt-4 space-y-3">
             {planDistribution?.map((plan: any) => (
               <div key={plan.planId} className="flex items-center justify-between">
@@ -205,7 +208,7 @@ export default function SuperAdminDashboardPage() {
               </div>
             ))}
             {(!planDistribution || planDistribution.length === 0) && (
-              <p className="text-sm text-zinc-400">No data available</p>
+              <p className="text-sm text-zinc-400">{t('dashboard.noDataAvailable')}</p>
             )}
           </div>
         </div>

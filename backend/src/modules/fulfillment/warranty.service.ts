@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Warranty bookkeeping. One row per (product, serial). Created automatically
@@ -19,6 +21,8 @@ import { OutboxService } from "../outbox/outbox.service";
  */
 @Injectable()
 export class WarrantyService {
+  private readonly logger = new Logger(WarrantyService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
@@ -61,7 +65,12 @@ export class WarrantyService {
           endAt: end,
         },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "createForSerial",
+        }),
+      );
     return row;
   }
 
@@ -110,7 +119,12 @@ export class WarrantyService {
         tenantId,
         payload: { warrantyId, claimId: claim.id, issue: input.issue },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fulfillment",
+          op: "fileClaim",
+        }),
+      );
     return updated;
   }
 

@@ -5,10 +5,12 @@ import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import { initializeNotificationSocket, disconnectNotificationSocket } from '../../lib/socket';
 import { useAuthStore } from '../../store/authStore';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 
 export const useNotifications = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', branchId],
     queryFn: async () => {
       const response = await api.get('/notifications');
       return response.data;
@@ -60,8 +62,11 @@ export const useNotificationSocket = () => {
         });
       }
 
-      // Update React Query cache to add new notification
-      queryClient.setQueryData(['notifications'], (oldData: any) => {
+      // Update React Query cache to add new notification. branchId is read
+      // fresh (socket re-roomed on switch) and appended to match the
+      // branch-scoped key useNotifications() registers.
+      const branchId = useBranchScopeStore.getState().branchId;
+      queryClient.setQueryData(['notifications', branchId], (oldData: any) => {
         if (!oldData) return [notification];
         return [notification, ...oldData];
       });

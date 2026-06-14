@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { addDays, addMonths, addYears } from "date-fns";
@@ -22,6 +23,9 @@ import {
 import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
 import { ChangePlanDto } from "../dto/change-plan.dto";
 import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
+import { foldPlanGrants } from "./effective-features.fold";
+import { MetricsService } from "../../../common/metrics/metrics.service";
+import { DowngradeUsageGuardService } from "./downgrade-usage-guard.service";
 
 @Injectable()
 export class SubscriptionService {
@@ -42,7 +46,84 @@ export class SubscriptionService {
     // overrides only — buying integration_yemeksepeti updated the engine
     // table but the UI never saw the change (it pulls from this method).
     private readonly entitlements: EntitlementService,
+    // Optional so unit tests constructing the service bare keep working and
+    // so a context without MetricsModule never fails to resolve.
+    @Optional() private readonly metrics?: MetricsService,
+    // Downgrade usage-limit guard extracted from this service. @Optional()
+    // so the bare unit-test constructors (which predate it) keep resolving;
+    // when DI omits it, `downgradeGuard` below lazily builds one over the
+    // same PrismaService so the extracted query runs identically.
+    @Optional()
+    private readonly injectedDowngradeGuard?: DowngradeUsageGuardService,
   ) {}
+
+  /**
+   * Resolve the downgrade usage-limit guard. Prefers the DI-provided
+   * collaborator; falls back to a Prisma-backed instance so unit tests that
+   * construct SubscriptionService without the guard still exercise the real
+   * (extracted-verbatim) check rather than a stub.
+   */
+  private get downgradeGuard(): DowngradeUsageGuardService {
+    if (!this.injectedDowngradeGuard) {
+      this.lazyDowngradeGuard ??= new DowngradeUsageGuardService(this.prisma);
+      return this.lazyDowngradeGuard;
+    }
+    return this.injectedDowngradeGuard;
+  }
+  private lazyDowngradeGuard?: DowngradeUsageGuardService;
+
+  /**
+   * Track 2 — record a committed subscription billing transition for
+   * Prometheus. Always called AFTER the mutating $transaction commits, and
+   * ?.-guarded so a missing collaborator can never break the business write.
+   * `event` is the developer-controlled lifecycle enum (create|change|
+   * cancel|reactivate), so label cardinality stays bounded.
+   */
+  private recordBillingEvent(
+    event: "create" | "change" | "cancel" | "reactivate",
+  ): void {
+    this.metrics?.incCounter(
+      "subscription_billing_total",
+      "Subscription billing lifecycle transitions (create|change|cancel|reactivate)",
+      { event },
+    );
+  }
+
+  /**
+   * Auditability — record a privileged billing decision (who created /
+   * changed / cancelled a paying subscription) in user_activities, the
+   * codebase's tenant-scoped audit log. The outbox lifecycle events the
+   * projector consumes are actor-less, so this is the only place the
+   * acting admin is captured for a "who changed our plan / cancelled our
+   * billing" forensic question.
+   *
+   * Best-effort and post-commit: a failure to write the audit row must
+   * never roll back or block the billing mutation that already succeeded,
+   * mirroring the emitLifecycle / notify swallow-and-log pattern. Skipped
+   * when there is no human actor (scheduler / cron callers pass none).
+   */
+  private async writeBillingAudit(
+    tenantId: string,
+    actorUserId: string | undefined,
+    action: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    if (!actorUserId) return;
+    try {
+      await this.prisma.userActivity.create({
+        data: {
+          userId: actorUserId,
+          tenantId,
+          action,
+          metadata: metadata as any,
+        },
+      });
+    } catch (e) {
+      this.logger.warn(
+        `billing audit ${action} failed for tenant=${tenantId}: ${(e as Error).message}`,
+      );
+    }
+  }
 
   /**
    * Append a subscription lifecycle event to the outbox.
@@ -175,7 +256,11 @@ export class SubscriptionService {
     return subscription;
   }
 
-  async createSubscription(tenantId: string, dto: CreateSubscriptionDto) {
+  async createSubscription(
+    tenantId: string,
+    dto: CreateSubscriptionDto,
+    actorUserId?: string,
+  ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
@@ -206,15 +291,20 @@ export class SubscriptionService {
       throw new BadRequestException("Invalid billing cycle");
     }
 
-    // Trial is a LIFETIME-PER-TENANT benefit. `Tenant.trialUsed` is the
-    // canonical gate — once any plan has been trialed (including the
-    // BUSINESS trial auto-started at registration), no further trials
-    // are available regardless of which paid plan the caller targets.
-    // We still write `usedTrialPlanIds` further down for audit, but the
-    // eligibility check is per-tenant, not per-plan.
-    const hasUsedAnyTrial = tenant.trialUsed === true;
+    // v3.0.1 round-5 audit fix — trial eligibility is now PER-PLAN, the
+    // same shape `getEffectiveFeatures` returns to the SPA. Pre-fix
+    // `tenant.trialUsed` was a lifetime gate, so once any plan had been
+    // trialed (including the auto-started BUSINESS trial at registration)
+    // every subsequent trial was denied — but the SPA showed "14 gün
+    // ücretsiz dene" CTAs on every plan the tenant hadn't yet tried, so
+    // users clicked through trial flows the backend silently refused.
+    // The schema's `usedTrialPlanIds[]` is the canonical per-plan
+    // registry (its model-side comment notes the legacy `trialUsed`
+    // bool is "Kept for backward-compat"); we now match.
+    const usedTrialPlanIds = (tenant.usedTrialPlanIds ?? []) as string[];
+    const hasUsedThisPlanTrial = usedTrialPlanIds.includes(plan.id);
     const canUseTrial =
-      !hasUsedAnyTrial &&
+      !hasUsedThisPlanTrial &&
       plan.trialDays > 0 &&
       plan.name !== SubscriptionPlanType.FREE;
     const isTrialPeriod = canUseTrial;
@@ -287,6 +377,21 @@ export class SubscriptionService {
         );
       }
 
+      this.recordBillingEvent("create");
+      await this.writeBillingAudit(
+        tenantId,
+        actorUserId,
+        "SUBSCRIPTION_CREATED",
+        {
+          subscriptionId: result.id,
+          planId: plan.id,
+          planName: plan.name,
+          billingCycle: dto.billingCycle,
+          amount: amount.toString(),
+          currency: plan.currency,
+          isTrialPeriod,
+        },
+      );
       return result;
     } catch (err) {
       if (
@@ -359,18 +464,20 @@ export class SubscriptionService {
       throw new BadRequestException("Plan does not offer a trial");
     }
 
-    // Lifetime-per-tenant eligibility check (mirrors PaymentsService) so
-    // direct callers don't bypass the once-per-tenant rule.
+    // v3.0.1 round-5 — per-plan eligibility (same shape `getEffectiveFeatures`
+    // exposes). Pre-fix was lifetime-per-tenant; see the matching comment
+    // in createSubscription for the UX-vs-backend mismatch this resolves.
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { trialUsed: true },
+      select: { usedTrialPlanIds: true },
     });
     if (!tenant) {
       throw new NotFoundException("Tenant not found");
     }
-    if (tenant.trialUsed === true) {
+    const usedTrialPlanIds = (tenant.usedTrialPlanIds ?? []) as string[];
+    if (usedTrialPlanIds.includes(plan.id)) {
       throw new BadRequestException(
-        "Tenant has already used their trial. Trials are once per account.",
+        "Tenant has already used the trial for this plan. Trials are once per plan.",
       );
     }
 
@@ -460,6 +567,7 @@ export class SubscriptionService {
       // identically. Emit a single canonical "activated" event.
       await this.emitLifecycle(EventTypes.SubscriptionActivated, subscription);
 
+      this.recordBillingEvent("create");
       return subscription;
     } catch (err) {
       if (
@@ -489,6 +597,7 @@ export class SubscriptionService {
     subscriptionId: string,
     tenantId: string,
     dto: ChangePlanDto,
+    actorUserId?: string,
   ) {
     const subscription = await this.getSubscriptionById(
       subscriptionId,
@@ -603,6 +712,25 @@ export class SubscriptionService {
         include: { plan: true, scheduledDowngradePlan: true },
       });
 
+    // The downgrade was committed (scheduled for period end); the upgrade
+    // branch above only returns a quote (no mutation), so it isn't counted —
+    // its committed billing change lands later in applyUpgrade.
+    this.recordBillingEvent("change");
+    await this.writeBillingAudit(
+      tenantId,
+      actorUserId,
+      "SUBSCRIPTION_PLAN_CHANGED",
+      {
+        subscriptionId,
+        type: "downgrade",
+        fromPlanId: currentPlan.id,
+        fromPlanName: currentPlan.name,
+        toPlanId: newPlan.id,
+        toPlanName: newPlan.name,
+        billingCycle,
+        scheduledFor: subscription.currentPeriodEnd?.toISOString(),
+      },
+    );
     return {
       subscription: updatedSubscription,
       type: "downgrade" as const,
@@ -612,6 +740,11 @@ export class SubscriptionService {
     };
   }
 
+  /**
+   * Thin facade over the extracted DowngradeUsageGuardService. Behavior and
+   * call sites (changePlan, applyScheduledDowngrade) are unchanged — the
+   * usage-count queries and violation-message formatting moved verbatim.
+   */
   private async assertDowngradeAllowed(
     tenantId: string,
     newPlan: {
@@ -621,40 +754,7 @@ export class SubscriptionService {
       maxCategories: number;
     },
   ) {
-    const usage = await this.getCurrentUsage(tenantId);
-    const violations: string[] = [];
-    if (newPlan.maxUsers !== -1 && usage.users > newPlan.maxUsers) {
-      violations.push(`Users: ${usage.users}/${newPlan.maxUsers}`);
-    }
-    if (newPlan.maxTables !== -1 && usage.tables > newPlan.maxTables) {
-      violations.push(`Tables: ${usage.tables}/${newPlan.maxTables}`);
-    }
-    if (newPlan.maxProducts !== -1 && usage.products > newPlan.maxProducts) {
-      violations.push(`Products: ${usage.products}/${newPlan.maxProducts}`);
-    }
-    if (
-      newPlan.maxCategories !== -1 &&
-      usage.categories > newPlan.maxCategories
-    ) {
-      violations.push(
-        `Categories: ${usage.categories}/${newPlan.maxCategories}`,
-      );
-    }
-    if (violations.length > 0) {
-      throw new BadRequestException(
-        `Cannot downgrade: current usage exceeds new plan limits. Please reduce: ${violations.join(", ")}`,
-      );
-    }
-  }
-
-  private async getCurrentUsage(tenantId: string) {
-    const [users, tables, products, categories] = await Promise.all([
-      this.prisma.user.count({ where: { tenantId, status: "ACTIVE" } }),
-      this.prisma.table.count({ where: { tenantId } }),
-      this.prisma.product.count({ where: { tenantId } }),
-      this.prisma.category.count({ where: { tenantId } }),
-    ]);
-    return { users, tables, products, categories };
+    return this.downgradeGuard.assertDowngradeAllowed(tenantId, newPlan);
   }
 
   /**
@@ -822,6 +922,7 @@ export class SubscriptionService {
     tenantId: string,
     immediate: boolean = false,
     reason?: string,
+    actorUserId?: string,
   ) {
     const subscription = await this.getSubscriptionById(
       subscriptionId,
@@ -904,6 +1005,24 @@ export class SubscriptionService {
       );
     }
     const updated = txResult.updated;
+    // Committed cancel (immediate or at-period-end) — recorded after the txn.
+    this.recordBillingEvent("cancel");
+    await this.writeBillingAudit(
+      tenantId,
+      actorUserId,
+      "SUBSCRIPTION_CANCELLED",
+      {
+        subscriptionId,
+        planId: subscription.planId,
+        planName: subscription.plan.name,
+        immediate,
+        reason,
+        effectiveAt: (immediate
+          ? now
+          : subscription.currentPeriodEnd
+        )?.toISOString(),
+      },
+    );
 
     // Notifications are user-facing side effects and stay outside the
     // txn — they touch SMTP and can stall for seconds.
@@ -993,6 +1112,7 @@ export class SubscriptionService {
     // Already emitted inside the txn above — preserve the legacy
     // "outer scope `updated` is available" shape for the rest of the
     // function.
+    this.recordBillingEvent("reactivate");
     return updated;
   }
 
@@ -1177,86 +1297,23 @@ export class SubscriptionService {
       this.logger.debug(
         `getEffectiveFeatures fell back to plan + override + addon fold for tenant=${tenantId} (engine empty)`,
       );
-      const featureOverrides =
-        (tenant.featureOverrides as Record<string, boolean>) || null;
-      const limitOverrides =
-        (tenant.limitOverrides as Record<string, number>) || null;
-      const features: Record<string, boolean> = {
-        advancedReports: plan.advancedReports,
-        multiLocation: plan.multiLocation,
-        customBranding: plan.customBranding,
-        apiAccess: plan.apiAccess,
-        prioritySupport: plan.prioritySupport,
-        inventoryTracking: plan.inventoryTracking,
-        kdsIntegration: plan.kdsIntegration,
-        reservationSystem: plan.reservationSystem,
-        personnelManagement: plan.personnelManagement,
-        deliveryIntegration: plan.deliveryIntegration,
-      };
-      const limits: Record<string, number> = {
-        maxUsers: plan.maxUsers,
-        maxTables: plan.maxTables,
-        maxProducts: plan.maxProducts,
-        maxCategories: plan.maxCategories,
-        maxMonthlyOrders: plan.maxMonthlyOrders,
-      };
-      const integrations: Record<string, string[]> = {};
-
-      // Fold active add-ons. Each TenantAddOn carries a snapshot of the
-      // MarketplaceAddOn.grants JSON applied at purchase time. The
-      // engine's projector uses the same shape — features OR-true,
-      // limits SUM, integrations array-union — so reproduce it here.
+      // Engine-empty fallback fold extracted to a pure, tested helper
+      // (effective-features.fold.ts) — mirrors PlanProjectorService's
+      // FEATURE_COLUMNS/LIMIT_COLUMNS in one named place.
       const activeAddOns = await this.prisma.tenantAddOn.findMany({
         where: { tenantId, status: "active" },
         include: { addOn: { select: { grants: true } } },
       });
-      for (const ta of activeAddOns) {
-        const grants = (ta.addOn?.grants ?? {}) as Record<string, unknown>;
-        for (const [k, v] of Object.entries(grants)) {
-          if (k.startsWith("feature.")) {
-            const name = k.slice("feature.".length);
-            if (v === true && name in features) features[name] = true;
-          } else if (k.startsWith("limit.")) {
-            const name = k.slice("limit.".length);
-            if (typeof v === "number" && name in limits) {
-              // SUM by qty. Engine treats -1 as "unlimited"; preserve.
-              if (limits[name] === -1 || v === -1) {
-                limits[name] = -1;
-              } else {
-                limits[name] = limits[name] + v * (ta.quantity ?? 1);
-              }
-            }
-          } else if (k.startsWith("integration.")) {
-            const domain = k.slice("integration.".length);
-            const vendors = Array.isArray(v) ? (v as string[]) : [];
-            if (!integrations[domain]) integrations[domain] = [];
-            for (const vendor of vendors) {
-              if (!integrations[domain].includes(vendor)) {
-                integrations[domain].push(vendor);
-              }
-            }
-          }
-        }
-      }
-
-      // Overrides win last (REPLACE semantics matching the engine).
-      if (featureOverrides) {
-        for (const [k, v] of Object.entries(featureOverrides)) {
-          if (k in features) features[k] = v;
-        }
-      }
-      if (limitOverrides) {
-        for (const [k, v] of Object.entries(limitOverrides)) {
-          if (k in limits) limits[k] = v;
-        }
-      }
-
-      return {
-        features,
-        limits,
-        integrations,
-        trialEligiblePlanIds,
-      };
+      const folded = foldPlanGrants(
+        plan,
+        activeAddOns.map((ta) => ({
+          grants: (ta.addOn?.grants ?? null) as Record<string, unknown> | null,
+          quantity: ta.quantity,
+        })),
+        (tenant.featureOverrides as Record<string, boolean>) || null,
+        (tenant.limitOverrides as Record<string, number>) || null,
+      );
+      return { ...folded, trialEligiblePlanIds };
     }
 
     // Engine-resolved path: strip the `feature.` / `limit.` /

@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import { Customer, PaginatedResponse } from '../../types';
 
 export const useCustomers = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customers', branchId],
     queryFn: async (): Promise<PaginatedResponse<Customer>> => {
       const response = await api.get<PaginatedResponse<Customer>>('/customers');
       return response.data;
@@ -15,8 +17,9 @@ export const useCustomers = () => {
 };
 
 export const useCustomer = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['customer', id],
+    queryKey: ['customer', id, branchId],
     queryFn: async () => {
       const response = await api.get(`/customers/${id}`);
       return response.data;

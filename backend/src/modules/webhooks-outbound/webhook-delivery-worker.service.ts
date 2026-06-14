@@ -1,8 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { PrismaService } from "../../prisma/prisma.service";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { WebhookOutboundService } from "./webhook-outbound.service";
+import { stripCorrelationMeta } from "../outbox/outbox.service";
 import {
   assertPublicHttpUrl,
   UnsafeUrlError,
@@ -30,7 +32,22 @@ export class WebhookDeliveryWorkerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbound: WebhookOutboundService,
+    // Optional so unit tests constructing the worker bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  /**
+   * Track 2 — record one finished webhook delivery attempt for Prometheus.
+   * ?.-guarded so metrics can never break or stall delivery. `result` is the
+   * developer-controlled success|failure enum, so label cardinality is fixed.
+   */
+  private recordDelivery(result: "success" | "failure"): void {
+    this.metrics?.incCounter(
+      "webhook_delivery_total",
+      "Outbound webhook delivery attempts by result (success|failure)",
+      { result },
+    );
+  }
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async tick(): Promise<void> {
@@ -74,7 +91,11 @@ export class WebhookDeliveryWorkerService {
     // policy), `loadPayload` returns null — sending {"payload":null} to
     // the receiver is silent data loss they can't detect. Mark this
     // delivery `failed` with an actionable message instead.
-    const payload = await this.loadPayload(d.eventId);
+    // Strip the internal _meta correlation envelope so it never reaches the
+    // external receiver / the HMAC-signed body.
+    const payload = stripCorrelationMeta(
+      (await this.loadPayload(d.eventId)) as Record<string, unknown> | null,
+    );
     if (payload == null) {
       this.logger.warn(
         `webhook ${d.id}: source outbox event ${d.eventId} no longer exists; marking failed`,
@@ -88,6 +109,7 @@ export class WebhookDeliveryWorkerService {
             "source event purged before delivery — payload unavailable",
         },
       });
+      this.recordDelivery("failure");
       return;
     }
 
@@ -121,6 +143,7 @@ export class WebhookDeliveryWorkerService {
             "subscription predates KMS encryption — tenant must re-subscribe",
         },
       });
+      this.recordDelivery("failure");
       return;
     }
 
@@ -145,6 +168,7 @@ export class WebhookDeliveryWorkerService {
           lastResponseSnippet: `URL rejected by SSRF guard: ${msg}`,
         },
       });
+      this.recordDelivery("failure");
       return;
     }
 
@@ -188,6 +212,7 @@ export class WebhookDeliveryWorkerService {
               ),
         },
       });
+      this.recordDelivery(success ? "success" : "failure");
 
       // Atomic increment + threshold check in one statement so two parallel
       // failing deliveries can't miss the auto-pause threshold by racing the
@@ -250,6 +275,7 @@ export class WebhookDeliveryWorkerService {
           ),
         },
       });
+      this.recordDelivery("failure");
     }
   }
 

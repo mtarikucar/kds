@@ -5,7 +5,6 @@ import {
   Param,
   Post,
   Query,
-  Req,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -17,6 +16,8 @@ import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresIntegration } from "../subscriptions/decorators/requires-integration.decorator";
 import { FiscalService } from "./fiscal.service";
 import { CancelReceiptDto } from "./dto/cancel-receipt.dto";
+import { CurrentScope } from "../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../common/scoping/branch-scope";
 
 // v2.8.88: fiscal recovery panel restricted to tenants who actually
 // own a fiscal integration (Hugin / Beko yazarkasa or e-Fatura). FREE
@@ -36,11 +37,8 @@ export class FiscalController {
   @ApiOperation({
     summary: "Queued + failed receipts — drives the manual recovery panel",
   })
-  pending(@Req() req: any, @Query("limit") limit?: string) {
-    return this.fiscal.listPending(
-      req.user.tenantId,
-      limit ? parseInt(limit, 10) : 100,
-    );
+  pending(@CurrentScope() scope: BranchScope, @Query("limit") limit?: string) {
+    return this.fiscal.listPending(scope, limit ? parseInt(limit, 10) : 100);
   }
 
   @Post("receipts/:id/retry")
@@ -48,23 +46,23 @@ export class FiscalController {
     summary:
       "Re-dispatch a queued/failed receipt to its adapter (uses original idempotency key)",
   })
-  retry(@Req() req: any, @Param("id") id: string) {
-    return this.fiscal.retryFailed(req.user.tenantId, id);
+  retry(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.fiscal.retryFailed(scope, id);
   }
 
   @Post("receipts/:id/cancel")
   @ApiOperation({ summary: "Cancel an already-issued receipt" })
   cancel(
-    @Req() req: any,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() body: CancelReceiptDto,
   ) {
-    return this.fiscal.cancelReceipt(req.user.tenantId, id, body.reason);
+    return this.fiscal.cancelReceipt(scope, id, body.reason);
   }
 
   @Post("devices/:id/close-day")
   @ApiOperation({ summary: "Close the fiscal day — runs Z report" })
-  closeDay(@Req() req: any, @Param("id") id: string) {
-    return this.fiscal.closeDay(req.user.tenantId, id);
+  closeDay(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.fiscal.closeDay(scope, id);
   }
 }

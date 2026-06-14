@@ -1,6 +1,15 @@
 import { DeviceService } from './device.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
+/** Minimal ConfigService stub honouring the (key, default) signature. */
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    get: jest.fn((key: string, def?: unknown) =>
+      key in overrides ? overrides[key] : def,
+    ),
+  } as any;
+}
+
 /**
  * Smoke tests for the most security-relevant flows on DeviceService: pairing
  * and token authentication. The full integration story (heartbeat sweeps,
@@ -15,7 +24,39 @@ describe('DeviceService pairing', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
-    svc = new DeviceService(prisma as any, outbox as any);
+    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+  });
+
+  describe('TTL config', () => {
+    const TEN_MIN_MS = 10 * 60 * 1000;
+
+    it('pairCode TTL defaults to 10m when DEVICE_PAIR_CODE_TTL_MS is unset', async () => {
+      prisma.device.findUnique.mockResolvedValue(null);
+      (prisma.device.create as any).mockImplementation(async ({ data }: any) => ({ id: 'dev-1', ...data }));
+
+      const before = Date.now();
+      const out = await svc.createSlot('tenant-1', { kind: 'kds_screen' });
+      const ttl = out.pairCodeExpiresAt.getTime() - before;
+      expect(ttl).toBeGreaterThanOrEqual(TEN_MIN_MS - 1000);
+      expect(ttl).toBeLessThanOrEqual(TEN_MIN_MS + 5000);
+    });
+
+    it('honours a DEVICE_PAIR_CODE_TTL_MS override', async () => {
+      const override = 90 * 1000;
+      svc = new DeviceService(
+        prisma as any,
+        outbox as any,
+        makeConfig({ DEVICE_PAIR_CODE_TTL_MS: override }),
+      );
+      prisma.device.findUnique.mockResolvedValue(null);
+      (prisma.device.create as any).mockImplementation(async ({ data }: any) => ({ id: 'dev-1', ...data }));
+
+      const before = Date.now();
+      const out = await svc.createSlot('tenant-1', { kind: 'kds_screen' });
+      const ttl = out.pairCodeExpiresAt.getTime() - before;
+      expect(ttl).toBeGreaterThanOrEqual(override - 1000);
+      expect(ttl).toBeLessThanOrEqual(override + 5000);
+    });
   });
 
   it('createSlot generates a pair code and stores it with TTL', async () => {

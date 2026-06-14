@@ -87,4 +87,103 @@ describe('EnvKmsProvider', () => {
     delete process.env.KMS_KEY_VERSION;
     delete process.env.KMS_MASTER_KEY_V2;
   });
+
+  describe('rotateCiphertext', () => {
+    const ctx = { tenantId: 't1', purpose: 'webhook' };
+
+    afterEach(() => {
+      delete process.env.KMS_KEY_VERSION;
+      delete process.env.KMS_MASTER_KEY_V2;
+      delete process.env.KMS_MASTER_KEY_V3;
+    });
+
+    it('re-encrypts an old-version blob to the current version and round-trips', async () => {
+      // Write a v1 blob, then bring up a provider whose current version is 2.
+      process.env.KMS_KEY_VERSION = '1';
+      provider = new EnvKmsProvider();
+      const ctV1 = await provider.encrypt({ context: ctx, plaintext: 'topsecret' });
+      expect(ctV1[1]).toBe(1); // key-version byte
+
+      process.env.KMS_KEY_VERSION = '2';
+      process.env.KMS_MASTER_KEY_V2 = 'spec-v2-key';
+      provider = new EnvKmsProvider();
+
+      const rotated = await provider.rotateCiphertext({ context: ctx, ciphertext: ctV1 });
+      // The rotated blob carries the new key-version in its envelope...
+      expect(rotated[1]).toBe(2);
+      // ...is a genuinely different blob (re-encrypted, not the same bytes)...
+      expect(Buffer.compare(rotated, ctV1)).not.toBe(0);
+      // ...and decrypts back to the original plaintext under the same context.
+      expect(await provider.decrypt({ context: ctx, ciphertext: rotated })).toBe('topsecret');
+    });
+
+    it('is idempotent — rotating an already-current blob is a no-op (same bytes)', async () => {
+      process.env.KMS_KEY_VERSION = '2';
+      process.env.KMS_MASTER_KEY_V2 = 'spec-v2-key';
+      provider = new EnvKmsProvider();
+      const ctV2 = await provider.encrypt({ context: ctx, plaintext: 'already-current' });
+      expect(ctV2[1]).toBe(2);
+
+      const rotated = await provider.rotateCiphertext({ context: ctx, ciphertext: ctV2 });
+      // Already at the current version: return the exact same bytes so a
+      // re-run of a rotation job is a true no-op (no write, no IV churn).
+      expect(Buffer.compare(rotated, ctV2)).toBe(0);
+      // Re-running again is still a no-op and still decrypts.
+      const rotatedAgain = await provider.rotateCiphertext({ context: ctx, ciphertext: rotated });
+      expect(Buffer.compare(rotatedAgain, ctV2)).toBe(0);
+      expect(await provider.decrypt({ context: ctx, ciphertext: rotatedAgain })).toBe('already-current');
+    });
+
+    it('verify-before-persist: a corrupted source blob throws and yields no output', async () => {
+      // Tamper an old-version blob so it cannot be decrypted. rotate must
+      // surface the failure rather than emit a blob that would overwrite a
+      // good secretEnc with garbage.
+      process.env.KMS_KEY_VERSION = '1';
+      provider = new EnvKmsProvider();
+      const longPlain = 'a sufficiently long secret so tampering lands on a real ciphertext byte';
+      const ctV1 = Buffer.from(await provider.encrypt({ context: ctx, plaintext: longPlain }));
+
+      process.env.KMS_KEY_VERSION = '2';
+      process.env.KMS_MASTER_KEY_V2 = 'spec-v2-key';
+      provider = new EnvKmsProvider();
+
+      ctV1[40] = ctV1[40] ^ 0x01; // flip a body byte → auth-tag check fails
+      await expect(
+        provider.rotateCiphertext({ context: ctx, ciphertext: ctV1 }),
+      ).rejects.toThrow();
+    });
+
+    it('verify-before-persist: a wrong context throws instead of producing a blob', async () => {
+      // Even if the source blob is intact, rotating it under the wrong
+      // context (which can't decrypt it) must fail closed.
+      process.env.KMS_KEY_VERSION = '1';
+      provider = new EnvKmsProvider();
+      const ctV1 = await provider.encrypt({ context: ctx, plaintext: 'cross-tenant' });
+
+      process.env.KMS_KEY_VERSION = '2';
+      process.env.KMS_MASTER_KEY_V2 = 'spec-v2-key';
+      provider = new EnvKmsProvider();
+
+      await expect(
+        provider.rotateCiphertext({
+          context: { tenantId: 'OTHER', purpose: 'webhook' },
+          ciphertext: ctV1,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('rotates across multiple versions (v1 → v3) in one hop', async () => {
+      process.env.KMS_KEY_VERSION = '1';
+      provider = new EnvKmsProvider();
+      const ctV1 = await provider.encrypt({ context: ctx, plaintext: 'multi-hop' });
+
+      process.env.KMS_KEY_VERSION = '3';
+      process.env.KMS_MASTER_KEY_V3 = 'spec-v3-key';
+      provider = new EnvKmsProvider();
+
+      const rotated = await provider.rotateCiphertext({ context: ctx, ciphertext: ctV1 });
+      expect(rotated[1]).toBe(3);
+      expect(await provider.decrypt({ context: ctx, ciphertext: rotated })).toBe('multi-hop');
+    });
+  });
 });

@@ -7,6 +7,7 @@ import {
 import { Server, Socket } from "socket.io";
 import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { BranchGuard } from "../auth/guards/branch.guard";
 
 @Injectable()
 @WebSocketGateway({
@@ -90,6 +91,25 @@ export class NotificationsGateway
           client.disconnect();
           return;
         }
+        // v3.0.1 round-6 audit fix — validate the handshake branchId
+        // against the JWT's role/branch allow-list. Pre-fix the gateway
+        // trusted whatever branchId the client sent; a WAITER pinned
+        // to branch A could connect with branchId=<branch-B> and start
+        // receiving branch B's notifications. Mirrors BranchGuard's
+        // role-aware predicate so HTTP and WS share the same semantics.
+        const allowed = BranchGuard.canAccessBranchStatic(
+          payload.role,
+          branchId,
+          payload.primaryBranchId ?? null,
+          payload.allowedBranchIds ?? [],
+        );
+        if (!allowed) {
+          this.logger.warn(
+            `Notifications JWT rejected for ${client.id}: branchId=${branchId} not accessible to role=${payload.role}`,
+          );
+          client.disconnect();
+          return;
+        }
         client.data.userId = userId;
         client.data.tenantId = payload.tenantId;
         client.data.branchId = branchId;
@@ -98,6 +118,17 @@ export class NotificationsGateway
 
         client.join(`user:${userId}`);
         client.join(`tenant:${payload.tenantId}:branch:${branchId}`);
+        // v3.0.1 round-6 audit fix — also join the bare tenant room.
+        // Pre-fix `broadcastToTenantAcrossBranches` emitted to
+        // `tenant:${tenantId}` but no socket was ever in that room,
+        // so billing / marketing / system-wide announcements silently
+        // dropped (and the broadcast log line falsely claimed success).
+        // Tenant-wide announcements legitimately want to reach every
+        // staff socket — joining BOTH the branch-scoped room and the
+        // tenant-wide room lets sendNotificationToBranch stay
+        // branch-isolated while broadcastToTenantAcrossBranches still
+        // fans out.
+        client.join(`tenant:${payload.tenantId}`);
 
         // Auto-disconnect at token expiry so an idle long-lived socket
         // can't keep receiving emits after its JWT becomes invalid. Pure

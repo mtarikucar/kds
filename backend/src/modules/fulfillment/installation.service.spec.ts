@@ -39,12 +39,16 @@ describe('InstallationService', () => {
       captured = data;
       return { count: 1 };
     });
-    (prisma.installationRequest.findUniqueOrThrow as any).mockImplementation(async () => ({
+    // iter-37 made complete() re-read via findFirstOrThrow (tenant-scoped) and
+    // feed updated.hwOrderId into syncOrderInstallation (null = standalone
+    // request, no linked hardware order → sync no-ops).
+    (prisma.installationRequest.findFirstOrThrow as any).mockImplementation(async () => ({
       id: 'i-1',
       tenantId: 't1',
       status: 'done',
       completedAt: new Date(),
       notes: 'done by team',
+      hwOrderId: null,
     }));
     await svc.complete('t1', 'i-1', 'done by team');
     expect(captured.status).toBe('done');

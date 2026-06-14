@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   forwardRef,
   Optional,
@@ -13,7 +14,6 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateOrderDto } from "../dto/create-order.dto";
 import { UpdateOrderDto } from "../dto/update-order.dto";
 import { UpdateOrderStatusDto } from "../dto/update-order-status.dto";
-import { TransferTableOrdersDto } from "../dto/transfer-table.dto";
 import {
   OrderStatus,
   StockMovementType,
@@ -28,9 +28,14 @@ import { SmsNotificationService } from "../../sms-settings/sms-notification.serv
 import { TaxCalculationService } from "../../accounting/services/tax-calculation.service";
 import { withTransaction, addBreadcrumb } from "../../../common/utils/tracing";
 import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
+import { OrderPricingCalculator } from "./order-pricing.calculator";
 import { ReservationStatus } from "../../reservations/constants/reservation-status.enum";
 import { OutboxService } from "../../outbox/outbox.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { MetricsService } from "../../../common/metrics/metrics.service";
+import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
+import { toIntCents } from "../../../common/money/to-int-cents";
+import { ORDER_DETAIL_INCLUDE, buildFindAllWhere } from "./order-query.builder";
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -64,7 +69,19 @@ export class OrdersService {
     // no-op (kds-routing falls back to the existing kdsGateway broadcast).
     @Optional()
     private outbox?: OutboxService,
-  ) {}
+    @Optional()
+    private metrics?: MetricsService,
+    // Pure line-item pricing math extracted from createInner()/update()
+    // (wave-d2 split). @Optional with a zero-dep fallback so existing tests
+    // that construct OrdersService directly (without listing the calculator
+    // as a provider) keep the identical pricing behaviour.
+    @Optional()
+    pricingCalculator?: OrderPricingCalculator,
+  ) {
+    this.pricingCalculator = pricingCalculator ?? new OrderPricingCalculator();
+  }
+
+  private pricingCalculator: OrderPricingCalculator;
 
   /**
    * Best-effort outbox emit so the new device-mesh KDS routing (and any
@@ -80,6 +97,11 @@ export class OrdersService {
       | "order.cancelled.v1",
     order: any,
   ): void {
+    this.metrics?.incCounter(
+      "orders_lifecycle_total",
+      "Order lifecycle events by type (created|updated|completed|cancelled)",
+      { type },
+    );
     if (!this.outbox) return;
     this.outbox
       .append({
@@ -96,41 +118,10 @@ export class OrdersService {
           // false and `totalCents` came out undefined. Normalise via
           // String() → integer cents to dodge the IEEE-754 conversion that
           // would otherwise lose precision on large orders.
-          totalCents: this.toIntCents(order?.finalAmount),
+          totalCents: toIntCents(order?.finalAmount),
         },
       })
-      .catch((e) =>
-        this.logger.warn(`outbox emit ${type} failed: ${(e as Error).message}`),
-      );
-  }
-
-  /**
-   * Convert any of {number, Prisma.Decimal, string} → integer cents.
-   *
-   * Why this exists: Prisma.Decimal columns deserialise to Decimal objects
-   * whose `*100 → Math.round` path goes through IEEE-754, dropping precision
-   * for large amounts and quietly losing the kuruş on edge values. The
-   * Decimal API exposes `.toFixed(2)` which renders the canonical 2-dp
-   * string; we then strip the decimal point and parse, never crossing the
-   * float boundary.
-   */
-  private toIntCents(v: unknown): number | undefined {
-    if (v == null) return undefined;
-    // Decimal has a toFixed; number doesn't. Detect by feature instead of
-    // by `instanceof Decimal` so the helper works in test fixtures that
-    // pass plain numbers.
-    const asDecimal = v as { toFixed?: (n: number) => string };
-    if (typeof asDecimal.toFixed === "function" && typeof v !== "number") {
-      const fixed = asDecimal.toFixed!(2); // "123.45"
-      const cents = Number(fixed.replace(".", "")); // 12345
-      return Number.isFinite(cents) ? cents : undefined;
-    }
-    if (typeof v === "number") return Math.round(v * 100);
-    if (typeof v === "string") {
-      const cents = Math.round(parseFloat(v) * 100);
-      return Number.isFinite(cents) ? cents : undefined;
-    }
-    return undefined;
+      .catch(captureSwallowedEmit(this.logger, { module: "orders", op: type }));
   }
 
   /**
@@ -221,12 +212,8 @@ export class OrdersService {
     );
   }
 
-  async create(
-    createOrderDto: CreateOrderDto,
-    userId: string,
-    tenantId: string,
-  ) {
-    const created = await this.createInner(createOrderDto, userId, tenantId);
+  async create(scope: BranchScope, createOrderDto: CreateOrderDto) {
+    const created = await this.createInner(scope, createOrderDto);
     // Outbox emit happens AFTER the transaction commits so consumers don't
     // see an order that later rolled back. Best-effort: a failed emit logs
     // a warning but never undoes a committed order.
@@ -235,10 +222,10 @@ export class OrdersService {
   }
 
   private async createInner(
+    scope: BranchScope,
     createOrderDto: CreateOrderDto,
-    userId: string,
-    tenantId: string,
   ) {
+    const { tenantId, userId } = scope;
     return withTransaction(
       {
         name: "order.create",
@@ -246,6 +233,7 @@ export class OrdersService {
         tags: {
           "order.type": createOrderDto.type,
           "tenant.id": tenantId,
+          "branch.id": scope.branchId,
           "user.id": userId,
           has_table: String(!!createOrderDto.tableId),
         },
@@ -260,15 +248,24 @@ export class OrdersService {
         });
 
         // Idempotency fast-path: if the client supplied a key and we've
-        // already recorded an order for this (tenantId, key), return the
-        // existing row instead of creating a duplicate. The DB has a
-        // partial unique index on (tenantId, idempotencyKey) WHERE key
-        // IS NOT NULL — this pre-check is the responsiveness path; the
-        // P2002 catch in createWithOrderNumberRetry handles concurrent
-        // retries authoritatively.
+        // already recorded an order for this (tenantId, branchId, key),
+        // return the existing row instead of creating a duplicate.
+        //
+        // v3.0.1 audit fix — branchId is now part of the idempotency
+        // address. Pre-fix the lookup AND the DB partial unique were
+        // (tenantId, idempotencyKey) only; a POS terminal in branch B2
+        // retrying with idempotencyKey=k could collide with a different
+        // order created in branch B1 by another tablet using the same
+        // key (UUIDv4 client-side, very low odds but non-zero, and any
+        // chain that templates keys deterministically would hit it).
+        // The DB migration also widens the partial unique to
+        // (tenantId, branchId, idempotencyKey).
         if (createOrderDto.idempotencyKey) {
           const existing = await this.prisma.order.findFirst({
-            where: { tenantId, idempotencyKey: createOrderDto.idempotencyKey },
+            where: {
+              ...branchScope(scope),
+              idempotencyKey: createOrderDto.idempotencyKey,
+            },
             include: {
               orderItems: {
                 include: {
@@ -315,6 +312,25 @@ export class OrdersService {
           if (!table) {
             throw new BadRequestException(
               "Invalid table or table does not belong to your tenant",
+            );
+          }
+
+          // v3.0.1 audit fix (round 2) — explicit cross-branch table
+          // guard. BranchGuard only proves `X-Branch-Id` is in the
+          // caller's allow-list; it does NOT cross-check the request
+          // body's `tableId` against the resolved scope. A waiter
+          // pinned to B1 could otherwise POST a body with a tableId
+          // belonging to B2 (same tenant) and the order would land on
+          // B2's books, bypassing the branch isolation contract. The
+          // round-1 fix only stamped scope.branchId on tableless
+          // orders; this round adds the equality assertion for the
+          // tableId path. Without it, the idempotency lookup
+          // (scope-keyed) and the create stamp (table-keyed) also
+          // diverge — see the round-2 audit note on P2002→500.
+          if (table.branchId && table.branchId !== scope.branchId) {
+            throw new ForbiddenException(
+              "Table belongs to a different branch than the request scope. " +
+                "Switch to that branch (X-Branch-Id) and retry.",
             );
           }
 
@@ -433,54 +449,17 @@ export class OrdersService {
         // Build product price map from DB (never trust client-supplied prices)
         const productMap = new Map(products.map((p) => [p.id, p]));
 
-        // Calculate totals with tax
-        let totalAmount = 0;
-        let totalTaxAmount = 0;
-        const orderItems = createOrderDto.items.map((item) => {
-          const product = productMap.get(item.productId);
-          const serverPrice = Number(product?.price ?? 0);
-          const taxRate = product?.taxRate ?? 10;
-
-          // Calculate modifier total for this item
-          let modifierTotal = 0;
-          const itemModifiers = (item.modifiers || []).map((mod) => {
-            const modifier = modifierMap.get(mod.modifierId);
-            const priceAdjustment = Number(modifier?.priceAdjustment || 0);
-            modifierTotal += priceAdjustment * mod.quantity;
-            return {
-              modifierId: mod.modifierId,
-              quantity: mod.quantity,
-              priceAdjustment,
-            };
-          });
-
-          const subtotal = item.quantity * (serverPrice + modifierTotal);
-          totalAmount += subtotal;
-
-          // Calculate tax for this line item (prices are KDV-inclusive)
-          let itemTaxAmount = 0;
-          if (this.taxCalculationService) {
-            const tax = this.taxCalculationService.extractTax(
-              subtotal,
-              taxRate,
-            );
-            itemTaxAmount = tax.taxAmount;
-            totalTaxAmount += itemTaxAmount;
-          }
-
-          return {
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: serverPrice,
-            subtotal,
-            modifierTotal,
-            taxRate,
-            taxAmount: itemTaxAmount,
-            notes: item.notes,
-            modifiers:
-              itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
-          };
-        });
+        // Calculate totals with tax — pure line-item pricing math extracted
+        // VERBATIM into OrderPricingCalculator (wave-d2 split). Identical
+        // server-side price + modifier + KDV-inclusive tax computation; the
+        // discount POLICY (throw-on-over-discount) stays inline below.
+        const { orderItems, totalAmount, totalTaxAmount } =
+          this.pricingCalculator.priceItems(
+            createOrderDto.items,
+            productMap,
+            modifierMap,
+            this.taxCalculationService,
+          );
 
         // Cap the discount at the order total — discount > total would mint a
         // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
@@ -526,12 +505,25 @@ export class OrdersService {
             if (createOrderDto.tableId) {
               createData.tableId = createOrderDto.tableId;
             }
-            // Inherit the table's branch onto the order so the new branch-scoped
-            // reports (and KDS routing) pick it up. Null is fine — pre-Branch
-            // tables keep null which falls into tenant-wide queries.
-            if (tableBranchId) {
-              createData.branchId = tableBranchId;
-            }
+            // v3.0.1 audit fix — always stamp branchId from the caller's
+            // BranchScope. Pre-fix only the tableId path inherited the
+            // branch from the Table row, so tableless/counter/QR-self
+            // orders ended up at branchId=null and disappeared from
+            // every branchScope()-filtered read (KDS, reports, daily
+            // totals).
+            //
+            // Post-round-2: the cross-branch guard above asserts
+            // `table.branchId === scope.branchId` whenever the table's
+            // branchId is non-null, so `tableBranchId` and
+            // `scope.branchId` are provably equal in that case. The
+            // `??` falls through only for legacy single-branch tables
+            // whose `branchId` is still NULL (pre-v3 rows that escaped
+            // the strict-branch backfill). The variable is kept rather
+            // than collapsing to `scope.branchId` to keep the
+            // "inherits from the seated table" intent legible — a
+            // future audit re-reading this block sees the table-tier
+            // first, the scope-tier fallback second.
+            createData.branchId = tableBranchId ?? scope.branchId;
 
             return this.prisma.order.create({
               data: createData,
@@ -676,78 +668,20 @@ export class OrdersService {
     take: number = 100,
     skip: number = 0,
   ) {
-    // v3.0.0 — branchScope spreads `{ tenantId, branchId }`. Pre-v3
-    // this filtered by tenantId only; the v3 audit flagged the leak
-    // where a MANAGER in branch A could enumerate branch B's order
-    // history via GET /orders. The (tenantId, branchId) compound is
-    // also a covering index entry on the Order table.
-    const where: any = { ...branchScope(scope) };
-
-    if (tableId) {
-      where.tableId = tableId;
-    }
-
-    if (statuses && statuses.length > 0) {
-      // Support both single status and multiple statuses
-      if (statuses.length === 1) {
-        where.status = statuses[0];
-      } else {
-        where.status = { in: statuses };
-      }
-    }
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = startDate;
-      }
-      if (endDate) {
-        where.createdAt.lte = endDate;
-      }
-    }
+    // WHERE assembly (branch-scope + optional tableId/status/date window)
+    // moved VERBATIM into the pure buildFindAllWhere builder — no behaviour
+    // change, just isolates the read-path shape from the query execution.
+    const where = buildFindAllWhere(
+      scope,
+      tableId,
+      statuses,
+      startDate,
+      endDate,
+    );
 
     const orders = await this.prisma.order.findMany({
       where,
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                image: true,
-              },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: {
-                    id: true,
-                    name: true,
-                    priceAdjustment: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        table: {
-          select: {
-            id: true,
-            number: true,
-            section: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        payments: true,
-      },
+      include: ORDER_DETAIL_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: Math.min(take, 500),
       skip,
@@ -762,46 +696,7 @@ export class OrdersService {
         id,
         ...branchScope(scope),
       },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                image: true,
-              },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: {
-                    id: true,
-                    name: true,
-                    priceAdjustment: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        table: {
-          select: {
-            id: true,
-            number: true,
-            section: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        payments: true,
-      },
+      include: ORDER_DETAIL_INCLUDE,
     });
 
     if (!order) {
@@ -827,25 +722,7 @@ export class OrdersService {
   async findOneByTenant(id: string, tenantId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id, tenantId },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: { id: true, name: true, price: true, image: true },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: { id: true, name: true, priceAdjustment: true },
-                },
-              },
-            },
-          },
-        },
-        table: { select: { id: true, number: true, section: true } },
-        user: { select: { id: true, firstName: true, lastName: true } },
-        payments: true,
-      },
+      include: ORDER_DETAIL_INCLUDE,
     });
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
@@ -925,50 +802,16 @@ export class OrdersService {
       // Build product price map from DB (never trust client-supplied prices)
       const productMap = new Map(products.map((p) => [p.id, p]));
 
-      // Calculate new totals using server-side prices
-      let totalAmount = 0;
-      let totalTaxAmount = 0;
-      const orderItems = updateOrderDto.items.map((item) => {
-        const product = productMap.get(item.productId);
-        const serverPrice = Number(product?.price ?? 0);
-        const taxRate = product?.taxRate ?? 10;
-
-        let modifierTotal = 0;
-        const itemModifiers = (item.modifiers || []).map((mod) => {
-          const modifier = modifierMap.get(mod.modifierId);
-          const priceAdjustment = Number(modifier?.priceAdjustment || 0);
-          modifierTotal += priceAdjustment * mod.quantity;
-          return {
-            modifierId: mod.modifierId,
-            quantity: mod.quantity,
-            priceAdjustment,
-          };
-        });
-
-        const subtotal = item.quantity * (serverPrice + modifierTotal);
-        totalAmount += subtotal;
-
-        // Calculate tax for this line item (prices are KDV-inclusive)
-        let itemTaxAmount = 0;
-        if (this.taxCalculationService) {
-          const tax = this.taxCalculationService.extractTax(subtotal, taxRate);
-          itemTaxAmount = tax.taxAmount;
-          totalTaxAmount += itemTaxAmount;
-        }
-
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: serverPrice,
-          subtotal,
-          modifierTotal,
-          taxRate,
-          taxAmount: itemTaxAmount,
-          notes: item.notes,
-          modifiers:
-            itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
-        };
-      });
+      // Calculate new totals using server-side prices — same pure line-item
+      // pricing math as createInner(), extracted into OrderPricingCalculator
+      // (wave-d2 split). The discount POLICY (cap via Math.min) stays inline.
+      const { orderItems, totalAmount, totalTaxAmount } =
+        this.pricingCalculator.priceItems(
+          updateOrderDto.items,
+          productMap,
+          modifierMap,
+          this.taxCalculationService,
+        );
 
       const rawDiscount =
         updateOrderDto.discount !== undefined
@@ -1685,211 +1528,6 @@ export class OrdersService {
     }
 
     return updatedOrder;
-  }
-
-  async transferTableOrders(scope: BranchScope, dto: TransferTableOrdersDto) {
-    const tenantId = scope.tenantId;
-    const { sourceTableId, targetTableId, allowMerge = true } = dto;
-
-    // Validate: source and target cannot be the same
-    if (sourceTableId === targetTableId) {
-      throw new BadRequestException(
-        "Source and target tables cannot be the same",
-      );
-    }
-
-    // v3.0.0 — source AND target must live in the caller's branch.
-    // A waiter in branch A can't shove an order onto a sister-branch
-    // table; refuse before any state change.
-    const sourceTable = await this.prisma.table.findFirst({
-      where: { id: sourceTableId, ...branchScope(scope) },
-    });
-
-    if (!sourceTable) {
-      throw new NotFoundException("Source table not found in current branch");
-    }
-
-    const targetTable = await this.prisma.table.findFirst({
-      where: { id: targetTableId, ...branchScope(scope) },
-    });
-
-    if (!targetTable) {
-      throw new NotFoundException("Target table not found in current branch");
-    }
-
-    // Cannot transfer to a RESERVED table
-    if (targetTable.status === TableStatus.RESERVED) {
-      throw new BadRequestException(
-        "Cannot transfer orders to a reserved table",
-      );
-    }
-
-    // Check if target table has active orders (occupied)
-    if (targetTable.status === TableStatus.OCCUPIED && !allowMerge) {
-      throw new BadRequestException(
-        "Target table has active orders. Set allowMerge to true to merge orders.",
-      );
-    }
-
-    // Find active orders on source table (exclude PAID, CANCELLED, PENDING_APPROVAL)
-    const activeOrders = await this.prisma.order.findMany({
-      where: {
-        tableId: sourceTableId,
-        ...branchScope(scope),
-        status: {
-          notIn: [
-            OrderStatus.PAID,
-            OrderStatus.CANCELLED,
-            OrderStatus.PENDING_APPROVAL,
-          ],
-        },
-      },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: { id: true, name: true, price: true, image: true },
-            },
-            modifiers: {
-              include: {
-                modifier: {
-                  select: { id: true, name: true, priceAdjustment: true },
-                },
-              },
-            },
-          },
-        },
-        table: { select: { id: true, number: true, section: true } },
-        user: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
-
-    if (activeOrders.length === 0) {
-      throw new BadRequestException("No active orders found on source table");
-    }
-
-    // Perform the transfer in a transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // v2.8.97 — lock both tables FOR UPDATE in deterministic id-sort
-      // order before any write. Pre-fix two concurrent transfers
-      // touching the same source/target tables could leave the source
-      // marked AVAILABLE while another transfer's orders were still
-      // moving to it, OR leave the target marked OCCUPIED when no
-      // orders actually arrived. The lock order (string-sort ASC) is
-      // shared with other order/table mutators so deadlocks can't
-      // form across paths.
-      const [firstLockId, secondLockId] = [sourceTableId, targetTableId].sort();
-      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${firstLockId} AND "tenantId" = ${scope.tenantId} AND "branchId" = ${scope.branchId} FOR UPDATE`;
-      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${secondLockId} AND "tenantId" = ${scope.tenantId} AND "branchId" = ${scope.branchId} FOR UPDATE`;
-
-      // Re-verify the source still has the active orders we read
-      // outside the lock — a concurrent payment / cancel between the
-      // pre-tx findMany and this txn's lock could have terminated
-      // them, in which case the transfer is a no-op rather than a
-      // silent table-status flip.
-      const stillActiveIds = await tx.order.findMany({
-        where: {
-          id: { in: activeOrders.map((o) => o.id) },
-          ...branchScope(scope),
-          tableId: sourceTableId,
-          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
-        },
-        select: { id: true },
-      });
-      if (stillActiveIds.length === 0) {
-        throw new BadRequestException(
-          "All source-table orders changed status while waiting for the table lock — refresh and retry.",
-        );
-      }
-
-      // Compound WHERE on scope — defence-in-depth so a regression
-      // in the pre-validation above can't be amplified by an
-      // unconditional updateMany. v3.0.0 adds branchId.
-      await tx.order.updateMany({
-        where: {
-          id: { in: stillActiveIds.map((o) => o.id) },
-          ...branchScope(scope),
-        },
-        data: {
-          tableId: targetTableId,
-        },
-      });
-
-      // Update source table to AVAILABLE only if no other active
-      // orders remain (a parallel transfer pointing TO the source
-      // could have just added some).
-      const remainingOnSource = await tx.order.count({
-        where: {
-          tableId: sourceTableId,
-          ...branchScope(scope),
-          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
-        },
-      });
-      if (remainingOnSource === 0) {
-        await tx.table.updateMany({
-          where: { id: sourceTableId, ...branchScope(scope) },
-          data: { status: TableStatus.AVAILABLE },
-        });
-      }
-
-      // Update target table to OCCUPIED
-      await tx.table.updateMany({
-        where: { id: targetTableId, ...branchScope(scope) },
-        data: { status: TableStatus.OCCUPIED },
-      });
-
-      // Fetch updated orders with new table info
-      const updatedOrders = await tx.order.findMany({
-        where: {
-          id: { in: activeOrders.map((o) => o.id) },
-        },
-        include: {
-          orderItems: {
-            include: {
-              product: {
-                select: { id: true, name: true, price: true, image: true },
-              },
-              modifiers: {
-                include: {
-                  modifier: {
-                    select: { id: true, name: true, priceAdjustment: true },
-                  },
-                },
-              },
-            },
-          },
-          table: { select: { id: true, number: true, section: true } },
-          user: { select: { id: true, firstName: true, lastName: true } },
-        },
-      });
-
-      return updatedOrders;
-    });
-
-    // Emit WebSocket event for table transfer
-    this.kdsGateway.emitTableTransfer(tenantId, sourceTable.branchId, {
-      sourceTableId,
-      targetTableId,
-      sourceTableNumber: sourceTable.number,
-      targetTableNumber: targetTable.number,
-      orders: result,
-      transferredCount: result.length,
-    });
-
-    return {
-      message: `Successfully transferred ${result.length} order(s) from table ${sourceTable.number} to table ${targetTable.number}`,
-      transferredOrders: result,
-      sourceTable: {
-        id: sourceTableId,
-        number: sourceTable.number,
-        newStatus: TableStatus.AVAILABLE,
-      },
-      targetTable: {
-        id: targetTableId,
-        number: targetTable.number,
-        newStatus: TableStatus.OCCUPIED,
-      },
-    };
   }
 
   /**

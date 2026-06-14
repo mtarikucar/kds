@@ -20,6 +20,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { OrdersService } from "../services/orders.service";
+import { OrderTransferService } from "../services/order-transfer.service";
 import { PaymentsService } from "../services/payments.service";
 import { CreateOrderDto } from "../dto/create-order.dto";
 import { UpdateOrderDto } from "../dto/update-order.dto";
@@ -46,6 +47,7 @@ import { OrderStatus } from "../../../common/constants/order-status.enum";
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
+    private readonly orderTransferService: OrderTransferService,
     private readonly paymentsService: PaymentsService,
   ) {}
 
@@ -57,8 +59,17 @@ export class OrdersController {
   @ApiResponse({ status: 201, description: "Order successfully created" })
   @ApiResponse({ status: 400, description: "Invalid data" })
   @ApiResponse({ status: 403, description: "Insufficient permissions" })
-  create(@Body() createOrderDto: CreateOrderDto, @Request() req) {
-    return this.ordersService.create(createOrderDto, req.user.id, req.tenantId);
+  create(
+    @Body() createOrderDto: CreateOrderDto,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    // v3.0.1 audit fix — POST /orders used to drop into the service with
+    // tenantId only; tableless / counter / QR-self-pickup orders ended
+    // up at branchId=null, then disappeared from every branchScope()
+    // -filtered read (KDS, reports, daily totals). Forward the resolved
+    // scope so createInner can stamp branchId from `scope.branchId` when
+    // no tableId was provided.
+    return this.ordersService.create(scope, createOrderDto);
   }
 
   // ========================================
@@ -79,7 +90,7 @@ export class OrdersController {
     @Body() dto: TransferTableOrdersDto,
     @CurrentScope() scope: BranchScope,
   ) {
-    return this.ordersService.transferTableOrders(scope, dto);
+    return this.orderTransferService.transferTableOrders(scope, dto);
   }
 
   @Post("sync-table-statuses")

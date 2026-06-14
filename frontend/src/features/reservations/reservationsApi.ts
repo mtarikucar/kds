@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import i18n from '../../i18n/config';
 import { toast } from 'sonner';
 import type {
@@ -22,8 +23,9 @@ interface PaginatedResponse<T> {
 
 // Reservation queries
 export const useReservations = (params?: { date?: string; status?: string; tableId?: string; search?: string; page?: number; limit?: number }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PaginatedResponse<Reservation>>({
-    queryKey: ['reservations', params],
+    queryKey: ['reservations', params, branchId],
     queryFn: async () => {
       const response = await api.get('/reservations', { params });
       return response.data;
@@ -32,8 +34,9 @@ export const useReservations = (params?: { date?: string; status?: string; table
 };
 
 export const useReservation = (id: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<Reservation>({
-    queryKey: ['reservations', id],
+    queryKey: ['reservations', id, branchId],
     queryFn: async () => {
       const response = await api.get(`/reservations/${id}`);
       return response.data;
@@ -43,8 +46,9 @@ export const useReservation = (id: string) => {
 };
 
 export const useReservationStats = (date?: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<ReservationStats>({
-    queryKey: ['reservationStats', date],
+    queryKey: ['reservationStats', date, branchId],
     queryFn: async () => {
       const response = await api.get('/reservations/stats', { params: { date } });
       return response.data;
@@ -251,8 +255,9 @@ export const useDeleteReservation = () => {
 
 // Settings
 export const useReservationSettings = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<ReservationSettings>({
-    queryKey: ['reservationSettings'],
+    queryKey: ['reservationSettings', branchId],
     queryFn: async () => {
       const response = await api.get('/reservations/settings/current');
       return response.data;

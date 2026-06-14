@@ -150,6 +150,37 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return false;
     }
 
+    // v3.0.1 round-6 audit fix — tokenVersion check at connect time.
+    // JwtStrategy honours `ver` for every HTTP request, but the
+    // gateway used to skip it: a password reset / admin suspension /
+    // logout-all bumps User.tokenVersion, but a long-lived socket
+    // already in flight kept receiving events until the JWT's exp
+    // (up to 15 min). One DB read at handshake closes that gap; the
+    // periodic re-check is the JWT exp itself (autodisconnect timer
+    // below).
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { tokenVersion: true, status: true },
+    });
+    if (!user) {
+      this.logger.warn(
+        `Staff JWT rejected for ${client.id}: user not found in tenant=${tenantId}`,
+      );
+      return false;
+    }
+    if (user.status !== "ACTIVE") {
+      this.logger.warn(
+        `Staff JWT rejected for ${client.id}: user.status=${user.status}`,
+      );
+      return false;
+    }
+    if (typeof payload.ver === "number" && payload.ver !== user.tokenVersion) {
+      this.logger.warn(
+        `Staff JWT rejected for ${client.id}: tokenVersion stale (jwt=${payload.ver} db=${user.tokenVersion})`,
+      );
+      return false;
+    }
+
     // v3.0.0 — branch identity is required for staff sockets. The
     // client passes `auth.branchId` at connect time (set by
     // frontend/src/lib/socket.ts from useBranchScopeStore). We
@@ -250,10 +281,30 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     const role = client.data.role as UserRole;
     const tenantId = client.data.tenantId as string;
-    const primaryBranchId = (client.data.primaryBranchId ?? null) as
-      | string
-      | null;
-    const allowedBranchIds = (client.data.allowedBranchIds ?? []) as string[];
+    const userId = client.data.userId as string;
+    // v3.0.1 round-6 audit fix — re-read the user's branch allow-list
+    // from the DB instead of trusting the connect-time cache. Pre-fix
+    // an admin revoking a user's branch access wouldn't take effect
+    // for the user's live socket until they reconnected (up to 15 min
+    // of JWT lifetime). One indexed lookup per `switchBranch` request
+    // is cheap — they're user-initiated, not high-fanout.
+    const fresh = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        primaryBranchId: true,
+        status: true,
+        branchAssignments: { select: { branchId: true } },
+      },
+    });
+    if (!fresh || fresh.status !== "ACTIVE") {
+      return { ok: false, code: "FORBIDDEN" };
+    }
+    const primaryBranchId = fresh.primaryBranchId ?? null;
+    const allowedBranchIds = fresh.branchAssignments.map((a) => a.branchId);
+    // Stay in sync with the live ACL so a subsequent emit decision can
+    // read the cached value with the fresh predicate already applied.
+    client.data.primaryBranchId = primaryBranchId;
+    client.data.allowedBranchIds = allowedBranchIds;
     if (
       !BranchGuard.canAccessBranchStatic(
         role,

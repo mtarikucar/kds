@@ -75,17 +75,61 @@ if docker ps --format '{{.Names}}' | grep -q "^${POSTGRES_CONTAINER}$"; then
   fi
 
   if [ "$user_tables" -gt 0 ] && [ "$applied_migs" -eq 0 ]; then
+    warn "Unbaselined DB: $user_tables user tables exist but 0 migrations are recorded as applied."
+    warn "(A fresh \`prisma db push\`, a force-reset, or a restore leaves _prisma_migrations empty.)"
+
+    backend_up=no
+    docker ps --format '{{.Names}}' | grep -q "^${BACKEND_CONTAINER}$" && backend_up=yes
+
+    # ------------------------------------------------------------------
+    # Opt-in automatic baseline (DOCTOR_AUTO_BASELINE=1). The original
+    # refusal here was correct ONLY because the script could not *prove*
+    # the schema was a complete snapshot. `prisma migrate diff` removes
+    # that uncertainty: comparing the live DB against prisma/schema.prisma
+    # tells us deterministically whether the DB already equals the model.
+    #   diff exit 0 ⇢ identical → marking every migration --applied just
+    #                 records history; it touches zero rows → provably safe.
+    #   diff exit 2 ⇢ they differ → real drift; refuse (same as before).
+    #   diff exit 1 ⇢ the diff itself errored → refuse, can't prove safety.
+    # This is the standard "baseline an existing database" procedure, made
+    # safe-by-construction for the deployer instead of a manual SSH step.
+    # ------------------------------------------------------------------
+    if [ "${DOCTOR_AUTO_BASELINE:-0}" = "1" ] && [ "$backend_up" = "yes" ]; then
+      log "DOCTOR_AUTO_BASELINE=1 — verifying live schema == prisma/schema.prisma before baselining…"
+      set +e
+      docker exec "$BACKEND_CONTAINER" sh -c \
+        'cd /app && npx --no-install prisma migrate diff \
+            --from-schema-datamodel prisma/schema.prisma \
+            --to-url "$DATABASE_URL" --exit-code' >/dev/null 2>&1
+      diff_rc=$?
+      set -e
+
+      if [ "$diff_rc" -eq 0 ]; then
+        log "Live schema matches the datamodel exactly — baselining history (resolve --applied, in order)…"
+        docker exec "$BACKEND_CONTAINER" sh -c \
+          'cd /app && for m in $(ls prisma/migrations | grep -E "^[0-9]" | sort); do
+             npx --no-install prisma migrate resolve --applied "$m" >/dev/null || exit 1
+           done'
+        ok "Baseline complete — the ledger now records the full migration history. Deploy may proceed."
+        exit 0
+      fi
+
+      err "Auto-baseline REFUSED: live schema does NOT match prisma/schema.prisma (migrate diff rc=$diff_rc)."
+      err "The db-push/restore did not produce the schema the repo expects — blindly marking migrations"
+      err "--applied would mask real drift. Inspect the difference with:"
+      err "  docker exec $BACKEND_CONTAINER sh -c 'cd /app && npx prisma migrate diff \\"
+      err "    --from-schema-datamodel prisma/schema.prisma --to-url \"\$DATABASE_URL\" --script'"
+      exit 1
+    fi
+
+    # Conservative default (no opt-in, or backend not running): never
+    # auto-resolve. `migrate deploy` would refuse with "schema not empty".
     err "P3005 (hidden): $user_tables user tables exist but 0 migrations are recorded as applied."
-    err "Prisma's \`migrate status\` reports these as 'pending'; \`migrate deploy\` would refuse with"
-    err "\"database schema is not empty\". The script must NOT auto-resolve this — the DB might already"
-    err "have most of the schema (and dropping it to re-apply migrations would lose data)."
+    err "The script must NOT auto-resolve this blindly — the DB might be partially migrated."
     err ""
-    err "If you've verified manually that the schema is in fact a snapshot of an applied-everything"
-    err "state (e.g. staging restored from a prod dump), baseline it in one shot:"
-    err "  ssh root@<host> 'docker exec $BACKEND_CONTAINER sh -c \\"
-    err "    \"cd /app && for m in \\\$(ls prisma/migrations | grep -E \\\"^[0-9]\\\" | sort); do"
-    err "       npx --no-install prisma migrate resolve --applied \\\"\\\$m\\\";"
-    err "     done\\\"'"
+    err "Let the deployer baseline automatically (it diff-checks the schema first) by setting"
+    err "DOCTOR_AUTO_BASELINE=1, or baseline manually once you've verified the schema is complete:"
+    err "  docker exec $BACKEND_CONTAINER sh -c 'cd /app && for m in \$(ls prisma/migrations | grep -E \"^[0-9]\" | sort); do npx --no-install prisma migrate resolve --applied \"\$m\"; done'"
     err "Then re-run the deploy."
     exit 1
   fi

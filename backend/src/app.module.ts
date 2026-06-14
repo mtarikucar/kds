@@ -2,7 +2,8 @@ import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { RequestContextInterceptor } from "./common/context/request-context.interceptor";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -57,12 +58,19 @@ import { HealthDashboardModule } from "./modules/health-dashboard/health-dashboa
 import { WebhooksOutboundModule } from "./modules/webhooks-outbound/webhooks-outbound.module";
 import { KmsModule } from "./modules/kms/kms.module";
 import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
+import { MetricsModule } from "./common/metrics/metrics.module";
+import { validate } from "./config/env.validation";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ".env",
+      // Typed env validation (NODE_ENV enum, PORT bounds, URL shapes).
+      // Secret presence/strength stays with common/helpers/env-validation.ts,
+      // which main.ts runs before Nest boots — see src/config/env.validation.ts
+      // for the division of labor.
+      validate,
     }),
     // Single root-level scheduler. Previously `ScheduleModule.forRoot()` was
     // called in z-reports, delivery-platforms, public-stats, and subscriptions
@@ -88,6 +96,9 @@ import { RequestLoggerMiddleware } from "./common/middleware/request-logger.midd
     ]),
     PrismaModule,
     CommonModule,
+    // Prometheus /api/metrics + the request-duration histogram fed by
+    // RequestLoggerMiddleware. @Global, like CommonModule.
+    MetricsModule,
     AuthModule,
     SubscriptionsModule,
     PaymentsModule,
@@ -164,6 +175,10 @@ import { RequestLoggerMiddleware } from "./common/middleware/request-logger.midd
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestContextInterceptor,
     },
   ],
 })

@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { UsersService } from "./users.service";
+import { UserOnboardingService } from "./services/user-onboarding.service";
 import { UsersController } from "./users.controller";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
@@ -21,7 +22,7 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
     SubscriptionsModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, UserOnboardingService],
   exports: [UsersService],
 })
 export class UsersModule {}

@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { v7 as uuidv7 } from "uuid";
@@ -10,6 +11,10 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { FiscalProviderRegistry } from "./fiscal-provider.registry";
 import { FiscalReceiptRequest } from "./fiscal-provider.interface";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { MetricsService } from "../../common/metrics/metrics.service";
+import { captureException } from "../../sentry.config";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Domain service for fiscal receipts. Persists every receipt request to
@@ -29,7 +34,17 @@ export class FiscalService {
     private readonly prisma: PrismaService,
     private readonly registry: FiscalProviderRegistry,
     private readonly outbox: OutboxService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  private countIssued(status: string): void {
+    this.metrics?.incCounter(
+      "fiscal_receipts_issued_total",
+      "Fiscal receipts by terminal status (issued|failed)",
+      { status },
+    );
+  }
 
   async issueReceipt(req: FiscalReceiptRequest) {
     // Compound WHERE — same defense-in-depth pattern as iter-35
@@ -76,6 +91,10 @@ export class FiscalService {
       data: {
         id: uuidv7(),
         tenantId: req.tenantId,
+        // Branch the receipt was issued at. Prefer the explicit request
+        // branch (POS terminal that produced it); fall back to the
+        // device's home branch for legacy/automated callers.
+        branchId: req.branchId ?? device.branchId ?? null,
         orderId: req.orderId,
         fiscalDeviceId: req.fiscalDeviceId,
         providerId: device.providerId,
@@ -115,6 +134,7 @@ export class FiscalService {
           lastError: result.status !== "issued" ? result.error : null,
         },
       });
+      this.countIssued(updated.status);
       await this.outbox
         .append({
           type:
@@ -129,9 +149,24 @@ export class FiscalService {
             error: result.error,
           },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "fiscal-core",
+            op: "issueReceipt",
+          }),
+        );
       return updated;
     } catch (e) {
+      // Compliance-critical money path — the provider dispatch threw. This was
+      // logged-only before; surface it to Sentry (correlation id auto-attached)
+      // so a fiscal-device outage is alertable, not silently swallowed.
+      captureException(e as Error, {
+        module: "fiscal-core",
+        op: "issueReceipt",
+        fiscalDeviceId: req.fiscalDeviceId,
+        tenantId: req.tenantId,
+      });
+      this.countIssued("failed");
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
@@ -146,18 +181,38 @@ export class FiscalService {
           tenantId: req.tenantId,
           payload: { fiscalReceiptId: updated.id, error: (e as Error).message },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "fiscal-core",
+            op: "issueReceipt",
+          }),
+        );
       return updated;
     }
   }
 
+  /**
+   * Recovery-read scope: the active branch PLUS branchless orphans. A receipt
+   * issued by a device with no branch (fiscal_devices.branchId NULL → receipt
+   * branchId NULL) would otherwise be invisible to every per-branch recovery
+   * read and stuck forever. Including NULL makes those orphans actionable from
+   * any branch's panel; branchId is a globally-unique FK, so this never
+   * exposes another branch's owned receipts — only the unowned orphans.
+   */
+  private recoveryScope(scope: BranchScope) {
+    return {
+      tenantId: scope.tenantId,
+      OR: [{ branchId: scope.branchId }, { branchId: null }],
+    };
+  }
+
   async cancelReceipt(
-    tenantId: string,
+    scope: BranchScope,
     fiscalReceiptId: string,
     reason: string,
   ) {
     const row = await this.prisma.fiscalReceipt.findFirst({
-      where: { id: fiscalReceiptId, tenantId },
+      where: { id: fiscalReceiptId, ...this.recoveryScope(scope) },
     });
     if (!row) throw new NotFoundException("Receipt not found");
     if (row.status !== "issued")
@@ -170,9 +225,12 @@ export class FiscalService {
     });
   }
 
-  async closeDay(tenantId: string, fiscalDeviceId: string) {
+  async closeDay(scope: BranchScope, fiscalDeviceId: string) {
+    // closeDay runs a Z report for ONE device, and a device lives in one
+    // branch. Scope the lookup so a branch-A operator can't close the day
+    // on a branch-B device by guessing its id (cross-branch IDOR).
     const device = await this.prisma.fiscalDeviceRecord.findFirst({
-      where: { id: fiscalDeviceId, tenantId },
+      where: { id: fiscalDeviceId, ...branchScope(scope) },
     });
     if (!device) throw new NotFoundException("Fiscal device not found");
     // Mirror issueReceipt's retired-device gate. A retired yazarkasa
@@ -188,7 +246,7 @@ export class FiscalService {
     await this.prisma.fiscalDayClose.create({
       data: {
         id: uuidv7(),
-        tenantId,
+        tenantId: scope.tenantId,
         fiscalDeviceId,
         zNo: report.zNo,
         openedAt: new Date(report.openedAt),
@@ -199,17 +257,25 @@ export class FiscalService {
     await this.outbox
       .append({
         type: "fiscal.day.closed.v1",
-        tenantId,
+        tenantId: scope.tenantId,
         payload: { fiscalDeviceId, zNo: report.zNo },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "fiscal-core",
+          op: "closeDay",
+        }),
+      );
     return report;
   }
 
   /** List receipts in queued/failed state — for the manual recovery panel. */
-  async listPending(tenantId: string, limit = 100) {
+  async listPending(scope: BranchScope, limit = 100) {
     return this.prisma.fiscalReceipt.findMany({
-      where: { tenantId, status: { in: ["queued", "failed"] } },
+      where: {
+        ...this.recoveryScope(scope),
+        status: { in: ["queued", "failed"] },
+      },
       include: { lines: true },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -231,9 +297,9 @@ export class FiscalService {
   // yazarkasa drivers do not handle parallel writes gracefully).
   private static readonly RETRY_COOLDOWN_MS = 30_000;
 
-  async retryFailed(tenantId: string, fiscalReceiptId: string) {
+  async retryFailed(scope: BranchScope, fiscalReceiptId: string) {
     const row = await this.prisma.fiscalReceipt.findFirst({
-      where: { id: fiscalReceiptId, tenantId },
+      where: { id: fiscalReceiptId, ...this.recoveryScope(scope) },
       include: { lines: true, fiscalDevice: true },
     });
     if (!row) throw new NotFoundException("Receipt not found");
@@ -256,7 +322,8 @@ export class FiscalService {
     const provider = this.registry.get(row.providerId);
     try {
       const result = await provider.issueReceipt({
-        tenantId,
+        tenantId: scope.tenantId,
+        branchId: row.branchId ?? undefined,
         fiscalDeviceId: row.fiscalDeviceId,
         orderId: row.orderId ?? undefined,
         idempotencyKey: row.idempotencyKey, // SAME key — provider dedupes
@@ -294,7 +361,7 @@ export class FiscalService {
             result.status === "issued"
               ? "fiscal.receipt.printed.v1"
               : "fiscal.receipt.failed.v1",
-          tenantId,
+          tenantId: scope.tenantId,
           payload: {
             fiscalReceiptId: updated.id,
             fiscalDeviceId: row.fiscalDeviceId,
@@ -303,7 +370,12 @@ export class FiscalService {
             retried: true,
           },
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "fiscal-core",
+            op: "retryFailed",
+          }),
+        );
 
       return updated;
     } catch (e) {

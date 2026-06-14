@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useCustomers, useDeleteCustomer } from '../../features/customers/customersApi';
 import Button from '../../components/ui/Button';
 import { Card, CardContent } from '../../components/ui/Card';
+import { ErrorState } from '../../components/ui/ErrorState';
 import Modal from '../../components/ui/Modal';
 import CustomerFormModal from '../../components/customers/CustomerFormModal';
 import { Customer } from '../../types';
@@ -13,7 +14,7 @@ import { useCurrency, SUPPORTED_CURRENCIES } from '../../hooks/useCurrency';
 const CustomersPage = () => {
   const { t } = useTranslation('customers');
   const navigate = useNavigate();
-  const { data: customersPage, isLoading } = useCustomers();
+  const { data: customersPage, isLoading, isError, error, refetch } = useCustomers();
   const customers: Customer[] = customersPage?.data ?? [];
   const { mutate: deleteCustomer } = useDeleteCustomer();
   const currencyCode = useCurrency();
@@ -79,6 +80,12 @@ const CustomersPage = () => {
         <div className="text-slate-600">{t('common:app.loading')}</div>
       </div>
     );
+  }
+
+  // Without this branch a failed fetch fell through to the "no customers"
+  // empty state — misleading the operator into thinking the list is empty.
+  if (isError) {
+    return <ErrorState error={error} onRetry={() => refetch()} className="h-screen" />;
   }
 
   return (

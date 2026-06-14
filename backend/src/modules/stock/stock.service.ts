@@ -2,16 +2,22 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateStockMovementDto } from "./dto/create-stock-movement.dto";
 import { StockMovementType } from "../../common/constants/order-status.enum";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { MetricsService } from "../../common/metrics/metrics.service";
 
 @Injectable()
 export class StockService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
 
   async createMovement(
     createDto: CreateStockMovementDto,
@@ -40,7 +46,7 @@ export class StockService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const movement = await this.prisma.$transaction(async (tx) => {
       // Apply the stock change via a conditional update so two concurrent
       // OUT movements can't both read stock=10 and each decrement — the
       // second loser sees `count: 0` and we raise insufficient-stock. For
@@ -146,6 +152,17 @@ export class StockService {
         },
       });
     });
+
+    // Track 2 — record the committed movement for Prometheus (IN/OUT/
+    // ADJUSTMENT throughput). After-commit + optional so it can never break
+    // the business write.
+    this.metrics?.incCounter(
+      "stock_movements_total",
+      "Stock movements by type (IN|OUT|ADJUSTMENT)",
+      { type: createDto.type },
+    );
+
+    return movement;
   }
 
   /**

@@ -1,42 +1,42 @@
 {
   "page": {
-    "title": "Plan & Access",
-    "subtitle": "Manage your current plan, usage quotas, and active add-ons in one place."
+    "title": "Тариф и доступ",
+    "subtitle": "Управляйте текущим тарифом, квотами использования и активными дополнениями в одном месте."
   },
   "plan": {
-    "current": "Current plan",
-    "nextBilling": "Next billing: {{date}}",
-    "trialEnds": "Trial ends: {{date}}",
-    "changePlanCta": "Change plan"
+    "current": "Текущий тариф",
+    "nextBilling": "Следующее списание: {{date}}",
+    "trialEnds": "Пробный период заканчивается: {{date}}",
+    "changePlanCta": "Сменить тариф"
   },
   "quota": {
-    "title": "Usage quotas",
-    "users": "Users",
-    "branches": "Branches",
-    "products": "Products",
-    "monthlyOrders": "Monthly orders"
+    "title": "Квоты использования",
+    "users": "Пользователи",
+    "branches": "Филиалы",
+    "products": "Товары",
+    "monthlyOrders": "Заказы в месяц"
   },
   "activeAddOns": {
-    "title": "Active add-ons",
-    "empty": "You haven't purchased any add-ons yet. See suggestions below.",
+    "title": "Активные дополнения",
+    "empty": "Вы ещё не приобрели ни одного дополнения. Смотрите рекомендации ниже.",
     "col": {
-      "name": "Add-on",
-      "price": "Price",
-      "renewal": "Renewal"
+      "name": "Дополнение",
+      "price": "Цена",
+      "renewal": "Продление"
     },
-    "scheduledToCancel": "Cancels at period end",
-    "cancelCta": "Cancel"
+    "scheduledToCancel": "Отменяется в конце периода",
+    "cancelCta": "Отменить"
   },
   "suggested": {
-    "title": "Suggested add-ons",
-    "viewAll": "Visit marketplace"
+    "title": "Рекомендуемые дополнения",
+    "viewAll": "Открыть маркетплейс"
   },
   "upsell": {
-    "defaultTitle": "This feature isn't in your subscription",
-    "defaultDescription": "You'll need to upgrade your plan or buy the matching add-on to access this page.",
-    "upgradePlanCta": "Upgrade plan",
-    "viewAddOnCta": "See add-on",
-    "helpHint": "Reach out to support if you have questions."
+    "defaultTitle": "Эта функция не входит в вашу подписку",
+    "defaultDescription": "Чтобы открыть эту страницу, необходимо повысить тариф или приобрести соответствующее дополнение.",
+    "upgradePlanCta": "Повысить тариф",
+    "viewAddOnCta": "Посмотреть дополнение",
+    "helpHint": "Если у вас есть вопросы, обратитесь в поддержку."
   },
   "branchPicker": {
     "activeBranch": "Выберите активный филиал",

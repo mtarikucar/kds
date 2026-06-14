@@ -120,6 +120,7 @@
   "users": "Users",
   "subscription": "Subscription",
   "desktopApp": "Desktop App",
+  "webhooks": "Webhooks",
   "desktopAppMenuDesc": "Download and manage desktop application",
   "desktopAppDesc": "Download the HummyTummy KDS desktop application for better performance and offline support",
   "selectPlatform": "Select Your Platform",

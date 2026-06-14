@@ -1,0 +1,41 @@
+{
+  "page": {
+    "title": "Local Bridges"
+  },
+  "provisioned": {
+    "title": "Bridge provisioned.",
+    "tokenIntro": "Token (single-use) — copy now and configure on the device:",
+    "copied": "I've copied it"
+  },
+  "create": {
+    "title": "New bridge",
+    "branch": "Branch",
+    "branchSelect": "— select —",
+    "sku": "SKU",
+    "skuLite": "HummyBox Lite",
+    "skuPro": "HummyBox Pro",
+    "skuByo": "BYO",
+    "hostname": "Hostname (optional)",
+    "submit": "Provision"
+  },
+  "list": {
+    "title": "Bridges",
+    "loading": "Loading…",
+    "empty": "No bridges provisioned yet.",
+    "col": {
+      "branch": "Branch",
+      "sku": "SKU",
+      "hostname": "Hostname",
+      "status": "Status",
+      "lastSeen": "Last seen"
+    },
+    "retire": "Retire",
+    "retireConfirm": "Retire this bridge?"
+  },
+  "status": {
+    "online": "online",
+    "offline": "offline",
+    "claiming": "claiming",
+    "retired": "retired"
+  }
+}

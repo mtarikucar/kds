@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   useListProducts,
+  useCategories,
   useQuoteCart,
   useCreateCheckoutIntent,
+  formatMoney,
+  SALE_MODE_DISCLAIMER_TR,
   type HardwareProduct,
   type CartQuote,
   type ShippingAddress,
@@ -58,43 +62,10 @@ function ProductImage({ src, alt }: { src: string; alt: string }) {
  * lets the landing's "Sipariş ver" CTA hand off a one-click checkout.
  */
 
-// Categories must match the backend CreateHardwareProductDto enum
-// (see backend/src/modules/catalog/dto/create-hardware-product.dto.ts).
-// 'service' filters the storefront down to hizmetler — also rendered
-// in its own dedicated section above the hardware grid (v2.8.87).
-const CATEGORIES = [
-  'all',
-  'yazarkasa',
-  'pos_terminal',
-  'printer',
-  'kds_screen',
-  'tablet',
-  'scanner',
-  'caller_id',
-  'cash_drawer',
-  'bridge',
-  'scale',
-  'cable',
-  'accessory',
-  'service',
-];
-
-const CATEGORY_LABELS_TR: Record<string, string> = {
-  all: 'Tüm kategoriler',
-  yazarkasa: 'Yazarkasa POS',
-  pos_terminal: 'POS Terminal',
-  printer: 'Yazıcı',
-  kds_screen: 'KDS Ekranı',
-  tablet: 'Tablet',
-  scanner: 'Barkod Okuyucu',
-  caller_id: 'Arayan Numara',
-  cash_drawer: 'Para Çekmecesi',
-  bridge: 'Network Bridge',
-  scale: 'Tartı',
-  cable: 'Kablo',
-  accessory: 'Aksesuar',
-  service: 'Kurulum & Hizmet',
-};
+// Category vocabulary (value + TR label) is fetched from the backend
+// (GET /v1/catalog/categories, via useCategories) so the filter can't drift
+// from the @IsIn gate / seed. The "all" sentinel is prepended client-side.
+const ALL_CATEGORY = { value: 'all', labelTr: 'Tüm kategoriler' };
 
 // LocalStorage key for the BYO disclaimer dismiss state. Versioned in case
 // we update the copy later — bumping the suffix re-shows the banner.
@@ -110,7 +81,15 @@ function headlineSpecs(p: HardwareProduct): string[] {
   return hs.filter((s): s is string => typeof s === 'string').slice(0, 3);
 }
 
+// Regulatory tier — undefined means DIRECT_SALE (back-compat for rows seeded
+// before saleMode existed). The server is authoritative; this only chooses
+// which storefront CTA to render.
+function saleModeOf(p: HardwareProduct): NonNullable<HardwareProduct['saleMode']> {
+  return p.saleMode ?? 'DIRECT_SALE';
+}
+
 export default function StorePage() {
+  const { t } = useTranslation('hardware');
   const [searchParams, setSearchParams] = useSearchParams();
   const [category, setCategory] = useState<string>('all');
   // v2.8.87: cart lives in the shared Zustand store so navigating to a
@@ -127,6 +106,9 @@ export default function StorePage() {
   // product in a category that's not currently filtered still resolves.
   const { data: products = [], isLoading } = useListProducts(category === 'all' ? undefined : category);
   const { data: allProducts = [] } = useListProducts(undefined);
+  // Category filter options from the backend vocabulary (single source).
+  const { data: fetchedCategories = [] } = useCategories();
+  const categoryOptions = [ALL_CATEGORY, ...fetchedCategories];
   const quote = useQuoteCart();
   const intent = useCreateCheckoutIntent();
   const user = useAuthStore((s) => s.user);
@@ -154,9 +136,14 @@ export default function StorePage() {
       return;
     }
     // Services need a branch picker + dates; we send the buyer to the
-    // detail page rather than auto-add. Hardware idempotently lands
-    // in the cart.
-    if (product.category === 'service') {
+    // detail page rather than auto-add. Non-DIRECT_SALE devices (yazarkasa
+    // teklif, bank-POS redirect, recommended-only) likewise can't be
+    // auto-carted — the detail page carries the right CTA. Hardware that is
+    // directly sellable idempotently lands in the cart.
+    if (
+      product.category === 'service' ||
+      (product.saleMode && product.saleMode !== 'DIRECT_SALE')
+    ) {
       const next = new URLSearchParams(searchParams);
       next.delete('sku');
       setSearchParams(next, { replace: true });
@@ -178,6 +165,11 @@ export default function StorePage() {
   const cartItems = useMemo(() => toCartItems(lines), [lines]);
 
   function add(product: HardwareProduct) {
+    // Only directly-sellable devices may be carted. QUOTE_ONLY /
+    // PARTNER_REDIRECT / RECOMMENDED_ONLY are handled by their own CTAs;
+    // this guard backs up the server-side checkout guard against accidental
+    // adds.
+    if ((product.saleMode ?? 'DIRECT_SALE') !== 'DIRECT_SALE') return;
     addHardware(product, { qty: 1, acquisition: 'sell' });
   }
 
@@ -226,16 +218,15 @@ export default function StorePage() {
       {!byoDismissed && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           <div>
-            <strong className="font-semibold">Mevcut donanımınız var mı?</strong>{' '}
-            Elinizdeki yazarkasa POS, termal yazıcı veya KDS ekranını da entegre edebiliriz —
-            yeni cihaz almak zorunda değilsiniz. Marka/model bilgisini destek ekibine iletmeniz yeterli.
+            <strong className="font-semibold">{t('store.byoTitle')}</strong>{' '}
+            {t('store.byoBody')}
           </div>
           <button
             type="button"
             onClick={dismissByo}
             className="text-blue-700 hover:text-blue-900 text-xs underline whitespace-nowrap"
           >
-            Anladım, kapat
+            {t('store.byoDismiss')}
           </button>
         </div>
       )}
@@ -243,25 +234,25 @@ export default function StorePage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <header className="flex items-center justify-between gap-4 flex-wrap">
-            <h1 className="text-2xl font-semibold">Donanım Mağazası</h1>
+            <h1 className="text-2xl font-semibold">{t('store.title')}</h1>
             <select
               className="rounded border px-2 py-1 text-sm"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_LABELS_TR[c] ?? c.replace(/_/g, ' ')}
+              {categoryOptions.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.value === 'all' ? t('store.allCategories') : c.labelTr}
                 </option>
               ))}
             </select>
           </header>
 
           {isLoading ? (
-            <div className="text-sm text-gray-500">Yükleniyor…</div>
+            <div className="text-sm text-gray-500">{t('store.loading')}</div>
           ) : products.length === 0 ? (
             <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
-              Bu kategoride ürün yok.
+              {t('store.emptyCategory')}
             </div>
           ) : (
             <>
@@ -272,10 +263,10 @@ export default function StorePage() {
                   <section className="space-y-3">
                     <div>
                       <h2 className="text-base font-semibold text-gray-900">
-                        Kurulum & Entegrasyon Hizmetleri
+                        {t('store.servicesTitle')}
                       </h2>
                       <p className="text-xs text-gray-600">
-                        Sahaya geliyoruz veya uzaktan kuruyoruz. Tüm paketler şeffaf.
+                        {t('store.servicesSubtitle')}
                       </p>
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -308,9 +299,9 @@ export default function StorePage() {
         </div>
 
         <aside className="space-y-4 rounded-lg border bg-white p-4 lg:sticky lg:top-6 lg:self-start">
-          <h2 className="text-lg font-semibold">Sepet</h2>
+          <h2 className="text-lg font-semibold">{t('store.cart')}</h2>
           {lines.length === 0 ? (
-            <p className="text-sm text-gray-500">Sepetiniz boş.</p>
+            <p className="text-sm text-gray-500">{t('store.cartEmpty')}</p>
           ) : (
             <>
               <ul className="space-y-2">
@@ -327,27 +318,24 @@ export default function StorePage() {
                           <span className="text-gray-500">× {l.qty}</span>
                         </div>
                         {l.type === 'hardware' && l.acquisition === 'rent' && (
-                          <div className="text-[11px] text-gray-500">Kira (aylık)</div>
+                          <div className="text-[11px] text-gray-500">{t('store.rentMonthly')}</div>
                         )}
                         {l.type === 'service' && (
                           <div className="text-[11px] text-gray-500">
-                            Hizmet
-                            {l.branchId ? ` · şube atanmış` : ''}
+                            {t('store.service')}
+                            {l.branchId ? t('store.serviceBranchAssigned') : ''}
                           </div>
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">
-                          {(lineCents / 100).toLocaleString('tr-TR', {
-                            style: 'currency',
-                            currency: l.product.currency,
-                          })}
+                          {formatMoney(lineCents, l.product.currency)}
                         </span>
                         <button
                           className="text-xs text-red-600 hover:underline"
                           onClick={() => removeFromCart(l.product.id)}
                         >
-                          Çıkar
+                          {t('store.remove')}
                         </button>
                       </div>
                     </li>
@@ -359,14 +347,14 @@ export default function StorePage() {
                 onClick={refreshQuote}
                 disabled={quote.isPending}
               >
-                {quote.isPending ? 'Fiyatlandırılıyor…' : 'Teklif al'}
+                {quote.isPending ? t('store.pricing') : t('store.getQuote')}
               </button>
               {currentQuote && (
                 <div className="space-y-1 rounded bg-gray-50 p-3 text-sm">
-                  <Row label="Ara toplam" cents={currentQuote.subtotalCents} currency={currentQuote.currency} />
-                  <Row label="KDV" cents={currentQuote.taxCents} currency={currentQuote.currency} />
-                  <Row label="Kargo" cents={currentQuote.shippingCents} currency={currentQuote.currency} />
-                  <Row label="Toplam" cents={currentQuote.totalCents} currency={currentQuote.currency} bold />
+                  <Row label={t('store.subtotal')} cents={currentQuote.subtotalCents} currency={currentQuote.currency} />
+                  <Row label={t('store.tax')} cents={currentQuote.taxCents} currency={currentQuote.currency} />
+                  <Row label={t('store.shipping')} cents={currentQuote.shippingCents} currency={currentQuote.currency} />
+                  <Row label={t('store.total')} cents={currentQuote.totalCents} currency={currentQuote.currency} bold />
                 </div>
               )}
               <button
@@ -374,13 +362,13 @@ export default function StorePage() {
                 onClick={() => setCheckoutOpen(true)}
                 disabled={intent.isPending || lines.length === 0}
               >
-                {intent.isPending ? 'Yönlendiriliyor…' : 'Ödemeye geç'}
+                {intent.isPending ? t('store.redirecting') : t('store.checkout')}
               </button>
               <Link
                 to="/admin/hardware-orders"
                 className="block w-full text-center text-xs text-blue-600 hover:underline"
               >
-                Geçmiş siparişlerim →
+                {t('store.pastOrders')}
               </Link>
             </>
           )}
@@ -393,29 +381,28 @@ export default function StorePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Teslimat bilgileri</h2>
+              <h2 className="text-lg font-semibold">{t('store.deliveryInfo')}</h2>
               <button
                 type="button"
                 onClick={() => setCheckoutOpen(false)}
                 className="text-sm text-gray-500 hover:text-gray-700"
-                aria-label="Kapat"
+                aria-label={t('store.close')}
               >
                 ✕
               </button>
             </div>
             <p className="mt-1 mb-4 text-xs text-gray-500">
-              Donanımınız bu adrese kargolanacak. Bilgiler güvenli PayTR ödeme sayfasına aktarılacaktır.
+              {t('store.deliveryNote')}
             </p>
             <ShippingAddressForm
               initial={shippingAddress ?? undefined}
               branches={branches}
               onSubmit={startCheckout}
               submitting={intent.isPending}
-              submitLabel="PayTR ile öde"
+              submitLabel={t('store.payWithPaytr')}
             />
             <p className="mt-3 text-[11px] text-gray-500">
-              Ödeme işlemi PayTR tarafından güvenli olarak gerçekleştirilir.
-              Kart bilgileriniz HummyTummy ile paylaşılmaz.
+              {t('store.paytrNote')}
             </p>
           </div>
         </div>
@@ -432,7 +419,7 @@ function Row({ label, cents, currency, bold }: { label: string; cents: number; c
   return (
     <div className={`flex items-center justify-between ${bold ? 'border-t pt-1 font-medium' : ''}`}>
       <span>{label}</span>
-      <span>{(cents / 100).toLocaleString('tr-TR', { style: 'currency', currency })}</span>
+      <span>{formatMoney(cents, currency)}</span>
     </div>
   );
 }
@@ -442,10 +429,19 @@ function Row({ label, cents, currency, bold }: { label: string; cents: number; c
 // CTA-light (must hit detail page to fill branch + dates).
 
 function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
+  const { t } = useTranslation('hardware');
   const showGib = gibCertified(p);
   const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
   const headline = headlineSpecs(p);
   const showLowStock = (p.available ?? 0) > 0 && (p.available ?? 0) <= 5;
+  const mode = saleModeOf(p);
+  const detailHref = `/admin/store/${encodeURIComponent(p.sku)}`;
+  // Only trust an absolute http(s) URL as a clickable outbound link — guards
+  // against a stored javascript:/data: payload (defense-in-depth; the server
+  // also validates the scheme at publish time).
+  const rawPartnerUrl = p.partnerRedirect?.partnerUrl;
+  const partnerUrl =
+    rawPartnerUrl && /^https?:\/\//i.test(rawPartnerUrl) ? rawPartnerUrl : undefined;
   return (
     <article className="overflow-hidden rounded-lg border bg-white">
       {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}
@@ -456,12 +452,27 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
           </span>
           {showGib && (
             <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-              GİB onaylı
+              {t('store.card.gibCertified')}
             </span>
           )}
-          {showLowStock && (
+          {mode === 'QUOTE_ONLY' && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              {t('store.card.quoteOnly')}
+            </span>
+          )}
+          {mode === 'PARTNER_REDIRECT' && (
+            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+              {t('store.card.partner')}
+            </span>
+          )}
+          {mode === 'RECOMMENDED_ONLY' && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+              {t('store.card.recommended')}
+            </span>
+          )}
+          {showLowStock && mode === 'DIRECT_SALE' && (
             <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
-              Son {p.available} adet
+              {t('store.card.lastUnits', { count: p.available })}
             </span>
           )}
         </div>
@@ -479,26 +490,77 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
           </div>
         )}
         <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-lg font-medium">
-            {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
-          </span>
-          <button
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isOos}
-            onClick={onAdd}
-          >
-            {p.stockStatus === 'out_of_stock'
-              ? 'Stokta yok'
-              : p.stockStatus === 'discontinued'
-                ? 'Üretimden kaldırıldı'
-                : 'Sepete ekle'}
-          </button>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          {/* For non-DIRECT_SALE the price is a reference list price, not a
+              sale price — qualify it so the card doesn't read as a firm
+              "buy at this price" next to a "satışa kapalı" disclaimer. */}
+          {mode === 'DIRECT_SALE' ? (
+            <span className="text-lg font-medium">{formatMoney(p.priceCents, p.currency)}</span>
+          ) : (
+            <span className="text-sm text-gray-500">
+              {t('store.card.list', { price: formatMoney(p.priceCents, p.currency) })}
+            </span>
+          )}
+          {/* CTA branches by regulatory tier (TR law). Only DIRECT_SALE
+              carts; the rest route to the detail page (full disclaimer +
+              quote form) or out to a licensed bank/PSP. */}
+          {mode === 'DIRECT_SALE' ? (
+            <button
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isOos}
+              onClick={onAdd}
+            >
+              {p.stockStatus === 'out_of_stock'
+                ? t('store.card.outOfStock')
+                : p.stockStatus === 'discontinued'
+                  ? t('store.card.discontinued')
+                  : t('store.card.addToCart')}
+            </button>
+          ) : mode === 'QUOTE_ONLY' ? (
+            <Link
+              to={detailHref}
+              className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white hover:bg-amber-700"
+            >
+              {t('store.card.getQuote')}
+            </Link>
+          ) : mode === 'PARTNER_REDIRECT' ? (
+            partnerUrl ? (
+              <a
+                href={partnerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+              >
+                {t('store.card.goToProvider')}
+              </a>
+            ) : (
+              <Link
+                to={detailHref}
+                className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+              >
+                {t('store.card.details')}
+              </Link>
+            )
+          ) : (
+            <span className="rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-600">
+              {t('store.card.recommendedEquipment')}
+            </span>
+          )}
         </div>
+        {mode === 'QUOTE_ONLY' && (
+          <p className="mt-2 text-[11px] leading-snug text-amber-700">
+            {SALE_MODE_DISCLAIMER_TR.QUOTE_ONLY}
+          </p>
+        )}
+        {mode === 'PARTNER_REDIRECT' && (
+          <p className="mt-2 text-[11px] leading-snug text-indigo-700">
+            {SALE_MODE_DISCLAIMER_TR.PARTNER_REDIRECT}
+          </p>
+        )}
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-          <span>{p.warrantyMonths} ay garanti</span>
-          <Link to={`/admin/store/${encodeURIComponent(p.sku)}`} className="text-blue-600 hover:underline">
-            Detaylar →
+          <span>{t('store.card.warranty', { count: p.warrantyMonths })}</span>
+          <Link to={detailHref} className="text-blue-600 hover:underline">
+            {t('store.card.detailsLink')}
           </Link>
         </div>
       </div>
@@ -507,13 +569,14 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
 }
 
 function ServiceCard({ p }: { p: HardwareProduct }) {
+  const { t } = useTranslation('hardware');
   const meta = (p.serviceMeta ?? {}) as { serviceType?: string; durationHours?: number };
   const serviceLabel =
     meta.serviceType === 'remote'
-      ? 'Uzaktan'
+      ? t('store.service_.remote')
       : meta.serviceType === 'consultation'
-        ? 'Danışmanlık'
-        : 'Sahada';
+        ? t('store.service_.consultation')
+        : t('store.service_.onsite');
   return (
     <article className="overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50/50 to-white">
       <div className="p-4">
@@ -523,7 +586,7 @@ function ServiceCard({ p }: { p: HardwareProduct }) {
           </span>
           {meta.durationHours && (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
-              {meta.durationHours} saat
+              {t('store.service_.hours', { count: meta.durationHours })}
             </span>
           )}
         </div>
@@ -531,13 +594,13 @@ function ServiceCard({ p }: { p: HardwareProduct }) {
         <p className="mt-1 line-clamp-3 text-sm text-gray-600">{p.description}</p>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-lg font-medium">
-            {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
+            {formatMoney(p.priceCents, p.currency)}
           </span>
           <Link
             to={`/admin/store/${encodeURIComponent(p.sku)}`}
             className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
           >
-            Detaylar
+            {t('store.service_.details')}
           </Link>
         </div>
       </div>

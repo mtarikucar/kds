@@ -27,7 +27,7 @@ import {
   Stethoscope,
   Network,
   PhoneIncoming,
-  Webhook,
+  Download,
   FileWarning,
   Store,
   ShoppingBag,
@@ -269,17 +269,20 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
       {
+        // v3.0.6: Desktop app promoted from a buried Settings sub-tab to a
+        // first-class sidebar destination (standalone /admin/desktop), sitting
+        // next to Plan & Erişim. Webhooks moved the other way → Settings tab.
+        to: '/admin/desktop',
+        icon: Download,
+        labelKey: 'navigation.desktopApp',
+        labelFallback: 'Masaüstü Uygulaması',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
         to: '/admin/settings',
         icon: Settings,
         labelKey: 'navigation.settings',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/webhooks',
-        icon: Webhook,
-        labelKey: 'navigation.webhooks',
-        roles: [UserRole.ADMIN],
-        gate: { feature: 'apiAccess' },
       },
       {
         to: '/admin/fiscal-recovery',

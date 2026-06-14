@@ -1,12 +1,14 @@
 import {
   Injectable,
   Logger,
+  Optional,
   OnModuleInit,
   OnModuleDestroy,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DomainEventBus } from "./domain-event-bus.service";
 import { MarketingEventRelayService } from "./marketing-event-relay.service";
+import { MetricsService } from "../../common/metrics/metrics.service";
 
 /**
  * Drains queued OutboxEvent rows onto the in-process DomainEventBus.
@@ -54,6 +56,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly bus: DomainEventBus,
     private readonly marketingRelay: MarketingEventRelayService,
+    // Optional so unit tests that construct the worker bare keep working and
+    // the reliability path never depends on the metrics registry being wired.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   onModuleInit(): void {
@@ -128,6 +133,15 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(
           `outbox prune: removed ${result} dispatched rows older than ${this.RETENTION_DAYS}d`,
         );
+      }
+      // Re-sync the DLQ-depth gauge to an authoritative count. The inline
+      // inc() on each give-up keeps it fresh between prunes; this corrects
+      // any drift after an operator requeues or deletes failed rows.
+      if (this.metrics) {
+        const failed = await this.prisma.outboxEvent.count({
+          where: { status: "failed" },
+        });
+        this.metrics.setOutboxDlqDepth(failed);
       }
     } finally {
       this.pruning = false;
@@ -230,6 +244,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
             lastError: null,
           },
         });
+        this.metrics?.incCounter(
+          "outbox_events_processed_total",
+          "Outbox events processed, labeled by terminal result",
+          { result: "dispatched" },
+        );
       } catch (e) {
         const msg = (e as Error).message?.slice(0, 500) ?? "unknown";
         const final = r.attempts >= this.MAX_ATTEMPTS;
@@ -250,6 +269,12 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
           // requeue via SuperadminOutboxController or delete it.
           this.logger.error(
             `outbox DLQ: event ${r.id} (${r.type}) gave up after ${r.attempts} attempts — ${msg}`,
+          );
+          this.metrics?.incOutboxDlqDepth();
+          this.metrics?.incCounter(
+            "outbox_events_processed_total",
+            "Outbox events processed, labeled by terminal result",
+            { result: "failed" },
           );
         } else {
           this.logger.warn(

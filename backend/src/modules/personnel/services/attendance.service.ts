@@ -12,6 +12,7 @@ import {
 } from "../dto/attendance-query.dto";
 import { paginated } from "../../../common/pagination";
 import { getTenantMidnight } from "../../../common/helpers/timezone.helper";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class AttendanceService {
@@ -306,11 +307,14 @@ export class AttendanceService {
     return result;
   }
 
-  async getMyStatus(tenantId: string, userId: string) {
-    const today = await this.tenantToday(tenantId);
+  async getMyStatus(scope: BranchScope) {
+    const today = await this.tenantToday(scope.tenantId);
 
+    // Self-scoped to the acting user, but still pinned to the active
+    // branch: a user only sees their record within the branch they are
+    // operating in (matches the v3.0.0 branch-scope design).
     const attendance = await this.prisma.attendance.findFirst({
-      where: { userId, date: today, tenantId },
+      where: { ...branchScope(scope), userId: scope.userId, date: today },
       include: {
         shiftAssignment: { include: { shiftTemplate: true } },
         user: {
@@ -322,11 +326,11 @@ export class AttendanceService {
     return attendance || { status: "NOT_CLOCKED_IN", date: today };
   }
 
-  async getTodayAttendance(tenantId: string) {
-    const today = await this.tenantToday(tenantId);
+  async getTodayAttendance(scope: BranchScope) {
+    const today = await this.tenantToday(scope.tenantId);
 
     return this.prisma.attendance.findMany({
-      where: { tenantId, date: today },
+      where: { ...branchScope(scope), date: today },
       include: {
         user: {
           select: { id: true, firstName: true, lastName: true, role: true },
@@ -337,8 +341,8 @@ export class AttendanceService {
     });
   }
 
-  async getAttendanceHistory(tenantId: string, query: AttendanceQueryDto) {
-    const where: any = { tenantId };
+  async getAttendanceHistory(scope: BranchScope, query: AttendanceQueryDto) {
+    const where: any = { ...branchScope(scope) };
 
     if (query.userId) where.userId = query.userId;
     if (query.status) where.status = query.status;
@@ -378,7 +382,7 @@ export class AttendanceService {
   }
 
   async getAttendanceSummary(
-    tenantId: string,
+    scope: BranchScope,
     query: AttendanceSummaryQueryDto,
   ) {
     const now = new Date();
@@ -389,7 +393,7 @@ export class AttendanceService {
 
     const attendances = await this.prisma.attendance.findMany({
       where: {
-        tenantId,
+        ...branchScope(scope),
         date: { gte: startDate, lte: endDate },
         status: AttendanceStatus.CLOCKED_OUT,
       },

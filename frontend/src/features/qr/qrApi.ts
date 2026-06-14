@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   QrMenuSettings,
   CreateQrSettingsDto,
@@ -10,8 +11,9 @@ import {
 } from '../../types';
 
 export const useQrSettings = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['qr-settings'],
+    queryKey: ['qr-settings', branchId],
     queryFn: async (): Promise<QrMenuSettings> => {
       const response = await api.get('/qr/settings');
       return response.data;
@@ -82,8 +84,9 @@ interface QrCodesResponse {
 }
 
 export const useQrCodes = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
-    queryKey: ['qr-codes'],
+    queryKey: ['qr-codes', branchId],
     queryFn: async (): Promise<QrCodesResponse> => {
       const response = await api.get('/qr/codes');
       return response.data;

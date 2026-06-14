@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 
 /**
@@ -28,7 +28,7 @@ describe('CatalogService — public view (v2.8.87)', () => {
         findMany: jest.fn(),
       },
     };
-    svc = new CatalogService(prisma);
+    svc = new CatalogService(prisma, { append: jest.fn() } as any);
   });
 
   function makeRow(overrides: any = {}) {
@@ -110,5 +110,195 @@ describe('CatalogService — public view (v2.8.87)', () => {
       const out: any[] = await svc.listPublic();
       expect(out[0].available).toBe(0);
     });
+
+    it('exposes saleMode / partnerRedirect / complianceDocs on the public payload', async () => {
+      // The storefront needs these to branch the CTA + render Tier-3 docs.
+      prisma.hardwareProduct.findUnique.mockResolvedValue(
+        makeRow({
+          saleMode: 'QUOTE_ONLY',
+          partnerRedirect: { partnerUrl: 'https://psp.example' },
+          complianceDocs: { warrantyCertUrl: '/docs/w.pdf' },
+        }),
+      );
+      const out: any = await svc.findBySkuPublicOrThrow('kds-21in');
+      expect(out.saleMode).toBe('QUOTE_ONLY');
+      expect(out.partnerRedirect).toEqual({ partnerUrl: 'https://psp.example' });
+      expect(out.complianceDocs).toEqual({ warrantyCertUrl: '/docs/w.pdf' });
+    });
+  });
+});
+
+/**
+ * Regulatory sale tier (TR law) — default resolution + publish gating.
+ * The tier defaults from the product category; publishing is blocked when
+ * the row would render a broken/non-compliant storefront.
+ */
+describe('CatalogService — saleMode (regulatory tiers)', () => {
+  let prisma: any;
+  let svc: CatalogService;
+  let captured: any;
+
+  beforeEach(() => {
+    captured = undefined;
+    const tx = {
+      hardwareProduct: {
+        create: jest.fn(async ({ data }: any) => {
+          captured = data;
+          return { id: 'p1', ...data };
+        }),
+      },
+      hardwareInventory: { create: jest.fn(async () => ({})) },
+    };
+    prisma = {
+      $transaction: jest.fn(async (cb: any) => cb(tx)),
+      hardwareProduct: { findUnique: jest.fn() },
+    };
+    svc = new CatalogService(prisma, { append: jest.fn() } as any);
+  });
+
+  const base = { name: 'X', priceCents: 1000 };
+
+  it('defaults a yazarkasa to QUOTE_ONLY when saleMode is omitted', async () => {
+    await svc.create({ sku: 'yk-x', category: 'yazarkasa', ...base });
+    expect(captured.saleMode).toBe('QUOTE_ONLY');
+  });
+
+  it('defaults a printer to DIRECT_SALE when saleMode is omitted', async () => {
+    await svc.create({ sku: 'pr-x', category: 'printer', ...base });
+    expect(captured.saleMode).toBe('DIRECT_SALE');
+  });
+
+  it('coerces a docless scale to RECOMMENDED_ONLY (publishable, never directly sold)', async () => {
+    await svc.create({ sku: 'sc-x', category: 'scale', ...base, status: 'published' });
+    expect(captured.saleMode).toBe('RECOMMENDED_ONLY');
+  });
+
+  it('rejects an EXPLICIT DIRECT_SALE scale with no compliance docs (loud, not silent)', async () => {
+    await expect(
+      svc.create({ sku: 'sc-x2', category: 'scale', ...base, saleMode: 'DIRECT_SALE' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('keeps a scale DIRECT_SALE when compliance docs are present', async () => {
+    await svc.create({
+      sku: 'sc-y',
+      category: 'scale',
+      ...base,
+      saleMode: 'DIRECT_SALE',
+      complianceDocs: { ceConformityUrl: '/docs/ce.pdf' },
+    });
+    expect(captured.saleMode).toBe('DIRECT_SALE');
+  });
+
+  it('blocks publishing a DIRECT_SALE product without compliance docs', async () => {
+    await expect(
+      svc.create({ sku: 'pr-y', category: 'printer', ...base, status: 'published' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('publishes a DIRECT_SALE product when compliance docs are present', async () => {
+    await svc.create({
+      sku: 'pr-z',
+      category: 'printer',
+      ...base,
+      status: 'published',
+      complianceDocs: { warrantyCertUrl: '/docs/w.pdf' },
+    });
+    expect(captured.saleMode).toBe('DIRECT_SALE');
+  });
+
+  it('blocks publishing a PARTNER_REDIRECT product without partnerRedirect.partnerUrl', async () => {
+    await expect(
+      svc.create({ sku: 'pos-x', category: 'pos_terminal', ...base, status: 'published' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('publishes a PARTNER_REDIRECT product when partnerUrl is present', async () => {
+    await svc.create({
+      sku: 'pos-y',
+      category: 'pos_terminal',
+      ...base,
+      status: 'published',
+      partnerRedirect: { partnerUrl: 'https://psp.example' },
+    });
+    expect(captured.saleMode).toBe('PARTNER_REDIRECT');
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,x', '//evil.example', 'ftp://x'])(
+    'rejects publishing a PARTNER_REDIRECT product with a non-http(s) partnerUrl (%s)',
+    async (partnerUrl) => {
+      await expect(
+        svc.create({
+          sku: 'pos-z',
+          category: 'pos_terminal',
+          ...base,
+          status: 'published',
+          partnerRedirect: { partnerUrl },
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+});
+
+/**
+ * "Teklif Al" → emits a HARDWARE_QUOTE outbox event (consumed by the marketing
+ * HardwareQuoteConsumer). The core catalog never writes the leads table. Only
+ * QUOTE_ONLY devices use this flow.
+ */
+describe('CatalogService — requestQuote', () => {
+  let prisma: any;
+  let outbox: any;
+  let svc: CatalogService;
+
+  beforeEach(() => {
+    prisma = {
+      hardwareProduct: { findUnique: jest.fn() },
+      tenant: { findUnique: jest.fn().mockResolvedValue({ name: 'Acme Cafe' }) },
+    };
+    outbox = { append: jest.fn() };
+    svc = new CatalogService(prisma, outbox);
+  });
+
+  function row(overrides: any = {}) {
+    return {
+      id: 'p1',
+      sku: 'yk-x',
+      name: 'Yazarkasa',
+      category: 'yazarkasa',
+      status: 'published',
+      saleMode: 'QUOTE_ONLY',
+      currency: 'TRY',
+      inventory: [],
+      ...overrides,
+    };
+  }
+
+  it('rejects a non-quote-only SKU', async () => {
+    prisma.hardwareProduct.findUnique.mockResolvedValue(row({ saleMode: 'DIRECT_SALE' }));
+    await expect(
+      svc.requestQuote('t1', { sku: 'yk-x', contactPerson: 'Ali' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(outbox.append).not.toHaveBeenCalled();
+  });
+
+  it('emits a HARDWARE_QUOTE outbox event with tenant + SKU context + dedup ref (no direct lead write)', async () => {
+    prisma.hardwareProduct.findUnique.mockResolvedValue(row());
+    const out: any = await svc.requestQuote('t1', { sku: 'yk-x', qty: 2, contactPerson: 'Ali' });
+    expect(out.ok).toBe(true);
+    // Core never touches the leads table.
+    expect((prisma as any).lead).toBeUndefined();
+    const ev = outbox.append.mock.calls[0][0];
+    expect(ev.type).toBe('marketing.lead.hardware_quote.v1');
+    // idempotencyKey == dedup key so retried emits collapse to one row.
+    expect(ev.idempotencyKey).toBe('hwq:t1:yk-x');
+    expect(ev.tenantId).toBe('t1');
+    expect(ev.payload.dedupRef).toBe('hwq:t1:yk-x');
+    expect(ev.payload.businessName).toBe('Acme Cafe');
+    expect(ev.payload.contactPerson).toBe('Ali');
+    expect(ev.payload.notes).toContain('yk-x');
+    expect(ev.payload.notes).toContain('× 2');
   });
 });

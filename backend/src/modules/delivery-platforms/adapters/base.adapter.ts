@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../../common/config/numeric-env.util";
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export abstract class BaseAdapter {
@@ -7,10 +8,24 @@ export abstract class BaseAdapter {
   protected readonly httpClient: AxiosInstance;
   protected readonly baseURL: string;
 
-  constructor(name: string, defaultBaseURL: string, timeout = 10_000) {
+  constructor(
+    name: string,
+    defaultBaseURL: string,
+    config?: ConfigService,
+    timeout?: number,
+  ) {
     this.logger = new Logger(name);
     this.baseURL = defaultBaseURL;
-    this.httpClient = axios.create({ baseURL: defaultBaseURL, timeout });
+    // Per-request HTTP timeout. Default 10s; override via
+    // DELIVERY_PLATFORM_HTTP_TIMEOUT_MS. An explicit `timeout` arg (rare)
+    // still wins so a subclass can hard-pin a value if it ever needs to.
+    const resolvedTimeout =
+      timeout ??
+      numericEnv(config?.get("DELIVERY_PLATFORM_HTTP_TIMEOUT_MS"), 10_000);
+    this.httpClient = axios.create({
+      baseURL: defaultBaseURL,
+      timeout: resolvedTimeout,
+    });
   }
 
   /** Allow overriding baseURL from env (call in subclass constructor if ConfigService is available) */

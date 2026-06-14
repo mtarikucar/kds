@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useVerify2FA, useSetup2FAWithToken, useEnable2FAWithToken } from '../../features/superadmin/api/superAdminApi';
 
 export default function SuperAdmin2FAPage() {
+  const { t } = useTranslation('superadmin');
   const [code, setCode] = useState('');
   const [qrData, setQrData] = useState<{ secret: string; qrCodeUrl: string } | null>(null);
   const {
@@ -65,7 +67,7 @@ export default function SuperAdmin2FAPage() {
             <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
               <span className="text-white text-lg font-semibold">K</span>
             </div>
-            <span className="text-zinc-900 text-xl font-semibold tracking-tight">KDS Admin</span>
+            <span className="text-zinc-900 text-xl font-semibold tracking-tight">{t('brand')}</span>
           </div>
         </div>
 
@@ -73,12 +75,12 @@ export default function SuperAdmin2FAPage() {
         <div className="bg-white rounded-2xl border border-zinc-200 p-8">
           <div className="text-center mb-6">
             <h1 className="text-xl font-semibold text-zinc-900">
-              {requires2FASetup ? 'Setup 2FA' : 'Two-Factor Authentication'}
+              {requires2FASetup ? t('twoFactor.setupTitle') : t('twoFactor.verifyTitle')}
             </h1>
             <p className="text-sm text-zinc-500 mt-1">
               {requires2FASetup
-                ? 'Scan the QR code with your authenticator'
-                : 'Enter the code from your authenticator'}
+                ? t('twoFactor.setupSubtitle')
+                : t('twoFactor.verifySubtitle')}
             </p>
           </div>
 
@@ -95,13 +97,13 @@ export default function SuperAdmin2FAPage() {
                     <div className="bg-white p-3 rounded-xl border border-zinc-200">
                       <img
                         src={qrData.qrCodeUrl}
-                        alt="2FA QR Code"
+                        alt={t('twoFactor.qrAlt')}
                         className="w-40 h-40"
                       />
                     </div>
                   </div>
                   <div className="bg-zinc-50 rounded-lg p-3">
-                    <p className="text-xs text-zinc-500 mb-1.5">Manual entry code:</p>
+                    <p className="text-xs text-zinc-500 mb-1.5">{t('twoFactor.manualEntryCode')}</p>
                     <code className="text-xs font-mono text-zinc-700 break-all select-all">
                       {qrData.secret}
                     </code>
@@ -114,13 +116,13 @@ export default function SuperAdmin2FAPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-lg">
-                {(error as any)?.response?.data?.message || 'Verification failed'}
+                {(error as any)?.response?.data?.message || t('twoFactor.verificationFailed')}
               </div>
             )}
 
             <div>
               <label htmlFor="code" className="block text-sm font-medium text-zinc-700 mb-1.5">
-                Verification Code
+                {t('twoFactor.verificationCode')}
               </label>
               <input
                 id="code"
@@ -143,21 +145,21 @@ export default function SuperAdmin2FAPage() {
                 onClick={handleCancel}
                 className="flex-1 bg-white border border-zinc-300 text-zinc-700 py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors"
               >
-                Cancel
+                {t('twoFactor.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={isLoading || code.length !== 6}
                 className="flex-1 bg-zinc-900 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isLoading ? 'Verifying...' : requires2FASetup ? 'Enable 2FA' : 'Verify'}
+                {isLoading ? t('twoFactor.verifying') : requires2FASetup ? t('twoFactor.enable') : t('twoFactor.verify')}
               </button>
             </div>
           </form>
         </div>
 
         <p className="text-center text-xs text-zinc-400 mt-6">
-          KDS Platform Administration
+          {t('platformAdministration')}
         </p>
       </div>
     </div>

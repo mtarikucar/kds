@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { appHref } from '@/lib/urls';
 import { Container } from '@/components/ui/Container';
 import { Check, ArrowRight, Sparkles, Tag } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -32,7 +33,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
       period: t('perMonth'),
       features: t.raw('plans.basic.features') as string[],
       cta: t('plans.basic.cta'),
-      href: '/app/register?plan=BASIC',
+      href: appHref('/register?plan=BASIC'),
       popular: false,
       monthlyPrice: 499,
     },
@@ -44,7 +45,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
       period: t('perMonth'),
       features: t.raw('plans.pro.features') as string[],
       cta: t('plans.pro.cta'),
-      href: '/app/register?plan=PRO',
+      href: appHref('/register?plan=PRO'),
       popular: true,
       monthlyPrice: 1299,
     },
@@ -56,7 +57,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
       period: t('perMonth'),
       features: t.raw('plans.business.features') as string[],
       cta: t('plans.business.cta'),
-      href: '/app/register?plan=BUSINESS',
+      href: appHref('/register?plan=BUSINESS'),
       popular: false,
       monthlyPrice: 2999,
     },

@@ -17,12 +17,14 @@ import {
   ApiResponse,
 } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
+import { UserOnboardingService } from "./services/user-onboarding.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
 import { UpdateOnboardingDto } from "./dto/update-onboarding.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
 // v2.8.92: route user-limit checks through the canonical PlanFeatureGuard
 // + modern `@CheckLimit(LimitType.USERS)` pair. Pre-v2.8.92 this
 // controller used the legacy SubscriptionLimitsGuard + free-form
@@ -48,7 +50,10 @@ import { UserRole } from "../../common/constants/roles.enum";
 @Controller("users")
 @UseGuards(PlanFeatureGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly onboardingService: UserOnboardingService,
+  ) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
@@ -123,12 +128,14 @@ export class UsersController {
 
   // Profile endpoints (all authenticated users)
   @Get("me/profile")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Get current user profile" })
   getMyProfile(@CurrentUser("id") userId: string) {
     return this.usersService.getMyProfile(userId);
   }
 
   @Patch("me/profile")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Update current user profile" })
   updateMyProfile(
     @CurrentUser("id") userId: string,
@@ -138,6 +145,7 @@ export class UsersController {
   }
 
   @Patch("me/email")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Update user email (requires password)" })
   updateMyEmail(
     @CurrentUser("id") userId: string,
@@ -178,17 +186,19 @@ export class UsersController {
 
   // Onboarding endpoints
   @Get("me/onboarding")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Get current user onboarding data" })
   getMyOnboarding(@CurrentUser("id") userId: string) {
-    return this.usersService.getOnboarding(userId);
+    return this.onboardingService.getOnboarding(userId);
   }
 
   @Patch("me/onboarding")
+  @SkipBranchScope()
   @ApiOperation({ summary: "Update current user onboarding data" })
   updateMyOnboarding(
     @CurrentUser("id") userId: string,
     @Body() updateOnboardingDto: UpdateOnboardingDto,
   ) {
-    return this.usersService.updateOnboarding(userId, updateOnboardingDto);
+    return this.onboardingService.updateOnboarding(userId, updateOnboardingDto);
   }
 }

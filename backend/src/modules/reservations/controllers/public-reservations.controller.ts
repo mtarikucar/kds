@@ -11,6 +11,7 @@ import { ApiTags, ApiOperation, ApiParam } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { Public } from "../../auth/decorators/public.decorator";
 import { ReservationsService } from "../services/reservations.service";
+import { ReservationAvailabilityService } from "../services/reservation-availability.service";
 import { ReservationSettingsService } from "../services/reservation-settings.service";
 import {
   CreateReservationDto,
@@ -28,6 +29,7 @@ import { LookupReservationDto } from "../dto/lookup-reservation.dto";
 export class PublicReservationsController {
   constructor(
     private readonly reservationsService: ReservationsService,
+    private readonly availabilityService: ReservationAvailabilityService,
     private readonly settingsService: ReservationSettingsService,
   ) {}
 
@@ -48,12 +50,18 @@ export class PublicReservationsController {
     @Param("tenantId") tenantId: string,
     @Query("date") date: string,
     @Query("guestCount") guestCount?: string,
+    // Optional explicit branch selector. Omitted → service falls back to
+    // the tenant's oldest-active branch (same default as createReservation),
+    // so single-branch callers are unaffected. Multi-branch tenants pass
+    // it to scope availability to one location.
+    @Query("branchId") branchId?: string,
   ) {
     const parsed = guestCount ? parseInt(guestCount, 10) : undefined;
-    return this.reservationsService.getAvailableSlots(
+    return this.availabilityService.getAvailableSlots(
       tenantId,
       date,
       Number.isFinite(parsed as number) ? parsed : undefined,
+      branchId,
     );
   }
 
@@ -67,14 +75,20 @@ export class PublicReservationsController {
     @Query("startTime") startTime: string,
     @Query("endTime") endTime: string,
     @Query("guestCount") guestCount?: string,
+    // Optional explicit branch selector. Omitted → service falls back to
+    // the tenant's oldest-active branch (same default as createReservation),
+    // so single-branch callers are unaffected. Multi-branch tenants pass
+    // it to scope availability to one location.
+    @Query("branchId") branchId?: string,
   ) {
     const parsed = guestCount ? parseInt(guestCount, 10) : undefined;
-    return this.reservationsService.getAvailableTables(
+    return this.availabilityService.getAvailableTables(
       tenantId,
       date,
       startTime,
       endTime,
       Number.isFinite(parsed as number) ? parsed : undefined,
+      branchId,
     );
   }
 
@@ -87,6 +101,16 @@ export class PublicReservationsController {
     @Body() dto: CreateReservationDto,
   ) {
     return this.reservationsService.createPublicReservation(tenantId, dto);
+  }
+
+  @Public()
+  @Get(":tenantId/branches")
+  @ApiOperation({
+    summary:
+      "List a tenant's bookable (active) branches for the public reservation branch picker",
+  })
+  listBranches(@Param("tenantId") tenantId: string) {
+    return this.availabilityService.listPublicBranches(tenantId);
   }
 
   @Public()

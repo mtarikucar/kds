@@ -99,18 +99,17 @@ import FeatureGate from './components/subscriptions/FeatureGate';
 import UpsellCard from './components/subscriptions/UpsellCard';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useBranchChangeInvalidation } from './hooks/useBranchChangeInvalidation';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
 import { useBranchScopeStore } from './store/branchScopeStore';
 import { UserRole } from './types';
 import { detectSubdomain } from './utils/subdomain';
-import { useQueryClient } from '@tanstack/react-query';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const isAuthenticated = useAuthStore((state) => !!state.accessToken);
   const user = useAuthStore((state) => state.user);
-  const queryClient = useQueryClient();
 
   // v3.0.0 — hydrate the branch scope every time the persisted user
   // changes. Cross-store side effects live HERE (component effect),
@@ -119,18 +118,10 @@ function App() {
     useBranchScopeStore.getState().hydrateFromUser(user);
   }, [user]);
 
-  // v3.0.0 — invalidate every TanStack Query when the active branch
-  // changes so stale data from the previous branch can't show up
-  // for the staleTime window.
-  useEffect(() => {
-    return useBranchScopeStore.subscribe(
-      (s, prev) => {
-        if (s.branchId !== prev.branchId) {
-          queryClient.removeQueries();
-        }
-      },
-    );
-  }, [queryClient]);
+  // v3.0.0 — invalidate every TanStack Query when the active branch changes so
+  // stale data from the previous branch can't show up for the staleTime window.
+  // Extracted to a unit-tested hook (useBranchChangeInvalidation).
+  useBranchChangeInvalidation();
 
   // Detect subdomain access
   const subdomainInfo = useMemo(() => detectSubdomain(), []);
@@ -261,8 +252,14 @@ function App() {
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>
-          <Route index element={<Navigate to="/admin/settings/subscription" replace />} />
-          <Route path="subscription" element={<SubscriptionSettingsPage />} />
+          <Route index element={<Navigate to="/admin/settings/pos" replace />} />
+          {/* v3.0.5: the "Abonelik" tab was removed from Settings — it
+              duplicated the top-level Plan & Erişim page (/admin/plan). The
+              billing detail page (invoices / cancel / reactivate / scheduled
+              downgrade) now lives standalone at /subscription/manage, linked
+              from Plan & Erişim. This old settings URL redirects there so any
+              existing bookmark keeps working. */}
+          <Route path="subscription" element={<Navigate to="/subscription/manage" replace />} />
           <Route path="pos" element={<POSSettingsPage />} />
           <Route path="qr-menu" element={<QRMenuSettingsPage />} />
           <Route path="reports" element={<ReportsSettingsPage />} />
@@ -271,13 +268,22 @@ function App() {
               <BrandingSettingsPage />
             </FeatureGate>
           } />
-          <Route path="desktop" element={<DesktopAppSettingsPage />} />
+          {/* v3.0.6: desktop app moved to a standalone sidebar destination
+              (/admin/desktop). Redirect the old Settings sub-tab URL. */}
+          <Route path="desktop" element={<Navigate to="/admin/desktop" replace />} />
           {/* v2.8.91: settings sub-pages now wrapped in FeatureGate so
               direct URL hits show UpsellCard instead of an empty page +
               403 toast on every backend call. */}
           <Route path="integrations" element={
             <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
               <IntegrationsSettingsPage />
+            </FeatureGate>
+          } />
+          {/* v3.0.6: webhooks moved from the top-level sidebar (/admin/webhooks)
+              into Settings — enterprise/developer feature, same apiAccess gate. */}
+          <Route path="webhooks" element={
+            <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
+              <WebhooksPage />
             </FeatureGate>
           } />
           <Route path="reservations" element={
@@ -304,7 +310,7 @@ function App() {
 
         {/* Legacy redirects */}
         <Route path="/admin/pos-settings" element={<Navigate to="/admin/settings/pos" replace />} />
-        <Route path="/subscription/manage" element={<Navigate to="/admin/settings/subscription" replace />} />
+        <Route path="/subscription/manage" element={<SubscriptionSettingsPage />} />
 
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
@@ -333,11 +339,9 @@ function App() {
         } />
         <Route path="/admin/health" element={<HealthPage />} />
         <Route path="/admin/bridges" element={<BridgesPage />} />
-        <Route path="/admin/webhooks" element={
-          <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
-            <WebhooksPage />
-          </FeatureGate>
-        } />
+        {/* v3.0.6: webhooks now lives under Settings (/admin/settings/webhooks).
+            Redirect the old top-level URL so existing links keep working. */}
+        <Route path="/admin/webhooks" element={<Navigate to="/admin/settings/webhooks" replace />} />
         <Route path="/admin/fiscal-recovery" element={
           <FeatureGate integration={{ domain: 'fiscal' }} fallback={<UpsellCard addOnCode="fiscal_hugin" />}>
             <FiscalRecoveryPage />
@@ -350,6 +354,9 @@ function App() {
         } />
         {/* v2.8.88: top-level Plan & Erişim page — plan + quota + active add-ons. */}
         <Route path="/admin/plan" element={<PlanAndAccessPage />} />
+        {/* v3.0.6: Desktop app as a standalone sidebar destination (moved out of
+            the Settings sub-tabs), mirroring Plan & Erişim. */}
+        <Route path="/admin/desktop" element={<DesktopAppSettingsPage />} />
       </Route>
 
       {/* SuperAdmin Routes */}
@@ -369,6 +376,8 @@ function App() {
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         </Route>
       </Route>
+      {/* Marketing panel routes removed — it is now a standalone app at
+          marketing.hummytummy.com; nginx 301-redirects /marketing/* there. */}
     </Routes>
     </Suspense>
 

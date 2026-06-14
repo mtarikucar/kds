@@ -21,6 +21,7 @@
  * domain failures (HttpException → { statusCode, message, errorCode }).
  */
 import { AxiosError, isAxiosError } from 'axios';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
 import i18n from '../i18n/config';
 
@@ -42,8 +43,20 @@ export type ApiError = AxiosError<ApiErrorBody>;
 
 /**
  * Narrow an unknown caught error to the standard ApiError shape.
- * Returns null for non-axios errors (network failure, code bug) so
- * the caller can decide whether to surface a generic message.
+ *
+ * Returns null for non-axios errors. That includes:
+ *   - Network failures the axios instance never wrapped (rare; the
+ *     interceptor in `lib/api.ts` normally rejects with AxiosError)
+ *   - DOMException / AbortError from a cancelled request
+ *   - Plain `throw new Error(...)` or `throw 'string'` from caller code
+ *   - Errors from the queryFn body unrelated to the HTTP layer
+ *
+ * Because `null` collapses every non-HTTP failure into the same bucket,
+ * downstream helpers (`getApiErrorStatus`, `getApiErrorCode`) also
+ * return `undefined` on those paths. Callers that need to differentiate
+ * "got a 401" from "lost network entirely" must check `getApiErrorStatus`
+ * against undefined explicitly — undefined here means "no response
+ * landed", and any 401-refresh logic must treat that as not-an-auth-error.
  */
 export function asApiError(err: unknown): ApiError | null {
   if (isAxiosError(err)) {
@@ -94,13 +107,19 @@ export function getApiErrorStatus(err: unknown): number | undefined {
  *   const handle = useApiErrorHandler();
  *   useMutation({ onError: (e) => handle(e, 'devices:createFailed') });
  *
- * Returns a stable function reference; no state.
+ * v3.0.1 audit fix (round 2) — wrapped in `useCallback` so the returned
+ * function has a stable identity across renders. Pre-fix the body
+ * returned a freshly-allocated arrow on every render; `useMutation`'s
+ * `onError` closure binding was fine in practice (read-once), but any
+ * caller using `handle` as a dependency in `useEffect` / `useMemo` /
+ * `useCallback` saw spurious re-runs. `i18n` and `toast` are stable
+ * module-level refs, so the empty deps array is correct.
  */
 export function useApiErrorHandler() {
-  return (err: unknown, fallbackKey: string) => {
+  return useCallback((err: unknown, fallbackKey: string) => {
     const fallback = i18n.t(fallbackKey, {
       defaultValue: 'Something went wrong. Please try again.',
     });
     toast.error(getApiErrorMessage(err, fallback));
-  };
+  }, []);
 }

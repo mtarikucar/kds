@@ -9,17 +9,53 @@ import { API_URL } from './env';
  * prefixes to fly without an X-Branch-Id header; everything else
  * gets fail-fast if branchScopeStore hasn't resolved a branchId.
  */
-const TENANT_WIDE_PATH_PREFIXES = [
+export const TENANT_WIDE_PATH_PREFIXES = [
   '/auth/',
   '/billing/',
   '/branches',
   '/me',
+  // Subscriptions, plan usage and invoices are tenant-level (one per tenant,
+  // not per branch) — the backend marks both controllers @SkipBranchScope.
+  // Bare '/subscriptions' (not '/subscriptions/') so the base create route
+  // POST /subscriptions flies too; the bare segment still matches every
+  // /subscriptions/{plans,current,effective-features,usage/snapshot,
+  // tenant/invoices,:id/*} sub-route. Covers /invoices/:id/download.
+  '/subscriptions',
+  '/invoices/',
   '/superadmin/',
+  // POS settings are one row per tenant (class-level @SkipBranchScope on the
+  // backend), so they must fly without a branch — a wildcard-owner ADMIN with
+  // an unresolved branchId was otherwise fail-fast'd out of the POS settings.
+  '/pos-settings',
+  // Delivery-platforms DLQ admin is tenant-wide (class-level @SkipBranchScope,
+  // tenant-fenced by req.user.tenantId) — dead-letters span all branches, so
+  // these routes must fly without a branch header. Bare (no trailing slash)
+  // covers /delivery-platforms/dlq, /dlq/summary, /dlq/requeue.
+  '/delivery-platforms/dlq',
 ];
 
-function isTenantWidePath(url: string | undefined): boolean {
+/**
+ * Exported for unit testing. Segment-aware matching:
+ *   - A directory prefix (trailing '/') may appear anywhere — '/auth/' can't
+ *     collide with '/authorize'.
+ *   - A bare segment prefix ('/me', '/branches') must END on a path boundary,
+ *     so '/me' matches '/users/me' and '/v1/entitlements/me' but NOT
+ *     '/menu/categories'.
+ * The previous `url.includes('/me')` matched '/menu/*' (since '/menu' starts
+ * with '/me'), shipping every branch-scoped menu request WITHOUT an
+ * X-Branch-Id header → the backend 400'd the entire menu (categories,
+ * products, images).
+ */
+export function isTenantWidePath(url: string | undefined): boolean {
   if (!url) return false;
-  return TENANT_WIDE_PATH_PREFIXES.some((p) => url.includes(p));
+  const path = url.split('?')[0];
+  return TENANT_WIDE_PATH_PREFIXES.some((p) => {
+    const idx = path.indexOf(p);
+    if (idx === -1) return false;
+    if (p.endsWith('/')) return true;
+    const after = path.charAt(idx + p.length);
+    return after === '' || after === '/';
+  });
 }
 
 const API_BASE_URL = API_URL;

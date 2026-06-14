@@ -25,12 +25,34 @@ export const usePublicReservationSettings = (tenantId: string) => {
   });
 };
 
-export const useAvailableSlots = (tenantId: string, date: string, guestCount?: number) => {
+export interface PublicBranch {
+  id: string;
+  name: string;
+}
+
+/** Bookable (active) branches for the public branch picker. */
+export const usePublicBranches = (tenantId: string) => {
+  return useQuery<PublicBranch[]>({
+    queryKey: ['publicBranches', tenantId],
+    queryFn: async () => {
+      const response = await publicApi.get(`/public/reservations/${tenantId}/branches`);
+      return response.data;
+    },
+    enabled: !!tenantId,
+  });
+};
+
+export const useAvailableSlots = (
+  tenantId: string,
+  date: string,
+  guestCount?: number,
+  branchId?: string,
+) => {
   return useQuery<AvailableSlot[]>({
-    queryKey: ['availableSlots', tenantId, date, guestCount],
+    queryKey: ['availableSlots', tenantId, date, guestCount, branchId],
     queryFn: async () => {
       const response = await publicApi.get(`/public/reservations/${tenantId}/available-slots`, {
-        params: { date, guestCount },
+        params: { date, guestCount, branchId },
       });
       return response.data;
     },
@@ -38,12 +60,19 @@ export const useAvailableSlots = (tenantId: string, date: string, guestCount?: n
   });
 };
 
-export const useAvailableTables = (tenantId: string, date: string, startTime: string, endTime: string, guestCount?: number) => {
+export const useAvailableTables = (
+  tenantId: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+  guestCount?: number,
+  branchId?: string,
+) => {
   return useQuery<AvailableTable[]>({
-    queryKey: ['availableTables', tenantId, date, startTime, endTime, guestCount],
+    queryKey: ['availableTables', tenantId, date, startTime, endTime, guestCount, branchId],
     queryFn: async () => {
       const response = await publicApi.get(`/public/reservations/${tenantId}/tables`, {
-        params: { date, startTime, endTime, guestCount },
+        params: { date, startTime, endTime, guestCount, branchId },
       });
       return response.data;
     },

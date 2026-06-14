@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowRight, Play, ChevronDown } from 'lucide-react';
+import { appHref } from '@/lib/urls';
 import { Container } from '@/components/ui/Container';
 import { useTranslations } from 'next-intl';
 import { DashboardMockup } from '@/components/mockups/DashboardMockup';
@@ -113,7 +114,7 @@ export default function Hero() {
                 style={{ animationDelay: '0.5s' }}
               >
                 <a
-                  href="/app/register"
+                  href={appHref('/register')}
                   className="hover-lift inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-semibold text-slate-900 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl hover:from-amber-500 hover:to-orange-500 transition-all hover:shadow-xl hover:shadow-orange-500/20 group"
                 >
                   {t('cta')}

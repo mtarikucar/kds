@@ -4,10 +4,13 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import { createHash, randomBytes } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Device registry + pairing + heartbeat + command queue.
@@ -25,8 +28,10 @@ import { OutboxService } from "../outbox/outbox.service";
 @Injectable()
 export class DeviceService {
   private readonly logger = new Logger(DeviceService.name);
-  private static readonly PAIR_CODE_TTL_MS = 10 * 60 * 1000;
-  private static readonly TOKEN_TTL_MS = 24 * 3600 * 1000;
+  // Pair-code lifetime (default 10m) and bearer-token lifetime (default 24h).
+  // Override via DEVICE_PAIR_CODE_TTL_MS / DEVICE_TOKEN_TTL_MS.
+  private readonly pairCodeTtlMs: number;
+  private readonly tokenTtlMs: number;
   // v2.8.97 — tightened from 60s to 45s. Combined with the sweeper's
   // 60s cron tick the worst-case "online but actually offline" window
   // drops from ~120s to ~105s. The 10s default heartbeat interval
@@ -39,7 +44,17 @@ export class DeviceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
-  ) {}
+    private readonly config?: ConfigService,
+  ) {
+    this.pairCodeTtlMs = numericEnv(
+      this.config?.get("DEVICE_PAIR_CODE_TTL_MS"),
+      10 * 60 * 1000,
+    );
+    this.tokenTtlMs = numericEnv(
+      this.config?.get("DEVICE_TOKEN_TTL_MS"),
+      24 * 3600 * 1000,
+    );
+  }
 
   /** Cryptographic, human-typable pair code. 6 chars in [A-Z0-9]. */
   private newPairCode(): string {
@@ -131,9 +146,7 @@ export class DeviceService {
         serial: input.serial,
         ownership: input.ownership ?? "byo",
         pairCode,
-        pairCodeExpiresAt: new Date(
-          Date.now() + DeviceService.PAIR_CODE_TTL_MS,
-        ),
+        pairCodeExpiresAt: new Date(Date.now() + this.pairCodeTtlMs),
       },
     });
 
@@ -143,7 +156,12 @@ export class DeviceService {
         tenantId,
         payload: { deviceId: row.id, kind: row.kind, branchId: row.branchId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "device-mesh",
+          op: "slot-created",
+        }),
+      );
 
     // Return the pair code in the slot-creation response — it's not a
     // secret per se, but it gates pairing for 10 minutes. UI shows it on
@@ -222,7 +240,7 @@ export class DeviceService {
 
     const token = this.newToken();
     const tokenHash = this.hashToken(token);
-    const tokenExpiresAt = new Date(Date.now() + DeviceService.TOKEN_TTL_MS);
+    const tokenExpiresAt = new Date(Date.now() + this.tokenTtlMs);
 
     // Atomic single-use pair-code claim.
     //
@@ -280,7 +298,12 @@ export class DeviceService {
         tenantId: row.tenantId,
         payload: { deviceId: row.id, kind: row.kind, branchId: row.branchId },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "device-mesh",
+          op: "device-paired",
+        }),
+      );
 
     return {
       deviceId: updated.id,

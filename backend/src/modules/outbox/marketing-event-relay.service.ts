@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import axios from "axios";
 import { EventTypes } from "./event-types";
 import { DomainEvent } from "./domain-event-bus.service";
+import { stripCorrelationMeta } from "./outbox.service";
 import {
   DeliverEventRequest,
   INTERNAL_EVENTS_ROUTE,
@@ -98,7 +99,9 @@ export class MarketingEventRelayService implements OnModuleInit {
 
   /** True for event types the kds-marketing service consumes. */
   isMarketingBound(type: string): boolean {
-    return type === EventTypes.PaymentSucceeded || type.startsWith("marketing.");
+    return (
+      type === EventTypes.PaymentSucceeded || type.startsWith("marketing.")
+    );
   }
 
   /**
@@ -108,14 +111,19 @@ export class MarketingEventRelayService implements OnModuleInit {
    * makes the worker park the row instead of marking it dispatched).
    */
   async relay(
-    event: Pick<DomainEvent, "type" | "payload" | "idempotencyKey" | "tenantId">,
+    event: Pick<
+      DomainEvent,
+      "type" | "payload" | "idempotencyKey" | "tenantId"
+    >,
   ): Promise<MarketingRelayResult> {
     if (!this.isMarketingBound(event.type)) return "skipped-not-marketing";
     if (!this.baseUrl) return "skipped-unconfigured";
 
     const body: DeliverEventRequest = {
       type: event.type,
-      payload: event.payload as Record<string, unknown>,
+      payload: stripCorrelationMeta(
+        event.payload as Record<string, unknown>,
+      ) as Record<string, unknown>,
       idempotencyKey: event.idempotencyKey,
       tenantId: event.tenantId ?? undefined,
     };

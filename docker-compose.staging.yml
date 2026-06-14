@@ -177,6 +177,7 @@ services:
           cpus: '0.25'
           memory: 256M
 
+
 volumes:
   postgres_data_staging:
   redis_data_staging:

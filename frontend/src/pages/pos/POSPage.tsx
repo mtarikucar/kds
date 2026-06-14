@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt } from 'lucide-react';
@@ -21,7 +21,6 @@ import BillSplitModal from '../../components/pos/BillSplitModal';
 import ProgressiveSplitModal from '../../components/pos/ProgressiveSplitModal';
 import ReservationActionDialog from '../../components/pos/ReservationActionDialog';
 import ManualLockDialog from '../../components/pos/ManualLockDialog';
-import type { UpcomingReservationOnTable } from '../../types';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
@@ -31,16 +30,20 @@ import { useResponsive } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
-import { useAuthStore } from '../../store/authStore';
-
-// View state type
-type POSView = 'table-selection' | 'order';
-
-interface CartItem extends Product {
-  quantity: number;
-  notes?: string;
-  modifiers?: SelectedModifier[];
-}
+import {
+  calculateSubtotal,
+  canProceedToPayment as computeCanProceedToPayment,
+  paymentBlockedReason as computePaymentBlockedReason,
+  resolvePaymentTarget,
+  hasRemainingUnpaidOrders,
+  mergeCartItem,
+} from './posCart';
+import { useCartPersistence } from './useCartPersistence';
+import { usePosTourSync } from './usePosTourSync';
+import { runReceiptSideEffects } from './posReceipt';
+import { buildOrderData } from './buildOrderData';
+import { useTableSelection } from './useTableSelection';
+import type { POSView, CartItem } from './posTypes';
 
 const POSPage = () => {
   const { t } = useTranslation('pos');
@@ -50,56 +53,10 @@ const POSPage = () => {
 
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   // Cart persisted in localStorage so an accidental tab close / refresh
-  // doesn't wipe an in-progress order.
-  //
-  // v2.8.97 — the key is now `pos_cart::<tenantId>::<userId>` so a
-  // logout-then-different-login on the same device cannot see the
-  // previous user's stale cart. Pre-fix the bare `pos_cart` key was
-  // shared across logins; queryClient.clear() on login (added in
-  // v2.8.91) only flushes React Query, not localStorage. The 12h TTL
-  // is unchanged.
-  const CART_TTL_MS = 12 * 60 * 60 * 1000;
-  const user = useAuthStore((s) => s.user);
-  const cartStorageKey = user
-    ? `pos_cart::${user.tenantId}::${user.id}`
-    : null;
-  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    if (!cartStorageKey) return [];
-    try {
-      // One-time legacy migration: drop the pre-v2.8.97 unscoped key
-      // so an upgraded build starts clean instead of cross-user
-      // surfacing.
-      localStorage.removeItem('pos_cart');
-      const saved = localStorage.getItem(cartStorageKey);
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      // Backwards-compat: older runs persisted a bare array. Treat those
-      // as expired (no timestamp = age unknown) so we don't carry over
-      // arbitrarily-old carts on first upgrade.
-      if (!parsed || !Array.isArray(parsed.items) || typeof parsed.savedAt !== 'number') {
-        localStorage.removeItem(cartStorageKey);
-        return [];
-      }
-      if (Date.now() - parsed.savedAt > CART_TTL_MS) {
-        localStorage.removeItem(cartStorageKey);
-        return [];
-      }
-      return parsed.items as CartItem[];
-    } catch {
-      return [];
-    }
-  });
-  useEffect(() => {
-    if (!cartStorageKey) return;
-    try {
-      localStorage.setItem(
-        cartStorageKey,
-        JSON.stringify({ items: cartItems, savedAt: Date.now() }),
-      );
-    } catch {
-      // Storage unavailable (private mode, quota exceeded) — drop silently.
-    }
-  }, [cartItems, cartStorageKey]);
+  // doesn't wipe an in-progress order. The per-user key shape
+  // (`pos_cart::<tenantId>::<userId>`, v2.8.97), the 12h TTL, and the
+  // legacy-key migration all live in useCartPersistence (unit-tested).
+  const { cartItems, setCartItems } = useCartPersistence<CartItem>();
   const [discount, setDiscount] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
@@ -118,28 +75,6 @@ const POSPage = () => {
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [isBillSplitModalOpen, setIsBillSplitModalOpen] = useState(false);
   const [isProgressiveModalOpen, setIsProgressiveModalOpen] = useState(false);
-
-  // RESERVED-table dialog: only opened when the scheduler/admin
-  // auto-held the table for an upcoming reservation (table.upcoming-
-  // Reservation populated). Manually-RESERVED tables fall through to
-  // a plain toast — they don't get an actionable dialog because the
-  // staff has no reservation row to seat.
-  const [reservationDialog, setReservationDialog] = useState<{
-    table: Table;
-    reservation: UpcomingReservationOnTable;
-  } | null>(null);
-
-  // Manual-lock dialog: opened when waiter taps a RESERVED table that
-  // has no upcomingReservation annotation (admin lock with no booking
-  // backing). Waiter can choose to override the lock and start an
-  // order — the table is flipped to AVAILABLE before the order screen.
-  const [manualLockDialog, setManualLockDialog] = useState<Table | null>(null);
-
-  // Set right before flipping selectedTable → OCCUPIED via the seat
-  // path. The OCCUPIED useEffect uses it to suppress the "table is
-  // occupied but no orders found" warning that would otherwise fire
-  // because a just-seated reservation has no orders yet.
-  const skipPostSeatOrderEffectRef = useRef(false);
 
   // Responsive hook
   const { isDesktop } = useResponsive();
@@ -188,23 +123,8 @@ const POSPage = () => {
 
   // Onboarding tour preview: force into 'order' view (takeaway shape) while
   // tour steps targeting menu-panel/order-cart are active, then restore the
-  // previous view. Snapshot prev view in a ref so we don't loop on view changes.
-  const posTourPreview = useUiStore((s) => s.posTourPreview);
-  const prevTourViewRef = useRef<POSView | null>(null);
-  useEffect(() => {
-    if (posTourPreview) {
-      if (prevTourViewRef.current === null) {
-        prevTourViewRef.current = currentView;
-      }
-      setSelectedTable(null);
-      setCurrentView('order');
-    } else if (prevTourViewRef.current !== null) {
-      setCurrentView(prevTourViewRef.current);
-      setSelectedTable(null);
-      prevTourViewRef.current = null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posTourPreview]);
+  // previous view. Logic lives in usePosTourSync.
+  usePosTourSync(currentView, setCurrentView, setSelectedTable);
 
   // Fetch active orders for selected table (exclude pending approval, paid, and cancelled)
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
@@ -238,207 +158,59 @@ const POSPage = () => {
     return tableOrders.find((o) => o.id === currentOrderId) || null;
   }, [currentOrderId, tableOrders]);
 
-  // Payment eligibility calculation for two-step checkout
-  const canProceedToPayment = useMemo(() => {
-    // Must have an active order to proceed to payment
-    if (!currentOrderId || !currentOrder) return false;
-
-    // Takeaway and delivery orders can always proceed to payment
-    const orderType = currentOrder.type || OrderType.DINE_IN;
-    if (orderType === OrderType.TAKEAWAY || orderType === OrderType.DELIVERY) {
-      return true;
-    }
-
-    // For dine-in, check if SERVED/READY status is required
-    if (posSettings?.requireServedForDineInPayment) {
-      return currentOrder.status === OrderStatus.SERVED || currentOrder.status === OrderStatus.READY;
-    }
-
-    // Setting is off - allow payment anytime
-    return true;
-  }, [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
+  // Payment eligibility calculation for two-step checkout. The gate logic
+  // (order-type + dine-in requireServed) is the pure computeCanProceedToPayment
+  // in posCart.ts; kept inside a useMemo so referential identity is unchanged.
+  const canProceedToPayment = useMemo(
+    () =>
+      computeCanProceedToPayment({
+        currentOrderId,
+        currentOrder,
+        requireServedForDineInPayment: !!posSettings?.requireServedForDineInPayment,
+      }),
+    [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment],
+  );
 
   // Reason why payment is blocked (for user feedback)
-  const paymentBlockedReason = useMemo(() => {
-    if (canProceedToPayment) return null;
-    if (!currentOrderId) return 'noActiveOrder';
-    if (
-      posSettings?.requireServedForDineInPayment &&
-      currentOrder?.type === OrderType.DINE_IN &&
-      currentOrder?.status !== OrderStatus.SERVED &&
-      currentOrder?.status !== OrderStatus.READY
-    ) {
-      return 'dineInPaymentRequiresReadyOrServed';
-    }
-    return null;
-  }, [canProceedToPayment, currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
+  const paymentBlockedReason = useMemo(
+    () =>
+      computePaymentBlockedReason({
+        currentOrderId,
+        currentOrder,
+        requireServedForDineInPayment: !!posSettings?.requireServedForDineInPayment,
+      }),
+    [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment],
+  );
 
-  // Load existing orders when an occupied table is selected
-  useEffect(() => {
-    if (skipPostSeatOrderEffectRef.current) {
-      // Arrived here via the reservation-seat path. The seat flow
-      // already cleared cart/customer state and the just-seated table
-      // has no orders by definition — emitting the "occupied but no
-      // orders" warning would be misleading.
-      skipPostSeatOrderEffectRef.current = false;
-      return;
-    }
-    if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
-      // Find the most recent editable order (only PENDING or PREPARING)
-      // READY and SERVED orders should not be continued - new order should be created
-      const activeOrder = tableOrders.find(
-        (order) =>
-          order.status === OrderStatus.PENDING ||
-          order.status === OrderStatus.PREPARING
-      );
-
-      if (activeOrder) {
-        setCurrentOrderId(activeOrder.id);
-        setCurrentOrderAmount(Number(activeOrder.finalAmount));
-
-        // Populate cart with existing order items
-        const items = activeOrder.orderItems || activeOrder.items || [];
-        const existingItems: CartItem[] = items.map((item) => ({
-          ...(item.product as Product),
-          quantity: item.quantity,
-          notes: item.notes || undefined,
-        }));
-
-        setCartItems(existingItems);
-        setDiscount(activeOrder.discount || 0);
-        setCustomerName('');
-        setOrderNotes(activeOrder.notes || '');
-
-        toast.info(
-          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
-        );
-      } else if (tableOrders.length === 0) {
-        // Table is marked occupied but no orders found at all - this is unusual
-        toast.warning(t('tableOccupiedNoOrders'));
-      }
-      // If there are only READY/SERVED orders, we don't show a warning - the AwaitingPaymentSection will handle them
-    }
-  }, [selectedTable, tableOrders, t]);
-
-  const handleSelectTable = (table: Table) => {
-    if (table.status === TableStatus.AVAILABLE) {
-      // Informational warning when the table has a reservation coming
-      // up in the next ~2 h. We still let the waiter proceed (a quick
-      // coffee may finish before the booking) but make sure they see
-      // it; the backend's reservation-overlap guard hard-blocks
-      // checkout if the reservation is within 30 minutes of now.
-      if (table.upcomingReservation) {
-        const r = table.upcomingReservation;
-        toast.warning(
-          t('availableTableHasUpcomingReservation', {
-            startTime: r.startTime,
-            customerName: r.customerName,
-            guestCount: r.guestCount,
-          }),
-        );
-      }
-      setSelectedTable(table);
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-      setCurrentOrderId(null);
-      setCurrentOrderAmount(null);
-      setCurrentView('order');
-    } else if (table.status === TableStatus.OCCUPIED) {
-      setSelectedTable(table);
-      // Clear cart first - useEffect will load existing orders
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-      setCurrentView('order');
-      toast.info(t('loadingExistingOrder'));
-    } else {
-      // RESERVED. Two flavours:
-      //   1. Auto-held for an upcoming reservation (v2.8.64 scheduler) —
-      //      `upcomingReservation` is populated. Show the dialog so the
-      //      waiter can see the booking details and seat the guest in
-      //      one tap when they arrive.
-      //   2. Manually RESERVED by admin (no reservation backing) —
-      //      `upcomingReservation` is null. Open the manual-lock
-      //      dialog so the waiter can override and start an order;
-      //      we don't have a row to "seat" but they shouldn't be
-      //      stuck either.
-      if (table.upcomingReservation) {
-        setReservationDialog({
-          table,
-          reservation: table.upcomingReservation,
-        });
-      } else {
-        setManualLockDialog(table);
-      }
-    }
-  };
-
-  /**
-   * Callback fired by ReservationActionDialog after a successful
-   * PATCH /reservations/:id/seat. The reservation hook has already
-   * invalidated both `['reservations']` and `['tables']` caches; we
-   * optimistically flip the local `selectedTable` to OCCUPIED so the
-   * order screen renders immediately without waiting for a refetch.
-   * Pre-fills `customerName` from the reservation so the waiter
-   * doesn't retype the name on the order header.
-   */
-  const handleReservationSeated = useCallback(() => {
-    const justSeated = reservationDialog;
-    setReservationDialog(null);
-    if (!justSeated) return;
-    skipPostSeatOrderEffectRef.current = true;
-    setSelectedTable({ ...justSeated.table, status: TableStatus.OCCUPIED });
-    setCartItems([]);
-    setDiscount(0);
-    setCustomerName(justSeated.reservation.customerName);
-    setOrderNotes('');
-    setCurrentOrderId(null);
-    setCurrentOrderAmount(null);
-    setCurrentView('order');
-  }, [reservationDialog]);
-
-  /**
-   * Callback fired by ManualLockDialog after a successful
-   * PATCH /tables/:id/status=AVAILABLE. The hook invalidated
-   * ['tables']; we optimistically use the AVAILABLE-table flow so
-   * the waiter lands on the order screen as a fresh start (no
-   * customer prefill, empty cart) — they'll be filling in the order
-   * from scratch.
-   */
-  const handleManualLockOverride = useCallback(() => {
-    const justUnlocked = manualLockDialog;
-    setManualLockDialog(null);
-    if (!justUnlocked) return;
-    setSelectedTable({ ...justUnlocked, status: TableStatus.AVAILABLE });
-    setCartItems([]);
-    setDiscount(0);
-    setCustomerName('');
-    setOrderNotes('');
-    setCurrentOrderId(null);
-    setCurrentOrderAmount(null);
-    setCurrentView('order');
-  }, [manualLockDialog]);
-
-  // Handle back to table selection (preserves cart)
-  const handleBackToTables = () => {
-    setCurrentView('table-selection');
-    // Cart is preserved - user can select different table
-  };
-
-  // Handle takeaway mode (no table needed)
-  const handleTakeawayMode = () => {
-    setSelectedTable(null);
-    setCartItems([]);
-    setDiscount(0);
-    setCustomerName('');
-    setOrderNotes('');
-    setCurrentOrderId(null);
-    setCurrentOrderAmount(null);
-    setCurrentView('order');
-  };
+  // Table-selection / reservation-seat / manual-lock-override flow + the
+  // occupied-table order-load effect. `selectedTable` state stays here (above,
+  // feeding useOrders); the hook drives it via setSelectedTable. The grouped
+  // `order` setters are the cart/order fields a selection action resets.
+  const {
+    reservationDialog,
+    setReservationDialog,
+    manualLockDialog,
+    setManualLockDialog,
+    handleSelectTable,
+    handleReservationSeated,
+    handleManualLockOverride,
+    handleBackToTables,
+    handleTakeawayMode,
+  } = useTableSelection({
+    selectedTable,
+    setSelectedTable,
+    tableOrders,
+    setCurrentView,
+    order: {
+      setCartItems,
+      setDiscount,
+      setCustomerName,
+      setOrderNotes,
+      setCurrentOrderId,
+      setCurrentOrderAmount,
+    },
+    t,
+  });
 
   const handleAddItem = (product: Product) => {
     // In tableless mode, table selection is optional
@@ -464,23 +236,9 @@ const POSPage = () => {
   };
 
   const addItemToCart = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
-    setCartItems((prev) => {
-      // Create a unique key based on product ID and selected modifiers
-      const modifierKey = modifiers.map(m => m.modifierId).sort().join('-');
-      const existingItem = prev.find(
-        (item) => item.id === product.id &&
-          (item.modifiers?.map(m => m.modifierId).sort().join('-') || '') === modifierKey
-      );
-
-      if (existingItem) {
-        return prev.map((item) =>
-          item === existingItem
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [...prev, { ...product, quantity, modifiers }];
-    });
+    // Dedup/merge rule (same product + same modifier set → increment) lives in
+    // posCart.mergeCartItem (unit-tested).
+    setCartItems((prev) => mergeCartItem(prev, product, quantity, modifiers));
   };
 
   const handleAddItemWithModifiers = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
@@ -520,32 +278,14 @@ const POSPage = () => {
       return;
     }
 
-    // Determine order type based on mode
-    const orderType = isTablelessMode && !selectedTable ? OrderType.TAKEAWAY : OrderType.DINE_IN;
-
-    const orderData = {
-      type: orderType,
-      tableId: selectedTable?.id,
-      customerName: customerName || undefined,
-      notes: orderNotes || undefined,
+    const orderData = buildOrderData({
+      isTablelessMode,
+      selectedTable,
+      customerName,
+      orderNotes,
       discount,
-      items: cartItems.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-        notes: item.notes,
-        modifiers: item.modifiers?.map(m => ({
-          modifierId: m.modifierId,
-          quantity: m.quantity,
-        })),
-      })),
-      // Stable per-click idempotency key. Backend dedupes by
-      // (tenantId, idempotencyKey) so a double-tap on a slow network
-      // returns the existing order instead of creating a duplicate.
-      // Generated here (in the click handler) — NOT in render — so it
-      // doesn't change between Axios's first request and any 401-refresh
-      // retry of the same logical action.
-      idempotencyKey: crypto.randomUUID(),
-    };
+      cartItems,
+    });
 
     // Update existing order if currentOrderId exists, otherwise create new
     if (currentOrderId) {
@@ -603,32 +343,14 @@ const POSPage = () => {
       return;
     }
 
-    // Determine order type based on mode
-    const orderType = isTablelessMode && !selectedTable ? OrderType.TAKEAWAY : OrderType.DINE_IN;
-
-    const orderData = {
-      type: orderType,
-      tableId: selectedTable?.id,
-      customerName: customerName || undefined,
-      notes: orderNotes || undefined,
+    const orderData = buildOrderData({
+      isTablelessMode,
+      selectedTable,
+      customerName,
+      orderNotes,
       discount,
-      items: cartItems.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-        notes: item.notes,
-        modifiers: item.modifiers?.map(m => ({
-          modifierId: m.modifierId,
-          quantity: m.quantity,
-        })),
-      })),
-      // Stable per-click idempotency key. Backend dedupes by
-      // (tenantId, idempotencyKey) so a double-tap on a slow network
-      // returns the existing order instead of creating a duplicate.
-      // Generated here (in the click handler) — NOT in render — so it
-      // doesn't change between Axios's first request and any 401-refresh
-      // retry of the same logical action.
-      idempotencyKey: crypto.randomUUID(),
-    };
+      cartItems,
+    });
 
     // Update existing order if currentOrderId exists, otherwise create new
     if (currentOrderId) {
@@ -676,11 +398,17 @@ const POSPage = () => {
   };
 
   const handlePaymentConfirm = (data: { method: string; transactionId?: string; customerPhone?: string }) => {
-    // Determine which order to pay: SERVED order (payingOrderId) or cart order (currentOrderId)
-    const orderIdToPay = payingOrderId || currentOrderId;
-    const amountToPay = payingOrderId ? payingOrderAmount : currentOrderAmount;
-
-    if (!orderIdToPay || amountToPay === null) return;
+    // Determine which order to pay: SERVED order (payingOrderId) or cart order
+    // (currentOrderId). Returns null (and we bail) when nothing is chargeable.
+    const target = resolvePaymentTarget({
+      payingOrderId,
+      payingOrderAmount,
+      currentOrderId,
+      currentOrderAmount,
+    });
+    if (!target) return;
+    const orderIdToPay = target.orderId;
+    const amountToPay = target.amount;
 
     createPayment(
       {
@@ -701,42 +429,15 @@ const POSPage = () => {
           // Failures are toasted with a one-tap Reprint action — the
           // snapshot is persisted on the backend so a manual reprint
           // never re-derives content (it matches the original
-          // byte-for-byte even if the order is edited later).
-          if (isTauri()) {
-            const printerId = useUiStore.getState().defaultReceiptPrinterId;
-            if (printerId && payment.receiptSnapshot) {
-              const snapshot = payment.receiptSnapshot;
-              HardwareService.printReceipt(printerId, snapshot)
-                .catch((err) => {
-                  console.error('Receipt print failed:', err);
-                  toast.error(
-                    t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded.'),
-                    {
-                      action: {
-                        label: t('pos.reprint.label', 'Reprint Receipt'),
-                        onClick: () => {
-                          HardwareService.printReceipt(printerId, snapshot).catch(
-                            (e) => {
-                              console.error('Reprint failed:', e);
-                              toast.error(
-                                t('pos.reprint.failed', 'Reprint failed — check printer connection'),
-                              );
-                            },
-                          );
-                        },
-                      },
-                      duration: 10_000,
-                    },
-                  );
-                });
-            }
-            // Pop the cash drawer for cash payments.
-            if (printerId && data.method === 'CASH') {
-              HardwareService.openCashDrawer(printerId).catch((err) => {
-                console.error('Cash drawer open failed:', err);
-              });
-            }
-          }
+          // byte-for-byte even if the order is edited later). Side-effect
+          // logic lives in posReceipt.runReceiptSideEffects (unit-tested).
+          runReceiptSideEffects(payment, data.method, {
+            isTauri,
+            getPrinterId: () => useUiStore.getState().defaultReceiptPrinterId,
+            hardware: HardwareService,
+            toast,
+            t,
+          });
 
           // Refetch orders to update the list
           // Re-fetch fresh table orders BEFORE deciding whether to free
@@ -750,22 +451,16 @@ const POSPage = () => {
           const freshOrders = refreshed.data ?? tableOrders ?? [];
 
           // Check if this was an existing order payment (from AwaitingPayment section)
-          const wasExistingOrderPayment = !!payingOrderId;
+          const wasExistingOrderPayment = target.wasExistingOrderPayment;
 
           // Reset payment state
           setIsPaymentModalOpen(false);
           setPayingOrderId(null);
           setPayingOrderAmount(null);
 
-          // Always check for remaining unpaid orders before marking table as available
-          const remainingOrders = freshOrders.filter(
-            (order) =>
-              order.id !== orderIdToPay &&
-              order.status !== OrderStatus.PAID &&
-              order.status !== OrderStatus.CANCELLED
-          );
-
-          const hasRemainingOrders = remainingOrders.length > 0;
+          // Always check for remaining unpaid orders before marking table as
+          // available (the documented stale-snapshot race guard).
+          const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders, orderIdToPay);
 
           if (wasExistingOrderPayment) {
             // For existing order payments (READY/SERVED), only mark available if no remaining orders
@@ -864,15 +559,10 @@ const POSPage = () => {
     });
   };
 
-  // Calculate totals (including modifier prices)
-  const subtotal = cartItems.reduce((sum, item) => {
-    const itemPrice = Number(item.price);
-    const modifiersTotal = (item.modifiers || []).reduce(
-      (modSum, mod) => modSum + (mod.priceAdjustment * mod.quantity),
-      0
-    );
-    return sum + (itemPrice + modifiersTotal) * item.quantity;
-  }, 0);
+  // Calculate totals (including modifier prices). Money math lives in
+  // posCart.ts so it shares a single tested arithmetic surface with
+  // cartStore.calculateItemTotal and can never drift.
+  const subtotal = calculateSubtotal(cartItems);
   const total = subtotal - discount;
   const hasCartItems = cartItems.length > 0;
 

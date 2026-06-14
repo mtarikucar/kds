@@ -2,13 +2,20 @@ import { Module } from "@nestjs/common";
 import { ZReportsController } from "./z-reports.controller";
 import { ZReportsService } from "./z-reports.service";
 import { ZReportSchedulerService } from "./services/z-report-scheduler.service";
+import { ZReportPdfService } from "./services/z-report-pdf.service";
+import { ZReportAggregator } from "./services/z-report-aggregator.service";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { CommonModule } from "../../common/common.module";
 
 @Module({
   imports: [PrismaModule, CommonModule],
   controllers: [ZReportsController],
-  providers: [ZReportsService, ZReportSchedulerService],
+  providers: [
+    ZReportsService,
+    ZReportSchedulerService,
+    ZReportPdfService,
+    ZReportAggregator,
+  ],
   exports: [ZReportsService],
 })
 export class ZReportsModule {}

@@ -12,6 +12,9 @@ import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { initSentry } from "./sentry.config";
 import { validateEnv } from "./common/helpers/env-validation";
 import { RedisIoAdapter } from "./common/adapters/redis-io.adapter";
+import { createUploadsAclMiddleware } from "./common/middleware/uploads-acl.middleware";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const expressStatic = require("express").static;
 
 // Fail-fast env validation BEFORE Sentry / Nest touches anything. Missing
 // secrets previously surfaced as a first-request 500; now abort startup.
@@ -23,6 +26,9 @@ initSentry();
 process.on("unhandledRejection", (reason: any) => {
   console.error("Unhandled Rejection:", reason);
   try {
+    // Lazy require: the handler must work even if module init partially
+    // failed, which a top-level import cannot guarantee.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Sentry = require("@sentry/node");
     Sentry.captureException(
       reason instanceof Error ? reason : new Error(String(reason)),
@@ -33,6 +39,7 @@ process.on("unhandledRejection", (reason: any) => {
 process.on("uncaughtException", (error: Error) => {
   console.error("Uncaught Exception:", error);
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Sentry = require("@sentry/node");
     Sentry.captureException(error);
   } catch {}
@@ -111,9 +118,25 @@ async function bootstrap() {
   // resolution to the canonical app root in both dev and prod. Same
   // pattern as EmailService + iter-23 SubscriptionNotificationService +
   // iter-24 ContactMailerService.
-  app.useStaticAssets(join(process.cwd(), "uploads"), {
-    prefix: "/uploads/",
-  });
+  //
+  // SECURITY: the previous `app.useStaticAssets(... { prefix: '/uploads/' })`
+  // was a blanket file server with NO authorization — any guessable path
+  // streamed raw bytes of ANY tenant's file, and any future private category
+  // would silently inherit that world-readable behavior. We replace it with
+  // an ALLOWLIST gate that serves ONLY the public-by-design QR-menu asset
+  // categories (`products/`, `logos/`) unauthenticated and 404s everything
+  // else (other categories, path traversal, dotfiles). The actual file serve
+  // is still delegated to express.static so Content-Type / ETag / range /
+  // streaming behavior is byte-for-byte what the blanket mount produced.
+  // See common/middleware/uploads-acl.middleware.ts for the threat model and
+  // the place to register future private (tenant-scoped) categories.
+  const uploadsRoot = join(process.cwd(), "uploads");
+  app.use(
+    "/uploads",
+    createUploadsAclMiddleware({
+      staticHandler: expressStatic(uploadsRoot),
+    }),
+  );
 
   app.setGlobalPrefix("api");
 

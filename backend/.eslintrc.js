@@ -1,7 +1,7 @@
 module.exports = {
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    project: 'tsconfig.json',
+    project: 'tsconfig.eslint.json',
     tsconfigRootDir: __dirname,
     sourceType: 'module',
   },
@@ -15,7 +15,18 @@ module.exports = {
     node: true,
     jest: true,
   },
-  ignorePatterns: ['.eslintrc.js'],
+  // Spec/test files are excluded for now — they were never effectively
+  // linted (the previous parserOptions.project setup made every spec file
+  // a parsing error, and lint never ran in CI), so ~6.4k autofixable
+  // formatting violations accumulated in them. Lifting this exclusion is
+  // a standalone formatting PR; tracked in docs/architecture/QUALITY_AUDIT.md.
+  // Production code is fully linted and gated in CI (quality-gates.yml).
+  ignorePatterns: [
+    '.eslintrc.js',
+    '**/*.spec.ts',
+    'test/**',
+    'src/common/test/**',
+  ],
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',

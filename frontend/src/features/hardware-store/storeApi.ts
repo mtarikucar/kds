@@ -32,7 +32,46 @@ export interface HardwareProduct {
   // v2.8.87 — public view exposes this scalar so cards can show
   // "Son N adet" low-stock badge without leaking allocated/serials.
   available?: number;
+  // Regulatory sale tier (TR law). Drives the storefront CTA. The server is
+  // authoritative: the checkout guard blocks any non-DIRECT_SALE SKU.
+  // Treat undefined as 'DIRECT_SALE' for back-compat.
+  //   DIRECT_SALE      — normal buy (+ compliance docs shown)
+  //   QUOTE_ONLY       — yazarkasa / YN ÖKC → "Teklif Al"
+  //   PARTNER_REDIRECT — bank POS → redirect to a licensed bank/PSP
+  //   RECOMMENDED_ONLY — uncertified scale etc. → recommended only, no CTA
+  saleMode?: 'DIRECT_SALE' | 'QUOTE_ONLY' | 'PARTNER_REDIRECT' | 'RECOMMENDED_ONLY';
+  // Tier 2 redirect target: { partnerName, partnerUrl, disclaimer? }
+  partnerRedirect?: { partnerName?: string; partnerUrl?: string; disclaimer?: string } | null;
+  // Tier 3 seller-responsibility docs (warranty, distributor, CE, manual, etc.)
+  complianceDocs?: Record<string, string | boolean> | null;
 }
+
+export type SaleMode = NonNullable<HardwareProduct['saleMode']>;
+
+/**
+ * Single money formatter for the storefront — one decimals policy (cents
+ * visible) so the store card and the product detail page can't disagree on
+ * how the same SKU's price renders. currency is non-optional in the product
+ * contract, so no 'TRY' fallback is needed.
+ */
+export function formatMoney(cents: number, currency: string, opts?: Intl.NumberFormatOptions): string {
+  return (cents / 100).toLocaleString('tr-TR', { style: 'currency', currency, ...opts });
+}
+
+/**
+ * Regulatory tier disclaimer copy (TR law). Shared by the store card and the
+ * product detail page so the legally-meaningful wording stays identical across
+ * both surfaces (no copy drift). null = no disclaimer for that tier.
+ */
+export const SALE_MODE_DISCLAIMER_TR: Record<SaleMode, string | null> = {
+  DIRECT_SALE: null,
+  QUOTE_ONLY:
+    'Bu ürün doğrudan satışa kapalıdır; yetkili bayi/servis üzerinden teklif ve kurulum süreci başlatılır.',
+  PARTNER_REDIRECT:
+    'POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu tarafından sağlanır.',
+  RECOMMENDED_ONLY:
+    'Bu ekipman yalnızca önerilen ekipman olarak listelenmiştir; doğrudan satışı yapılmamaktadır.',
+};
 
 export interface CartItem {
   type: 'plan' | 'addon' | 'hardware' | 'service';
@@ -83,6 +122,24 @@ export const useListProducts = (category?: string) =>
     },
   });
 
+export interface CatalogCategory {
+  value: string;
+  labelTr: string;
+}
+
+// Single source of truth for the category vocabulary — served by the backend
+// (GET /v1/catalog/categories) so the storefront filter doesn't keep its own
+// hand-synced copy that can drift from the @IsIn gate / seed.
+export const useCategories = () =>
+  useQuery({
+    queryKey: ['hardware-store', 'categories'] as const,
+    queryFn: async (): Promise<CatalogCategory[]> => {
+      const r = await api.get('/v1/catalog/categories');
+      return r.data;
+    },
+    staleTime: 60 * 60 * 1000, // vocabulary changes rarely
+  });
+
 // v2.8.87 — single-product fetch for /admin/store/:sku detail page.
 export const useGetProductBySku = (sku: string | undefined) =>
   useQuery({
@@ -93,6 +150,32 @@ export const useGetProductBySku = (sku: string | undefined) =>
     },
     enabled: Boolean(sku),
   });
+
+// "Teklif Al" for a QUOTE_ONLY device (yazarkasa / YN ÖKC). These can't be
+// bought directly — the request lands in the marketing lead board so a rep
+// runs the authorized-dealer/service + GİB offer/installation process.
+export interface HardwareQuoteRequest {
+  sku: string;
+  qty?: number;
+  contactPerson: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
+export const useRequestQuote = () => {
+  return useMutation({
+    mutationFn: async (body: HardwareQuoteRequest) => {
+      // Server emits a marketing outbox event (lead created async by the
+      // marketing consumer), so the response is just an ack — no synchronous
+      // leadId. The form only needs success/failure.
+      const r = await api.post('/v1/catalog/quote-request', body);
+      return r.data as { ok: boolean };
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message ?? 'Teklif talebi gönderilemedi'),
+  });
+};
 
 export const useQuoteCart = () => {
   return useMutation({
@@ -111,7 +194,21 @@ export const useConfirmCheckout = () => {
       return r.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries(); // entitlements + addons + devices may all change
+      // v3.0.1 round-4 audit fix — targeted invalidation. Pre-fix this
+      // called `qc.invalidateQueries()` with no key, which nuked the
+      // entire query cache: every POS/KDS/orders/menu list refetched
+      // immediately on the same tick. With a heavily-loaded admin
+      // session this was the largest single jank source after a
+      // hardware purchase. Hit only the surfaces the confirm flow
+      // actually changes: subscriptions (entitlements + add-ons),
+      // devices (a new device slot or activation may have been
+      // provisioned), hardware orders (the new row), and marketplace
+      // listings (capacity counters).
+      qc.invalidateQueries({ queryKey: ['subscriptions'] });
+      qc.invalidateQueries({ queryKey: ['entitlements'] });
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      qc.invalidateQueries({ queryKey: ['hardware-orders'] });
+      qc.invalidateQueries({ queryKey: ['marketplace'] });
       toast.success('Order placed.');
     },
     onError: (e: any) => toast.error(e.response?.data?.message ?? 'Checkout failed'),

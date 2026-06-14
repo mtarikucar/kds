@@ -13,27 +13,51 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+import { MaxJsonBytes } from "../../../common/dto/max-json-bytes.validator";
+import { CATEGORY_VALUES } from "../category-vocabulary";
 
-// Categories the seed + frontend storefront actually use, plus a few
-// generic buckets. Kept in sync with frontend/src/features/hardware-store/
-// StorePage.tsx and backend/prisma/seeds/seed-marketplace.ts. Adding a
-// category requires touching all three.
-const CATEGORIES = [
-  "yazarkasa", // YN ÖKC (GİB-certified)
-  "pos_terminal", // generic POS terminal (non-fiscal)
-  "printer", // thermal receipt + kitchen printers
-  "kds_screen", // kitchen display screen
-  "tablet", // garson / customer-facing tablet
-  "scanner", // barcode scanner
-  "caller_id", // arayan numara modülü
-  "cash_drawer", // para çekmecesi
-  "bridge", // network bridge (HummyBox)
-  "scale", // tartı
-  "cable",
-  "accessory",
-  "service", // installation / setup services
-] as const;
+// Cap on every free-form JSON column: generous for legit metadata, but stops
+// a multi-MB blob being persisted and then serialized on every public
+// storefront load (toPublicView). Mirrors the description/images caps.
+const JSON_FIELD_MAX_BYTES = 16_384;
+
+// Allowed category values for the @IsIn gate — derived from the single
+// category vocabulary (value + TR label + order) in ../category-vocabulary,
+// which the storefront also fetches via GET /v1/catalog/categories. Adding a
+// category is now a one-place change.
+const CATEGORIES = CATEGORY_VALUES;
 const STATUSES = ["draft", "published", "archived"] as const;
+
+// Regulatory sale tiers (TR law). Kept as plain string literals to mirror the
+// CATEGORIES/STATUSES style; the canonical type is Prisma's HardwareSaleMode.
+export const SALE_MODES = [
+  "DIRECT_SALE", // Tier 3 — normal sale, seller-responsibility docs apply
+  "QUOTE_ONLY", // Tier 1 — yazarkasa / YN ÖKC; teklif/kurulum via dealer + GİB
+  "PARTNER_REDIRECT", // Tier 2 — bank POS; redirect to a licensed bank/PSP
+  "RECOMMENDED_ONLY", // Tier 4 — uncertified scale etc.; recommended only
+] as const;
+export type SaleMode = (typeof SALE_MODES)[number];
+
+// Default regulatory tier per category. Applied by CatalogService when an
+// admin omits saleMode, and by backend/prisma/seeds/seed-marketplace.ts.
+// Per-product override is always allowed — saleMode is a real column, so this
+// map is only the default, not a hard constraint. Single source of truth: the
+// storefront reads saleMode off the product payload (no duplicate FE copy).
+export const CATEGORY_DEFAULT_SALE_MODE: Record<string, SaleMode> = {
+  yazarkasa: "QUOTE_ONLY", // Tier 1 — fiscal
+  pos_terminal: "PARTNER_REDIRECT", // Tier 2 — bank/payment terminal
+  printer: "DIRECT_SALE",
+  kds_screen: "DIRECT_SALE",
+  tablet: "DIRECT_SALE",
+  scanner: "DIRECT_SALE",
+  caller_id: "DIRECT_SALE",
+  cash_drawer: "DIRECT_SALE",
+  bridge: "DIRECT_SALE",
+  scale: "RECOMMENDED_ONLY", // Tier 4 — safe default; admin overrides to DIRECT_SALE only with docs
+  cable: "DIRECT_SALE",
+  accessory: "DIRECT_SALE",
+  service: "DIRECT_SALE", // fiscal-install services overridden per-row to QUOTE_ONLY
+};
 
 export class CreateHardwareProductDto {
   @ApiProperty({
@@ -90,6 +114,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   specs?: Record<string, unknown>;
 
   @ApiProperty({
@@ -99,6 +124,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   compat?: Record<string, unknown>;
 
   // v2.8.87 — structured rich detail used by the product/service detail
@@ -122,6 +148,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   details?: Record<string, unknown>;
 
   // v2.8.87 — service-only metadata. Shape:
@@ -141,6 +168,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   serviceMeta?: Record<string, unknown>;
 
   @ApiProperty({
@@ -215,6 +243,7 @@ export class CreateHardwareProductDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
   shippingProfile?: Record<string, unknown>;
 
   @ApiProperty({ required: false, enum: STATUSES, default: "draft" })
@@ -222,4 +251,44 @@ export class CreateHardwareProductDto {
   @IsString()
   @IsIn(STATUSES as unknown as string[])
   status?: string;
+
+  // Regulatory tier. When omitted, CatalogService defaults it from
+  // CATEGORY_DEFAULT_SALE_MODE[category]. The checkout guard
+  // (QuoteService.quote) blocks any non-DIRECT_SALE SKU from a cart.
+  @ApiProperty({
+    required: false,
+    enum: SALE_MODES,
+    description: "Regulatory sale tier — defaults from category when omitted",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(SALE_MODES as unknown as string[])
+  saleMode?: string;
+
+  // Tier 2 (PARTNER_REDIRECT) target. Shape:
+  //   { partnerName: string, partnerUrl: string, disclaimer?: string }
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      "Bank/PSP redirect target for PARTNER_REDIRECT products (partnerName, partnerUrl, disclaimer)",
+  })
+  @IsOptional()
+  @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
+  partnerRedirect?: Record<string, unknown>;
+
+  // Tier 3 (DIRECT_SALE) seller-responsibility compliance docs. Shape:
+  //   { invoiceIssued?, warrantyCertUrl?, distributorName?, ceConformityUrl?,
+  //     turkishManualUrl?, serviceInfo?, returnTermsUrl? }
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      "Seller-responsibility compliance docs (warranty, distributor, CE, manual, service, return terms)",
+  })
+  @IsOptional()
+  @IsObject()
+  @MaxJsonBytes(JSON_FIELD_MAX_BYTES)
+  complianceDocs?: Record<string, unknown>;
 }

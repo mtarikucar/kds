@@ -47,8 +47,10 @@ describe('SubscriptionService.getEffectiveFeatures (v2.8.88)', () => {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
       maxUsers: 15,
       maxTables: 50,
+      maxBranches: 3,
       maxProducts: 500,
       maxCategories: 50,
       maxMonthlyOrders: 5000,
@@ -139,9 +141,9 @@ describe('SubscriptionService.getEffectiveFeatures (v2.8.88)', () => {
 
     const result = await svc.getEffectiveFeatures(tenantId);
 
-    // Engine path returns `limits` as a Record<string, number>; cast
-    // for the dynamic key. (The fallback path's narrower typed shape
-    // doesn't include maxBranches because no plan column tracks it.)
+    // Engine path returns `limits` as a Record<string, number>; cast for
+    // the dynamic key. (Since v3.0.7 the fallback path carries maxBranches
+    // too — pinned by the engine-empty test below.)
     expect((result.limits as Record<string, number>).maxBranches).toBe(4);
     expect(result.features.multiLocation).toBe(true);
   });
@@ -169,6 +171,13 @@ describe('SubscriptionService.getEffectiveFeatures (v2.8.88)', () => {
     expect(result.features.advancedReports).toBe(false);
     expect(result.limits.maxUsers).toBe(15);
     expect(result.integrations).toEqual({});
+    // v3.0.7 regression — posAccess + maxBranches must survive the engine-empty
+    // fallback. They were omitted from the fallback's hardcoded lists (added to
+    // the projector in v3.0.0 but not mirrored here), so a fresh BUSINESS tenant
+    // whose projector hadn't run resolved posAccess=undefined → the POS UI and
+    // sidebar item were hidden. Pins the fallback to the projector's columns.
+    expect(result.features.posAccess).toBe(true);
+    expect((result.limits as Record<string, number>).maxBranches).toBe(3);
   });
 
   it('throws NotFound when tenant has no plan (preserved from legacy behavior)', async () => {

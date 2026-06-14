@@ -65,8 +65,19 @@
     "store": "متجر المعدات",
     "bridges": "الجسور المحلية",
     "webhooks": "ويب هوكس",
+    "desktopApp": "تطبيق سطح المكتب",
     "fiscalRecovery": "استرداد الإيصالات",
     "callerFeed": "سجل المكالمات",
+    "hardwareOrders": "طلبات المعدات الخاصة بي",
+    "planAndAccess": "الخطة والوصول",
+    "sections": {
+      "business": "العمليات",
+      "menuAndTables": "القائمة والطاولات",
+      "operation": "المكتب الخلفي",
+      "multiBranch": "متعدد الفروع",
+      "marketplace": "متجر الإضافات",
+      "planAndAccess": "الإعدادات والوصول"
+    },
     "expandSidebar": "توسيع الشريط الجانبي",
     "collapseSidebar": "طي الشريط الجانبي"
   },
@@ -153,6 +164,140 @@
       "status": "الحالة",
       "created": "تاريخ الإنشاء",
       "add": "إضافة فرع"
+    },
+    "webhooks": {
+      "title": "ويب هوكس",
+      "subtitle": "اشترك في نقطة نهاية HTTPS لاستقبال أحداث HummyTummy. عمليات التسليم موقّعة بـ HMAC-SHA256 مع طابع زمني. يتم الإيقاف المؤقت تلقائياً بعد 20 فشلاً متتالياً.",
+      "newSubscription": "اشتراك جديد",
+      "urlPlaceholder": "https://your-server.example.com/hummytummy-webhook",
+      "events": "الأحداث",
+      "create": "إنشاء اشتراك",
+      "yours": "اشتراكاتك",
+      "noSubscriptions": "لا توجد اشتراكات.",
+      "col": { "url": "الرابط", "events": "الأحداث", "status": "الحالة", "lastDelivery": "آخر تسليم" },
+      "revoke": "إلغاء",
+      "createdBanner": "تم إنشاء الاشتراك.",
+      "secretWarning": "أدناه مفتاح التوقيع السري. انسخه الآن — لا يمكننا عرضه مرة أخرى.",
+      "copiedIt": "لقد نسخته",
+      "failures": "فشل"
+    },
+    "bridges": {
+      "title": "الجسور المحلية",
+      "newBridge": "جسر جديد",
+      "provision": "تجهيز",
+      "branch": "الفرع",
+      "selectBranch": "— اختر —",
+      "sku": "رمز المنتج",
+      "hostname": "اسم المضيف (اختياري)",
+      "createdBanner": "تم تجهيز الجسر.",
+      "tokenWarning": "الرمز (يُستخدم مرة واحدة) — انسخه الآن وأعدّ الجهاز:",
+      "list": "الجسور",
+      "noBridges": "لم يتم تجهيز أي جسور بعد.",
+      "col": { "branch": "الفرع", "sku": "رمز المنتج", "hostname": "اسم المضيف", "status": "الحالة", "lastSeen": "آخر اتصال" },
+      "confirmRetire": "هل تريد إيقاف هذا الجسر؟",
+      "retire": "إيقاف"
+    },
+    "fiscalRecovery": {
+      "title": "استرداد الإيصالات",
+      "subtitle": "الإيصالات المعلّقة والفاشلة. تستخدم إعادة المحاولة مفتاح المعاملة الأصلي، لذا لا يمكن للجهاز إصدار إيصال مكرر.",
+      "refresh": "تحديث",
+      "empty": "لا توجد إيصالات معلّقة أو فاشلة. 🎉",
+      "col": {
+        "created": "تاريخ الإنشاء",
+        "provider": "المزوّد",
+        "order": "الطلب",
+        "status": "الحالة",
+        "total": "الإجمالي",
+        "lastError": "آخر خطأ"
+      },
+      "retry": "إعادة المحاولة"
+    },
+    "callerFeed": {
+      "title": "سجل المكالمات",
+      "subtitle": "أحداث هوية المتصل الواردة. يتم التحديث كل 10 ثوانٍ.",
+      "empty": "لا توجد أحداث مكالمات بعد. أقرن جهاز هوية المتصل أو فعّل تكامل VoIP من متجر الإضافات.",
+      "col": {
+        "time": "الوقت",
+        "provider": "المزوّد",
+        "kind": "النوع",
+        "phone": "الهاتف",
+        "customer": "العميل",
+        "duration": "المدة",
+        "order": "الطلب"
+      },
+      "view": "عرض",
+      "unmatched": "غير مطابق",
+      "open": "فتح"
+    },
+    "setupChecklist": {
+      "title": "إعداد مطعمك",
+      "items": {
+        "branch": "أنشئ فرعاً واحداً على الأقل",
+        "kds": "أقرن شاشة عرض المطبخ",
+        "tablet": "أقرن جهاز نادل لوحي واحد على الأقل",
+        "bridge": "شغّل جسراً محلياً (HummyBox)",
+        "fiscal": "اربط مزوّد إيصالات ضريبية"
+      },
+      "goTo": "اذهب إلى {{label}} ←"
+    },
+    "reportsBranchFilter": {
+      "label": "الفرع",
+      "all": "كل الفروع"
+    },
+    "superAdminMarketplace": {
+      "title": "إدارة متجر الإضافات",
+      "tabs": { "addons": "الإضافات", "products": "المعدات" },
+      "addons": {
+        "title": "كتالوج الإضافات",
+        "new": "إضافة جديدة",
+        "edit": "تعديل",
+        "publish": "نشر",
+        "archive": "أرشفة",
+        "confirmArchive": "أرشفة الإضافة \"{{code}}\"؟",
+        "form": {
+          "newTitle": "إضافة جديدة",
+          "editTitle": "تعديل الإضافة",
+          "code": "الرمز",
+          "name": "الاسم",
+          "kind": "النوع",
+          "billing": "الفوترة",
+          "priceCents": "السعر (سنت)",
+          "currency": "العملة",
+          "status": "الحالة",
+          "deps": "التبعيات (مفصولة بفواصل؛ plan:PRO أو رمز الإضافة)",
+          "description": "الوصف",
+          "grants": "المنح (JSON)",
+          "cancel": "إلغاء",
+          "create": "إنشاء",
+          "save": "حفظ",
+          "grantsInvalid": "يجب أن تكون المنح بصيغة JSON صالحة"
+        }
+      },
+      "products": {
+        "title": "كتالوج المعدات",
+        "new": "رمز منتج جديد",
+        "receiveStock": "استلام مخزون",
+        "receiveStockPrompt": "كم عدد الوحدات المستلمة؟",
+        "publish": "نشر",
+        "archive": "أرشفة",
+        "confirmArchive": "أرشفة رمز المنتج \"{{sku}}\"؟",
+        "form": {
+          "title": "رمز منتج جديد للمعدات",
+          "sku": "رمز المنتج",
+          "name": "الاسم",
+          "category": "الفئة",
+          "brand": "العلامة التجارية",
+          "model": "الطراز",
+          "priceCents": "السعر (سنت)",
+          "rental": "الإيجار / شهر (سنت، اختياري)",
+          "currency": "العملة",
+          "warranty": "الضمان (أشهر)",
+          "status": "الحالة",
+          "description": "الوصف",
+          "cancel": "إلغاء",
+          "create": "إنشاء"
+        }
+      }
     }
   },
   "header": {

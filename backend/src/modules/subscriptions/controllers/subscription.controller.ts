@@ -14,6 +14,7 @@ import { SubscriptionService } from "../services/subscription.service";
 import { BillingService } from "../services/billing.service";
 import { UsageService } from "../services/usage.service";
 import { Public } from "../../auth/decorators/public.decorator";
+import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
@@ -29,6 +30,12 @@ import { CancelSubscriptionDto } from "../dto/cancel-subscription.dto";
  */
 @ApiTags("subscriptions")
 @ApiBearerAuth()
+// Subscriptions are tenant-level (one per tenant, not per branch). Exempt the
+// whole controller from the global BranchGuard so the plan/billing pages load
+// before a branch is selected (e.g. right after login, or for a tenant whose
+// branches were wiped). Without this the dashboard's /subscriptions/* calls
+// 400 with "X-Branch-Id header required". Same fix-class as entitlements/me.
+@SkipBranchScope()
 @Controller("subscriptions")
 export class SubscriptionController {
   constructor(
@@ -85,13 +92,17 @@ export class SubscriptionController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async createSubscription(@Request() req, @Body() dto: CreateSubscriptionDto) {
-    return this.subscriptionService.createSubscription(req.user.tenantId, dto);
+    return this.subscriptionService.createSubscription(
+      req.user.tenantId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Patch(":id")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async updateSubscription(
     @Param("id") id: string,
     @Body() dto: UpdateSubscriptionDto,
@@ -105,13 +116,18 @@ export class SubscriptionController {
   }
 
   @Post(":id/change-plan")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async changePlan(
     @Param("id") id: string,
     @Body() dto: ChangePlanDto,
     @Request() req,
   ) {
-    return this.subscriptionService.changePlan(id, req.user.tenantId, dto);
+    return this.subscriptionService.changePlan(
+      id,
+      req.user.tenantId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Get(":id/scheduled-downgrade")
@@ -124,7 +140,7 @@ export class SubscriptionController {
   }
 
   @Delete(":id/scheduled-downgrade")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async cancelScheduledDowngrade(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.cancelScheduledDowngrade(
       id,
@@ -133,7 +149,7 @@ export class SubscriptionController {
   }
 
   @Post(":id/cancel")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async cancelSubscription(
     @Param("id") id: string,
     @Body() body: CancelSubscriptionDto,
@@ -144,11 +160,12 @@ export class SubscriptionController {
       req.user.tenantId,
       body.immediate || false,
       body.reason,
+      req.user.id,
     );
   }
 
   @Post(":id/reactivate")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async reactivateSubscription(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.reactivateSubscription(
       id,

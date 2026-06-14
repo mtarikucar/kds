@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  Optional,
   NotFoundException,
   BadRequestException,
   ConflictException,
@@ -8,6 +9,8 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { MetricsService } from "../../../common/metrics/metrics.service";
+import { captureException } from "../../../sentry.config";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { NotificationType } from "../../notifications/dto/create-notification.dto";
 import { CreateReservationDto } from "../dto/create-reservation.dto";
@@ -16,6 +19,10 @@ import { ReservationQueryDto } from "../dto/reservation-query.dto";
 import { ReservationSettingsService } from "./reservation-settings.service";
 import { ReservationStatus } from "../constants/reservation-status.enum";
 import { ReservationNotificationService } from "./reservation-notification.service";
+import {
+  ReservationAvailabilityService,
+  timeToMinutes,
+} from "./reservation-availability.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
@@ -30,7 +37,44 @@ export class ReservationsService {
     // Email-first / SMS-fallback abstraction. Still calls into the
     // SMS service under the hood when phone is the live channel.
     private reservationNotificationService: ReservationNotificationService,
+    // Public-availability reads + shared public branch resolver, extracted
+    // into their own service (god-file split). createPublicReservation here
+    // still calls resolvePublicBranchId through it.
+    private availability: ReservationAvailabilityService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
+
+  private countReservation(status: string): void {
+    this.metrics?.incCounter(
+      "reservations_total",
+      "Reservations by lifecycle event (created|confirmed)",
+      { status },
+    );
+  }
+
+  /**
+   * Fire-and-forget customer notify, but with the failure surfaced to Sentry
+   * (correlation id auto-attached) instead of silently lost — the audit
+   * flagged these unawaited notify() calls as dropping send failures.
+   */
+  private notifyCustomer(
+    tenantId: string,
+    event: "created" | "confirmed",
+    payload: Parameters<ReservationNotificationService["notify"]>[2],
+  ): void {
+    this.countReservation(event);
+    void this.reservationNotificationService
+      .notify(tenantId, event, payload)
+      .catch((e) =>
+        captureException(e as Error, {
+          module: "reservations",
+          op: "notifyCustomer",
+          event,
+          tenantId,
+        }),
+      );
+  }
 
   private async validateTenant(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
@@ -185,19 +229,22 @@ export class ReservationsService {
 
     // Walk-in / no-table reservations still need a branchId (v3.0.0 strict
     // schema). This endpoint is @Public(), so there's no @CurrentScope —
-    // fall back to the tenant's first branch (the "Main" branch created
-    // at tenant bootstrap). Multi-branch tenants that want a specific
-    // branch should pass tableId.
+    // resolvePublicBranchId() honors an explicit branchId on the DTO when
+    // present (validated against THIS tenant + active) and otherwise falls
+    // back to the tenant's oldest ACTIVE branch (the "Main" branch created
+    // at tenant bootstrap). This is the SAME resolver the public
+    // availability reads use, so what the guest saw as available matches
+    // the branch the booking lands on.
+    //
+    // v3.0.1 audit follow-up (now resolved): a walk-in / no-table booking
+    // honors an explicit dto.branchId (multi-branch picker), falling back to
+    // the oldest-active branch only when none is supplied. The DTO now
+    // declares branchId so the whitelisting ValidationPipe keeps it.
     if (!resolvedBranchId) {
-      const defaultBranch = await this.prisma.branch.findFirst({
-        where: { tenantId },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      });
-      if (!defaultBranch) {
-        throw new BadRequestException("No branch configured for this tenant");
-      }
-      resolvedBranchId = defaultBranch.id;
+      resolvedBranchId = await this.availability.resolvePublicBranchId(
+        tenantId,
+        dto.branchId,
+      );
     }
 
     const status = settings.requireApproval
@@ -235,12 +282,12 @@ export class ReservationsService {
                 },
               });
 
-              const requestStart = this.timeToMinutes(dto.startTime);
-              const requestEnd = this.timeToMinutes(dto.endTime);
+              const requestStart = timeToMinutes(dto.startTime);
+              const requestEnd = timeToMinutes(dto.endTime);
 
               for (const res of existingTableReservations) {
-                const resStart = this.timeToMinutes(res.startTime);
-                const resEnd = this.timeToMinutes(res.endTime);
+                const resStart = timeToMinutes(res.startTime);
+                const resEnd = timeToMinutes(res.endTime);
                 if (requestStart < resEnd && requestEnd > resStart) {
                   throw new BadRequestException(
                     "This table is already reserved for the selected time period",
@@ -378,7 +425,7 @@ export class ReservationsService {
     // Notify customer. Channel chosen at call time: email if the
     // customer left one and the emailOnReservationCreated toggle is on;
     // SMS otherwise (or as fallback when email send fails).
-    this.reservationNotificationService.notify(tenantId, "created", {
+    this.notifyCustomer(tenantId, "created", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,
@@ -533,12 +580,12 @@ export class ReservationsService {
         },
       });
 
-      const requestStart = this.timeToMinutes(effectiveStartTime);
-      const requestEnd = this.timeToMinutes(effectiveEndTime);
+      const requestStart = timeToMinutes(effectiveStartTime);
+      const requestEnd = timeToMinutes(effectiveEndTime);
 
       for (const res of existingTableReservations) {
-        const resStart = this.timeToMinutes(res.startTime);
-        const resEnd = this.timeToMinutes(res.endTime);
+        const resStart = timeToMinutes(res.startTime);
+        const resEnd = timeToMinutes(res.endTime);
         if (requestStart < resEnd && requestEnd > resStart) {
           throw new BadRequestException(
             "This table is already reserved for the selected time period",
@@ -592,7 +639,7 @@ export class ReservationsService {
       reservation.date instanceof Date
         ? reservation.date.toISOString().split("T")[0]
         : String(reservation.date);
-    this.reservationNotificationService.notify(scope.tenantId, "confirmed", {
+    this.notifyCustomer(scope.tenantId, "confirmed", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,
@@ -949,161 +996,6 @@ export class ReservationsService {
     });
   }
 
-  async getAvailableSlots(tenantId: string, date: string, guestCount?: number) {
-    await this.validateTenant(tenantId);
-
-    const settings = await this.settingsService.getOrCreate(tenantId);
-
-    if (!settings.isEnabled) {
-      return [];
-    }
-
-    const dayOfWeek = new Date(date)
-      .toLocaleDateString("en-US", { weekday: "long" })
-      .toLowerCase();
-    let openTime = "09:00";
-    let closeTime = "22:00";
-    let isClosed = false;
-
-    if (settings.operatingHours) {
-      const hours = settings.operatingHours as any;
-      if (hours[dayOfWeek]) {
-        if (hours[dayOfWeek].closed) {
-          isClosed = true;
-        } else {
-          openTime = hours[dayOfWeek].open || openTime;
-          closeTime = hours[dayOfWeek].close || closeTime;
-        }
-      }
-    }
-
-    if (isClosed) {
-      return [];
-    }
-
-    // Generate time slots
-    const slots: { time: string; available: boolean }[] = [];
-    const interval = settings.timeSlotInterval;
-    const [openH, openM] = openTime.split(":").map(Number);
-    const [closeH, closeM] = closeTime.split(":").map(Number);
-
-    let currentMinutes = openH * 60 + openM;
-    const closeMinutes = closeH * 60 + closeM;
-
-    // Get existing reservations for this date
-    const existingReservations = await this.prisma.reservation.findMany({
-      where: {
-        tenantId,
-        date: new Date(date),
-        status: {
-          in: [
-            ReservationStatus.PENDING,
-            ReservationStatus.CONFIRMED,
-            ReservationStatus.SEATED,
-          ],
-        },
-      },
-    });
-
-    while (currentMinutes + settings.defaultDuration <= closeMinutes) {
-      const h = Math.floor(currentMinutes / 60);
-      const m = currentMinutes % 60;
-      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-
-      let available = true;
-
-      // Check min advance booking
-      const now = new Date();
-      const slotDateTime = new Date(date);
-      slotDateTime.setHours(h, m, 0, 0);
-      if (
-        slotDateTime.getTime() - now.getTime() <
-        settings.minAdvanceBooking * 60 * 1000
-      ) {
-        available = false;
-      }
-
-      // Check max reservations per slot
-      if (available && settings.maxReservationsPerSlot) {
-        const slotReservations = existingReservations.filter(
-          (r) => r.startTime === timeStr,
-        );
-        if (slotReservations.length >= settings.maxReservationsPerSlot) {
-          available = false;
-        }
-      }
-
-      slots.push({ time: timeStr, available });
-      currentMinutes += interval;
-    }
-
-    return slots;
-  }
-
-  async getAvailableTables(
-    tenantId: string,
-    date: string,
-    startTime: string,
-    endTime: string,
-    guestCount?: number,
-  ) {
-    await this.validateTenant(tenantId);
-
-    // Get all tables for this tenant
-    const tables = await this.prisma.table.findMany({
-      where: { tenantId },
-      orderBy: [{ section: "asc" }, { number: "asc" }],
-    });
-
-    // Get reservations that overlap with the requested time
-    const existingReservations = await this.prisma.reservation.findMany({
-      where: {
-        tenantId,
-        date: new Date(date),
-        status: {
-          in: [
-            ReservationStatus.PENDING,
-            ReservationStatus.CONFIRMED,
-            ReservationStatus.SEATED,
-          ],
-        },
-        tableId: { not: null },
-      },
-    });
-
-    // Filter out tables that are already reserved during the requested time
-    const requestStart = this.timeToMinutes(startTime);
-    const requestEnd = this.timeToMinutes(endTime);
-
-    const availableTables = tables.filter((table) => {
-      // Check capacity
-      if (guestCount && table.capacity < guestCount) {
-        return false;
-      }
-
-      // Check for overlapping reservations
-      const tableReservations = existingReservations.filter(
-        (r) => r.tableId === table.id,
-      );
-      for (const res of tableReservations) {
-        const resStart = this.timeToMinutes(res.startTime);
-        const resEnd = this.timeToMinutes(res.endTime);
-        if (requestStart < resEnd && requestEnd > resStart) {
-          return false; // Overlap
-        }
-      }
-
-      return true;
-    });
-
-    return availableTables.map((t) => ({
-      id: t.id,
-      number: t.number,
-      capacity: t.capacity,
-      section: t.section,
-    }));
-  }
-
   async lookupReservation(
     tenantId: string,
     phone: string,
@@ -1125,10 +1017,5 @@ export class ReservationsService {
     }
 
     return reservation;
-  }
-
-  private timeToMinutes(time: string): number {
-    const [h, m] = time.split(":").map(Number);
-    return h * 60 + m;
   }
 }

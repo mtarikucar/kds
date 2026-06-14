@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HexColorPicker } from 'react-colorful';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
-import Input from '../ui/Input';
-import { Save, RotateCcw, Palette, Type, Layout, QrCode, Eye, Upload, Sparkles, ChevronDown, ChevronUp, UtensilsCrossed, Loader2 } from 'lucide-react';
+import { Save, RotateCcw, Palette, Type, Layout, QrCode, Eye, Sparkles, ChevronDown, ChevronUp, UtensilsCrossed } from 'lucide-react';
 import type { QrMenuSettings, UpdateQrSettingsDto } from '../../types';
 import QrCodeDisplay from './QrCodeDisplay';
 import api from '../../lib/api';
-
-// Max file size for logo upload (5MB)
-const MAX_LOGO_SIZE = 5 * 1024 * 1024;
+import { MAX_LOGO_SIZE, colorThemes, designTemplates } from './designEditor.constants';
+import TemplatesTab from './tabs/TemplatesTab';
+import ColorsTab from './tabs/ColorsTab';
+import TypographyTab from './tabs/TypographyTab';
+import LayoutTab from './tabs/LayoutTab';
+import QrTab from './tabs/QrTab';
 
 interface DesignEditorProps {
   settings: QrMenuSettings;
@@ -19,135 +20,6 @@ interface DesignEditorProps {
   isUpdating?: boolean;
   tenant?: { id: string; name: string };
 }
-
-const colorThemes = [
-  { id: 'modernBlue', name: 'Modern Blue', primary: '#3B82F6', secondary: '#1E40AF', background: '#F0F9FF' },
-  { id: 'elegantDark', name: 'Elegant Dark', primary: '#1F2937', secondary: '#111827', background: '#F9FAFB' },
-  { id: 'warmOrange', name: 'Warm Orange', primary: '#F97316', secondary: '#EA580C', background: '#FFF7ED' },
-  { id: 'freshGreen', name: 'Fresh Green', primary: '#10B981', secondary: '#059669', background: '#F0FDF4' },
-  { id: 'royalPurple', name: 'Royal Purple', primary: '#8B5CF6', secondary: '#7C3AED', background: '#FAF5FF' },
-  { id: 'classicRed', name: 'Classic Red', primary: '#EF4444', secondary: '#DC2626', background: '#FEF2F2' }
-];
-
-const designTemplates = [
-  {
-    id: 'fineDining',
-    name: 'Fine Dining',
-    description: 'Elegant and sophisticated design',
-    preview: '🍽️',
-    settings: {
-      primaryColor: '#1F2937',
-      secondaryColor: '#111827',
-      backgroundColor: '#F9FAFB',
-      fontFamily: 'Playfair Display',
-      layoutStyle: 'LIST',
-      showRestaurantInfo: true,
-      showPrices: true,
-      showDescription: true,
-      showImages: true,
-      itemsPerRow: 1
-    }
-  },
-  {
-    id: 'modernCafe',
-    name: 'Modern Cafe',
-    description: 'Clean and minimal design',
-    preview: '☕',
-    settings: {
-      primaryColor: '#3B82F6',
-      secondaryColor: '#1E40AF',
-      backgroundColor: '#F0F9FF',
-      fontFamily: 'Inter',
-      layoutStyle: 'GRID',
-      showRestaurantInfo: true,
-      showPrices: true,
-      showDescription: false,
-      showImages: true,
-      itemsPerRow: 2
-    }
-  },
-  {
-    id: 'fastFood',
-    name: 'Fast Food',
-    description: 'Vibrant and energetic design',
-    preview: '🍔',
-    settings: {
-      primaryColor: '#EF4444',
-      secondaryColor: '#DC2626',
-      backgroundColor: '#FEF2F2',
-      fontFamily: 'Montserrat',
-      layoutStyle: 'GRID',
-      showRestaurantInfo: true,
-      showPrices: true,
-      showDescription: false,
-      showImages: true,
-      itemsPerRow: 3
-    }
-  },
-  {
-    id: 'healthyFresh',
-    name: 'Healthy & Fresh',
-    description: 'Natural and organic feel',
-    preview: '🥗',
-    settings: {
-      primaryColor: '#10B981',
-      secondaryColor: '#059669',
-      backgroundColor: '#F0FDF4',
-      fontFamily: 'Open Sans',
-      layoutStyle: 'GRID',
-      showRestaurantInfo: true,
-      showPrices: true,
-      showDescription: true,
-      showImages: true,
-      itemsPerRow: 2
-    }
-  },
-  {
-    id: 'pizzaPlace',
-    name: 'Pizza Place',
-    description: 'Warm and inviting design',
-    preview: '🍕',
-    settings: {
-      primaryColor: '#F97316',
-      secondaryColor: '#EA580C',
-      backgroundColor: '#FFF7ED',
-      fontFamily: 'Roboto',
-      layoutStyle: 'GRID',
-      showRestaurantInfo: true,
-      showPrices: true,
-      showDescription: true,
-      showImages: true,
-      itemsPerRow: 2
-    }
-  },
-  {
-    id: 'minimalist',
-    name: 'Minimalist',
-    description: 'Simple black and white',
-    preview: '⚫',
-    settings: {
-      primaryColor: '#000000',
-      secondaryColor: '#374151',
-      backgroundColor: '#FFFFFF',
-      fontFamily: 'Inter',
-      layoutStyle: 'LIST',
-      showRestaurantInfo: false,
-      showPrices: true,
-      showDescription: false,
-      showImages: false,
-      itemsPerRow: 1
-    }
-  }
-];
-
-const fontOptions = [
-  { value: 'Inter', label: 'Inter', className: 'font-sans' },
-  { value: 'Roboto', label: 'Roboto', className: 'font-sans' },
-  { value: 'Open Sans', label: 'Open Sans', className: 'font-sans' },
-  { value: 'Playfair Display', label: 'Playfair Display', className: 'font-serif' },
-  { value: 'Merriweather', label: 'Merriweather', className: 'font-serif' },
-  { value: 'Montserrat', label: 'Montserrat', className: 'font-sans' }
-];
 
 const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorProps) => {
   const { t } = useTranslation('common');
@@ -210,37 +82,6 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
       tableQRMessage: t('admin.scanToViewMenu'),
     });
   };
-
-  const ColorPickerButton = ({ label, colorKey }: { label: string; colorKey: string }) => (
-    <div className="relative">
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-      <button
-        type="button"
-        onClick={() => setShowColorPicker(showColorPicker === colorKey ? null : colorKey)}
-        className="w-full h-10 rounded border-2 border-slate-300 flex items-center gap-2 px-3 hover:border-blue-500"
-      >
-        <div
-          className="w-6 h-6 rounded border border-slate-300"
-          style={{ backgroundColor: formData[colorKey as keyof typeof formData] as string }}
-        />
-        <span className="text-sm font-mono">{formData[colorKey as keyof typeof formData]}</span>
-      </button>
-      {showColorPicker === colorKey && (
-        <div className="absolute z-10 mt-2">
-          <div
-            className="fixed inset-0"
-            onClick={() => setShowColorPicker(null)}
-          />
-          <div className="relative bg-white p-3 rounded-lg shadow-lg border border-slate-200">
-            <HexColorPicker
-              color={formData[colorKey as keyof typeof formData] as string}
-              onChange={(color) => setFormData({ ...formData, [colorKey]: color })}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   const applyTheme = (theme: typeof colorThemes[0]) => {
     setFormData({
@@ -359,308 +200,38 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
           <form onSubmit={handleSubmit} className="space-y-6">
         {/* Templates Tab */}
         {activeTab === 'templates' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                {t('admin.designTemplates')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600 mb-4">
-                {t('admin.choosePreDesignedTemplate')}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {designTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => applyTemplate(template)}
-                    className="p-4 rounded-lg border-2 border-slate-200 hover:border-blue-500 transition-all hover:shadow-md text-left"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-2xl">{template.preview}</span>
-                      <div className="flex gap-1">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: template.settings.primaryColor }} />
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: template.settings.secondaryColor }} />
-                        <div className="w-3 h-3 rounded-full border border-slate-300" style={{ backgroundColor: template.settings.backgroundColor }} />
-                      </div>
-                    </div>
-                    <p className="font-semibold text-slate-900 mb-1">{t(`common:qrDesigner.templates.${template.id}.name`)}</p>
-                    <p className="text-xs text-slate-600">{t(`common:qrDesigner.templates.${template.id}.description`)}</p>
-                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-                      <span>{template.settings.layoutStyle}</span>
-                      <span>•</span>
-                      <span>{template.settings.fontFamily}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <TemplatesTab onApplyTemplate={applyTemplate} />
         )}
 
         {/* Colors Tab */}
         {activeTab === 'colors' && (
-          <div className="space-y-6">
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="h-5 w-5" />
-                  {t('common:qrDesigner.quickColorThemes')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {colorThemes.map((theme) => (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => applyTheme(theme)}
-                      className="p-3 rounded-lg border-2 border-slate-200 hover:border-blue-500 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex gap-1">
-                          <div className="w-5 h-5 rounded" style={{ backgroundColor: theme.primary }} />
-                          <div className="w-5 h-5 rounded" style={{ backgroundColor: theme.secondary }} />
-                          <div className="w-5 h-5 rounded border border-slate-200" style={{ backgroundColor: theme.background }} />
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium text-slate-700">{t(`common:qrDesigner.themes.${theme.id}`)}</p>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('common:qrDesigner.customColors')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ColorPickerButton label={t('common:qrDesigner.primaryColor')} colorKey="primaryColor" />
-                  <ColorPickerButton label={t('common:qrDesigner.secondaryColor')} colorKey="secondaryColor" />
-                  <ColorPickerButton label={t('common:qrDesigner.backgroundColor')} colorKey="backgroundColor" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <ColorsTab
+            formData={formData}
+            setFormData={setFormData}
+            showColorPicker={showColorPicker}
+            setShowColorPicker={setShowColorPicker}
+            onApplyTheme={applyTheme}
+          />
         )}
 
         {/* Typography Tab */}
         {activeTab === 'typography' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('common:qrDesigner.typographySettings')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.fontFamily')}</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {fontOptions.map((font) => (
-                    <button
-                      key={font.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, fontFamily: font.value })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.fontFamily === font.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <p className={`text-lg ${font.className} font-medium`}>{font.label}</p>
-                      <p className="text-xs text-slate-500 mt-1">{t('common:qrDesigner.sampleText')}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.logoUpload')}</label>
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
-                  {isUploadingLogo ? (
-                    <div className="flex flex-col items-center">
-                      <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-2" />
-                      <p className="text-sm text-slate-600">{t('common:qrDesigner.uploadingLogo', 'Uploading...')}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
-                      <p className="text-sm text-slate-600 mb-2">{t('common:qrDesigner.uploadLogo')}</p>
-                      <p className="text-xs text-slate-400 mb-3">{t('common:qrDesigner.maxFileSize', 'Max file size: 5MB')}</p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="hidden"
-                        id="logo-upload"
-                        disabled={isUploadingLogo}
-                      />
-                      <label
-                        htmlFor="logo-upload"
-                        className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700"
-                      >
-                        {t('common:qrDesigner.chooseFile')}
-                      </label>
-                    </>
-                  )}
-                  {formData.logoUrl && (
-                    <div className="mt-4">
-                      <img src={formData.logoUrl} alt={t('common:qrDesigner.logoPreview')} className="h-16 mx-auto rounded-lg" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <TypographyTab
+            formData={formData}
+            setFormData={setFormData}
+            isUploadingLogo={isUploadingLogo}
+            onLogoUpload={handleLogoUpload}
+          />
         )}
 
         {/* Layout Tab */}
         {activeTab === 'layout' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('common:qrDesigner.layoutDisplayOptions')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.layoutStyle')}</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: 'GRID', label: t('common:qrDesigner.gridView'), description: t('common:qrDesigner.gridDesc') },
-                    { value: 'LIST', label: t('common:qrDesigner.listView'), description: t('common:qrDesigner.listDesc') },
-                    { value: 'COMPACT', label: t('common:qrDesigner.compact'), description: t('common:qrDesigner.compactDesc') }
-                  ].map((style) => (
-                    <button
-                      key={style.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, layoutStyle: style.value as any })}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        formData.layoutStyle === style.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <p className="font-medium text-slate-900">{style.label}</p>
-                      <p className="text-xs text-slate-500 mt-1">{style.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {formData.layoutStyle === 'GRID' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">{t('common:qrDesigner.itemsPerRow')}</label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, itemsPerRow: num })}
-                        className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                          formData.itemsPerRow === num
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-slate-700">{t('common:qrDesigner.displayOptions')}</p>
-                <div className="space-y-2">
-                  {[
-                    { key: 'showRestaurantInfo', label: t('common:qrDesigner.showRestaurantInfo') },
-                    { key: 'showPrices', label: t('common:qrDesigner.showPrices') },
-                    { key: 'showDescription', label: t('common:qrDesigner.showDescriptions') },
-                    { key: 'showImages', label: t('common:qrDesigner.showImages') }
-                  ].map((option) => (
-                    <label key={option.key} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50">
-                      <input
-                        type="checkbox"
-                        checked={formData[option.key as keyof typeof formData] as boolean}
-                        onChange={(e) => setFormData({ ...formData, [option.key]: e.target.checked })}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-slate-700">{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <LayoutTab formData={formData} setFormData={setFormData} />
         )}
 
         {/* QR Style Tab */}
         {activeTab === 'qr' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('admin.qrCodeCustomization')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <p className="text-sm font-medium text-slate-700">{t('admin.tableQRCodes')}</p>
-                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50">
-                  <input
-                    type="checkbox"
-                    checked={formData.enableTableQR}
-                    onChange={(e) => setFormData({ ...formData, enableTableQR: e.target.checked })}
-                    className="rounded border-slate-300 text-blue-600"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-slate-700">{t('admin.enableTableQR')}</span>
-                    <p className="text-xs text-slate-500">{t('admin.enableTableQRDesc')}</p>
-                  </div>
-                </label>
-
-                {formData.enableTableQR && (
-                  <div className="ml-6 space-y-4">
-                    <Input
-                      label={t('common:qrDesigner.tableQRMessage')}
-                      type="text"
-                      value={formData.tableQRMessage}
-                      onChange={(e) => setFormData({ ...formData, tableQRMessage: e.target.value })}
-                      placeholder={t('admin.scanToViewMenu')}
-                    />
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-xs font-medium text-blue-900 mb-1">{t('common:qrDesigner.proTip')}</p>
-                      <p className="text-xs text-blue-800">
-                        {t('common:qrDesigner.proTipText')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-4 border-t border-slate-200">
-                <p className="text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.qrCodePreview')}</p>
-                <div className="bg-slate-50 rounded-lg p-4 text-center">
-                  <p className="text-xs text-slate-500 mb-2">{t('common:qrDesigner.qrWillUseColors')}</p>
-                  <div className="flex justify-center gap-4">
-                    <div className="text-center">
-                      <div 
-                        className="w-16 h-16 rounded-lg border-2 border-slate-300 mb-1" 
-                        style={{ backgroundColor: formData.primaryColor }}
-                      />
-                      <p className="text-xs text-slate-600">{t('common:qrDesigner.qrPattern')}</p>
-                    </div>
-                    <div className="text-center">
-                      <div 
-                        className="w-16 h-16 rounded-lg border-2 border-slate-300 mb-1" 
-                        style={{ backgroundColor: formData.backgroundColor }}
-                      />
-                      <p className="text-xs text-slate-600">{t('common:qrDesigner.background')}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <QrTab formData={formData} setFormData={setFormData} />
         )}
 
             <div className="flex gap-3 sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-200">

@@ -20,6 +20,7 @@ import {
 import { ProductsService } from "../services/products.service";
 import { CreateProductDto } from "../dto/create-product.dto";
 import { UpdateProductDto } from "../dto/update-product.dto";
+import { ListQueryDto } from "../../../common/dto/list-query.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -56,9 +57,29 @@ export class ProductsController {
     required: false,
     description: "Filter by category ID",
   })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "Optional page size (omit for full list)",
+  })
+  @ApiQuery({
+    name: "offset",
+    required: false,
+    description: "Optional rows to skip",
+  })
   @ApiResponse({ status: 200, description: "List of all products" })
-  findAll(@Request() req, @Query("categoryId") categoryId?: string) {
-    return this.productsService.findAll(req.tenantId, categoryId);
+  findAll(
+    @Request() req,
+    @Query("categoryId") categoryId?: string,
+    @Query() query?: ListQueryDto,
+  ) {
+    // ADDITIVE: limit/offset are optional. When absent the DTO leaves them
+    // undefined, the service returns the full list (byte-identical default),
+    // and the response stays a bare array — no {data,total} envelope.
+    return this.productsService.findAll(req.tenantId, categoryId, {
+      limit: query?.limit,
+      offset: query?.offset,
+    });
   }
 
   @Get(":id")

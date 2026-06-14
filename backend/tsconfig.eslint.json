@@ -1,0 +1,10 @@
+{
+  // Lint-only project file. tsconfig.json excludes *.spec.ts so `nest
+  // build` doesn't compile tests into dist/ — but eslint's
+  // parserOptions.project refuses any file outside its project, which
+  // made every spec file a parsing error. This wrapper widens the
+  // include for the linter only; the build keeps using tsconfig.json.
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -82,6 +82,9 @@ describe('QuoteService', () => {
         return {
           sku: 'kds-21in', name: '21" KDS Screen', status: 'published', category: 'kds_screen',
           priceCents: 75000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-1', warrantyMonths: 12,
+          // v3.0.1 round-4 — guard is now fail-closed (`!== "DIRECT_SALE"`)
+          // so fixtures must explicitly mark sellable rows.
+          saleMode: 'DIRECT_SALE',
         } as any;
       }
       throw new Error(`SKU not in fixture: ${sku}`);
@@ -115,6 +118,8 @@ describe('QuoteService', () => {
     catalog.findBySkuOrThrow.mockResolvedValue({
       sku: 'tab-a8', name: 'Tablet', status: 'published',
       priceCents: 10000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-9', warrantyMonths: 12,
+      // v3.0.1 round-4 — fail-closed saleMode guard requires this.
+      saleMode: 'DIRECT_SALE',
     } as any);
     await expect(
       svc.quote({ items: [{ type: 'hardware', sku: 'tab-a8', qty: 1, acquisition: 'rent' }] }),
@@ -123,5 +128,61 @@ describe('QuoteService', () => {
 
   it('rejects empty carts', async () => {
     await expect(svc.quote({ items: [] })).rejects.toThrow(/empty/i);
+  });
+
+  // Regulatory tier guard (TR law): only DIRECT_SALE hardware may be priced.
+  // QUOTE_ONLY (yazarkasa), PARTNER_REDIRECT (bank POS) and RECOMMENDED_ONLY
+  // (uncertified scale) are dropped to a warning even if a tampered client
+  // adds them — proving a regulated device can never reach payment.
+  it.each(['QUOTE_ONLY', 'PARTNER_REDIRECT', 'RECOMMENDED_ONLY'])(
+    'drops a %s hardware SKU from the quote (no priced line, soft warning)',
+    async (saleMode) => {
+      catalog.findBySkuOrThrow.mockResolvedValue({
+        sku: 'yazarkasa-x', name: 'Yazarkasa', status: 'published', category: 'yazarkasa',
+        priceCents: 1_299_900, rentalMonthlyCents: null, currency: 'TRY', id: 'h-yk',
+        warrantyMonths: 24, saleMode,
+      } as any);
+      const q = await svc.quote({ items: [{ type: 'hardware', sku: 'yazarkasa-x', qty: 1 }] });
+      expect(q.lines).toHaveLength(0);
+      expect(q.warnings).toContainEqual(expect.stringContaining('yazarkasa-x'));
+      expect(q.subtotalCents).toBe(0);
+    },
+  );
+
+  it('still prices a DIRECT_SALE hardware SKU normally', async () => {
+    catalog.findBySkuOrThrow.mockResolvedValue({
+      sku: 'printer-80mm', name: 'Printer', status: 'published', category: 'printer',
+      priceCents: 50_000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-pr',
+      warrantyMonths: 12, saleMode: 'DIRECT_SALE',
+    } as any);
+    const q = await svc.quote({ items: [{ type: 'hardware', sku: 'printer-80mm', qty: 1 }] });
+    expect(q.lines).toHaveLength(1);
+    expect(q.subtotalCents).toBe(50_000);
+  });
+
+  // The service branch carries the same regulatory gate: a non-DIRECT_SALE
+  // service row (e.g. a fiscal-install / GİB-activation offering tagged
+  // QUOTE_ONLY) must be dropped, never priced/provisioned.
+  it('drops a non-DIRECT_SALE service SKU from the quote', async () => {
+    catalog.findBySkuOrThrow.mockResolvedValue({
+      sku: 'install-yazarkasa-gib', name: 'Yazarkasa kurulum', status: 'published',
+      category: 'service', priceCents: 100_000, currency: 'TRY', id: 's-1',
+      serviceMeta: { serviceType: 'onsite' }, saleMode: 'QUOTE_ONLY',
+    } as any);
+    const q = await svc.quote({ items: [{ type: 'service', code: 'install-yazarkasa-gib' }] });
+    expect(q.lines).toHaveLength(0);
+    expect(q.warnings).toContainEqual(expect.stringContaining('install-yazarkasa-gib'));
+    expect(q.subtotalCents).toBe(0);
+  });
+
+  it('still prices a DIRECT_SALE service SKU normally', async () => {
+    catalog.findBySkuOrThrow.mockResolvedValue({
+      sku: 'install-kds', name: 'KDS kurulum', status: 'published', category: 'service',
+      priceCents: 100_000, currency: 'TRY', id: 's-2',
+      serviceMeta: { serviceType: 'onsite' }, saleMode: 'DIRECT_SALE',
+    } as any);
+    const q = await svc.quote({ items: [{ type: 'service', code: 'install-kds' }] });
+    expect(q.lines).toHaveLength(1);
+    expect(q.subtotalCents).toBe(100_000);
   });
 });

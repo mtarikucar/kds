@@ -5,11 +5,16 @@ import { CatalogService } from "./catalog.service";
 import {
   CatalogController,
   SuperadminCatalogController,
+  TenantCatalogController,
 } from "./catalog.controller";
 
 @Module({
   imports: [PrismaModule, SuperAdminModule],
-  controllers: [CatalogController, SuperadminCatalogController],
+  controllers: [
+    CatalogController,
+    TenantCatalogController,
+    SuperadminCatalogController,
+  ],
   providers: [CatalogService],
   exports: [CatalogService],
 })

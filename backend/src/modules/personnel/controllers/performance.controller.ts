@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Request, UseGuards } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -8,6 +8,8 @@ import { RequiresFeature } from "../../subscriptions/decorators/requires-feature
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 import { PerformanceService } from "../services/performance.service";
 import { PerformanceQueryDto } from "../dto/performance-query.dto";
 
@@ -22,14 +24,20 @@ export class PerformanceController {
   @Get("metrics")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get enhanced performance metrics" })
-  getMetrics(@Request() req, @Query() query: PerformanceQueryDto) {
-    return this.performanceService.getEnhancedMetrics(req.tenantId, query);
+  getMetrics(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: PerformanceQueryDto,
+  ) {
+    return this.performanceService.getEnhancedMetrics(scope, query);
   }
 
   @Get("trends")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get monthly performance trends" })
-  getTrends(@Request() req, @Query() query: PerformanceQueryDto) {
-    return this.performanceService.getTrends(req.tenantId, query);
+  getTrends(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: PerformanceQueryDto,
+  ) {
+    return this.performanceService.getTrends(scope, query);
   }
 }

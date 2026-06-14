@@ -108,13 +108,25 @@ export default function PlanAndAccessPage() {
               </div>
             )}
           </div>
-          <Link
-            to="/subscription/plans"
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            {t('plan.changePlanCta', { defaultValue: 'Planı değiştir' })}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="flex flex-col items-stretch gap-2">
+            <Link
+              to="/subscription/plans"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              {t('plan.changePlanCta', { defaultValue: 'Planı değiştir' })}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            {/* v3.0.5: billing detail (invoices / cancel / reactivate) moved
+                out of Settings → reached from here. */}
+            <Link
+              to="/subscription/manage"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              {t('plan.manageBillingCta', {
+                defaultValue: 'Fatura & abonelik yönetimi',
+              })}
+            </Link>
+          </div>
         </div>
       </section>
 

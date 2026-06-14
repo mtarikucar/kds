@@ -211,3 +211,154 @@ describe('NotificationsService.markAllAsRead (iter-53 createMany swap)', () => {
     expect((prisma.userNotificationRead.upsert as any).mock.calls.length).toBe(0);
   });
 });
+
+/**
+ * Track 2 observability — every notification that is actually dispatched
+ * bumps a Prometheus counter labeled by the developer-controlled
+ * NotificationType enum and the dispatch channel (user|global|admins).
+ * A Grafana panel can then show notification throughput per type/channel.
+ *
+ * Mirrors the merged stock_movements_total pattern: @Optional() MetricsService,
+ * after the DB write, ?.-guarded so a missing collaborator can never break
+ * the business write. Labels are ONLY on developer-controlled enums — never
+ * user input (title/message) — so cardinality stays bounded.
+ */
+describe('NotificationsService metrics (notifications_sent_total)', () => {
+  let prisma: MockPrismaClient;
+  let gateway: {
+    sendNotificationToUser: jest.Mock;
+    broadcastToTenantAcrossBranches: jest.Mock;
+  };
+  let metrics: { incCounter: jest.Mock };
+  let svc: NotificationsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    gateway = {
+      sendNotificationToUser: jest.fn(),
+      broadcastToTenantAcrossBranches: jest.fn(),
+    };
+    metrics = { incCounter: jest.fn() };
+    svc = new NotificationsService(prisma as any, gateway as any, metrics as any);
+    prisma.branch.findFirst.mockResolvedValue({ id: 'b-1' } as any);
+  });
+
+  it('createAndSend to a specific user records channel=user labeled by type', async () => {
+    (prisma.notification.create as any).mockResolvedValue({
+      id: 'n-1',
+      type: NotificationType.ORDER,
+      userId: 'u-1',
+    });
+
+    await svc.createAndSend({
+      title: 'T',
+      message: 'M',
+      type: NotificationType.ORDER,
+      tenantId: 't1',
+      branchId: 'b-1',
+      userId: 'u-1',
+    } as any);
+
+    expect(metrics.incCounter).toHaveBeenCalledWith(
+      'notifications_sent_total',
+      expect.any(String),
+      { type: NotificationType.ORDER, channel: 'user' },
+    );
+  });
+
+  it('createAndSend with isGlobal records channel=global labeled by type', async () => {
+    (prisma.notification.create as any).mockResolvedValue({
+      id: 'n-2',
+      type: NotificationType.SYSTEM,
+      isGlobal: true,
+    });
+
+    await svc.createAndSend({
+      title: 'T',
+      message: 'M',
+      type: NotificationType.SYSTEM,
+      tenantId: 't1',
+      branchId: 'b-1',
+      isGlobal: true,
+    } as any);
+
+    expect(metrics.incCounter).toHaveBeenCalledWith(
+      'notifications_sent_total',
+      expect.any(String),
+      { type: NotificationType.SYSTEM, channel: 'global' },
+    );
+  });
+
+  it('notifyAdmins records channel=admins labeled by type', async () => {
+    prisma.user.findMany.mockResolvedValue([{ id: 'u-a' }, { id: 'u-b' }] as any);
+    let captured: any[] = [];
+    (prisma.notification.createMany as any).mockImplementation(async ({ data }: any) => {
+      captured = data;
+      return { count: data.length };
+    });
+    (prisma.notification.findMany as any).mockImplementation(async () => captured);
+
+    await svc.notifyAdmins('t1', {
+      title: 'Stock low',
+      message: 'msg',
+      type: NotificationType.WARNING,
+    });
+
+    expect(metrics.incCounter).toHaveBeenCalledWith(
+      'notifications_sent_total',
+      expect.any(String),
+      { type: NotificationType.WARNING, channel: 'admins' },
+    );
+  });
+
+  it('notifyAdmins with zero admins does NOT bump the counter (nothing dispatched)', async () => {
+    prisma.user.findMany.mockResolvedValue([] as any);
+
+    await svc.notifyAdmins('t1', {
+      title: 'T',
+      message: 'M',
+      type: NotificationType.INFO,
+    });
+
+    expect(metrics.incCounter).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when no MetricsService is injected (optional dep) — createAndSend', async () => {
+    const bare = new NotificationsService(prisma as any, gateway as any);
+    (prisma.notification.create as any).mockResolvedValue({
+      id: 'n-3',
+      type: NotificationType.INFO,
+      userId: 'u-1',
+    });
+
+    await expect(
+      bare.createAndSend({
+        title: 'T',
+        message: 'M',
+        type: NotificationType.INFO,
+        tenantId: 't1',
+        branchId: 'b-1',
+        userId: 'u-1',
+      } as any),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not throw when no MetricsService is injected (optional dep) — notifyAdmins', async () => {
+    const bare = new NotificationsService(prisma as any, gateway as any);
+    prisma.user.findMany.mockResolvedValue([{ id: 'u-a' }] as any);
+    let captured: any[] = [];
+    (prisma.notification.createMany as any).mockImplementation(async ({ data }: any) => {
+      captured = data;
+      return { count: data.length };
+    });
+    (prisma.notification.findMany as any).mockImplementation(async () => captured);
+
+    await expect(
+      bare.notifyAdmins('t1', {
+        title: 'T',
+        message: 'M',
+        type: NotificationType.INFO,
+      }),
+    ).resolves.toBeDefined();
+  });
+});

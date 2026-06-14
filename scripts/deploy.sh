@@ -284,6 +284,13 @@ run_migration_doctor() {
   db_user=$(grep -E '^POSTGRES_USER=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
   db_name="${db_name:-restaurant_pos_prod}"
   db_user="${db_user:-postgres}"
+  # New-system DBs are provisioned with `prisma db push` (empty migration
+  # ledger), so the doctor must baseline on first contact. It only does so
+  # after proving via `migrate diff` that the live schema already equals
+  # prisma/schema.prisma — so this is a no-op on an established DB (there
+  # applied_migs>0 and the baseline branch is never reached). Override with
+  # DOCTOR_AUTO_BASELINE=0 to restore the strict manual-baseline behaviour.
+  DOCTOR_AUTO_BASELINE="${DOCTOR_AUTO_BASELINE:-1}" \
   "$SCRIPT_DIR/db-migration-doctor.sh" \
     "$BACKEND_CONTAINER" "$PROJECT_ROOT/backend" \
     "$POSTGRES_CONTAINER" "$db_user" "$db_name"
@@ -389,7 +396,10 @@ swap_backend() {
 swap_app_containers() {
   retag_to_current "$FRONTEND_IMG"
   retag_to_current "$LANDING_IMG"
-  dc up -d --force-recreate frontend landing
+  # --remove-orphans reaps the retired in-repo marketing SPA container —
+  # marketing.hummytummy.com is served by the standalone kds-marketing
+  # stack (ports 3210/3211) since the v1.0.x cutover.
+  dc up -d --force-recreate --remove-orphans frontend landing
   sleep 3
   verify_running_image "$FRONTEND_CONTAINER" "$FRONTEND_IMG"
   verify_running_image "$LANDING_CONTAINER"  "$LANDING_IMG"
@@ -403,7 +413,6 @@ verify_and_promote() {
   # Landing probe is best-effort — its URL layout has changed in the
   # past and we don't want a 301 to fail the deploy.
   wait_until_healthy "$LANDING_PUBLIC_URL"  30 || warn "Landing probe non-200 (likely a redirect)"
-
   # SSL cert expiry — warn at 14d, error at 3d.
   local host="${API_PUBLIC_URL#https://}"; host="${host%%/*}"
   local exp_str exp_ts now_ts days
@@ -460,13 +469,12 @@ restore_image_ids() {
     docker tag "$LANDING_PREV_IMAGE"  "$LANDING_IMG:current"  || warn "landing retag failed"
     restored=$((restored + 1))
   fi
-
   if [ "$restored" -eq 0 ]; then
     err "Snapshot is empty — manual recovery required"
     return 1
   fi
 
-  dc up -d --force-recreate backend frontend landing
+  dc up -d --force-recreate --remove-orphans backend frontend landing
   sleep 5
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC" || warn "Post-rollback API not healthy"
 

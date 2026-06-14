@@ -43,6 +43,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       priceCents: 350_000,
       currency: 'TRY',
       serviceMeta: { serviceType: 'onsite', durationHours: 4, requiresBranch: true },
+      saleMode: 'DIRECT_SALE',
     });
 
     const q = await svc.quote({
@@ -64,6 +65,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
     expect(q.lines[0].meta).toMatchObject({
       branchId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       serviceMeta: { serviceType: 'onsite', durationHours: 4, requiresBranch: true },
+      saleMode: 'DIRECT_SALE',
       preferredDates: ['2026-06-15', '2026-06-18'],
       notes: 'Personel mesai dışı saatlerde ulaşılabilir',
     });
@@ -133,6 +135,8 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       priceCents: 250_000,
       currency: 'TRY',
       serviceMeta: { serviceType: 'remote' },
+      // v3.0.1 round-4 — service branch is fail-closed on saleMode too.
+      saleMode: 'DIRECT_SALE',
     });
 
     const q = await svc.quote({

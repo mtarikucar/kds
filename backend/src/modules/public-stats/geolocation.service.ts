@@ -1,4 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { numericEnv } from "../../common/config/numeric-env.util";
 import axios from "axios";
 import { maskIp } from "../../common/helpers/pii-mask.helper";
 
@@ -18,7 +20,8 @@ export class GeolocationService {
     string,
     { data: GeoData | null; timestamp: number }
   >();
-  private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  // 24 hours by default; override via GEOLOCATION_CACHE_TTL_MS.
+  private readonly CACHE_TTL: number;
   // v2.8.97 — cap. Pre-fix the Map grew without bound: a tenant with
   // high-traffic public-stats endpoints (campaign landing page) could
   // pile up tens of thousands of entries per day before the periodic
@@ -26,6 +29,13 @@ export class GeolocationService {
   // oldest-inserted entries (Map preserves insertion order) so RSS
   // stays bounded.
   private static readonly MAX_CACHE_SIZE = 50_000;
+
+  constructor(private readonly config?: ConfigService) {
+    this.CACHE_TTL = numericEnv(
+      this.config?.get("GEOLOCATION_CACHE_TTL_MS"),
+      24 * 60 * 60 * 1000,
+    );
+  }
 
   private isLocalIp(ip: string): boolean {
     return (

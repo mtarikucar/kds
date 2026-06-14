@@ -87,6 +87,10 @@ jobs:
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
+          NETGSM_USERCODE: ${{ secrets.NETGSM_USERCODE }}
+          NETGSM_PASSWORD: ${{ secrets.NETGSM_PASSWORD }}
+          NETGSM_MSGHEADER: ${{ secrets.NETGSM_MSGHEADER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -111,6 +115,7 @@ jobs:
             JWT_SECRET JWT_REFRESH_SECRET
             SUPERADMIN_JWT_SECRET SUPERADMIN_JWT_REFRESH_SECRET
             ENCRYPTION_MASTER_KEY
+            INTEGRATION_KEY
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
           )
@@ -120,6 +125,7 @@ jobs:
             EMAIL_HOST EMAIL_USER EMAIL_PASSWORD EMAIL_FROM
             GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
             DESKTOP_RELEASE_API_KEY
+            NETGSM_USERCODE NETGSM_PASSWORD NETGSM_MSGHEADER
           )
 
           missing=()
@@ -149,6 +155,12 @@ jobs:
           ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           server-host: ${{ env.SERVER_HOST }}
 
+  # Blocking quality gate: lint + typecheck + unit tests + contract drift
+  # (see quality-gates.yml). No image is built from a red suite.
+  quality:
+    name: Quality gates
+    uses: ./.github/workflows/quality-gates.yml
+
   # -------------------------------------------------------------------
   # Build images in parallel and push to GHCR. Production used to ship
   # tar.gz over scp — replaced by registry pull, both for symmetry with
@@ -159,7 +171,7 @@ jobs:
     name: Build & push to GHCR
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: pre-check
+    needs: [pre-check, quality]
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
     steps:
@@ -259,6 +271,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache,mode=max
 
+
   # -------------------------------------------------------------------
   # Render .env.production from secrets, ship it + the repo HEAD to the
   # server, and run scripts/deploy.sh. deploy.sh owns every step from
@@ -297,6 +310,10 @@ jobs:
           MARKETING_SERVICE_URL: ${{ vars.MARKETING_SERVICE_URL }}
           INTERNAL_SERVICE_TOKEN: ${{ secrets.INTERNAL_SERVICE_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
+          NETGSM_USERCODE: ${{ secrets.NETGSM_USERCODE }}
+          NETGSM_PASSWORD: ${{ secrets.NETGSM_PASSWORD }}
+          NETGSM_MSGHEADER: ${{ secrets.NETGSM_MSGHEADER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -330,11 +347,17 @@ jobs:
           SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
           SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+          # At-rest seed for per-tenant integration envelope keys (EnvKmsProvider
+          # + integration-gateway, HKDF-sha256). Required in prod by both the
+          # compose (${INTEGRATION_KEY:?}) and env-validation.ts. MUST be stable:
+          # if prod already holds encrypted integration credentials, this has to
+          # match the key they were encrypted under or they become undecryptable.
+          INTEGRATION_KEY=${INTEGRATION_KEY}
 
           MARKETING_SERVICE_URL=${MARKETING_SERVICE_URL}
           INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
 
-          CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
+          CORS_ORIGIN=https://hummytummy.com,https://marketing.hummytummy.com,https://landing.hummytummy.com,https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com
 
           PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
@@ -353,6 +376,17 @@ jobs:
           EMAIL_PASSWORD=${EMAIL_PASSWORD}
           EMAIL_FROM=${EMAIL_FROM}
           ADMIN_EMAIL=contact@hummytummy.com
+
+          # Customer OTP SMS (NetGSM). PLACEHOLDER: creds not ready, so SMS is
+          # bypassed for launch — ALLOW_MOCK_SMS_IN_PROD=true lets the backend
+          # boot with OTP delivery mocked/silent. Once the NETGSM_* repo secrets
+          # are set, the provider auto-activates (mockMode off) and real SMS
+          # flows on the next deploy — no code change; ALLOW_MOCK becomes a no-op.
+          ALLOW_MOCK_SMS_IN_PROD=true
+          SMS_PROVIDER=netgsm
+          NETGSM_USERCODE=${NETGSM_USERCODE}
+          NETGSM_PASSWORD=${NETGSM_PASSWORD}
+          NETGSM_MSGHEADER=${NETGSM_MSGHEADER}
 
           DEFAULT_TRIAL_DAYS=14
           TRIAL_REMINDER_DAYS=3

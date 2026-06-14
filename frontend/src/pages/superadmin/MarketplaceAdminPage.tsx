@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   type AdminAddOn,
   type AdminHardwareProduct,
@@ -27,21 +28,22 @@ import {
  * who actually touch them.
  */
 export default function MarketplaceAdminPage() {
+  const { t: tr } = useTranslation('superadmin');
   const [tab, setTab] = useState<'addons' | 'products'>('addons');
   return (
     <div className="space-y-6 p-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Marketplace Admin</h1>
+        <h1 className="text-2xl font-semibold">{tr('marketplace.title')}</h1>
         <nav className="flex gap-1">
-          {(['addons', 'products'] as const).map((t) => (
+          {(['addons', 'products'] as const).map((tabKey) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
               className={`rounded-full px-3 py-1 text-sm ${
-                tab === t ? 'bg-gray-900 text-white' : 'border bg-white hover:bg-gray-50'
+                tab === tabKey ? 'bg-gray-900 text-white' : 'border bg-white hover:bg-gray-50'
               }`}
             >
-              {t === 'addons' ? 'Add-ons' : 'Hardware'}
+              {tabKey === 'addons' ? tr('marketplace.tabAddons') : tr('marketplace.tabHardware')}
             </button>
           ))}
         </nav>
@@ -55,6 +57,7 @@ export default function MarketplaceAdminPage() {
 // ── Add-ons ────────────────────────────────────────────────────────────
 
 function AddOnsSection() {
+  const { t: tr } = useTranslation('superadmin');
   const { data: addons = [], isLoading } = useSaListAddOns();
   const create = useSaCreateAddOn();
   const update = useSaUpdateAddOn();
@@ -65,27 +68,27 @@ function AddOnsSection() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">Add-on catalogue</h2>
+        <h2 className="text-lg font-medium">{tr('marketplace.addons.catalogue')}</h2>
         <button
           onClick={() => setCreating(true)}
           className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
         >
-          New add-on
+          {tr('marketplace.addons.new')}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="text-sm text-gray-500">Loading…</div>
+        <div className="text-sm text-gray-500">{tr('marketplace.loading')}</div>
       ) : (
         <table className="w-full divide-y rounded border text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
-              <th className="px-3 py-2 font-medium">Code</th>
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Kind</th>
-              <th className="px-3 py-2 font-medium">Billing</th>
-              <th className="px-3 py-2 font-medium">Price</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.code')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.name')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.kind')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.billing')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.price')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.status')}</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -104,24 +107,24 @@ function AddOnsSection() {
                 </td>
                 <td className="space-x-2 px-3 py-2 text-right text-xs">
                   <button onClick={() => setEditing(a)} className="text-blue-600 hover:underline">
-                    Edit
+                    {tr('marketplace.addons.edit')}
                   </button>
                   {a.status !== 'published' && (
                     <button
                       onClick={() => update.mutate({ id: a.id, status: 'published' })}
                       className="text-green-700 hover:underline"
                     >
-                      Publish
+                      {tr('marketplace.addons.publish')}
                     </button>
                   )}
                   {a.status !== 'archived' && (
                     <button
                       onClick={() => {
-                        if (confirm(`Archive add-on "${a.code}"?`)) archive.mutate(a.id);
+                        if (confirm(tr('marketplace.addons.confirmArchive', { code: a.code }))) archive.mutate(a.id);
                       }}
                       className="text-red-600 hover:underline"
                     >
-                      Archive
+                      {tr('marketplace.addons.archive')}
                     </button>
                   )}
                 </td>
@@ -157,6 +160,7 @@ interface AddOnEditorProps {
 }
 
 function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
+  const { t: tr } = useTranslation('superadmin');
   const [form, setForm] = useState({
     code: initial?.code ?? '',
     name: initial?.name ?? '',
@@ -177,7 +181,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
     try {
       grants = JSON.parse(form.grantsJson);
     } catch {
-      setError('grants must be valid JSON');
+      setError(tr('marketplace.addons.grantsInvalid'));
       return;
     }
     const body: Partial<AdminAddOn> = {
@@ -198,10 +202,10 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-3 text-lg font-semibold">{initial ? 'Edit add-on' : 'New add-on'}</h3>
+        <h3 className="mb-3 text-lg font-semibold">{initial ? tr('marketplace.addons.editTitle') : tr('marketplace.addons.newTitle')}</h3>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Code">
+          <Field label={tr('marketplace.addons.fields.code')}>
             <input
               className="rounded border px-2 py-1 text-sm font-mono w-full"
               disabled={!!initial}
@@ -210,10 +214,10 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
               placeholder="kds_extra_screen"
             />
           </Field>
-          <Field label="Name">
+          <Field label={tr('marketplace.addons.fields.name')}>
             <input className="rounded border px-2 py-1 text-sm w-full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </Field>
-          <Field label="Kind">
+          <Field label={tr('marketplace.addons.fields.kind')}>
             <select className="rounded border px-2 py-1 text-sm w-full" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as any }))}>
               <option value="software">software</option>
               <option value="integration">integration</option>
@@ -221,31 +225,31 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
               <option value="support">support</option>
             </select>
           </Field>
-          <Field label="Billing">
+          <Field label={tr('marketplace.addons.fields.billing')}>
             <select className="rounded border px-2 py-1 text-sm w-full" value={form.billing} onChange={(e) => setForm((f) => ({ ...f, billing: e.target.value as any }))}>
               <option value="recurring">recurring</option>
               <option value="oneTime">oneTime</option>
             </select>
           </Field>
-          <Field label="Price (cents)">
+          <Field label={tr('marketplace.addons.fields.priceCents')}>
             <input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.priceCents} onChange={(e) => setForm((f) => ({ ...f, priceCents: Number(e.target.value) }))} />
           </Field>
-          <Field label="Currency">
+          <Field label={tr('marketplace.addons.fields.currency')}>
             <input className="rounded border px-2 py-1 text-sm w-full" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} />
           </Field>
-          <Field label="Status">
+          <Field label={tr('marketplace.addons.fields.status')}>
             <select className="rounded border px-2 py-1 text-sm w-full" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}>
               <option value="draft">draft</option>
               <option value="published">published</option>
               <option value="archived">archived</option>
             </select>
           </Field>
-          <Field label="Deps (comma-separated; plan:PRO or addon code)">
+          <Field label={tr('marketplace.addons.fields.deps')}>
             <input className="rounded border px-2 py-1 text-sm w-full" value={form.depsCsv} onChange={(e) => setForm((f) => ({ ...f, depsCsv: e.target.value }))} placeholder="plan:PRO, delivery_hub" />
           </Field>
         </div>
 
-        <Field label="Description">
+        <Field label={tr('marketplace.addons.fields.description')}>
           <textarea
             className="mt-1 w-full rounded border px-2 py-1 text-sm"
             rows={2}
@@ -254,7 +258,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
           />
         </Field>
 
-        <Field label="Grants (JSON)">
+        <Field label={tr('marketplace.addons.fields.grants')}>
           <textarea
             className="mt-1 w-full rounded border px-2 py-1 font-mono text-xs"
             rows={6}
@@ -266,9 +270,9 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded border px-3 py-1.5 text-sm">Cancel</button>
+          <button onClick={onClose} className="rounded border px-3 py-1.5 text-sm">{tr('marketplace.cancel')}</button>
           <button onClick={submit} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">
-            {initial ? 'Save' : 'Create'}
+            {initial ? tr('marketplace.addons.save') : tr('marketplace.addons.create')}
           </button>
         </div>
       </div>
@@ -279,6 +283,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
 // ── Hardware products ──────────────────────────────────────────────────
 
 function ProductsSection() {
+  const { t: tr } = useTranslation('superadmin');
   const { data: products = [], isLoading } = useSaListProducts();
   const update = useSaUpdateProduct();
   const archive = useSaArchiveProduct();
@@ -289,27 +294,27 @@ function ProductsSection() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">Hardware catalogue</h2>
+        <h2 className="text-lg font-medium">{tr('marketplace.products.catalogue')}</h2>
         <button
           onClick={() => setCreating(true)}
           className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
         >
-          New SKU
+          {tr('marketplace.products.new')}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="text-sm text-gray-500">Loading…</div>
+        <div className="text-sm text-gray-500">{tr('marketplace.loading')}</div>
       ) : (
         <table className="w-full divide-y rounded border text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
-              <th className="px-3 py-2 font-medium">SKU</th>
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Category</th>
-              <th className="px-3 py-2 font-medium">Price</th>
-              <th className="px-3 py-2 font-medium">Available</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.sku')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.name')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.category')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.price')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.available')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.status')}</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -325,7 +330,7 @@ function ProductsSection() {
                 <td className="px-3 py-2 tabular-nums">
                   {p.inventory?.available ?? 0}
                   {(p.inventory?.allocated ?? 0) > 0 && (
-                    <span className="ml-1 text-xs text-gray-500">(+{p.inventory!.allocated} allocated)</span>
+                    <span className="ml-1 text-xs text-gray-500">{tr('marketplace.products.allocated', { count: p.inventory!.allocated })}</span>
                   )}
                 </td>
                 <td className="px-3 py-2">
@@ -334,31 +339,31 @@ function ProductsSection() {
                 <td className="space-x-2 px-3 py-2 text-right text-xs">
                   <button
                     onClick={() => {
-                      const qty = prompt('Receive how many units?');
+                      const qty = prompt(tr('marketplace.products.promptReceiveUnits'));
                       const n = Number(qty);
                       if (!Number.isFinite(n) || n < 1) return;
                       stock.mutate({ id: p.id, qty: n });
                     }}
                     className="text-blue-600 hover:underline"
                   >
-                    Receive stock
+                    {tr('marketplace.products.receiveStock')}
                   </button>
                   {p.status !== 'published' && (
                     <button
                       onClick={() => update.mutate({ id: p.id, status: 'published' })}
                       className="text-green-700 hover:underline"
                     >
-                      Publish
+                      {tr('marketplace.products.publish')}
                     </button>
                   )}
                   {p.status !== 'archived' && (
                     <button
                       onClick={() => {
-                        if (confirm(`Archive SKU "${p.sku}"?`)) archive.mutate(p.id);
+                        if (confirm(tr('marketplace.products.confirmArchive', { sku: p.sku }))) archive.mutate(p.id);
                       }}
                       className="text-red-600 hover:underline"
                     >
-                      Archive
+                      {tr('marketplace.products.archive')}
                     </button>
                   )}
                 </td>
@@ -387,6 +392,7 @@ interface ProductEditorProps {
 }
 
 function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
+  const { t: tr } = useTranslation('superadmin');
   const [form, setForm] = useState({
     sku: '',
     category: 'kds_screen',
@@ -420,11 +426,11 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-3 text-lg font-semibold">New hardware SKU</h3>
+        <h3 className="mb-3 text-lg font-semibold">{tr('marketplace.products.newTitle')}</h3>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="SKU"><input className="rounded border px-2 py-1 text-sm font-mono w-full" value={form.sku} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))} /></Field>
-          <Field label="Name"><input className="rounded border px-2 py-1 text-sm w-full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
-          <Field label="Category">
+          <Field label={tr('marketplace.products.fields.sku')}><input className="rounded border px-2 py-1 text-sm font-mono w-full" value={form.sku} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))} /></Field>
+          <Field label={tr('marketplace.products.fields.name')}><input className="rounded border px-2 py-1 text-sm w-full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
+          <Field label={tr('marketplace.products.fields.category')}>
             <select className="rounded border px-2 py-1 text-sm w-full" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
               <option value="kds_screen">kds_screen</option>
               <option value="tablet">tablet</option>
@@ -437,26 +443,26 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
               <option value="other">other</option>
             </select>
           </Field>
-          <Field label="Brand"><input className="rounded border px-2 py-1 text-sm w-full" value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} /></Field>
-          <Field label="Model"><input className="rounded border px-2 py-1 text-sm w-full" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} /></Field>
-          <Field label="Price (cents)"><input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.priceCents} onChange={(e) => setForm((f) => ({ ...f, priceCents: Number(e.target.value) }))} /></Field>
-          <Field label="Rental / month (cents, optional)"><input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.rentalMonthlyCents} onChange={(e) => setForm((f) => ({ ...f, rentalMonthlyCents: e.target.value }))} /></Field>
-          <Field label="Currency"><input className="rounded border px-2 py-1 text-sm w-full" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} /></Field>
-          <Field label="Warranty (months)"><input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.warrantyMonths} onChange={(e) => setForm((f) => ({ ...f, warrantyMonths: Number(e.target.value) }))} /></Field>
-          <Field label="Status">
+          <Field label={tr('marketplace.products.fields.brand')}><input className="rounded border px-2 py-1 text-sm w-full" value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} /></Field>
+          <Field label={tr('marketplace.products.fields.model')}><input className="rounded border px-2 py-1 text-sm w-full" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} /></Field>
+          <Field label={tr('marketplace.products.fields.priceCents')}><input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.priceCents} onChange={(e) => setForm((f) => ({ ...f, priceCents: Number(e.target.value) }))} /></Field>
+          <Field label={tr('marketplace.products.fields.rentalMonthly')}><input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.rentalMonthlyCents} onChange={(e) => setForm((f) => ({ ...f, rentalMonthlyCents: e.target.value }))} /></Field>
+          <Field label={tr('marketplace.products.fields.currency')}><input className="rounded border px-2 py-1 text-sm w-full" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} /></Field>
+          <Field label={tr('marketplace.products.fields.warrantyMonths')}><input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.warrantyMonths} onChange={(e) => setForm((f) => ({ ...f, warrantyMonths: Number(e.target.value) }))} /></Field>
+          <Field label={tr('marketplace.products.fields.status')}>
             <select className="rounded border px-2 py-1 text-sm w-full" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
               <option value="draft">draft</option>
               <option value="published">published</option>
             </select>
           </Field>
         </div>
-        <Field label="Description">
+        <Field label={tr('marketplace.products.fields.description')}>
           <textarea className="mt-1 w-full rounded border px-2 py-1 text-sm" rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
         </Field>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded border px-3 py-1.5 text-sm">Cancel</button>
-          <button onClick={submit} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">Create</button>
+          <button onClick={onClose} className="rounded border px-3 py-1.5 text-sm">{tr('marketplace.products.cancel')}</button>
+          <button onClick={submit} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">{tr('marketplace.products.create')}</button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSubscriptions, useExtendSubscription, useCancelSubscription, usePlans } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionListItem } from '../../features/superadmin/types';
 
@@ -11,6 +12,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function SubscriptionsPage() {
+  const { t } = useTranslation('superadmin');
   const [status, setStatus] = useState('');
   const [planId, setPlanId] = useState('');
   const [page, setPage] = useState(1);
@@ -26,15 +28,15 @@ export default function SubscriptionsPage() {
   const cancelMutation = useCancelSubscription();
 
   const handleExtend = (id: string) => {
-    const days = prompt('Enter number of days to extend:');
+    const days = prompt(t('subscriptions.promptExtendDays'));
     if (days && !isNaN(Number(days))) {
       extendMutation.mutate({ id, days: Number(days) });
     }
   };
 
   const handleCancel = (id: string) => {
-    if (window.confirm('Cancel this subscription?')) {
-      const reason = prompt('Enter cancellation reason (optional):');
+    if (window.confirm(t('subscriptions.confirmCancel'))) {
+      const reason = prompt(t('subscriptions.promptCancelReason'));
       cancelMutation.mutate({ id, reason: reason || undefined });
     }
   };
@@ -43,8 +45,8 @@ export default function SubscriptionsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Subscriptions</h1>
-        <p className="text-sm text-zinc-500 mt-1">Manage tenant subscriptions</p>
+        <h1 className="text-2xl font-semibold text-zinc-900">{t('subscriptions.title')}</h1>
+        <p className="text-sm text-zinc-500 mt-1">{t('subscriptions.subtitle')}</p>
       </div>
 
       {/* Filters */}
@@ -57,12 +59,12 @@ export default function SubscriptionsPage() {
           }}
           className="px-4 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
         >
-          <option value="">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="CANCELLED">Cancelled</option>
-          <option value="EXPIRED">Expired</option>
-          <option value="PAST_DUE">Past Due</option>
-          <option value="TRIALING">Trialing</option>
+          <option value="">{t('subscriptions.filters.allStatus')}</option>
+          <option value="ACTIVE">{t('subscriptions.filters.active')}</option>
+          <option value="CANCELLED">{t('subscriptions.filters.cancelled')}</option>
+          <option value="EXPIRED">{t('subscriptions.filters.expired')}</option>
+          <option value="PAST_DUE">{t('subscriptions.filters.pastDue')}</option>
+          <option value="TRIALING">{t('subscriptions.filters.trialing')}</option>
         </select>
 
         <select
@@ -73,7 +75,7 @@ export default function SubscriptionsPage() {
           }}
           className="px-4 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
         >
-          <option value="">All Plans</option>
+          <option value="">{t('subscriptions.filters.allPlans')}</option>
           {plans?.map((plan) => (
             <option key={plan.id} value={plan.id}>
               {plan.displayName}
@@ -88,19 +90,19 @@ export default function SubscriptionsPage() {
           <thead>
             <tr className="border-b border-zinc-100">
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Tenant
+                {t('subscriptions.col.tenant')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Plan
+                {t('subscriptions.col.plan')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Status
+                {t('subscriptions.col.status')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Billing
+                {t('subscriptions.col.billing')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Ends
+                {t('subscriptions.col.ends')}
               </th>
               <th className="w-28"></th>
             </tr>
@@ -146,14 +148,14 @@ export default function SubscriptionsPage() {
                         onClick={() => handleExtend(sub.id)}
                         className="text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
                       >
-                        Extend
+                        {t('subscriptions.extend')}
                       </button>
                       {sub.status === 'ACTIVE' && (
                         <button
                           onClick={() => handleCancel(sub.id)}
                           className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors"
                         >
-                          Cancel
+                          {t('subscriptions.cancel')}
                         </button>
                       )}
                     </div>
@@ -168,7 +170,7 @@ export default function SubscriptionsPage() {
         {data && data.meta.totalPages > 1 && (
           <div className="px-5 py-4 border-t border-zinc-100 flex items-center justify-between">
             <span className="text-sm text-zinc-500">
-              Page {data.meta.page} of {data.meta.totalPages}
+              {t('common.pageOf', { page: data.meta.page, totalPages: data.meta.totalPages })}
             </span>
             <div className="flex gap-2">
               <button
@@ -176,14 +178,14 @@ export default function SubscriptionsPage() {
                 disabled={data.meta.page === 1}
                 className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Previous
+                {t('common.previous')}
               </button>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={data.meta.page === data.meta.totalPages}
                 className="px-3 py-1.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Next
+                {t('common.next')}
               </button>
             </div>
           </div>

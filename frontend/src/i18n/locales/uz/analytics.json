@@ -1,0 +1,67 @@
+{
+  "heatmap": {
+    "settings": "Heatmap Settings",
+    "visualizationType": "Visualization Type",
+    "colorScheme": "Color Scheme",
+    "opacity": "Opacity: {{percent}}%",
+    "loadingData": "Loading heatmap data...",
+    "types": {
+      "none": { "label": "None", "description": "Hide heatmap" },
+      "occupancy": { "label": "Occupancy", "description": "Show customer density" },
+      "traffic": { "label": "Traffic Flow", "description": "Show movement patterns" },
+      "dwellTime": { "label": "Dwell Time", "description": "Show time spent in areas" }
+    },
+    "schemes": {
+      "heat": "Heat (Red)",
+      "viridis": "Viridis (Green-Purple)",
+      "plasma": "Plasma (Yellow-Purple)",
+      "coolwarm": "Cool-Warm (Blue-Red)",
+      "blues": "Blues"
+    },
+    "legend": {
+      "customerDensity": "Customer Density",
+      "trafficVolume": "Traffic Volume",
+      "dwellTime": "Dwell Time",
+      "low": "Low",
+      "high": "High"
+    }
+  },
+  "calibration": {
+    "title": "Camera Calibration",
+    "saveFailed": "Failed to save calibration",
+    "pointLabels": {
+      "topLeft": "Top-Left",
+      "topRight": "Top-Right",
+      "bottomRight": "Bottom-Right",
+      "bottomLeft": "Bottom-Left"
+    },
+    "step1": {
+      "heading": "Step 1: Select Camera Points",
+      "instructions": "Click on 4 corners of a rectangular area in the camera view. Start from the top-left corner and go clockwise."
+    },
+    "step2": {
+      "heading": "Step 2: Select Floor Plan Points",
+      "instructions": "Click on the corresponding 4 points on the floor plan grid. Match the same order as the camera points (top-left, top-right, bottom-right, bottom-left).",
+      "cameraView": "Camera View",
+      "floorPlan": "Floor Plan"
+    },
+    "step3": {
+      "heading": "Step 3: Review Calibration",
+      "instructions": "Verify that the camera and floor plan points are correctly aligned. The transformation will map positions from the camera view to the floor plan.",
+      "cameraPoints": "Camera Points",
+      "floorPlanPoints": "Floor Plan Points"
+    },
+    "complete": {
+      "heading": "Calibration Complete",
+      "message": "The camera has been successfully calibrated. Position data will now be mapped to the floor plan coordinates."
+    },
+    "pointsSelected": "Points selected: {{count}} / {{total}}",
+    "captureFrame": "Capture Frame",
+    "undo": "Undo",
+    "reset": "Reset",
+    "back": "Back",
+    "next": "Next",
+    "save": "Save Calibration",
+    "saving": "Saving..."
+  }
+}

@@ -4,6 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { OutboxService } from "../outbox/outbox.service";
 import { EventTypes } from "../outbox/event-types";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 
 /**
  * Nightly sweeper that closes out tenant add-ons whose billing window has
@@ -78,7 +79,12 @@ export class TenantAddOnSweeperService {
                 addOnCode: row.addOn.code,
               },
             })
-            .catch(() => undefined);
+            .catch(
+              captureSwallowedEmit(this.logger, {
+                module: "marketplace",
+                op: "addonSweeper",
+              }),
+            );
           closed++;
         } else {
           // Roll period forward 30 days. Real cycle alignment comes when

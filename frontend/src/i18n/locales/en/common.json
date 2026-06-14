@@ -65,6 +65,7 @@
     "store": "Hardware Store",
     "bridges": "Local Bridges",
     "webhooks": "Webhooks",
+    "desktopApp": "Desktop App",
     "fiscalRecovery": "Fiscal Recovery",
     "callerFeed": "Phone Calls",
     "hardwareOrders": "My Hardware Orders",

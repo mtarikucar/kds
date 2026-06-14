@@ -59,22 +59,29 @@ export class ZReportsController {
   @ApiQuery({ name: "limit", required: false })
   @ApiQuery({ name: "startDate", required: false })
   @ApiQuery({ name: "endDate", required: false })
-  async findAll(@Req() req, @Query() query: QueryZReportDto) {
-    return this.zReportsService.findAll(req.user.tenantId, query);
+  async findAll(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: QueryZReportDto,
+  ) {
+    return this.zReportsService.findAll(scope, query);
   }
 
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get a specific Z-Report" })
-  async findOne(@Req() req, @Param("id") id: string) {
-    return this.zReportsService.findOne(id, req.user.tenantId);
+  async findOne(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.zReportsService.findOne(id, scope);
   }
 
   @Get(":id/pdf")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Download Z-Report as PDF" })
-  async downloadPdf(@Req() req, @Param("id") id: string, @Res() res: Response) {
-    const pdf = await this.zReportsService.generatePdf(id, req.user.tenantId);
+  async downloadPdf(
+    @CurrentScope() scope: BranchScope,
+    @Param("id") id: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.zReportsService.generatePdf(id, scope);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -87,22 +94,26 @@ export class ZReportsController {
   @Patch(":id/close")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Close/finalize a Z-Report" })
-  async close(@Req() req, @Param("id") id: string) {
-    return this.zReportsService.closeReport(id, req.user.tenantId, req.user.id);
+  async close(
+    @CurrentScope() scope: BranchScope,
+    @Req() req,
+    @Param("id") id: string,
+  ) {
+    return this.zReportsService.closeReport(
+      id,
+      scope,
+      scope.userId ?? req.user.id,
+    );
   }
 
   @Post(":id/send-email")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Send Z-Report via email" })
   async sendEmail(
-    @Req() req,
+    @CurrentScope() scope: BranchScope,
     @Param("id") id: string,
     @Body() body: { emails?: string[] },
   ) {
-    return this.zReportsService.sendReportEmail(
-      id,
-      req.user.tenantId,
-      body.emails,
-    );
+    return this.zReportsService.sendReportEmail(id, scope, body.emails);
   }
 }

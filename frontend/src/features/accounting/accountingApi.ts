@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import type { PaginatedResponse } from '../../types';
 import { AccountingSettings, SalesInvoice } from './types';
 
-export const useGetAccountingSettings = () =>
-  useQuery<AccountingSettings>({
-    queryKey: ['accountingSettings'],
+export const useGetAccountingSettings = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<AccountingSettings>({
+    queryKey: ['accountingSettings', branchId],
     queryFn: async () => (await api.get('/accounting-settings')).data,
   });
+};
 
 export const useUpdateAccountingSettings = () => {
   const qc = useQueryClient();
@@ -24,11 +27,13 @@ export const useTestAccountingConnection = () =>
       (await api.post('/accounting-settings/test-connection')).data as { success: boolean; error?: string },
   });
 
-export const useGetSalesInvoices = (params?: Record<string, any>) =>
-  useQuery<PaginatedResponse<SalesInvoice>>({
-    queryKey: ['salesInvoices', params],
+export const useGetSalesInvoices = (params?: Record<string, any>) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<PaginatedResponse<SalesInvoice>>({
+    queryKey: ['salesInvoices', params, branchId],
     queryFn: async () => (await api.get<PaginatedResponse<SalesInvoice>>('/sales-invoices', { params })).data,
   });
+};
 
 export const useSyncInvoice = () => {
   const qc = useQueryClient();

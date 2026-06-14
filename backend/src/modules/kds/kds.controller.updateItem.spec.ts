@@ -21,7 +21,15 @@ import { OrderItemStatus } from './dto/update-order-item-status.dto';
 describe('KdsController.updateOrderItemStatus (iter-91)', () => {
   let kdsService: { updateOrderItemStatus: jest.Mock };
   let ctrl: KdsController;
-  const req = { tenantId: 't-1' } as any;
+  // Track-1 branch-scope: the controller now receives a resolved
+  // BranchScope from @CurrentScope() (BranchGuard's req.scope) instead of
+  // a bare req.tenantId, and forwards it as the FIRST positional arg.
+  const scope = {
+    tenantId: 't-1',
+    branchId: 'b-1',
+    userId: 'u-1',
+    role: 'KITCHEN',
+  } as any;
 
   beforeEach(() => {
     kdsService = { updateOrderItemStatus: jest.fn().mockResolvedValue({}) };
@@ -32,12 +40,12 @@ describe('KdsController.updateOrderItemStatus (iter-91)', () => {
     await ctrl.updateOrderItemStatus(
       'item-from-url',
       { status: OrderItemStatus.READY } as any,
-      req,
+      scope,
     );
     expect(kdsService.updateOrderItemStatus).toHaveBeenCalledWith(
+      scope,
       'item-from-url',
       OrderItemStatus.READY,
-      't-1',
     );
   });
 
@@ -51,20 +59,23 @@ describe('KdsController.updateOrderItemStatus (iter-91)', () => {
       // Cast through any so we can simulate a client posting the legacy
       // body shape.
       ({ status: OrderItemStatus.PREPARING, orderItemId: 'item-from-body' }) as any,
-      req,
+      scope,
     );
-    const [calledItemId] = kdsService.updateOrderItemStatus.mock.calls[0];
+    // itemId is now the SECOND positional arg (scope is first).
+    const [, calledItemId] = kdsService.updateOrderItemStatus.mock.calls[0];
     expect(calledItemId).toBe('item-from-url');
     expect(calledItemId).not.toBe('item-from-body');
   });
 
-  it('forwards the tenant from req — not from the body', async () => {
+  it('forwards the resolved branch scope — not anything from the body', async () => {
     await ctrl.updateOrderItemStatus(
       'item-1',
       ({ status: OrderItemStatus.READY, tenantId: 'wrong-tenant' }) as any,
-      req,
+      scope,
     );
-    const [, , tenant] = kdsService.updateOrderItemStatus.mock.calls[0];
-    expect(tenant).toBe('t-1');
+    const [calledScope] = kdsService.updateOrderItemStatus.mock.calls[0];
+    expect(calledScope).toBe(scope);
+    expect(calledScope.tenantId).toBe('t-1');
+    expect(calledScope.branchId).toBe('b-1');
   });
 });

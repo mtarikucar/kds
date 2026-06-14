@@ -54,6 +54,27 @@ export class RetryScheduler {
     }
   }
 
+  /**
+   * Cheap periodic re-sync of the `delivery_dlq_depth` gauge to an
+   * authoritative COUNT(*). DeliveryLogService.incrementRetry bumps the
+   * gauge inline the instant a row exhausts its retries, which keeps a
+   * Prometheus alert responsive; this tick corrects any drift introduced
+   * by an operator requeue/delete or a process restart (which resets the
+   * in-memory gauge to 0). dlqDepth() itself performs the gauge.set() —
+   * the scheduler just provides the heartbeat. A 5-minute cadence is far
+   * cheaper than the gauge's value and well within alert-evaluation
+   * tolerances. Errors are swallowed: a transient DB blip must not crash
+   * the scheduler.
+   */
+  @Interval(300_000) // Every 5 minutes
+  async syncDlqDepth(): Promise<void> {
+    try {
+      await this.logService.dlqDepth();
+    } catch (error: any) {
+      this.logger.warn(`DLQ-depth re-sync failed: ${error.message}`);
+    }
+  }
+
   private async runRetries() {
     try {
       const failedOps = await this.logService.getFailedOperations(20);

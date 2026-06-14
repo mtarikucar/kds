@@ -1,0 +1,123 @@
+# Opt-in monitoring stack for the kds backend: Prometheus + Alertmanager.
+#
+# This file is intentionally SEPARATE from docker-compose.prod.yml /
+# docker-compose.staging.yml — it adds NOTHING to and changes NOTHING in the
+# existing service definitions. Run it on its own (or alongside the app stack)
+# only when you want metric scraping + alerting:
+#
+#   # 1) point it at a running backend and (optionally) its metrics token:
+#   export KDS_BACKEND_TARGET=kds_backend_prod:3000     # container:port, or host:port
+#   export METRICS_TOKEN=...            # must match the backend's METRICS_TOKEN, or leave empty
+#   export ALERT_WEBHOOK_URL=https://example.invalid/hook   # operator-owned receiver
+#   # 2) join the app's docker network so 'kds_backend_prod' resolves:
+#   export KDS_NETWORK=kds-prod_kds_network             # `docker network ls` to find it
+#   # 3) run:
+#   docker compose -f docker-compose.monitoring.yml up -d
+#
+# Config files in ops/monitoring/ are TEMPLATES containing ${ENV} placeholders;
+# the entrypoints below run `envsubst` to render them into a writable path
+# before launching the binary (Prometheus/Alertmanager do not expand env vars
+# inside their own config files). See ops/monitoring/README.md.
+
+name: kds-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: kds_prometheus
+    restart: unless-stopped
+    user: root
+    # Render the env placeholders in the mounted template, then hand off to the
+    # stock prometheus binary with the standard flags. The template is mounted
+    # read-only; the rendered copy lives in the container's writable /tmp.
+    # Render the __PLACEHOLDER__ tokens in the mounted template from the env
+    # vars (set via `environment:` below), then hand off to the stock
+    # prometheus binary. The template is mounted read-only; the rendered copy
+    # lives in the container's writable /tmp. The tokens use a __VAR__ form so
+    # `sed` substitution can never collide with compose ${...} interpolation,
+    # shell expansion, or Prometheus' own $labels/$value rule templating.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        sed -e "s#__METRICS_TOKEN__#$${METRICS_TOKEN}#g" \
+            -e "s#__KDS_BACKEND_TARGET__#$${KDS_BACKEND_TARGET}#g" \
+            /etc/prometheus/prometheus.template.yml > /tmp/prometheus.yml
+        # rule_files in the rendered config points at the mounted, unmodified
+        # /etc/prometheus/alert.rules.yml.
+        exec /bin/prometheus \
+          --config.file=/tmp/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --web.console.libraries=/usr/share/prometheus/console_libraries \
+          --web.console.templates=/usr/share/prometheus/consoles
+    volumes:
+      - ./ops/monitoring/prometheus.yml:/etc/prometheus/prometheus.template.yml:ro
+      - ./ops/monitoring/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      KDS_BACKEND_TARGET: ${KDS_BACKEND_TARGET:-kds_backend_prod:3000}
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+      - kds_app
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: kds_alertmanager
+    restart: unless-stopped
+    user: root
+    # Same render-then-exec pattern: substitute the operator's receiver/SMTP
+    # secrets (from the env vars below) into a writable copy, then start the
+    # stock alertmanager binary. __VAR__ tokens, sed with a # delimiter so URLs
+    # containing / are safe.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        sed -e "s#__ALERT_WEBHOOK_URL__#$${ALERT_WEBHOOK_URL}#g" \
+            -e "s#__ALERT_EMAIL_FROM__#$${ALERT_EMAIL_FROM}#g" \
+            -e "s#__ALERT_EMAIL_TO__#$${ALERT_EMAIL_TO}#g" \
+            -e "s#__ALERT_SMTP_SMARTHOST__#$${ALERT_SMTP_SMARTHOST}#g" \
+            -e "s#__ALERT_SMTP_USERNAME__#$${ALERT_SMTP_USERNAME}#g" \
+            -e "s#__ALERT_SMTP_PASSWORD__#$${ALERT_SMTP_PASSWORD}#g" \
+            /etc/alertmanager/alertmanager.template.yml > /tmp/alertmanager.yml
+        exec /bin/alertmanager \
+          --config.file=/tmp/alertmanager.yml \
+          --storage.path=/alertmanager
+    volumes:
+      - ./ops/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.template.yml:ro
+      - alertmanager_data:/alertmanager
+    environment:
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-http://localhost:5001/}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-alerts@example.invalid}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-ops@example.invalid}
+      ALERT_SMTP_SMARTHOST: ${ALERT_SMTP_SMARTHOST:-localhost:25}
+      ALERT_SMTP_USERNAME: ${ALERT_SMTP_USERNAME:-}
+      ALERT_SMTP_PASSWORD: ${ALERT_SMTP_PASSWORD:-}
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
+
+networks:
+  # Internal network shared by prometheus <-> alertmanager.
+  monitoring:
+    driver: bridge
+  # The app's network, joined as EXTERNAL so this stack can reach the backend
+  # container by name (e.g. kds_backend_prod) without redefining it. Set
+  # KDS_NETWORK to the real network name (`docker network ls`). When running
+  # standalone without the app, set KDS_BACKEND_TARGET to a host:port instead
+  # and this external network can be removed.
+  kds_app:
+    external: true
+    name: ${KDS_NETWORK:-kds-prod_kds_network}

@@ -1,6 +1,15 @@
 import { CommandQueueService } from './command-queue.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
+/** Minimal ConfigService stub honouring the (key, default) signature. */
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    get: jest.fn((key: string, def?: unknown) =>
+      key in overrides ? overrides[key] : def,
+    ),
+  } as any;
+}
+
 /**
  * CommandQueueService talks raw SQL for the atomic claim path; here we focus
  * on the idempotency-on-create branch and the ack state machine, which sit
@@ -14,7 +23,47 @@ describe('CommandQueueService', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('ok') };
-    svc = new CommandQueueService(prisma as any, outbox as any);
+    svc = new CommandQueueService(prisma as any, outbox as any, makeConfig());
+  });
+
+  describe('DEFAULT_TTL config', () => {
+    const THIRTY_MIN_MS = 30 * 60 * 1000;
+
+    it('defaults to 30m when DEVICE_COMMAND_TTL_MS is unset', async () => {
+      prisma.device.findFirst.mockResolvedValue({ id: 'dev', status: 'online', branchId: 'b' } as any);
+      let captured: any = null;
+      (prisma.deviceCommand.create as any).mockImplementation(async ({ data }: any) => {
+        captured = data;
+        return { id: 'c-1', ...data };
+      });
+
+      const before = Date.now();
+      await svc.enqueue('t', 'dev', { kind: 'print', payload: {} });
+      const ttl = captured.expiresAt.getTime() - before;
+      expect(ttl).toBeGreaterThanOrEqual(THIRTY_MIN_MS - 1000);
+      expect(ttl).toBeLessThanOrEqual(THIRTY_MIN_MS + 5000);
+    });
+
+    it('honours a DEVICE_COMMAND_TTL_MS override', async () => {
+      const override = 5 * 60 * 1000;
+      svc = new CommandQueueService(
+        prisma as any,
+        outbox as any,
+        makeConfig({ DEVICE_COMMAND_TTL_MS: override }),
+      );
+      prisma.device.findFirst.mockResolvedValue({ id: 'dev', status: 'online', branchId: 'b' } as any);
+      let captured: any = null;
+      (prisma.deviceCommand.create as any).mockImplementation(async ({ data }: any) => {
+        captured = data;
+        return { id: 'c-1', ...data };
+      });
+
+      const before = Date.now();
+      await svc.enqueue('t', 'dev', { kind: 'print', payload: {} });
+      const ttl = captured.expiresAt.getTime() - before;
+      expect(ttl).toBeGreaterThanOrEqual(override - 1000);
+      expect(ttl).toBeLessThanOrEqual(override + 5000);
+    });
   });
 
   it('enqueue dedupes on (deviceId, idempotencyKey)', async () => {

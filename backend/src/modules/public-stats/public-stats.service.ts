@@ -167,11 +167,34 @@ export class PublicStatsService {
     };
   }
 
+  /**
+   * Strip HTML tags from public, display-only review text (defense-in-depth
+   * stored-XSS guard). We strip markup rather than entity-escape so legitimate
+   * punctuation (O'Brien & Sons) survives — the same reason the global
+   * input-sanitizer middleware was removed (it mangled apostrophes/OAuth codes).
+   * The reviews surface in the moderation UI (PENDING) and publicly (APPROVED).
+   */
+  private stripTags(v: string | undefined): string | undefined {
+    if (v == null) return v;
+    return (
+      v
+        // Drop <script>/<style> blocks wholesale so no inert-but-ugly inner
+        // text (e.g. "alert(1)") survives, then strip any remaining tags.
+        .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+        .replace(/<[^>]*>/g, "")
+        .trim()
+    );
+  }
+
   async submitReview(dto: CreateReviewDto, ip: string) {
     const geoData = await this.geolocationService.lookup(ip);
 
-    // Generate avatar from initials
-    const initials = dto.name
+    const name = this.stripTags(dto.name) ?? "";
+    const restaurant = this.stripTags(dto.restaurant);
+    const comment = this.stripTags(dto.comment);
+
+    // Generate avatar from initials (derived from the sanitized name)
+    const initials = name
       .split(" ")
       .map((n) => n[0])
       .join("")
@@ -180,11 +203,11 @@ export class PublicStatsService {
 
     return this.prisma.publicReview.create({
       data: {
-        name: dto.name,
+        name,
         email: dto.email,
-        restaurant: dto.restaurant,
+        restaurant,
         rating: dto.rating,
-        comment: dto.comment,
+        comment,
         avatar: initials,
         country: geoData?.country,
         city: geoData?.city,

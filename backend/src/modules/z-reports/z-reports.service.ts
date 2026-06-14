@@ -14,19 +14,13 @@ import {
   getTenantMidnight,
 } from "../../common/helpers/timezone.helper";
 import { CreateZReportDto } from "./dto/create-z-report.dto";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { UserRole } from "../../common/constants/roles.enum";
 import { paginated } from "../../common/pagination";
-import PDFDocument from "pdfkit";
 import { format } from "date-fns";
-
-// Currency symbol mapping
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  TRY: "₺",
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  CAD: "C$",
-  AUD: "A$",
-};
+import { ZReportPdfService } from "./services/z-report-pdf.service";
+import { ZReportAggregator } from "./services/z-report-aggregator.service";
+import { CURRENCY_SYMBOLS } from "./currency-symbols";
 
 @Injectable()
 export class ZReportsService {
@@ -35,6 +29,8 @@ export class ZReportsService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private readonly pdfService: ZReportPdfService,
+    private readonly aggregator: ZReportAggregator,
   ) {}
 
   /**
@@ -85,6 +81,7 @@ export class ZReportsService {
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        branchId,
         paidAt: {
           gte: startOfDay,
           lt: endOfDay,
@@ -106,69 +103,6 @@ export class ZReportsService {
       },
     });
 
-    // v2.8.97 — all money math now goes through Prisma.Decimal so
-    // IEEE-754 drift can't accumulate over high-volume tenants
-    // (~1000+ orders/day) where Number additions silently round.
-    // The final fields are stored as Decimal columns anyway, so
-    // converting at the end is the only place precision crosses
-    // the boundary back to JS Number.
-    const decSum = <T>(
-      items: T[],
-      pick: (item: T) => Prisma.Decimal | number | string | null | undefined,
-    ): Prisma.Decimal =>
-      items.reduce(
-        (acc, item) => acc.add(new Prisma.Decimal(pick(item) ?? 0)),
-        new Prisma.Decimal(0),
-      );
-
-    // Calculate totals
-    const totalOrders = orders.length;
-    const grossSales = decSum(orders, (o) => o.totalAmount);
-    const discounts = decSum(orders, (o) => o.discount);
-    const rawNetSales = decSum(orders, (o) => o.finalAmount);
-
-    // Calculate payment method breakdown (only COMPLETED payments)
-    const allPayments = orders
-      .flatMap((o) => o.payments)
-      .filter((p) => p.status === "COMPLETED");
-
-    const cashPaymentsList = allPayments.filter((p) => p.method === "CASH");
-    const cashPayments = decSum(cashPaymentsList, (p) => p.amount);
-    const cashPaymentCount = cashPaymentsList.length;
-
-    const cardPaymentsList = allPayments.filter((p) => p.method === "CARD");
-    const cardPayments = decSum(cardPaymentsList, (p) => p.amount);
-    const cardPaymentCount = cardPaymentsList.length;
-
-    const digitalPaymentsList = allPayments.filter(
-      (p) => p.method === "DIGITAL",
-    );
-    const digitalPayments = decSum(digitalPaymentsList, (p) => p.amount);
-    const digitalPaymentCount = digitalPaymentsList.length;
-
-    // Calculate refunds
-    const refundedPayments = orders
-      .flatMap((o) => o.payments)
-      .filter((p) => p.status === "REFUNDED");
-    const refundedAmount = decSum(refundedPayments, (p) => p.amount);
-    const totalRefunds = refundedAmount;
-
-    // Net sales accounts for refunds
-    const netSales = rawNetSales.sub(totalRefunds);
-
-    // Order type breakdown
-    const dineInOrders = orders.filter((o) => o.type === "DINE_IN");
-    const dineInSales = decSum(dineInOrders, (o) => o.finalAmount);
-
-    const takeawayOrders = orders.filter((o) => o.type === "TAKEAWAY");
-    const takeawaySales = decSum(takeawayOrders, (o) => o.finalAmount);
-
-    const deliveryOrders = orders.filter((o) => o.type === "DELIVERY");
-    const deliverySales = decSum(deliveryOrders, (o) => o.finalAmount);
-
-    const counterOrders = orders.filter((o) => o.type === "COUNTER");
-    const counterSales = decSum(counterOrders, (o) => o.finalAmount);
-
     // Cancelled orders that *closed* during the reporting day. Originally
     // this filtered on createdAt — but PAID orders use paidAt (the event
     // time), so the two halves of the report disagreed on what "today"
@@ -179,6 +113,7 @@ export class ZReportsService {
     const cancelledOrdersList = await this.prisma.order.findMany({
       where: {
         tenantId,
+        branchId,
         status: "CANCELLED",
         OR: [
           { cancelledAt: { gte: startOfDay, lt: endOfDay } },
@@ -189,82 +124,6 @@ export class ZReportsService {
         totalAmount: true,
       },
     });
-    const cancelledOrders = cancelledOrdersList.length;
-    const cancelledOrdersAmount = decSum(
-      cancelledOrdersList,
-      (o) => o.totalAmount,
-    );
-
-    // Get top selling products — Decimal accumulation, number on output.
-    const productDecSales = new Map<
-      string,
-      { name: string; quantity: number; revenue: Prisma.Decimal }
-    >();
-    orders.forEach((order) => {
-      order.orderItems.forEach((item) => {
-        let existing = productDecSales.get(item.productId);
-        if (!existing) {
-          existing = {
-            name: item.product.name,
-            quantity: 0,
-            revenue: new Prisma.Decimal(0),
-          };
-          productDecSales.set(item.productId, existing);
-        }
-        existing.quantity += item.quantity;
-        existing.revenue = existing.revenue.add(
-          new Prisma.Decimal(item.subtotal),
-        );
-      });
-    });
-
-    const topProducts = Array.from(productDecSales.values())
-      .map((p) => ({
-        name: p.name,
-        quantity: p.quantity,
-        revenue: p.revenue.toDecimalPlaces(2).toNumber(),
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-
-    // Tax breakdown from order items (Decimal arithmetic — same
-    // accumulation-precision reason as the sale totals above).
-    const allOrderItems = orders.flatMap((o) => o.orderItems);
-    const taxBreakdownDecMap = new Map<
-      number,
-      { taxableAmount: Prisma.Decimal; taxAmount: Prisma.Decimal }
-    >();
-    let totalTaxDec = new Prisma.Decimal(0);
-
-    for (const item of allOrderItems) {
-      const rate = item.taxRate ?? 10;
-      const tax = new Prisma.Decimal(item.taxAmount || 0);
-      const subtotalDec = new Prisma.Decimal(item.subtotal || 0);
-      let bucket = taxBreakdownDecMap.get(rate);
-      if (!bucket) {
-        bucket = {
-          taxableAmount: new Prisma.Decimal(0),
-          taxAmount: new Prisma.Decimal(0),
-        };
-        taxBreakdownDecMap.set(rate, bucket);
-      }
-      bucket.taxAmount = bucket.taxAmount.add(tax);
-      bucket.taxableAmount = bucket.taxableAmount.add(subtotalDec.sub(tax));
-      totalTaxDec = totalTaxDec.add(tax);
-    }
-    // Storage shape stays {number → {taxableAmount: number, taxAmount: number}}
-    // for backward compat with downstream consumers.
-    const taxBreakdownMap: Record<
-      number,
-      { taxableAmount: number; taxAmount: number }
-    > = {};
-    for (const [rate, b] of taxBreakdownDecMap) {
-      taxBreakdownMap[rate] = {
-        taxableAmount: b.taxableAmount.toDecimalPlaces(2).toNumber(),
-        taxAmount: b.taxAmount.toDecimalPlaces(2).toNumber(),
-      };
-    }
-    const totalTax = totalTaxDec.toDecimalPlaces(2).toNumber();
 
     // v2.8.99 — only APPROVED cash drawer movements count toward
     // reconciliation. DRAFT rows are CASH_OUT or ADJUSTMENT entries
@@ -274,6 +133,7 @@ export class ZReportsService {
     const cashMovements = await this.prisma.cashDrawerMovement.findMany({
       where: {
         tenantId,
+        branchId,
         approvalStatus: "APPROVED",
         createdAt: {
           gte: startOfDay,
@@ -291,104 +151,64 @@ export class ZReportsService {
       },
     });
 
-    // Calculate cash in/out movements (Decimal)
-    const cashInTotal = decSum(
-      cashMovements.filter((m) => m.type === "CASH_IN"),
-      (m) => m.amount,
-    );
-    const cashOutTotal = decSum(
-      cashMovements.filter((m) => m.type === "CASH_OUT"),
-      (m) => m.amount,
-    );
-    const cashInOut = cashInTotal.sub(cashOutTotal);
-
-    // Cash drawer reconciliation. cashDrawerOpening / cashDrawerClosing
-    // arrive as JS numbers from the closing DTO; coerce through Decimal
-    // before adding so the final reconciliation row is precision-clean.
-    const openingDec = new Prisma.Decimal(cashDrawerOpening);
-    const closingDec = new Prisma.Decimal(cashDrawerClosing);
-    const expectedCash = openingDec.add(cashPayments).add(cashInOut);
-    const cashDifference = closingDec.sub(expectedCash);
-
-    // Calculate staff performance — Decimal accumulation, number on
-    // the JSON output (staffPerformance is read by reporting UIs that
-    // expect plain numbers).
-    const staffDecMap = new Map<
-      string,
-      { name: string; sales: Prisma.Decimal; orders: number; refunds: number }
-    >();
-    for (const order of orders) {
-      const staffId = order.userId || "unknown";
-      const staffName = order.user
-        ? `${order.user.firstName} ${order.user.lastName}`
-        : "Unknown";
-      let existing = staffDecMap.get(staffId);
-      if (!existing) {
-        existing = {
-          name: staffName,
-          sales: new Prisma.Decimal(0),
-          orders: 0,
-          refunds: 0,
-        };
-        staffDecMap.set(staffId, existing);
-      }
-      existing.sales = existing.sales.add(
-        new Prisma.Decimal(order.finalAmount),
-      );
-      existing.orders += 1;
-    }
-    const staffPerformance = Array.from(staffDecMap.entries()).map(
-      ([id, data]) => ({
-        staffId: id,
-        name: data.name,
-        sales: data.sales.toDecimalPlaces(2).toNumber(),
-        orders: data.orders,
-        refunds: data.refunds,
-      }),
-    );
-
     // Calculate open (unfulfilled) orders
     const openOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        branchId,
         createdAt: { gte: startOfDay, lt: endOfDay },
         status: { notIn: ["PAID", "CANCELLED"] },
       },
       select: { finalAmount: true },
     });
-    const openChecks = openOrders.length;
-    const openChecksAmount = decSum(openOrders, (o) => o.finalAmount);
 
-    // Calculate category breakdown — Decimal accumulation as above.
-    const categoryDecMap = new Map<
-      string,
-      { categoryName: string; sales: Prisma.Decimal; quantity: number }
-    >();
-    for (const order of orders) {
-      for (const item of order.orderItems) {
-        const catId = item.product.categoryId;
-        const catName = item.product.category?.name || "Uncategorized";
-        let existing = categoryDecMap.get(catId);
-        if (!existing) {
-          existing = {
-            categoryName: catName,
-            sales: new Prisma.Decimal(0),
-            quantity: 0,
-          };
-          categoryDecMap.set(catId, existing);
-        }
-        existing.sales = existing.sales.add(new Prisma.Decimal(item.subtotal));
-        existing.quantity += item.quantity;
-      }
-    }
-    const categoryBreakdown = Array.from(categoryDecMap.entries()).map(
-      ([id, data]) => ({
-        categoryId: id,
-        categoryName: data.categoryName,
-        sales: data.sales.toDecimalPlaces(2).toNumber(),
-        quantity: data.quantity,
-      }),
-    );
+    // Pure number-crunching lives in ZReportAggregator (god-file split).
+    // All Decimal money math, payment/refund/order-type/tax/cash/staff/
+    // category/top-product aggregation and rounding is computed there from
+    // the already-fetched, branch-scoped rows. The data-fetching above and
+    // the create below stay here so the per-branch scoping and the
+    // $transaction-free dedupe/create flow are unchanged.
+    const totals = this.aggregator.aggregate({
+      orders,
+      cancelledOrdersList,
+      cashMovements,
+      openOrders,
+      cashDrawerOpening,
+      cashDrawerClosing,
+    });
+    const {
+      totalOrders,
+      totalSales: grossSales,
+      totalDiscount: discounts,
+      netSales,
+      totalTax,
+      taxBreakdown: taxBreakdownMap,
+      cashPayments,
+      cashPaymentCount,
+      cardPayments,
+      cardPaymentCount,
+      digitalPayments,
+      digitalPaymentCount,
+      dineInSales,
+      dineInOrders: dineInOrdersCount,
+      takeawaySales,
+      takeawayOrders: takeawayOrdersCount,
+      deliverySales,
+      deliveryOrders: deliveryOrdersCount,
+      cancelledOrders,
+      cancelledOrdersAmount,
+      totalRefunds,
+      refundedPayments: refundedPaymentsCount,
+      refundedAmount,
+      expectedCash,
+      cashDifference,
+      cashInOut,
+      openChecks,
+      openChecksAmount,
+      topProducts,
+      categoryBreakdown,
+      staffPerformance,
+    } = totals;
 
     // Create the Z-Report. The `findFirst` above is a fast-path dedupe;
     // the schema has `@@unique([tenantId, reportNumber])` and the report
@@ -423,11 +243,11 @@ export class ZReportsService {
 
           // Order type breakdown
           dineInSales,
-          dineInOrders: dineInOrders.length,
+          dineInOrders: dineInOrdersCount,
           takeawaySales,
-          takeawayOrders: takeawayOrders.length,
+          takeawayOrders: takeawayOrdersCount,
           deliverySales,
-          deliveryOrders: deliveryOrders.length,
+          deliveryOrders: deliveryOrdersCount,
 
           // Cancelled orders
           cancelledOrders,
@@ -435,7 +255,7 @@ export class ZReportsService {
 
           // Refund data
           totalRefunds,
-          refundedPayments: refundedPayments.length,
+          refundedPayments: refundedPaymentsCount,
           refundedAmount,
 
           // Cash drawer
@@ -471,10 +291,16 @@ export class ZReportsService {
   }
 
   /**
-   * Get all Z-Reports for a tenant
+   * Get all Z-Reports for the active branch.
+   *
+   * Track-1: Z-Reports are fiscal, per-branch records (the row carries a
+   * NOT-NULL branchId). The list must be scoped to the caller's active
+   * branch — a tenant-wide list would leak every branch's fiscal totals
+   * to an admin who only switched to one branch. Callers pass the
+   * branchId off `@CurrentScope()`.
    */
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     query: {
       page?: number;
       limit?: number;
@@ -486,7 +312,7 @@ export class ZReportsService {
     const limit = query.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: any = { tenantId };
+    const where: any = { ...branchScope(scope) };
 
     if (query.startDate || query.endDate) {
       where.reportDate = {};
@@ -512,11 +338,16 @@ export class ZReportsService {
   }
 
   /**
-   * Get a specific Z-Report
+   * Get a specific Z-Report, scoped to the caller's active branch.
+   *
+   * Track-1: branch-scoped so an admin on branch A cannot fetch branch
+   * B's fiscal report by id. The PDF/email/close paths all funnel
+   * through here, so scoping it once covers every read of a single
+   * report.
    */
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, scope: BranchScope) {
     const report = await this.prisma.zReport.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
 
     if (!report) {
@@ -529,111 +360,14 @@ export class ZReportsService {
   /**
    * Generate PDF for Z-Report
    */
-  async generatePdf(id: string, tenantId: string): Promise<Buffer> {
-    const report = await this.findOne(id, tenantId);
-
+  async generatePdf(id: string, scope: BranchScope): Promise<Buffer> {
+    const report = await this.findOne(id, scope);
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { id: scope.tenantId },
     });
-
-    return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
-      const chunks: Buffer[] = [];
-
-      doc.on("data", (chunk) => chunks.push(chunk));
-      doc.on("end", () => resolve(Buffer.concat(chunks)));
-      doc.on("error", reject);
-
-      // Header
-      doc.fontSize(20).text("Z-REPORT", { align: "center" });
-      doc.fontSize(12).text(tenant.name, { align: "center" });
-      doc.moveDown();
-
-      doc.fontSize(12).text(`Report Number: ${report.reportNumber}`);
-      doc.text(`Date: ${format(new Date(report.reportDate), "MMMM dd, yyyy")}`);
-      doc.text(
-        `Generated: ${format(new Date(report.createdAt), "MMMM dd, yyyy HH:mm")}`,
-      );
-      doc.moveDown();
-
-      // Get currency symbol
-      const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || "$";
-
-      // Sales Summary
-      doc.fontSize(14).text("Sales Summary", { underline: true });
-      doc.fontSize(10);
-      doc.text(`Total Orders: ${report.totalOrders}`);
-      doc.text(
-        `Total Sales: ${currencySymbol}${Number(report.totalSales).toFixed(2)}`,
-      );
-      doc.text(
-        `Discounts: ${currencySymbol}${Number(report.totalDiscount).toFixed(2)}`,
-      );
-      doc.text(
-        `Net Sales: ${currencySymbol}${Number(report.netSales).toFixed(2)}`,
-      );
-      doc.moveDown();
-
-      // Payment Methods
-      doc.fontSize(14).text("Payment Methods", { underline: true });
-      doc.fontSize(10);
-      doc.text(
-        `Cash: ${currencySymbol}${Number(report.cashPayments).toFixed(2)}`,
-      );
-      doc.text(
-        `Card: ${currencySymbol}${Number(report.cardPayments).toFixed(2)}`,
-      );
-      doc.text(
-        `Digital: ${currencySymbol}${Number(report.digitalPayments).toFixed(2)}`,
-      );
-      doc.moveDown();
-
-      // Cash Drawer
-      doc.fontSize(14).text("Cash Drawer Reconciliation", { underline: true });
-      doc.fontSize(10);
-      doc.text(
-        `Opening Balance: ${currencySymbol}${Number(report.openingCash).toFixed(2)}`,
-      );
-      doc.text(
-        `Cash Sales: ${currencySymbol}${Number(report.cashPayments).toFixed(2)}`,
-      );
-      doc.text(
-        `Expected Cash: ${currencySymbol}${Number(report.expectedCash).toFixed(2)}`,
-      );
-      doc.text(
-        `Actual Cash: ${currencySymbol}${Number(report.countedCash).toFixed(2)}`,
-      );
-      doc.text(
-        `Difference: ${currencySymbol}${Number(report.cashDifference).toFixed(2)}`,
-        {
-          continued: true,
-        },
-      );
-
-      const cashDiff = Number(report.cashDifference);
-      if (cashDiff !== 0) {
-        doc
-          .fillColor(cashDiff > 0 ? "green" : "red")
-          .text(` (${cashDiff > 0 ? "Over" : "Short"})`)
-          .fillColor("black");
-      }
-      doc.moveDown();
-
-      // Notes
-      if (report.notes) {
-        doc.fontSize(14).text("Notes", { underline: true });
-        doc.fontSize(10).text(report.notes);
-        doc.moveDown();
-      }
-
-      // Footer
-      doc
-        .fontSize(8)
-        .text(`Generated by ${tenant.name} POS System`, { align: "center" })
-        .text(`Report ID: ${report.id}`, { align: "center" });
-
-      doc.end();
-    });
+    // Pure rendering lives in ZReportPdfService (god-file split). tenant is
+    // assumed present for a valid scope, preserving the prior behavior.
+    return this.pdfService.render(report, tenant!);
   }
 
   /**
@@ -643,8 +377,8 @@ export class ZReportsService {
    * updateMany on isFinalized=false ensures two concurrent close clicks
    * can't both win.
    */
-  async closeReport(id: string, tenantId: string, userId?: string) {
-    const report = await this.findOne(id, tenantId);
+  async closeReport(id: string, scope: BranchScope, userId?: string) {
+    const report = await this.findOne(id, scope);
     if ((report as any).isFinalized) {
       throw new BadRequestException("Report is already finalized");
     }
@@ -657,7 +391,7 @@ export class ZReportsService {
     const payloadHash = this.computePayloadHash(report);
 
     const result = await this.prisma.zReport.updateMany({
-      where: { id, tenantId, isFinalized: false },
+      where: { id, ...branchScope(scope), isFinalized: false },
       data: {
         isFinalized: true,
         finalizedAt: new Date(),
@@ -670,7 +404,7 @@ export class ZReportsService {
     if (result.count !== 1) {
       throw new ConflictException("Report was concurrently finalized");
     }
-    return this.findOne(id, tenantId);
+    return this.findOne(id, scope);
   }
 
   /**
@@ -724,13 +458,13 @@ export class ZReportsService {
    */
   async sendReportEmail(
     id: string,
-    tenantId: string,
+    scope: BranchScope,
     toEmails?: string[],
   ): Promise<{ success: boolean; message: string }> {
-    const report = await this.findOne(id, tenantId);
+    const report = await this.findOne(id, scope);
 
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { id: scope.tenantId },
     });
 
     if (!tenant) {
@@ -840,7 +574,7 @@ export class ZReportsService {
       // (B41-B45 pattern). `closeReport` already uses updateMany with
       // tenant scoping; this email-status write must match.
       await this.prisma.zReport.updateMany({
-        where: { id, tenantId },
+        where: { id, ...branchScope(scope) },
         data: {
           emailSent: success,
           emailSentAt: success ? new Date() : null,
@@ -867,8 +601,8 @@ export class ZReportsService {
       this.logger.error(`Failed to send Z-Report email: ${error.message}`);
 
       // Update report with error
-      await this.prisma.zReport.update({
-        where: { id },
+      await this.prisma.zReport.updateMany({
+        where: { id, ...branchScope(scope) },
         data: {
           emailError: error.message,
         },
@@ -936,7 +670,17 @@ export class ZReportsService {
     let emailSent = false;
 
     if (tenant?.reportEmailEnabled && tenant.reportEmails?.length > 0) {
-      const result = await this.sendReportEmail(report.id, tenantId);
+      // Scheduler path: rebuild the branch scope from the resolved
+      // (tenantId, branchId) so the email-status write stays pinned to
+      // the same branch the report belongs to. role/userId are the
+      // acting system context; only tenantId/branchId are load-bearing.
+      const scope: BranchScope = {
+        tenantId,
+        branchId,
+        userId,
+        role: UserRole.ADMIN,
+      };
+      const result = await this.sendReportEmail(report.id, scope);
       emailSent = result.success;
     }
 

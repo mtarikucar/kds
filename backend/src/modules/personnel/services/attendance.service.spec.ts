@@ -59,3 +59,70 @@ describe('AttendanceService.tenantToday (iter-52)', () => {
     expect((lookupArgs.where.date as Date).getTime()).toBe(expectedToday.getTime());
   });
 });
+
+/**
+ * Track-1 branch-scope hardening: the attendance READ paths must filter
+ * by the active branch. A manager pinned to branch A must not read
+ * branch B's attendance rows. Self-scoped reads (my-status) still pin
+ * the branch so a user only sees their record within the active branch.
+ */
+describe('AttendanceService branch-scope reads (track-1)', () => {
+  let prisma: MockPrismaClient;
+  let kdsGateway: any;
+  let svc: AttendanceService;
+  const scope = {
+    tenantId: 't-1',
+    branchId: 'b-1',
+    userId: 'u-1',
+    role: 'MANAGER',
+  } as any;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    kdsGateway = { emitAttendanceUpdate: jest.fn() };
+    svc = new AttendanceService(prisma as any, kdsGateway);
+    prisma.tenant.findUnique.mockResolvedValue({ timezone: 'UTC' } as any);
+  });
+
+  it('getTodayAttendance filters by branchId + tenantId', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([]);
+
+    await svc.getTodayAttendance(scope);
+
+    const where = (prisma.attendance.findMany as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+  });
+
+  it('getAttendanceHistory filters by branchId + tenantId', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([]);
+    (prisma.attendance.count as any).mockResolvedValue(0);
+
+    await svc.getAttendanceHistory(scope, {} as any);
+
+    const where = (prisma.attendance.findMany as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+  });
+
+  it('getAttendanceSummary filters by branchId + tenantId', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([]);
+
+    await svc.getAttendanceSummary(scope, {} as any);
+
+    const where = (prisma.attendance.findMany as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+  });
+
+  it('getMyStatus pins the active branch for the self-scoped read', async () => {
+    (prisma.attendance.findFirst as any).mockResolvedValue(null);
+
+    await svc.getMyStatus(scope);
+
+    const where = (prisma.attendance.findFirst as any).mock.calls[0][0].where;
+    expect(where.branchId).toBe('b-1');
+    expect(where.tenantId).toBe('t-1');
+    expect(where.userId).toBe('u-1');
+  });
+});

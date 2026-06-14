@@ -7,8 +7,11 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Use /app/ base path for web builds, but keep root for Tauri desktop
-  base: process.env.TAURI_PLATFORM ? '/' : '/app/',
+  // Served at the domain root now (hummytummy.com → this SPA). The old /app/
+  // base is gone; nginx 301-redirects legacy /app/* → /*. Tauri desktop was
+  // already root. Root base also makes main.tsx's routerBasename resolve to
+  // undefined (it keys off BASE_URL === '/'), so links work at the root.
+  base: '/',
   plugins: [
     react(),
     // Sentry plugin for source map upload (production builds only)

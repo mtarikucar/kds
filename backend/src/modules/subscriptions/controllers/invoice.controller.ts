@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { BillingService } from "../services/billing.service";
 import { InvoicePdfService } from "../services/invoice-pdf.service";
@@ -19,6 +20,9 @@ import { InvoicePdfService } from "../services/invoice-pdf.service";
  * by TenantGuard and filter every lookup by it — the prior version did a
  * global invoice-number lookup, enabling cross-tenant IDOR.
  */
+// Tenant-level (scoped by req.tenantId, never by branch) → exempt from the
+// global BranchGuard so invoice download works without an X-Branch-Id header.
+@SkipBranchScope()
 @Controller("invoices")
 export class InvoiceController {
   constructor(
@@ -73,7 +77,7 @@ export class InvoiceController {
   }
 
   @Post(":id/generate-pdf")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async generatePdf(@Param("id") invoiceNumber: string, @Req() req: Request) {
     const tenantId = (req as any).tenantId;
     const invoice = await this.billingService.getInvoiceByNumber(

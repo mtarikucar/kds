@@ -25,6 +25,7 @@ describe('RetryScheduler (iter-40)', () => {
       getFailedOperations: jest.fn().mockResolvedValue([]),
       markRetrySuccess: jest.fn().mockResolvedValue(undefined),
       incrementRetry: jest.fn().mockResolvedValue(undefined),
+      dlqDepth: jest.fn().mockResolvedValue(0),
     };
     statusSyncService = { syncStatusToPlatform: jest.fn() };
     authService = { ensureValidToken: jest.fn() };
@@ -128,5 +129,17 @@ describe('RetryScheduler (iter-40)', () => {
     // cross-tenant order lookup.
     const where = (prisma.order.findFirst as any).mock.calls[0][0].where;
     expect(where).toEqual({ id: 'order-1', tenantId: 't1' });
+  });
+
+  describe('DLQ-depth re-sync tick', () => {
+    it('calls logService.dlqDepth() to re-sync the authoritative gauge', async () => {
+      await svc.syncDlqDepth();
+      expect(logService.dlqDepth).toHaveBeenCalledTimes(1);
+    });
+
+    it('swallows a dlqDepth() error so a metrics hiccup never crashes the scheduler', async () => {
+      logService.dlqDepth.mockRejectedValue(new Error('db blip'));
+      await expect(svc.syncDlqDepth()).resolves.toBeUndefined();
+    });
   });
 });

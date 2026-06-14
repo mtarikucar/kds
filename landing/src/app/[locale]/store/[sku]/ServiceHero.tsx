@@ -7,6 +7,8 @@
  * shape of the engagement.
  */
 
+import { appHref } from '@/lib/urls';
+
 interface ServiceMeta {
   durationHours?: number;
   geoCoverage?: string[];
@@ -104,7 +106,7 @@ export default function ServiceHero({
           <div className="text-3xl font-semibold text-slate-900">{priceLabel}</div>
           <div className="mt-1 text-xs text-slate-500">Tek seferlik, KDV hariç</div>
           <a
-            href={`/app/admin/store?sku=${encodeURIComponent(sku)}`}
+            href={appHref(`/admin/store?sku=${encodeURIComponent(sku)}`)}
             className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
           >
             {t.buy}

@@ -6,7 +6,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Req,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -47,24 +46,30 @@ export class CashDrawerController {
   @Get("movements/pending")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "List DRAFT movements awaiting approval" })
-  listPending(@Req() req: any) {
-    return this.svc.listPending(req.user.tenantId);
+  listPending(@CurrentScope() scope: BranchScope) {
+    return this.svc.listPending(scope);
   }
 
   @Get("movements/:id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: "Get one movement with audit trail" })
-  findOne(@Req() req: any, @Param("id", ParseUUIDPipe) id: string) {
-    return this.svc.findOne(req.user.tenantId, id);
+  findOne(
+    @CurrentScope() scope: BranchScope,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.svc.findOne(scope, id);
   }
 
   @Patch("movements/:id/approve")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Approve a DRAFT movement (ADMIN/MANAGER)" })
-  approve(@Req() req: any, @Param("id", ParseUUIDPipe) id: string) {
-    return this.svc.approve(req.user.tenantId, id, {
-      id: req.user.id,
-      role: req.user.role,
+  approve(
+    @CurrentScope() scope: BranchScope,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.svc.approve(scope, id, {
+      id: scope.userId,
+      role: scope.role,
     });
   }
 
@@ -74,14 +79,14 @@ export class CashDrawerController {
     summary: "Reject a DRAFT movement with a reason (ADMIN/MANAGER)",
   })
   reject(
-    @Req() req: any,
+    @CurrentScope() scope: BranchScope,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: RejectCashDrawerMovementDto,
   ) {
     return this.svc.reject(
-      req.user.tenantId,
+      scope,
       id,
-      { id: req.user.id, role: req.user.role },
+      { id: scope.userId, role: scope.role },
       dto,
     );
   }

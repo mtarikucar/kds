@@ -5,10 +5,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MetricsService } from '../../common/metrics/metrics.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -24,6 +26,7 @@ describe('AuthService', () => {
   let prisma: MockPrismaClient;
   let jwtService: JwtService;
   let configService: ConfigService;
+  let metrics: { incCounter: jest.Mock };
 
   const mockJwtService = {
     sign: jest.fn(),
@@ -51,6 +54,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     prisma = mockPrismaClient();
+    metrics = { incCounter: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -81,6 +85,10 @@ describe('AuthService', () => {
             createNotification: jest.fn(),
             sendToUser: jest.fn(),
           },
+        },
+        {
+          provide: MetricsService,
+          useValue: metrics,
         },
       ],
     }).compile();
@@ -314,6 +322,70 @@ describe('AuthService', () => {
           tenantId: 'tenant-existing',
         },
       });
+    });
+
+    // Orphan-tenant guard (HIGH). Scenario 1 used to create the tenant +
+    // subscription + branch in one transaction and the user in a SEPARATE
+    // one. A crash between them committed a tenant with NO users and a
+    // consumed subdomain. The fix folds user creation into the SAME
+    // transaction as the tenant. This test pins that:
+    //   1. A failure during user.create rejects the whole register() —
+    //      because user.create now runs inside the tenant's tx, the tx
+    //      rolls back (the real Prisma client never commits the tenant).
+    //   2. Scenario 1 issues exactly ONE prisma.$transaction call — the
+    //      one wrapping tenant + subscription + branch + user — not two.
+    //      A second $transaction call would mean the user is created in a
+    //      detached tx, reopening the orphan window.
+    it('creates tenant + user in ONE transaction (scenario 1 atomicity)', async () => {
+      const registerDto: RegisterDto = {
+        email: 'newadmin@test.com',
+        password: 'password123',
+        firstName: 'John',
+        lastName: 'Doe',
+        restaurantName: 'Atomic Restaurant',
+      };
+
+      prisma.user.findUnique.mockResolvedValue(null); // existence check
+      prisma.tenant.findUnique.mockResolvedValue(null); // subdomain free
+      prisma.subscriptionPlan.findUnique.mockResolvedValue({
+        id: 'plan-business',
+        name: 'BUSINESS',
+        trialDays: 14,
+        monthlyPrice: 2990,
+        currency: 'TRY',
+      } as any);
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-new' } as any);
+      prisma.subscription.create.mockResolvedValue({} as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      // The user create blows up *inside* the transaction (e.g. a DB
+      // CHECK-constraint violation or a process crash mid-write).
+      prisma.user.create.mockRejectedValue(new Error('boom: user write failed'));
+
+      // Count how many distinct $transaction calls register() makes and
+      // surface the rejection from the wrapped callback (so a failure in
+      // user.create propagates out of the transaction, exactly as the
+      // real client would when the tx aborts).
+      const txSpy = prisma.$transaction as jest.Mock;
+      txSpy.mockImplementation(async (arg: any) => {
+        if (typeof arg === 'function') return arg(prisma);
+        return Promise.all(arg);
+      });
+
+      await expect(service.register(registerDto)).rejects.toThrow(
+        'boom: user write failed',
+      );
+
+      // Exactly one transaction wrapped tenant+subscription+branch+user.
+      expect(txSpy).toHaveBeenCalledTimes(1);
+      // The user write was attempted inside that single transaction…
+      expect(prisma.user.create).toHaveBeenCalledTimes(1);
+      // …alongside the tenant create (same tx) — proving they share a
+      // rollback boundary. With the real client, the tenant row never
+      // commits, so no orphan tenant survives.
+      expect(prisma.tenant.create).toHaveBeenCalledTimes(1);
+      // No allow-list row and no token persistence past the failure.
+      expect(prisma.userBranchAssignment.create).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     });
   });
 
@@ -571,6 +643,415 @@ describe('AuthService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(service.getProfile('nonexistent')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  // Regression: a new Google/Apple signup must get the SAME provisioning as
+  // email register() — a BUSINESS trial + an auto-created Main branch + seeded
+  // featureOverrides. The old social path provisioned FREE + no branch, which
+  // made the dashboard prompt "create a branch" against the MULTI_LOCATION gate
+  // and surface "Bu özellik aboneliğinizde yok" on a brand-new account (the
+  // trial never started). This pins the two paths in lockstep.
+  describe('createSocialAuthUser (social signup provisioning parity)', () => {
+    const businessPlan = {
+      id: 'plan-business',
+      name: 'BUSINESS',
+      trialDays: 14,
+      monthlyPrice: 2990,
+      currency: 'TRY',
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: true,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      reservationSystem: true,
+      personnelManagement: true,
+      deliveryIntegration: true,
+    };
+
+    const armHappyPath = () => {
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(businessPlan as any);
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-1' } as any);
+      prisma.subscription.create.mockResolvedValue({ id: 'sub-1' } as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'g@test.com',
+        firstName: 'G',
+        lastName: 'U',
+        role: UserRole.ADMIN,
+        tenantId: 'tenant-1',
+      } as any);
+      // allocateSubdomain runs its own tenant.findUnique loop — stub it so the
+      // test exercises only the provisioning we care about.
+      jest
+        .spyOn(service as any, 'allocateSubdomain')
+        .mockResolvedValue('g-restaurant');
+      mockJwtService.sign.mockReturnValue('signed-token');
+    };
+
+    it('provisions a BUSINESS trial + Main branch + ADMIN for a new social user', async () => {
+      armHappyPath();
+
+      const result = await (service as any).createSocialAuthUser({
+        email: 'g@test.com',
+        firstName: 'G',
+        lastName: 'U',
+        googleId: 'google-123',
+        authProvider: 'google',
+      });
+
+      // BUSINESS trial subscription (bug was: FREE / none → trial never started)
+      expect(prisma.subscription.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            planId: 'plan-business',
+            status: 'TRIALING',
+            isTrialPeriod: true,
+          }),
+        }),
+      );
+      // A Main branch (bug was: none → MULTI_LOCATION gate blocked first branch)
+      expect(prisma.branch.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Main', status: 'active' }),
+        }),
+      );
+      // Tenant seeded with the trial markers + the plan's featureOverrides
+      expect(prisma.tenant.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            currentPlanId: 'plan-business',
+            trialUsed: true,
+            featureOverrides: expect.objectContaining({ multiLocation: true }),
+          }),
+        }),
+      );
+      // ADMIN pinned to the Main branch
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: UserRole.ADMIN,
+            primaryBranchId: 'branch-main',
+            authProvider: 'google',
+            emailVerified: true,
+          }),
+        }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('throws when the BUSINESS plan is unseeded (never silently under-provisions)', async () => {
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(null as any);
+      jest
+        .spyOn(service as any, 'allocateSubdomain')
+        .mockResolvedValue('x-restaurant');
+
+      await expect(
+        (service as any).createSocialAuthUser({
+          email: 'x@test.com',
+          firstName: 'X',
+          lastName: 'Y',
+          googleId: 'gid',
+          authProvider: 'google',
+        }),
+      ).rejects.toThrow();
+      // No tenant is created on the failure path.
+      expect(prisma.tenant.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // CHARACTERIZATION TESTS — pin the three MUST-PRESERVE invariants before the
+  // auth.service refactor (thin facade + TokenService / PasswordService /
+  // EmailVerificationService / AuthProvisioningService). These tests MUST stay
+  // green byte-for-byte across the extraction; if any of them flips, a guard
+  // or transaction boundary moved.
+  // =========================================================================
+
+  // Invariant (a): register() scenario-1 creates tenant + subscription +
+  // branch + the ADMIN user ALL INSIDE THE SAME $transaction callback. The
+  // user.create runs through the SAME tx client object the tenant.create
+  // received — proving they share one rollback boundary. A user.create
+  // rejection leaves NO committed tenant (the whole register() rejects and,
+  // with the real client, the tenant row never commits). The P2002 mapping on
+  // the tenant tx still surfaces ResourceAlreadyExistsException.
+  describe('register scenario-1 atomicity (INVARIANT a)', () => {
+    const armScenario1 = () => {
+      prisma.user.findUnique.mockResolvedValue(null); // email free
+      prisma.tenant.findUnique.mockResolvedValue(null); // subdomain free
+      prisma.subscriptionPlan.findUnique.mockResolvedValue({
+        id: 'plan-business',
+        name: 'BUSINESS',
+        trialDays: 14,
+        monthlyPrice: 2990,
+        currency: 'TRY',
+      } as any);
+    };
+
+    it('runs tenant.create AND user.create inside ONE shared $transaction client', async () => {
+      armScenario1();
+
+      // Capture the exact tx client object handed to each write so we can
+      // prove tenant.create and user.create share it (same rollback scope).
+      const seenClients: Record<string, unknown> = {};
+      const txSpy = prisma.$transaction as jest.Mock;
+      txSpy.mockImplementation(async (arg: any) => {
+        if (typeof arg === 'function') return arg(prisma);
+        return Promise.all(arg);
+      });
+      (prisma.tenant.create as any).mockImplementation(async function (
+        this: unknown,
+      ) {
+        return { id: 'tenant-new' };
+      });
+
+      // Wrap the write fns so the call records which client invoked them.
+      // Because $transaction replays the callback against `prisma`, the same
+      // object is `this`/closure for every write — assert there is exactly
+      // one tx and both writes happened within it.
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-new' } as any);
+      prisma.subscription.create.mockResolvedValue({} as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      prisma.user.create.mockImplementation(async () => {
+        seenClients.userCreateDuringTx = txSpy.mock.calls.length === 1;
+        return {
+          id: 'user-new',
+          email: 'a@test.com',
+          firstName: 'A',
+          lastName: 'B',
+          role: UserRole.ADMIN,
+          tenantId: 'tenant-new',
+          primaryBranchId: 'branch-main',
+        } as any;
+      });
+      prisma.refreshToken.create.mockResolvedValue({} as any);
+      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+        if (where?.email) return null;
+        return { tokenVersion: 0, primaryBranchId: 'branch-main', branchAssignments: [] };
+      });
+      mockJwtService.sign.mockReturnValue('a-token');
+
+      const dto: RegisterDto = {
+        email: 'a@test.com',
+        password: 'password123',
+        firstName: 'A',
+        lastName: 'B',
+        restaurantName: 'Atomic One',
+      };
+
+      await service.register(dto);
+
+      // Exactly ONE $transaction wraps the whole provisioning.
+      expect(txSpy).toHaveBeenCalledTimes(1);
+      // tenant + branch + user all written; user.create fired while the
+      // single transaction was the only one open (no detached second tx).
+      expect(prisma.tenant.create).toHaveBeenCalledTimes(1);
+      expect(prisma.branch.create).toHaveBeenCalledTimes(1);
+      expect(prisma.user.create).toHaveBeenCalledTimes(1);
+      expect(seenClients.userCreateDuringTx).toBe(true);
+    });
+
+    it('a user.create failure rolls back — NO committed tenant, NO orphan side effects', async () => {
+      armScenario1();
+      const txSpy = prisma.$transaction as jest.Mock;
+      txSpy.mockImplementation(async (arg: any) => {
+        if (typeof arg === 'function') return arg(prisma);
+        return Promise.all(arg);
+      });
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-new' } as any);
+      prisma.subscription.create.mockResolvedValue({} as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      prisma.user.create.mockRejectedValue(new Error('boom: user write failed'));
+
+      const dto: RegisterDto = {
+        email: 'a@test.com',
+        password: 'password123',
+        firstName: 'A',
+        lastName: 'B',
+        restaurantName: 'Atomic Two',
+      };
+
+      await expect(service.register(dto)).rejects.toThrow(
+        'boom: user write failed',
+      );
+
+      // Single tx; tenant + user attempted in it; the rejection propagates
+      // out so the real client never commits the tenant (no orphan tenant /
+      // consumed subdomain). No allow-list row, no token persisted.
+      expect(txSpy).toHaveBeenCalledTimes(1);
+      expect(prisma.tenant.create).toHaveBeenCalledTimes(1);
+      expect(prisma.user.create).toHaveBeenCalledTimes(1);
+      expect(prisma.userBranchAssignment.create).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    });
+
+    it('maps a P2002 on the tenant tx to ResourceAlreadyExistsException (covers user.create too)', async () => {
+      armScenario1();
+      const txSpy = prisma.$transaction as jest.Mock;
+      txSpy.mockImplementation(async (arg: any) => {
+        if (typeof arg === 'function') return arg(prisma);
+        return Promise.all(arg);
+      });
+      prisma.tenant.create.mockResolvedValue({ id: 'tenant-new' } as any);
+      prisma.subscription.create.mockResolvedValue({} as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
+      // Simulate the unique-constraint collision surfacing from inside the
+      // tx (e.g. user.create racing the email unique index).
+      const p2002 = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        { code: 'P2002', clientVersion: 'test' } as any,
+      );
+      prisma.user.create.mockRejectedValue(p2002);
+
+      const dto: RegisterDto = {
+        email: 'a@test.com',
+        password: 'password123',
+        firstName: 'A',
+        lastName: 'B',
+        restaurantName: 'Atomic Three',
+      };
+
+      await expect(service.register(dto)).rejects.toBeInstanceOf(
+        ResourceAlreadyExistsException,
+      );
+      expect(txSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Invariant (b): refreshToken ordering. A stale-ver token (payload.ver !==
+  // user.tokenVersion) must fail cleanly: NO atomic rotation claim runs (the
+  // row is not burned) and NO family revoke happens (no updateMany on the
+  // user's family). The order is findUnique(stored) -> findUnique(user) ->
+  // ver check -> claim. We pin that the ver-mismatch path throws BEFORE any
+  // updateMany is called.
+  describe('refreshToken safe ordering (INVARIANT b)', () => {
+    it('stale tokenVersion fails WITHOUT burning the row or family-revoking', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'user-1',
+        type: 'user',
+        ver: 0, // stale: user.tokenVersion is 5 below
+      });
+      (prisma.refreshToken.findUnique as any).mockResolvedValue({
+        id: 'rt-1',
+        userId: 'user-1',
+        tokenHash: 'irrelevant-hash',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        revokedAt: null,
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'u@test.com',
+        firstName: 'U',
+        lastName: 'X',
+        role: UserRole.ADMIN,
+        status: 'ACTIVE',
+        tenantId: 'tenant-1',
+        tokenVersion: 5, // bumped by a password reset; presented ver=0 is stale
+        tenant: { status: 'ACTIVE' },
+      } as any);
+
+      await expect(service.refreshToken('stale-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      // CRITICAL: the ver check ran BEFORE the rotation claim. No updateMany
+      // ran at all — so the presented row was NOT burned and the refresh
+      // family was NOT revoked. A second updateMany would mean a family
+      // revoke (the DoS vector the audit fix removed).
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+      // No reuse counter on a clean stale-ver failure.
+      expect(metrics.incCounter).not.toHaveBeenCalledWith(
+        'auth_refresh_reuse_total',
+        expect.anything(),
+      );
+    });
+
+    it('a genuine reuse (claim count 0) DOES family-revoke and counts the theft signal', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'user-1',
+        type: 'user',
+        ver: 0, // matches tokenVersion below → passes the ver check
+      });
+      (prisma.refreshToken.findUnique as any).mockResolvedValue({
+        id: 'rt-1',
+        userId: 'user-1',
+        tokenHash: 'irrelevant-hash',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        revokedAt: null,
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'u@test.com',
+        firstName: 'U',
+        lastName: 'X',
+        role: UserRole.ADMIN,
+        status: 'ACTIVE',
+        tenantId: 'tenant-1',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      } as any);
+      // First updateMany (the atomic claim) loses the race → count 0.
+      // Second updateMany is the family revoke.
+      (prisma.refreshToken.updateMany as any)
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 3 });
+
+      await expect(service.refreshToken('reused-token')).rejects.toThrow(
+        'Refresh token reuse detected',
+      );
+
+      // Claim + family-revoke = two updateMany calls.
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(2);
+      // The second call is the family revoke (whole user, revokedAt: null).
+      expect(prisma.refreshToken.updateMany).toHaveBeenNthCalledWith(2, {
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      // Theft-signal counter fired.
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'auth_refresh_reuse_total',
+        expect.any(String),
+      );
+    });
+  });
+
+  // Invariant (c): the three security counters fire — login failure
+  // (unknown_user / bad_password) via validateUser, and refresh reuse via
+  // refreshToken. MetricsService stays injected (@Optional) on AuthService.
+  describe('security metrics counters (INVARIANT c)', () => {
+    it('counts auth_login_failures_total{unknown_user} on an unknown email', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.validateUser('ghost@test.com', 'whatever');
+
+      expect(result).toBeNull();
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'auth_login_failures_total',
+        expect.any(String),
+        { reason: 'unknown_user' },
+      );
+    });
+
+    it('counts auth_login_failures_total{bad_password} on a wrong password', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'u@test.com',
+        password: await bcrypt.hash('correct-pw', 4),
+        status: 'ACTIVE',
+        tenant: { status: 'ACTIVE' },
+      } as any);
+
+      const result = await service.validateUser('u@test.com', 'wrong-pw');
+
+      expect(result).toBeNull();
+      expect(metrics.incCounter).toHaveBeenCalledWith(
+        'auth_login_failures_total',
+        expect.any(String),
+        { reason: 'bad_password' },
+      );
     });
   });
 });

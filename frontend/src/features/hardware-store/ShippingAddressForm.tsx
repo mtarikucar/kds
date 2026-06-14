@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import type { ShippingAddress } from './storeApi';
 import type { Branch } from '../branches/branchesApi';
 
@@ -32,60 +33,67 @@ import type { Branch } from '../branches/branchesApi';
 
 const phoneRegex = /^[+()\d\s-]{6,32}$/;
 
+type TFn = (key: string) => string;
+
 // v2.8.99.3 — line1 / city / country are required in custom mode but
 // not rendered in branch mode (they come from the selected branch
 // snapshot). Conditional required-ness via `superRefine` keyed on a
 // hidden `mode` field. zod's discriminatedUnion would also work but
 // superRefine plays nicer with react-hook-form's single
 // defaultValues object.
-const schema = z
-  .object({
-    mode: z.enum(['branch', 'custom']),
-    recipientName: z.string().min(2, 'Alıcı adı en az 2 karakter olmalı').max(80),
-    phone: z
-      .string()
-      .min(6, 'Geçerli bir telefon numarası giriniz')
-      .max(32)
-      .regex(phoneRegex, 'Telefon numarası rakam, boşluk, +, -, ( ) içerebilir'),
-    line1: z.string().max(160).optional().or(z.literal('')),
-    line2: z.string().max(160).optional().or(z.literal('')),
-    district: z.string().max(80).optional().or(z.literal('')),
-    city: z.string().max(80).optional().or(z.literal('')),
-    postalCode: z
-      .string()
-      .max(16)
-      .regex(/^[A-Za-z0-9\s-]*$/, 'Posta kodu geçersiz')
-      .optional()
-      .or(z.literal('')),
-    country: z.string().max(64).optional().or(z.literal('')),
-  })
-  .superRefine((v, ctx) => {
-    if (v.mode === 'custom') {
-      if (!v.line1 || v.line1.length < 3) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['line1'],
-          message: 'Açık adres en az 3 karakter olmalı',
-        });
+//
+// Built from a translator so validation messages localise; the schema
+// is memoised per `t` in the component.
+function makeSchema(t: TFn) {
+  return z
+    .object({
+      mode: z.enum(['branch', 'custom']),
+      recipientName: z.string().min(2, t('shippingForm.errors.recipientMin')).max(80),
+      phone: z
+        .string()
+        .min(6, t('shippingForm.errors.phoneInvalid'))
+        .max(32)
+        .regex(phoneRegex, t('shippingForm.errors.phoneFormat')),
+      line1: z.string().max(160).optional().or(z.literal('')),
+      line2: z.string().max(160).optional().or(z.literal('')),
+      district: z.string().max(80).optional().or(z.literal('')),
+      city: z.string().max(80).optional().or(z.literal('')),
+      postalCode: z
+        .string()
+        .max(16)
+        .regex(/^[A-Za-z0-9\s-]*$/, t('shippingForm.errors.postalInvalid'))
+        .optional()
+        .or(z.literal('')),
+      country: z.string().max(64).optional().or(z.literal('')),
+    })
+    .superRefine((v, ctx) => {
+      if (v.mode === 'custom') {
+        if (!v.line1 || v.line1.length < 3) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['line1'],
+            message: t('shippingForm.errors.line1Min'),
+          });
+        }
+        if (!v.city || v.city.length < 2) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['city'],
+            message: t('shippingForm.errors.cityRequired'),
+          });
+        }
+        if (!v.country || v.country.length < 2) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['country'],
+            message: t('shippingForm.errors.countryRequired'),
+          });
+        }
       }
-      if (!v.city || v.city.length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['city'],
-          message: 'Şehir gerekli',
-        });
-      }
-      if (!v.country || v.country.length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['country'],
-          message: 'Ülke gerekli',
-        });
-      }
-    }
-  });
+    });
+}
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
 interface Props {
   initial?: Partial<ShippingAddress>;
@@ -122,8 +130,11 @@ export default function ShippingAddressForm({
   branches,
   onSubmit,
   submitting,
-  submitLabel = 'Devam et',
+  submitLabel,
 }: Props) {
+  const { t } = useTranslation('hardware');
+  const schema = useMemo(() => makeSchema(t), [t]);
+  const effectiveSubmitLabel = submitLabel ?? t('shippingForm.continue');
   const activeBranches = useMemo(
     () => (branches ?? []).filter((b) => b.status === 'active'),
     [branches],
@@ -219,7 +230,7 @@ export default function ShippingAddressForm({
       {activeBranches.length > 0 && (
         <div
           role="radiogroup"
-          aria-label="Teslimat adresi modu"
+          aria-label={t('shippingForm.modeAria')}
           className="flex gap-2 rounded border bg-gray-50 p-2 text-sm"
         >
           <label className="flex flex-1 cursor-pointer items-center gap-2 rounded px-3 py-2 hover:bg-white">
@@ -230,7 +241,7 @@ export default function ShippingAddressForm({
               checked={mode === 'branch'}
               onChange={() => setMode('branch')}
             />
-            <span className="font-medium">Şube adresi</span>
+            <span className="font-medium">{t('shippingForm.branchAddress')}</span>
           </label>
           <label className="flex flex-1 cursor-pointer items-center gap-2 rounded px-3 py-2 hover:bg-white">
             <input
@@ -240,14 +251,14 @@ export default function ShippingAddressForm({
               checked={mode === 'custom'}
               onChange={() => setMode('custom')}
             />
-            <span className="font-medium">Yeni adres</span>
+            <span className="font-medium">{t('shippingForm.newAddress')}</span>
           </label>
         </div>
       )}
 
       {/* recipientName + phone are ALWAYS editable, in both modes —
           Branch.address doesn't carry them. */}
-      <Field label="Alıcı adı" error={errors.recipientName?.message}>
+      <Field label={t('shippingForm.recipientName')} error={errors.recipientName?.message}>
         <input
           type="text"
           autoComplete="name"
@@ -256,11 +267,11 @@ export default function ShippingAddressForm({
         />
       </Field>
 
-      <Field label="Telefon" error={errors.phone?.message}>
+      <Field label={t('shippingForm.phone')} error={errors.phone?.message}>
         <input
           type="tel"
           autoComplete="tel"
-          placeholder="+90 555 123 45 67"
+          placeholder={t('shippingForm.phonePlaceholder')}
           {...register('phone')}
           className="w-full rounded border px-3 py-2 text-sm"
         />
@@ -270,9 +281,9 @@ export default function ShippingAddressForm({
         <div className="space-y-2">
           {activeBranches.length > 1 && (
             <label className="block space-y-1">
-              <span className="text-xs font-medium text-gray-700">Şube seçin</span>
+              <span className="text-xs font-medium text-gray-700">{t('shippingForm.selectBranch')}</span>
               <select
-                aria-label="Şube seçin"
+                aria-label={t('shippingForm.selectBranch')}
                 value={selectedBranchId}
                 onChange={(e) => setSelectedBranchId(e.target.value)}
                 className="w-full rounded border px-3 py-2 text-sm"
@@ -293,7 +304,7 @@ export default function ShippingAddressForm({
             className="rounded border border-dashed bg-gray-50 p-3 text-sm text-gray-700"
           >
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              {selectedBranch?.name ?? 'Şube'}
+              {selectedBranch?.name ?? t('shippingForm.branchFallback')}
             </div>
             {branchAddress?.line1 ? (
               <>
@@ -308,15 +319,14 @@ export default function ShippingAddressForm({
               </>
             ) : (
               <div className="text-gray-500">
-                Bu şubenin adresi henüz tanımlanmamış. Yönetici sayfasından doldurun veya
-                &quot;Yeni adres&quot; seçin.
+                {t('shippingForm.branchNoAddress')}
               </div>
             )}
           </div>
         </div>
       ) : (
         <>
-          <Field label="Adres satırı 1" error={errors.line1?.message}>
+          <Field label={t('shippingForm.line1')} error={errors.line1?.message}>
             <input
               type="text"
               autoComplete="address-line1"
@@ -325,7 +335,7 @@ export default function ShippingAddressForm({
             />
           </Field>
 
-          <Field label="Adres satırı 2 (opsiyonel)" error={errors.line2?.message}>
+          <Field label={t('shippingForm.line2')} error={errors.line2?.message}>
             <input
               type="text"
               autoComplete="address-line2"
@@ -335,7 +345,7 @@ export default function ShippingAddressForm({
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Şehir" error={errors.city?.message}>
+            <Field label={t('shippingForm.city')} error={errors.city?.message}>
               <input
                 type="text"
                 autoComplete="address-level2"
@@ -343,7 +353,7 @@ export default function ShippingAddressForm({
                 className="w-full rounded border px-3 py-2 text-sm"
               />
             </Field>
-            <Field label="İlçe (opsiyonel)" error={errors.district?.message}>
+            <Field label={t('shippingForm.district')} error={errors.district?.message}>
               <input
                 type="text"
                 autoComplete="address-level3"
@@ -354,7 +364,7 @@ export default function ShippingAddressForm({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Posta kodu (opsiyonel)" error={errors.postalCode?.message}>
+            <Field label={t('shippingForm.postalCode')} error={errors.postalCode?.message}>
               <input
                 type="text"
                 autoComplete="postal-code"
@@ -362,7 +372,7 @@ export default function ShippingAddressForm({
                 className="w-full rounded border px-3 py-2 text-sm"
               />
             </Field>
-            <Field label="Ülke" error={errors.country?.message}>
+            <Field label={t('shippingForm.country')} error={errors.country?.message}>
               <input
                 type="text"
                 autoComplete="country-name"
@@ -379,7 +389,7 @@ export default function ShippingAddressForm({
         disabled={submitting}
         className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {submitting ? 'İşleniyor…' : submitLabel}
+        {submitting ? t('shippingForm.processing') : effectiveSubmitLabel}
       </button>
     </form>
   );

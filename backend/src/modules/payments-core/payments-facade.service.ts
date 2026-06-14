@@ -1,4 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import {
   PaymentIntent,
@@ -26,6 +28,9 @@ export class PaymentsFacadeService {
   constructor(
     private readonly registry: PaymentProviderRegistry,
     private readonly outbox: OutboxService,
+    // Optional so unit tests constructing the façade bare keep working and
+    // so a context without MetricsModule never fails to resolve.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   async createIntent(
@@ -47,7 +52,27 @@ export class PaymentsFacadeService {
           externalRef: req.externalRef,
         },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "payments-core",
+          op: "intent_created",
+        }),
+      );
+
+    // Track 2 — record the intent outcome for Prometheus. After the
+    // best-effort emit, optional + ?.-guarded so metrics can never break a
+    // payment. `outcome` is derived from the developer-controlled
+    // PaymentStatus enum (failed/cancelled → "failed", else "success"), so
+    // label cardinality stays bounded.
+    const outcome =
+      intent.status === "failed" || intent.status === "cancelled"
+        ? "failed"
+        : "success";
+    this.metrics?.incCounter(
+      "payment_intents_outcome_total",
+      "Payment intents by outcome (success|failed|refunded)",
+      { outcome },
+    );
 
     return intent;
   }
@@ -71,7 +96,19 @@ export class PaymentsFacadeService {
         tenantId,
         payload: { providerId, ...refund },
       })
-      .catch(() => undefined);
+      .catch(
+        captureSwallowedEmit(this.logger, {
+          module: "payments-core",
+          op: "refund",
+        }),
+      );
+    // Track 2 — a completed refund is the "refunded" outcome of the intent
+    // lifecycle. ?.-guarded after the emit so it can never break the refund.
+    this.metrics?.incCounter(
+      "payment_intents_outcome_total",
+      "Payment intents by outcome (success|failed|refunded)",
+      { outcome: "refunded" },
+    );
     return refund;
   }
 
@@ -96,7 +133,12 @@ export class PaymentsFacadeService {
           tenantId: null,
           payload: ev as any,
         })
-        .catch(() => undefined);
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "payments-core",
+            op: "ingestWebhook",
+          }),
+        );
     }
   }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, RefreshCw, X, RotateCcw, Save } from 'lucide-react';
 import {
   useTenant,
@@ -43,6 +44,7 @@ const LIMIT_LABELS: Record<string, string> = {
 type FeatureOverrideState = 'default' | 'on' | 'off';
 
 export default function TenantDetailPage() {
+  const { t } = useTranslation('superadmin');
   const { id } = useParams<{ id: string }>();
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
@@ -102,16 +104,16 @@ export default function TenantDetailPage() {
   if (!tenant) {
     return (
       <div className="text-center py-12">
-        <p className="text-sm text-zinc-500">Tenant not found</p>
+        <p className="text-sm text-zinc-500">{t('tenantDetail.notFound')}</p>
         <Link to="/superadmin/tenants" className="text-sm text-zinc-900 underline mt-2 inline-block">
-          Back to Tenants
+          {t('tenantDetail.backToTenants')}
         </Link>
       </div>
     );
   }
 
   const handleStatusChange = (status: string) => {
-    if (window.confirm(`Change status to ${status}?`)) {
+    if (window.confirm(t('tenantDetail.confirmStatusChange', { status }))) {
       updateStatusMutation.mutate({ id: tenant.id, status });
     }
   };
@@ -177,7 +179,7 @@ export default function TenantDetailPage() {
   };
 
   const handleResetOverrides = () => {
-    if (!window.confirm('Reset all overrides to plan defaults?')) return;
+    if (!window.confirm(t('tenantDetail.confirmResetOverrides'))) return;
     resetOverridesMutation.mutate(tenant.id, {
       onSuccess: () => setHasOverrideChanges(false),
     });
@@ -225,10 +227,10 @@ export default function TenantDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Overview */}
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900 mb-4">Overview</h3>
+          <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.overview')}</h3>
           <dl className="space-y-3">
             <div className="flex justify-between items-center">
-              <dt className="text-sm text-zinc-500">Plan</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.plan')}</dt>
               <dd className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zinc-900">
                   {tenant.currentPlan?.displayName || '—'}
@@ -237,7 +239,7 @@ export default function TenantDetailPage() {
                   <button
                     onClick={openPlanModal}
                     className="p-1 rounded hover:bg-zinc-100 transition-colors"
-                    title="Change Plan"
+                    title={t('tenantDetail.changePlanTitle')}
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
                   </button>
@@ -245,11 +247,11 @@ export default function TenantDetailPage() {
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Currency</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.currency')}</dt>
               <dd className="text-sm text-zinc-900">{tenant.currency}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Created</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.created')}</dt>
               <dd className="text-sm text-zinc-900">
                 {new Date(tenant.createdAt).toLocaleDateString()}
               </dd>
@@ -259,20 +261,20 @@ export default function TenantDetailPage() {
 
         {/* Statistics */}
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900 mb-4">Statistics</h3>
+          <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.statistics')}</h3>
           <dl className="space-y-3">
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Total Revenue</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.totalRevenue')}</dt>
               <dd className="text-sm font-medium text-zinc-900">
                 ₺{(stats?.revenue.total || 0).toLocaleString()}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Orders Today</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.ordersToday')}</dt>
               <dd className="text-sm text-zinc-900">{stats?.orders.today || 0}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Orders This Month</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.ordersThisMonth')}</dt>
               <dd className="text-sm text-zinc-900">{stats?.orders.thisMonth || 0}</dd>
             </div>
           </dl>
@@ -280,22 +282,22 @@ export default function TenantDetailPage() {
 
         {/* Resources */}
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900 mb-4">Resources</h3>
+          <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.resources')}</h3>
           <dl className="space-y-3">
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Users</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.users')}</dt>
               <dd className="text-sm text-zinc-900">{tenant._count.users}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Products</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.products')}</dt>
               <dd className="text-sm text-zinc-900">{tenant._count.products}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Tables</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.tables')}</dt>
               <dd className="text-sm text-zinc-900">{tenant._count.tables}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Customers</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.customers')}</dt>
               <dd className="text-sm text-zinc-900">{tenant._count.customers}</dd>
             </div>
           </dl>
@@ -305,22 +307,22 @@ export default function TenantDetailPage() {
       {/* Subscription Info */}
       {activeSubscription && (
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900 mb-4">Active Subscription</h3>
+          <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.activeSubscription')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-xs text-zinc-500">Plan</p>
+              <p className="text-xs text-zinc-500">{t('tenantDetail.plan')}</p>
               <p className="text-sm font-medium text-zinc-900 mt-0.5">{activeSubscription.plan?.displayName}</p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Status</p>
+              <p className="text-xs text-zinc-500">{t('tenantDetail.status')}</p>
               <p className="text-sm font-medium text-zinc-900 mt-0.5">{activeSubscription.status}</p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Billing Cycle</p>
+              <p className="text-xs text-zinc-500">{t('tenantDetail.billingCycle')}</p>
               <p className="text-sm font-medium text-zinc-900 mt-0.5">{activeSubscription.billingCycle}</p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Period End</p>
+              <p className="text-xs text-zinc-500">{t('tenantDetail.periodEnd')}</p>
               <p className="text-sm font-medium text-zinc-900 mt-0.5">
                 {new Date(activeSubscription.currentPeriodEnd).toLocaleDateString()}
               </p>
@@ -331,14 +333,14 @@ export default function TenantDetailPage() {
 
       {/* Actions */}
       <div className="bg-white rounded-xl border border-zinc-200 p-5">
-        <h3 className="text-sm font-medium text-zinc-900 mb-4">Actions</h3>
+        <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.actions')}</h3>
         <div className="flex flex-wrap gap-3">
           {activeSubscription && (
             <button
               onClick={openPlanModal}
               className="px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition-colors"
             >
-              Change Plan
+              {t('tenantDetail.changePlan')}
             </button>
           )}
           {tenant.status === 'ACTIVE' && (
@@ -346,7 +348,7 @@ export default function TenantDetailPage() {
               onClick={() => handleStatusChange('SUSPENDED')}
               className="px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
             >
-              Suspend
+              {t('tenantDetail.suspend')}
             </button>
           )}
           {tenant.status === 'SUSPENDED' && (
@@ -354,7 +356,7 @@ export default function TenantDetailPage() {
               onClick={() => handleStatusChange('ACTIVE')}
               className="px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
             >
-              Activate
+              {t('tenantDetail.activate')}
             </button>
           )}
           {tenant.status !== 'DELETED' && (
@@ -362,7 +364,7 @@ export default function TenantDetailPage() {
               onClick={() => handleStatusChange('DELETED')}
               className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
             >
-              Delete
+              {t('tenantDetail.delete')}
             </button>
           )}
         </div>
@@ -373,8 +375,8 @@ export default function TenantDetailPage() {
         <div className="bg-white rounded-xl border border-zinc-200 p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-sm font-medium text-zinc-900">Feature & Limit Overrides</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Override plan defaults for this tenant</p>
+              <h3 className="text-sm font-medium text-zinc-900">{t('tenantDetail.overridesTitle')}</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">{t('tenantDetail.overridesSubtitle')}</p>
             </div>
             <div className="flex gap-2">
               <button
@@ -383,7 +385,7 @@ export default function TenantDetailPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-50 border border-zinc-200 rounded-lg hover:bg-zinc-100 disabled:opacity-50 transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Reset All
+                {t('tenantDetail.resetAll')}
               </button>
               <button
                 onClick={handleSaveOverrides}
@@ -391,40 +393,40 @@ export default function TenantDetailPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 disabled:opacity-50 transition-colors"
               >
                 <Save className="w-3.5 h-3.5" />
-                {updateOverridesMutation.isPending ? 'Saving...' : 'Save'}
+                {updateOverridesMutation.isPending ? t('tenantDetail.saving') : t('tenantDetail.save')}
               </button>
             </div>
           </div>
 
           {/* Feature Overrides */}
           <div className="mb-6">
-            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Features</h4>
+            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">{t('tenantDetail.features')}</h4>
             <div className="border border-zinc-200 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200">
-                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">Feature</th>
-                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Plan Default</th>
-                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Override</th>
-                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Effective</th>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.feature')}</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.planDefault')}</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.override')}</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.effective')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {Object.entries(FEATURE_LABELS).map(([key, label]) => {
+                  {Object.keys(FEATURE_LABELS).map((key) => {
                     const planDefault = overridesData.planDefaults?.features?.[key] ?? false;
                     const state = featureStates[key] || 'default';
                     const effective = getEffectiveFeature(key);
 
                     return (
                       <tr key={key}>
-                        <td className="px-4 py-2.5 text-sm text-zinc-900">{label}</td>
+                        <td className="px-4 py-2.5 text-sm text-zinc-900">{t(`tenantDetail.featureLabels.${key}`, FEATURE_LABELS[key])}</td>
                         <td className="px-4 py-2.5 text-center">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
                             planDefault
                               ? 'bg-emerald-50 text-emerald-700'
                               : 'bg-zinc-100 text-zinc-500'
                           }`}>
-                            {planDefault ? 'ON' : 'OFF'}
+                            {planDefault ? t('tenantDetail.on') : t('tenantDetail.off')}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-center">
@@ -438,7 +440,7 @@ export default function TenantDetailPage() {
                                 : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                             }`}
                           >
-                            {state === 'default' ? 'Default' : state === 'on' ? 'Force ON' : 'Force OFF'}
+                            {state === 'default' ? t('tenantDetail.default') : state === 'on' ? t('tenantDetail.forceOn') : t('tenantDetail.forceOff')}
                           </button>
                         </td>
                         <td className="px-4 py-2.5 text-center">
@@ -460,28 +462,28 @@ export default function TenantDetailPage() {
 
           {/* Limit Overrides */}
           <div>
-            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Limits</h4>
+            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">{t('tenantDetail.limits')}</h4>
             <div className="border border-zinc-200 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200">
-                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">Limit</th>
-                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Plan Default</th>
-                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Override</th>
-                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Effective</th>
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.limit')}</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.planDefault')}</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.override')}</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">{t('tenantDetail.col.effective')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {Object.entries(LIMIT_LABELS).map(([key, label]) => {
+                  {Object.keys(LIMIT_LABELS).map((key) => {
                     const planDefault = overridesData.planDefaults?.limits?.[key] ?? 0;
                     const effective = getEffectiveLimit(key);
 
                     return (
                       <tr key={key}>
-                        <td className="px-4 py-2.5 text-sm text-zinc-900">{label}</td>
+                        <td className="px-4 py-2.5 text-sm text-zinc-900">{t(`tenantDetail.limitLabels.${key}`, LIMIT_LABELS[key])}</td>
                         <td className="px-4 py-2.5 text-center">
                           <span className="text-sm text-zinc-600">
-                            {planDefault === -1 ? 'Unlimited' : planDefault}
+                            {planDefault === -1 ? t('tenantDetail.unlimited') : planDefault}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-center">
@@ -497,7 +499,7 @@ export default function TenantDetailPage() {
                           <span className={`text-sm font-medium ${
                             limitValues[key] !== '' ? 'text-blue-700' : 'text-zinc-600'
                           }`}>
-                            {effective === -1 ? 'Unlimited' : effective}
+                            {effective === -1 ? t('tenantDetail.unlimited') : effective}
                           </span>
                         </td>
                       </tr>
@@ -506,7 +508,7 @@ export default function TenantDetailPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-zinc-400 mt-2">Empty = use plan default. Enter -1 for unlimited.</p>
+            <p className="text-xs text-zinc-400 mt-2">{t('tenantDetail.limitsHint')}</p>
           </div>
         </div>
       )}
@@ -514,22 +516,22 @@ export default function TenantDetailPage() {
       {/* Users Table */}
       <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-zinc-100">
-          <h3 className="text-sm font-medium text-zinc-900">Users</h3>
+          <h3 className="text-sm font-medium text-zinc-900">{t('tenantDetail.users')}</h3>
         </div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-zinc-100">
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Name
+                {t('tenantDetail.usersTable.name')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Email
+                {t('tenantDetail.usersTable.email')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Role
+                {t('tenantDetail.usersTable.role')}
               </th>
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Status
+                {t('tenantDetail.usersTable.status')}
               </th>
             </tr>
           </thead>
@@ -562,7 +564,7 @@ export default function TenantDetailPage() {
             <div className="fixed inset-0 bg-zinc-900/50" onClick={() => setShowPlanModal(false)} />
             <div className="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-zinc-900">Change Plan</h2>
+                <h2 className="text-lg font-semibold text-zinc-900">{t('tenantDetail.changePlan')}</h2>
                 <button
                   onClick={() => setShowPlanModal(false)}
                   className="p-1 rounded-lg hover:bg-zinc-100 transition-colors"
@@ -572,7 +574,7 @@ export default function TenantDetailPage() {
               </div>
 
               <p className="text-sm text-zinc-500 mb-4">
-                Select a new plan for <span className="font-medium text-zinc-900">{tenant.name}</span>
+                {t('tenantDetail.selectNewPlan')} <span className="font-medium text-zinc-900">{tenant.name}</span>
               </p>
 
               <div className="space-y-2 mb-6">
@@ -597,16 +599,16 @@ export default function TenantDetailPage() {
                       <div>
                         <p className="text-sm font-medium text-zinc-900">{plan.displayName}</p>
                         <p className="text-xs text-zinc-500">
-                          {plan.maxUsers} users · {plan.maxTables} tables · {plan.maxProducts} products
+                          {t('tenantDetail.usersTablesProducts', { users: plan.maxUsers, tables: plan.maxTables, products: plan.maxProducts })}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-zinc-900">
-                        ₺{Number(plan.monthlyPrice).toLocaleString()}/mo
+                        ₺{Number(plan.monthlyPrice).toLocaleString()}{t('plans.perMonth')}
                       </p>
                       {plan.id === tenant.currentPlan?.id && (
-                        <span className="text-xs text-zinc-500">Current</span>
+                        <span className="text-xs text-zinc-500">{t('tenantDetail.current')}</span>
                       )}
                     </div>
                   </label>
@@ -616,7 +618,7 @@ export default function TenantDetailPage() {
               {changePlanMutation.isError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
                   <p className="text-sm text-red-600">
-                    {(changePlanMutation.error as any)?.response?.data?.message || 'Failed to change plan'}
+                    {(changePlanMutation.error as any)?.response?.data?.message || t('tenantDetail.changePlanError')}
                   </p>
                 </div>
               )}
@@ -627,14 +629,14 @@ export default function TenantDetailPage() {
                   onClick={() => setShowPlanModal(false)}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
                 >
-                  Cancel
+                  {t('tenantDetail.cancel')}
                 </button>
                 <button
                   onClick={handleChangePlan}
                   disabled={!selectedPlanId || selectedPlanId === tenant.currentPlan?.id || changePlanMutation.isPending}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {changePlanMutation.isPending ? 'Changing...' : 'Change Plan'}
+                  {changePlanMutation.isPending ? t('tenantDetail.changing') : t('tenantDetail.changePlan')}
                 </button>
               </div>
             </div>

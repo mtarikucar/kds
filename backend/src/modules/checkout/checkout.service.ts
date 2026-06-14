@@ -1,6 +1,12 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
+import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
@@ -35,6 +41,8 @@ export class CheckoutService {
     private readonly quoteSvc: QuoteService,
     private readonly catalog: CatalogService,
     private readonly tenantMarketplace: TenantMarketplaceService,
+    // Optional so unit tests constructing the service bare keep working.
+    @Optional() private readonly metrics?: MetricsService,
   ) {}
 
   /** Re-price the cart at confirm time so the user can't tamper with totals. */
@@ -125,7 +133,7 @@ export class CheckoutService {
         const onsiteServiceLines = hardwareLines.filter(
           (l) =>
             l.type === "service" &&
-            ((l.meta as any)?.serviceMeta?.serviceType === "onsite" ||
+            (l.meta?.serviceMeta?.serviceType === "onsite" ||
               // Legacy fallback (the 2 hardcoded codes don't carry
               // serviceMeta from the catalog).
               l.code.startsWith("onsite_install")),
@@ -163,9 +171,8 @@ export class CheckoutService {
         hardwareOrderId = order.id;
 
         for (const l of hardwareLines.filter((l) => l.type === "hardware")) {
-          const productId = (l.meta as any)?.productId as string;
-          const acquisition =
-            ((l.meta as any)?.acquisition as "sell" | "rent") ?? "sell";
+          const productId = l.meta?.productId as string;
+          const acquisition = l.meta?.acquisition ?? "sell";
           // Allocate stock inside the same tx so over-selling is impossible.
           const { serials } = await this.catalog.allocate(productId, l.qty, tx);
           await tx.hardwareOrderItem.create({
@@ -189,22 +196,21 @@ export class CheckoutService {
         // branchId / preferredDates / notes come from the cart line meta
         // populated at quote time.
         for (const l of onsiteServiceLines) {
-          const meta = (l.meta ?? {}) as Record<string, unknown>;
+          const meta = l.meta ?? {};
           await tx.installationRequest.create({
             data: {
               id: uuidv7(),
               tenantId,
               hwOrderId: order.id,
-              branchId: (meta.branchId as string) ?? null,
+              branchId: meta.branchId ?? null,
               status: "requested",
               preferredDates:
                 Array.isArray(meta.preferredDates) &&
                 meta.preferredDates.length > 0
-                  ? (meta.preferredDates as string[]).map((d) => new Date(d))
+                  ? meta.preferredDates.map((d) => new Date(d))
                   : [],
               notes:
-                (meta.notes as string) ??
-                `Auto-created from checkout (service: ${l.code})`,
+                meta.notes ?? `Auto-created from checkout (service: ${l.code})`,
             },
           });
         }
@@ -214,7 +220,7 @@ export class CheckoutService {
       // Already-deduped by the catalog service; dependency checks run inside
       // tenantMarketplace.purchase.
       for (const l of addOnLines) {
-        const branchId = (l.meta as any)?.branchId as string | undefined;
+        const branchId = l.meta?.branchId;
         const ta = await this.tenantMarketplace.purchase(tenantId, {
           addOnCode: l.code,
           quantity: l.qty,
@@ -236,7 +242,7 @@ export class CheckoutService {
             payload: {
               tenantId,
               planCode: l.code,
-              billingCycle: (l.meta as any)?.billingCycle ?? "MONTHLY",
+              billingCycle: l.meta?.billingCycle ?? "MONTHLY",
               paymentRef,
             } as any,
             idempotencyKey: uuidv7(),
@@ -297,6 +303,18 @@ export class CheckoutService {
         });
       }
     });
+
+    // Track 2 — record the committed provisioning for Prometheus. After the
+    // $transaction commits, optional + ?.-guarded so it can never break the
+    // provisioning write. `result` is the developer-controlled paid-vs-comped
+    // distinction (paymentRef present → "paid", null → super-admin "comped"),
+    // so label cardinality stays bounded. The idempotent-replay early return
+    // above never reaches here, so cached hits aren't double-counted.
+    this.metrics?.incCounter(
+      "checkout_provisions_total",
+      "Checkout cart provisions by result (paid|comped)",
+      { result: paymentRef ? "paid" : "comped" },
+    );
 
     return { quote, hardwareOrderId, addOnIds };
   }

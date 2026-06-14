@@ -156,6 +156,201 @@ describe('PaytrSettlementService — payment.succeeded emission', () => {
   });
 });
 
+describe('PaytrSettlementService — settlement outcome metric', () => {
+  let prisma: MockPrismaClient;
+  let billing: any;
+  let notifications: any;
+  let outbox: { append: jest.Mock };
+  let metrics: { incCounter: jest.Mock };
+  let svc: PaytrSettlementService;
+
+  const MERCHANT_OID = 'SUB-tenant-1-abc';
+  const PLAN_ID = 'plan-pro';
+  const TENANT_ID = 'tenant-1';
+
+  const pendingPayment: any = {
+    id: 'pay-1',
+    paytrMerchantOid: MERCHANT_OID,
+    amount: new Prisma.Decimal('799'),
+    status: 'PENDING',
+    referredByMarketingUserId: null,
+    referralCode: null,
+    subscription: {
+      id: 'sub-1',
+      tenantId: TENANT_ID,
+      planId: PLAN_ID,
+      amount: new Prisma.Decimal('799'),
+      currency: 'TRY',
+      billingCycle: 'MONTHLY',
+      paymentProvider: 'PAYTR',
+      plan: {
+        displayName: 'Profesyonel',
+        monthlyPrice: new Prisma.Decimal('799'),
+        yearlyPrice: new Prisma.Decimal('7990'),
+        currency: 'TRY',
+        commissionRate: new Prisma.Decimal('0.15'),
+        name: 'pro',
+      },
+      tenant: { id: TENANT_ID, name: 'Test Restoran' },
+    },
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    billing = { createInvoice: jest.fn().mockResolvedValue({ invoiceNumber: 'INV-001' }) };
+    notifications = {
+      sendSubscriptionActivated: jest.fn().mockResolvedValue(undefined),
+    };
+    outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
+    metrics = { incCounter: jest.fn() };
+    svc = new PaytrSettlementService(
+      prisma as any,
+      billing,
+      notifications,
+      outbox as any,
+      metrics as any,
+    );
+
+    prisma.subscriptionPayment.findUnique.mockResolvedValue(pendingPayment);
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.pendingPlanChange.findUnique.mockResolvedValue(null);
+    prisma.subscription.update.mockResolvedValue({} as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
+    prisma.subscriptionPayment.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscriptionPayment.findUniqueOrThrow.mockResolvedValue({
+      ...pendingPayment,
+      status: 'SUCCEEDED',
+    } as any);
+    prisma.subscriptionPayment.update.mockResolvedValue({ ...pendingPayment, status: 'FAILED' } as any);
+    prisma.subscriptionPayment.count.mockResolvedValue(0);
+    prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
+    prisma.subscription.findFirst.mockResolvedValue({
+      ...pendingPayment.subscription,
+      status: 'ACTIVE',
+    } as any);
+  });
+
+  it('emits paytr_settlement_total{result:success} after a committed success settlement', async () => {
+    const result = await svc.settlePayment(MERCHANT_OID, { kind: 'success', paymentType: 'card' });
+
+    expect(result).toBe('OK');
+    expect(metrics.incCounter).toHaveBeenCalledWith(
+      'paytr_settlement_total',
+      expect.any(String),
+      { result: 'success' },
+    );
+    // bounded enum label — never the failure variant on a success path.
+    const labels = metrics.incCounter.mock.calls
+      .filter((c: any[]) => c[0] === 'paytr_settlement_total')
+      .map((c: any[]) => c[2].result);
+    expect(labels).toEqual(['success']);
+  });
+
+  it('emits paytr_settlement_total{result:failure} after a committed failure settlement', async () => {
+    const result = await svc.settlePayment(MERCHANT_OID, {
+      kind: 'failure',
+      failureCode: 'DECLINED',
+      failureMessage: 'card declined',
+    });
+
+    expect(result).toBe('OK');
+    // The FAILED write must land before the counter increments.
+    expect(prisma.subscriptionPayment.update).toHaveBeenCalled();
+    expect(metrics.incCounter).toHaveBeenCalledWith(
+      'paytr_settlement_total',
+      expect.any(String),
+      { result: 'failure' },
+    );
+  });
+
+  it('does not emit a settlement metric when the settlement is ALREADY_TERMINAL', async () => {
+    prisma.subscriptionPayment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      status: 'SUCCEEDED',
+      subscription: {},
+    } as any);
+
+    const result = await svc.settlePayment(MERCHANT_OID, { kind: 'success' });
+
+    expect(result).toBe('ALREADY_TERMINAL');
+    expect(metrics.incCounter).not.toHaveBeenCalled();
+  });
+});
+
+describe('PaytrSettlementService — metrics optional (no MetricsService bound)', () => {
+  let prisma: MockPrismaClient;
+  let svc: PaytrSettlementService;
+
+  const MERCHANT_OID = 'SUB-tenant-1-abc';
+
+  const pendingPayment: any = {
+    id: 'pay-1',
+    paytrMerchantOid: MERCHANT_OID,
+    amount: new Prisma.Decimal('799'),
+    status: 'PENDING',
+    referredByMarketingUserId: null,
+    referralCode: null,
+    subscription: {
+      id: 'sub-1',
+      tenantId: 'tenant-1',
+      planId: 'plan-pro',
+      amount: new Prisma.Decimal('799'),
+      currency: 'TRY',
+      billingCycle: 'MONTHLY',
+      paymentProvider: 'PAYTR',
+      plan: {
+        displayName: 'Profesyonel',
+        monthlyPrice: new Prisma.Decimal('799'),
+        yearlyPrice: new Prisma.Decimal('7990'),
+        currency: 'TRY',
+        commissionRate: new Prisma.Decimal('0.15'),
+        name: 'pro',
+      },
+      tenant: { id: 'tenant-1', name: 'Test Restoran' },
+    },
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    // No 5th constructor arg → metrics is undefined (the @Optional() path).
+    svc = new PaytrSettlementService(
+      prisma as any,
+      { createInvoice: jest.fn().mockResolvedValue({ invoiceNumber: 'INV-001' }) } as any,
+      { sendSubscriptionActivated: jest.fn().mockResolvedValue(undefined) } as any,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+    );
+    prisma.subscriptionPayment.findUnique.mockResolvedValue(pendingPayment);
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.pendingPlanChange.findUnique.mockResolvedValue(null);
+    prisma.subscription.update.mockResolvedValue({} as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
+    prisma.subscriptionPayment.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscriptionPayment.findUniqueOrThrow.mockResolvedValue({
+      ...pendingPayment,
+      status: 'SUCCEEDED',
+    } as any);
+    prisma.subscriptionPayment.update.mockResolvedValue({ ...pendingPayment, status: 'FAILED' } as any);
+    prisma.subscriptionPayment.count.mockResolvedValue(0);
+    prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
+    prisma.subscription.findFirst.mockResolvedValue({
+      ...pendingPayment.subscription,
+      status: 'ACTIVE',
+    } as any);
+  });
+
+  it('settles a success without throwing when no MetricsService is bound', async () => {
+    await expect(
+      svc.settlePayment(MERCHANT_OID, { kind: 'success', paymentType: 'card' }),
+    ).resolves.toBe('OK');
+  });
+
+  it('settles a failure without throwing when no MetricsService is bound', async () => {
+    await expect(
+      svc.settlePayment(MERCHANT_OID, { kind: 'failure', failureCode: 'DECLINED' }),
+    ).resolves.toBe('OK');
+  });
+});
+
 describe('PaytrSettlementService — idempotency', () => {
   let prisma: MockPrismaClient;
   let svc: PaytrSettlementService;

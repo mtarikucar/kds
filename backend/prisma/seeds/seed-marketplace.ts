@@ -11,8 +11,22 @@
  * a data change — no redeploy needed.
  */
 import { PrismaClient } from '@prisma/client';
+// Single source of truth for the regulatory tier-by-category policy — shared
+// with CatalogService so seeded rows and admin-created rows can't drift.
+import { CATEGORY_DEFAULT_SALE_MODE } from '../../src/modules/catalog/dto/create-hardware-product.dto';
 
 const prisma = new PrismaClient();
+
+// Minimal seller-responsibility docs stamped on seeded DIRECT_SALE rows so
+// (a) the storefront "Yasal & Garanti" tab isn't empty and (b) a later admin
+// edit doesn't hit the publish gate (which requires complianceDocs for
+// DIRECT_SALE). Demo placeholders — real catalog rows carry real documents.
+const SEED_DEFAULT_COMPLIANCE = {
+  invoiceIssued: true,
+  warrantyCertUrl: '/docs/garanti-belgesi.pdf',
+  returnTermsUrl: '/docs/iade-ve-cayma-sartlari.pdf',
+  serviceInfo: 'Yetkili teknik servis üzerinden — destek hattı: 0850 000 00 00',
+};
 
 // ---- Add-on catalog ---------------------------------------------------
 
@@ -867,6 +881,9 @@ async function main() {
     // services already carry details inline). Lets us keep the PRODUCTS
     // array shape unchanged while still seeding `details` + headlineSpecs.
     const overlay = HARDWARE_DETAILS[p.sku];
+    // Per-entry override wins, else the shared category→tier map, else direct.
+    const saleMode =
+      (p as any).saleMode ?? CATEGORY_DEFAULT_SALE_MODE[p.category] ?? 'DIRECT_SALE';
     const sharedData = {
       category: p.category,
       name: p.name,
@@ -883,6 +900,12 @@ async function main() {
       details: overlay?.details ?? (p as any).details ?? null,
       serviceMeta: (p as any).serviceMeta ?? null,
       status: 'published',
+      saleMode,
+      // DIRECT_SALE rows must carry compliance docs (publish gate); other
+      // tiers aren't sold directly so they don't need them.
+      complianceDocs:
+        (p as any).complianceDocs ??
+        (saleMode === 'DIRECT_SALE' ? SEED_DEFAULT_COMPLIANCE : null),
     };
     const product = await prisma.hardwareProduct.upsert({
       where: { sku: p.sku },

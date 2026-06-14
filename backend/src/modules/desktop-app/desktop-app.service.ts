@@ -229,35 +229,64 @@ export class DesktopAppService {
       return null;
     }
 
-    // Build platform manifests
+    // Build platform manifests.
+    //
+    // SECURITY: the Tauri auto-updater only installs a binary whose
+    // minisign signature verifies against the pinned pubkey. A platform
+    // that has a download URL but NO signature is therefore not
+    // installable — and silently emitting such a half-populated entry
+    // would, at best, hand the client an unverifiable binary. Each
+    // platform is evaluated explicitly: a URL without a (non-empty)
+    // signature is treated as not-updatable and logged, never dropped
+    // silently.
     const platforms: UpdateManifestDto["platforms"] = {};
 
-    if (latestRelease.windowsUrl && latestRelease.windowsSignature) {
-      platforms["windows-x86_64"] = {
+    const candidates: Array<{
+      key: keyof UpdateManifestDto["platforms"];
+      url: string | null;
+      signature: string | null;
+    }> = [
+      {
+        key: "windows-x86_64",
         url: latestRelease.windowsUrl,
         signature: latestRelease.windowsSignature,
-      };
-    }
-
-    if (latestRelease.macArmUrl && latestRelease.macArmSignature) {
-      platforms["darwin-aarch64"] = {
+      },
+      {
+        key: "darwin-aarch64",
         url: latestRelease.macArmUrl,
         signature: latestRelease.macArmSignature,
-      };
-    }
-
-    if (latestRelease.macIntelUrl && latestRelease.macIntelSignature) {
-      platforms["darwin-x86_64"] = {
+      },
+      {
+        key: "darwin-x86_64",
         url: latestRelease.macIntelUrl,
         signature: latestRelease.macIntelSignature,
-      };
-    }
-
-    if (latestRelease.linuxUrl && latestRelease.linuxSignature) {
-      platforms["linux-x86_64"] = {
+      },
+      {
+        key: "linux-x86_64",
         url: latestRelease.linuxUrl,
         signature: latestRelease.linuxSignature,
-      };
+      },
+    ];
+
+    for (const { key, url, signature } of candidates) {
+      if (!url) {
+        // Platform simply not built for this release — nothing to serve.
+        continue;
+      }
+
+      const hasSignature =
+        typeof signature === "string" && signature.trim().length > 0;
+      if (!hasSignature) {
+        // A binary URL exists but is unsigned: explicitly not-updatable.
+        this.logger.warn(
+          `Release ${latestRelease.version} has a binary URL for ${key} ` +
+            `but no signature — treating ${key} as not-updatable ` +
+            `(unsigned binaries are never served to the auto-updater).`,
+        );
+        continue;
+      }
+
+      platforms[key] = { url, signature };
     }
 
     // Check if requested platform is available
