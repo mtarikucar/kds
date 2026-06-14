@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HexColorPicker } from 'react-colorful';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
@@ -10,6 +9,7 @@ import type { QrMenuSettings, UpdateQrSettingsDto } from '../../types';
 import QrCodeDisplay from './QrCodeDisplay';
 import api from '../../lib/api';
 import { MAX_LOGO_SIZE, colorThemes, designTemplates, fontOptions } from './designEditor.constants';
+import ColorPickerButton from './ColorPickerButton';
 
 interface DesignEditorProps {
   settings: QrMenuSettings;
@@ -79,37 +79,6 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
       tableQRMessage: t('admin.scanToViewMenu'),
     });
   };
-
-  const ColorPickerButton = ({ label, colorKey }: { label: string; colorKey: string }) => (
-    <div className="relative">
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-      <button
-        type="button"
-        onClick={() => setShowColorPicker(showColorPicker === colorKey ? null : colorKey)}
-        className="w-full h-10 rounded border-2 border-slate-300 flex items-center gap-2 px-3 hover:border-blue-500"
-      >
-        <div
-          className="w-6 h-6 rounded border border-slate-300"
-          style={{ backgroundColor: formData[colorKey as keyof typeof formData] as string }}
-        />
-        <span className="text-sm font-mono">{formData[colorKey as keyof typeof formData]}</span>
-      </button>
-      {showColorPicker === colorKey && (
-        <div className="absolute z-10 mt-2">
-          <div
-            className="fixed inset-0"
-            onClick={() => setShowColorPicker(null)}
-          />
-          <div className="relative bg-white p-3 rounded-lg shadow-lg border border-slate-200">
-            <HexColorPicker
-              color={formData[colorKey as keyof typeof formData] as string}
-              onChange={(color) => setFormData({ ...formData, [colorKey]: color })}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   const applyTheme = (theme: typeof colorThemes[0]) => {
     setFormData({
@@ -309,9 +278,30 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ColorPickerButton label={t('common:qrDesigner.primaryColor')} colorKey="primaryColor" />
-                  <ColorPickerButton label={t('common:qrDesigner.secondaryColor')} colorKey="secondaryColor" />
-                  <ColorPickerButton label={t('common:qrDesigner.backgroundColor')} colorKey="backgroundColor" />
+                  <ColorPickerButton
+                    label={t('common:qrDesigner.primaryColor')}
+                    value={formData.primaryColor as string}
+                    isOpen={showColorPicker === 'primaryColor'}
+                    onToggle={() => setShowColorPicker(showColorPicker === 'primaryColor' ? null : 'primaryColor')}
+                    onClose={() => setShowColorPicker(null)}
+                    onChange={(color) => setFormData({ ...formData, primaryColor: color })}
+                  />
+                  <ColorPickerButton
+                    label={t('common:qrDesigner.secondaryColor')}
+                    value={formData.secondaryColor as string}
+                    isOpen={showColorPicker === 'secondaryColor'}
+                    onToggle={() => setShowColorPicker(showColorPicker === 'secondaryColor' ? null : 'secondaryColor')}
+                    onClose={() => setShowColorPicker(null)}
+                    onChange={(color) => setFormData({ ...formData, secondaryColor: color })}
+                  />
+                  <ColorPickerButton
+                    label={t('common:qrDesigner.backgroundColor')}
+                    value={formData.backgroundColor as string}
+                    isOpen={showColorPicker === 'backgroundColor'}
+                    onToggle={() => setShowColorPicker(showColorPicker === 'backgroundColor' ? null : 'backgroundColor')}
+                    onClose={() => setShowColorPicker(null)}
+                    onChange={(color) => setFormData({ ...formData, backgroundColor: color })}
+                  />
                 </div>
               </CardContent>
             </Card>
