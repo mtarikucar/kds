@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt } from 'lucide-react';
@@ -21,7 +21,6 @@ import BillSplitModal from '../../components/pos/BillSplitModal';
 import ProgressiveSplitModal from '../../components/pos/ProgressiveSplitModal';
 import ReservationActionDialog from '../../components/pos/ReservationActionDialog';
 import ManualLockDialog from '../../components/pos/ManualLockDialog';
-import type { UpcomingReservationOnTable } from '../../types';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
@@ -37,12 +36,12 @@ import {
   paymentBlockedReason as computePaymentBlockedReason,
   resolvePaymentTarget,
   hasRemainingUnpaidOrders,
-  mapOrderItemsToCart,
 } from './posCart';
 import { useCartPersistence } from './useCartPersistence';
 import { usePosTourSync } from './usePosTourSync';
 import { runReceiptSideEffects } from './posReceipt';
 import { buildOrderData } from './buildOrderData';
+import { useTableSelection } from './useTableSelection';
 import type { POSView, CartItem } from './posTypes';
 
 const POSPage = () => {
@@ -75,28 +74,6 @@ const POSPage = () => {
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [isBillSplitModalOpen, setIsBillSplitModalOpen] = useState(false);
   const [isProgressiveModalOpen, setIsProgressiveModalOpen] = useState(false);
-
-  // RESERVED-table dialog: only opened when the scheduler/admin
-  // auto-held the table for an upcoming reservation (table.upcoming-
-  // Reservation populated). Manually-RESERVED tables fall through to
-  // a plain toast — they don't get an actionable dialog because the
-  // staff has no reservation row to seat.
-  const [reservationDialog, setReservationDialog] = useState<{
-    table: Table;
-    reservation: UpcomingReservationOnTable;
-  } | null>(null);
-
-  // Manual-lock dialog: opened when waiter taps a RESERVED table that
-  // has no upcomingReservation annotation (admin lock with no booking
-  // backing). Waiter can choose to override the lock and start an
-  // order — the table is flipped to AVAILABLE before the order screen.
-  const [manualLockDialog, setManualLockDialog] = useState<Table | null>(null);
-
-  // Set right before flipping selectedTable → OCCUPIED via the seat
-  // path. The OCCUPIED useEffect uses it to suppress the "table is
-  // occupied but no orders found" warning that would otherwise fire
-  // because a just-seated reservation has no orders yet.
-  const skipPostSeatOrderEffectRef = useRef(false);
 
   // Responsive hook
   const { isDesktop } = useResponsive();
@@ -204,167 +181,35 @@ const POSPage = () => {
     [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment],
   );
 
-  // Load existing orders when an occupied table is selected
-  useEffect(() => {
-    if (skipPostSeatOrderEffectRef.current) {
-      // Arrived here via the reservation-seat path. The seat flow
-      // already cleared cart/customer state and the just-seated table
-      // has no orders by definition — emitting the "occupied but no
-      // orders" warning would be misleading.
-      skipPostSeatOrderEffectRef.current = false;
-      return;
-    }
-    if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
-      // Find the most recent editable order (only PENDING or PREPARING)
-      // READY and SERVED orders should not be continued - new order should be created
-      const activeOrder = tableOrders.find(
-        (order) =>
-          order.status === OrderStatus.PENDING ||
-          order.status === OrderStatus.PREPARING
-      );
-
-      if (activeOrder) {
-        setCurrentOrderId(activeOrder.id);
-        setCurrentOrderAmount(Number(activeOrder.finalAmount));
-
-        // Populate cart with existing order items
-        const existingItems = mapOrderItemsToCart(activeOrder);
-
-        setCartItems(existingItems);
-        setDiscount(activeOrder.discount || 0);
-        setCustomerName('');
-        setOrderNotes(activeOrder.notes || '');
-
-        toast.info(
-          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: existingItems.length })
-        );
-      } else if (tableOrders.length === 0) {
-        // Table is marked occupied but no orders found at all - this is unusual
-        toast.warning(t('tableOccupiedNoOrders'));
-      }
-      // If there are only READY/SERVED orders, we don't show a warning - the AwaitingPaymentSection will handle them
-    }
-  }, [selectedTable, tableOrders, t]);
-
-  const handleSelectTable = (table: Table) => {
-    if (table.status === TableStatus.AVAILABLE) {
-      // Informational warning when the table has a reservation coming
-      // up in the next ~2 h. We still let the waiter proceed (a quick
-      // coffee may finish before the booking) but make sure they see
-      // it; the backend's reservation-overlap guard hard-blocks
-      // checkout if the reservation is within 30 minutes of now.
-      if (table.upcomingReservation) {
-        const r = table.upcomingReservation;
-        toast.warning(
-          t('availableTableHasUpcomingReservation', {
-            startTime: r.startTime,
-            customerName: r.customerName,
-            guestCount: r.guestCount,
-          }),
-        );
-      }
-      setSelectedTable(table);
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-      setCurrentOrderId(null);
-      setCurrentOrderAmount(null);
-      setCurrentView('order');
-    } else if (table.status === TableStatus.OCCUPIED) {
-      setSelectedTable(table);
-      // Clear cart first - useEffect will load existing orders
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-      setCurrentView('order');
-      toast.info(t('loadingExistingOrder'));
-    } else {
-      // RESERVED. Two flavours:
-      //   1. Auto-held for an upcoming reservation (v2.8.64 scheduler) —
-      //      `upcomingReservation` is populated. Show the dialog so the
-      //      waiter can see the booking details and seat the guest in
-      //      one tap when they arrive.
-      //   2. Manually RESERVED by admin (no reservation backing) —
-      //      `upcomingReservation` is null. Open the manual-lock
-      //      dialog so the waiter can override and start an order;
-      //      we don't have a row to "seat" but they shouldn't be
-      //      stuck either.
-      if (table.upcomingReservation) {
-        setReservationDialog({
-          table,
-          reservation: table.upcomingReservation,
-        });
-      } else {
-        setManualLockDialog(table);
-      }
-    }
-  };
-
-  /**
-   * Callback fired by ReservationActionDialog after a successful
-   * PATCH /reservations/:id/seat. The reservation hook has already
-   * invalidated both `['reservations']` and `['tables']` caches; we
-   * optimistically flip the local `selectedTable` to OCCUPIED so the
-   * order screen renders immediately without waiting for a refetch.
-   * Pre-fills `customerName` from the reservation so the waiter
-   * doesn't retype the name on the order header.
-   */
-  const handleReservationSeated = useCallback(() => {
-    const justSeated = reservationDialog;
-    setReservationDialog(null);
-    if (!justSeated) return;
-    skipPostSeatOrderEffectRef.current = true;
-    setSelectedTable({ ...justSeated.table, status: TableStatus.OCCUPIED });
-    setCartItems([]);
-    setDiscount(0);
-    setCustomerName(justSeated.reservation.customerName);
-    setOrderNotes('');
-    setCurrentOrderId(null);
-    setCurrentOrderAmount(null);
-    setCurrentView('order');
-  }, [reservationDialog]);
-
-  /**
-   * Callback fired by ManualLockDialog after a successful
-   * PATCH /tables/:id/status=AVAILABLE. The hook invalidated
-   * ['tables']; we optimistically use the AVAILABLE-table flow so
-   * the waiter lands on the order screen as a fresh start (no
-   * customer prefill, empty cart) — they'll be filling in the order
-   * from scratch.
-   */
-  const handleManualLockOverride = useCallback(() => {
-    const justUnlocked = manualLockDialog;
-    setManualLockDialog(null);
-    if (!justUnlocked) return;
-    setSelectedTable({ ...justUnlocked, status: TableStatus.AVAILABLE });
-    setCartItems([]);
-    setDiscount(0);
-    setCustomerName('');
-    setOrderNotes('');
-    setCurrentOrderId(null);
-    setCurrentOrderAmount(null);
-    setCurrentView('order');
-  }, [manualLockDialog]);
-
-  // Handle back to table selection (preserves cart)
-  const handleBackToTables = () => {
-    setCurrentView('table-selection');
-    // Cart is preserved - user can select different table
-  };
-
-  // Handle takeaway mode (no table needed)
-  const handleTakeawayMode = () => {
-    setSelectedTable(null);
-    setCartItems([]);
-    setDiscount(0);
-    setCustomerName('');
-    setOrderNotes('');
-    setCurrentOrderId(null);
-    setCurrentOrderAmount(null);
-    setCurrentView('order');
-  };
+  // Table-selection / reservation-seat / manual-lock-override flow + the
+  // occupied-table order-load effect. `selectedTable` state stays here (above,
+  // feeding useOrders); the hook drives it via setSelectedTable. The grouped
+  // `order` setters are the cart/order fields a selection action resets.
+  const {
+    reservationDialog,
+    setReservationDialog,
+    manualLockDialog,
+    setManualLockDialog,
+    handleSelectTable,
+    handleReservationSeated,
+    handleManualLockOverride,
+    handleBackToTables,
+    handleTakeawayMode,
+  } = useTableSelection({
+    selectedTable,
+    setSelectedTable,
+    tableOrders,
+    setCurrentView,
+    order: {
+      setCartItems,
+      setDiscount,
+      setCustomerName,
+      setOrderNotes,
+      setCurrentOrderId,
+      setCurrentOrderAmount,
+    },
+    t,
+  });
 
   const handleAddItem = (product: Product) => {
     // In tableless mode, table selection is optional
