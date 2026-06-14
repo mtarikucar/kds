@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { UserFilterDto, UserActivityFilterDto } from "../dto/user-filter.dto";
+import { SuperAdminAuditService } from "./superadmin-audit.service";
+import { AuditAction, EntityType } from "../dto/audit-filter.dto";
 
 @Injectable()
 export class SuperAdminUsersService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(SuperAdminUsersService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private auditService: SuperAdminAuditService,
+  ) {}
 
   async findAll(filters: UserFilterDto) {
     const { search, role, tenantId, status, page = 1, limit = 20 } = filters;
@@ -120,17 +127,56 @@ export class SuperAdminUsersService {
     };
   }
 
-  async setEmailVerified(id: string, emailVerified: boolean) {
+  async setEmailVerified(
+    id: string,
+    emailVerified: boolean,
+    actorId: string,
+    actorEmail: string,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        tenantId: true,
+        tenant: { select: { name: true } },
+      },
     });
     if (!user) throw new NotFoundException("User not found");
-    return this.prisma.user.update({
+
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { emailVerified },
       select: { id: true, email: true, emailVerified: true },
     });
+
+    // Auditability — a super-admin flipping a tenant user's emailVerified
+    // flag bypasses the email-verify gate (and the payments-intent gate
+    // that depends on it), so it is a privileged mutation that must leave
+    // a trail. Best-effort: a failure to record the audit row must never
+    // break the support action that already succeeded, mirroring the
+    // notify/outbox swallow-and-log pattern used elsewhere.
+    await this.auditService
+      .log({
+        action: AuditAction.UPDATE,
+        entityType: EntityType.USER,
+        entityId: id,
+        actorId,
+        actorEmail,
+        previousData: { emailVerified: user.emailVerified },
+        newData: { emailVerified, targetEmail: user.email },
+        targetTenantId: user.tenantId ?? undefined,
+        targetTenantName: user.tenant?.name ?? undefined,
+      })
+      .catch((err) => {
+        this.logger.error(
+          `Failed to write audit log for setEmailVerified user=${id}`,
+          err as any,
+        );
+      });
+
+    return updated;
   }
 
   async getActivity(filters: UserActivityFilterDto) {

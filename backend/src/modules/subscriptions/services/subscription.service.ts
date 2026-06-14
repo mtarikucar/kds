@@ -90,6 +90,37 @@ export class SubscriptionService {
   }
 
   /**
+   * Auditability — record a privileged billing decision (who created /
+   * changed / cancelled a paying subscription) in user_activities, the
+   * codebase's tenant-scoped audit log. The outbox lifecycle events the
+   * projector consumes are actor-less, so this is the only place the
+   * acting admin is captured for a "who changed our plan / cancelled our
+   * billing" forensic question.
+   *
+   * Best-effort and post-commit: a failure to write the audit row must
+   * never roll back or block the billing mutation that already succeeded,
+   * mirroring the emitLifecycle / notify swallow-and-log pattern. Skipped
+   * when there is no human actor (scheduler / cron callers pass none).
+   */
+  private async writeBillingAudit(
+    tenantId: string,
+    actorUserId: string | undefined,
+    action: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    if (!actorUserId) return;
+    try {
+      await this.prisma.userActivity.create({
+        data: { userId: actorUserId, tenantId, action, metadata: metadata as any },
+      });
+    } catch (e) {
+      this.logger.warn(
+        `billing audit ${action} failed for tenant=${tenantId}: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
    * Append a subscription lifecycle event to the outbox.
    *
    * Centralised so every mutation site uses the same payload shape; the
@@ -220,7 +251,11 @@ export class SubscriptionService {
     return subscription;
   }
 
-  async createSubscription(tenantId: string, dto: CreateSubscriptionDto) {
+  async createSubscription(
+    tenantId: string,
+    dto: CreateSubscriptionDto,
+    actorUserId?: string,
+  ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
@@ -338,6 +373,15 @@ export class SubscriptionService {
       }
 
       this.recordBillingEvent("create");
+      await this.writeBillingAudit(tenantId, actorUserId, "SUBSCRIPTION_CREATED", {
+        subscriptionId: result.id,
+        planId: plan.id,
+        planName: plan.name,
+        billingCycle: dto.billingCycle,
+        amount: amount.toString(),
+        currency: plan.currency,
+        isTrialPeriod,
+      });
       return result;
     } catch (err) {
       if (
@@ -543,6 +587,7 @@ export class SubscriptionService {
     subscriptionId: string,
     tenantId: string,
     dto: ChangePlanDto,
+    actorUserId?: string,
   ) {
     const subscription = await this.getSubscriptionById(
       subscriptionId,
@@ -661,6 +706,21 @@ export class SubscriptionService {
     // branch above only returns a quote (no mutation), so it isn't counted —
     // its committed billing change lands later in applyUpgrade.
     this.recordBillingEvent("change");
+    await this.writeBillingAudit(
+      tenantId,
+      actorUserId,
+      "SUBSCRIPTION_PLAN_CHANGED",
+      {
+        subscriptionId,
+        type: "downgrade",
+        fromPlanId: currentPlan.id,
+        fromPlanName: currentPlan.name,
+        toPlanId: newPlan.id,
+        toPlanName: newPlan.name,
+        billingCycle,
+        scheduledFor: subscription.currentPeriodEnd?.toISOString(),
+      },
+    );
     return {
       subscription: updatedSubscription,
       type: "downgrade" as const,
@@ -852,6 +912,7 @@ export class SubscriptionService {
     tenantId: string,
     immediate: boolean = false,
     reason?: string,
+    actorUserId?: string,
   ) {
     const subscription = await this.getSubscriptionById(
       subscriptionId,
@@ -936,6 +997,14 @@ export class SubscriptionService {
     const updated = txResult.updated;
     // Committed cancel (immediate or at-period-end) — recorded after the txn.
     this.recordBillingEvent("cancel");
+    await this.writeBillingAudit(tenantId, actorUserId, "SUBSCRIPTION_CANCELLED", {
+      subscriptionId,
+      planId: subscription.planId,
+      planName: subscription.plan.name,
+      immediate,
+      reason,
+      effectiveAt: (immediate ? now : subscription.currentPeriodEnd)?.toISOString(),
+    });
 
     // Notifications are user-facing side effects and stay outside the
     // txn — they touch SMTP and can stall for seconds.

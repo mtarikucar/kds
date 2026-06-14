@@ -142,9 +142,22 @@ export class CashDrawerService {
       "Cash drawer operations by op (open|close|movement|approve)",
       { op: "approve" },
     );
-    return this.prisma.cashDrawerMovement.findFirstOrThrow({
+    const approved = await this.prisma.cashDrawerMovement.findFirstOrThrow({
       where: { id: movementId, ...branchScope(scope) },
     });
+    // Auditability — approving a CASH_OUT / ADJUSTMENT releases money from
+    // the till, so it is a privileged money mutation that must leave a
+    // forensic "who approved what" trail in user_activities (the codebase's
+    // tenant-scoped audit log). The compound-WHERE claim above guarantees
+    // the row was DRAFT before the flip, so before=DRAFT is exact.
+    await this.writeAudit(scope, approver.id, "CASH_DRAWER_APPROVED", {
+      movementId,
+      type: approved.type,
+      amount: approved.amount.toString(),
+      from: "DRAFT",
+      to: "APPROVED",
+    });
+    return approved;
   }
 
   async reject(
@@ -168,9 +181,52 @@ export class CashDrawerService {
         "Movement is no longer DRAFT — refresh and retry.",
       );
     }
-    return this.prisma.cashDrawerMovement.findFirstOrThrow({
+    const rejected = await this.prisma.cashDrawerMovement.findFirstOrThrow({
       where: { id: movementId, ...branchScope(scope) },
     });
+    // Auditability — rejecting a pending CASH_OUT / ADJUSTMENT is also a
+    // privileged decision (a manager refusing money to leave the till);
+    // record it with the reason so the trail is symmetric with approve.
+    await this.writeAudit(scope, approver.id, "CASH_DRAWER_REJECTED", {
+      movementId,
+      type: rejected.type,
+      amount: rejected.amount.toString(),
+      from: "DRAFT",
+      to: "REJECTED",
+      reason: dto.reason,
+    });
+    return rejected;
+  }
+
+  /**
+   * Best-effort tenant-scoped audit write. Money/approval decisions on the
+   * till land in user_activities — the same append-only log the auth, users
+   * and tenants modules use for privileged mutations — so support can answer
+   * "who approved/rejected this movement and when". Swallow-and-log: a
+   * failure to record the audit row must never roll back the approval/
+   * rejection that already committed, matching the metrics/notify pattern.
+   */
+  private async writeAudit(
+    scope: BranchScope,
+    actorUserId: string,
+    action: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.prisma.userActivity.create({
+        data: {
+          userId: actorUserId,
+          tenantId: scope.tenantId,
+          action,
+          metadata: { ...metadata, branchId: scope.branchId } as any,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to write cash-drawer audit (${action})`,
+        err as any,
+      );
+    }
   }
 
   async findOne(scope: BranchScope, movementId: string) {

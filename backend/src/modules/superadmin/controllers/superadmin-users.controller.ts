@@ -13,6 +13,7 @@ import { SuperAdminUsersService } from "../services/superadmin-users.service";
 import { UserFilterDto, UserActivityFilterDto } from "../dto/user-filter.dto";
 import { SuperAdminGuard } from "../guards/superadmin.guard";
 import { SuperAdminRoute } from "../decorators/superadmin.decorator";
+import { CurrentSuperAdmin } from "../decorators/current-superadmin.decorator";
 
 class SetEmailVerifiedDto {
   @IsBoolean()
@@ -54,7 +55,14 @@ export class SuperAdminUsersController {
   async setEmailVerified(
     @Param("id") id: string,
     @Body() dto: SetEmailVerifiedDto,
+    @CurrentSuperAdmin("id") actorId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
   ) {
-    return this.usersService.setEmailVerified(id, dto.emailVerified);
+    return this.usersService.setEmailVerified(
+      id,
+      dto.emailVerified,
+      actorId,
+      actorEmail,
+    );
   }
 }

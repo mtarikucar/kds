@@ -60,7 +60,7 @@ describe('CashDrawerService', () => {
   it('approve flips DRAFT → APPROVED via compound WHERE (tenantId + branchId + status=DRAFT)', async () => {
     (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
     (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
-      id: 'm-1', approvalStatus: 'APPROVED',
+      id: 'm-1', approvalStatus: 'APPROVED', type: 'CASH_OUT', amount: { toString: () => '100' },
     });
     await svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER });
     const args = (prisma.cashDrawerMovement.updateMany as any).mock.calls[0][0];
@@ -79,7 +79,7 @@ describe('CashDrawerService', () => {
   it('reject records rejection reason', async () => {
     (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
     (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
-      id: 'm-1', approvalStatus: 'REJECTED',
+      id: 'm-1', approvalStatus: 'REJECTED', type: 'ADJUSTMENT', amount: { toString: () => '50' },
     });
     await svc.reject(
       scope,
@@ -102,11 +102,86 @@ describe('CashDrawerService', () => {
 
   it('approve gates the compound WHERE on branchId', async () => {
     (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
-    (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({ id: 'm-1' });
+    (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
+      id: 'm-1', type: 'CASH_OUT', amount: { toString: () => '100' },
+    });
     await svc.approve(scope, 'm-1', { id: 'u-1', role: UserRole.MANAGER as any });
     const where = (prisma.cashDrawerMovement.updateMany as any).mock.calls[0][0].where;
     expect(where.branchId).toBe('b-1');
     expect(where.tenantId).toBe('t-1');
+  });
+
+  // ── Auditability: privileged money decisions land in user_activities ──
+  describe('audit trail (user_activities)', () => {
+    it('approve writes a CASH_DRAWER_APPROVED audit with actor + before/after', async () => {
+      (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
+        id: 'm-1', approvalStatus: 'APPROVED', type: 'CASH_OUT', amount: { toString: () => '120' },
+      });
+      await svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER });
+      expect(prisma.userActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 'mgr-1',
+          tenantId: 't-1',
+          action: 'CASH_DRAWER_APPROVED',
+          metadata: expect.objectContaining({
+            movementId: 'm-1',
+            type: 'CASH_OUT',
+            amount: '120',
+            from: 'DRAFT',
+            to: 'APPROVED',
+            branchId: 'b-1',
+          }),
+        }),
+      });
+    });
+
+    it('reject writes a CASH_DRAWER_REJECTED audit including the reason', async () => {
+      (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
+        id: 'm-2', approvalStatus: 'REJECTED', type: 'ADJUSTMENT', amount: { toString: () => '75' },
+      });
+      await svc.reject(
+        scope,
+        'm-2',
+        { id: 'mgr-9', role: UserRole.ADMIN },
+        { reason: 'till count mismatch' },
+      );
+      expect(prisma.userActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 'mgr-9',
+          tenantId: 't-1',
+          action: 'CASH_DRAWER_REJECTED',
+          metadata: expect.objectContaining({
+            movementId: 'm-2',
+            from: 'DRAFT',
+            to: 'REJECTED',
+            reason: 'till count mismatch',
+            branchId: 'b-1',
+          }),
+        }),
+      });
+    });
+
+    it('does NOT write an audit when the approve claim loses the race', async () => {
+      (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 0 });
+      await expect(
+        svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.userActivity.create).not.toHaveBeenCalled();
+    });
+
+    it('is best-effort: a failing audit write does not break the approval', async () => {
+      (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
+        id: 'm-1', approvalStatus: 'APPROVED', type: 'CASH_OUT', amount: { toString: () => '10' },
+      });
+      (prisma.userActivity.create as any).mockRejectedValue(new Error('audit sink down'));
+      jest.spyOn((svc as any).logger, 'error').mockImplementation(() => undefined);
+      await expect(
+        svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER }),
+      ).resolves.toEqual(expect.objectContaining({ approvalStatus: 'APPROVED' }));
+    });
   });
 
   // ── Track 2 domain counter: cash_drawer_ops_total ──────────────────
@@ -139,7 +214,9 @@ describe('CashDrawerService', () => {
 
     it('approve records op=approve after a winning claim', async () => {
       (prisma.cashDrawerMovement.updateMany as any).mockResolvedValue({ count: 1 });
-      (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({ id: 'm-1' });
+      (prisma.cashDrawerMovement.findFirstOrThrow as any).mockResolvedValue({
+        id: 'm-1', type: 'CASH_OUT', amount: { toString: () => '100' },
+      });
       await svc.approve(scope, 'm-1', { id: 'mgr-1', role: UserRole.MANAGER });
       expect(metrics.incCounter).toHaveBeenCalledWith(
         'cash_drawer_ops_total',
