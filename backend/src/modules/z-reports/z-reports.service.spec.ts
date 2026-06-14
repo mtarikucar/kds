@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { ZReportsService } from './z-reports.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 import { getTenantMidnight } from '../../common/helpers/timezone.helper';
@@ -160,5 +161,326 @@ describe('ZReportsService.generateReport (track-1 branch scope)', () => {
       .calls[0][0].where;
     expect(cashWhere.tenantId).toBe(TENANT);
     expect(cashWhere.branchId).toBe(BRANCH);
+  });
+});
+
+/**
+ * Characterization: pins the EXACT data object generateReport hands to
+ * zReport.create for a non-trivial dataset. This is the golden test that
+ * guards the aggregation/number-crunching split — every total (sales,
+ * payment breakdown, refunds, order-type, cancelled, tax, cash
+ * reconciliation, staff, category, top-products) and every money-rounding
+ * boundary must be byte-for-byte identical before and after extracting the
+ * pure aggregator. Decimal columns are asserted via .toString() so a
+ * silent precision drift (Number vs Prisma.Decimal) would fail here.
+ */
+describe('ZReportsService.generateReport (characterization — aggregation totals)', () => {
+  let prisma: MockPrismaClient;
+  let email: any;
+  let svc: ZReportsService;
+
+  const TENANT = 't-1';
+  const BRANCH = 'b-1';
+  const USER = 'user-1';
+
+  // Two paid orders across two staff, two categories, two tax rates,
+  // mixed payment methods, one refunded payment. Amounts chosen so that
+  // naive Number addition would drift (0.1 + 0.2 family) — the Decimal
+  // path must keep them exact.
+  const ordersFixture = [
+    {
+      id: 'o1',
+      type: 'DINE_IN',
+      totalAmount: '100.10',
+      discount: '5.05',
+      finalAmount: '95.05',
+      userId: 'staff-A',
+      user: { id: 'staff-A', firstName: 'Ann', lastName: 'A' },
+      payments: [
+        { status: 'COMPLETED', method: 'CASH', amount: '50.05' },
+        { status: 'COMPLETED', method: 'CARD', amount: '45.00' },
+        { status: 'REFUNDED', method: 'CARD', amount: '10.01' },
+      ],
+      orderItems: [
+        {
+          productId: 'p1',
+          quantity: 2,
+          subtotal: '60.06',
+          taxRate: 10,
+          taxAmount: '5.46',
+          product: {
+            name: 'Burger',
+            categoryId: 'c1',
+            category: { id: 'c1', name: 'Food' },
+          },
+        },
+        {
+          productId: 'p2',
+          quantity: 1,
+          subtotal: '35.04',
+          taxRate: 20,
+          taxAmount: '5.84',
+          product: {
+            name: 'Cola',
+            categoryId: 'c2',
+            category: { id: 'c2', name: 'Drinks' },
+          },
+        },
+      ],
+    },
+    {
+      id: 'o2',
+      type: 'TAKEAWAY',
+      totalAmount: '30.30',
+      discount: '0.00',
+      finalAmount: '30.30',
+      userId: 'staff-B',
+      user: { id: 'staff-B', firstName: 'Bob', lastName: 'B' },
+      payments: [
+        { status: 'COMPLETED', method: 'DIGITAL', amount: '30.30' },
+      ],
+      orderItems: [
+        {
+          productId: 'p1',
+          quantity: 3,
+          subtotal: '30.30',
+          taxRate: 10,
+          taxAmount: '2.75',
+          product: {
+            name: 'Burger',
+            categoryId: 'c1',
+            category: { id: 'c1', name: 'Food' },
+          },
+        },
+      ],
+    },
+  ];
+
+  const cancelledFixture = [
+    { totalAmount: '12.34' },
+    { totalAmount: '7.66' },
+  ];
+
+  const cashMovementsFixture = [
+    { type: 'CASH_IN', amount: '20.00', user: null },
+    { type: 'CASH_OUT', amount: '8.00', user: null },
+    { type: 'CASH_IN', amount: '0.50', user: null },
+  ];
+
+  const openOrdersFixture = [
+    { finalAmount: '11.11' },
+    { finalAmount: '22.22' },
+  ];
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    email = { sendEmail: jest.fn().mockResolvedValue(true) };
+    svc = new ZReportsService(prisma as any, email, { render: jest.fn() } as any);
+
+    prisma.zReport.findFirst.mockResolvedValue(null);
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: TENANT,
+      timezone: 'UTC',
+      currency: 'TRY',
+    } as any);
+
+    // order.findMany is called 3 times: paid, cancelled, open (in that
+    // order). cashDrawerMovement.findMany once.
+    (prisma.order.findMany as any)
+      .mockResolvedValueOnce(ordersFixture as any) // paid
+      .mockResolvedValueOnce(cancelledFixture as any) // cancelled
+      .mockResolvedValueOnce(openOrdersFixture as any); // open
+    prisma.cashDrawerMovement.findMany.mockResolvedValue(
+      cashMovementsFixture as any,
+    );
+    prisma.zReport.create.mockImplementation((args: any) =>
+      Promise.resolve({ id: 'zr-new', ...args.data }),
+    );
+  });
+
+  const dto = {
+    reportDate: '2026-06-01T00:00:00.000Z',
+    cashDrawerOpening: 100,
+    cashDrawerClosing: 150,
+    notes: 'characterization',
+  };
+
+  const str = (v: any) => v?.toString?.() ?? String(v);
+
+  it('produces exact aggregation totals in the create() payload', async () => {
+    await svc.generateReport(TENANT, BRANCH, USER, dto as any);
+
+    const data = (prisma.zReport.create as any).mock.calls[0][0].data;
+
+    // Identity / counts
+    expect(data.tenantId).toBe(TENANT);
+    expect(data.branchId).toBe(BRANCH);
+    expect(data.closedById).toBe(USER);
+    expect(data.totalOrders).toBe(2);
+    expect(data.reportNumber).toBe('Z-20260601');
+
+    // Sales totals (Decimal columns -> string compare)
+    expect(str(data.totalSales)).toBe('130.4'); // 100.10 + 30.30
+    expect(str(data.totalDiscount)).toBe('5.05'); // 5.05 + 0
+    // rawNetSales = 95.05 + 30.30 = 125.35; netSales = raw - refunds(10.01)
+    expect(str(data.netSales)).toBe('115.34');
+
+    // Payment breakdown (COMPLETED only)
+    expect(str(data.cashPayments)).toBe('50.05');
+    expect(data.cashPaymentCount).toBe(1);
+    expect(str(data.cardPayments)).toBe('45');
+    expect(data.cardPaymentCount).toBe(1);
+    expect(str(data.digitalPayments)).toBe('30.3');
+    expect(data.digitalPaymentCount).toBe(1);
+
+    // Refunds
+    expect(str(data.totalRefunds)).toBe('10.01');
+    expect(data.refundedPayments).toBe(1);
+    expect(str(data.refundedAmount)).toBe('10.01');
+
+    // Order-type breakdown
+    expect(str(data.dineInSales)).toBe('95.05');
+    expect(data.dineInOrders).toBe(1);
+    expect(str(data.takeawaySales)).toBe('30.3');
+    expect(data.takeawayOrders).toBe(1);
+    expect(str(data.deliverySales)).toBe('0');
+    expect(data.deliveryOrders).toBe(0);
+
+    // Cancelled
+    expect(data.cancelledOrders).toBe(2);
+    expect(str(data.cancelledOrdersAmount)).toBe('20'); // 12.34 + 7.66
+
+    // Tax: totalTax = 5.46 + 5.84 + 2.75 = 14.05
+    expect(data.totalTax).toBe(14.05);
+    // taxBreakdown buckets: rate 10 -> taxable = (60.06-5.46)+(30.30-2.75)
+    //   = 54.60 + 27.55 = 82.15 ; tax = 5.46 + 2.75 = 8.21
+    // rate 20 -> taxable = 35.04 - 5.84 = 29.20 ; tax = 5.84
+    expect(data.taxBreakdown[10]).toEqual({
+      taxableAmount: 82.15,
+      taxAmount: 8.21,
+    });
+    expect(data.taxBreakdown[20]).toEqual({
+      taxableAmount: 29.2,
+      taxAmount: 5.84,
+    });
+
+    // Cash reconciliation
+    // cashInOut = (20 + 0.50) - 8 = 12.50
+    expect(str(data.cashInOut)).toBe('12.5');
+    expect(str(data.openingCash)).toBe('100');
+    expect(str(data.countedCash)).toBe('150');
+    // expectedCash = opening(100) + cashPayments(50.05) + cashInOut(12.50)
+    //   = 162.55
+    expect(str(data.expectedCash)).toBe('162.55');
+    // cashDifference = closing(150) - expected(162.55) = -12.55
+    expect(str(data.cashDifference)).toBe('-12.55');
+
+    // Open checks
+    expect(data.openChecks).toBe(2);
+    expect(str(data.openChecksAmount)).toBe('33.33'); // 11.11 + 22.22
+
+    // Top products: aggregated by productId
+    //   p1 quantity 2+3=5, revenue 60.06+30.30=90.36
+    //   p2 quantity 1, revenue 35.04
+    expect(data.topProducts).toEqual([
+      { name: 'Burger', quantity: 5, revenue: 90.36 },
+      { name: 'Cola', quantity: 1, revenue: 35.04 },
+    ]);
+
+    // Category breakdown
+    //   c1 (Food): sales 60.06+30.30=90.36, qty 5
+    //   c2 (Drinks): sales 35.04, qty 1
+    expect(data.categoryBreakdown).toEqual([
+      { categoryId: 'c1', categoryName: 'Food', sales: 90.36, quantity: 5 },
+      { categoryId: 'c2', categoryName: 'Drinks', sales: 35.04, quantity: 1 },
+    ]);
+
+    // Staff performance
+    //   staff-A: sales 95.05, orders 1 ; staff-B: 30.30, 1
+    expect(data.staffPerformance).toEqual([
+      { staffId: 'staff-A', name: 'Ann A', sales: 95.05, orders: 1, refunds: 0 },
+      { staffId: 'staff-B', name: 'Bob B', sales: 30.3, orders: 1, refunds: 0 },
+    ]);
+
+    expect(data.notes).toBe('characterization');
+  });
+
+  it('throws fast-path dedupe when a report already exists for the date', async () => {
+    prisma.zReport.findFirst.mockResolvedValue({ id: 'dup' } as any);
+    await expect(
+      svc.generateReport(TENANT, BRANCH, USER, dto as any),
+    ).rejects.toThrow('Z-Report already exists for this date');
+    expect(prisma.zReport.create).not.toHaveBeenCalled();
+  });
+
+  it('translates a concurrent P2002 unique violation into the business error', async () => {
+    const p2002 = Object.assign(
+      new Prisma.PrismaClientKnownRequestError('dup', {
+        code: 'P2002',
+        clientVersion: 'x',
+      }),
+      {},
+    );
+    prisma.zReport.create.mockRejectedValue(p2002 as any);
+    await expect(
+      svc.generateReport(TENANT, BRANCH, USER, dto as any),
+    ).rejects.toThrow('Z-Report already exists for this date');
+  });
+
+  it('rethrows non-P2002 create errors unchanged', async () => {
+    const boom = new Error('db down');
+    prisma.zReport.create.mockRejectedValue(boom as any);
+    await expect(
+      svc.generateReport(TENANT, BRANCH, USER, dto as any),
+    ).rejects.toThrow('db down');
+  });
+
+  it('defaults taxRate to 10 for items with no taxRate', async () => {
+    (prisma.order.findMany as any).mockReset();
+    (prisma.order.findMany as any)
+      .mockResolvedValueOnce([
+        {
+          id: 'o1',
+          type: 'COUNTER',
+          totalAmount: '10.00',
+          discount: '0',
+          finalAmount: '10.00',
+          userId: null,
+          user: null,
+          payments: [],
+          orderItems: [
+            {
+              productId: 'p1',
+              quantity: 1,
+              subtotal: '10.00',
+              taxRate: null,
+              taxAmount: '1.00',
+              product: {
+                name: 'X',
+                categoryId: 'c1',
+                category: null,
+              },
+            },
+          ],
+        },
+      ] as any)
+      .mockResolvedValueOnce([] as any)
+      .mockResolvedValueOnce([] as any);
+
+    await svc.generateReport(TENANT, BRANCH, USER, dto as any);
+    const data = (prisma.zReport.create as any).mock.calls[0][0].data;
+
+    // Falls into the rate-10 bucket; taxable = 10.00 - 1.00 = 9.00
+    expect(data.taxBreakdown[10]).toEqual({
+      taxableAmount: 9,
+      taxAmount: 1,
+    });
+    // null userId -> 'unknown' / 'Unknown'; null category -> 'Uncategorized'
+    expect(data.staffPerformance).toEqual([
+      { staffId: 'unknown', name: 'Unknown', sales: 10, orders: 1, refunds: 0 },
+    ]);
+    expect(data.categoryBreakdown).toEqual([
+      { categoryId: 'c1', categoryName: 'Uncategorized', sales: 10, quantity: 1 },
+    ]);
   });
 });
