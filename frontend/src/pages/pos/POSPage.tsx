@@ -38,6 +38,7 @@ import {
 } from './posCart';
 import { useCartPersistence } from './useCartPersistence';
 import { usePosTourSync } from './usePosTourSync';
+import { runReceiptSideEffects } from './posReceipt';
 import type { POSView, CartItem } from './posTypes';
 
 const POSPage = () => {
@@ -627,42 +628,15 @@ const POSPage = () => {
           // Failures are toasted with a one-tap Reprint action — the
           // snapshot is persisted on the backend so a manual reprint
           // never re-derives content (it matches the original
-          // byte-for-byte even if the order is edited later).
-          if (isTauri()) {
-            const printerId = useUiStore.getState().defaultReceiptPrinterId;
-            if (printerId && payment.receiptSnapshot) {
-              const snapshot = payment.receiptSnapshot;
-              HardwareService.printReceipt(printerId, snapshot)
-                .catch((err) => {
-                  console.error('Receipt print failed:', err);
-                  toast.error(
-                    t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded.'),
-                    {
-                      action: {
-                        label: t('pos.reprint.label', 'Reprint Receipt'),
-                        onClick: () => {
-                          HardwareService.printReceipt(printerId, snapshot).catch(
-                            (e) => {
-                              console.error('Reprint failed:', e);
-                              toast.error(
-                                t('pos.reprint.failed', 'Reprint failed — check printer connection'),
-                              );
-                            },
-                          );
-                        },
-                      },
-                      duration: 10_000,
-                    },
-                  );
-                });
-            }
-            // Pop the cash drawer for cash payments.
-            if (printerId && data.method === 'CASH') {
-              HardwareService.openCashDrawer(printerId).catch((err) => {
-                console.error('Cash drawer open failed:', err);
-              });
-            }
-          }
+          // byte-for-byte even if the order is edited later). Side-effect
+          // logic lives in posReceipt.runReceiptSideEffects (unit-tested).
+          runReceiptSideEffects(payment, data.method, {
+            isTauri,
+            getPrinterId: () => useUiStore.getState().defaultReceiptPrinterId,
+            hardware: HardwareService,
+            toast,
+            t,
+          });
 
           // Refetch orders to update the list
           // Re-fetch fresh table orders BEFORE deciding whether to free
