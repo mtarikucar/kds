@@ -77,7 +77,7 @@ export class InvoiceController {
   }
 
   @Post(":id/generate-pdf")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN)
   async generatePdf(@Param("id") invoiceNumber: string, @Req() req: Request) {
     const tenantId = (req as any).tenantId;
     const invoice = await this.billingService.getInvoiceByNumber(

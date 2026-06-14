@@ -2,6 +2,8 @@ import { Module, forwardRef } from "@nestjs/common";
 import { OrdersService } from "./services/orders.service";
 import { OrderTransferService } from "./services/order-transfer.service";
 import { PaymentsService } from "./services/payments.service";
+import { PaymentMathCalculator } from "./services/payment-math.calculator";
+import { PaymentFinalizer } from "./services/payment-finalizer.service";
 import { ReceiptSnapshotBuilder } from "./services/receipt-snapshot.builder";
 import { OrdersController } from "./controllers/orders.controller";
 import { PaymentsController } from "./controllers/payments.controller";
@@ -28,6 +30,13 @@ import { StockManagementModule } from "../stock-management/stock-management.modu
     OrdersService,
     OrderTransferService,
     PaymentsService,
+    // Refactor split of payments.service.ts: pure per-item math
+    // (PaymentMathCalculator, zero deps) + the finalization cluster
+    // (PaymentFinalizer — same forwardRef(KdsGateway)/@Optional accounting
+    // wiring PaymentsService already carries). PaymentsService remains a
+    // thin facade that owns every $transaction boundary.
+    PaymentMathCalculator,
+    PaymentFinalizer,
     ReceiptSnapshotBuilder,
   ],
   exports: [OrdersService, PaymentsService, ReceiptSnapshotBuilder],
