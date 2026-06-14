@@ -41,15 +41,18 @@ export class StockCountsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get all stock counts" })
   @ApiQuery({ name: "status", required: false })
-  findAll(@Request() req, @Query("status") status?: string) {
-    return this.service.findAll(req.tenantId, status);
+  findAll(
+    @CurrentScope() scope: BranchScope,
+    @Query("status") status?: string,
+  ) {
+    return this.service.findAll(scope, status);
   }
 
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get a stock count by ID" })
-  findOne(@Param("id") id: string, @Request() req) {
-    return this.service.findOne(id, req.tenantId);
+  findOne(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.findOne(id, scope);
   }
 
   @Post()
@@ -70,22 +73,22 @@ export class StockCountsController {
     @Param("id") id: string,
     @Param("itemId") itemId: string,
     @Body() dto: UpdateStockCountItemDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.service.updateItem(id, itemId, dto, req.tenantId);
+    return this.service.updateItem(id, itemId, dto, scope);
   }
 
   @Post(":id/finalize")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Finalize stock count and apply adjustments" })
-  finalize(@Param("id") id: string, @Request() req) {
-    return this.service.finalize(id, req.tenantId);
+  finalize(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.finalize(id, scope);
   }
 
   @Post(":id/cancel")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Cancel a stock count" })
-  cancel(@Param("id") id: string, @Request() req) {
-    return this.service.cancel(id, req.tenantId);
+  cancel(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.cancel(id, scope);
   }
 }

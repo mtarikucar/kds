@@ -37,7 +37,7 @@ export class RecipesController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get all recipes" })
   findAll(
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Query("limit") limit?: string,
     @Query("offset") offset?: string,
   ) {
@@ -47,7 +47,7 @@ export class RecipesController {
     // page without 500ing.
     const parsedLimit = limit ? parseInt(limit, 10) : undefined;
     const parsedOffset = offset ? parseInt(offset, 10) : undefined;
-    return this.service.findAll(req.tenantId, {
+    return this.service.findAll(scope, {
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
       offset: Number.isFinite(parsedOffset) ? parsedOffset : undefined,
     });
@@ -56,15 +56,18 @@ export class RecipesController {
   @Get("by-product/:productId")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get recipe by product ID" })
-  findByProduct(@Param("productId") productId: string, @Request() req) {
-    return this.service.findByProduct(productId, req.tenantId);
+  findByProduct(
+    @Param("productId") productId: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.service.findByProduct(productId, scope);
   }
 
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get a recipe by ID" })
-  findOne(@Param("id") id: string, @Request() req) {
-    return this.service.findOne(id, req.tenantId);
+  findOne(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.findOne(id, scope);
   }
 
   @Post()
@@ -83,12 +86,12 @@ export class RecipesController {
   @ApiOperation({ summary: "Check if stock is sufficient for recipe" })
   checkStock(
     @Param("id") id: string,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Query("quantity") quantity?: string,
   ) {
     return this.service.checkStock(
       id,
-      req.tenantId,
+      scope,
       quantity ? parseInt(quantity) : 1,
     );
   }
@@ -99,15 +102,15 @@ export class RecipesController {
   update(
     @Param("id") id: string,
     @Body() dto: UpdateRecipeDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.service.update(id, dto, req.tenantId);
+    return this.service.update(id, dto, scope);
   }
 
   @Delete(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Delete a recipe" })
-  remove(@Param("id") id: string, @Request() req) {
-    return this.service.remove(id, req.tenantId);
+  remove(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.remove(id, scope);
   }
 }

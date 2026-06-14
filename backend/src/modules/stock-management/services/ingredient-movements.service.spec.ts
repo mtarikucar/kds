@@ -19,6 +19,15 @@ import {
  */
 describe("IngredientMovementsService", () => {
   const TENANT = "tenant-1";
+  const BRANCH = "branch-1";
+  // v3 branch-scope: findAll takes a BranchScope; branchScope(scope)
+  // fences the read on (tenantId, branchId).
+  const SCOPE = {
+    tenantId: TENANT,
+    branchId: BRANCH,
+    userId: "user-1",
+    role: "ADMIN",
+  } as const;
   let prisma: MockPrismaClient;
   let svc: IngredientMovementsService;
 
@@ -32,12 +41,17 @@ describe("IngredientMovementsService", () => {
       (prisma.ingredientMovement.findMany as any).mockResolvedValue([]);
     });
 
-    it("maps stockItemId + type filters into where and applies default take/skip", async () => {
-      await svc.findAll(TENANT, { stockItemId: "si-1", type: "OUT" });
+    it("maps stockItemId + type filters into a branch-fenced where and applies default take/skip", async () => {
+      await svc.findAll(SCOPE, { stockItemId: "si-1", type: "OUT" });
 
       expect(prisma.ingredientMovement.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { tenantId: TENANT, stockItemId: "si-1", type: "OUT" },
+          where: {
+            tenantId: TENANT,
+            branchId: BRANCH,
+            stockItemId: "si-1",
+            type: "OUT",
+          },
           orderBy: { createdAt: "desc" },
           take: 500,
           skip: 0,
@@ -49,7 +63,7 @@ describe("IngredientMovementsService", () => {
     });
 
     it("clamps an over-large limit to HARD_MAX (5000) and honours offset", async () => {
-      await svc.findAll(TENANT, { limit: 999999, offset: 42 });
+      await svc.findAll(SCOPE, { limit: 999999, offset: 42 });
 
       const arg = (prisma.ingredientMovement.findMany as any).mock.calls[0][0];
       expect(arg.take).toBe(5000);
@@ -57,7 +71,7 @@ describe("IngredientMovementsService", () => {
     });
 
     it("builds a createdAt window from startDate+endDate", async () => {
-      await svc.findAll(TENANT, {
+      await svc.findAll(SCOPE, {
         startDate: "2024-01-01",
         endDate: "2024-01-31",
       });
@@ -68,7 +82,7 @@ describe("IngredientMovementsService", () => {
     });
 
     it("omits createdAt entirely when no date filters are supplied", async () => {
-      await svc.findAll(TENANT, { stockItemId: "si-1" });
+      await svc.findAll(SCOPE, { stockItemId: "si-1" });
 
       const arg = (prisma.ingredientMovement.findMany as any).mock.calls[0][0];
       expect(arg.where.createdAt).toBeUndefined();
@@ -76,14 +90,14 @@ describe("IngredientMovementsService", () => {
 
     it("rejects an invalid startDate before hitting the DB", async () => {
       await expect(
-        svc.findAll(TENANT, { startDate: "not-a-date" }),
+        svc.findAll(SCOPE, { startDate: "not-a-date" }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.ingredientMovement.findMany).not.toHaveBeenCalled();
     });
 
     it("rejects start>end", async () => {
       await expect(
-        svc.findAll(TENANT, {
+        svc.findAll(SCOPE, {
           startDate: "2024-02-01",
           endDate: "2024-01-01",
         }),
@@ -92,7 +106,7 @@ describe("IngredientMovementsService", () => {
 
     it("rejects a window wider than 366 days", async () => {
       await expect(
-        svc.findAll(TENANT, {
+        svc.findAll(SCOPE, {
           startDate: "2024-01-01",
           endDate: "2025-06-01",
         }),
@@ -100,7 +114,7 @@ describe("IngredientMovementsService", () => {
     });
 
     it("accepts a window of exactly 366 days (boundary inclusive)", async () => {
-      await svc.findAll(TENANT, {
+      await svc.findAll(SCOPE, {
         startDate: "2024-01-01",
         endDate: "2024-01-01",
       });

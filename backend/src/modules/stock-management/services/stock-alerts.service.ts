@@ -5,6 +5,7 @@ import {
   forwardRef,
   Optional,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { KdsGateway } from "../../kds/kds.gateway";
 
@@ -48,16 +49,24 @@ export class StockAlertsService {
     private kdsGateway?: KdsGateway,
   ) {}
 
-  async checkLowStock(tenantId: string) {
-    const lowStockItems = await this.prisma.$queryRaw<any[]>`
+  // `branchId` is optional: the hourly scheduler runs tenant-wide (every
+  // active tenant, no branch axis), while the branch-scoped dashboard
+  // passes its branchId so the alert feed only reflects that branch's
+  // stock. When supplied, the raw SQL gains `AND si."branchId" = $branchId`.
+  async checkLowStock(tenantId: string, branchId?: string) {
+    const branchFilter = branchId
+      ? Prisma.sql`AND si."branchId" = ${branchId}`
+      : Prisma.empty;
+    const lowStockItems = await this.prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT si.id, si.name, si.unit, si."currentStock", si."minStock", sic.name as "categoryName"
       FROM stock_items si
       LEFT JOIN stock_item_categories sic ON si."categoryId" = sic.id
       WHERE si."tenantId" = ${tenantId}
+        ${branchFilter}
         AND si."isActive" = true
         AND si."currentStock" <= si."minStock"
       ORDER BY si."currentStock" ASC
-    `;
+    `);
 
     if (
       this.shouldEmitAlert(
@@ -89,7 +98,14 @@ export class StockAlertsService {
     return lowStockItems;
   }
 
-  async checkExpiringBatches(tenantId: string, days?: number) {
+  // `branchId` optional — same scheduler-vs-dashboard split as
+  // checkLowStock. When supplied, the batch query is fenced to that
+  // branch so the expiry feed never surfaces another branch's batches.
+  async checkExpiringBatches(
+    tenantId: string,
+    days?: number,
+    branchId?: string,
+  ) {
     // v3.0.1 — findFirst (compound-unique with branchId: null trips
     // Prisma client validation; see branch-scope helper note).
     const settings = await this.prisma.stockSettings.findFirst({
@@ -103,6 +119,7 @@ export class StockAlertsService {
     const expiringBatches = await this.prisma.stockBatch.findMany({
       where: {
         tenantId,
+        ...(branchId ? { branchId } : {}),
         quantity: { gt: 0 },
         expiryDate: { lte: alertDate, gte: new Date() },
       },

@@ -19,6 +19,14 @@ import { RecipesService } from './recipes.service';
  * window.
  */
 describe('RecipesService (iter-93)', () => {
+  // v3 branch-scope: read/update/remove/checkStock take a BranchScope.
+  // branchScope(scope) fences every where on (tenantId, branchId).
+  const SCOPE = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'u1',
+    role: 'ADMIN',
+  } as const;
   const validIngredient = (stockItemId: string, qty: number = 1) => ({
     stockItemId,
     quantity: qty,
@@ -194,7 +202,7 @@ describe('RecipesService (iter-93)', () => {
               validIngredient('flour-uuid', 100),
             ],
           } as any,
-          't1',
+          SCOPE,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
@@ -202,8 +210,65 @@ describe('RecipesService (iter-93)', () => {
     it('allows omitting the ingredients array entirely (metadata-only update)', async () => {
       // Metadata-only update should still go through the txn but never
       // touch the dedup gate.
-      await svc.update('r1', { name: 'New name' } as any, 't1');
+      await svc.update('r1', { name: 'New name' } as any, SCOPE);
       expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('fences both the pre-check read and the mutation on (tenantId, branchId)', async () => {
+      const txMock = {
+        recipe: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ id: 'r1' }),
+        },
+        recipeIngredient: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+        stockItem: { findMany: jest.fn().mockResolvedValue([]) },
+      };
+      const findFirst = jest.fn().mockResolvedValue({
+        id: 'r1',
+        productId: 'p1',
+        name: 'Burger',
+        ingredients: [],
+        product: { id: 'p1', name: 'Burger' },
+      });
+      const localPrisma: any = {
+        recipe: { findFirst },
+        $transaction: jest.fn().mockImplementation(async (fn: any) => fn(txMock)),
+      };
+      const localSvc = new RecipesService(localPrisma);
+
+      await localSvc.update('r1', { name: 'New name' } as any, SCOPE);
+
+      // findOne pre-check is branch-fenced.
+      expect(findFirst.mock.calls[0][0].where).toEqual({
+        id: 'r1',
+        tenantId: 't1',
+        branchId: 'b1',
+      });
+      // The mutation's own WHERE is branch-fenced (defence-in-depth IDOR).
+      expect(txMock.recipe.updateMany.mock.calls[0][0].where).toEqual({
+        id: 'r1',
+        tenantId: 't1',
+        branchId: 'b1',
+      });
+    });
+
+    it('does NOT mutate a cross-branch recipe id (findOne fence → NotFound)', async () => {
+      const findFirst = jest.fn().mockResolvedValue(null); // wrong-branch id
+      const localPrisma: any = {
+        recipe: { findFirst },
+        $transaction: jest.fn(),
+      };
+      const localSvc = new RecipesService(localPrisma);
+      const { NotFoundException } = require('@nestjs/common');
+
+      await expect(
+        localSvc.update('cross-branch-id', { name: 'X' } as any, SCOPE),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      // The mutating transaction must never run for a cross-branch id.
+      expect(localPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -219,23 +284,103 @@ describe('RecipesService (iter-93)', () => {
     });
 
     it('applies a 500-row default take when no pagination passed', async () => {
-      await svc.findAll('t1');
+      await svc.findAll(SCOPE);
       const call = prisma.recipe.findMany.mock.calls[0][0];
       expect(call.take).toBe(500);
       expect(call.skip).toBe(0);
     });
 
     it('caps take at the 2000 hard max', async () => {
-      await svc.findAll('t1', { limit: 50_000 });
+      await svc.findAll(SCOPE, { limit: 50_000 });
       const call = prisma.recipe.findMany.mock.calls[0][0];
       expect(call.take).toBe(2000);
     });
 
     it('forwards a custom limit/offset within the cap', async () => {
-      await svc.findAll('t1', { limit: 100, offset: 200 });
+      await svc.findAll(SCOPE, { limit: 100, offset: 200 });
       const call = prisma.recipe.findMany.mock.calls[0][0];
       expect(call.take).toBe(100);
       expect(call.skip).toBe(200);
+    });
+
+    it('fences the list read on (tenantId, branchId)', async () => {
+      await svc.findAll(SCOPE);
+      const where = prisma.recipe.findMany.mock.calls[0][0].where;
+      expect(where.tenantId).toBe('t1');
+      expect(where.branchId).toBe('b1');
+    });
+  });
+
+  describe('findOne / findByProduct — branch fence', () => {
+    let prisma: any;
+    let svc: RecipesService;
+
+    beforeEach(() => {
+      prisma = { recipe: { findFirst: jest.fn() } };
+      svc = new RecipesService(prisma);
+    });
+
+    it('findOne scopes by id + (tenantId, branchId)', async () => {
+      prisma.recipe.findFirst.mockResolvedValue({ id: 'r1', ingredients: [] });
+      await svc.findOne('r1', SCOPE);
+      expect(prisma.recipe.findFirst.mock.calls[0][0].where).toEqual({
+        id: 'r1',
+        tenantId: 't1',
+        branchId: 'b1',
+      });
+    });
+
+    it('findOne throws NotFound for a cross-branch id (fence returns null)', async () => {
+      prisma.recipe.findFirst.mockResolvedValue(null);
+      const { NotFoundException } = require('@nestjs/common');
+      await expect(svc.findOne('cross-branch', SCOPE)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('findByProduct scopes by productId + (tenantId, branchId)', async () => {
+      prisma.recipe.findFirst.mockResolvedValue({ id: 'r1', ingredients: [] });
+      await svc.findByProduct('p1', SCOPE);
+      expect(prisma.recipe.findFirst.mock.calls[0][0].where).toEqual({
+        productId: 'p1',
+        tenantId: 't1',
+        branchId: 'b1',
+      });
+    });
+  });
+
+  describe('remove — branch fence', () => {
+    it('does NOT delete a cross-branch recipe id (findOne fence → NotFound)', async () => {
+      const prisma: any = {
+        recipe: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          deleteMany: jest.fn(),
+        },
+      };
+      const svc = new RecipesService(prisma);
+      const { NotFoundException } = require('@nestjs/common');
+      await expect(svc.remove('cross-branch', SCOPE)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.recipe.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('deletes via a branch-fenced deleteMany when the recipe is in-branch', async () => {
+      const prisma: any = {
+        recipe: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: 'r1', name: 'Burger', productId: 'p1' }),
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      const svc = new RecipesService(prisma);
+      await svc.remove('r1', SCOPE);
+      expect(prisma.recipe.deleteMany.mock.calls[0][0].where).toEqual({
+        id: 'r1',
+        tenantId: 't1',
+        branchId: 'b1',
+      });
     });
   });
 });

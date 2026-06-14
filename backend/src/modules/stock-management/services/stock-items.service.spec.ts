@@ -20,6 +20,15 @@ import {
 describe("StockItemsService", () => {
   const TENANT = "tenant-1";
   const BRANCH = "branch-1";
+  // v3 branch-scope: read/write methods take a BranchScope. The
+  // branchScope(scope) helper turns this into { tenantId, branchId },
+  // which is the (tenantId, branchId) fence asserted on every where.
+  const SCOPE = {
+    tenantId: TENANT,
+    branchId: BRANCH,
+    userId: "user-1",
+    role: "ADMIN",
+  } as const;
   let prisma: MockPrismaClient;
   let svc: StockItemsService;
 
@@ -34,7 +43,7 @@ describe("StockItemsService", () => {
     });
 
     it("builds an insensitive OR search across name+sku", async () => {
-      await svc.findAll(TENANT, { search: "tom" } as any);
+      await svc.findAll(SCOPE, { search: "tom" } as any);
 
       const arg = (prisma.stockItem.findMany as any).mock.calls[0][0];
       expect(arg.where.OR).toEqual([
@@ -44,7 +53,7 @@ describe("StockItemsService", () => {
     });
 
     it("applies categoryId and isActive filters", async () => {
-      await svc.findAll(TENANT, {
+      await svc.findAll(SCOPE, {
         categoryId: "cat-1",
         isActive: false,
       } as any);
@@ -53,6 +62,7 @@ describe("StockItemsService", () => {
       expect(arg.where).toEqual(
         expect.objectContaining({
           tenantId: TENANT,
+          branchId: BRANCH,
           categoryId: "cat-1",
           isActive: false,
         }),
@@ -60,7 +70,7 @@ describe("StockItemsService", () => {
     });
 
     it("honours sortBy + sortOrder", async () => {
-      await svc.findAll(TENANT, {
+      await svc.findAll(SCOPE, {
         sortBy: "currentStock",
         sortOrder: "desc",
       } as any);
@@ -70,14 +80,14 @@ describe("StockItemsService", () => {
     });
 
     it("defaults sort to name asc when sortBy is absent", async () => {
-      await svc.findAll(TENANT, {} as any);
+      await svc.findAll(SCOPE, {} as any);
 
       const arg = (prisma.stockItem.findMany as any).mock.calls[0][0];
       expect(arg.orderBy).toEqual({ name: "asc" });
     });
 
     it("defaults sortOrder to asc when sortBy is given without order", async () => {
-      await svc.findAll(TENANT, { sortBy: "name" } as any);
+      await svc.findAll(SCOPE, { sortBy: "name" } as any);
 
       const arg = (prisma.stockItem.findMany as any).mock.calls[0][0];
       expect(arg.orderBy).toEqual({ name: "asc" });
@@ -87,17 +97,21 @@ describe("StockItemsService", () => {
   describe("findOne", () => {
     it("throws NotFound when the item is missing", async () => {
       (prisma.stockItem.findFirst as any).mockResolvedValue(null);
-      await expect(svc.findOne("x", TENANT)).rejects.toThrow(
+      await expect(svc.findOne("x", SCOPE)).rejects.toThrow(
         NotFoundException,
       );
     });
 
-    it("scopes by id+tenant and only includes in-stock batches", async () => {
+    it("scopes by id+tenant+branch and only includes in-stock batches", async () => {
       (prisma.stockItem.findFirst as any).mockResolvedValue({ id: "si-1" });
-      await svc.findOne("si-1", TENANT);
+      await svc.findOne("si-1", SCOPE);
 
       const arg = (prisma.stockItem.findFirst as any).mock.calls[0][0];
-      expect(arg.where).toEqual({ id: "si-1", tenantId: TENANT });
+      expect(arg.where).toEqual({
+        id: "si-1",
+        tenantId: TENANT,
+        branchId: BRANCH,
+      });
       expect(arg.include.batches.where).toEqual({ quantity: { gt: 0 } });
     });
   });
@@ -163,10 +177,14 @@ describe("StockItemsService", () => {
       (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 1 });
       (prisma.stockItem.findUnique as any).mockResolvedValue({ id: "si-1" });
 
-      await svc.update("si-1", { sku: "" } as any, TENANT);
+      await svc.update("si-1", { sku: "" } as any, SCOPE);
 
       const arg = (prisma.stockItem.updateMany as any).mock.calls[0][0];
-      expect(arg.where).toEqual({ id: "si-1", tenantId: TENANT });
+      expect(arg.where).toEqual({
+        id: "si-1",
+        tenantId: TENANT,
+        branchId: BRANCH,
+      });
       expect(arg.data.sku).toBeNull();
     });
 
@@ -175,7 +193,7 @@ describe("StockItemsService", () => {
       (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 1 });
       (prisma.stockItem.findUnique as any).mockResolvedValue({ id: "si-1" });
 
-      await svc.update("si-1", { name: "New" } as any, TENANT);
+      await svc.update("si-1", { name: "New" } as any, SCOPE);
 
       const arg = (prisma.stockItem.updateMany as any).mock.calls[0][0];
       expect("sku" in arg.data).toBe(false);
@@ -186,7 +204,7 @@ describe("StockItemsService", () => {
       (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 0 });
 
       await expect(
-        svc.update("si-1", { name: "New" } as any, TENANT),
+        svc.update("si-1", { name: "New" } as any, SCOPE),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.stockItem.findUnique).not.toHaveBeenCalled();
     });
@@ -199,23 +217,30 @@ describe("StockItemsService", () => {
         recipe: { name: "Margherita" },
       });
 
-      await expect(svc.remove("si-1", TENANT)).rejects.toThrow(
+      await expect(svc.remove("si-1", SCOPE)).rejects.toThrow(
         /used in recipe "Margherita"/,
       );
       expect(prisma.stockItem.deleteMany).not.toHaveBeenCalled();
     });
 
-    it("scopes the recipe-usage probe to the tenant via the recipe relation", async () => {
+    it("scopes the recipe-usage probe to the branch via the recipe relation", async () => {
       (prisma.stockItem.findFirst as any).mockResolvedValue({ id: "si-1" });
       (prisma.recipeIngredient.findFirst as any).mockResolvedValue(null);
       (prisma.stockItem.deleteMany as any).mockResolvedValue({ count: 1 });
 
-      await svc.remove("si-1", TENANT);
+      await svc.remove("si-1", SCOPE);
 
       const arg = (prisma.recipeIngredient.findFirst as any).mock.calls[0][0];
       expect(arg.where).toEqual({
         stockItemId: "si-1",
-        recipe: { tenantId: TENANT },
+        recipe: { tenantId: TENANT, branchId: BRANCH },
+      });
+      // And the actual delete is branch-fenced too.
+      const delArg = (prisma.stockItem.deleteMany as any).mock.calls[0][0];
+      expect(delArg.where).toEqual({
+        id: "si-1",
+        tenantId: TENANT,
+        branchId: BRANCH,
       });
     });
 
@@ -224,7 +249,7 @@ describe("StockItemsService", () => {
       (prisma.recipeIngredient.findFirst as any).mockResolvedValue(null);
       (prisma.stockItem.deleteMany as any).mockResolvedValue({ count: 1 });
 
-      const res = await svc.remove("si-1", TENANT);
+      const res = await svc.remove("si-1", SCOPE);
       expect(res).toEqual({ id: "si-1" });
     });
 
@@ -233,7 +258,7 @@ describe("StockItemsService", () => {
       (prisma.recipeIngredient.findFirst as any).mockResolvedValue(null);
       (prisma.stockItem.deleteMany as any).mockResolvedValue({ count: 0 });
 
-      await expect(svc.remove("si-1", TENANT)).rejects.toThrow(
+      await expect(svc.remove("si-1", SCOPE)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -244,11 +269,12 @@ describe("StockItemsService", () => {
       (prisma.stockBatch.findMany as any).mockResolvedValue([]);
 
       const before = new Date();
-      await svc.findExpiringSoon(TENANT, 5);
+      await svc.findExpiringSoon(SCOPE, 5);
       const after = new Date();
 
       const arg = (prisma.stockBatch.findMany as any).mock.calls[0][0];
       expect(arg.where.tenantId).toBe(TENANT);
+      expect(arg.where.branchId).toBe(BRANCH);
       expect(arg.where.quantity).toEqual({ gt: 0 });
       expect(arg.where.stockItem).toEqual({ trackExpiry: true });
       // lte ≈ now + 5 days.
@@ -263,7 +289,7 @@ describe("StockItemsService", () => {
       (prisma.stockBatch.findMany as any).mockResolvedValue([]);
 
       const before = Date.now();
-      await svc.findExpiringSoon(TENANT);
+      await svc.findExpiringSoon(SCOPE);
 
       const arg = (prisma.stockBatch.findMany as any).mock.calls[0][0];
       const deltaDays =

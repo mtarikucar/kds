@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateIngredientMovementDto } from "../dto/create-ingredient-movement.dto";
 import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 // Iter-92: same window cap as waste-logs / analytics / reports. Bounds
 // the worst-case findMany scan on a chain tenant with years of movement
@@ -51,7 +52,7 @@ export class IngredientMovementsService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     filters?: {
       stockItemId?: string;
       type?: string;
@@ -61,7 +62,7 @@ export class IngredientMovementsService {
       offset?: number;
     },
   ) {
-    const where: any = { tenantId };
+    const where: any = { ...branchScope(scope) };
 
     if (filters?.stockItemId) where.stockItemId = filters.stockItemId;
     if (filters?.type) where.type = filters.type;

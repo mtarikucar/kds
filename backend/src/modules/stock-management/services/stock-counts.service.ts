@@ -12,13 +12,14 @@ import {
   StockCountStatus,
   IngredientMovementType,
 } from "../../../common/constants/stock-management.enum";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class StockCountsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, status?: string) {
-    const where: any = { tenantId };
+  async findAll(scope: BranchScope, status?: string) {
+    const where: any = { ...branchScope(scope) };
     if (status !== undefined) {
       // Iter-94: allowlist the status filter. Pre-fix the controller
       // accepted any string and forwarded it straight to Prisma; an
@@ -41,9 +42,9 @@ export class StockCountsService {
     });
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, scope: BranchScope) {
     const count = await this.prisma.stockCount.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         items: {
           include: {
@@ -130,9 +131,9 @@ export class StockCountsService {
     countId: string,
     itemId: string,
     dto: UpdateStockCountItemDto,
-    tenantId: string,
+    scope: BranchScope,
   ) {
-    const count = await this.findOne(countId, tenantId);
+    const count = await this.findOne(countId, scope);
     if (count.status !== StockCountStatus.IN_PROGRESS) {
       throw new BadRequestException(
         "Can only update items in an in-progress count",
@@ -144,12 +145,12 @@ export class StockCountsService {
 
     const variance = dto.countedQty - Number(countItem.expectedQty);
 
-    // Defence-in-depth: stockCountItem doesn't carry tenantId directly,
-    // but the parent `count` row does — scope by both the row id and
-    // its parent count's tenantId so a regression of the pre-check
-    // above can't be exploited cross-tenant.
+    // Defence-in-depth: stockCountItem doesn't carry tenantId/branchId
+    // directly, but the parent `count` row does — scope by both the row
+    // id and its parent count's (tenantId, branchId) so a regression of
+    // the pre-check above can't be exploited cross-branch.
     const result = await this.prisma.stockCountItem.updateMany({
-      where: { id: itemId, stockCount: { tenantId } },
+      where: { id: itemId, stockCount: { ...branchScope(scope) } },
       data: { countedQty: dto.countedQty, variance },
     });
     if (result.count === 0) {
@@ -165,8 +166,8 @@ export class StockCountsService {
     });
   }
 
-  async finalize(id: string, tenantId: string) {
-    const count = await this.findOne(id, tenantId);
+  async finalize(id: string, scope: BranchScope) {
+    const count = await this.findOne(id, scope);
     if (count.status !== StockCountStatus.IN_PROGRESS) {
       throw new BadRequestException("Can only finalize an in-progress count");
     }
@@ -189,7 +190,11 @@ export class StockCountsService {
       // returns count===0 and the txn aborts before any increment is
       // emitted.
       const claim = await tx.stockCount.updateMany({
-        where: { id, tenantId, status: StockCountStatus.IN_PROGRESS },
+        where: {
+          id,
+          ...branchScope(scope),
+          status: StockCountStatus.IN_PROGRESS,
+        },
         data: { status: StockCountStatus.COMPLETED, completedAt: new Date() },
       });
       if (claim.count === 0) {
@@ -202,10 +207,10 @@ export class StockCountsService {
         if (item.countedQty === null) continue;
         const countedQty = new Prisma.Decimal(item.countedQty);
 
-        // Tenant-scoped lookup so a poisoned stockItemId from some
-        // other tenant cannot be overwritten here.
+        // Branch-scoped lookup so a poisoned stockItemId from some
+        // other branch/tenant cannot be overwritten here.
         const current = await tx.stockItem.findFirst({
-          where: { id: item.stockItemId, tenantId },
+          where: { id: item.stockItemId, ...branchScope(scope) },
         });
         if (!current) continue;
 
@@ -226,7 +231,7 @@ export class StockCountsService {
         // stock = (current - 5) + adjustment = countedQty - 5, which
         // correctly reflects both events.
         await tx.stockItem.updateMany({
-          where: { id: item.stockItemId, tenantId },
+          where: { id: item.stockItemId, ...branchScope(scope) },
           data: { currentStock: { increment: adjustment as any } },
         });
 
@@ -238,8 +243,8 @@ export class StockCountsService {
             referenceType: "STOCK_COUNT",
             referenceId: count.id,
             stockItemId: item.stockItemId,
-            branchId: item.stockItem.branchId,
-            tenantId,
+            branchId: scope.branchId,
+            tenantId: scope.tenantId,
           },
         });
       }
@@ -264,17 +269,19 @@ export class StockCountsService {
     });
   }
 
-  async cancel(id: string, tenantId: string) {
-    const count = await this.findOne(id, tenantId);
+  async cancel(id: string, scope: BranchScope) {
+    const count = await this.findOne(id, scope);
     if (count.status !== StockCountStatus.IN_PROGRESS) {
       throw new BadRequestException("Can only cancel an in-progress count");
     }
 
-    // Defence-in-depth IDOR — tenantId in the WHERE.
+    // Defence-in-depth IDOR — (tenantId, branchId) in the WHERE.
     await this.prisma.stockCount.updateMany({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       data: { status: StockCountStatus.CANCELLED },
     });
-    return this.prisma.stockCount.findFirstOrThrow({ where: { id, tenantId } });
+    return this.prisma.stockCount.findFirstOrThrow({
+      where: { id, ...branchScope(scope) },
+    });
   }
 }

@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateWasteLogDto } from "../dto/create-waste-log.dto";
 import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 // Iter-92: hard cap on the explicit date window for the waste log list /
 // summary queries. Same memory-bound reasoning as iter-64 (reports) and
@@ -65,7 +66,7 @@ export class WasteLogsService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     filters?: {
       stockItemId?: string;
       reason?: string;
@@ -75,7 +76,7 @@ export class WasteLogsService {
       offset?: number;
     },
   ) {
-    const where: any = { tenantId };
+    const where: any = { ...branchScope(scope) };
     if (filters?.stockItemId) where.stockItemId = filters.stockItemId;
     if (filters?.reason) where.reason = filters.reason;
     const window = parseWindow(filters?.startDate, filters?.endDate);
@@ -205,8 +206,8 @@ export class WasteLogsService {
     });
   }
 
-  async getSummary(tenantId: string, startDate?: string, endDate?: string) {
-    const where: any = { tenantId };
+  async getSummary(scope: BranchScope, startDate?: string, endDate?: string) {
+    const where: any = { ...branchScope(scope) };
     const window = parseWindow(startDate, endDate);
     if (window.gte || window.lte) where.createdAt = window;
 

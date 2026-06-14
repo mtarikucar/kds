@@ -19,6 +19,8 @@ import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { IngredientMovementsService } from "../services/ingredient-movements.service";
 import { CreateIngredientMovementDto } from "../dto/create-ingredient-movement.dto";
 import { ListIngredientMovementsQueryDto } from "../dto/list-stock-logs.dto";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 
 @ApiTags("stock-management/movements")
 @ApiBearerAuth()
@@ -31,8 +33,11 @@ export class IngredientMovementsController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get all ingredient movements" })
-  findAll(@Request() req, @Query() query: ListIngredientMovementsQueryDto) {
-    return this.service.findAll(req.tenantId, query);
+  findAll(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: ListIngredientMovementsQueryDto,
+  ) {
+    return this.service.findAll(scope, query);
   }
 
   @Post()

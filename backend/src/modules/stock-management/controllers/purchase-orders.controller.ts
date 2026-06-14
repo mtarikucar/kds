@@ -41,15 +41,18 @@ export class PurchaseOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get all purchase orders" })
   @ApiQuery({ name: "status", required: false })
-  findAll(@Request() req, @Query("status") status?: string) {
-    return this.service.findAll(req.tenantId, status);
+  findAll(
+    @CurrentScope() scope: BranchScope,
+    @Query("status") status?: string,
+  ) {
+    return this.service.findAll(scope, status);
   }
 
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get a purchase order by ID" })
-  findOne(@Param("id") id: string, @Request() req) {
-    return this.service.findOne(id, req.tenantId);
+  findOne(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.findOne(id, scope);
   }
 
   @Post()
@@ -71,8 +74,8 @@ export class PurchaseOrdersController {
   @Post(":id/submit")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Submit a draft purchase order" })
-  submit(@Param("id") id: string, @Request() req) {
-    return this.service.submit(id, req.tenantId);
+  submit(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.submit(id, scope);
   }
 
   @Post(":id/receive")
@@ -81,15 +84,15 @@ export class PurchaseOrdersController {
   receive(
     @Param("id") id: string,
     @Body() dto: ReceivePurchaseOrderDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.service.receive(id, dto, req.tenantId, req.user?.id);
+    return this.service.receive(id, dto, scope, scope.userId);
   }
 
   @Post(":id/cancel")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Cancel a purchase order" })
-  cancel(@Param("id") id: string, @Request() req) {
-    return this.service.cancel(id, req.tenantId, req.user?.id);
+  cancel(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.cancel(id, scope, scope.userId);
   }
 }

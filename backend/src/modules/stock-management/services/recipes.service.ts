@@ -7,6 +7,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateRecipeDto, RecipeIngredientDto } from "../dto/create-recipe.dto";
 import { UpdateRecipeDto } from "../dto/update-recipe.dto";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 // Iter-93: pagination cap on recipes list. Most tenants have ~50 distinct
 // product recipes; large chains in our pipeline have ~500. 500 is a comfortable
@@ -44,7 +45,7 @@ export class RecipesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     pagination?: { limit?: number; offset?: number },
   ) {
     const take = Math.min(
@@ -53,7 +54,7 @@ export class RecipesService {
     );
     const skip = pagination?.offset ?? 0;
     return this.prisma.recipe.findMany({
-      where: { tenantId },
+      where: { ...branchScope(scope) },
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
@@ -70,9 +71,9 @@ export class RecipesService {
     });
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, scope: BranchScope) {
     const recipe = await this.prisma.recipe.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
@@ -94,9 +95,9 @@ export class RecipesService {
     return recipe;
   }
 
-  async findByProduct(productId: string, tenantId: string) {
+  async findByProduct(productId: string, scope: BranchScope) {
     const recipe = await this.prisma.recipe.findFirst({
-      where: { productId, tenantId },
+      where: { productId, ...branchScope(scope) },
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
@@ -182,15 +183,16 @@ export class RecipesService {
     });
   }
 
-  async update(id: string, dto: UpdateRecipeDto, tenantId: string) {
-    const recipe = await this.findOne(id, tenantId);
+  async update(id: string, dto: UpdateRecipeDto, scope: BranchScope) {
+    const recipe = await this.findOne(id, scope);
 
     return this.prisma.$transaction(async (tx) => {
-      // Defence-in-depth: even though findOne above checked tenant, the
-      // mutation itself must filter by tenantId so a regression that
-      // drops the pre-check can't expose cross-tenant writes.
+      // Defence-in-depth: even though findOne above checked scope, the
+      // mutation itself must filter by (tenantId, branchId) so a
+      // regression that drops the pre-check can't expose cross-branch
+      // writes.
       const updated = await tx.recipe.updateMany({
-        where: { id, tenantId },
+        where: { id, ...branchScope(scope) },
         data: {
           name: dto.name,
           notes: dto.notes,
@@ -206,10 +208,11 @@ export class RecipesService {
         // Iter-93: same dedup gate as create. Update can pass duplicates too.
         assertUniqueIngredients(dto.ingredients);
 
-        // Verify all stock items exist
+        // Verify all stock items exist within this branch — ingredients
+        // can only reference stock items in the same branch as the recipe.
         const stockItemIds = dto.ingredients.map((i) => i.stockItemId);
         const stockItems = await tx.stockItem.findMany({
-          where: { id: { in: stockItemIds }, tenantId },
+          where: { id: { in: stockItemIds }, ...branchScope(scope) },
         });
         if (stockItems.length !== stockItemIds.length) {
           throw new BadRequestException("One or more stock items not found");
@@ -249,8 +252,8 @@ export class RecipesService {
     });
   }
 
-  async remove(id: string, tenantId: string) {
-    const recipe = await this.findOne(id, tenantId);
+  async remove(id: string, scope: BranchScope) {
+    const recipe = await this.findOne(id, scope);
     // Log loudly — deleting a recipe stops ingredient deduction for the
     // bound product without any other signal.
     const logger = new (await import("@nestjs/common")).Logger(
@@ -259,9 +262,10 @@ export class RecipesService {
     logger.warn(
       `Recipe ${recipe.name ?? recipe.id} removed for product ${recipe.productId}; ingredient auto-deduction for this product has stopped.`,
     );
-    // Compound WHERE — defence-in-depth IDOR (B41-B45 pattern).
+    // Compound WHERE — defence-in-depth IDOR (B41-B45 pattern), now
+    // branch-fenced so a cross-branch recipe id can't be deleted.
     const result = await this.prisma.recipe.deleteMany({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
     if (result.count === 0) {
       throw new BadRequestException("Recipe not found");
@@ -269,8 +273,8 @@ export class RecipesService {
     return { id };
   }
 
-  async checkStock(id: string, tenantId: string, quantity: number = 1) {
-    const recipe = await this.findOne(id, tenantId);
+  async checkStock(id: string, scope: BranchScope, quantity: number = 1) {
+    const recipe = await this.findOne(id, scope);
 
     const results = recipe.ingredients.map((ingredient) => {
       const required = (Number(ingredient.quantity) / recipe.yield) * quantity;

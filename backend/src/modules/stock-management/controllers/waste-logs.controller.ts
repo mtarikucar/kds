@@ -22,6 +22,8 @@ import {
   ListWasteLogsQueryDto,
   WasteLogsSummaryQueryDto,
 } from "../dto/list-stock-logs.dto";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 
 @ApiTags("stock-management/waste-logs")
 @ApiBearerAuth()
@@ -34,19 +36,21 @@ export class WasteLogsController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get all waste logs" })
-  findAll(@Request() req, @Query() query: ListWasteLogsQueryDto) {
-    return this.service.findAll(req.tenantId, query);
+  findAll(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: ListWasteLogsQueryDto,
+  ) {
+    return this.service.findAll(scope, query);
   }
 
   @Get("summary")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get waste summary with totals by reason" })
-  getSummary(@Request() req, @Query() query: WasteLogsSummaryQueryDto) {
-    return this.service.getSummary(
-      req.tenantId,
-      query.startDate,
-      query.endDate,
-    );
+  getSummary(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: WasteLogsSummaryQueryDto,
+  ) {
+    return this.service.getSummary(scope, query.startDate, query.endDate);
   }
 
   @Post()
