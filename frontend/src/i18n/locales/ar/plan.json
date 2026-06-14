@@ -1,42 +1,42 @@
 {
   "page": {
-    "title": "Plan & Access",
-    "subtitle": "Manage your current plan, usage quotas, and active add-ons in one place."
+    "title": "الخطة والوصول",
+    "subtitle": "أدِر خطتك الحالية وحصص الاستخدام والإضافات النشطة في مكان واحد."
   },
   "plan": {
-    "current": "Current plan",
-    "nextBilling": "Next billing: {{date}}",
-    "trialEnds": "Trial ends: {{date}}",
-    "changePlanCta": "Change plan"
+    "current": "الخطة الحالية",
+    "nextBilling": "الفوترة التالية: {{date}}",
+    "trialEnds": "تنتهي الفترة التجريبية: {{date}}",
+    "changePlanCta": "تغيير الخطة"
   },
   "quota": {
-    "title": "Usage quotas",
-    "users": "Users",
-    "branches": "Branches",
-    "products": "Products",
-    "monthlyOrders": "Monthly orders"
+    "title": "حصص الاستخدام",
+    "users": "المستخدمون",
+    "branches": "الفروع",
+    "products": "المنتجات",
+    "monthlyOrders": "الطلبات الشهرية"
   },
   "activeAddOns": {
-    "title": "Active add-ons",
-    "empty": "You haven't purchased any add-ons yet. See suggestions below.",
+    "title": "الإضافات النشطة",
+    "empty": "لم تشترِ أي إضافات بعد. اطّلع على الاقتراحات أدناه.",
     "col": {
-      "name": "Add-on",
-      "price": "Price",
-      "renewal": "Renewal"
+      "name": "الإضافة",
+      "price": "السعر",
+      "renewal": "التجديد"
     },
-    "scheduledToCancel": "Cancels at period end",
-    "cancelCta": "Cancel"
+    "scheduledToCancel": "يُلغى في نهاية الفترة",
+    "cancelCta": "إلغاء"
   },
   "suggested": {
-    "title": "Suggested add-ons",
-    "viewAll": "Visit marketplace"
+    "title": "إضافات مقترحة",
+    "viewAll": "زيارة المتجر"
   },
   "upsell": {
-    "defaultTitle": "This feature isn't in your subscription",
-    "defaultDescription": "You'll need to upgrade your plan or buy the matching add-on to access this page.",
-    "upgradePlanCta": "Upgrade plan",
-    "viewAddOnCta": "See add-on",
-    "helpHint": "Reach out to support if you have questions."
+    "defaultTitle": "هذه الميزة غير متضمَّنة في اشتراكك",
+    "defaultDescription": "ستحتاج إلى ترقية خطتك أو شراء الإضافة المناسبة للوصول إلى هذه الصفحة.",
+    "upgradePlanCta": "ترقية الخطة",
+    "viewAddOnCta": "عرض الإضافة",
+    "helpHint": "تواصل مع الدعم إذا كانت لديك أي أسئلة."
   },
   "branchPicker": {
     "activeBranch": "حدد الفرع النشط",

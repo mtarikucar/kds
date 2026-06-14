@@ -1,42 +1,42 @@
 {
   "page": {
-    "title": "Plan & Access",
-    "subtitle": "Manage your current plan, usage quotas, and active add-ons in one place."
+    "title": "Tarif va kirish",
+    "subtitle": "Joriy tarifingiz, foydalanish kvotalari va faol qoʻshimchalarni bir joyda boshqaring."
   },
   "plan": {
-    "current": "Current plan",
-    "nextBilling": "Next billing: {{date}}",
-    "trialEnds": "Trial ends: {{date}}",
-    "changePlanCta": "Change plan"
+    "current": "Joriy tarif",
+    "nextBilling": "Keyingi toʻlov: {{date}}",
+    "trialEnds": "Sinov muddati tugaydi: {{date}}",
+    "changePlanCta": "Tarifni oʻzgartirish"
   },
   "quota": {
-    "title": "Usage quotas",
-    "users": "Users",
-    "branches": "Branches",
-    "products": "Products",
-    "monthlyOrders": "Monthly orders"
+    "title": "Foydalanish kvotalari",
+    "users": "Foydalanuvchilar",
+    "branches": "Filiallar",
+    "products": "Mahsulotlar",
+    "monthlyOrders": "Oylik buyurtmalar"
   },
   "activeAddOns": {
-    "title": "Active add-ons",
-    "empty": "You haven't purchased any add-ons yet. See suggestions below.",
+    "title": "Faol qoʻshimchalar",
+    "empty": "Hozircha hech qanday qoʻshimcha sotib olmadingiz. Quyidagi tavsiyalarni koʻring.",
     "col": {
-      "name": "Add-on",
-      "price": "Price",
-      "renewal": "Renewal"
+      "name": "Qoʻshimcha",
+      "price": "Narx",
+      "renewal": "Yangilash"
     },
-    "scheduledToCancel": "Cancels at period end",
-    "cancelCta": "Cancel"
+    "scheduledToCancel": "Davr oxirida bekor qilinadi",
+    "cancelCta": "Bekor qilish"
   },
   "suggested": {
-    "title": "Suggested add-ons",
-    "viewAll": "Visit marketplace"
+    "title": "Tavsiya etilgan qoʻshimchalar",
+    "viewAll": "Marketplace'ga oʻtish"
   },
   "upsell": {
-    "defaultTitle": "This feature isn't in your subscription",
-    "defaultDescription": "You'll need to upgrade your plan or buy the matching add-on to access this page.",
-    "upgradePlanCta": "Upgrade plan",
-    "viewAddOnCta": "See add-on",
-    "helpHint": "Reach out to support if you have questions."
+    "defaultTitle": "Bu funksiya obunangizga kirmaydi",
+    "defaultDescription": "Bu sahifaga kirish uchun tarifingizni yangilashingiz yoki mos qoʻshimchani sotib olishingiz kerak.",
+    "upgradePlanCta": "Tarifni yangilash",
+    "viewAddOnCta": "Qoʻshimchani koʻrish",
+    "helpHint": "Savollaringiz boʻlsa, qoʻllab-quvvatlash xizmatiga murojaat qiling."
   },
   "branchPicker": {
     "activeBranch": "Faol filialni tanlang",

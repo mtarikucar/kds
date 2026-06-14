@@ -1,0 +1,17 @@
+{
+  "ar": [
+    "reports.json#zReports.emailPlaceholder",
+    "settings.json#nav.qrMenu"
+  ],
+  "ru": [
+    "common.json#hummytummy.devices.kind.caller_id",
+    "reports.json#zReports.emailPlaceholder",
+    "settings.json#nav.qrMenu"
+  ],
+  "uz": [
+    "common.json#hummytummy.devices.kind.caller_id",
+    "common.json#hummytummy.devices.kind.pos_terminal",
+    "reports.json#zReports.emailPlaceholder",
+    "settings.json#nav.qrMenu"
+  ]
+}
