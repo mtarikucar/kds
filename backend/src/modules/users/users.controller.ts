@@ -17,6 +17,7 @@ import {
   ApiResponse,
 } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
+import { UserOnboardingService } from "./services/user-onboarding.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
@@ -49,7 +50,10 @@ import { UserRole } from "../../common/constants/roles.enum";
 @Controller("users")
 @UseGuards(PlanFeatureGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly onboardingService: UserOnboardingService,
+  ) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
@@ -185,7 +189,7 @@ export class UsersController {
   @SkipBranchScope()
   @ApiOperation({ summary: "Get current user onboarding data" })
   getMyOnboarding(@CurrentUser("id") userId: string) {
-    return this.usersService.getOnboarding(userId);
+    return this.onboardingService.getOnboarding(userId);
   }
 
   @Patch("me/onboarding")
@@ -195,6 +199,6 @@ export class UsersController {
     @CurrentUser("id") userId: string,
     @Body() updateOnboardingDto: UpdateOnboardingDto,
   ) {
-    return this.usersService.updateOnboarding(userId, updateOnboardingDto);
+    return this.onboardingService.updateOnboarding(userId, updateOnboardingDto);
   }
 }
