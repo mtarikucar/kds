@@ -45,6 +45,22 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * Depth of the delivery-platforms dead-letter queue: log rows that
+   * exhausted their retry budget (success=false, retryCount>=maxRetries,
+   * nextRetryAt=null) and the RetryScheduler will never re-claim on its
+   * own. Mirrors `outbox_dlq_depth`: DeliveryLogService bumps it inline
+   * when incrementRetry crosses a row into the terminal null state, and
+   * a cheap periodic tick re-sets it to an authoritative COUNT(*) so an
+   * operator requeue/delete (or a restart) can't leave the gauge drifted.
+   * A Prometheus alert can fire on `delivery_dlq_depth > 0`.
+   */
+  private readonly deliveryDlqDepthGauge = new Gauge({
+    name: "delivery_dlq_depth",
+    help: "Number of delivery-platform log entries parked in the dead-letter queue (retries exhausted, nextRetryAt=null)",
+    registers: [this.registry],
+  });
+
   constructor() {
     collectDefaultMetrics({ register: this.registry });
   }
@@ -57,6 +73,16 @@ export class MetricsService {
   /** Increment the DLQ depth by one as a single event gives up. */
   incOutboxDlqDepth(): void {
     this.outboxDlqDepthGauge.inc();
+  }
+
+  /** Set the delivery DLQ depth to an authoritative value (COUNT(*) result). */
+  setDeliveryDlqDepth(depth: number): void {
+    this.deliveryDlqDepthGauge.set(depth);
+  }
+
+  /** Increment the delivery DLQ depth by one as a single log row gives up. */
+  incDeliveryDlqDepth(): void {
+    this.deliveryDlqDepthGauge.inc();
   }
 
   /**

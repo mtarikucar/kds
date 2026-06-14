@@ -22,6 +22,7 @@ import { DeliveryLogService } from "./services/delivery-log.service";
 // Controllers
 import { DeliveryPlatformsController } from "./controllers/delivery-platforms.controller";
 import { DeliveryWebhookController } from "./controllers/delivery-webhook.controller";
+import { DeliveryDlqController } from "./controllers/delivery-dlq.controller";
 
 // Schedulers
 import { OrderPollingScheduler } from "./schedulers/order-polling.scheduler";
@@ -38,7 +39,11 @@ import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
     forwardRef(() => KdsModule),
     SubscriptionsModule,
   ],
-  controllers: [DeliveryPlatformsController, DeliveryWebhookController],
+  controllers: [
+    DeliveryPlatformsController,
+    DeliveryWebhookController,
+    DeliveryDlqController,
+  ],
   providers: [
     // Adapters
     GetirAdapter,

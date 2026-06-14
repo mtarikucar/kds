@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { DeliveryLogService } from './delivery-log.service';
 import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
 
@@ -20,10 +21,15 @@ import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-
 describe('DeliveryLogService', () => {
   let prisma: MockPrismaClient;
   let svc: DeliveryLogService;
+  let metrics: { incDeliveryDlqDepth: jest.Mock; setDeliveryDlqDepth: jest.Mock };
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    svc = new DeliveryLogService(prisma as any);
+    metrics = {
+      incDeliveryDlqDepth: jest.fn(),
+      setDeliveryDlqDepth: jest.fn(),
+    };
+    svc = new DeliveryLogService(prisma as any, metrics as any);
   });
 
   describe('scrubPii', () => {
@@ -172,6 +178,163 @@ describe('DeliveryLogService', () => {
       await svc.incrementRetry('missing');
 
       expect(prisma.deliveryPlatformLog.update).not.toHaveBeenCalled();
+    });
+
+    it('incrementRetry bumps the delivery DLQ gauge when a row crosses into the terminal state', async () => {
+      // retryCount 2 -> 3 with maxRetries 3 means nextRetryAt becomes null:
+      // the row just entered the dead-letter terminal state, so the inline
+      // gauge inc must fire exactly once.
+      (prisma.deliveryPlatformLog.findUnique as any).mockResolvedValue({
+        id: 'log-1', retryCount: 2, maxRetries: 3,
+      });
+
+      await svc.incrementRetry('log-1');
+
+      expect(metrics.incDeliveryDlqDepth).toHaveBeenCalledTimes(1);
+    });
+
+    it('incrementRetry does NOT bump the gauge while retries remain', async () => {
+      (prisma.deliveryPlatformLog.findUnique as any).mockResolvedValue({
+        id: 'log-1', retryCount: 0, maxRetries: 3,
+      });
+
+      await svc.incrementRetry('log-1');
+
+      expect(metrics.incDeliveryDlqDepth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dead-letter queue readout', () => {
+    it('getDeadLetters filters to the terminal state (success=false, nextRetryAt=null, retries exhausted)', async () => {
+      (prisma.deliveryPlatformLog.findMany as any).mockResolvedValue([
+        { id: 'dl-2' }, { id: 'dl-1' },
+      ]);
+
+      const out = await svc.getDeadLetters({ tenantId: 't1', platform: 'GETIR', limit: 50 });
+
+      const arg = (prisma.deliveryPlatformLog.findMany as any).mock.calls[0][0];
+      expect(arg.where).toMatchObject({
+        tenantId: 't1',
+        platform: 'GETIR',
+        success: false,
+        nextRetryAt: null,
+      });
+      // The retryCount>=maxRetries half is expressed as a column-to-column
+      // comparison (Prisma field reference) so assert the predicate KEY is
+      // present rather than its opaque encoding.
+      expect(arg.where).toHaveProperty('retryCount');
+      expect(arg.where.success).toBe(false);
+      expect(arg.where.nextRetryAt).toBeNull();
+      expect(out.items).toHaveLength(2);
+      expect(out.nextCursor).toBeNull();
+    });
+
+    it('getDeadLetters clamps limit to [1,200] and paginates by cursor', async () => {
+      (prisma.deliveryPlatformLog.findMany as any).mockResolvedValue([
+        { id: 'dl-3' }, { id: 'dl-2' }, { id: 'dl-1' },
+      ]);
+
+      const out = await svc.getDeadLetters({ limit: 2, cursor: 'dl-9' });
+
+      const arg = (prisma.deliveryPlatformLog.findMany as any).mock.calls[0][0];
+      expect(arg.take).toBe(3); // limit(2) + 1 to detect hasMore
+      expect(arg.cursor).toEqual({ id: 'dl-9' });
+      expect(arg.skip).toBe(1);
+      expect(out.items).toHaveLength(2);
+      expect(out.nextCursor).toBe('dl-2');
+    });
+
+    it('getDeadLetters works tenant-wide (no tenantId) for SuperAdmin readout', async () => {
+      (prisma.deliveryPlatformLog.findMany as any).mockResolvedValue([]);
+
+      await svc.getDeadLetters({});
+
+      const where = (prisma.deliveryPlatformLog.findMany as any).mock.calls[0][0].where;
+      expect(where.tenantId).toBeUndefined();
+      expect(where.success).toBe(false);
+      expect(where.nextRetryAt).toBeNull();
+    });
+
+    it('dlqDepth COUNTs exactly the terminal set and re-syncs the gauge', async () => {
+      (prisma.deliveryPlatformLog.count as any).mockResolvedValue(7);
+
+      const n = await svc.dlqDepth();
+
+      expect(n).toBe(7);
+      const where = (prisma.deliveryPlatformLog.count as any).mock.calls[0][0].where;
+      expect(where.success).toBe(false);
+      expect(where.nextRetryAt).toBeNull();
+      // Re-sync side effect keeps the inline-incremented gauge honest.
+      expect(metrics.setDeliveryDlqDepth).toHaveBeenCalledWith(7);
+    });
+
+    it('dlqDepth can scope by tenantId/platform', async () => {
+      (prisma.deliveryPlatformLog.count as any).mockResolvedValue(2);
+
+      await svc.dlqDepth({ tenantId: 't1', platform: 'TRENDYOL' });
+
+      const where = (prisma.deliveryPlatformLog.count as any).mock.calls[0][0].where;
+      expect(where.tenantId).toBe('t1');
+      expect(where.platform).toBe('TRENDYOL');
+    });
+  });
+
+  describe('requeueDeadLetters', () => {
+    it('sets nextRetryAt=now so the EXISTING RetryScheduler re-claims, without resetting attempts by default', async () => {
+      (prisma.deliveryPlatformLog.updateMany as any).mockResolvedValue({ count: 2 });
+      const before = Date.now();
+
+      const out = await svc.requeueDeadLetters(['dl-1', 'dl-2']);
+
+      const arg = (prisma.deliveryPlatformLog.updateMany as any).mock.calls[0][0];
+      // Only rows still in the terminal state are eligible.
+      expect(arg.where).toMatchObject({
+        id: { in: ['dl-1', 'dl-2'] },
+        success: false,
+        nextRetryAt: null,
+      });
+      expect(arg.data.nextRetryAt).toBeInstanceOf(Date);
+      expect(arg.data.nextRetryAt.getTime()).toBeGreaterThanOrEqual(before);
+      // resetAttempts defaults FALSE — a poison-pill row keeps its exhausted
+      // counter so it re-DLQs after one more failed tick instead of looping.
+      expect(arg.data.retryCount).toBeUndefined();
+      expect(out).toEqual({ requeued: 2, requested: 2 });
+    });
+
+    it('optionally resets retryCount to 0 when caller passes resetAttempts', async () => {
+      (prisma.deliveryPlatformLog.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.requeueDeadLetters(['dl-1'], { resetAttempts: true });
+
+      const arg = (prisma.deliveryPlatformLog.updateMany as any).mock.calls[0][0];
+      expect(arg.data.retryCount).toBe(0);
+    });
+
+    it('fences the updateMany by tenantId when caller scopes it (no cross-tenant replay)', async () => {
+      (prisma.deliveryPlatformLog.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.requeueDeadLetters(['dl-1'], { tenantId: 't1' });
+
+      const where = (prisma.deliveryPlatformLog.updateMany as any).mock.calls[0][0].where;
+      expect(where.tenantId).toBe('t1');
+    });
+
+    it('re-syncs the gauge after a requeue (rows left the terminal set)', async () => {
+      (prisma.deliveryPlatformLog.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.deliveryPlatformLog.count as any).mockResolvedValue(4);
+
+      await svc.requeueDeadLetters(['dl-1']);
+
+      expect(metrics.setDeliveryDlqDepth).toHaveBeenCalledWith(4);
+    });
+
+    it('rejects an empty id list', async () => {
+      await expect(svc.requeueDeadLetters([])).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects more than 100 ids to bound blast radius', async () => {
+      const ids = Array.from({ length: 101 }, (_, i) => `dl-${i}`);
+      await expect(svc.requeueDeadLetters(ids)).rejects.toThrow(BadRequestException);
     });
   });
 });

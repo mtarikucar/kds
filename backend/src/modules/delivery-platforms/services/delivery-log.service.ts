@@ -1,5 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { MetricsService } from "../../../common/metrics/metrics.service";
 import {
   PlatformLogDirection,
   PlatformLogAction,
@@ -26,7 +32,34 @@ export interface LogEntry {
 export class DeliveryLogService {
   private readonly logger = new Logger(DeliveryLogService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Optional so the many unit tests that construct this service bare keep
+    // working and the audit/retry path never depends on the metrics registry
+    // being wired — metrics must never break a delivery operation.
+    @Optional() private readonly metrics?: MetricsService,
+  ) {}
+
+  /**
+   * Canonical predicate for the delivery dead-letter terminal state.
+   *
+   * incrementRetry sets `nextRetryAt=null` exactly when
+   * `retryCount>=maxRetries`; markRetrySuccess also nulls nextRetryAt but
+   * flips `success=true`. So `success:false AND nextRetryAt:null` already
+   * isolates the dead-letter set — the explicit `retryCount>=maxRetries`
+   * (a Prisma column-to-column field reference) is kept as a belt-and-braces
+   * guard so a future code path that nulls nextRetryAt for another reason
+   * can't leak non-exhausted rows into the DLQ readout.
+   */
+  private deadLetterWhere(filters?: { tenantId?: string; platform?: string }) {
+    return {
+      success: false as const,
+      nextRetryAt: null,
+      retryCount: { gte: this.prisma.deliveryPlatformLog.fields.maxRetries },
+      ...(filters?.tenantId ? { tenantId: filters.tenantId } : {}),
+      ...(filters?.platform ? { platform: filters.platform } : {}),
+    };
+  }
 
   /**
    * Best-effort log write. Swallows errors so a transient DB hiccup in
@@ -117,17 +150,30 @@ export class DeliveryLogService {
 
     const nextRetryCount = log.retryCount + 1;
     const backoffMs = Math.min(60_000 * Math.pow(2, nextRetryCount), 3_600_000); // Max 1 hour
+    const exhausted = nextRetryCount >= log.maxRetries;
 
     await this.prisma.deliveryPlatformLog.update({
       where: { id: logId },
       data: {
         retryCount: nextRetryCount,
-        nextRetryAt:
-          nextRetryCount >= log.maxRetries
-            ? null // No more retries
-            : new Date(Date.now() + backoffMs),
+        nextRetryAt: exhausted
+          ? null // No more retries — this is the dead-letter terminal state.
+          : new Date(Date.now() + backoffMs),
       },
     });
+
+    // This row just crossed into the dead-letter terminal state
+    // (nextRetryAt=null, retries exhausted). Bump the DLQ-depth gauge
+    // inline so a Prometheus alert can fire between the periodic
+    // authoritative re-syncs (dlqDepth()). Wrapped so a metrics hiccup
+    // can never fail the retry-accounting write above.
+    if (exhausted) {
+      try {
+        this.metrics?.incDeliveryDlqDepth();
+      } catch {
+        /* metrics must never break the retry path */
+      }
+    }
   }
 
   async markRetrySuccess(logId: string) {
@@ -161,5 +207,133 @@ export class DeliveryLogService {
     ]);
 
     return { logs, total };
+  }
+
+  // ========================================
+  // Dead-letter queue (DLQ) readout + replay
+  //
+  // The terminal dead-letter state is `success:false AND nextRetryAt:null
+  // AND retryCount>=maxRetries` — the state incrementRetry parks a row in
+  // once it exhausts its retry budget. The RetryScheduler's
+  // getFailedOperations() filters on `nextRetryAt <= now`, so a null
+  // nextRetryAt row is never re-claimed: it sits dead until an operator
+  // requeues it. These methods make that set visible and replayable
+  // (mirrors SuperAdminOutboxService.listFailed/summary/requeue).
+  // ========================================
+
+  /**
+   * Page through dead-lettered log rows. Cursor-paginated by id (desc) so an
+   * ops dashboard can scroll a large backlog without OFFSET cost. Optional
+   * tenantId/platform narrow the set; omitting tenantId is the SuperAdmin
+   * cross-tenant readout.
+   */
+  async getDeadLetters(params: {
+    tenantId?: string;
+    platform?: string;
+    limit?: number;
+    cursor?: string;
+  }) {
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
+    const rows = await this.prisma.deliveryPlatformLog.findMany({
+      where: this.deadLetterWhere(params),
+      orderBy: { id: "desc" },
+      take: limit + 1, // +1 to detect "more available" without a second query
+      ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        tenantId: true,
+        branchId: true,
+        platform: true,
+        direction: true,
+        action: true,
+        orderId: true,
+        externalId: true,
+        statusCode: true,
+        error: true,
+        retryCount: true,
+        maxRetries: true,
+        createdAt: true,
+      },
+    });
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      items,
+      nextCursor: hasMore ? items[items.length - 1].id : null,
+    };
+  }
+
+  /**
+   * Authoritative COUNT(*) of the dead-letter set. Also re-syncs the
+   * `delivery_dlq_depth` gauge to the counted value — the inline inc() in
+   * incrementRetry keeps it fresh between syncs, this corrects any drift
+   * after an operator requeue/delete or a process restart.
+   */
+  async dlqDepth(filters?: {
+    tenantId?: string;
+    platform?: string;
+  }): Promise<number> {
+    const depth = await this.prisma.deliveryPlatformLog.count({
+      where: this.deadLetterWhere(filters),
+    });
+    // Re-sync the gauge to the authoritative value. Only sync the GLOBAL
+    // count (no filter) so a tenant-scoped read can't clobber the
+    // process-wide gauge with a partial number.
+    if (!filters?.tenantId && !filters?.platform) {
+      try {
+        this.metrics?.setDeliveryDlqDepth(depth);
+      } catch {
+        /* metrics must never break the read path */
+      }
+    }
+    return depth;
+  }
+
+  /**
+   * Re-queue dead-lettered rows for the EXISTING RetryScheduler: set
+   * `nextRetryAt=new Date()` so the scheduler's next tick (getFailedOperations
+   * filters `nextRetryAt <= now`) re-claims them — no new worker.
+   *
+   * Up to 100 ids per call so an ops mistake can't flood the scheduler. The
+   * WHERE keeps the dead-letter predicate so a row that's since been requeued
+   * or succeeded isn't touched twice. `resetAttempts=true` is an escape hatch
+   * (infra-side outage) that zeroes retryCount for a full retry budget;
+   * default FALSE so a poison-pill row keeps its exhausted counter and
+   * re-DLQs after one more failed tick instead of looping forever.
+   */
+  async requeueDeadLetters(
+    ids: string[],
+    opts: { resetAttempts?: boolean; tenantId?: string } = {},
+  ): Promise<{ requeued: number; requested: number }> {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException("ids[] must contain at least one log id");
+    }
+    if (ids.length > 100) {
+      throw new BadRequestException(
+        "Maximum 100 dead-letters per requeue call",
+      );
+    }
+    const result = await this.prisma.deliveryPlatformLog.updateMany({
+      where: {
+        id: { in: ids },
+        success: false,
+        nextRetryAt: null,
+        retryCount: { gte: this.prisma.deliveryPlatformLog.fields.maxRetries },
+        // Tenant fence: a tenant-scoped controller passes its own tenantId so
+        // an ADMIN can never replay another tenant's dead-letters by guessing
+        // ids. Omitted only by the (cross-tenant) SuperAdmin path.
+        ...(opts.tenantId ? { tenantId: opts.tenantId } : {}),
+      },
+      data: {
+        nextRetryAt: new Date(),
+        ...(opts.resetAttempts ? { retryCount: 0 } : {}),
+      },
+    });
+    this.logger.log(
+      `requeued ${result.count}/${ids.length} delivery dead-letters (resetAttempts=${!!opts.resetAttempts})`,
+    );
+    // Rows just left the dead-letter set — refresh the gauge to the truth.
+    await this.dlqDepth();
+    return { requeued: result.count, requested: ids.length };
   }
 }
