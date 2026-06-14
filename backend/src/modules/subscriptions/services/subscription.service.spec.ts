@@ -572,3 +572,237 @@ describe('SubscriptionService — downgrade usage-limit guard (changePlan)', () 
     );
   });
 });
+
+/**
+ * Auditability — privileged billing mutations (create / change-plan /
+ * cancel) must capture the acting admin in user_activities so support can
+ * answer "who created / downgraded / cancelled this tenant's plan". The
+ * audit write is best-effort and only fires when a human actor id is
+ * threaded through (scheduler/cron callers pass none).
+ */
+describe('SubscriptionService — billing audit (user_activities)', () => {
+  let prisma: MockPrismaClient;
+  let svc: SubscriptionService;
+
+  const TENANT_ID = 'tenant-1';
+  const SUB_ID = 'sub-1';
+  const ACTOR_ID = 'admin-7';
+
+  function build() {
+    prisma = mockPrismaClient();
+    svc = new SubscriptionService(
+      prisma as any,
+      {} as any,
+      { sendTrialStarted: jest.fn().mockResolvedValue(undefined) } as any,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+      {
+        getForTenant: jest.fn().mockResolvedValue({
+          features: {},
+          limits: {},
+          integrations: {},
+          computedAt: new Date(0).toISOString(),
+        }),
+      } as any,
+    );
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+  }
+
+  beforeEach(build);
+
+  it('createSubscription writes SUBSCRIPTION_CREATED with actor + plan fields', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: TENANT_ID,
+      usedTrialPlanIds: [],
+      trialUsed: false,
+    } as any);
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'u-admin',
+      emailVerified: true,
+    } as any);
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: 'plan-free',
+      name: 'FREE',
+      currency: 'TRY',
+      monthlyPrice: '0',
+      yearlyPrice: '0',
+      trialDays: 0,
+      isActive: true,
+      displayName: 'Ücretsiz',
+    } as any);
+    prisma.subscription.create.mockResolvedValue({ id: SUB_ID, plan: {} } as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
+
+    await svc.createSubscription(
+      TENANT_ID,
+      { planId: 'plan-free', billingCycle: BillingCycle.MONTHLY } as any,
+      ACTOR_ID,
+    );
+
+    expect(prisma.userActivity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: ACTOR_ID,
+        tenantId: TENANT_ID,
+        action: 'SUBSCRIPTION_CREATED',
+        metadata: expect.objectContaining({
+          subscriptionId: SUB_ID,
+          planId: 'plan-free',
+          planName: 'FREE',
+          billingCycle: BillingCycle.MONTHLY,
+        }),
+      }),
+    });
+  });
+
+  it('createSubscription WITHOUT an actor writes no audit row', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: TENANT_ID,
+      usedTrialPlanIds: [],
+      trialUsed: false,
+    } as any);
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'u-admin',
+      emailVerified: true,
+    } as any);
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: 'plan-free',
+      name: 'FREE',
+      currency: 'TRY',
+      monthlyPrice: '0',
+      yearlyPrice: '0',
+      trialDays: 0,
+      isActive: true,
+      displayName: 'Ücretsiz',
+    } as any);
+    prisma.subscription.create.mockResolvedValue({ id: SUB_ID, plan: {} } as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
+
+    await svc.createSubscription(
+      TENANT_ID,
+      { planId: 'plan-free', billingCycle: BillingCycle.MONTHLY } as any,
+    );
+
+    expect(prisma.userActivity.create).not.toHaveBeenCalled();
+  });
+
+  it('changePlan (downgrade) writes SUBSCRIPTION_PLAN_CHANGED with from/to', async () => {
+    prisma.subscription.findUnique.mockResolvedValue({
+      id: SUB_ID,
+      tenantId: TENANT_ID,
+      status: 'ACTIVE',
+      planId: 'plan-pro',
+      amount: '100',
+      billingCycle: BillingCycle.MONTHLY,
+      currentPeriodStart: new Date(Date.now() - 86_400_000),
+      currentPeriodEnd: new Date(Date.now() + 86_400_000),
+      scheduledDowngradePlanId: null,
+      plan: { id: 'plan-pro', name: 'PRO', currency: 'TRY' },
+      tenant: {},
+    } as any);
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: 'plan-basic',
+      name: 'BASIC',
+      isActive: true,
+      currency: 'TRY',
+      monthlyPrice: '50',
+      yearlyPrice: '500',
+      maxUsers: 10,
+      maxTables: 10,
+      maxProducts: 100,
+      maxCategories: 20,
+    } as any);
+    prisma.user.count.mockResolvedValue(1 as any);
+    prisma.table.count.mockResolvedValue(1 as any);
+    prisma.product.count.mockResolvedValue(1 as any);
+    prisma.category.count.mockResolvedValue(1 as any);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscription.findUniqueOrThrow.mockResolvedValue({
+      id: SUB_ID,
+      plan: {},
+      scheduledDowngradePlan: {},
+    } as any);
+
+    await svc.changePlan(
+      SUB_ID,
+      TENANT_ID,
+      { newPlanId: 'plan-basic' } as any,
+      ACTOR_ID,
+    );
+
+    expect(prisma.userActivity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: ACTOR_ID,
+        tenantId: TENANT_ID,
+        action: 'SUBSCRIPTION_PLAN_CHANGED',
+        metadata: expect.objectContaining({
+          subscriptionId: SUB_ID,
+          fromPlanName: 'PRO',
+          toPlanName: 'BASIC',
+          type: 'downgrade',
+        }),
+      }),
+    });
+  });
+
+  it('cancelSubscription writes SUBSCRIPTION_CANCELLED with actor + reason', async () => {
+    prisma.subscription.findUnique.mockResolvedValue({
+      id: SUB_ID,
+      tenantId: TENANT_ID,
+      status: 'ACTIVE',
+      planId: 'plan-pro',
+      currentPeriodEnd: new Date(Date.now() + 86_400_000),
+      plan: { name: 'PRO', displayName: 'Profesyonel' },
+      tenant: { name: 'Test Restoran' },
+    } as any);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscription.findUniqueOrThrow.mockResolvedValue({
+      id: SUB_ID,
+      plan: { name: 'PRO', displayName: 'Profesyonel' },
+      tenant: { name: 'Test Restoran' },
+    } as any);
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'free-plan' } as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
+    prisma.user.findFirst.mockResolvedValue(null as any);
+
+    await svc.cancelSubscription(SUB_ID, TENANT_ID, true, 'churned', ACTOR_ID);
+
+    expect(prisma.userActivity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: ACTOR_ID,
+        tenantId: TENANT_ID,
+        action: 'SUBSCRIPTION_CANCELLED',
+        metadata: expect.objectContaining({
+          subscriptionId: SUB_ID,
+          immediate: true,
+          reason: 'churned',
+        }),
+      }),
+    });
+  });
+
+  it('is best-effort: a failing billing audit never breaks the cancel', async () => {
+    prisma.subscription.findUnique.mockResolvedValue({
+      id: SUB_ID,
+      tenantId: TENANT_ID,
+      status: 'ACTIVE',
+      planId: 'plan-pro',
+      currentPeriodEnd: new Date(Date.now() + 86_400_000),
+      plan: { name: 'PRO', displayName: 'Profesyonel' },
+      tenant: { name: 'Test Restoran' },
+    } as any);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscription.findUniqueOrThrow.mockResolvedValue({
+      id: SUB_ID,
+      plan: { name: 'PRO', displayName: 'Profesyonel' },
+      tenant: { name: 'Test Restoran' },
+    } as any);
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'free-plan' } as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
+    prisma.user.findFirst.mockResolvedValue(null as any);
+    (prisma.userActivity.create as any).mockRejectedValue(new Error('audit down'));
+    jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => undefined);
+
+    await expect(
+      svc.cancelSubscription(SUB_ID, TENANT_ID, true, 'churned', ACTOR_ID),
+    ).resolves.toEqual(expect.objectContaining({ id: SUB_ID }));
+  });
+});

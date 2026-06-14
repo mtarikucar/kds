@@ -19,6 +19,7 @@ import { CustomerSessionService } from "../../customers/customer-session.service
 import { StockDeductionService } from "../../stock-management/services/stock-deduction.service";
 import { OutboxService } from "../../outbox/outbox.service";
 import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
+import { toIntCents } from "../../../common/money/to-int-cents";
 import { CreateCustomerOrderDto } from "../dto/create-customer-order.dto";
 import {
   CreateBillRequestDto,
@@ -53,14 +54,6 @@ export class CustomerOrdersService {
     private outbox?: OutboxService,
   ) {}
 
-  /** Prisma.Decimal | number | string → integer cents (no float boundary). */
-  private toIntCents(v: unknown): number | undefined {
-    if (v == null) return undefined;
-    return Number(
-      new Prisma.Decimal(v as Prisma.Decimal.Value).toFixed(2).replace(".", ""),
-    );
-  }
-
   /**
    * Durable order.created.v1 emit for a customer (QR) order. Customer orders
    * are created directly here (not via OrdersService), so without this they
@@ -81,7 +74,7 @@ export class CustomerOrdersService {
           branchId: order?.branchId ?? null,
           tableId: order?.tableId ?? null,
           status: order?.status,
-          totalCents: this.toIntCents(order?.finalAmount),
+          totalCents: toIntCents(order?.finalAmount),
         },
       })
       .catch(

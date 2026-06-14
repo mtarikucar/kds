@@ -94,7 +94,11 @@ export class SubscriptionController {
   @Post()
   @Roles(UserRole.ADMIN)
   async createSubscription(@Request() req, @Body() dto: CreateSubscriptionDto) {
-    return this.subscriptionService.createSubscription(req.user.tenantId, dto);
+    return this.subscriptionService.createSubscription(
+      req.user.tenantId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Patch(":id")
@@ -118,7 +122,12 @@ export class SubscriptionController {
     @Body() dto: ChangePlanDto,
     @Request() req,
   ) {
-    return this.subscriptionService.changePlan(id, req.user.tenantId, dto);
+    return this.subscriptionService.changePlan(
+      id,
+      req.user.tenantId,
+      dto,
+      req.user.id,
+    );
   }
 
   @Get(":id/scheduled-downgrade")
@@ -151,6 +160,7 @@ export class SubscriptionController {
       req.user.tenantId,
       body.immediate || false,
       body.reason,
+      req.user.id,
     );
   }
 

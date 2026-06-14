@@ -35,11 +35,14 @@ import { PaymentFinalizer } from "./payment-finalizer.service";
 import { PaymentValidator } from "./payment-validator.service";
 
 // v2.8.97 — single source of truth for the cross-payment-path rounding
-// tolerance. Both the single-payment overpayment check and the
-// split-bill exact-match check accept ±1 kuruş for float-legacy callers
-// computing finalAmount client-side. Defining the value once means a
-// future audit/refactor doesn't have to chase two hardcoded literals.
-const PAYMENT_TOLERANCE = new Prisma.Decimal("0.01");
+// tolerance. Both the single-payment overpayment check (here, reading the
+// remaining from a tx aggregate) and the split-bill exact-match check
+// (inside PaymentValidator.validateSplitTotal) accept ±1 kuruş for
+// float-legacy callers computing finalAmount client-side. The canonical
+// literal lives on PaymentValidator.PAYMENT_TOLERANCE; this module-level
+// alias just gives the in-create() overpayment check a local name and
+// guarantees both paths share the exact same Decimal.
+const PAYMENT_TOLERANCE = PaymentValidator.PAYMENT_TOLERANCE;
 
 @Injectable()
 export class PaymentsService {
