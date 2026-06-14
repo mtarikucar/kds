@@ -23,11 +23,34 @@ export interface KmsDecryptInput {
   ciphertext: Buffer;
 }
 
+export interface KmsRotateCiphertextInput {
+  context: Record<string, string>;
+  /** A ciphertext previously produced by this provider's `encrypt()`. */
+  ciphertext: Buffer;
+}
+
 export interface KmsProvider {
   readonly id: string;
   encrypt(input: KmsEncryptInput): Promise<Buffer>;
   decrypt(input: KmsDecryptInput): Promise<string>;
   /** Optional rotation hook — called by ops when a key version retires. */
   rotate?(context: Record<string, string>): Promise<void>;
+  /**
+   * Re-wrap a single ciphertext under the provider's *current* key version.
+   *
+   * This is the per-blob primitive an operational rotation job runs against
+   * each persisted secret (e.g. `secretEnc`): decrypt with the old embedded
+   * key version, re-encrypt with the current one. Implementations MUST be
+   *   • idempotent  — a blob already at the current version is returned
+   *     unchanged (same bytes) so re-running the job is a true no-op; and
+   *   • verify-before-persist — the freshly produced blob is decrypted back
+   *     and checked against the original plaintext before being returned, so
+   *     a failed rotation throws rather than emitting a blob that could
+   *     overwrite a good secret with garbage.
+   *
+   * Optional: providers that delegate rotation to the backing KMS (e.g. AWS)
+   * may leave this undefined.
+   */
+  rotateCiphertext?(input: KmsRotateCiphertextInput): Promise<Buffer>;
   healthCheck(): Promise<{ ok: boolean; details?: Record<string, unknown> }>;
 }
