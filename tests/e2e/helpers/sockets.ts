@@ -9,15 +9,25 @@ const KDS_BASE = process.env.SOCKET_BASE || 'http://localhost:50080';
  * connected socket and a `waitFor(event)` helper that resolves on
  * the next emission (with optional payload filter).
  *
+ * `baseUrl` overrides the origin the socket dials (default
+ * `SOCKET_BASE` env / `http://localhost:50080`). This lets a spec
+ * connect a client to a SPECIFIC replica — e.g. the multi-replica
+ * broadcast e2e dials replica B explicitly so it can prove an action
+ * on replica A fans out across Redis. The auth token is identical
+ * regardless of which replica answers, so any node accepts it.
+ *
  * Always pair with `socket.disconnect()` in a finally block — leaked
  * sockets keep the dev server's connection table growing.
  */
-export async function connectKdsAs(role: DemoRole): Promise<KdsClient> {
+export async function connectKdsAs(
+  role: DemoRole,
+  baseUrl: string = KDS_BASE,
+): Promise<KdsClient> {
   const { accessToken, api } = await loginAsApi(role);
   // We only needed the token; release the request context.
   await api.dispose();
 
-  const socket = io(`${KDS_BASE}/kds`, {
+  const socket = io(`${baseUrl}/kds`, {
     transports: ['websocket'],
     auth: { token: accessToken },
     forceNew: true,
