@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, RefreshCw, X, RotateCcw, Save } from 'lucide-react';
+import { ArrowLeft, RefreshCw, RotateCcw, Save } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
 import {
   useTenant,
   useTenantUsers,
@@ -527,21 +528,12 @@ export default function TenantDetailPage() {
       </div>
 
       {/* Plan Change Modal */}
-      {showPlanModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-zinc-900/50" onClick={() => setShowPlanModal(false)} />
-            <div className="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-zinc-900">{t('tenantDetail.changePlan')}</h2>
-                <button
-                  onClick={() => setShowPlanModal(false)}
-                  className="p-1 rounded-lg hover:bg-zinc-100 transition-colors"
-                >
-                  <X className="w-5 h-5 text-zinc-500" />
-                </button>
-              </div>
-
+      <Modal
+        isOpen={showPlanModal}
+        onClose={() => setShowPlanModal(false)}
+        title={t('tenantDetail.changePlan')}
+        size="md"
+      >
               <p className="text-sm text-zinc-500 mb-4">
                 {t('tenantDetail.selectNewPlan')} <span className="font-medium text-zinc-900">{tenant.name}</span>
               </p>
@@ -608,10 +600,7 @@ export default function TenantDetailPage() {
                   {changePlanMutation.isPending ? t('tenantDetail.changing') : t('tenantDetail.changePlan')}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

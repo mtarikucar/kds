@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, X, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
 import { usePlans, useCreatePlan, useUpdatePlan, useDeletePlan } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionPlan } from '../../features/superadmin/types';
 import { discountedMonthlyPrice } from './plans.helpers';
@@ -260,19 +261,12 @@ function PlanModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-zinc-900/50" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-zinc-900">
-              {plan ? t('plans.modal.editTitle') : t('plans.modal.createTitle')}
-            </h2>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-100 transition-colors">
-              <X className="w-5 h-5 text-zinc-500" />
-            </button>
-          </div>
-
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={plan ? t('plans.modal.editTitle') : t('plans.modal.createTitle')}
+      size="md"
+    >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -543,8 +537,6 @@ function PlanModal({
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

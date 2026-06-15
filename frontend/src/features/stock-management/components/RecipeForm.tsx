@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useStockItems } from '../stockManagementApi';
 import { type Recipe } from '../types';
 import api from '../../../lib/api';
+import Modal from '../../../components/ui/Modal';
 
 interface Props {
   recipe: Recipe | null;
@@ -76,13 +77,8 @@ const RecipeForm = ({ recipe, onSave, onClose, isLoading }: Props) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-semibold">{recipe ? t('recipes.edit') : t('recipes.create')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={recipe ? t('recipes.edit') : t('recipes.create')} size="md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {!recipe && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('recipes.product')} *</label>
@@ -153,8 +149,7 @@ const RecipeForm = ({ recipe, onSave, onClose, isLoading }: Props) => {
             <button type="submit" disabled={isLoading} className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{t('common.save')}</button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

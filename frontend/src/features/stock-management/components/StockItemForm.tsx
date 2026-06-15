@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Plus, Check, Edit2, Trash2, Settings2 } from 'lucide-react';
 import { StockUnit, type StockItem, type StockItemCategory } from '../types';
 import { useStockCategories, useCreateStockCategory, useUpdateStockCategory, useDeleteStockCategory } from '../stockManagementApi';
+import Modal from '../../../components/ui/Modal';
 
 interface Props {
   item: StockItem | null;
@@ -118,13 +119,8 @@ const StockItemForm = ({ item, onSave, onClose, isLoading }: Props) => {
   const showCategoryForm = categoryMode === 'create' || categoryMode === 'edit';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-semibold">{item ? t('items.edit') : t('items.create')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={item ? t('items.edit') : t('items.create')} size="md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('items.name')} *</label>
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
@@ -299,8 +295,7 @@ const StockItemForm = ({ item, onSave, onClose, isLoading }: Props) => {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

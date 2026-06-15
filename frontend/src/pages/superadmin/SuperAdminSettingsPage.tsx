@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import Modal from '../../components/ui/Modal';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useSetup2FA, useEnable2FA } from '../../features/superadmin/api/superAdminApi';
 import { getApiErrorMessage } from '../../lib/api-error';
@@ -91,15 +92,13 @@ export default function SuperAdminSettingsPage() {
       </div>
 
       {/* 2FA Setup Modal */}
-      {showSetup2FA && qrData && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowSetup2FA(false)} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                {t('settings.setupModalTitle')}
-              </h2>
-
+      {qrData && (
+        <Modal
+          isOpen={showSetup2FA}
+          onClose={() => setShowSetup2FA(false)}
+          title={t('settings.setupModalTitle')}
+          size="sm"
+        >
               <div className="space-y-4">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {t('settings.setupModalIntro')}
@@ -155,9 +154,7 @@ export default function SuperAdminSettingsPage() {
                   </p>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

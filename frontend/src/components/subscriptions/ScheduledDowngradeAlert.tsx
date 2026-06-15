@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AlertTriangle, Clock, ArrowDownCircle, X } from 'lucide-react';
+import { Clock, ArrowDownCircle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
+import Modal from '../ui/Modal';
 import { useCancelScheduledDowngrade, ScheduledDowngrade } from '../../features/subscriptions/subscriptionsApi';
 import { cn } from '../../lib/utils';
 
@@ -95,34 +96,32 @@ const ScheduledDowngradeAlert = ({
       </div>
 
       {/* Cancel Confirmation Dialog */}
-      {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              {t('subscriptions.scheduledDowngrade.cancelTitle')}
-            </h3>
-            <p className="text-slate-600 mb-4">
-              {t('subscriptions.scheduledDowngrade.cancelConfirm')}
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowCancelConfirm(false)}
-                disabled={cancelMutation.isPending}
-              >
-                {t('common:buttons.cancel', 'Cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCancel}
-                isLoading={cancelMutation.isPending}
-              >
-                {t('subscriptions.scheduledDowngrade.keepCurrentPlan')}
-              </Button>
-            </div>
-          </div>
+      <Modal
+        isOpen={showCancelConfirm}
+        onClose={() => setShowCancelConfirm(false)}
+        title={t('subscriptions.scheduledDowngrade.cancelTitle')}
+        size="md"
+      >
+        <p className="text-slate-600 mb-4">
+          {t('subscriptions.scheduledDowngrade.cancelConfirm')}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowCancelConfirm(false)}
+            disabled={cancelMutation.isPending}
+          >
+            {t('common:buttons.cancel', 'Cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCancel}
+            isLoading={cancelMutation.isPending}
+          >
+            {t('subscriptions.scheduledDowngrade.keepCurrentPlan')}
+          </Button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

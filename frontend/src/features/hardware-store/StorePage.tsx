@@ -14,6 +14,7 @@ import {
 } from './storeApi';
 import { useCartStore, toCartItems } from './cartStore';
 import ShippingAddressForm from './ShippingAddressForm';
+import Modal from '../../components/ui/Modal';
 import { useAuthStore } from '../../store/authStore';
 // v2.8.99.3 — pull the tenant's branches into the shipping form so
 // the buyer can "ship to my branch" instead of typing a custom
@@ -377,36 +378,26 @@ export default function StorePage() {
 
       {/* v2.8.84: checkout modal — collects shipping address, then
           POST /v1/checkout/intent → redirect to PayTR. */}
-      {checkoutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{t('store.deliveryInfo')}</h2>
-              <button
-                type="button"
-                onClick={() => setCheckoutOpen(false)}
-                className="text-sm text-gray-500 hover:text-gray-700"
-                aria-label={t('store.close')}
-              >
-                ✕
-              </button>
-            </div>
-            <p className="mt-1 mb-4 text-xs text-gray-500">
-              {t('store.deliveryNote')}
-            </p>
-            <ShippingAddressForm
-              initial={shippingAddress ?? undefined}
-              branches={branches}
-              onSubmit={startCheckout}
-              submitting={intent.isPending}
-              submitLabel={t('store.payWithPaytr')}
-            />
-            <p className="mt-3 text-[11px] text-gray-500">
-              {t('store.paytrNote')}
-            </p>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        title={t('store.deliveryInfo')}
+        size="lg"
+      >
+        <p className="mb-4 text-xs text-gray-500">
+          {t('store.deliveryNote')}
+        </p>
+        <ShippingAddressForm
+          initial={shippingAddress ?? undefined}
+          branches={branches}
+          onSubmit={startCheckout}
+          submitting={intent.isPending}
+          submitLabel={t('store.payWithPaytr')}
+        />
+        <p className="mt-3 text-[11px] text-gray-500">
+          {t('store.paytrNote')}
+        </p>
+      </Modal>
     </div>
   );
 }

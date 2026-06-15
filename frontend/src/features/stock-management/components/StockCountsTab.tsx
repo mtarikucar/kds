@@ -6,6 +6,7 @@ import {
   useUpdateStockCountItem, useFinalizeStockCount, useCancelStockCount,
 } from '../stockManagementApi';
 import { StockCountStatus, type StockCount } from '../types';
+import Modal from '../../../components/ui/Modal';
 
 const statusColors: Record<string, string> = {
   IN_PROGRESS: 'bg-blue-100 text-blue-700',
@@ -130,13 +131,8 @@ function CreateCountForm({ onSave, onClose, isLoading, t }: any) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-semibold">{t('counts.create')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={t('counts.create')} size="sm">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('counts.name')}</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Weekly Count" className="w-full border rounded-lg px-3 py-2 text-sm" />
@@ -150,8 +146,7 @@ function CreateCountForm({ onSave, onClose, isLoading, t }: any) {
             <button type="submit" disabled={isLoading} className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{t('counts.create')}</button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

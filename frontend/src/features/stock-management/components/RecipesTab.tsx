@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Edit2, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe, useCheckRecipeStock } from '../stockManagementApi';
 import { type Recipe } from '../types';
 import RecipeForm from './RecipeForm';
+import Modal from '../../../components/ui/Modal';
 
 const RecipesTab = () => {
   const { t } = useTranslation('stock');
@@ -91,14 +92,7 @@ const RecipesTab = () => {
 
       {/* Stock Check Result Modal */}
       {stockCheck && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{t('recipes.checkStock')}</h3>
-              <button onClick={() => setStockCheck(null)} className="p-1 hover:bg-gray-100 rounded">
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
+        <Modal isOpen onClose={() => setStockCheck(null)} title={t('recipes.checkStock')} size="sm">
             <div className={`p-3 rounded-lg mb-4 ${stockCheck.canProduce ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
               {stockCheck.canProduce ? t('recipes.canProduce') : t('recipes.cannotProduce')}
               <span className="ml-2 font-medium">{t('recipes.maxQuantity')}: {stockCheck.maxQuantity}</span>
@@ -111,8 +105,7 @@ const RecipesTab = () => {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {showForm && (

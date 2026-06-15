@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import Modal from '../../components/ui/Modal';
 import {
   type AdminAddOn,
   type AdminHardwareProduct,
@@ -200,10 +201,12 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-3 text-lg font-semibold">{initial ? tr('marketplace.addons.editTitle') : tr('marketplace.addons.newTitle')}</h3>
-
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={initial ? tr('marketplace.addons.editTitle') : tr('marketplace.addons.newTitle')}
+      size="xl"
+    >
         <div className="grid grid-cols-2 gap-3">
           <Field label={tr('marketplace.addons.fields.code')}>
             <input
@@ -275,8 +278,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
             {initial ? tr('marketplace.addons.save') : tr('marketplace.addons.create')}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -424,9 +426,7 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-3 text-lg font-semibold">{tr('marketplace.products.newTitle')}</h3>
+    <Modal isOpen onClose={onClose} title={tr('marketplace.products.newTitle')} size="xl">
         <div className="grid grid-cols-2 gap-3">
           <Field label={tr('marketplace.products.fields.sku')}><input className="rounded border px-2 py-1 text-sm font-mono w-full" value={form.sku} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))} /></Field>
           <Field label={tr('marketplace.products.fields.name')}><input className="rounded border px-2 py-1 text-sm w-full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
@@ -464,8 +464,7 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
           <button onClick={onClose} className="rounded border px-3 py-1.5 text-sm">{tr('marketplace.products.cancel')}</button>
           <button onClick={submit} className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">{tr('marketplace.products.create')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

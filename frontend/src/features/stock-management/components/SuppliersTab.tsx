@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Edit2, Trash2, Phone, Mail, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Phone, Mail } from 'lucide-react';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '../stockManagementApi';
 import { type Supplier } from '../types';
 import PhoneInput from '../../../components/ui/PhoneInput';
+import Modal from '../../../components/ui/Modal';
 
 interface SupplierFormProps {
   supplier: Supplier | null;
@@ -31,13 +32,8 @@ const SupplierForm = ({ supplier, onSave, onClose, isLoading }: SupplierFormProp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-semibold">{supplier ? t('suppliers.edit') : t('suppliers.create')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={supplier ? t('suppliers.edit') : t('suppliers.create')} size="md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('suppliers.name')} *</label>
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
@@ -83,8 +79,7 @@ const SupplierForm = ({ supplier, onSave, onClose, isLoading }: SupplierFormProp
             <button type="submit" disabled={isLoading} className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{t('common.save')}</button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

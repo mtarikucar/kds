@@ -19,6 +19,7 @@ import {
   useCancelPublicReservation,
 } from '../../features/reservations/publicReservationsApi';
 import PhoneInput from '../../components/ui/PhoneInput';
+import Modal from '../../components/ui/Modal';
 import type { Reservation, ReservationStatus } from '../../types';
 import {
   formatReservationDate,
@@ -205,16 +206,14 @@ const ReservationLookupPage: React.FC = () => {
           </div>
         )}
 
-        {showCancelConfirm && reservation && (
-          <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
-            onClick={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
+        {reservation && (
+          <Modal
+            isOpen={showCancelConfirm}
+            onClose={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
+            title={t('lookup.cancelTitle')}
+            size="sm"
           >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm rounded-2xl bg-card p-6 space-y-4"
-            >
-              <h2 className="text-lg font-semibold text-foreground">{t('lookup.cancelTitle')}</h2>
+            <div className="space-y-4">
               <p className="text-sm text-muted-foreground">{t('lookup.cancelConfirm')}</p>
               <div className="flex gap-2">
                 <button
@@ -236,7 +235,7 @@ const ReservationLookupPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </div>
     </div>

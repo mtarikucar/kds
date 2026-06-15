@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Plus, X } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import Modal from '../../components/ui/Modal';
 import {
   LegalDocumentKind,
   useListLegalDocuments,
@@ -177,16 +178,8 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">{t('legal.publishNewVersion')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
-            <X className="w-5 h-5" />
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={t('legal.publishNewVersion')} size="full">
+        <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <label className="block">
               <span className="text-xs font-medium text-slate-700">{t('legal.modal.kind')}</span>
@@ -258,7 +251,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
           </div>
         </div>
 
-        <footer className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-slate-200">
           <button
             onClick={onClose}
             className="px-4 py-2 text-slate-700 hover:bg-slate-200 rounded-md text-sm"
@@ -272,8 +265,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
           >
             {publishMutation.isPending ? t('legal.modal.publishing') : t('legal.modal.publish')}
           </button>
-        </footer>
-      </div>
-    </div>
+        </div>
+    </Modal>
   );
 }

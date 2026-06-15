@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Plus, X, ArrowLeftRight } from 'lucide-react';
+import Modal from '../ui/Modal';
 import {
   useWeeklySchedule,
   useShiftTemplates,
@@ -203,71 +204,71 @@ const ScheduleTab = () => {
       )}
 
       {/* Assign Modal */}
-      {isAssignModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-4">{t('schedule.assignShift')}</h3>
-            <form onSubmit={handleAssign} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('schedule.selectEmployee')}</label>
-                <select
-                  required
-                  value={assignForm.userId}
-                  onChange={(e) => setAssignForm({ ...assignForm, userId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">{t('schedule.selectEmployee')}</option>
-                  {schedule?.staff?.map((s) => (
-                    <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('schedule.selectShift')}</label>
-                <select
-                  required
-                  value={assignForm.shiftTemplateId}
-                  onChange={(e) => setAssignForm({ ...assignForm, shiftTemplateId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">{t('schedule.selectShift')}</option>
-                  {templates?.filter((tmpl) => tmpl.isActive).map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} ({template.startTime}-{template.endTime})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('schedule.selectDate')}</label>
-                <input
-                  type="date"
-                  required
-                  value={assignForm.date}
-                  onChange={(e) => setAssignForm({ ...assignForm, date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAssignModalOpen(false)}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={assignShift.isPending}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {t('schedule.assign')}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        title={t('schedule.assignShift')}
+        size="md"
+      >
+        <form onSubmit={handleAssign} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('schedule.selectEmployee')}</label>
+            <select
+              required
+              value={assignForm.userId}
+              onChange={(e) => setAssignForm({ ...assignForm, userId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">{t('schedule.selectEmployee')}</option>
+              {schedule?.staff?.map((s) => (
+                <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('schedule.selectShift')}</label>
+            <select
+              required
+              value={assignForm.shiftTemplateId}
+              onChange={(e) => setAssignForm({ ...assignForm, shiftTemplateId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">{t('schedule.selectShift')}</option>
+              {templates?.filter((tmpl) => tmpl.isActive).map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name} ({template.startTime}-{template.endTime})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('schedule.selectDate')}</label>
+            <input
+              type="date"
+              required
+              value={assignForm.date}
+              onChange={(e) => setAssignForm({ ...assignForm, date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsAssignModalOpen(false)}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={assignShift.isPending}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {t('schedule.assign')}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
