@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useSetup2FA, useEnable2FA } from '../../features/superadmin/api/superAdminApi';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export default function SuperAdminSettingsPage() {
   const { t } = useTranslation('superadmin');
@@ -150,7 +151,7 @@ export default function SuperAdminSettingsPage() {
 
                 {enable2FAMutation.isError && (
                   <p className="text-sm text-red-500">
-                    {(enable2FAMutation.error as any)?.response?.data?.message || t('settings.enableFailed')}
+                    {getApiErrorMessage(enable2FAMutation.error, t('settings.enableFailed'))}
                   </p>
                 )}
               </div>

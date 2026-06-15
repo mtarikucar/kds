@@ -58,7 +58,7 @@ describe('branchesApi', () => {
   });
 
   it('useCreateBranch surfaces a server error via toast', async () => {
-    h.post.mockRejectedValue({ response: { data: { message: 'dup code' } } });
+    h.post.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'dup code' } } });
     const { result } = renderHook(() => useCreateBranch(), { wrapper });
     await result.current.mutateAsync({ name: 'x' }).catch(() => undefined);
     expect(h.toastError).toHaveBeenCalledWith('dup code');

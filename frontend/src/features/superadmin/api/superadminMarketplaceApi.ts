@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '../../../lib/api-error';
 import { superAdminApi as api } from './superAdminApi';
 
 export interface AdminAddOn {
@@ -63,7 +64,7 @@ export const useSaCreateAddOn = () => {
       qc.invalidateQueries({ queryKey: ['sa', 'addons'] });
       toast.success('Add-on created.');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Create failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Create failed')),
   });
 };
 
@@ -117,7 +118,7 @@ export const useSaCreateProduct = () => {
       qc.invalidateQueries({ queryKey: ['sa', 'products'] });
       toast.success('Product created.');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Create failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Create failed')),
   });
 };
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export interface LocalBridge {
   id: string;
@@ -43,7 +44,7 @@ export const useCreateBridge = () => {
       qc.invalidateQueries({ queryKey: bridgeKeys.all });
       toast.success('Bridge provisioned — copy the token before closing.');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Failed')),
   });
 };
 

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useAuthStore } from '../../store/authStore';
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '../../types';
 
@@ -28,8 +29,8 @@ export const useLogin = () => {
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.loginSuccessful'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.loginFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.loginFailed')));
     },
   });
 };
@@ -52,8 +53,8 @@ export const useRegister = () => {
         toast.success(i18n.t('common:notifications.registrationSuccessful'));
       }
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.registrationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.registrationFailed')));
     },
   });
 };
@@ -113,8 +114,8 @@ export const useForgotPassword = () => {
     onSuccess: () => {
       toast.success(i18n.t('common:notifications.passwordResetLinkSent'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -128,8 +129,8 @@ export const useResetPassword = () => {
     onSuccess: () => {
       toast.success(i18n.t('common:notifications.passwordResetSuccessful'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -143,8 +144,8 @@ export const useChangePassword = () => {
     onSuccess: () => {
       toast.success(i18n.t('common:notifications.passwordChangedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -162,8 +163,8 @@ export const useVerifyEmail = () => {
       // Invalidate profile query to refresh email verified status
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -177,8 +178,8 @@ export const useResendVerificationEmail = () => {
     onSuccess: () => {
       toast.success(i18n.t('common:notifications.verificationCodeSent'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -205,8 +206,8 @@ export const useGoogleAuth = () => {
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.googleLoginSuccessful'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.loginFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.loginFailed')));
     },
   });
 };
@@ -228,8 +229,8 @@ export const useAppleAuth = () => {
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.appleLoginSuccessful'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.loginFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.loginFailed')));
     },
   });
 };

@@ -24,6 +24,7 @@ import {
   initFeatureStates,
   initLimitValues,
 } from './tenantOverrides.helpers';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 const statusStyles = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -586,7 +587,7 @@ export default function TenantDetailPage() {
               {changePlanMutation.isError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
                   <p className="text-sm text-red-600">
-                    {(changePlanMutation.error as any)?.response?.data?.message || t('tenantDetail.changePlanError')}
+                    {getApiErrorMessage(changePlanMutation.error, t('tenantDetail.changePlanError'))}
                   </p>
                 </div>
               )}

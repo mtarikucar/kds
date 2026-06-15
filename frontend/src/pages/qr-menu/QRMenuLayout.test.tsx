@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { AxiosError } from 'axios';
+
+// getApiErrorMessage only reads the body off genuine AxiosErrors
+// (isAxiosError gate), so the rejection fixture is a real one carrying the
+// server message rather than a bare { response } literal.
+function axiosErrorWithMessage(message: string): AxiosError {
+  const err = new AxiosError('Request failed');
+  err.response = { data: { message } } as AxiosError['response'];
+  return err;
+}
 
 /**
  * Specs for QRMenuLayout — the QR menu shell that fetches menu data and
@@ -14,9 +24,16 @@ import { MemoryRouter } from 'react-router-dom';
 
 const get = vi.fn();
 const post = vi.fn();
-vi.mock('axios', () => ({
-  default: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) },
-}));
+// Keep the real AxiosError / isAxiosError named exports (getApiErrorMessage,
+// reached via the error branch, gates on isAxiosError) while stubbing the
+// default client's get/post.
+vi.mock('axios', async () => {
+  const actual = await vi.importActual<typeof import('axios')>('axios');
+  return {
+    ...actual,
+    default: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) },
+  };
+});
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 
@@ -120,7 +137,7 @@ describe('QRMenuLayout — successful fetch', () => {
 
 describe('QRMenuLayout — error', () => {
   it('renders the server error message and a back-home button on fetch failure', async () => {
-    get.mockRejectedValue({ response: { data: { message: 'menu offline' } } });
+    get.mockRejectedValue(axiosErrorWithMessage('menu offline'));
     renderLayout();
     await waitFor(() => expect(screen.getByText('menu offline')).toBeInTheDocument());
     // backHome button uses an inline English fallback -> 'Back Home'.

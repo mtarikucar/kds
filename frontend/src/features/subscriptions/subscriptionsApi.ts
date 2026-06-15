@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import {
   Plan,
   Subscription,
@@ -98,8 +99,8 @@ export const useCreateSubscription = () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.subscriptionCreatedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -125,8 +126,8 @@ export const useUpdateSubscription = () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.updatedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -184,8 +185,8 @@ export const useChangePlan = () => {
         toast.info(i18n.t('common:notifications.redirectingToPayment'));
       }
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.changePlanFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.changePlanFailed')));
     },
   });
 };
@@ -215,8 +216,8 @@ export const useCancelSubscription = () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.subscriptionCancelledSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.cancelSubscriptionFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.cancelSubscriptionFailed')));
     },
   });
 };
@@ -237,8 +238,8 @@ export const useReactivateSubscription = () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.subscriptionReactivatedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.reactivateSubscriptionFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.reactivateSubscriptionFailed')));
     },
   });
 };
@@ -311,8 +312,8 @@ export const useCancelScheduledDowngrade = () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       toast.success(i18n.t('common:notifications.scheduledDowngradeCancelled'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };

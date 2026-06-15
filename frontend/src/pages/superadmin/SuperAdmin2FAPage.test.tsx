@@ -2,8 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
 import SuperAdmin2FAPage from './SuperAdmin2FAPage';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
+
+// getApiErrorMessage only reads the body off genuine AxiosErrors
+// (isAxiosError gate), so the fixture constructs a real one carrying the
+// server message rather than a bare { response } literal.
+function axiosErrorWithMessage(message: string): AxiosError {
+  const err = new AxiosError('Request failed');
+  err.response = { data: { message } } as AxiosError['response'];
+  return err;
+}
 
 const verifyMutate = vi.fn();
 const setupMutate = vi.fn();
@@ -21,6 +31,9 @@ vi.mock('../../features/superadmin/api/superAdminApi', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+// getApiErrorMessage imports i18n/config, which would eagerly re-init i18next
+// against the partial react-i18next mock. Stub it.
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 function resetStore() {
   useSuperAdminAuthStore.setState({
@@ -139,7 +152,7 @@ describe('SuperAdmin2FAPage — verify mode', () => {
   });
 
   it('surfaces the verification error message', () => {
-    verifyState = { isPending: false, error: { response: { data: { message: 'Wrong code' } } } };
+    verifyState = { isPending: false, error: axiosErrorWithMessage('Wrong code') };
     renderAt();
     expect(screen.getByText('Wrong code')).toBeInTheDocument();
   });

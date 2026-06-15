@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useVerify2FA, useSetup2FAWithToken, useEnable2FAWithToken } from '../../features/superadmin/api/superAdminApi';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export default function SuperAdmin2FAPage() {
   const { t } = useTranslation('superadmin');
@@ -116,7 +117,7 @@ export default function SuperAdmin2FAPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-lg">
-                {(error as any)?.response?.data?.message || t('twoFactor.verificationFailed')}
+                {getApiErrorMessage(error, t('twoFactor.verificationFailed'))}
               </div>
             )}
 

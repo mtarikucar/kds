@@ -21,6 +21,18 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, fb?: any) => (typeof fb === 'string' ? fb : key) }),
 }));
 
+// The page extracts the error message via the shared helper. Mock it here
+// so the suite stays decoupled from i18n/config (which api-error imports for
+// its useApiErrorHandler hook) — this test only needs the body-message path.
+vi.mock('../../lib/api-error', () => ({
+  getApiErrorMessage: (err: any, fallback: string) => {
+    const raw = err?.response?.data?.message;
+    if (typeof raw === 'string' && raw.length > 0) return raw;
+    if (Array.isArray(raw) && raw.length > 0) return raw.join('; ');
+    return fallback;
+  },
+}));
+
 const verifyEmail = vi.fn();
 const resendVerification = vi.fn();
 vi.mock('../../features/auth/authApi', () => ({

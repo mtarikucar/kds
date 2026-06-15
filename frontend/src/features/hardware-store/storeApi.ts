@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export interface HardwareProduct {
   id: string;
@@ -172,8 +173,8 @@ export const useRequestQuote = () => {
       const r = await api.post('/v1/catalog/quote-request', body);
       return r.data as { ok: boolean };
     },
-    onError: (e: any) =>
-      toast.error(e.response?.data?.message ?? 'Teklif talebi gönderilemedi'),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, 'Teklif talebi gönderilemedi')),
   });
 };
 
@@ -211,7 +212,7 @@ export const useConfirmCheckout = () => {
       qc.invalidateQueries({ queryKey: ['marketplace'] });
       toast.success('Order placed.');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Checkout failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Checkout failed')),
   });
 };
 
@@ -271,7 +272,7 @@ export const useCreateCheckoutIntent = () => {
       const r = await api.post('/v1/checkout/intent', args);
       return r.data;
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Ödeme başlatılamadı'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Ödeme başlatılamadı')),
   });
 };
 

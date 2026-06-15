@@ -7,6 +7,7 @@ import {
   readAndClearReturnPath,
   resolvePostLoginTarget,
 } from './superAdminLogin.helpers';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export default function SuperAdminLoginPage() {
   const { t } = useTranslation('superadmin');
@@ -59,7 +60,7 @@ export default function SuperAdminLoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {loginMutation.isError && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-lg">
-                {(loginMutation.error as any)?.response?.data?.message || t('login.invalidCredentials')}
+                {getApiErrorMessage(loginMutation.error, t('login.invalidCredentials'))}
               </div>
             )}
 

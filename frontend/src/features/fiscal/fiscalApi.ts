@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 
 export interface FiscalReceiptLine {
@@ -61,6 +62,6 @@ export const useRetryReceipt = () => {
       if (out.status === 'issued') toast.success(`Receipt issued (${out.fiscalNo}).`);
       else toast.error(`Retry failed: ${out.lastError ?? 'unknown'}`);
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Retry failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Retry failed')),
   });
 };

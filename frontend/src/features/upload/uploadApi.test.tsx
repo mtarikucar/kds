@@ -133,6 +133,7 @@ describe('uploadApi mutations', () => {
 
   it('surfaces a server error message on failure', async () => {
     h.post.mockRejectedValue({
+      isAxiosError: true,
       response: { data: { message: 'boom' } },
     });
     const { result } = renderHook(() => useUploadProductImage(), { wrapper });

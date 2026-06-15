@@ -93,7 +93,7 @@ describe('useLogin', () => {
   });
 
   it('surfaces the server message on failure without touching the store', async () => {
-    postMock.mockRejectedValue({ response: { data: { message: 'bad creds' } } });
+    postMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'bad creds' } } });
     const client = new QueryClient();
     const { result } = renderHook(() => useLogin(), { wrapper: wrapper(client) });
     result.current.mutate({ email: 'a@b.com', password: 'x' } as any);

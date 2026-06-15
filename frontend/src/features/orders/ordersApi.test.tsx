@@ -170,7 +170,7 @@ describe('useTransferTableOrders', () => {
   });
 
   it('surfaces the server error message on failure', async () => {
-    postMock.mockRejectedValue({ response: { data: { message: 'tables busy' } } });
+    postMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'tables busy' } } });
     const client = new QueryClient();
     const { result } = renderHook(() => useTransferTableOrders(), { wrapper: wrapper(client) });
     result.current.mutate({ sourceTableId: 's', targetTableId: 't' });

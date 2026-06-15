@@ -11,6 +11,7 @@ import type { AutoSaveStatus } from '../../hooks/useAutoSave';
 import { SettingsSection, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsSelect } from '../../components/settings/SettingsToggle';
 import SubdomainSettings from '../../components/settings/SubdomainSettings';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 const BrandingSettingsPage = () => {
   const { t } = useTranslation('settings');
@@ -51,9 +52,9 @@ const BrandingSettingsPage = () => {
           toast.success(t('settingsSaved'));
           setTimeout(() => setTaxIdStatus('idle'), 2000);
         },
-        onError: (error: Error & { response?: { data?: { message?: string } } }) => {
+        onError: (error) => {
           setTaxIdStatus('error');
-          toast.error(error.response?.data?.message || t('settingsFailed'));
+          toast.error(getApiErrorMessage(error, t('settingsFailed')));
         },
       },
     );
@@ -69,9 +70,9 @@ const BrandingSettingsPage = () => {
           toast.success(t('settingsSaved'));
           setTimeout(() => setCurrencyStatus('idle'), 2000);
         },
-        onError: (error: Error & { response?: { data?: { message?: string } } }) => {
+        onError: (error) => {
           setCurrencyStatus('error');
-          toast.error(error.response?.data?.message || t('settingsFailed'));
+          toast.error(getApiErrorMessage(error, t('settingsFailed')));
         },
       }
     );

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 import i18n from '../../i18n/config';
 import { toast } from 'sonner';
@@ -70,7 +71,7 @@ export const useUpdateReservation = () => {
       toast.success(i18n.t('reservations:notifications.updated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -98,7 +99,7 @@ export const useConfirmReservation = () => {
       // the floor plan and reservation list reflect reality.
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -124,7 +125,7 @@ export const useRejectReservation = () => {
       // rejected by another terminal" 409s.
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -155,7 +156,7 @@ export const useSeatReservation = () => {
       // tenant-scoped list.
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -179,7 +180,7 @@ export const useCompleteReservation = () => {
       // landed — refetch so the user sees current state.
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -204,7 +205,7 @@ export const useNoShowReservation = () => {
       // already marked the row or the guest may have arrived.
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -230,7 +231,7 @@ export const useCancelReservation = () => {
       // SEATED/COMPLETED). Refetch so the user sees the final state.
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -248,7 +249,7 @@ export const useDeleteReservation = () => {
       toast.success(i18n.t('reservations:notifications.deleted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };

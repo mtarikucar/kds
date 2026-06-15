@@ -17,6 +17,9 @@ vi.mock('../../features/superadmin/api/superAdminApi', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+// getApiErrorMessage imports i18n/config, which would eagerly re-init i18next
+// against the partial react-i18next mock. Stub it.
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 function setAdmin(over: Partial<any> = {}) {
   useSuperAdminAuthStore.setState({
