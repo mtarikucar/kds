@@ -13,8 +13,15 @@ export const useMyProfile = () => {
   });
 };
 
-export const useUpdateProfile = () => {
+/**
+ * @param options.silent — suppress the built-in success/error toasts so the
+ *   caller can own all feedback (used by the actionable-error inline-fix flow,
+ *   which shows its own inline error and resumes the original action on
+ *   success). The cache invalidation always runs.
+ */
+export const useUpdateProfile = (options?: { silent?: boolean }) => {
   const queryClient = useQueryClient();
+  const silent = options?.silent ?? false;
 
   return useMutation({
     mutationFn: async (data: { firstName?: string; lastName?: string; phone?: string }) => {
@@ -23,10 +30,10 @@ export const useUpdateProfile = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
-      toast.success(i18n.t('common:notifications.profileUpdatedSuccessfully'));
+      if (!silent) toast.success(i18n.t('common:notifications.profileUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      if (!silent) toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };

@@ -375,7 +375,7 @@ describe('PaymentsService', () => {
           ),
         ).rejects.toMatchObject({
           response: expect.objectContaining({
-            code: 'PAYTR_ONLY_SUPPORTS_TRY',
+            errorCode: 'PAYTR_ONLY_SUPPORTS_TRY',
           }),
         });
 

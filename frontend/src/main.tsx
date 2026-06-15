@@ -7,6 +7,7 @@ import { Toaster } from 'sonner';
 import { I18nextProvider } from 'react-i18next';
 import * as Sentry from '@sentry/react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ActionableErrorProvider } from './components/common/actionable-errors/ActionableErrorProvider';
 import App from './App';
 import i18n from './i18n/config';
 import { initSentry } from './sentry.config';
@@ -59,7 +60,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
             <BrowserRouter basename={routerBasename}>
-              <App />
+              <ActionableErrorProvider>
+                <App />
+              </ActionableErrorProvider>
               <Toaster position="top-right" richColors />
             </BrowserRouter>
           </QueryClientProvider>

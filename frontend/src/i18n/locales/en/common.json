@@ -1,4 +1,14 @@
 {
+  "actionableErrors": {
+    "saveAndContinue": "Save & continue",
+    "saveFailed": "Could not save. Please try again.",
+    "phone": {
+      "title": "Add your phone number",
+      "body": "A phone number is required to continue. Enter it here and we'll pick up right where you left off.",
+      "label": "Phone number",
+      "invalid": "Enter a valid phone number (e.g. +90 555 123 45 67)."
+    }
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "Loading...",

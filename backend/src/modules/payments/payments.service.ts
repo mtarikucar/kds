@@ -157,7 +157,7 @@ export class PaymentsService {
       throw new BadRequestException({
         statusCode: 400,
         error: "Profile Phone Required",
-        code: "PROFILE_PHONE_REQUIRED",
+        errorCode: "PROFILE_PHONE_REQUIRED",
         message:
           "Telefon numarası gereklidir. Lütfen profilinize bir telefon ekleyin ve ödeme adımına geri dönün.",
       });
@@ -190,7 +190,7 @@ export class PaymentsService {
       throw new BadRequestException({
         statusCode: 400,
         error: "Unsupported Currency",
-        code: "PAYTR_ONLY_SUPPORTS_TRY",
+        errorCode: "PAYTR_ONLY_SUPPORTS_TRY",
         message: `PayTR yalnızca TRY ile tahsilat yapar. Bu plan ${plan.currency} ile fiyatlandırılmış.`,
       });
     }
@@ -207,7 +207,7 @@ export class PaymentsService {
       throw new BadRequestException({
         statusCode: 400,
         error: "Legal Consent Required",
-        code: "LEGAL_CONSENT_REQUIRED",
+        errorCode: "LEGAL_CONSENT_REQUIRED",
         message:
           "Devam etmek için KVKK, Mesafeli Satış ve İade politikalarını onaylamanız gerekiyor.",
       });

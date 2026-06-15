@@ -33,6 +33,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = "Internal server error";
     let error = "InternalServerError";
+    // Machine-readable code the SPA branches on (e.g. PROFILE_PHONE_REQUIRED
+    // → inline phone prompt). Distinct from `error` (a human/category label
+    // that is sometimes localized or class-validator's "Bad Request"). Kept
+    // on the wire in EVERY environment — it carries no PII and the UI's
+    // actionable-error flow depends on it in production. Pre-fix the filter
+    // copied only message+error from a plain HttpException body, silently
+    // dropping any `errorCode`/`code` the thrower attached, so the inline
+    // remediation never fired in prod.
+    let errorCode: string | undefined = undefined;
     let details: any = undefined;
     let stack: string | undefined = undefined;
 
@@ -43,6 +52,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse() as any;
       message = exceptionResponse.message || exception.message;
       error = exceptionResponse.errorCode || "BusinessError";
+      errorCode = exceptionResponse.errorCode;
       details = exceptionResponse.details;
     } else if (exception instanceof HttpException) {
       // Standard HTTP exceptions
@@ -54,6 +64,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       } else if (typeof exceptionResponse === "object") {
         message = (exceptionResponse as any).message || exception.message;
         error = (exceptionResponse as any).error || exception.name;
+        // Accept both the canonical `errorCode` and the legacy `code`
+        // alias some gates still emit — standardize them onto errorCode.
+        errorCode =
+          (exceptionResponse as any).errorCode ??
+          (exceptionResponse as any).code;
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       // Prisma database errors
@@ -86,6 +101,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       requestId,
     };
+
+    // Surface the machine-readable code (when present) so the SPA's
+    // actionable-error flow can branch on it. Omitted entirely when absent
+    // to keep ordinary error bodies unchanged.
+    if (errorCode) errorResponse.errorCode = errorCode;
 
     // Include details and stack only in development
     if (isDevelopment) {

@@ -1,4 +1,14 @@
 {
+  "actionableErrors": {
+    "saveAndContinue": "Kaydet ve devam et",
+    "saveFailed": "Kaydedilemedi. Lütfen tekrar deneyin.",
+    "phone": {
+      "title": "Telefon numaranızı ekleyin",
+      "body": "Devam etmek için bir telefon numarası gerekli. Buraya girin, kaldığınız yerden devam edelim.",
+      "label": "Telefon numarası",
+      "invalid": "Geçerli bir telefon numarası girin (örn. +90 555 123 45 67)."
+    }
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "Yükleniyor...",

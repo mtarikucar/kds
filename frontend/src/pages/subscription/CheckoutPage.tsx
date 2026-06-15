@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, Lock, ExternalLink, Phone, X } from 'lucide-react';
+import { ShieldCheck, Lock, ExternalLink } from 'lucide-react';
 import { useCreatePaymentIntent } from '../../api/paymentsApi';
 import { useGetCurrentLegalDocument } from '../../features/legal/legalApi';
-import { useUpdateProfile } from '../../features/users/usersApi';
+import { useActionableError } from '../../components/common/actionable-errors/ActionableErrorProvider';
+import { getApiErrorCode, getApiErrorMessage } from '../../lib/api-error';
 import Spinner from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
 import { BillingCycle } from '../../types';
 
 const AUTO_REDIRECT_MS = 3000;
@@ -48,15 +48,11 @@ const CheckoutPage = () => {
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(AUTO_REDIRECT_MS / 1000);
 
-  // Inline phone-prompt state: when the backend rejects the payment
-  // intent with PROFILE_PHONE_REQUIRED, we collect the missing phone
-  // here instead of bouncing the user to /profile. After save we
-  // automatically re-fire handleSubmit so the checkout flow continues
-  // without the user having to re-tick the consents or click again.
-  const [phonePromptOpen, setPhonePromptOpen] = useState(false);
-  const [phoneValue, setPhoneValue] = useState('');
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-  const { mutate: updateProfile, isPending: phoneSaving } = useUpdateProfile();
+  // Missing-info errors (e.g. PROFILE_PHONE_REQUIRED) are completed inline by
+  // the app-wide actionable-error provider: it collects the missing field and
+  // auto-resumes the original action, so the user never leaves checkout or
+  // has to re-tick the consents.
+  const actionableError = useActionableError();
 
   useEffect(() => {
     if (!planId) navigate('/subscription/plans', { replace: true });
@@ -86,33 +82,38 @@ const CheckoutPage = () => {
             setError(t('subscriptions.checkout.missingLink', 'Ödeme bağlantısı oluşturulamadı.'));
           }
         },
-        onError: (err: any) => {
-          const code = err?.response?.data?.code;
-          if (code === 'PROFILE_PHONE_REQUIRED') {
-            // Inline collection instead of redirecting to /profile. We
-            // re-fire submitIntent() once the phone PATCH succeeds —
-            // the user stays on the checkout page, keeps their consent
-            // ticks, and doesn't have to navigate the page graph.
-            setPhoneValue('');
-            setPhoneError(null);
-            setPhonePromptOpen(true);
+        onError: (err: unknown) => {
+          // Actionable inline-fix: a missing required field (e.g. phone) is
+          // collected inline by the provider and the intent auto-resumes —
+          // the user keeps their consent ticks and doesn't navigate away.
+          // Re-lock the submit button for the resumed attempt.
+          if (
+            actionableError.handleApiError(err, () => {
+              setSubmitted(true);
+              submitIntent();
+            })
+          ) {
             setSubmitted(false);
             return;
           }
-          if (code === 'LEGAL_CONSENT_REQUIRED') {
+          if (getApiErrorCode(err) === 'LEGAL_CONSENT_REQUIRED') {
             // Backend rejected our consent shape — surface the message so
             // the user re-reads the docs and re-checks. Reset submit lock.
             setSubmitted(false);
             setError(
-              err?.response?.data?.message ??
+              getApiErrorMessage(
+                err,
                 t(
                   'subscriptions.checkout.consentRequired',
                   'KVKK, Mesafeli Satış ve İade politikalarını onaylamanız gerekiyor.',
                 ),
+              ),
             );
             return;
           }
-          setError(err?.response?.data?.message ?? err?.message ?? 'Payment intent failed');
+          setError(
+            getApiErrorMessage(err, t('subscriptions.checkout.intentFailed', 'Payment intent failed')),
+          );
         },
       },
     );
@@ -123,44 +124,6 @@ const CheckoutPage = () => {
     if (!kvkkQ.data || !distanceQ.data || !refundQ.data) return;
     setSubmitted(true);
     submitIntent();
-  };
-
-  const handlePhoneSave = () => {
-    const trimmed = phoneValue.trim();
-    // Light validation: digits/+/spaces/dashes/parens, 7-20 chars. PayTR
-    // will validate the strict format server-side; this just blocks the
-    // obvious-typo paths so the user doesn't burn another round-trip.
-    if (!/^[+0-9\s()-]{7,20}$/.test(trimmed)) {
-      setPhoneError(
-        t(
-          'subscriptions.checkout.phoneInvalid',
-          'Geçerli bir telefon numarası girin (örn. +90 555 123 45 67).',
-        ),
-      );
-      return;
-    }
-    setPhoneError(null);
-    updateProfile(
-      { phone: trimmed },
-      {
-        onSuccess: () => {
-          // Profile cache invalidated by the hook. Close + re-fire intent
-          // immediately — user doesn't have to re-tick or re-click.
-          setPhonePromptOpen(false);
-          setSubmitted(true);
-          submitIntent();
-        },
-        onError: (err: any) => {
-          setPhoneError(
-            err?.response?.data?.message ??
-              t(
-                'subscriptions.checkout.phoneSaveFailed',
-                'Telefon kaydedilemedi. Lütfen tekrar deneyin.',
-              ),
-          );
-        },
-      },
-    );
   };
 
   // Auto-redirect countdown for phase 2
@@ -340,79 +303,6 @@ const CheckoutPage = () => {
         </p>
       </div>
 
-      {/* Phone-prompt modal. Opens when the backend rejects the payment
-          intent with PROFILE_PHONE_REQUIRED. We collect the phone here,
-          PATCH it to the user's profile, and auto-resume the intent —
-          no navigation away from checkout. */}
-      {phonePromptOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-indigo-600" />
-                </div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {t('subscriptions.checkout.phonePromptTitle', 'Telefon numarası gerekli')}
-                </h2>
-              </div>
-              <button
-                onClick={() => {
-                  setPhonePromptOpen(false);
-                  setPhoneError(null);
-                }}
-                className="text-slate-400 hover:text-slate-600"
-                aria-label={t('common.close', 'Kapat')}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-sm text-slate-600 mb-4">
-              {t(
-                'subscriptions.checkout.phonePromptBody',
-                'PayTR fatura için geçerli bir telefon numarası talep ediyor. Numaranızı girin, ödeme adımına devam edelim.',
-              )}
-            </p>
-            <Input
-              type="tel"
-              value={phoneValue}
-              onChange={(e) => {
-                setPhoneValue(e.target.value);
-                if (phoneError) setPhoneError(null);
-              }}
-              placeholder="+90 555 123 45 67"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !phoneSaving) handlePhoneSave();
-              }}
-              disabled={phoneSaving}
-              error={phoneError ?? undefined}
-            />
-            <div className="mt-5 flex items-center gap-2">
-              <Button
-                variant="primary"
-                className="flex-1"
-                onClick={handlePhoneSave}
-                disabled={phoneSaving || !phoneValue.trim()}
-              >
-                {phoneSaving
-                  ? t('subscriptions.checkout.phoneSaving', 'Kaydediliyor...')
-                  : t('subscriptions.checkout.phoneSaveAndContinue', 'Kaydet ve devam et')}
-              </Button>
-              <button
-                onClick={() => {
-                  setPhonePromptOpen(false);
-                  setPhoneError(null);
-                }}
-                className="text-sm text-slate-500 hover:text-slate-700 px-3 py-2"
-                disabled={phoneSaving}
-              >
-                {t('subscriptions.checkout.cancel', 'Vazgeç')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

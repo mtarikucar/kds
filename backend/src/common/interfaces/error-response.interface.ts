@@ -14,9 +14,18 @@ export interface ErrorResponse {
   message: string | string[];
 
   /**
-   * Error type/code for client-side handling
+   * Error type/category label (human/category, sometimes localized or
+   * class-validator's "Bad Request").
    */
   error: string;
+
+  /**
+   * Machine-readable, stable error code the client branches on for
+   * actionable remediation (e.g. PROFILE_PHONE_REQUIRED → inline phone
+   * prompt). Present only when the thrown exception attaches one; carries
+   * no PII, so it is surfaced in every environment.
+   */
+  errorCode?: string;
 
   /**
    * Request timestamp
