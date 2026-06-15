@@ -8,8 +8,15 @@ import {
   Matches,
   MaxLength,
 } from "class-validator";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+// Phone fields are NORMALIZED to E.164 (NormalizePhone) before validation, so
+// callers can type any natural format — "0555 123 45 67", "+90 555 123 45 67",
+// "(0555) 123-45-67" — and it lands as "+905551234567". The regex then asserts
+// the canonical E.164 shape; an unparseable value passes through untouched and
+// is rejected with the friendly message.
+const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+const PHONE_MESSAGE = "Lütfen geçerli bir telefon numarası girin.";
 // Iter-85: customer-session token shape. createSession emits
 // randomBytes(32).toString('hex') = exactly 64 lower-hex chars.
 // Pre-iter-85 the four sessionId fields below used @Length(32, 128)
@@ -24,8 +31,9 @@ export class CreateCustomerDto {
   name: string;
 
   @ApiProperty({ description: "Customer phone (E.164 or digits)" })
+  @NormalizePhone("TR")
   @IsString()
-  @Matches(PHONE_REGEX)
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
   phone: string;
 
@@ -56,9 +64,10 @@ export class UpdateCustomerDto {
   name?: string;
 
   @ApiPropertyOptional()
+  @NormalizePhone("TR")
   @IsOptional()
   @IsString()
-  @Matches(PHONE_REGEX)
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
   phone?: string;
 
@@ -112,8 +121,9 @@ export class IdentifyCustomerDto {
   sessionId: string;
 
   @ApiProperty()
+  @NormalizePhone("TR")
   @IsString()
-  @Matches(PHONE_REGEX)
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
   phone: string;
 
@@ -132,8 +142,9 @@ export class IdentifyCustomerDto {
 
 export class SendOTPDto {
   @ApiProperty()
+  @NormalizePhone("TR")
   @IsString()
-  @Matches(PHONE_REGEX)
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
   phone: string;
 
@@ -148,8 +159,9 @@ export class SendOTPDto {
 
 export class VerifyOTPDto {
   @ApiProperty()
+  @NormalizePhone("TR")
   @IsString()
-  @Matches(PHONE_REGEX)
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
   phone: string;
 

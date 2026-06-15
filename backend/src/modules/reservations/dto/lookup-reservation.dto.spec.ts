@@ -26,6 +26,15 @@ describe('LookupReservationDto (iter-50)', () => {
     ).toEqual([]);
   });
 
+  it('normalizes a natural phone to +905551234567 before matching', async () => {
+    const dto = plainToInstance(LookupReservationDto, {
+      phone: '0555 123 45 67',
+      reservationNumber: 'R-20260328-AB12',
+    });
+    expect(await validate(dto as object)).toEqual([]);
+    expect((dto as LookupReservationDto).phone).toBe('+905551234567');
+  });
+
   it('rejects phone > 20 chars', async () => {
     const msgs = await validateDto({
       phone: '+9' + '0'.repeat(30),

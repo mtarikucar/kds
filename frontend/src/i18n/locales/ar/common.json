@@ -9,6 +9,9 @@
       "invalid": "أدخل رقم هاتف صالح (مثال: +90 555 123 45 67)."
     }
   },
+  "phoneInput": {
+    "country": "رمز الدولة"
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "جاري التحميل...",

@@ -9,6 +9,9 @@
       "invalid": "To‘g‘ri telefon raqamini kiriting (masalan, +90 555 123 45 67)."
     }
   },
+  "phoneInput": {
+    "country": "Mamlakat kodi"
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "Yuklanmoqda...",

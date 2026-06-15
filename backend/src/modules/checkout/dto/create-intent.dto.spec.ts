@@ -31,6 +31,23 @@ describe('CheckoutBuyerDto', () => {
     expect(await validateDto(CheckoutBuyerDto, base())).toEqual([]);
   });
 
+  it.each([
+    '0555 123 45 67',
+    '+90 555 123 45 67',
+    '05551234567',
+    '(0555) 123-45-67',
+    '+905551234567',
+  ])('normalizes the natural phone %p to +905551234567 and accepts it', async (phone) => {
+    const dto = plainToInstance(CheckoutBuyerDto, { ...base(), phone });
+    expect(collect(await validate(dto as object))).toEqual([]);
+    expect((dto as CheckoutBuyerDto).phone).toBe('+905551234567');
+  });
+
+  it('rejects an unparseable phone with the friendly message', async () => {
+    const msgs = await validateDto(CheckoutBuyerDto, { ...base(), phone: 'call-me' });
+    expect(msgs).toContain('Lütfen geçerli bir telefon numarası girin.');
+  });
+
   it('rejects a non-email', async () => {
     const msgs = await validateDto(CheckoutBuyerDto, { ...base(), email: 'nope' });
     expect(msgs.some((m) => /email/i.test(m))).toBe(true);
@@ -43,7 +60,7 @@ describe('CheckoutBuyerDto', () => {
 
   it('rejects a phone with script-like content (Matches regex)', async () => {
     const msgs = await validateDto(CheckoutBuyerDto, { ...base(), phone: '<script>x' });
-    expect(msgs.some((m) => /phone/i.test(m))).toBe(true);
+    expect(msgs).toContain('Lütfen geçerli bir telefon numarası girin.');
   });
 
   it('rejects an address over 240 chars', async () => {

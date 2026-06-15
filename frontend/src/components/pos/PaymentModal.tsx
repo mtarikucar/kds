@@ -1,28 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import PhoneInput from '../ui/PhoneInput';
 import NumericKeypad from './NumericKeypad';
 import { PaymentMethod } from '../../types';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { useTranslation } from 'react-i18next';
-import { isValidPhone } from '../../utils/validation';
 import { CreditCard, Banknote, Smartphone } from 'lucide-react';
 import { computeChangeDue, isTenderSufficient } from '../../pages/pos/posCart';
 
-const createPaymentSchema = (t: (key: string) => string) => z.object({
+// `customerPhone` is now fed by <PhoneInput>, which only ever emits a canonical
+// E.164 string (or '' while incomplete), so it's valid by construction — no
+// format refinement needed here.
+const createPaymentSchema = () => z.object({
   method: z.nativeEnum(PaymentMethod),
   transactionId: z.string().optional(),
-  customerPhone: z.string()
-    .optional()
-    .refine(
-      (val) => !val || isValidPhone(val),
-      { message: t('validation:invalidPhone') }
-    )
-    .or(z.literal('')),
+  customerPhone: z.string().optional().or(z.literal('')),
 });
 
 type PaymentFormData = z.infer<ReturnType<typeof createPaymentSchema>>;
@@ -46,11 +43,12 @@ const PaymentModal = ({
 }: PaymentModalProps) => {
   const { t } = useTranslation(['pos', 'validation']);
   const formatPrice = useFormatCurrency();
-  const paymentSchema = createPaymentSchema(t);
+  const paymentSchema = createPaymentSchema();
   const {
     register,
     handleSubmit,
     watch,
+    control,
     formState: { errors },
   } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -124,12 +122,18 @@ const PaymentModal = ({
           </p>
         </div>
 
-        <Input
-          label={t('payment.customerPhone')}
-          placeholder={t('payment.customerPhonePlaceholder')}
-          type="tel"
-          error={errors.customerPhone?.message}
-          {...register('customerPhone')}
+        <Controller
+          name="customerPhone"
+          control={control}
+          render={({ field, fieldState }) => (
+            <PhoneInput
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              label={t('payment.customerPhone')}
+              error={fieldState.error?.message}
+              defaultCountry="TR"
+            />
+          )}
         />
 
         {/* Payment Method Selection */}

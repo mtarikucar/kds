@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { Phone, Check, Loader2 } from 'lucide-react';
-import { isValidPhone } from '../../utils/validation';
+import PhoneInput from '../ui/PhoneInput';
 
 interface PhoneVerificationProps {
   tenantId: string;
@@ -30,8 +30,9 @@ const PhoneVerification = ({
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Phone validation with E.164 format check
-    if (!phone || !isValidPhone(phone)) {
+    // PhoneInput only emits a value once it's a valid E.164 number, so a
+    // non-empty `phone` is already well-formed — just gate on "required".
+    if (!phone) {
       toast.error(t('phoneVerification.invalidPhone', 'Please enter a valid phone number'));
       return;
     }
@@ -114,22 +115,14 @@ const PhoneVerification = ({
 
         <form onSubmit={handleSendOTP}>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              {t('phoneVerification.phoneLabel', 'Phone Number')}
-            </label>
-            <input
-              type="tel"
+            <PhoneInput
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+905551234567"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg"
-              style={{ ['--tw-ring-color' as any]: primaryColor }}
+              onChange={setPhone}
+              label={t('phoneVerification.phoneLabel', 'Phone Number')}
+              hint={t('phoneVerification.phoneHint', 'Include country code (e.g., +90)')}
               disabled={isLoading}
               autoFocus
             />
-            <p className="text-xs text-slate-500 mt-1">
-              {t('phoneVerification.phoneHint', 'Include country code (e.g., +90)')}
-            </p>
           </div>
 
           <button

@@ -14,6 +14,7 @@ import {
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
 // E.164-ish: 8-15 digits, optional leading +. Mirrors the regex used in
 // orders/dto/create-payment.dto.ts and customer-orders/dto/create-customer-order.dto.ts
@@ -60,6 +61,7 @@ export class CreatePayIntentDto {
       "Optional customer phone — links the resulting Payment to a Customer row for loyalty.",
   })
   @EmptyStringToUndefined()
+  @NormalizePhone("TR")
   @IsString()
   @IsOptional()
   @MaxLength(20)

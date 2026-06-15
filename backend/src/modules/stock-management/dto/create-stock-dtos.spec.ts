@@ -65,7 +65,19 @@ describe('CreateSupplierDto', () => {
 
   it('rejects a malformed phone (Matches regex)', async () => {
     const msgs = await validateDto(CreateSupplierDto, { name: 'ACME', phone: 'call-me' });
-    expect(msgs.some((m) => /phone/i.test(m))).toBe(true);
+    expect(msgs).toContain('Lütfen geçerli bir telefon numarası girin.');
+  });
+
+  it.each([
+    '0555 123 45 67',
+    '+90 555 123 45 67',
+    '05551234567',
+    '(0555) 123-45-67',
+    '+905551234567',
+  ])('normalizes the natural supplier phone %p to +905551234567', async (phone) => {
+    const dto = plainToInstance(CreateSupplierDto, { name: 'ACME', phone });
+    expect(collect(await validate(dto as object))).toEqual([]);
+    expect((dto as CreateSupplierDto).phone).toBe('+905551234567');
   });
 });
 

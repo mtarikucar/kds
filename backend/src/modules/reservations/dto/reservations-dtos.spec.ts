@@ -69,7 +69,19 @@ describe('CreateReservationDto', () => {
 
   it('rejects a junk phone (E.164 regex) when present', async () => {
     const msgs = await validateDto(CreateReservationDto, { ...validReservation(), customerPhone: 'call-me' });
-    expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+    expect(msgs).toContain('Lütfen geçerli bir telefon numarası girin.');
+  });
+
+  it.each([
+    '0555 123 45 67',
+    '+90 555 123 45 67',
+    '05551234567',
+    '(0555) 123-45-67',
+    '+905551234567',
+  ])('normalizes the natural customerPhone %p to +905551234567', async (customerPhone) => {
+    const dto = plainToInstance(CreateReservationDto, { ...validReservation(), customerPhone });
+    expect(collect(await validate(dto as object))).toEqual([]);
+    expect((dto as CreateReservationDto).customerPhone).toBe('+905551234567');
   });
 });
 
@@ -88,7 +100,16 @@ describe('CancelPublicReservationDto', () => {
       customerPhone: 'xyz',
       reservationNumber: 'RSV-123',
     });
-    expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+    expect(msgs).toContain('Lütfen geçerli bir telefon numarası girin.');
+  });
+
+  it('normalizes a natural customerPhone to +905551234567', async () => {
+    const dto = plainToInstance(CancelPublicReservationDto, {
+      customerPhone: '0555 123 45 67',
+      reservationNumber: 'RSV-123',
+    });
+    expect(collect(await validate(dto as object))).toEqual([]);
+    expect((dto as CancelPublicReservationDto).customerPhone).toBe('+905551234567');
   });
 });
 

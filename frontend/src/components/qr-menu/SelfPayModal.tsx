@@ -9,6 +9,7 @@ import {
   type CustomerPayableItem,
 } from '../../features/qr-menu/customerPayApi';
 import { formatCurrency } from '../../lib/utils';
+import PhoneInput from '../ui/PhoneInput';
 
 interface SelfPayModalProps {
   isOpen: boolean;
@@ -290,19 +291,12 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
                 </button>
 
                 {/* Phone (optional) */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">
-                    {t('payment.phoneOptional', 'Phone (optional — for loyalty)')}
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value.slice(0, 32))}
-                    placeholder="+90 5__ ___ __ __"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-sm"
-                  />
-                </div>
+                <PhoneInput
+                  value={customerPhone}
+                  onChange={setCustomerPhone}
+                  label={t('payment.phoneOptional', 'Phone (optional — for loyalty)')}
+                  defaultCountry="TR"
+                />
               </>
             )}
           </div>

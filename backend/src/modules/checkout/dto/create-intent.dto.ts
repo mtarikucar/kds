@@ -11,6 +11,7 @@ import {
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { CartDto } from "./cart.dto";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
 // v2.8.85 — input contract for `POST /v1/checkout/intent`.
 //
@@ -41,16 +42,19 @@ export class CheckoutBuyerDto {
   @MaxLength(NAME_MAX)
   name!: string;
 
-  // Phone is a free-form string at this layer — PayTR doesn't enforce a
-  // format and TR numbers come through in multiple shapes (+90, 0090, 90,
-  // 0 5XX…). The regex blocks anything that obviously isn't a phone (HTML,
-  // emoji, scripts) while staying lenient on punctuation.
+  // Phone is NORMALIZED to E.164 (NormalizePhone) before validation, so the
+  // buyer can type any natural format TR numbers come through in — "0555 123
+  // 45 67", "+90 555 123 45 67", "(0555) 123-45-67" — and it lands as
+  // "+905551234567" (the canonical value PayTR's fraud-scoring prefers). An
+  // unparseable value passes through untouched and fails the E.164 check
+  // below with a clear message.
   @ApiProperty({ maxLength: PHONE_MAX })
+  @NormalizePhone("TR")
   @IsString()
   @IsNotEmpty()
   @MaxLength(PHONE_MAX)
-  @Matches(/^[+()\d\s-]{6,32}$/, {
-    message: "phone must contain digits, spaces, +, -, () only",
+  @Matches(/^\+[1-9]\d{6,14}$/, {
+    message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone!: string;
 

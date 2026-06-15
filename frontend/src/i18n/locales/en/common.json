@@ -9,6 +9,9 @@
       "invalid": "Enter a valid phone number (e.g. +90 555 123 45 67)."
     }
   },
+  "phoneInput": {
+    "country": "Country code"
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "Loading...",

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import type { ShippingAddress } from './storeApi';
 import type { Branch } from '../branches/branchesApi';
+import PhoneInput from '../../components/ui/PhoneInput';
 
 /**
  * v2.8.84 — shipping address form for the hardware checkout flow.
@@ -31,8 +32,6 @@ import type { Branch } from '../branches/branchesApi';
  * `address` lands inside `cart.shippingAddress` as the snapshot.
  */
 
-const phoneRegex = /^[+()\d\s-]{6,32}$/;
-
 type TFn = (key: string) => string;
 
 // v2.8.99.3 — line1 / city / country are required in custom mode but
@@ -49,11 +48,11 @@ function makeSchema(t: TFn) {
     .object({
       mode: z.enum(['branch', 'custom']),
       recipientName: z.string().min(2, t('shippingForm.errors.recipientMin')).max(80),
-      phone: z
-        .string()
-        .min(6, t('shippingForm.errors.phoneInvalid'))
-        .max(32)
-        .regex(phoneRegex, t('shippingForm.errors.phoneFormat')),
+      // The phone now arrives as canonical E.164 from <PhoneInput> (it
+      // emits '' until the number is valid), so a `min` length doubles as
+      // the required + format gate — the natural-input regex that used to
+      // live here is obsolete.
+      phone: z.string().min(6, t('shippingForm.errors.phoneInvalid')).max(32),
       line1: z.string().max(160).optional().or(z.literal('')),
       line2: z.string().max(160).optional().or(z.literal('')),
       district: z.string().max(80).optional().or(z.literal('')),
@@ -166,6 +165,7 @@ export default function ShippingAddressForm({
     register,
     handleSubmit,
     setValue,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -267,15 +267,20 @@ export default function ShippingAddressForm({
         />
       </Field>
 
-      <Field label={t('shippingForm.phone')} error={errors.phone?.message}>
-        <input
-          type="tel"
-          autoComplete="tel"
-          placeholder={t('shippingForm.phonePlaceholder')}
-          {...register('phone')}
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </Field>
+      <Controller
+        control={control}
+        name="phone"
+        render={({ field, fieldState }) => (
+          <PhoneInput
+            label={t('shippingForm.phone')}
+            value={field.value ?? ''}
+            onChange={field.onChange}
+            error={fieldState.error?.message}
+            placeholder={t('shippingForm.phonePlaceholder')}
+            defaultCountry="TR"
+          />
+        )}
+      />
 
       {mode === 'branch' && activeBranches.length > 0 ? (
         <div className="space-y-2">

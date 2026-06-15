@@ -8,6 +8,7 @@ import {
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
 // Caps mirror auth + create-user DTOs (iter-43 / iter-46) so every
 // password-shaped field on the API surface is bounded against the
@@ -33,14 +34,18 @@ export class UpdateProfileDto {
   @MaxLength(NAME_MAX_LENGTH)
   lastName?: string;
 
-  // E.164 max is 15 digits + optional '+'. Cap at 20 for headroom.
-  @ApiProperty({ example: "+1234567890", required: false })
-  @EmptyStringToUndefined()
+  // Phone is NORMALIZED to E.164 before validation (NormalizePhone), so the
+  // user can type any natural format — "0555 123 45 67", "+90 555 123 45 67",
+  // "(0555) 123-45-67" — and it lands as "+905551234567". An unparseable
+  // value passes through untouched and fails the E.164 check below with a
+  // clear message. E.164 max is 15 digits + '+'; cap at 20 for headroom.
+  @ApiProperty({ example: "+905551234567", required: false })
+  @NormalizePhone("TR")
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  @Matches(/^\+?[1-9]\d{1,14}$/, {
-    message: "Phone number must be in valid international format",
+  @Matches(/^\+[1-9]\d{6,14}$/, {
+    message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone?: string;
 }

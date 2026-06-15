@@ -48,6 +48,7 @@
     "i18next-http-backend": "^3.0.2",
     "konva": "^10.2.0",
     "leaflet": "^1.9.4",
+    "libphonenumber-js": "^1.13.6",
     "lucide-react": "^0.303.0",
     "react": "^18.2.0",
     "react-apple-signin-auth": "^1.1.2",
