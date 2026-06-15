@@ -151,12 +151,18 @@ describe("IngredientMovementsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", type: "OUT", quantity: 4 } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
-      // newStock = 10 + (-4) = 6, guarded by the observed currentStock=10.
+      // newStock = 10 + (-4) = 6, guarded by the observed currentStock=10
+      // AND fenced on (tenantId, branchId) per branchScope(scope).
       expect(tx.stockItem.updateMany).toHaveBeenCalledWith({
-        where: { id: "si-1", tenantId: TENANT, currentStock: 10 },
+        where: {
+          id: "si-1",
+          tenantId: TENANT,
+          branchId: "br-1",
+          currentStock: 10,
+        },
         data: { currentStock: 6 },
       });
       // Movement stores the SIGNED delta (-4), not the raw input.
@@ -184,7 +190,7 @@ describe("IngredientMovementsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", type: "OUT", quantity: -3 } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // -Math.abs(-3) = -3 → 10 - 3 = 7
@@ -204,7 +210,7 @@ describe("IngredientMovementsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", type: "IN", quantity: 5 } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       expect(tx.stockItem.updateMany).toHaveBeenCalledWith(
@@ -223,7 +229,7 @@ describe("IngredientMovementsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", type: "ADJUSTMENT", quantity: -2 } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       expect(tx.stockItem.updateMany).toHaveBeenCalledWith(
@@ -243,7 +249,7 @@ describe("IngredientMovementsService", () => {
       await expect(
         svc.create(
           { stockItemId: "missing", type: "OUT", quantity: 1 } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow("Stock item not found");
       expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
@@ -261,7 +267,7 @@ describe("IngredientMovementsService", () => {
       await expect(
         svc.create(
           { stockItemId: "si-1", type: "OUT", quantity: 5 } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow(/Insufficient stock for Flour/);
       expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
@@ -281,7 +287,7 @@ describe("IngredientMovementsService", () => {
       await expect(
         svc.create(
           { stockItemId: "si-1", type: "OUT", quantity: 4 } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow(/changed mid-flight; please retry/);
       // The movement row is NOT created when the lock loses.

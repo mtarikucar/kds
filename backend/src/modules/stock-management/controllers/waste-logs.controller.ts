@@ -56,7 +56,11 @@ export class WasteLogsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Log waste" })
-  create(@Body() dto: CreateWasteLogDto, @Request() req) {
-    return this.service.create(dto, req.tenantId, req.user?.id);
+  create(
+    @Body() dto: CreateWasteLogDto,
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.service.create(dto, scope, req.user?.id);
   }
 }

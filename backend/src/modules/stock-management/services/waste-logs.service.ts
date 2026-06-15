@@ -97,10 +97,10 @@ export class WasteLogsService {
     });
   }
 
-  async create(dto: CreateWasteLogDto, tenantId: string, userId?: string) {
+  async create(dto: CreateWasteLogDto, scope: BranchScope, userId?: string) {
     return this.prisma.$transaction(async (tx) => {
       const stockItem = await tx.stockItem.findFirst({
-        where: { id: dto.stockItemId, tenantId },
+        where: { id: dto.stockItemId, ...branchScope(scope) },
       });
       if (!stockItem) throw new BadRequestException("Stock item not found");
 
@@ -112,7 +112,7 @@ export class WasteLogsService {
       const decremented = await tx.stockItem.updateMany({
         where: {
           id: stockItem.id,
-          tenantId,
+          ...branchScope(scope),
           currentStock: { gte: wasteQty as any },
         },
         data: { currentStock: { decrement: wasteQty as any } },
@@ -134,7 +134,11 @@ export class WasteLogsService {
       // economically meaningful number.
       let remaining = wasteQty;
       const batches = await tx.stockBatch.findMany({
-        where: { stockItemId: stockItem.id, tenantId, quantity: { gt: 0 } },
+        where: {
+          stockItemId: stockItem.id,
+          ...branchScope(scope),
+          quantity: { gt: 0 },
+        },
         orderBy: [
           { expiryDate: { sort: "asc", nulls: "last" } },
           { receivedAt: "asc" },
@@ -178,7 +182,7 @@ export class WasteLogsService {
           notes: dto.notes,
           cost: cost ? (cost as any) : undefined,
           stockItemId: dto.stockItemId,
-          tenantId,
+          tenantId: scope.tenantId,
           branchId: stockItem.branchId,
           createdById: userId,
         },
@@ -196,7 +200,7 @@ export class WasteLogsService {
           referenceType: "WASTE_LOG",
           referenceId: wasteLog.id,
           stockItemId: dto.stockItemId,
-          tenantId,
+          tenantId: scope.tenantId,
           branchId: stockItem.branchId,
           createdById: userId,
         },

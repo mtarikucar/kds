@@ -87,10 +87,10 @@ export class IngredientMovementsService {
     });
   }
 
-  async create(dto: CreateIngredientMovementDto, tenantId: string) {
+  async create(dto: CreateIngredientMovementDto, scope: BranchScope) {
     return this.prisma.$transaction(async (tx) => {
       const stockItem = await tx.stockItem.findFirst({
-        where: { id: dto.stockItemId, tenantId },
+        where: { id: dto.stockItemId, ...branchScope(scope) },
       });
       if (!stockItem) throw new BadRequestException("Stock item not found");
 
@@ -117,7 +117,7 @@ export class IngredientMovementsService {
       const updated = await tx.stockItem.updateMany({
         where: {
           id: stockItem.id,
-          tenantId,
+          ...branchScope(scope),
           currentStock: stockItem.currentStock,
         },
         data: { currentStock: newStock },
@@ -135,7 +135,7 @@ export class IngredientMovementsService {
           costPerUnit: dto.costPerUnit,
           notes: dto.notes,
           stockItemId: dto.stockItemId,
-          tenantId,
+          tenantId: scope.tenantId,
           branchId: stockItem.branchId,
         },
         include: {

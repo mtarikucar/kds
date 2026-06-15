@@ -43,7 +43,10 @@ export class IngredientMovementsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Create a manual ingredient movement" })
-  create(@Body() dto: CreateIngredientMovementDto, @Request() req) {
-    return this.service.create(dto, req.tenantId);
+  create(
+    @Body() dto: CreateIngredientMovementDto,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.service.create(dto, scope);
   }
 }

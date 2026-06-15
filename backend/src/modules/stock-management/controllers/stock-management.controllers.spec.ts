@@ -259,10 +259,10 @@ describe('WasteLogsController', () => {
     ctrl.getSummary(scope, { startDate: '2026-01-01', endDate: '2026-02-01' } as any);
     expect(svc.getSummary).toHaveBeenCalledWith(scope, '2026-01-01', '2026-02-01');
   });
-  it('create forwards dto, tenantId, actor', () => {
+  it('create forwards dto, scope, actor', () => {
     const dto = { stockItemId: 's1', quantity: 1, reason: 'SPOILED' } as any;
-    ctrl.create(dto, req as any);
-    expect(svc.create).toHaveBeenCalledWith(dto, 't1', 'u1');
+    ctrl.create(dto, req as any, scope);
+    expect(svc.create).toHaveBeenCalledWith(dto, scope, 'u1');
   });
 });
 
@@ -275,10 +275,10 @@ describe('IngredientMovementsController', () => {
     ctrl.findAll(scope, q);
     expect(svc.findAll).toHaveBeenCalledWith(scope, q);
   });
-  it('create forwards dto + tenantId', () => {
+  it('create forwards dto + scope', () => {
     const dto = { stockItemId: 's1', type: 'IN', quantity: 1 } as any;
-    ctrl.create(dto, req as any);
-    expect(svc.create).toHaveBeenCalledWith(dto, 't1');
+    ctrl.create(dto, scope);
+    expect(svc.create).toHaveBeenCalledWith(dto, scope);
   });
 });
 

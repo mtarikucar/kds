@@ -71,7 +71,11 @@ export class StockCountsService {
     branchId: string,
     userId?: string,
   ) {
-    const itemsWhere: Prisma.StockItemWhereInput = { tenantId, isActive: true };
+    const itemsWhere: Prisma.StockItemWhereInput = {
+      tenantId,
+      branchId,
+      isActive: true,
+    };
     if (dto.stockItemIds?.length) {
       itemsWhere.id = { in: dto.stockItemIds };
     }
@@ -90,6 +94,7 @@ export class StockCountsService {
     const existing = await this.prisma.stockCount.findFirst({
       where: {
         tenantId,
+        branchId,
         status: StockCountStatus.IN_PROGRESS,
         items: { some: { stockItemId: { in: stockItems.map((s) => s.id) } } },
       },

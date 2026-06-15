@@ -96,7 +96,7 @@ describe("WasteLogsService", () => {
             quantity: 5,
             reason: WasteReason.SPOILED,
           } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow(ConflictException);
       // No waste log / movement booked when the guard fails.
@@ -111,7 +111,7 @@ describe("WasteLogsService", () => {
       await expect(
         svc.create(
           { stockItemId: "x", quantity: 1, reason: WasteReason.EXPIRED } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow("Stock item not found");
       expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 3, reason: WasteReason.DAMAGED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       expect(tx.stockBatch.findMany).toHaveBeenCalledWith(
@@ -141,6 +141,7 @@ describe("WasteLogsService", () => {
           where: {
             stockItemId: "si-1",
             tenantId: TENANT,
+            branchId: "br-1",
             quantity: { gt: 0 },
           },
           orderBy: [
@@ -172,7 +173,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 5, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // Exactly two batch decrements (4 then 1), in order.
@@ -207,7 +208,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 3, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       const batchCalls = (tx.stockBatch.updateMany as any).mock.calls;
@@ -239,7 +240,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 4, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // weightedAcc only counts b2's take (4 @10) since b1 was skipped.
@@ -264,7 +265,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 2, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // weightedCostAcc stays 0 → fall back to stockItem.costPerUnit=7.
@@ -287,7 +288,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 2, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       const wasteArg = (tx.wasteLog.create as any).mock.calls[0][0];
@@ -318,7 +319,7 @@ describe("WasteLogsService", () => {
           reason: WasteReason.EXPIRED,
           notes: "moldy",
         } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-9" } as any,
         "user-7",
       );
 
@@ -353,7 +354,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 1, reason: WasteReason.DAMAGED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       const movArg = (tx.ingredientMovement.create as any).mock.calls[0][0];
