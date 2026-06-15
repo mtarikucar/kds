@@ -99,6 +99,24 @@ describe('PlanComparisonMatrix', () => {
     expect(screen.getByText('50')).toBeInTheDocument();
   });
 
+  it('renders a price row with monthly price + currency (and Free for zero)', () => {
+    render(<PlanComparisonMatrix plans={plans} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /subscriptions.comparison.toggle/i }),
+    );
+
+    // Locate the price row by its label cell.
+    const priceRow = screen
+      .getByText('subscriptions.comparison.priceRow')
+      .closest('tr')!;
+    const cells = within(priceRow).getAllByRole('cell');
+    // 1 label cell + Free + Pro (cheapest → expensive).
+    expect(cells).toHaveLength(3);
+    // Free (0) → "Ücretsiz" fallback; Pro (300) → "300 TRY".
+    expect(within(priceRow).getByText('subscriptions.comparison.free')).toBeInTheDocument();
+    expect(within(priceRow).getByText('300 TRY')).toBeInTheDocument();
+  });
+
   it('renders a feature check only where the plan grants it', () => {
     render(<PlanComparisonMatrix plans={plans} />);
     fireEvent.click(

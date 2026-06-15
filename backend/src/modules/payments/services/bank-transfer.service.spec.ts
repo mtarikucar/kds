@@ -155,6 +155,130 @@ describe("BankTransferService.reject", () => {
   });
 });
 
+describe("BankTransferService.updateSettings enable-guard", () => {
+  const COMPLETE = {
+    id: "default",
+    enabled: false,
+    bankName: "Ziraat",
+    accountHolder: "Hummy Tummy A.S.",
+    iban: "TR000000000000000000000000",
+    instructions: null,
+  };
+
+  it("blocks enabling when stored config is incomplete and no fields supplied", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.findUnique.mockResolvedValue({
+      id: "default",
+      enabled: false,
+      bankName: null,
+      accountHolder: null,
+      iban: null,
+      instructions: null,
+    });
+
+    await expect(svc.updateSettings({ enabled: true })).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: "INCOMPLETE_BANK_TRANSFER_CONFIG",
+      }),
+    });
+    expect(prisma.bankTransferSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("lists every missing field in the error", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.findUnique.mockResolvedValue({
+      ...COMPLETE,
+      bankName: null,
+      iban: null,
+    });
+
+    await expect(
+      svc.updateSettings({ enabled: true }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    try {
+      await svc.updateSettings({ enabled: true });
+    } catch (e: any) {
+      expect(e.response.message).toContain("bankName");
+      expect(e.response.message).toContain("iban");
+      expect(e.response.message).not.toContain("accountHolder");
+    }
+  });
+
+  it("treats whitespace-only / empty-string incoming fields as missing", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.findUnique.mockResolvedValue(COMPLETE);
+
+    await expect(
+      // explicit blank IBAN overrides the stored value
+      svc.updateSettings({ enabled: true, iban: "   " }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: "INCOMPLETE_BANK_TRANSFER_CONFIG",
+      }),
+    });
+  });
+
+  it("enables when stored config is already complete (no fields supplied)", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.findUnique.mockResolvedValue(COMPLETE);
+    prisma.bankTransferSettings.upsert.mockResolvedValue({
+      ...COMPLETE,
+      enabled: true,
+    });
+
+    await svc.updateSettings({ enabled: true }, "admin@x.com");
+
+    expect(prisma.bankTransferSettings.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ enabled: true }),
+      }),
+    );
+  });
+
+  it("enables when incoming fields complete a previously-empty config", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.findUnique.mockResolvedValue({
+      id: "default",
+      enabled: false,
+      bankName: null,
+      accountHolder: null,
+      iban: null,
+      instructions: null,
+    });
+    prisma.bankTransferSettings.upsert.mockResolvedValue({ id: "default", enabled: true });
+
+    await svc.updateSettings({
+      enabled: true,
+      bankName: "Ziraat",
+      accountHolder: "Hummy Tummy A.S.",
+      iban: "TR000000000000000000000000",
+    });
+
+    expect(prisma.bankTransferSettings.upsert).toHaveBeenCalled();
+  });
+
+  it("does not validate when enabled is not being turned on (editing details while disabled)", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.upsert.mockResolvedValue({ id: "default" });
+
+    await svc.updateSettings({ bankName: "New Bank" });
+
+    // no enable flag → skip the completeness gate entirely (no settings read)
+    expect(prisma.bankTransferSettings.findUnique).not.toHaveBeenCalled();
+    expect(prisma.bankTransferSettings.upsert).toHaveBeenCalled();
+  });
+
+  it("does not validate when explicitly disabling", async () => {
+    const { svc, prisma } = makeDeps();
+    prisma.bankTransferSettings.upsert.mockResolvedValue({ id: "default", enabled: false });
+
+    await svc.updateSettings({ enabled: false, iban: null });
+
+    expect(prisma.bankTransferSettings.findUnique).not.toHaveBeenCalled();
+    expect(prisma.bankTransferSettings.upsert).toHaveBeenCalled();
+  });
+});
+
 describe("BankTransferService.createIntent guards", () => {
   it("refuses when bank transfer is disabled / unconfigured", async () => {
     const { svc, prisma } = makeDeps();

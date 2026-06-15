@@ -98,6 +98,11 @@ export const useBankTransferDetails = () => {
       const response = await api.get('/payments/bank-transfer/details');
       return response.data;
     },
+    // The havale channel is a low-churn superadmin toggle, but it must not
+    // stay stale indefinitely: a 60s window means a superadmin enabling the
+    // channel reflects at checkout within a minute without hammering the
+    // endpoint on every mount/refocus.
+    staleTime: 60_000,
   });
 };
 

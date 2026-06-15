@@ -45,6 +45,16 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
   const fmtLimit = (n: number) =>
     n === -1 ? '∞' : n.toLocaleString('tr-TR');
 
+  // Monthly price + ISO currency code per plan, so buyers can compare
+  // cost head-to-head inside the matrix (the cards show it, but the
+  // matrix should stand on its own for the side-by-side comparison).
+  const fmtPrice = (p: Plan) => {
+    const monthly = Number(p.monthlyPrice);
+    const currency = p.currency || 'TRY';
+    if (monthly === 0) return t('subscriptions.comparison.free', 'Ücretsiz');
+    return `${monthly.toLocaleString('tr-TR')} ${currency}`;
+  };
+
   return (
     <div className="mt-12 border-t pt-8">
       <button
@@ -70,6 +80,21 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
               </tr>
             </thead>
             <tbody>
+              {/* Price row — first so the cost is the top reference point
+                  when scanning columns. Shows monthly price + currency. */}
+              <tr className="border-b border-slate-100">
+                <td className="py-2.5 pl-4 text-slate-700 font-medium">
+                  {t('subscriptions.comparison.priceRow', 'Fiyat')}
+                </td>
+                {sorted.map((p) => (
+                  <td key={p.id} className="text-center py-2.5 px-2 text-slate-900 font-semibold">
+                    {fmtPrice(p)}
+                    <span className="block text-xs font-normal text-slate-400">
+                      /{t('subscriptions.comparison.perMonth', 'ay')}
+                    </span>
+                  </td>
+                ))}
+              </tr>
               {/* Limits group */}
               <tr className="bg-slate-50/50">
                 <td colSpan={sorted.length + 1} className="py-2 pl-4 text-xs uppercase tracking-wider text-slate-500 font-medium">

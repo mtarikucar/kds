@@ -82,6 +82,36 @@ export class BankTransferService {
     },
     actorEmail?: string,
   ) {
+    // Enabling havale must not leave a half-configured account live — a tenant
+    // would otherwise reach the checkout havale screen with no IBAN to pay to.
+    // When `enabled` is being flipped on, every account field the tenant needs
+    // (bankName, accountHolder, iban) must resolve to a non-empty value, taking
+    // the incoming dto first and the already-persisted settings as fallback.
+    if (dto.enabled === true) {
+      const current = await this.getSettings();
+      const resolve = (
+        incoming: string | null | undefined,
+        stored: string | null,
+      ) => (incoming !== undefined ? incoming : stored)?.trim() || "";
+      const bankName = resolve(dto.bankName, current.bankName);
+      const accountHolder = resolve(dto.accountHolder, current.accountHolder);
+      const iban = resolve(dto.iban, current.iban);
+      const missing: string[] = [];
+      if (!bankName) missing.push("bankName");
+      if (!accountHolder) missing.push("accountHolder");
+      if (!iban) missing.push("iban");
+      if (missing.length > 0) {
+        throw new BadRequestException({
+          statusCode: 400,
+          error: "Bad Request",
+          errorCode: "INCOMPLETE_BANK_TRANSFER_CONFIG",
+          message:
+            "Havale ile ödemeyi açmadan önce banka adı, hesap sahibi ve IBAN " +
+            `alanlarını doldurun. Eksik: ${missing.join(", ")}.`,
+        });
+      }
+    }
+
     return this.prisma.bankTransferSettings.upsert({
       where: { id: "default" },
       create: { id: "default", ...dto, updatedByEmail: actorEmail },

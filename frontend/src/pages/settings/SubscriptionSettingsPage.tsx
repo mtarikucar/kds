@@ -25,6 +25,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
+import { useBankTransferDetails } from '../../api/paymentsApi';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { SubscriptionStatus, BillingCycle, InvoiceStatus } from '../../types';
 import { formatCurrency } from '../../lib/currency';
 
@@ -43,6 +45,7 @@ const SubscriptionManagementSection = () => {
   const { data: currentSubscription, isLoading: subLoading, refetch: refetchSubscription } = useGetCurrentSubscription();
   const { data: plans } = useGetPlans();
   const { data: invoices, isLoading: invoicesLoading } = useGetTenantInvoices();
+  const { data: bankTransfer } = useBankTransferDetails();
   const cancelSubscription = useCancelSubscription();
   const reactivateSubscription = useReactivateSubscription();
 
@@ -113,7 +116,11 @@ const SubscriptionManagementSection = () => {
       setCancellationReason('');
     } catch (error) {
       console.error('Failed to cancel subscription:', error);
-      toast.error(t('common:notifications.cancelSubscriptionFailed'));
+      // Surface the backend's reason (e.g. "already cancelled", grace
+      // window rules) instead of a one-size-fits-all toast.
+      toast.error(
+        getApiErrorMessage(error, t('common:notifications.cancelSubscriptionFailed')),
+      );
     }
   };
 
@@ -123,7 +130,9 @@ const SubscriptionManagementSection = () => {
       await reactivateSubscription.mutateAsync(currentSubscription.id);
     } catch (error) {
       console.error('Failed to reactivate subscription:', error);
-      toast.error(t('common:notifications.reactivateSubscriptionFailed'));
+      toast.error(
+        getApiErrorMessage(error, t('common:notifications.reactivateSubscriptionFailed')),
+      );
     }
   };
 
@@ -136,6 +145,17 @@ const SubscriptionManagementSection = () => {
   };
 
   const currentPlan = plans?.find((p) => p.id === currentSubscription.planId);
+
+  // A non-TRY plan can only be paid via bank transfer (PayTR card rail is
+  // TRY-only). If Havale/EFT isn't enabled there's no working payment path,
+  // so the PAST_DUE "renew now" / EXPIRED "resubscribe" CTAs must NOT route
+  // to the checkout dead-end — send the user to the plans page instead,
+  // where they can pick a payable plan. Prefer the plan's own currency,
+  // falling back to the subscription's stored currency.
+  const planCurrency = currentPlan?.currency || currentSubscription.currency || 'TRY';
+  const isNonTryPlan = planCurrency !== 'TRY';
+  const havaleEnabled = bankTransfer?.enabled ?? false;
+  const noWorkingPaymentPath = isNonTryPlan && !havaleEnabled;
 
   return (
     <div className="space-y-6">
@@ -246,10 +266,23 @@ const SubscriptionManagementSection = () => {
                 <Button
                   variant="primary"
                   className="w-full"
+                  // Non-TRY plan + Havale disabled → checkout would dead-end
+                  // (no card rail for foreign currency); send them to the
+                  // plans page to choose a payable plan instead.
                   onClick={() =>
                     navigate(
-                      `/subscription/checkout?planId=${currentSubscription.planId}&billingCycle=${currentSubscription.billingCycle}`,
+                      noWorkingPaymentPath
+                        ? '/subscription/plans?renew=1'
+                        : `/subscription/checkout?planId=${currentSubscription.planId}&billingCycle=${currentSubscription.billingCycle}`,
                     )
+                  }
+                  title={
+                    noWorkingPaymentPath
+                      ? t(
+                          'subscriptions.noPaymentPathHint',
+                          'Bu plan için ödeme yöntemi yapılandırılmamış. Lütfen bir plan seçin.',
+                        )
+                      : undefined
                   }
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
@@ -259,11 +292,22 @@ const SubscriptionManagementSection = () => {
               {/* EXPIRED → grace period elapsed; route to plans page with
                   ?renew=1 so the user can confirm the same plan or pick
                   a different one. */}
+              {/* EXPIRED already routes to the plans page (safe — no
+                  checkout dead-end). When the current plan has no working
+                  payment path, add an explanatory tooltip. */}
               {currentSubscription.status === SubscriptionStatus.EXPIRED && (
                 <Button
                   variant="primary"
                   className="w-full"
                   onClick={() => navigate('/subscription/plans?renew=1')}
+                  title={
+                    noWorkingPaymentPath
+                      ? t(
+                          'subscriptions.noPaymentPathHint',
+                          'Bu plan için ödeme yöntemi yapılandırılmamış. Lütfen bir plan seçin.',
+                        )
+                      : undefined
+                  }
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
                   {t('subscriptions.resubscribe', 'Yeniden abone ol')}

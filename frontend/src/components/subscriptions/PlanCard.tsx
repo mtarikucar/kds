@@ -30,6 +30,14 @@ interface PlanCardProps {
   onSelectPlan: (planId: string) => void;
   isLoading?: boolean;
   buttonText?: string;
+  /**
+   * When set, the select CTA is rendered as a non-actionable dead-end
+   * guard: the button is disabled and carries this string as its tooltip
+   * (and a small hint line underneath). Used when a non-TRY plan has no
+   * working payment path configured so the user doesn't bounce off an
+   * unusable checkout. The rest of the card stays fully viewable.
+   */
+  selectDisabledHint?: string;
 }
 
 const PlanCard = ({
@@ -41,6 +49,7 @@ const PlanCard = ({
   onSelectPlan,
   isLoading = false,
   buttonText,
+  selectDisabledHint,
 }: PlanCardProps) => {
   const { t } = useTranslation('common');
 
@@ -63,6 +72,11 @@ const PlanCard = ({
 
   const pricePerMonth = billingCycle === BillingCycle.YEARLY ? price / 12 : price;
   const originalPricePerMonth = billingCycle === BillingCycle.YEARLY ? originalPrice / 12 : originalPrice;
+
+  // Currency the plan is billed in. Non-TRY plans have no card rail
+  // (PayTR is TRY-only) → bank transfer is the only path, which we badge.
+  const planCurrency = plan.currency || 'TRY';
+  const isNonTry = planCurrency !== 'TRY';
 
   const isUnlimited = (limit: number) => limit === -1;
   const formatLimit = (limit: number) => (isUnlimited(limit) ? t('subscriptions.unlimited') : limit);
@@ -121,13 +135,22 @@ const PlanCard = ({
       <div className="mb-6">
         <h3 className="text-2xl font-bold text-slate-900 mb-2">{planDisplayName}</h3>
         <p className="text-slate-600 text-sm min-h-[40px]">{planDescription}</p>
+        {/* Non-TRY plans can only be paid by bank transfer (no PayTR card
+            rail for foreign currency), so surface that constraint up front
+            with a small badge rather than letting the user discover it at
+            checkout. */}
+        {isNonTry && (
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+            {t('subscriptions.havaleOnlyBadge', { defaultValue: 'Havale ile ödeme' })}
+          </span>
+        )}
       </div>
 
       <div className="mb-6">
         {/* Original price with strikethrough if discounted */}
         {hasDiscount && originalPrice > 0 && (
           <div className="text-lg text-slate-400 line-through mb-1">
-            {getCurrencySymbol(plan.currency)}{originalPrice.toFixed(2)}
+            {getCurrencySymbol(planCurrency)}{originalPrice.toFixed(2)}
           </div>
         )}
 
@@ -136,8 +159,12 @@ const PlanCard = ({
             'text-4xl font-bold',
             hasDiscount ? 'text-red-600' : 'text-slate-900'
           )}>
-            {getCurrencySymbol(plan.currency)}{price.toFixed(2)}
+            {getCurrencySymbol(planCurrency)}{price.toFixed(2)}
           </span>
+          {/* Spell the ISO currency code out next to the symbol so the
+              billing currency is unambiguous (₺ alone is easy to skim
+              past; "TRY"/"USD" makes the rail explicit). */}
+          <span className="text-slate-500 ml-1 text-sm font-medium">{planCurrency}</span>
           <span className="text-slate-600 ml-2">
             /{billingCycle === BillingCycle.MONTHLY ? t('pricing.month') : t('pricing.year')}
           </span>
@@ -145,7 +172,7 @@ const PlanCard = ({
 
         {billingCycle === BillingCycle.YEARLY && price > 0 && (
           <p className="text-sm text-green-600 mt-1">
-            {getCurrencySymbol(plan.currency)}{pricePerMonth.toFixed(2)}/{t('pricing.month')} - {t('pricing.save')}{' '}
+            {getCurrencySymbol(planCurrency)}{pricePerMonth.toFixed(2)}/{t('pricing.month')} - {t('pricing.save')}{' '}
             {Math.round(((Number(plan.monthlyPrice) * 12 - price) / (Number(plan.monthlyPrice) * 12)) * 100)}%
           </p>
         )}
@@ -154,7 +181,7 @@ const PlanCard = ({
         {hasDiscount && totalSavings > 0 && (
           <div className="mt-2 space-y-1">
             <p className="text-sm text-red-600 font-semibold">
-              {t('pricing.youSave')}: {getCurrencySymbol(plan.currency)}{totalSavings.toFixed(2)}
+              {t('pricing.youSave')}: {getCurrencySymbol(planCurrency)}{totalSavings.toFixed(2)}
             </p>
             <div className="flex items-center gap-1 text-xs text-orange-600">
               <Clock className="w-3 h-3" />
@@ -250,11 +277,18 @@ const PlanCard = ({
           hasDiscount && 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 border-0'
         )}
         onClick={() => onSelectPlan(plan.id)}
-        disabled={isCurrentPlan || isLoading}
+        disabled={isCurrentPlan || isLoading || !!selectDisabledHint}
         isLoading={isLoading}
+        title={selectDisabledHint || undefined}
       >
         {isCurrentPlan ? t('pricing.currentPlan') : (buttonText || t('pricing.selectPlan'))}
       </Button>
+      {/* Dead-end guard hint: a non-TRY plan with no configured payment
+          path can't be checked out, so spell that out under the disabled
+          CTA instead of silently bouncing the user off checkout. */}
+      {selectDisabledHint && !isCurrentPlan && (
+        <p className="mt-2 text-xs text-amber-700 text-center">{selectDisabledHint}</p>
+      )}
     </div>
   );
 };
