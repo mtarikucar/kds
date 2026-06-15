@@ -41,6 +41,12 @@ vi.mock('../marketplace/marketplaceApi', () => ({
   useListMyAddOns: () => ({ data: myAddOnsRef.value }),
   useCancelAddOn: () => ({ mutate: cancelAddOnMutate, isPending: cancelPending }),
 }));
+// The subscription/billing management section (folded in from the old
+// /subscription/manage page) has its own data hooks; stub it here so this
+// page test stays focused on the plan/quota/add-on sections.
+vi.mock('../../pages/settings/SubscriptionSettingsPage', () => ({
+  default: () => <div data-testid="subscription-management" />,
+}));
 
 function renderPage() {
   return render(
@@ -61,20 +67,10 @@ describe('PlanAndAccessPage', () => {
     cancelPending = false;
   });
 
-  it('shows the current plan name and the localized next-billing date', () => {
+  it('embeds the subscription/billing management section (merged from /subscription/manage)', () => {
     planRef.value = { displayName: 'Pro', currency: 'TRY' };
-    subscriptionRef.value = {
-      currentPeriodEnd: '2026-07-15T00:00:00.000Z',
-      currency: 'TRY',
-    };
-
     renderPage();
-
-    expect(screen.getByText('Pro')).toBeInTheDocument();
-    // toLocaleDateString('tr-TR') → 15.07.2026
-    expect(
-      screen.getByText('Sonraki tahsilat: 15.07.2026'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('subscription-management')).toBeInTheDocument();
   });
 
   it('renders the quota card with current/max and a quota grid', () => {
