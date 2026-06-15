@@ -17,6 +17,7 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PaymentMethod } from "../../../common/constants/order-status.enum";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
 // E.164-ish: 8-15 digits, optional leading +. Same shape every other
 // surface that feeds findOrCreateByPhone uses (create-payment.dto.ts,
@@ -78,6 +79,7 @@ export class PayItemsDto {
       "Customer phone for linking to CRM record (used only when this payment closes the order)",
   })
   @EmptyStringToUndefined()
+  @NormalizePhone("TR")
   @IsString()
   @IsOptional()
   @MaxLength(20)

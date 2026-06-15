@@ -15,6 +15,7 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PaymentMethod } from "../../../common/constants/order-status.enum";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
 // E.164-ish: 8-15 digits, optional leading +. Same shape every other
 // surface that feeds findOrCreateByPhone uses — keeps the canonical
@@ -86,6 +87,7 @@ export class SplitBillDto {
 
   @ApiPropertyOptional({ description: "Customer phone for linking" })
   @EmptyStringToUndefined()
+  @NormalizePhone("TR")
   @IsString()
   @IsOptional()
   @MaxLength(20)

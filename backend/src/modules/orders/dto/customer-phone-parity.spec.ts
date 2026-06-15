@@ -99,9 +99,14 @@ describe('customerPhone PHONE_REGEX parity (iter-54)', () => {
     });
 
     it('rejects junk', async () => {
+      // The reservation DTO now normalizes to E.164 (@NormalizePhone) and uses
+      // the shared friendly "Lütfen geçerli bir telefon numarası girin." message
+      // — which no longer contains the field name. The base object is otherwise
+      // valid (the "accepts a valid phone" case above asserts []), so ANY error
+      // here is the customerPhone rejection we're guarding.
       const dto = plainToInstance(UpdateReservationDto, { customerPhone: 'NOT-A-PHONE' });
       const msgs = await errors(dto);
-      expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+      expect(msgs.length).toBeGreaterThan(0);
     });
   });
 });
