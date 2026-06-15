@@ -1,14 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, Lock, ExternalLink } from 'lucide-react';
-import { useCreatePaymentIntent } from '../../api/paymentsApi';
+import type { TFunction } from 'i18next';
+import { toast } from 'sonner';
+import { ShieldCheck, Lock, ExternalLink, CreditCard, Landmark, Copy, Check } from 'lucide-react';
+import {
+  useCreatePaymentIntent,
+  useBankTransferDetails,
+  useCreateBankTransferIntent,
+  type BankTransferIntentResponse,
+} from '../../api/paymentsApi';
+import { useGetPlans } from '../../features/subscriptions/subscriptionsApi';
 import { useGetCurrentLegalDocument } from '../../features/legal/legalApi';
 import { useActionableError } from '../../components/common/actionable-errors/ActionableErrorProvider';
 import { getApiErrorCode, getApiErrorMessage } from '../../lib/api-error';
 import Spinner from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
 import { BillingCycle } from '../../types';
+
+type PaymentMethod = 'CARD' | 'BANK_TRANSFER';
 
 const AUTO_REDIRECT_MS = 3000;
 
@@ -30,6 +40,30 @@ const CheckoutPage = () => {
   const planId = params.get('planId');
   const billingCycle = (params.get('billingCycle') ?? BillingCycle.MONTHLY) as BillingCycle;
   const createIntent = useCreatePaymentIntent();
+  const createBankTransferIntent = useCreateBankTransferIntent();
+
+  // Plan + bank-transfer availability. We need the plan's currency to
+  // decide whether the PayTR (card) option can be offered at all — PayTR
+  // only settles in TRY, so a non-TRY plan is havale-only.
+  const plansQ = useGetPlans();
+  const plan = plansQ.data?.find((p) => p.id === planId);
+  const currency = plan?.currency ?? 'TRY';
+  const isTry = currency === 'TRY';
+  const bankTransferQ = useBankTransferDetails();
+  const havaleEnabled = bankTransferQ.data?.enabled === true;
+  // Card is offered only for TRY plans; havale only when the superadmin has
+  // switched the channel on. If neither qualifies we still keep card as the
+  // fallback so the consent gate never dead-ends.
+  const cardAvailable = isTry;
+  const showMethodChoice = cardAvailable && havaleEnabled;
+
+  // Selected payment method. Default to card when available, else havale.
+  const [method, setMethod] = useState<PaymentMethod>('CARD');
+  useEffect(() => {
+    if (!cardAvailable && havaleEnabled) {
+      setMethod('BANK_TRANSFER');
+    }
+  }, [cardAvailable, havaleEnabled]);
 
   // Phase 0 state — consent checkboxes
   const kvkkQ = useGetCurrentLegalDocument('KVKK');
@@ -47,6 +81,8 @@ const CheckoutPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(AUTO_REDIRECT_MS / 1000);
+  // Havale success → render the bank-transfer instructions panel.
+  const [bankTransfer, setBankTransfer] = useState<BankTransferIntentResponse | null>(null);
 
   // Missing-info errors (e.g. PROFILE_PHONE_REQUIRED) are completed inline by
   // the app-wide actionable-error provider: it collects the missing field and
@@ -119,11 +155,61 @@ const CheckoutPage = () => {
     );
   };
 
+  const submitBankTransfer = () => {
+    if (!planId || !kvkkQ.data || !distanceQ.data || !refundQ.data) return;
+    createBankTransferIntent.mutate(
+      {
+        planId,
+        billingCycle,
+        acceptedDocumentIds: [kvkkQ.data.id, distanceQ.data.id, refundQ.data.id],
+      },
+      {
+        onSuccess: (data) => {
+          setBankTransfer(data);
+        },
+        onError: (err: unknown) => {
+          // Same actionable inline-fix path as the card flow (e.g. a missing
+          // required profile field): collect inline, auto-resume the havale
+          // intent, keep the consent ticks. Re-lock submit for the retry.
+          if (
+            actionableError.handleApiError(err, () => {
+              setSubmitted(true);
+              submitBankTransfer();
+            })
+          ) {
+            setSubmitted(false);
+            return;
+          }
+          if (getApiErrorCode(err) === 'LEGAL_CONSENT_REQUIRED') {
+            setSubmitted(false);
+            setError(
+              getApiErrorMessage(
+                err,
+                t(
+                  'subscriptions.checkout.consentRequired',
+                  'KVKK, Mesafeli Satış ve İade politikalarını onaylamanız gerekiyor.',
+                ),
+              ),
+            );
+            return;
+          }
+          setError(
+            getApiErrorMessage(err, t('subscriptions.checkout.intentFailed', 'Payment intent failed')),
+          );
+        },
+      },
+    );
+  };
+
   const handleSubmit = () => {
     if (!planId || !allChecked || submitted) return;
     if (!kvkkQ.data || !distanceQ.data || !refundQ.data) return;
     setSubmitted(true);
-    submitIntent();
+    if (method === 'BANK_TRANSFER') {
+      submitBankTransfer();
+    } else {
+      submitIntent();
+    }
   };
 
   // Auto-redirect countdown for phase 2
@@ -153,6 +239,17 @@ const CheckoutPage = () => {
           {t('subscriptions.checkout.backToPlans', 'Planlara dön')}
         </Button>
       </div>
+    );
+  }
+
+  // Havale success: bank-transfer instructions panel.
+  if (bankTransfer) {
+    return (
+      <BankTransferInstructions
+        data={bankTransfer}
+        onDone={() => navigate('/admin/settings/subscription', { replace: true })}
+        t={t}
+      />
     );
   }
 
@@ -194,8 +291,8 @@ const CheckoutPage = () => {
     );
   }
 
-  // Phase 1: creating intent
-  if (submitted && createIntent.isPending) {
+  // Phase 1: creating intent (card or havale)
+  if (submitted && (createIntent.isPending || createBankTransferIntent.isPending)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <Spinner size="lg" />
@@ -278,6 +375,42 @@ const CheckoutPage = () => {
           version={refundQ.data?.version}
         />
 
+        {(showMethodChoice || (havaleEnabled && !cardAvailable)) && (
+          <div className="mt-8">
+            <h2 className="text-sm font-semibold text-slate-700 mb-3">
+              {t('subscriptions.checkout.methodTitle', 'Ödeme yöntemi')}
+            </h2>
+            {!cardAvailable && (
+              <p className="text-xs text-slate-500 mb-3">
+                {t(
+                  'subscriptions.checkout.cardUnavailableNote',
+                  'Bu plan {{currency}} para biriminde olduğu için kart ile ödeme kullanılamıyor. Havale / EFT ile ödeyebilirsiniz.',
+                ).replace('{{currency}}', currency)}
+              </p>
+            )}
+            <div className="grid sm:grid-cols-2 gap-3">
+              {cardAvailable && (
+                <MethodOption
+                  selected={method === 'CARD'}
+                  onSelect={() => setMethod('CARD')}
+                  icon={<CreditCard className="w-5 h-5" />}
+                  label={t('subscriptions.checkout.methodCard', 'Kart ile öde')}
+                  hint={t('subscriptions.checkout.methodCardHint', 'PayTR güvenli ödeme')}
+                />
+              )}
+              {havaleEnabled && (
+                <MethodOption
+                  selected={method === 'BANK_TRANSFER'}
+                  onSelect={() => setMethod('BANK_TRANSFER')}
+                  icon={<Landmark className="w-5 h-5" />}
+                  label={t('subscriptions.checkout.methodBankTransfer', 'Havale / EFT')}
+                  hint={t('subscriptions.checkout.methodBankTransferHint', 'Banka havalesi ile öde')}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 flex items-center gap-3">
           <Button
             variant="primary"
@@ -285,7 +418,9 @@ const CheckoutPage = () => {
             disabled={!allChecked || submitted}
             onClick={handleSubmit}
           >
-            {t('subscriptions.checkout.proceedToPayment', 'Devam et — Ödemeye geç')}
+            {method === 'BANK_TRANSFER'
+              ? t('subscriptions.checkout.proceedToBankTransfer', 'Devam et — Havale bilgilerini gör')
+              : t('subscriptions.checkout.proceedToPayment', 'Devam et — Ödemeye geç')}
           </Button>
           <button
             onClick={() => navigate('/subscription/plans')}
@@ -359,6 +494,181 @@ function ConsentRow({
         )}
       </div>
     </label>
+  );
+}
+
+interface MethodOptionProps {
+  selected: boolean;
+  onSelect: () => void;
+  icon: ReactNode;
+  label: string;
+  hint: string;
+}
+
+function MethodOption({ selected, onSelect, icon, label, hint }: MethodOptionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`flex items-center gap-3 p-4 rounded-lg border text-left transition-colors ${
+        selected
+          ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300'
+          : 'border-slate-200 bg-white hover:bg-slate-50'
+      }`}
+    >
+      <span className={selected ? 'text-indigo-600' : 'text-slate-500'}>{icon}</span>
+      <span className="flex-1">
+        <span className="block font-medium text-slate-900">{label}</span>
+        <span className="block text-xs text-slate-500">{hint}</span>
+      </span>
+      {selected && <Check className="w-5 h-5 text-indigo-600" />}
+    </button>
+  );
+}
+
+interface BankTransferInstructionsProps {
+  data: BankTransferIntentResponse;
+  onDone: () => void;
+  t: TFunction<'subscriptions'>;
+}
+
+function BankTransferInstructions({ data, onDone, t }: BankTransferInstructionsProps) {
+  const { bankDetails } = data;
+  return (
+    <div className="max-w-xl mx-auto mt-12 px-4 pb-16">
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+            <Landmark className="w-6 h-6 text-indigo-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {t('subscriptions.checkout.bankTransfer.title', 'Havale / EFT bilgileri')}
+          </h1>
+        </div>
+        <p className="text-slate-600 mb-6">
+          {t('subscriptions.checkout.bankTransfer.intro', 'Aşağıdaki hesaba ödeme yapın. Açıklama kısmına referans kodunu yazmayı unutmayın.')}
+        </p>
+
+        {/* Amount */}
+        <div className="rounded-lg border border-slate-200 p-4 mb-4">
+          <div className="text-xs text-slate-500">
+            {t('subscriptions.checkout.bankTransfer.amount', 'Tutar')}
+            {data.planName ? ` — ${data.planName}` : ''}
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data.amount} {data.currency}
+          </div>
+        </div>
+
+        {/* Reference — prominent + copyable */}
+        <CopyRow
+          label={t('subscriptions.checkout.bankTransfer.reference', 'Referans kodu (açıklamaya yazın)')}
+          value={data.reference}
+          emphasized
+          t={t}
+        />
+
+        {/* Bank details */}
+        {bankDetails.bankName && (
+          <DetailRow
+            label={t('subscriptions.checkout.bankTransfer.bankName', 'Banka')}
+            value={bankDetails.bankName}
+          />
+        )}
+        {bankDetails.accountHolder && (
+          <DetailRow
+            label={t('subscriptions.checkout.bankTransfer.accountHolder', 'Hesap sahibi')}
+            value={bankDetails.accountHolder}
+          />
+        )}
+        {bankDetails.iban && (
+          <CopyRow
+            label={t('subscriptions.checkout.bankTransfer.iban', 'IBAN')}
+            value={bankDetails.iban}
+            t={t}
+          />
+        )}
+
+        {bankDetails.instructions && (
+          <div className="rounded-lg border border-slate-200 p-4 mt-4 text-sm text-slate-600 whitespace-pre-line">
+            {bankDetails.instructions}
+          </div>
+        )}
+
+        <div className="mt-6 rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+          {t(
+            'subscriptions.checkout.bankTransfer.confirmationNote',
+            'Erişiminiz, havale ekibimiz tarafından onaylandıktan sonra açılacaktır. Onay genellikle kısa sürede tamamlanır.',
+          )}
+        </div>
+
+        <Button variant="primary" className="w-full mt-6" onClick={onDone}>
+          {t('subscriptions.checkout.bankTransfer.done', 'Tamam / panele dön')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface DetailRowProps {
+  label: string;
+  value: string;
+}
+
+function DetailRow({ label, value }: DetailRowProps) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-4 mt-3">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="font-medium text-slate-900 break-all">{value}</div>
+    </div>
+  );
+}
+
+interface CopyRowProps {
+  label: string;
+  value: string;
+  emphasized?: boolean;
+  t: TFunction<'subscriptions'>;
+}
+
+function CopyRow({ label, value, emphasized, t }: CopyRowProps) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast.success(t('subscriptions.checkout.bankTransfer.copied', 'Kopyalandı'));
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — silently no-op; the
+      // value is still visible for manual copy.
+    }
+  };
+  return (
+    <div
+      className={`rounded-lg border p-4 mt-3 flex items-center gap-3 ${
+        emphasized ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200'
+      }`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-slate-500">{label}</div>
+        <div
+          className={`font-mono break-all ${emphasized ? 'text-lg font-bold text-slate-900' : 'font-medium text-slate-900'}`}
+        >
+          {value}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={t('subscriptions.checkout.bankTransfer.copy', 'Kopyala')}
+        className="shrink-0 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded"
+      >
+        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        {t('subscriptions.checkout.bankTransfer.copy', 'Kopyala')}
+      </button>
+    </div>
   );
 }
 
