@@ -28,10 +28,13 @@ import { SuperAdminGuard } from "./guards/superadmin.guard";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
+import { BankTransferModule } from "../payments/services/bank-transfer.module";
 
 @Module({
   imports: [
     NotificationsModule,
+    // Havale confirm/reject + settings endpoints on the subscriptions controller.
+    BankTransferModule,
     // SuperAdminSubscriptionsService dispatches into SubscriptionService
     // for ops-only actions (e.g. forcing the trial-expiry cron from a
     // test or support session). Keeps the canonical lifecycle logic in
