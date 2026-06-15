@@ -45,36 +45,40 @@ describe('StockItemsController', () => {
   );
   const ctrl = new StockItemsController(svc as any);
 
-  it('findAll forwards tenantId + query', () => {
+  it('findAll forwards scope + query', () => {
     const q = { search: 'x' } as any;
-    ctrl.findAll(req as any, q);
-    expect(svc.findAll).toHaveBeenCalledWith('t1', q);
+    ctrl.findAll(scope, q);
+    expect(svc.findAll).toHaveBeenCalledWith(scope, q);
   });
-  it('findLowStock forwards tenantId', () => {
-    ctrl.findLowStock(req as any);
-    expect(svc.findLowStockItems).toHaveBeenCalledWith('t1');
+  it('findLowStock forwards scope', () => {
+    ctrl.findLowStock(scope);
+    expect(svc.findLowStockItems).toHaveBeenCalledWith(scope);
   });
   it('findExpiringSoon parses days', () => {
-    ctrl.findExpiringSoon(req as any, '7');
-    expect(svc.findExpiringSoon).toHaveBeenCalledWith('t1', 7);
+    ctrl.findExpiringSoon(scope, '7');
+    expect(svc.findExpiringSoon).toHaveBeenCalledWith(scope, 7);
   });
   it('findExpiringSoon passes undefined when days omitted', () => {
-    ctrl.findExpiringSoon(req as any);
-    expect(svc.findExpiringSoon).toHaveBeenCalledWith('t1', undefined);
+    ctrl.findExpiringSoon(scope);
+    expect(svc.findExpiringSoon).toHaveBeenCalledWith(scope, undefined);
+  });
+  it('findOne forwards id + scope', () => {
+    ctrl.findOne('s1', scope);
+    expect(svc.findOne).toHaveBeenCalledWith('s1', scope);
   });
   it('create stamps scope.branchId', () => {
     const dto = { name: 'Flour' } as any;
     ctrl.create(dto, req as any, scope);
     expect(svc.create).toHaveBeenCalledWith(dto, 't1', 'b1');
   });
-  it('update forwards id, dto, tenantId', () => {
+  it('update forwards id, dto, scope', () => {
     const dto = { isActive: false } as any;
-    ctrl.update('s1', dto, req as any);
-    expect(svc.update).toHaveBeenCalledWith('s1', dto, 't1');
+    ctrl.update('s1', dto, scope);
+    expect(svc.update).toHaveBeenCalledWith('s1', dto, scope);
   });
-  it('remove forwards id + tenantId', () => {
-    ctrl.remove('s1', req as any);
-    expect(svc.remove).toHaveBeenCalledWith('s1', 't1');
+  it('remove forwards id + scope', () => {
+    ctrl.remove('s1', scope);
+    expect(svc.remove).toHaveBeenCalledWith('s1', scope);
   });
 });
 
@@ -131,23 +135,31 @@ describe('PurchaseOrdersController', () => {
   const svc = mocks('findAll', 'findOne', 'create', 'submit', 'receive', 'cancel');
   const ctrl = new PurchaseOrdersController(svc as any);
 
-  it('findAll forwards tenantId + status', () => {
-    ctrl.findAll(req as any, 'DRAFT');
-    expect(svc.findAll).toHaveBeenCalledWith('t1', 'DRAFT');
+  it('findAll forwards scope + status', () => {
+    ctrl.findAll(scope, 'DRAFT');
+    expect(svc.findAll).toHaveBeenCalledWith(scope, 'DRAFT');
+  });
+  it('findOne forwards id + scope', () => {
+    ctrl.findOne('po1', scope);
+    expect(svc.findOne).toHaveBeenCalledWith('po1', scope);
   });
   it('create forwards dto, scope tenant+branch AND actor id', () => {
     const dto = { supplierId: 'sup1', items: [] } as any;
     ctrl.create(dto, scope, req as any);
     expect(svc.create).toHaveBeenCalledWith(dto, 't1', 'b1', 'u1');
   });
-  it('receive forwards id, dto, tenantId, actor', () => {
-    const dto = { items: [] } as any;
-    ctrl.receive('po1', dto, req as any);
-    expect(svc.receive).toHaveBeenCalledWith('po1', dto, 't1', 'u1');
+  it('submit forwards id + scope', () => {
+    ctrl.submit('po1', scope);
+    expect(svc.submit).toHaveBeenCalledWith('po1', scope);
   });
-  it('cancel forwards id, tenantId, actor', () => {
-    ctrl.cancel('po1', req as any);
-    expect(svc.cancel).toHaveBeenCalledWith('po1', 't1', 'u1');
+  it('receive forwards id, dto, scope, actor', () => {
+    const dto = { items: [] } as any;
+    ctrl.receive('po1', dto, scope);
+    expect(svc.receive).toHaveBeenCalledWith('po1', dto, scope, 'u1');
+  });
+  it('cancel forwards id, scope, actor', () => {
+    ctrl.cancel('po1', scope);
+    expect(svc.cancel).toHaveBeenCalledWith('po1', scope, 'u1');
   });
 });
 
@@ -164,12 +176,20 @@ describe('RecipesController', () => {
   const ctrl = new RecipesController(svc as any);
 
   it('findAll parses limit/offset', () => {
-    ctrl.findAll(req as any, '10', '5');
-    expect(svc.findAll).toHaveBeenCalledWith('t1', { limit: 10, offset: 5 });
+    ctrl.findAll(scope, '10', '5');
+    expect(svc.findAll).toHaveBeenCalledWith(scope, { limit: 10, offset: 5 });
   });
   it('findAll coerces a non-numeric limit to undefined', () => {
-    ctrl.findAll(req as any, 'banana');
-    expect(svc.findAll).toHaveBeenCalledWith('t1', { limit: undefined, offset: undefined });
+    ctrl.findAll(scope, 'banana');
+    expect(svc.findAll).toHaveBeenCalledWith(scope, { limit: undefined, offset: undefined });
+  });
+  it('findByProduct forwards productId + scope', () => {
+    ctrl.findByProduct('p1', scope);
+    expect(svc.findByProduct).toHaveBeenCalledWith('p1', scope);
+  });
+  it('findOne forwards id + scope', () => {
+    ctrl.findOne('r1', scope);
+    expect(svc.findOne).toHaveBeenCalledWith('r1', scope);
   });
   it('create stamps scope.branchId', () => {
     const dto = { productId: 'p1', ingredients: [] } as any;
@@ -177,11 +197,20 @@ describe('RecipesController', () => {
     expect(svc.create).toHaveBeenCalledWith(dto, 't1', 'b1');
   });
   it('checkStock parses quantity (defaults to 1)', () => {
-    ctrl.checkStock('r1', req as any, '3');
-    expect(svc.checkStock).toHaveBeenCalledWith('r1', 't1', 3);
+    ctrl.checkStock('r1', scope, '3');
+    expect(svc.checkStock).toHaveBeenCalledWith('r1', scope, 3);
     svc.checkStock.mockClear();
-    ctrl.checkStock('r1', req as any);
-    expect(svc.checkStock).toHaveBeenCalledWith('r1', 't1', 1);
+    ctrl.checkStock('r1', scope);
+    expect(svc.checkStock).toHaveBeenCalledWith('r1', scope, 1);
+  });
+  it('update forwards id, dto, scope', () => {
+    const dto = { name: 'X' } as any;
+    ctrl.update('r1', dto, scope);
+    expect(svc.update).toHaveBeenCalledWith('r1', dto, scope);
+  });
+  it('remove forwards id + scope', () => {
+    ctrl.remove('r1', scope);
+    expect(svc.remove).toHaveBeenCalledWith('r1', scope);
   });
 });
 
@@ -189,19 +218,31 @@ describe('StockCountsController', () => {
   const svc = mocks('findAll', 'findOne', 'create', 'updateItem', 'finalize', 'cancel');
   const ctrl = new StockCountsController(svc as any);
 
+  it('findAll forwards scope + status', () => {
+    ctrl.findAll(scope, 'IN_PROGRESS');
+    expect(svc.findAll).toHaveBeenCalledWith(scope, 'IN_PROGRESS');
+  });
+  it('findOne forwards id + scope', () => {
+    ctrl.findOne('sc1', scope);
+    expect(svc.findOne).toHaveBeenCalledWith('sc1', scope);
+  });
   it('create forwards dto, tenantId, branch, actor', () => {
     const dto = {} as any;
     ctrl.create(dto, req as any, scope);
     expect(svc.create).toHaveBeenCalledWith(dto, 't1', 'b1', 'u1');
   });
-  it('updateItem forwards both ids, dto, tenantId', () => {
+  it('updateItem forwards both ids, dto, scope', () => {
     const dto = { countedQty: 5 } as any;
-    ctrl.updateItem('sc1', 'item1', dto, req as any);
-    expect(svc.updateItem).toHaveBeenCalledWith('sc1', 'item1', dto, 't1');
+    ctrl.updateItem('sc1', 'item1', dto, scope);
+    expect(svc.updateItem).toHaveBeenCalledWith('sc1', 'item1', dto, scope);
   });
-  it('finalize forwards id + tenantId', () => {
-    ctrl.finalize('sc1', req as any);
-    expect(svc.finalize).toHaveBeenCalledWith('sc1', 't1');
+  it('finalize forwards id + scope', () => {
+    ctrl.finalize('sc1', scope);
+    expect(svc.finalize).toHaveBeenCalledWith('sc1', scope);
+  });
+  it('cancel forwards id + scope', () => {
+    ctrl.cancel('sc1', scope);
+    expect(svc.cancel).toHaveBeenCalledWith('sc1', scope);
   });
 });
 
@@ -209,19 +250,19 @@ describe('WasteLogsController', () => {
   const svc = mocks('findAll', 'getSummary', 'create');
   const ctrl = new WasteLogsController(svc as any);
 
-  it('findAll forwards tenantId + query', () => {
+  it('findAll forwards scope + query', () => {
     const q = { limit: 100 } as any;
-    ctrl.findAll(req as any, q);
-    expect(svc.findAll).toHaveBeenCalledWith('t1', q);
+    ctrl.findAll(scope, q);
+    expect(svc.findAll).toHaveBeenCalledWith(scope, q);
   });
-  it('getSummary unwraps startDate/endDate', () => {
-    ctrl.getSummary(req as any, { startDate: '2026-01-01', endDate: '2026-02-01' } as any);
-    expect(svc.getSummary).toHaveBeenCalledWith('t1', '2026-01-01', '2026-02-01');
+  it('getSummary unwraps startDate/endDate on a scoped read', () => {
+    ctrl.getSummary(scope, { startDate: '2026-01-01', endDate: '2026-02-01' } as any);
+    expect(svc.getSummary).toHaveBeenCalledWith(scope, '2026-01-01', '2026-02-01');
   });
-  it('create forwards dto, tenantId, actor', () => {
+  it('create forwards dto, scope, actor', () => {
     const dto = { stockItemId: 's1', quantity: 1, reason: 'SPOILED' } as any;
-    ctrl.create(dto, req as any);
-    expect(svc.create).toHaveBeenCalledWith(dto, 't1', 'u1');
+    ctrl.create(dto, req as any, scope);
+    expect(svc.create).toHaveBeenCalledWith(dto, scope, 'u1');
   });
 });
 
@@ -229,15 +270,15 @@ describe('IngredientMovementsController', () => {
   const svc = mocks('findAll', 'create');
   const ctrl = new IngredientMovementsController(svc as any);
 
-  it('findAll forwards tenantId + query', () => {
+  it('findAll forwards scope + query', () => {
     const q = { type: 'IN' } as any;
-    ctrl.findAll(req as any, q);
-    expect(svc.findAll).toHaveBeenCalledWith('t1', q);
+    ctrl.findAll(scope, q);
+    expect(svc.findAll).toHaveBeenCalledWith(scope, q);
   });
-  it('create forwards dto + tenantId', () => {
+  it('create forwards dto + scope', () => {
     const dto = { stockItemId: 's1', type: 'IN', quantity: 1 } as any;
-    ctrl.create(dto, req as any);
-    expect(svc.create).toHaveBeenCalledWith(dto, 't1');
+    ctrl.create(dto, scope);
+    expect(svc.create).toHaveBeenCalledWith(dto, scope);
   });
 });
 
@@ -245,13 +286,17 @@ describe('StockDashboardController', () => {
   const svc = mocks('getDashboard', 'getValuation', 'getMovementSummary');
   const ctrl = new StockDashboardController(svc as any);
 
-  it('getDashboard forwards tenantId', () => {
-    ctrl.getDashboard(req as any);
-    expect(svc.getDashboard).toHaveBeenCalledWith('t1');
+  it('getDashboard forwards scope', () => {
+    ctrl.getDashboard(scope);
+    expect(svc.getDashboard).toHaveBeenCalledWith(scope);
   });
-  it('getMovementSummary unwraps the date window', () => {
-    ctrl.getMovementSummary(req as any, { startDate: '2026-01-01', endDate: '2026-02-01' } as any);
-    expect(svc.getMovementSummary).toHaveBeenCalledWith('t1', '2026-01-01', '2026-02-01');
+  it('getValuation forwards scope', () => {
+    ctrl.getValuation(scope);
+    expect(svc.getValuation).toHaveBeenCalledWith(scope);
+  });
+  it('getMovementSummary unwraps the date window on a scoped read', () => {
+    ctrl.getMovementSummary(scope, { startDate: '2026-01-01', endDate: '2026-02-01' } as any);
+    expect(svc.getMovementSummary).toHaveBeenCalledWith(scope, '2026-01-01', '2026-02-01');
   });
 });
 

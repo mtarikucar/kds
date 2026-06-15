@@ -163,6 +163,32 @@ describe('ZReportsService.generateReport (track-1 branch scope)', () => {
     expect(cashWhere.tenantId).toBe(TENANT);
     expect(cashWhere.branchId).toBe(BRANCH);
   });
+
+  /**
+   * v3 branch-isolation FOUNDATION: reportNumber is unique PER BRANCH
+   * (@@unique([tenantId, branchId, reportNumber])). Each branch closes its
+   * own fiscal day, so two branches on the SAME date must produce DISTINCT
+   * report numbers (the number embeds a stable per-branch token), and the
+   * write carries the report's branchId.
+   */
+  it('two branches on the same date produce DISTINCT, branch-tagged report numbers', async () => {
+    const captured: any[] = [];
+    (prisma.zReport.create as any).mockImplementation(async (args: any) => {
+      captured.push(args.data);
+      return { id: `zr-${args.data.branchId}`, ...args.data };
+    });
+
+    await svc.generateReport(TENANT, 'branch-alpha', USER, dto as any);
+    await svc.generateReport(TENANT, 'branch-beta', USER, dto as any);
+
+    expect(captured).toHaveLength(2);
+    // Same calendar day, different branch -> different reportNumber.
+    expect(captured[0].reportNumber).not.toBe(captured[1].reportNumber);
+    expect(captured[0].reportNumber).toMatch(/^Z-20260601-/);
+    expect(captured[1].reportNumber).toMatch(/^Z-20260601-/);
+    expect(captured[0].branchId).toBe('branch-alpha');
+    expect(captured[1].branchId).toBe('branch-beta');
+  });
 });
 
 /**
@@ -318,7 +344,11 @@ describe('ZReportsService.generateReport (characterization — aggregation total
     expect(data.branchId).toBe(BRANCH);
     expect(data.closedById).toBe(USER);
     expect(data.totalOrders).toBe(2);
-    expect(data.reportNumber).toBe('Z-20260601');
+    // v3 branch-scope: reportNumber now embeds a stable branch token so
+    // two branches closing the SAME calendar day produce DISTINCT numbers
+    // under @@unique([tenantId, branchId, reportNumber]). branchId 'b-1'
+    // -> token 'B1' (hyphens stripped, first 8 chars, upper-cased).
+    expect(data.reportNumber).toBe('Z-20260601-B1');
 
     // Sales totals (Decimal columns -> string compare)
     expect(str(data.totalSales)).toBe('130.4'); // 100.10 + 30.30

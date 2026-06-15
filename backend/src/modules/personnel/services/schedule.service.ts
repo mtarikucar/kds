@@ -66,9 +66,14 @@ export class ScheduleService {
     });
     if (!user) throw new NotFoundException("User not found in this tenant");
 
-    // Validate shift template belongs to tenant
+    // Validate shift template belongs to THIS BRANCH (not just the
+    // tenant). Scoping by tenantId alone let a B1 manager pass a B2
+    // template id and have the assignment silently land in B2 (the
+    // write path below derives branchId from the template). Spreading
+    // branchScope(scope) confines the lookup to the actor's active
+    // branch, so an out-of-branch template id 404s instead of leaking.
     const template = await this.prisma.shiftTemplate.findFirst({
-      where: { id: dto.shiftTemplateId, tenantId },
+      where: { id: dto.shiftTemplateId, ...branchScope(scope) },
     });
     if (!template) throw new NotFoundException("Shift template not found");
 
@@ -96,9 +101,15 @@ export class ScheduleService {
         },
       });
     } catch (error: any) {
+      // v3 branch-scope: the unique key is now [userId, date, branchId],
+      // so this P2002 only fires when the user is already assigned for the
+      // SAME date IN THE SAME branch — a user CAN now hold a shift in two
+      // different branches on the same date. ShiftAssignment carries no
+      // other unique constraint, so a P2002 here unambiguously maps to the
+      // per-(user, date, branch) collision below.
       if (error.code === "P2002") {
         throw new BadRequestException(
-          "User already has a shift assigned for this date",
+          "User already has a shift assigned for this date in this branch",
         );
       }
       throw error;
@@ -119,18 +130,23 @@ export class ScheduleService {
     return { successes, failures, total: dto.assignments.length };
   }
 
-  async remove(id: string, tenantId: string) {
+  async remove(scope: BranchScope, id: string) {
+    // Branch-scope the read AND the delete. Filtering on tenantId alone
+    // let a B1 manager delete a B2 branch's assignment by id (assignments
+    // are per-branch physical rows). branchScope(scope) confines both the
+    // existence check and the deleteMany to the actor's active branch, so
+    // an out-of-branch id 404s instead of being silently removed.
     const assignment = await this.prisma.shiftAssignment.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
 
     if (!assignment) {
       throw new NotFoundException("Shift assignment not found");
     }
 
-    // Defence-in-depth: tenantId in the WHERE (B41-B45 pattern).
+    // Defence-in-depth: branch scope in the WHERE (B41-B45 pattern).
     const result = await this.prisma.shiftAssignment.deleteMany({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
     if (result.count === 0) {
       throw new NotFoundException("Shift assignment not found");

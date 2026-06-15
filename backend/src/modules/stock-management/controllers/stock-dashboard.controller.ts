@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Request, UseGuards } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
@@ -13,6 +13,8 @@ import { StockDashboardService } from "../services/stock-dashboard.service";
 // / endDate with @IsDateString. ValidationPipe rejects bad strings at
 // the boundary; the service-side parseWindow adds NaN defense + 366d cap.
 import { WasteLogsSummaryQueryDto } from "../dto/list-stock-logs.dto";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 
 @ApiTags("stock-management/dashboard")
 @ApiBearerAuth()
@@ -25,23 +27,26 @@ export class StockDashboardController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get stock management dashboard overview" })
-  getDashboard(@Request() req) {
-    return this.service.getDashboard(req.tenantId);
+  getDashboard(@CurrentScope() scope: BranchScope) {
+    return this.service.getDashboard(scope);
   }
 
   @Get("valuation")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get inventory valuation" })
-  getValuation(@Request() req) {
-    return this.service.getValuation(req.tenantId);
+  getValuation(@CurrentScope() scope: BranchScope) {
+    return this.service.getValuation(scope);
   }
 
   @Get("movement-summary")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get movement summary by type" })
-  getMovementSummary(@Request() req, @Query() query: WasteLogsSummaryQueryDto) {
+  getMovementSummary(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: WasteLogsSummaryQueryDto,
+  ) {
     return this.service.getMovementSummary(
-      req.tenantId,
+      scope,
       query.startDate,
       query.endDate,
     );

@@ -211,10 +211,22 @@ export class ZReportsService {
     } = totals;
 
     // Create the Z-Report. The `findFirst` above is a fast-path dedupe;
-    // the schema has `@@unique([tenantId, reportNumber])` and the report
-    // number is deterministic per `(tenant, reportDate)`, so a concurrent
-    // second generate surfaces as P2002 here — translate it to the same
-    // "already exists" business error rather than a raw 500.
+    // the schema now has `@@unique([tenantId, branchId, reportNumber])`
+    // (v3 branch-scope: each branch closes its own fiscal day). The report
+    // number is deterministic per `(branch, reportDate)` — we embed a
+    // stable branch token so two branches closing the SAME calendar day
+    // produce DISTINCT report numbers (no longer colliding tenant-wide),
+    // while a concurrent second generate for the SAME branch+date still
+    // surfaces as P2002 here — translated to the same "already exists"
+    // business error rather than a raw 500.
+    const reportDay = new Date(reportDate)
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, "");
+    // Stable, branch-distinct token. branchId is a UUID; its leading
+    // segment is unique enough within a tenant to disambiguate per-branch
+    // report numbers while keeping the value deterministic per branch.
+    const branchToken = branchId.replace(/-/g, "").slice(0, 8).toUpperCase();
     let report;
     try {
       report = await this.prisma.zReport.create({
@@ -222,7 +234,7 @@ export class ZReportsService {
           tenantId,
           branchId,
           reportDate: new Date(reportDate),
-          reportNumber: `Z-${new Date(reportDate).toISOString().slice(0, 10).replace(/-/g, "")}`,
+          reportNumber: `Z-${reportDay}-${branchToken}`,
           closedById: userId,
 
           // Sales data

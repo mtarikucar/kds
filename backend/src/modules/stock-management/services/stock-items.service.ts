@@ -8,13 +8,14 @@ import { CreateStockItemDto } from "../dto/create-stock-item.dto";
 import { UpdateStockItemDto } from "../dto/update-stock-item.dto";
 import { StockItemQueryDto } from "../dto/stock-item-query.dto";
 import { Prisma } from "@prisma/client";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class StockItemsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, query: StockItemQueryDto) {
-    const where: Prisma.StockItemWhereInput = { tenantId };
+  async findAll(scope: BranchScope, query: StockItemQueryDto) {
+    const where: Prisma.StockItemWhereInput = { ...branchScope(scope) };
 
     if (query.search) {
       where.OR = [
@@ -39,9 +40,9 @@ export class StockItemsService {
     });
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, scope: BranchScope) {
     const item = await this.prisma.stockItem.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         category: true,
         batches: {
@@ -57,22 +58,24 @@ export class StockItemsService {
 
   async create(dto: CreateStockItemDto, tenantId: string, branchId: string) {
     return this.prisma.stockItem.create({
-      // Empty-string SKU collides on the @@unique([tenantId, sku])
-      // constraint while null is allowed to repeat. Normalise here.
+      // v3 branch-scope: SKU uniqueness is the compound
+      // @@unique([tenantId, branchId, sku]) — branch A and branch B may
+      // each carry SKU "COKE". Empty-string SKU still collides within a
+      // branch while null is allowed to repeat, so normalise to null here.
       data: { ...dto, sku: dto.sku ? dto.sku : null, tenantId, branchId },
       include: { category: true },
     });
   }
 
-  async update(id: string, dto: UpdateStockItemDto, tenantId: string) {
-    await this.findOne(id, tenantId);
+  async update(id: string, dto: UpdateStockItemDto, scope: BranchScope) {
+    await this.findOne(id, scope);
     const data = "sku" in dto ? { ...dto, sku: dto.sku ? dto.sku : null } : dto;
-    // Defence-in-depth: tenant filter in the update's own WHERE so the
-    // pre-check can't be the *only* tenant guard. updateMany + count
+    // Defence-in-depth: branch filter in the update's own WHERE so the
+    // pre-check can't be the *only* scope guard. updateMany + count
     // check (TOCTOU-safe) — if the row was deleted between the pre-check
     // and the update, we throw instead of silently failing.
     const result = await this.prisma.stockItem.updateMany({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       data,
     });
     if (result.count === 0) {
@@ -84,12 +87,14 @@ export class StockItemsService {
     });
   }
 
-  async remove(id: string, tenantId: string) {
-    await this.findOne(id, tenantId);
+  async remove(id: string, scope: BranchScope) {
+    await this.findOne(id, scope);
 
-    // Prevent deletion of stock items used in active recipes
+    // Prevent deletion of stock items used in active recipes (scope the
+    // recipe lookup to the same branch — a recipe in another branch must
+    // not be able to block this branch's delete, nor leak its name).
     const recipeUsage = await this.prisma.recipeIngredient.findFirst({
-      where: { stockItemId: id, recipe: { tenantId } },
+      where: { stockItemId: id, recipe: { ...branchScope(scope) } },
       include: { recipe: { select: { name: true } } },
     });
     if (recipeUsage) {
@@ -100,7 +105,7 @@ export class StockItemsService {
 
     // Compound-filter delete — see comment in update().
     const result = await this.prisma.stockItem.deleteMany({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
     if (result.count === 0) {
       throw new NotFoundException("Stock item not found");
@@ -108,20 +113,23 @@ export class StockItemsService {
     return { id };
   }
 
-  async findLowStockItems(tenantId: string) {
-    // Use raw query for comparing two columns
+  async findLowStockItems(scope: BranchScope) {
+    // Use raw query for comparing two columns. Branch-fenced: both the
+    // tenantId AND branchId predicates are bound parameters so a
+    // low-stock list never bleeds another branch's items.
     return this.prisma.$queryRaw`
       SELECT si.*, sic.name as "categoryName"
       FROM stock_items si
       LEFT JOIN stock_item_categories sic ON si."categoryId" = sic.id
-      WHERE si."tenantId" = ${tenantId}
+      WHERE si."tenantId" = ${scope.tenantId}
+        AND si."branchId" = ${scope.branchId}
         AND si."isActive" = true
         AND si."currentStock" <= si."minStock"
       ORDER BY si."currentStock" ASC
     `;
   }
 
-  async findExpiringSoon(tenantId: string, days: number = 3) {
+  async findExpiringSoon(scope: BranchScope, days: number = 3) {
     const alertDate = new Date();
     alertDate.setDate(alertDate.getDate() + days);
 
@@ -134,7 +142,7 @@ export class StockItemsService {
     // to SKUs the operator actually opted into expiry tracking for.
     return this.prisma.stockBatch.findMany({
       where: {
-        tenantId,
+        ...branchScope(scope),
         quantity: { gt: 0 },
         expiryDate: { lte: alertDate, gte: new Date() },
         stockItem: { trackExpiry: true },

@@ -694,9 +694,15 @@ export class AnalyticsGateway
       const [cellX, cellZ] = key.split("-").map(Number);
 
       await this.prisma.trafficFlowRecord.upsert({
+        // v3 branch-scope: traffic-flow cells are unique PER BRANCH
+        // (@@unique([tenantId, branchId, hourBucket, cellX, cellZ])), so
+        // the upsert target MUST include branchId — otherwise two branches
+        // streaming into the same cell/hour would clobber each other's
+        // aggregates instead of maintaining independent per-branch rows.
         where: {
-          tenantId_hourBucket_cellX_cellZ: {
+          tenantId_branchId_hourBucket_cellX_cellZ: {
             tenantId,
+            branchId,
             hourBucket,
             cellX,
             cellZ,

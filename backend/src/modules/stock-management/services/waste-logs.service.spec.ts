@@ -24,6 +24,15 @@ import {
  */
 describe("WasteLogsService", () => {
   const TENANT = "tenant-1";
+  const BRANCH = "branch-1";
+  // v3 branch-scope: read aggregates take a BranchScope; branchScope(scope)
+  // fences the where on (tenantId, branchId).
+  const SCOPE = {
+    tenantId: TENANT,
+    branchId: BRANCH,
+    userId: "user-1",
+    role: "ADMIN",
+  } as const;
   let prisma: MockPrismaClient;
   let svc: WasteLogsService;
 
@@ -87,7 +96,7 @@ describe("WasteLogsService", () => {
             quantity: 5,
             reason: WasteReason.SPOILED,
           } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow(ConflictException);
       // No waste log / movement booked when the guard fails.
@@ -102,7 +111,7 @@ describe("WasteLogsService", () => {
       await expect(
         svc.create(
           { stockItemId: "x", quantity: 1, reason: WasteReason.EXPIRED } as any,
-          TENANT,
+          { tenantId: TENANT, branchId: "br-1" } as any,
         ),
       ).rejects.toThrow("Stock item not found");
       expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
@@ -124,7 +133,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 3, reason: WasteReason.DAMAGED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       expect(tx.stockBatch.findMany).toHaveBeenCalledWith(
@@ -132,6 +141,7 @@ describe("WasteLogsService", () => {
           where: {
             stockItemId: "si-1",
             tenantId: TENANT,
+            branchId: "br-1",
             quantity: { gt: 0 },
           },
           orderBy: [
@@ -163,7 +173,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 5, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // Exactly two batch decrements (4 then 1), in order.
@@ -198,7 +208,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 3, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       const batchCalls = (tx.stockBatch.updateMany as any).mock.calls;
@@ -230,7 +240,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 4, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // weightedAcc only counts b2's take (4 @10) since b1 was skipped.
@@ -255,7 +265,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 2, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       // weightedCostAcc stays 0 → fall back to stockItem.costPerUnit=7.
@@ -278,7 +288,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 2, reason: WasteReason.SPOILED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       const wasteArg = (tx.wasteLog.create as any).mock.calls[0][0];
@@ -309,7 +319,7 @@ describe("WasteLogsService", () => {
           reason: WasteReason.EXPIRED,
           notes: "moldy",
         } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-9" } as any,
         "user-7",
       );
 
@@ -344,7 +354,7 @@ describe("WasteLogsService", () => {
 
       await svc.create(
         { stockItemId: "si-1", quantity: 1, reason: WasteReason.DAMAGED } as any,
-        TENANT,
+        { tenantId: TENANT, branchId: "br-1" } as any,
       );
 
       const movArg = (tx.ingredientMovement.create as any).mock.calls[0][0];
@@ -357,12 +367,17 @@ describe("WasteLogsService", () => {
       (prisma.wasteLog.findMany as any).mockResolvedValue([]);
     });
 
-    it("maps stockItemId + reason into where with default take 500", async () => {
-      await svc.findAll(TENANT, { stockItemId: "si-1", reason: "EXPIRED" });
+    it("maps stockItemId + reason into a branch-fenced where with default take 500", async () => {
+      await svc.findAll(SCOPE, { stockItemId: "si-1", reason: "EXPIRED" });
 
       expect(prisma.wasteLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { tenantId: TENANT, stockItemId: "si-1", reason: "EXPIRED" },
+          where: {
+            tenantId: TENANT,
+            branchId: BRANCH,
+            stockItemId: "si-1",
+            reason: "EXPIRED",
+          },
           take: 500,
           skip: 0,
           orderBy: { createdAt: "desc" },
@@ -372,8 +387,17 @@ describe("WasteLogsService", () => {
 
     it("rejects an invalid endDate", async () => {
       await expect(
-        svc.findAll(TENANT, { endDate: "2025-02-30T99:99" }),
+        svc.findAll(SCOPE, { endDate: "2025-02-30T99:99" }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it("does NOT find a cross-branch waste log (branchId fences the read)", async () => {
+      await svc.findAll(SCOPE, {});
+      const arg = (prisma.wasteLog.findMany as any).mock.calls[0][0];
+      // The where carries OUR branchId, so a row written under another
+      // branch can never match — Prisma applies the compound predicate.
+      expect(arg.where.branchId).toBe(BRANCH);
+      expect(arg.where.tenantId).toBe(TENANT);
     });
   });
 
@@ -388,15 +412,22 @@ describe("WasteLogsService", () => {
       });
       (prisma.wasteLog.findMany as any).mockResolvedValue([{ id: "wl-1" }]);
 
-      const res = await svc.getSummary(TENANT, "2024-01-01", "2024-01-31");
+      const res = await svc.getSummary(SCOPE, "2024-01-01", "2024-01-31");
 
       expect(res.totalCost).toBe(0);
       expect(res.totalCount).toBe(7);
       expect(res.byReason).toHaveLength(1);
       expect(res.recentLogs).toEqual([{ id: "wl-1" }]);
-      // window applied to the aggregate where.createdAt.
+      // window applied to the aggregate where.createdAt, and the where is
+      // branch-fenced across groupBy + aggregate + recentLogs.
       const aggArg = (prisma.wasteLog.aggregate as any).mock.calls[0][0];
       expect(aggArg.where.createdAt.gte).toEqual(new Date("2024-01-01"));
+      expect(aggArg.where.tenantId).toBe(TENANT);
+      expect(aggArg.where.branchId).toBe(BRANCH);
+      const grpArg = (prisma.wasteLog.groupBy as any).mock.calls[0][0];
+      expect(grpArg.where.branchId).toBe(BRANCH);
+      const recentArg = (prisma.wasteLog.findMany as any).mock.calls[0][0];
+      expect(recentArg.where.branchId).toBe(BRANCH);
     });
 
     it("passes through a non-null totalCost unchanged", async () => {
@@ -407,7 +438,7 @@ describe("WasteLogsService", () => {
       });
       (prisma.wasteLog.findMany as any).mockResolvedValue([]);
 
-      const res = await svc.getSummary(TENANT);
+      const res = await svc.getSummary(SCOPE);
       expect(res.totalCost).toBe(42.5);
     });
   });

@@ -163,28 +163,30 @@ describe("ZReportSchedulerService", () => {
   // ---------------------------------------------------------------------------
   // Idempotency / no double-run
   // ---------------------------------------------------------------------------
-  describe("idempotency / dedup", () => {
-    it("SKIPS a tenant that already has a FINALIZED report for today (tenant-tz midnight)", async () => {
+  describe("idempotency / dedup (now PER BRANCH)", () => {
+    it("SKIPS a branch that already has a FINALIZED report for today (tenant-tz midnight)", async () => {
       prisma.tenant.findMany.mockResolvedValue([eligibleTenant()] as any);
       prisma.branch.findMany.mockResolvedValue([{ id: "b-1" }] as any);
       prisma.zReport.findFirst.mockResolvedValue({ id: "zr-existing" } as any);
 
       await svc.handleZReportEmails();
 
-      // dedup read keyed on tenant id + tenant-tz midnight + isFinalized.
+      // dedup read keyed on tenant id + BRANCH id + tenant-tz midnight +
+      // isFinalized — the leak fix adds branchId to the predicate.
       const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
       expect(where.tenantId).toBe("t-1");
+      expect(where.branchId).toBe("b-1");
       expect(where.isFinalized).toBe(true);
       expect(where.reportDate.getTime()).toBe(
         getTenantMidnight(NOW, "UTC").getTime(),
       );
-      // and because a finalized report exists, no generation happens.
+      // and because this branch's finalized report exists, no generation.
       expect(zReports.generateAndSendReport).not.toHaveBeenCalled();
     });
 
     it("PROCEEDS when only a NON-finalized report exists (dedup keys on isFinalized)", async () => {
       // The dedup query itself filters isFinalized:true, so a draft/un-
-      // finalized row returns null here and the tenant is still processed.
+      // finalized row returns null here and the branch is still processed.
       prisma.tenant.findMany.mockResolvedValue([eligibleTenant()] as any);
       prisma.branch.findMany.mockResolvedValue([{ id: "b-1" }] as any);
       prisma.zReport.findFirst.mockResolvedValue(null); // finalized:true -> none
@@ -192,6 +194,42 @@ describe("ZReportSchedulerService", () => {
       await svc.handleZReportEmails();
 
       expect(zReports.generateAndSendReport).toHaveBeenCalledTimes(1);
+    });
+
+    it("LEAK FIX: one branch already closed does NOT skip the tenant's other branches", async () => {
+      // The bug: a tenant-level done-check {tenantId, reportDate,
+      // isFinalized} (no branchId) dropped the WHOLE tenant the instant
+      // ANY one branch finalized. Now the check is per-branch, so b-1
+      // (done) is skipped while b-2 and b-3 still generate.
+      prisma.tenant.findMany.mockResolvedValue([eligibleTenant()] as any);
+      prisma.branch.findMany.mockResolvedValue([
+        { id: "b-1" },
+        { id: "b-2" },
+        { id: "b-3" },
+      ] as any);
+      prisma.zReport.findFirst.mockImplementation(async ({ where }: any) =>
+        where.branchId === "b-1" ? ({ id: "zr-b1-done" } as any) : null,
+      );
+
+      await svc.handleZReportEmails();
+
+      const branchArgs = zReports.generateAndSendReport.mock.calls.map(
+        (c) => c[1],
+      );
+      // b-1 is deduped; b-2 and b-3 still close.
+      expect(branchArgs).toEqual(["b-2", "b-3"]);
+    });
+
+    it("the per-branch dedup is also tenant-scoped (no cross-tenant collision)", async () => {
+      prisma.tenant.findMany.mockResolvedValue([eligibleTenant()] as any);
+      prisma.branch.findMany.mockResolvedValue([{ id: "b-1" }] as any);
+      prisma.zReport.findFirst.mockResolvedValue(null);
+
+      await svc.handleZReportEmails();
+
+      const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
+      expect(where.tenantId).toBe("t-1");
+      expect(where.branchId).toBe("b-1");
     });
   });
 

@@ -133,12 +133,25 @@ export class TablesController {
   @ApiOperation({
     summary: "Get available tables for customer selection (no auth required)",
   })
+  @ApiQuery({
+    name: "branchId",
+    required: false,
+    description:
+      "Branch to list tables for; defaults to the tenant's oldest-active branch",
+  })
   @ApiResponse({
     status: 200,
     description: "List of available tables for customers",
   })
-  getPublicTables(@Param("tenantId") tenantId: string) {
-    return this.tablesService.findAvailableForCustomers(tenantId);
+  getPublicTables(
+    @Param("tenantId") tenantId: string,
+    @Query("branchId") branchId?: string,
+  ) {
+    // Anonymous read — no @CurrentScope. The optional branchId narrows
+    // the listing to one branch; the service validates it belongs to the
+    // tenant (else oldest-active fallback) so a guest can't enumerate or
+    // mix in another tenant's / archived branch's tables.
+    return this.tablesService.findAvailableForCustomers(tenantId, branchId);
   }
 
   @Get(":id")

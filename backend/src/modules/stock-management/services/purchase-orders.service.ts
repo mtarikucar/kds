@@ -12,6 +12,7 @@ import {
   PurchaseOrderStatus,
   IngredientMovementType,
 } from "../../../common/constants/stock-management.enum";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 type Tx = Prisma.TransactionClient;
 
@@ -77,8 +78,8 @@ export class PurchaseOrdersService {
     return `${settings.poNumberPrefix}-${seq}`;
   }
 
-  async findAll(tenantId: string, status?: string) {
-    const where: Prisma.PurchaseOrderWhereInput = { tenantId };
+  async findAll(scope: BranchScope, status?: string) {
+    const where: Prisma.PurchaseOrderWhereInput = { ...branchScope(scope) };
     if (status) where.status = status;
 
     return this.prisma.purchaseOrder.findMany({
@@ -95,9 +96,9 @@ export class PurchaseOrdersService {
     });
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, scope: BranchScope) {
     const po = await this.prisma.purchaseOrder.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         supplier: true,
         items: {
@@ -174,20 +175,21 @@ export class PurchaseOrdersService {
     });
   }
 
-  async submit(id: string, tenantId: string) {
-    const po = await this.findOne(id, tenantId);
+  async submit(id: string, scope: BranchScope) {
+    const po = await this.findOne(id, scope);
     if (po.status !== PurchaseOrderStatus.DRAFT) {
       throw new BadRequestException(
         "Only draft purchase orders can be submitted",
       );
     }
 
-    // Atomic claim with tenant + status predicate — if a parallel call
+    // Atomic claim with branch + status predicate — if a parallel call
     // already submitted this PO (or it slipped to another state), the
     // updateMany returns 0 and we abort instead of clobbering a more
-    // advanced status. Also serves as the IDOR guard (tenantId filter).
+    // advanced status. Also serves as the IDOR guard ((tenantId,
+    // branchId) filter).
     const result = await this.prisma.purchaseOrder.updateMany({
-      where: { id, tenantId, status: PurchaseOrderStatus.DRAFT },
+      where: { id, ...branchScope(scope), status: PurchaseOrderStatus.DRAFT },
       data: { status: PurchaseOrderStatus.SUBMITTED, submittedAt: new Date() },
     });
     if (result.count === 0) {
@@ -211,13 +213,14 @@ export class PurchaseOrdersService {
   async receive(
     id: string,
     dto: ReceivePurchaseOrderDto,
-    tenantId: string,
+    scope: BranchScope,
     userId?: string,
   ) {
     // Cheap pre-flight rejection so the obvious "wrong status" case
     // doesn't burn a Serializable txn. The in-txn re-read below is
-    // what actually guards the race.
-    const po = await this.findOne(id, tenantId);
+    // what actually guards the race. findOne is branch-fenced, so a
+    // cross-branch PO id is rejected before any stock is mutated.
+    const po = await this.findOne(id, scope);
     if (
       po.status !== PurchaseOrderStatus.SUBMITTED &&
       po.status !== PurchaseOrderStatus.PARTIALLY_RECEIVED
@@ -327,8 +330,8 @@ export class PurchaseOrdersService {
                 : undefined,
               stockItemId: poItem.stockItemId,
               purchaseOrderItemId: poItem.id,
-              tenantId,
-              branchId: poItem.stockItem.branchId,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
             },
           });
 
@@ -341,8 +344,8 @@ export class PurchaseOrdersService {
               referenceType: "PURCHASE_ORDER",
               referenceId: po.id,
               stockItemId: poItem.stockItemId,
-              branchId: poItem.stockItem.branchId,
-              tenantId,
+              branchId: scope.branchId,
+              tenantId: scope.tenantId,
               createdById: userId,
             },
           });
@@ -398,8 +401,8 @@ export class PurchaseOrdersService {
    * PO_CANCEL_REVERSAL movements — prior behaviour just logged a
    * warning and left stock inflated forever.
    */
-  async cancel(id: string, tenantId: string, userId?: string) {
-    const po = await this.findOne(id, tenantId);
+  async cancel(id: string, scope: BranchScope, userId?: string) {
+    const po = await this.findOne(id, scope);
     if (
       po.status === PurchaseOrderStatus.RECEIVED ||
       po.status === PurchaseOrderStatus.CANCELLED
@@ -431,8 +434,8 @@ export class PurchaseOrdersService {
             referenceType: "PURCHASE_ORDER",
             referenceId: po.id,
             stockItemId: item.stockItemId,
-            branchId: item.stockItem.branchId,
-            tenantId,
+            branchId: scope.branchId,
+            tenantId: scope.tenantId,
             createdById: userId,
           },
         });

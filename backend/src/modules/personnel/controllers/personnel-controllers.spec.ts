@@ -10,8 +10,8 @@ import { BranchScope } from "../../../common/scoping/branch-scope";
  * Long-tail forwarding spec for the remaining personnel controllers. Load-
  * bearing: every endpoint threads the BranchScope (these are branch-scoped
  * resources); schedule reads destructure query.weekStart; bulk-assign and
- * single-assign route to their distinct service methods; remove passes the
- * scope's tenantId.
+ * single-assign route to their distinct service methods; remove threads the
+ * full BranchScope (branch-scoped delete).
  */
 const scope = { tenantId: "t1", branchId: "b1" } as unknown as BranchScope;
 
@@ -85,8 +85,8 @@ describe("ScheduleController", () => {
     expect(svc.assignBulk).toHaveBeenCalledWith(scope, bulk);
   });
 
-  it("remove passes the scope's tenantId", () => {
+  it("remove threads the full scope (branch-scoped delete)", () => {
     ctrl.remove(scope, "asg-1");
-    expect(svc.remove).toHaveBeenCalledWith("asg-1", "t1");
+    expect(svc.remove).toHaveBeenCalledWith(scope, "asg-1");
   });
 });

@@ -22,6 +22,15 @@ describe('StockDashboardService.getMovementSummary (iter-95)', () => {
   let stockAlerts: any;
   let svc: StockDashboardService;
 
+  // v3 branch-scope: dashboard aggregates take a BranchScope; branchScope
+  // fences every aggregate on (tenantId, branchId).
+  const SCOPE = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'u1',
+    role: 'ADMIN',
+  } as const;
+
   beforeEach(() => {
     prisma = {
       ingredientMovement: { groupBy: jest.fn().mockResolvedValue([]) },
@@ -32,38 +41,103 @@ describe('StockDashboardService.getMovementSummary (iter-95)', () => {
 
   it('rejects an Invalid-Date startDate', async () => {
     await expect(
-      svc.getMovementSummary('t1', 'totally-not-an-iso-string'),
+      svc.getMovementSummary(SCOPE, 'totally-not-an-iso-string'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects an Invalid-Date endDate', async () => {
     await expect(
-      svc.getMovementSummary('t1', undefined, 'still-not-a-date'),
+      svc.getMovementSummary(SCOPE, undefined, 'still-not-a-date'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects startDate > endDate', async () => {
     await expect(
-      svc.getMovementSummary('t1', '2026-06-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+      svc.getMovementSummary(SCOPE, '2026-06-01T00:00:00Z', '2026-01-01T00:00:00Z'),
     ).rejects.toThrow(/before or equal/);
   });
 
   it('rejects a window > 366 days (the IngredientMovement-table DoS lever)', async () => {
     await expect(
-      svc.getMovementSummary('t1', '2024-01-01T00:00:00Z', '2025-06-01T00:00:00Z'),
+      svc.getMovementSummary(SCOPE, '2024-01-01T00:00:00Z', '2025-06-01T00:00:00Z'),
     ).rejects.toThrow(/366 days/);
   });
 
-  it('forwards a valid window to the Prisma groupBy', async () => {
-    await svc.getMovementSummary('t1', '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z');
+  it('forwards a valid window to a branch-fenced Prisma groupBy', async () => {
+    await svc.getMovementSummary(SCOPE, '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z');
     const where = prisma.ingredientMovement.groupBy.mock.calls[0][0].where;
     expect(where.createdAt.gte).toEqual(new Date('2026-01-01T00:00:00Z'));
     expect(where.createdAt.lte).toEqual(new Date('2026-02-01T00:00:00Z'));
+    expect(where.tenantId).toBe('t1');
+    expect(where.branchId).toBe('b1');
   });
 
-  it('omits createdAt when no dates supplied', async () => {
-    await svc.getMovementSummary('t1');
+  it('omits createdAt when no dates supplied but still fences by branch', async () => {
+    await svc.getMovementSummary(SCOPE);
     const where = prisma.ingredientMovement.groupBy.mock.calls[0][0].where;
     expect(where.createdAt).toBeUndefined();
+    expect(where.tenantId).toBe('t1');
+    expect(where.branchId).toBe('b1');
+  });
+});
+
+/**
+ * v3 branch-scope: getDashboard + getValuation must fence every count /
+ * aggregate on (tenantId, branchId) AND pass the branchId down to the
+ * stock-alerts low-stock + expiry feeds.
+ */
+describe('StockDashboardService.getDashboard / getValuation — branch fence', () => {
+  const SCOPE = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'u1',
+    role: 'ADMIN',
+  } as const;
+
+  function makePrisma() {
+    return {
+      stockItem: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      ingredientMovement: { findMany: jest.fn().mockResolvedValue([]) },
+      wasteLog: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { cost: null }, _count: 0 }),
+      },
+      purchaseOrder: { count: jest.fn().mockResolvedValue(0) },
+    } as any;
+  }
+
+  it('getDashboard fences counts/aggregates and forwards branchId to stock-alerts', async () => {
+    const prisma = makePrisma();
+    const stockAlerts = {
+      checkLowStock: jest.fn().mockResolvedValue([]),
+      checkExpiringBatches: jest.fn().mockResolvedValue([]),
+    } as any;
+    const svc = new StockDashboardService(prisma, stockAlerts);
+
+    await svc.getDashboard(SCOPE);
+
+    // Every stockItem.count where is branch-fenced.
+    for (const call of prisma.stockItem.count.mock.calls) {
+      expect(call[0].where.tenantId).toBe('t1');
+      expect(call[0].where.branchId).toBe('b1');
+    }
+    expect(prisma.purchaseOrder.count.mock.calls[0][0].where.branchId).toBe('b1');
+    expect(prisma.ingredientMovement.findMany.mock.calls[0][0].where.branchId).toBe('b1');
+    expect(prisma.wasteLog.aggregate.mock.calls[0][0].where.branchId).toBe('b1');
+    // stock-alerts receives the branchId so its feeds are branch-scoped.
+    expect(stockAlerts.checkLowStock).toHaveBeenCalledWith('t1', 'b1');
+    expect(stockAlerts.checkExpiringBatches).toHaveBeenCalledWith('t1', undefined, 'b1');
+  });
+
+  it('getValuation fences the stockItem.findMany on (tenantId, branchId)', async () => {
+    const prisma = makePrisma();
+    const svc = new StockDashboardService(prisma, {} as any);
+    await svc.getValuation(SCOPE);
+    const where = prisma.stockItem.findMany.mock.calls[0][0].where;
+    expect(where.tenantId).toBe('t1');
+    expect(where.branchId).toBe('b1');
+    expect(where.isActive).toBe(true);
   });
 });

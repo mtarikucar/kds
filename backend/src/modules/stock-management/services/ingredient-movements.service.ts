@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateIngredientMovementDto } from "../dto/create-ingredient-movement.dto";
 import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 // Iter-92: same window cap as waste-logs / analytics / reports. Bounds
 // the worst-case findMany scan on a chain tenant with years of movement
@@ -51,7 +52,7 @@ export class IngredientMovementsService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(
-    tenantId: string,
+    scope: BranchScope,
     filters?: {
       stockItemId?: string;
       type?: string;
@@ -61,7 +62,7 @@ export class IngredientMovementsService {
       offset?: number;
     },
   ) {
-    const where: any = { tenantId };
+    const where: any = { ...branchScope(scope) };
 
     if (filters?.stockItemId) where.stockItemId = filters.stockItemId;
     if (filters?.type) where.type = filters.type;
@@ -86,10 +87,10 @@ export class IngredientMovementsService {
     });
   }
 
-  async create(dto: CreateIngredientMovementDto, tenantId: string) {
+  async create(dto: CreateIngredientMovementDto, scope: BranchScope) {
     return this.prisma.$transaction(async (tx) => {
       const stockItem = await tx.stockItem.findFirst({
-        where: { id: dto.stockItemId, tenantId },
+        where: { id: dto.stockItemId, ...branchScope(scope) },
       });
       if (!stockItem) throw new BadRequestException("Stock item not found");
 
@@ -116,7 +117,7 @@ export class IngredientMovementsService {
       const updated = await tx.stockItem.updateMany({
         where: {
           id: stockItem.id,
-          tenantId,
+          ...branchScope(scope),
           currentStock: stockItem.currentStock,
         },
         data: { currentStock: newStock },
@@ -134,7 +135,7 @@ export class IngredientMovementsService {
           costPerUnit: dto.costPerUnit,
           notes: dto.notes,
           stockItemId: dto.stockItemId,
-          tenantId,
+          tenantId: scope.tenantId,
           branchId: stockItem.branchId,
         },
         include: {

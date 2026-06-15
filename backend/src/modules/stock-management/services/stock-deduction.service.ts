@@ -55,7 +55,13 @@ export class StockDeductionService {
           include: {
             product: {
               include: {
-                recipe: {
+                // v3 branch-scope: a product carries one recipe PER BRANCH
+                // (@@unique([productId, branchId])), so the relation is now
+                // one-to-many. We can't reference order.branchId from inside
+                // the query that fetches the order, so we pull the product's
+                // recipe(s) and buildDeductions selects the row matching the
+                // order's branch.
+                recipes: {
                   include: { ingredients: { include: { stockItem: true } } },
                 },
               },
@@ -114,7 +120,12 @@ export class StockDeductionService {
   private buildDeductions(order: any): Deduction[] {
     const acc = new Map<string, Deduction>();
     for (const orderItem of order.orderItems) {
-      const recipe = orderItem.product?.recipe;
+      // v3 branch-scope: products may carry one recipe per branch, so pick
+      // the recipe belonging to THIS order's branch. Deducting from another
+      // branch's recipe would draw down the wrong branch's stock.
+      const recipe = (orderItem.product?.recipes ?? []).find(
+        (r: any) => r.branchId === order.branchId,
+      );
       if (!recipe) continue;
       const yieldVal = recipe.yield || 1;
       for (const ingredient of recipe.ingredients) {
