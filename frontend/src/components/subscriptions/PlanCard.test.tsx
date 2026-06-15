@@ -140,6 +140,70 @@ describe('PlanCard', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('spells the currency code out next to the price', () => {
+    render(
+      <PlanCard
+        plan={makePlan()}
+        billingCycle={BillingCycle.MONTHLY}
+        onSelectPlan={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('₺100.00')).toBeInTheDocument();
+    // ISO code shown alongside the symbol so the rail is unambiguous.
+    expect(screen.getByText('TRY')).toBeInTheDocument();
+  });
+
+  it('badges a non-TRY plan as bank-transfer-only and shows the USD code', () => {
+    render(
+      <PlanCard
+        plan={makePlan({ currency: 'USD' })}
+        billingCycle={BillingCycle.MONTHLY}
+        onSelectPlan={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Havale ile ödeme')).toBeInTheDocument();
+    expect(screen.getByText('USD')).toBeInTheDocument();
+    // USD symbol used, not the TRY symbol.
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+  });
+
+  it('does NOT show the bank-transfer badge for a TRY plan', () => {
+    render(
+      <PlanCard
+        plan={makePlan({ currency: 'TRY' })}
+        billingCycle={BillingCycle.MONTHLY}
+        onSelectPlan={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Havale ile ödeme')).toBeNull();
+  });
+
+  it('guards the CTA as a dead-end when selectDisabledHint is set (no select fires)', () => {
+    const onSelect = vi.fn();
+    render(
+      <PlanCard
+        plan={makePlan({ currency: 'USD' })}
+        billingCycle={BillingCycle.MONTHLY}
+        onSelectPlan={onSelect}
+        buttonText="Select Pro"
+        selectDisabledHint="Bu plan için ödeme yöntemi yapılandırılmamış"
+      />,
+    );
+
+    const cta = screen.getByRole('button', { name: 'Select Pro' });
+    expect(cta).toBeDisabled();
+    expect(cta).toHaveAttribute('title', 'Bu plan için ödeme yöntemi yapılandırılmamış');
+    fireEvent.click(cta);
+    expect(onSelect).not.toHaveBeenCalled();
+    // Visible explanatory hint under the CTA.
+    expect(
+      screen.getByText('Bu plan için ödeme yöntemi yapılandırılmamış'),
+    ).toBeInTheDocument();
+  });
+
   it('renders the discounted total with the original price struck through', () => {
     const plan = makePlan({
       discount: {

@@ -51,16 +51,32 @@ const CheckoutPage = () => {
   const isTry = currency === 'TRY';
   const bankTransferQ = useBankTransferDetails();
   const havaleEnabled = bankTransferQ.data?.enabled === true;
-  // Card is offered only for TRY plans; havale only when the superadmin has
-  // switched the channel on. If neither qualifies we still keep card as the
-  // fallback so the consent gate never dead-ends.
+  // Card is offered only for TRY plans (PayTR settles in TRY only); havale
+  // only when the superadmin has switched the channel on. If NEITHER is
+  // available we must NOT let the user reach the consent gate — we render a
+  // dead-end-free "no payment method" card below instead.
   const cardAvailable = isTry;
   const showMethodChoice = cardAvailable && havaleEnabled;
+  const noPaymentMethod = !cardAvailable && !havaleEnabled;
+  // We can only trust the availability decision once both feeds have settled —
+  // before that `havaleEnabled` is falsy simply because the query is still in
+  // flight, which would wrongly trip the no-payment-method card.
+  const availabilityLoading = plansQ.isLoading || bankTransferQ.isLoading;
 
-  // Selected payment method. Default to card when available, else havale.
-  const [method, setMethod] = useState<PaymentMethod>('CARD');
+  // Selected payment method. Lazy init so the first render already reflects
+  // the only viable channel: when card isn't available but havale is, start on
+  // BANK_TRANSFER instead of flashing CARD then correcting via an effect.
+  const [method, setMethod] = useState<PaymentMethod>(() =>
+    !cardAvailable && havaleEnabled ? 'BANK_TRANSFER' : 'CARD',
+  );
+  // Keep the selection consistent if availability resolves after mount (the
+  // bank-transfer query may settle a tick later than the initial render): if
+  // card is the only option force CARD, if havale is the only option force
+  // BANK_TRANSFER. When both exist we leave the user's pick alone.
   useEffect(() => {
-    if (!cardAvailable && havaleEnabled) {
+    if (cardAvailable && !havaleEnabled) {
+      setMethod('CARD');
+    } else if (!cardAvailable && havaleEnabled) {
       setMethod('BANK_TRANSFER');
     }
   }, [cardAvailable, havaleEnabled]);
@@ -73,6 +89,14 @@ const CheckoutPage = () => {
   const [acceptedDistance, setAcceptedDistance] = useState(false);
   const [acceptedRefund, setAcceptedRefund] = useState(false);
   const allChecked = acceptedKvkk && acceptedDistance && acceptedRefund;
+  // Clear the consent ticks only on a *successful* intent (the page is about to
+  // navigate / swap to a confirm panel anyway). On error we deliberately leave
+  // them ticked so the user can retry without re-reading + re-checking.
+  const clearConsents = () => {
+    setAcceptedKvkk(false);
+    setAcceptedDistance(false);
+    setAcceptedRefund(false);
+  };
   const docsLoading = kvkkQ.isLoading || distanceQ.isLoading || refundQ.isLoading;
   const docsError = kvkkQ.error || distanceQ.error || refundQ.error;
 
@@ -108,6 +132,9 @@ const CheckoutPage = () => {
       },
       {
         onSuccess: (data) => {
+          // Success: safe to drop the consent ticks now (page navigates away
+          // or swaps to the confirm panel).
+          clearConsents();
           if (data.provider === 'TRIAL') {
             navigate('/admin/settings/subscription', { replace: true });
             return;
@@ -130,6 +157,24 @@ const CheckoutPage = () => {
             })
           ) {
             setSubmitted(false);
+            return;
+          }
+          if (getApiErrorCode(err) === 'PAYTR_ONLY_SUPPORTS_TRY') {
+            // The plan is priced in a non-TRY currency so PayTR (card) can't
+            // process it. Steer the user to havale when available — auto-switch
+            // the method so a single tap on "Devam et" retries via the right
+            // channel — otherwise surface a clear, localized explanation.
+            setSubmitted(false);
+            if (havaleEnabled) {
+              setMethod('BANK_TRANSFER');
+            }
+            setError(null);
+            toast.error(
+              t(
+                'subscriptions.checkout.cardCurrencyUnsupported',
+                'Bu plan {{currency}} ile fiyatlandırıldığı için kart ile ödeme yapılamıyor. Havale/EFT seçeneğini kullanın veya TRY bir plan seçin.',
+              ).replace('{{currency}}', currency),
+            );
             return;
           }
           if (getApiErrorCode(err) === 'LEGAL_CONSENT_REQUIRED') {
@@ -165,6 +210,8 @@ const CheckoutPage = () => {
       },
       {
         onSuccess: (data) => {
+          // Success: instructions panel is about to render — drop the ticks.
+          clearConsents();
           setBankTransfer(data);
         },
         onError: (err: unknown) => {
@@ -178,6 +225,24 @@ const CheckoutPage = () => {
             })
           ) {
             setSubmitted(false);
+            return;
+          }
+          if (getApiErrorCode(err) === 'PAYTR_ONLY_SUPPORTS_TRY') {
+            // Shouldn't normally surface on the havale path (havale is
+            // currency-agnostic), but handle it defensively so the code is
+            // never raw: surface the same friendly guidance and ensure we're
+            // on the havale method.
+            setSubmitted(false);
+            if (havaleEnabled) {
+              setMethod('BANK_TRANSFER');
+            }
+            setError(null);
+            toast.error(
+              t(
+                'subscriptions.checkout.cardCurrencyUnsupported',
+                'Bu plan {{currency}} ile fiyatlandırıldığı için kart ile ödeme yapılamıyor. Havale/EFT seçeneğini kullanın veya TRY bir plan seçin.',
+              ).replace('{{currency}}', currency),
+            );
             return;
           }
           if (getApiErrorCode(err) === 'LEGAL_CONSENT_REQUIRED') {
@@ -298,6 +363,60 @@ const CheckoutPage = () => {
         <Spinner size="lg" />
         <p className="mt-6 text-slate-600">
           {t('subscriptions.checkout.preparing', 'Ödeme hazırlanıyor...')}
+        </p>
+      </div>
+    );
+  }
+
+  // Wait for plan + havale availability before deciding anything that depends
+  // on them (the no-payment-method gate, the method picker) so we never flash a
+  // wrong state while the bank-transfer query is still in flight.
+  if (availabilityLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Spinner size="lg" />
+        <p className="mt-6 text-slate-600">
+          {t('subscriptions.checkout.loadingConsents', 'Sözleşmeler yükleniyor...')}
+        </p>
+      </div>
+    );
+  }
+
+  // Pre-flight: no payment method available for this plan. This happens when
+  // the plan is priced in a non-TRY currency (so PayTR/card is out — it only
+  // settles in TRY) AND the superadmin hasn't enabled the havale channel yet.
+  // Render a clear dead-end-free card BEFORE the consent gate so the user is
+  // never asked to tick consents only to find there's no way to pay.
+  if (noPaymentMethod) {
+    return (
+      <div className="max-w-md mx-auto mt-20 px-4 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
+          <Landmark className="w-8 h-8 text-amber-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-slate-900 mb-3">
+          {t(
+            'subscriptions.checkout.noPaymentMethodTitle',
+            'Bu plan için ödeme yöntemi kullanılamıyor',
+          )}
+        </h1>
+        <p className="text-slate-600 mb-6">
+          {t(
+            'subscriptions.checkout.noPaymentMethodBody',
+            'Bu plan {{currency}} para biriminde fiyatlandırıldığı için kart ile ödeme (PayTR, yalnızca TRY) kullanılamıyor ve havale / EFT kanalı henüz etkin değil.',
+          ).replace('{{currency}}', currency)}
+        </p>
+        <Button
+          variant="primary"
+          className="w-full"
+          onClick={() => navigate('/subscription/plans')}
+        >
+          {t('subscriptions.checkout.viewPlans', 'Planları gör')}
+        </Button>
+        <p className="mt-4 text-xs text-slate-500">
+          {t(
+            'subscriptions.checkout.noPaymentMethodSupportHint',
+            'TRY bir plan seçebilir veya bu plan için ödeme yöntemlerini etkinleştirmek üzere destek ile iletişime geçebilirsiniz.',
+          )}
         </p>
       </div>
     );

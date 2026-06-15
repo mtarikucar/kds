@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { usePlans, useCreatePlan, useUpdatePlan, useDeletePlan } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionPlan } from '../../features/superadmin/types';
@@ -12,6 +12,9 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
 
   const { data: plans, isLoading } = usePlans();
+  const hasNonTryActivePlan = (plans ?? []).some(
+    (p: SubscriptionPlan) => p.isActive && p.currency && p.currency !== 'TRY',
+  );
   const createMutation = useCreatePlan();
   const updateMutation = useUpdatePlan();
   const deleteMutation = useDeletePlan();
@@ -56,6 +59,19 @@ export default function PlansPage() {
           {t('plans.addPlan')}
         </button>
       </div>
+
+      {/* Non-TRY active plan warning — havale is the only payment path for these */}
+      {hasNonTryActivePlan && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+          <p className="text-sm text-amber-800">
+            {t(
+              'plans.nonTryActiveBanner',
+              'TRY dışı para birimine sahip en az bir aktif plan var. Bu planlar kartla (PayTR) tahsil edilemez; tenant ödeme yapabilsin diye havale ayarlarını açtığınızdan emin olun.',
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -233,6 +249,7 @@ function PlanModal({
     description: plan?.description || '',
     monthlyPrice: plan?.monthlyPrice || 0,
     yearlyPrice: plan?.yearlyPrice || 0,
+    currency: plan?.currency || 'TRY',
     maxUsers: plan?.maxUsers || 1,
     maxTables: plan?.maxTables || 5,
     maxProducts: plan?.maxProducts || 50,
@@ -320,6 +337,29 @@ function PlanModal({
                   required
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+                {t('plans.modal.currency', 'Para birimi')}
+              </label>
+              <select
+                value={formData.currency}
+                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+              >
+                <option value="TRY">TRY (₺)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+              </select>
+              {formData.currency !== 'TRY' && (
+                <p className="mt-1.5 text-xs text-amber-600">
+                  {t(
+                    'plans.modal.nonTryCurrencyNote',
+                    'TRY dışı planlar yalnızca havale ile ödenebilir; havale ayarlarını açın.',
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-5 gap-3">

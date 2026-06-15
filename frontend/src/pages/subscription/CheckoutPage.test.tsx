@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { AxiosError } from 'axios';
 import CheckoutPage from './CheckoutPage';
+
+/** Build a real AxiosError so `getApiErrorCode` (which gates on
+ * `isAxiosError`) reads the `errorCode` off the response body. */
+function apiError(errorCode: string, message = 'error') {
+  const err = new AxiosError(message);
+  // @ts-expect-error — minimal response shape, enough for the helpers.
+  err.response = { status: 400, data: { errorCode, message } };
+  return err;
+}
 
 // --- api layer mocks -------------------------------------------------
 // createIntent.mutate is the money mutation we assert fires (and with
@@ -11,6 +21,9 @@ const createBankTransferMutate = vi.fn();
 const updateProfileMutate = vi.fn();
 // Toggled per-test to control whether the havale channel is offered.
 let bankTransferEnabled = false;
+// Currency of the (single) plan the checkout resolves. TRY → card available;
+// anything else → card unavailable (PayTR only settles TRY).
+let planCurrency = 'TRY';
 
 vi.mock('../../api/paymentsApi', () => ({
   useCreatePaymentIntent: () => ({
@@ -40,7 +53,7 @@ vi.mock('../../api/paymentsApi', () => ({
 // so the card option is available alongside havale.
 vi.mock('../../features/subscriptions/subscriptionsApi', () => ({
   useGetPlans: () => ({
-    data: [{ id: 'plan-pro', currency: 'TRY' }],
+    data: [{ id: 'plan-pro', currency: planCurrency }],
     isLoading: false,
     error: null,
   }),
@@ -58,6 +71,15 @@ vi.mock('../../features/legal/legalApi', () => ({
     isLoading: false,
     error: null,
   }),
+}));
+
+// Toast spy — the currency-unsupported path surfaces guidance via toast.error.
+const toastError = vi.fn();
+vi.mock('sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => toastError(...args),
+    success: vi.fn(),
+  },
 }));
 
 vi.mock('react-i18next', () => ({
@@ -90,7 +112,9 @@ describe('CheckoutPage consent gate', () => {
     createIntentMutate.mockClear();
     createBankTransferMutate.mockClear();
     updateProfileMutate.mockClear();
+    toastError.mockClear();
     bankTransferEnabled = false;
+    planCurrency = 'TRY';
   });
 
   it('blocks the payment intent until all three consents are checked', () => {
@@ -190,5 +214,80 @@ describe('CheckoutPage consent gate', () => {
     expect(screen.getByText('TR000000000000000000000000')).toBeInTheDocument();
     expect(screen.getByText('HT-REF-12345')).toBeInTheDocument();
     expect(screen.getByText(/499 TRY/)).toBeInTheDocument();
+  });
+
+  it('shows a no-payment-method dead-end (not the consent gate) when the plan is non-TRY and havale is off', () => {
+    planCurrency = 'USD';
+    bankTransferEnabled = false;
+    renderCheckout('plan-pro');
+
+    // The dead-end card, not the consent form.
+    expect(
+      screen.getByRole('heading', { name: /ödeme yöntemi kullanılamıyor/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Planları gör/i })).toBeInTheDocument();
+    // No consent checkboxes and no proceed CTA — the user can't reach the gate.
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Devam et/i })).toBeNull();
+    // Currency is interpolated into the explanation.
+    expect(screen.getByText(/USD/)).toBeInTheDocument();
+  });
+
+  it('defaults to havale (forces BANK_TRANSFER, hides card) for a non-TRY plan when havale is enabled', () => {
+    planCurrency = 'USD';
+    bankTransferEnabled = true;
+    renderCheckout('plan-pro');
+
+    // Only the havale CTA — card is not offered for a non-TRY plan.
+    expect(
+      screen.getByRole('button', { name: /Devam et — Havale bilgilerini gör/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Devam et — Ödemeye geç/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Kart ile öde/i })).toBeNull();
+
+    // Submitting routes to the bank-transfer intent, not the card one.
+    screen.getAllByRole('checkbox').forEach((box) => fireEvent.click(box));
+    fireEvent.click(
+      screen.getByRole('button', { name: /Devam et — Havale bilgilerini gör/i }),
+    );
+    expect(createBankTransferMutate).toHaveBeenCalledTimes(1);
+    expect(createIntentMutate).not.toHaveBeenCalled();
+  });
+
+  it('on PAYTR_ONLY_SUPPORTS_TRY: toasts guidance and auto-switches to havale without resetting consents', () => {
+    // TRY-mismatched edge: the plan currency desyncs between plan list and the
+    // intent (PayTR rejects with the code). Card is the initial method; havale
+    // is enabled so we can recover.
+    bankTransferEnabled = true;
+    renderCheckout('plan-pro');
+
+    // Card is the default → its CTA is shown.
+    const proceed = screen.getByRole('button', { name: /Devam et — Ödemeye geç/i });
+    screen.getAllByRole('checkbox').forEach((box) => fireEvent.click(box));
+    fireEvent.click(proceed);
+
+    expect(createIntentMutate).toHaveBeenCalledTimes(1);
+    const [, callbacks] = createIntentMutate.mock.calls[0];
+
+    // PayTR rejects the card flow for a non-TRY plan.
+    act(() => {
+      callbacks.onError(apiError('PAYTR_ONLY_SUPPORTS_TRY'));
+    });
+
+    // Friendly guidance toasted (not a raw error screen).
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(String(toastError.mock.calls[0][0])).toMatch(/kart ile ödeme yapılamıyor/i);
+    expect(
+      screen.queryByRole('heading', { name: /^Hata$/ }),
+    ).toBeNull();
+
+    // Auto-switched to havale: the CTA flipped to the bank-transfer label and
+    // the consents are still ticked — so a single retry uses the havale intent.
+    const havaleProceed = screen.getByRole('button', {
+      name: /Devam et — Havale bilgilerini gör/i,
+    });
+    expect(havaleProceed).toBeEnabled();
+    fireEvent.click(havaleProceed);
+    expect(createBankTransferMutate).toHaveBeenCalledTimes(1);
   });
 });

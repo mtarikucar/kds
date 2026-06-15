@@ -93,7 +93,16 @@ export const useCancelAddOn = () => {
       qc.invalidateQueries({ queryKey: marketplaceKeys.mine });
       qc.invalidateQueries({ queryKey: entitlementKeys.me });
       qc.invalidateQueries({ queryKey: ['subscriptions', 'effective-features'] });
-      toast.success('Add-on cancelled.');
+      toast.success(
+        i18n.t('marketplace:cancel.success', { defaultValue: 'Add-on cancelled.' }),
+      );
     },
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('marketplace:cancel.failed', { defaultValue: 'Cancellation failed' }),
+        ),
+      ),
   });
 };

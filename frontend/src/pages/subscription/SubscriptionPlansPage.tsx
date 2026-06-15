@@ -10,6 +10,7 @@ import PlanCard from '../../components/subscriptions/PlanCard';
 import PlanCardSkeleton from '../../components/subscriptions/PlanCardSkeleton';
 import PlanComparisonMatrix from '../../components/subscriptions/PlanComparisonMatrix';
 import Button from '../../components/ui/Button';
+import { useBankTransferDetails } from '../../api/paymentsApi';
 import { BillingCycle, SubscriptionPlanType, Plan } from '../../types';
 
 /**
@@ -59,6 +60,13 @@ const SubscriptionPlansPage = () => {
   const { data: currentSubscription } = useGetCurrentSubscription();
   const { data: effective } = useGetEffectiveFeatures();
   const trialEligibleIds = effective?.trialEligiblePlanIds ?? [];
+
+  // Bank transfer (Havale / EFT) is the only payment rail for non-TRY
+  // plans — PayTR card checkout is TRY-only. If a superadmin hasn't
+  // enabled the channel, a foreign-currency plan has no working payment
+  // path, so we mark its CTA as a dead-end guard (read-only signal).
+  const { data: bankTransfer } = useBankTransferDetails();
+  const havaleEnabled = bankTransfer?.enabled ?? false;
 
   // Compute savings before any early-return — useMemo was below the
   // conditional returns, which violated rules-of-hooks if the component
@@ -196,18 +204,34 @@ const SubscriptionPlansPage = () => {
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-        {sortedPlans.map((plan) => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            billingCycle={billingCycle}
-            isCurrentPlan={currentSubscription?.planId === plan.id}
-            isPopular={plan.name === SubscriptionPlanType.PRO}
-            isTrialEligible={trialEligibleIds.includes(plan.id)}
-            onSelectPlan={handleSelectPlan}
-            isLoading={processingPlanId === plan.id}
-          />
-        ))}
+        {sortedPlans.map((plan) => {
+          // A non-TRY plan with bank transfer disabled has no usable
+          // payment path → guard the CTA so the user doesn't dead-end at
+          // checkout. They can still read the card; only the select action
+          // is blocked, with an explanatory hint.
+          const isNonTry = (plan.currency || 'TRY') !== 'TRY';
+          const noPaymentPath = isNonTry && !havaleEnabled;
+          return (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              billingCycle={billingCycle}
+              isCurrentPlan={currentSubscription?.planId === plan.id}
+              isPopular={plan.name === SubscriptionPlanType.PRO}
+              isTrialEligible={trialEligibleIds.includes(plan.id)}
+              onSelectPlan={handleSelectPlan}
+              isLoading={processingPlanId === plan.id}
+              selectDisabledHint={
+                noPaymentPath
+                  ? t(
+                      'subscriptions.plansPage.noPaymentMethodHint',
+                      'Bu plan için ödeme yöntemi yapılandırılmamış',
+                    )
+                  : undefined
+              }
+            />
+          );
+        })}
       </div>
 
       {/* Current Subscription Info */}
