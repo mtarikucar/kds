@@ -6,6 +6,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { MetricsService } from "../../../common/metrics/metrics.service";
 import { TenantStatus } from "../../../common/constants/subscription.enum";
 import { AuthResponseDto, UserResponseDto } from "../dto/auth-response.dto";
+import { resolvePrimaryBranchId } from "./resolve-primary-branch";
 
 /**
  * TokenService — owns access/refresh token mint, rotation, and refresh-token
@@ -52,7 +53,16 @@ export class TokenService {
         branchAssignments: { select: { branchId: true } },
       },
     });
-    const primaryBranchId = row?.primaryBranchId ?? null;
+    // Owner ADMIN/MANAGER accounts predating the v3.0.0 branch system (or
+    // any user the backfill missed) carry a null primaryBranchId. Resolve
+    // the tenant's home branch so the response/JWT always hand the SPA a
+    // concrete branchId — otherwise its branchScopeStore resolves null and
+    // the api-client rejects every branch-scoped request client-side.
+    const primaryBranchId = await resolvePrimaryBranchId(
+      this.prisma,
+      user.tenantId,
+      row?.primaryBranchId ?? null,
+    );
     const allowedBranchIds = (row?.branchAssignments ?? []).map(
       (a) => a.branchId,
     );
