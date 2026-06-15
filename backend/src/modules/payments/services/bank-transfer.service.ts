@@ -412,6 +412,9 @@ export class BankTransferService {
       }
     });
 
+    this.logger.log(
+      `Bank transfer ${payment.externalReference ?? payment.id} rejected by ${actorEmail ?? "superadmin"}${reason ? ` (${reason})` : ""}`,
+    );
     return { rejected: true };
   }
 

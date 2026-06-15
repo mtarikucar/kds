@@ -222,7 +222,9 @@ export class SuperAdminSubscriptionsController {
   }
 
   @Post("bank-transfer/:paymentId/confirm")
-  @ApiOperation({ summary: "Confirm a received bank transfer (activates the subscription)" })
+  @ApiOperation({
+    summary: "Confirm a received bank transfer (activates the subscription)",
+  })
   async confirmBankTransfer(
     @Param("paymentId") paymentId: string,
     @CurrentSuperAdmin("email") actorEmail: string,
