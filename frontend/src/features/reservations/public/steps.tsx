@@ -1,6 +1,7 @@
 import React from 'react';
-import { useFormContext } from 'react-hook-form';
+import { Controller, useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import PhoneInput from '../../../components/ui/PhoneInput';
 import {
   CalendarDays,
   Clock,
@@ -277,6 +278,7 @@ export const Step4Contact: React.FC<StepCommonProps> = () => {
   const { t } = useTranslation('reservations');
   const {
     register,
+    control,
     formState: { errors },
   } = useFormContext<ReservationFormValues>();
 
@@ -314,16 +316,26 @@ export const Step4Contact: React.FC<StepCommonProps> = () => {
           <label className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5" /> {t('public.phone')}
           </label>
-          <input
-            type="tel"
-            autoComplete="tel"
-            placeholder="+90555..."
-            {...register('customerPhone')}
-            className="w-full h-12 rounded-xl border border-border bg-background px-4 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          <Controller
+            control={control}
+            name="customerPhone"
+            render={({ field }) => (
+              <PhoneInput
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                defaultCountry="TR"
+                // Format errors can't occur now (PhoneInput only emits valid
+                // E.164 or ''); keep the existing branch so a real format
+                // error would still surface, but suppress the contact-group
+                // refinement which renders its own banner below.
+                error={
+                  phoneError && phoneError !== 'contactRequired'
+                    ? t('public.validation.phoneInvalid')
+                    : undefined
+                }
+              />
+            )}
           />
-          {phoneError && phoneError !== 'contactRequired' && (
-            <p className="text-xs text-destructive">{t('public.validation.phoneInvalid')}</p>
-          )}
         </div>
 
         <div className="space-y-1.5">

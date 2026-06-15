@@ -28,6 +28,9 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) =>
       opts && typeof opts.count !== 'undefined' ? `${key}:${opts.count}` : key,
+    // PhoneInput (rendered inside Step4) reads i18n.language for its
+    // country-list localization, so the mock must expose it.
+    i18n: { language: 'tr' },
   }),
 }));
 
@@ -275,15 +278,17 @@ describe('Step4Contact — contact validation display', () => {
     expect(screen.queryByText('public.validation.contactRequired')).not.toBeInTheDocument();
   });
 
-  it('registers phone so typing updates the form value', () => {
+  it('wires PhoneInput so typing a natural number stores canonical E.164', () => {
     render(
       <Harness>
         <Step4Contact />
       </Harness>,
     );
-    fireEvent.input(screen.getByPlaceholderText('+90555...'), {
-      target: { value: '+905551112233' },
-    });
+    // PhoneInput renders the national-number field as the type=tel input
+    // (the country selector is a separate <select>). Typing a Turkish
+    // national number emits canonical E.164 into the form via Controller.
+    const tel = document.querySelector('input[type="tel"]') as HTMLInputElement;
+    fireEvent.change(tel, { target: { value: '0555 111 22 33' } });
     expect(formRef.getValues('customerPhone')).toBe('+905551112233');
   });
 });

@@ -13,6 +13,7 @@ import { useCartStore } from './cartStore';
 import { useListBranches } from '../branches/branchesApi';
 import { useAuthStore } from '../../store/authStore';
 import { prettyKey, prettyValue, localizeDetails } from './productDetailHelpers';
+import PhoneInput from '../../components/ui/PhoneInput';
 
 // Mirrors the language resolution that localizeDetails used to do
 // internally (document.documentElement.lang with a TR fallback). Kept at
@@ -708,14 +709,15 @@ function QuoteRequestForm({ sku }: { sku: string }) {
         maxLength={120}
         required
       />
-      <div className="flex gap-2">
-        <input
-          className={inputCls}
-          placeholder={t('productDetail.quoteForm.phone')}
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          maxLength={40}
-        />
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <PhoneInput
+            value={phone}
+            onChange={setPhone}
+            placeholder={t('productDetail.quoteForm.phone')}
+            defaultCountry="TR"
+          />
+        </div>
         <input
           className="w-20 rounded border px-2 py-1.5 text-sm"
           type="number"

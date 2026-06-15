@@ -18,6 +18,7 @@ import {
   useLookupReservation,
   useCancelPublicReservation,
 } from '../../features/reservations/publicReservationsApi';
+import PhoneInput from '../../components/ui/PhoneInput';
 import type { Reservation, ReservationStatus } from '../../types';
 import {
   formatReservationDate,
@@ -110,13 +111,7 @@ const ReservationLookupPage: React.FC = () => {
             <label className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Phone className="h-3.5 w-3.5" /> {t('lookup.phone')}
             </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full h-12 rounded-xl border border-border bg-background px-4 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
+            <PhoneInput value={phone} onChange={setPhone} defaultCountry="TR" />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground flex items-center gap-1.5">

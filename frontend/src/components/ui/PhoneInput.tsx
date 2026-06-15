@@ -110,9 +110,12 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       emit(national, next);
     };
 
+    // i18n may be absent when a consumer's test mocks useTranslation to return
+    // only { t } — don't hard-crash; fall back to the Turkish-first locale.
+    const locale = i18n?.language ?? 'tr';
     const countries = useMemo(
-      () => buildCountryOptions(i18n.language || 'tr', [defaultCountry]),
-      [i18n.language, defaultCountry],
+      () => buildCountryOptions(locale, [defaultCountry]),
+      [locale, defaultCountry],
     );
 
     return (

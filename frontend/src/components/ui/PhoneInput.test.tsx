@@ -32,7 +32,7 @@ describe('PhoneInput', () => {
     render(<PhoneInput label="Telefon" value="" onChange={onChange} />);
     fireEvent.change(screen.getByLabelText('Telefon'), { target: { value: '202 555 0182' } });
     onChange.mockClear();
-    fireEvent.change(screen.getByLabelText('Ülke kodu'), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText('Country code'), { target: { value: 'US' } });
     expect(onChange).toHaveBeenLastCalledWith('+12025550182');
   });
 

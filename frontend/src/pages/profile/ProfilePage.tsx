@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
@@ -7,8 +7,8 @@ import { useMyProfile, useUpdateProfile } from '../../features/users/usersApi';
 import { useChangePassword } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import PhoneInput from '../../components/ui/PhoneInput';
 import { EmailVerificationCard } from '../../components/EmailVerificationCard';
-import { isValidPhone } from '../../utils/validation';
 import {
   User,
   Mail,
@@ -40,13 +40,9 @@ const ProfilePage = () => {
   const profileSchema = z.object({
     firstName: z.string().min(2, t('validation.firstNameMin')),
     lastName: z.string().min(2, t('validation.lastNameMin')),
-    phone: z.string()
-      .optional()
-      .refine(
-        (val) => !val || isValidPhone(val),
-        { message: t('validation:invalidPhone') }
-      )
-      .or(z.literal('')),
+    // <PhoneInput> emits canonical E.164 ('+90…') or '' while incomplete —
+    // both already valid, so the field just needs to be an optional string.
+    phone: z.string().optional().or(z.literal('')),
   });
 
   type ProfileFormData = z.infer<typeof profileSchema>;
@@ -67,6 +63,7 @@ const ProfilePage = () => {
 
   const {
     register: registerProfile,
+    control: controlProfile,
     handleSubmit: handleProfileSubmit,
     formState: { errors: profileErrors },
   } = useForm<ProfileFormData>({
@@ -243,11 +240,18 @@ const ProfilePage = () => {
               hint={t('profile.contactAdminEmail')}
             />
 
-            <Input
-              label={t('profile.phone')}
-              placeholder={t('profile.phonePlaceholder')}
-              error={profileErrors.phone?.message}
-              {...registerProfile('phone')}
+            <Controller
+              control={controlProfile}
+              name="phone"
+              render={({ field, fieldState }) => (
+                <PhoneInput
+                  label={t('profile.phone')}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={fieldState.error?.message}
+                  defaultCountry="TR"
+                />
+              )}
             />
 
             <Button type="submit" isLoading={isUpdating} className="w-full">

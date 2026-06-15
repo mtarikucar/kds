@@ -17,7 +17,11 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  // `i18n` is consumed by the real <PhoneInput> (rendered for the phone
+  // field) to localize its country list, so the stub must expose it.
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'tr' } }),
+}));
 vi.mock('@hookform/resolvers/zod', () => ({
   zodResolver: () => async (values: any) => ({ values, errors: {} }),
 }));

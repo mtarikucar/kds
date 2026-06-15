@@ -12,10 +12,15 @@ import {
   ValidateIf,
 } from "class-validator";
 import { AtLeastOneOf } from "../../../common/validators/at-least-one-of.decorator";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 
-// E.164-ish: optional +, 8-15 digits. Accepts typical restaurant phones and
-// rejects obvious junk / oversized bodies.
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+// Phone is NORMALIZED to E.164 (NormalizePhone) before validation, so the
+// caller can type any natural format — "0555 123 45 67", "+90 555 123 45 67",
+// "(0555) 123-45-67" — and it lands as "+905551234567". The regex then
+// asserts canonical E.164; an unparseable value passes through untouched and
+// is rejected with the friendly message.
+const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+const PHONE_MESSAGE = "Lütfen geçerli bir telefon numarası girin.";
 
 @AtLeastOneOf(["customerEmail", "customerPhone"], {
   message: "Either customerEmail or customerPhone must be provided",
@@ -58,6 +63,7 @@ export class CreateReservationDto {
     description: "Customer phone (E.164 or digits)",
     example: "+905551234567",
   })
+  @NormalizePhone("TR")
   @IsOptional()
   @ValidateIf(
     (o) =>
@@ -67,10 +73,7 @@ export class CreateReservationDto {
   )
   @IsString()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, {
-    message:
-      "customerPhone must be a valid phone number (8-15 digits, optional leading +)",
-  })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   customerPhone?: string;
 
   @ApiPropertyOptional({ description: "Customer email" })
@@ -104,12 +107,10 @@ export class CreateReservationDto {
 
 export class CancelPublicReservationDto {
   @ApiProperty({ description: "Customer phone used at booking time" })
+  @NormalizePhone("TR")
   @IsString()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, {
-    message:
-      "customerPhone must be a valid phone number (8-15 digits, optional leading +)",
-  })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   customerPhone: string;
 
   @ApiProperty({ description: "Reservation number issued at booking time" })

@@ -72,7 +72,7 @@ const MenuPanel = ({
   return (
     <div className="flex flex-col h-full bg-slate-50/50 rounded-xl">
       {/* Header Section */}
-      <div className="p-4 bg-white rounded-t-xl border-b border-slate-100 space-y-4">
+      <div className="p-3 sm:p-4 bg-white rounded-t-xl border-b border-slate-100 space-y-3 sm:space-y-4">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -156,7 +156,7 @@ const MenuPanel = ({
       </div>
 
       {/* Products Grid/List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-2.5 sm:p-4">
         {productsLoading ? (
           <div className="flex items-center justify-center h-64">
             <Spinner />
@@ -184,7 +184,7 @@ const MenuPanel = ({
           </div>
         ) : viewMode === 'grid' ? (
           /* Grid View */
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4">
             {filteredProducts.map((product) => {
               const inCartQty = cartQuantities[product.id] ?? 0;
               const requiresModifiers = hasRequiredModifiers(product);
@@ -257,43 +257,50 @@ const MenuPanel = ({
                     )}
                   </div>
 
-                  {/* Content */}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-slate-900 truncate">{product.name}</h3>
+                  {/* Content. Footer STACKS on narrow phones (2-col cards are
+                      ~115px wide — price + a 2-button stepper can't share a
+                      row without clipping) and becomes a compact side-by-side
+                      row from sm up. */}
+                  <div className="p-2.5 sm:p-4">
+                    <h3 className="font-semibold text-slate-900 truncate text-sm sm:text-base">{product.name}</h3>
                     {product.description && (
-                      <p className="text-sm text-slate-500 mt-1 line-clamp-1">{product.description}</p>
+                      <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1 line-clamp-1">{product.description}</p>
                     )}
-                    <div className="flex items-center justify-between mt-3">
-                      <p className="text-primary-600 font-bold text-lg">{formatPrice(product.price)}</p>
+                    <div className="mt-2 sm:mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-primary-600 font-bold text-base sm:text-lg leading-tight">{formatPrice(product.price)}</p>
                       {showInlineSteppers ? (
-                        /* Inline +/- stepper for an in-cart item (no modal) */
+                        /* Inline +/- stepper for an in-cart item (no modal).
+                           Full-width on mobile (− and + pinned to the edges),
+                           compact on sm+. */
                         <div
-                          className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-0.5"
+                          className="flex items-center justify-between sm:justify-start gap-1 bg-white rounded-lg border border-slate-200 p-0.5 w-full sm:w-auto"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
                             type="button"
                             onClick={() => onDecrement!(product.id)}
                             aria-label={t('menu.decrease', 'Azalt')}
-                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
+                            className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
                           >
                             <Minus className="h-4 w-4" />
                           </button>
-                          <span className="w-6 text-center font-semibold text-sm text-slate-900 tabular-nums">
+                          <span className="flex-1 sm:flex-none sm:w-6 text-center font-semibold text-sm text-slate-900 tabular-nums">
                             {inCartQty}
                           </span>
                           <button
                             type="button"
                             onClick={() => onIncrement!(product.id)}
                             aria-label={t('menu.increase', 'Artır')}
-                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
+                            className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
                           >
                             <Plus className="h-4 w-4" />
                           </button>
                         </div>
                       ) : (
+                        /* Add affordance: full-width with an "Ekle" label on
+                           mobile (clearer + easier to tap), compact square on sm+. */
                         <span
-                          className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-all duration-200 ${
+                          className={`flex items-center justify-center gap-1.5 rounded-lg transition-all duration-200 w-full h-10 sm:w-auto sm:h-auto sm:min-h-[44px] sm:min-w-[44px] sm:p-2 ${
                             product.currentStock === 0
                               ? 'bg-slate-100 text-slate-400'
                               : 'bg-primary-500 text-white group-hover:bg-primary-600 shadow-sm'
@@ -301,6 +308,7 @@ const MenuPanel = ({
                           aria-hidden="true"
                         >
                           <Plus className="h-5 w-5" />
+                          <span className="sm:hidden text-sm font-semibold">{t('add', 'Ekle')}</span>
                         </span>
                       )}
                     </div>

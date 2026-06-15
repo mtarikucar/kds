@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import PhoneInput from '../ui/PhoneInput';
 import { Customer, CreateCustomerDto } from '../../types';
 import { useCreateCustomer, useUpdateCustomer } from '../../features/customers/customersApi';
-import { isValidPhone } from '../../utils/validation';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -32,13 +32,9 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const customerSchema = z.object({
     name: z.string().min(2, t('validation:nameMin')),
     email: z.string().email(t('validation:email')).optional().or(z.literal('')),
-    phone: z.string()
-      .optional()
-      .refine(
-        (val) => !val || isValidPhone(val),
-        { message: t('validation:invalidPhone') }
-      )
-      .or(z.literal('')),
+    // <PhoneInput> emits canonical E.164 ('+90…') or '' while incomplete —
+    // both already valid, so the field just needs to be an optional string.
+    phone: z.string().optional().or(z.literal('')),
     birthday: z.string().optional().or(z.literal('')),
     notes: z.string().optional().or(z.literal('')),
   });
@@ -47,6 +43,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -166,12 +163,18 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           placeholder={t('customers.email')}
         />
 
-        <Input
-          label={t('customers.phone')}
-          type="tel"
-          {...register('phone')}
-          error={errors.phone?.message}
-          placeholder="+905551234567"
+        <Controller
+          control={control}
+          name="phone"
+          render={({ field, fieldState }) => (
+            <PhoneInput
+              label={t('customers.phone')}
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              error={fieldState.error?.message}
+              defaultCountry="TR"
+            />
+          )}
         />
 
         <Input

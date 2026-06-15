@@ -34,12 +34,16 @@ beforeAll(async () => {
  * read `.address` from the wrapper.
  */
 describe('ShippingAddressForm (v2.8.84 + v2.8.99.3)', () => {
+  // Phone is now the shared <PhoneInput>: getByLabelText(/^Telefon/) targets
+  // its national-number field, and any natural input is emitted to the form
+  // as canonical E.164 ("+905551234567"). The default below resolves to
+  // PHONE_E164.
   function fillRequired(values: Partial<Record<string, string>> = {}) {
     fireEvent.input(screen.getByLabelText(/Alıcı adı/), {
       target: { value: values.recipientName ?? 'Mehmet Mağaza' },
     });
-    fireEvent.input(screen.getByLabelText(/^Telefon/), {
-      target: { value: values.phone ?? '+90 555 123 45 67' },
+    fireEvent.change(screen.getByLabelText(/^Telefon/), {
+      target: { value: values.phone ?? '0555 123 45 67' },
     });
     // The line1/city inputs only exist in custom mode; the helper is
     // also used by branch-mode tests where these fields are omitted by
@@ -79,7 +83,7 @@ describe('ShippingAddressForm (v2.8.84 + v2.8.99.3)', () => {
     expect(onSubmit).toHaveBeenCalledWith({
       address: {
         recipientName: 'Mehmet Mağaza',
-        phone: '+90 555 123 45 67',
+        phone: '+905551234567',
         line1: 'Atatürk Cad. 12',
         line2: 'Kat 3 Daire 5',
         district: 'Kadıköy',
@@ -114,23 +118,26 @@ describe('ShippingAddressForm (v2.8.84 + v2.8.99.3)', () => {
     const onSubmit = vi.fn();
     const { rerender } = render(<ShippingAddressForm onSubmit={onSubmit} />);
 
-    // Try a bad phone first.
+    // Try a bad phone first. <PhoneInput> can't yield a valid E.164 from
+    // garbage — it emits '' which fails the required `min` check, surfacing
+    // the "geçerli bir telefon numarası" error.
     fillRequired({ phone: '<script>' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => {
       expect(
-        screen.getByText(/Telefon numarası rakam, boşluk, \+, -, \( \) içerebilir/),
+        screen.getByText(/Geçerli bir telefon numarası giriniz/),
       ).toBeInTheDocument();
     });
     expect(onSubmit).not.toHaveBeenCalled();
 
-    // Now a good one, in a different format.
+    // Now a good one, in a different (landline) format — emitted as E.164.
     rerender(<ShippingAddressForm onSubmit={onSubmit} />);
     fillRequired({ phone: '(0212) 555 12 34' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
+    expect(onSubmit.mock.calls[0][0].address.phone).toBe('+902125551234');
   });
 
   it('refuses obviously-short required fields with a visible error', async () => {
@@ -158,7 +165,11 @@ describe('ShippingAddressForm (v2.8.84 + v2.8.99.3)', () => {
       />,
     );
     expect(screen.getByLabelText(/Alıcı adı/)).toHaveValue('Saved Recipient');
-    expect(screen.getByLabelText(/^Telefon/)).toHaveValue('+905001234567');
+    // <PhoneInput> seeds its national-number field from the stored E.164,
+    // so the visible value is the formatted national number (sans +90), not
+    // the raw E.164. Assert the national digits are present.
+    const tel = screen.getByLabelText(/^Telefon/) as HTMLInputElement;
+    expect(tel.value.replace(/\D/g, '')).toBe('5001234567');
     expect(screen.getByLabelText(/^Adres satırı 1/)).toHaveValue('Saved line 1');
     expect(screen.getByLabelText(/^Şehir/)).toHaveValue('Bursa');
   });
@@ -198,7 +209,10 @@ describe('ShippingAddressForm (v2.8.84 + v2.8.99.3)', () => {
     render(<ShippingAddressForm onSubmit={onSubmit} branches={[branch]} />);
 
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument(); // 1 branch → no dropdown
+    // 1 branch → no branch dropdown. (Query by the branch select's
+    // accessible name rather than the generic combobox role, since
+    // <PhoneInput>'s country selector is also a combobox.)
+    expect(screen.queryByLabelText(/Şube seçin/)).not.toBeInTheDocument();
     expect(screen.getByTestId('branch-address-preview')).toHaveTextContent(/Atatürk Cad\. 12/);
     expect(screen.getByTestId('branch-address-preview')).toHaveTextContent(/Kadıköy Şubesi/);
 
@@ -214,7 +228,7 @@ describe('ShippingAddressForm (v2.8.84 + v2.8.99.3)', () => {
     expect(onSubmit).toHaveBeenCalledWith({
       address: {
         recipientName: 'Mehmet Mağaza',
-        phone: '+90 555 123 45 67',
+        phone: '+905551234567',
         line1: 'Atatürk Cad. 12',
         line2: 'Kat 3',
         district: 'Kadıköy',

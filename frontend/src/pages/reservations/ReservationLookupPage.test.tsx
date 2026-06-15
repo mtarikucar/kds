@@ -17,7 +17,14 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string, opts?: any) => (opts ? `${k}:${JSON.stringify(opts)}` : k) }),
+  // PhoneInput passes a string default as the 2nd t() arg; echo the key for
+  // those, JSON-stringify object opts (count interpolation) as before. Also
+  // expose i18n.language for PhoneInput's country-list localization.
+  useTranslation: () => ({
+    t: (k: string, opts?: any) =>
+      opts && typeof opts === 'object' ? `${k}:${JSON.stringify(opts)}` : k,
+    i18n: { language: 'tr' },
+  }),
 }));
 
 const lookupAsync = vi.fn();
@@ -51,8 +58,11 @@ const reservation = {
   table: { number: '12', section: 'Patio' },
 };
 
-function fillAndSearch(phone = '  555-1  ', num = '  RES-9  ') {
-  // Phone is the type=tel input; reservation number is the type=text input.
+// Phone is now entered through the shared <PhoneInput>: its national-number
+// field is the only type=tel input; typing a natural Turkish number emits
+// canonical E.164. The reservation number is the type=text input.
+const E164 = '+905551234567';
+function fillAndSearch(phone = '0555 123 45 67', num = '  RES-9  ') {
   const telInput = document.querySelector('input[type="tel"]') as HTMLInputElement;
   const numInput = document.querySelector('input[type="text"]') as HTMLInputElement;
   fireEvent.change(telInput, { target: { value: phone } });
@@ -72,7 +82,7 @@ describe('ReservationLookupPage — search', () => {
     fillAndSearch();
 
     await waitFor(() =>
-      expect(lookupAsync).toHaveBeenCalledWith({ tenantId: 't-1', phone: '555-1', reservationNumber: 'RES-9' }),
+      expect(lookupAsync).toHaveBeenCalledWith({ tenantId: 't-1', phone: E164, reservationNumber: 'RES-9' }),
     );
     await waitFor(() => expect(screen.getByText('RES-9')).toBeInTheDocument());
     // CONFIRMED status badge rendered via the status.* key.
@@ -120,7 +130,7 @@ describe('ReservationLookupPage — cancel flow', () => {
       expect(cancelAsync).toHaveBeenCalledWith({
         tenantId: 't-1',
         id: 'r-1',
-        customerPhone: '555-1',
+        customerPhone: E164,
         reservationNumber: 'RES-9',
       }),
     );

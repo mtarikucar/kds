@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Edit2, Trash2, Phone, Mail, X } from 'lucide-react';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '../stockManagementApi';
 import { type Supplier } from '../types';
+import PhoneInput from '../../../components/ui/PhoneInput';
 
 interface SupplierFormProps {
   supplier: Supplier | null;
@@ -47,8 +48,12 @@ const SupplierForm = ({ supplier, onSave, onClose, isLoading }: SupplierFormProp
               <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('suppliers.phone')}</label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <PhoneInput
+                label={t('suppliers.phone')}
+                value={form.phone}
+                onChange={(v) => setForm({ ...form, phone: v })}
+                defaultCountry="TR"
+              />
             </div>
           </div>
           <div>
