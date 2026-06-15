@@ -58,7 +58,6 @@ export default function MarketplacePage() {
     const tid = setTimeout(() => setHighlightCode(null), 2500);
     return () => clearTimeout(tid);
     // Re-run once the catalogue (which holds the target card) has loaded.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusCode, catalogLoading, catalogCodes]);
 
   // Clear the per-card busy marker once the mutation settles. Driven off
