@@ -3,13 +3,22 @@ import { CustomerOrdersController } from './customer-orders.controller';
 /**
  * Thin-controller spec for CustomerOrdersController. Public mutations forward
  * the dto (tenantId is resolved server-side from the session — the controller
- * never reads it). Staff routes read req.tenantId (+ req.user.id for the
- * acknowledge/complete actor) and forward both.
+ * never reads it).
+ *
+ * v3 branch-scope: staff routes no longer read the tenant-wide `req.tenantId`.
+ * They take the branch-fenced `@CurrentScope()` and forward the whole scope
+ * (the actor id comes off `scope.userId`). Forwarding the tenant-only id was
+ * the cross-branch read leak this change closes.
  */
 describe('CustomerOrdersController', () => {
   let svc: Record<string, jest.Mock>;
   let ctrl: CustomerOrdersController;
-  const req = { tenantId: 't1', user: { id: 'staff-1' } };
+  const scope = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'staff-1',
+    role: 'WAITER',
+  } as any;
 
   beforeEach(() => {
     svc = {
@@ -58,33 +67,36 @@ describe('CustomerOrdersController', () => {
     expect(svc.createBillRequest).toHaveBeenCalledWith(dto);
   });
 
-  it('getActiveWaiterRequests forwards req.tenantId', async () => {
-    await ctrl.getActiveWaiterRequests(req as any);
-    expect(svc.getActiveWaiterRequests).toHaveBeenCalledWith('t1');
+  it('getActiveWaiterRequests forwards the branch scope (not a bare tenantId)', async () => {
+    await ctrl.getActiveWaiterRequests(scope);
+    expect(svc.getActiveWaiterRequests).toHaveBeenCalledWith(scope);
+    // Guard against a regression back to the tenant-wide leak.
+    expect(svc.getActiveWaiterRequests).not.toHaveBeenCalledWith('t1');
   });
 
-  it('acknowledgeWaiterRequest forwards id, actor user id AND tenantId', async () => {
-    await ctrl.acknowledgeWaiterRequest('w1', req as any);
-    expect(svc.acknowledgeWaiterRequest).toHaveBeenCalledWith('w1', 'staff-1', 't1');
+  it('acknowledgeWaiterRequest forwards id, actor user id AND the branch scope', async () => {
+    await ctrl.acknowledgeWaiterRequest('w1', scope);
+    expect(svc.acknowledgeWaiterRequest).toHaveBeenCalledWith('w1', 'staff-1', scope);
   });
 
-  it('completeWaiterRequest forwards id, actor user id AND tenantId', async () => {
-    await ctrl.completeWaiterRequest('w1', req as any);
-    expect(svc.completeWaiterRequest).toHaveBeenCalledWith('w1', 'staff-1', 't1');
+  it('completeWaiterRequest forwards id, actor user id AND the branch scope', async () => {
+    await ctrl.completeWaiterRequest('w1', scope);
+    expect(svc.completeWaiterRequest).toHaveBeenCalledWith('w1', 'staff-1', scope);
   });
 
-  it('getActiveBillRequests forwards req.tenantId', async () => {
-    await ctrl.getActiveBillRequests(req as any);
-    expect(svc.getActiveBillRequests).toHaveBeenCalledWith('t1');
+  it('getActiveBillRequests forwards the branch scope (not a bare tenantId)', async () => {
+    await ctrl.getActiveBillRequests(scope);
+    expect(svc.getActiveBillRequests).toHaveBeenCalledWith(scope);
+    expect(svc.getActiveBillRequests).not.toHaveBeenCalledWith('t1');
   });
 
-  it('acknowledgeBillRequest forwards id, actor, tenantId', async () => {
-    await ctrl.acknowledgeBillRequest('b1', req as any);
-    expect(svc.acknowledgeBillRequest).toHaveBeenCalledWith('b1', 'staff-1', 't1');
+  it('acknowledgeBillRequest forwards id, actor, branch scope', async () => {
+    await ctrl.acknowledgeBillRequest('b1', scope);
+    expect(svc.acknowledgeBillRequest).toHaveBeenCalledWith('b1', 'staff-1', scope);
   });
 
-  it('completeBillRequest forwards id, actor, tenantId', async () => {
-    await ctrl.completeBillRequest('b1', req as any);
-    expect(svc.completeBillRequest).toHaveBeenCalledWith('b1', 'staff-1', 't1');
+  it('completeBillRequest forwards id, actor, branch scope', async () => {
+    await ctrl.completeBillRequest('b1', scope);
+    expect(svc.completeBillRequest).toHaveBeenCalledWith('b1', 'staff-1', scope);
   });
 });

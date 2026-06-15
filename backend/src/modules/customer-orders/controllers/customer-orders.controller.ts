@@ -6,7 +6,6 @@ import {
   Patch,
   Post,
   Query,
-  Request,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -21,6 +20,8 @@ import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { CustomerOrdersService } from "../services/customer-orders.service";
 import { CreateCustomerOrderDto } from "../dto/create-customer-order.dto";
@@ -131,8 +132,8 @@ export class CustomerOrdersController {
   @ApiOperation({
     summary: "Get all active waiter requests for tenant (STAFF)",
   })
-  async getActiveWaiterRequests(@Request() req) {
-    return this.customerOrdersService.getActiveWaiterRequests(req.tenantId);
+  async getActiveWaiterRequests(@CurrentScope() scope: BranchScope) {
+    return this.customerOrdersService.getActiveWaiterRequests(scope);
   }
 
   @Patch("waiter-requests/:id/acknowledge")
@@ -140,11 +141,14 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Acknowledge a waiter request (STAFF)" })
-  async acknowledgeWaiterRequest(@Param("id") id: string, @Request() req) {
+  async acknowledgeWaiterRequest(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
     return this.customerOrdersService.acknowledgeWaiterRequest(
       id,
-      req.user.id,
-      req.tenantId,
+      scope.userId,
+      scope,
     );
   }
 
@@ -153,11 +157,14 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Mark a waiter request as completed (STAFF)" })
-  async completeWaiterRequest(@Param("id") id: string, @Request() req) {
+  async completeWaiterRequest(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
     return this.customerOrdersService.completeWaiterRequest(
       id,
-      req.user.id,
-      req.tenantId,
+      scope.userId,
+      scope,
     );
   }
 
@@ -166,8 +173,8 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get all active bill requests for tenant (STAFF)" })
-  async getActiveBillRequests(@Request() req) {
-    return this.customerOrdersService.getActiveBillRequests(req.tenantId);
+  async getActiveBillRequests(@CurrentScope() scope: BranchScope) {
+    return this.customerOrdersService.getActiveBillRequests(scope);
   }
 
   @Patch("bill-requests/:id/acknowledge")
@@ -175,11 +182,14 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Acknowledge a bill request (STAFF)" })
-  async acknowledgeBillRequest(@Param("id") id: string, @Request() req) {
+  async acknowledgeBillRequest(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
     return this.customerOrdersService.acknowledgeBillRequest(
       id,
-      req.user.id,
-      req.tenantId,
+      scope.userId,
+      scope,
     );
   }
 
@@ -188,11 +198,14 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Mark a bill request as completed (STAFF)" })
-  async completeBillRequest(@Param("id") id: string, @Request() req) {
+  async completeBillRequest(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
     return this.customerOrdersService.completeBillRequest(
       id,
-      req.user.id,
-      req.tenantId,
+      scope.userId,
+      scope,
     );
   }
 }
