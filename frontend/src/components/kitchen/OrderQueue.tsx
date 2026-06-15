@@ -3,6 +3,7 @@ import { Clock, ChefHat, CheckCircle2 } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import OrderCard from './OrderCard';
 import { sortOrdersByAge, countUrgentOrders, cn } from '../../lib/utils';
+import { kioskColumnShell } from './kioskTheme';
 
 interface OrderQueueProps {
   title: string;
@@ -15,6 +16,8 @@ interface OrderQueueProps {
   // Tag the first card's action button with data-tour="order-actions" so the
   // onboarding tour can spotlight a concrete button instead of the column.
   tagFirstActionForTour?: boolean;
+  // Dark high-contrast theme for kiosk mode. Default false = today's look.
+  kiosk?: boolean;
 }
 
 const OrderQueue = ({
@@ -26,6 +29,7 @@ const OrderQueue = ({
   updatingOrderId,
   dataTour,
   tagFirstActionForTour,
+  kiosk = false,
 }: OrderQueueProps) => {
   const { t } = useTranslation('kitchen');
 
@@ -79,7 +83,7 @@ const OrderQueue = ({
   const EmptyIcon = config.emptyIcon;
 
   return (
-    <div className={cn('rounded-xl border border-slate-200/60 h-full flex flex-col min-h-0', config.bg)} data-tour={dataTour}>
+    <div className={kioskColumnShell(kiosk, config.bg)} data-tour={dataTour}>
       {/* Column Header */}
       <div className={cn('flex items-center justify-between px-4 py-3 rounded-t-xl', config.headerBg)}>
         <div className="flex items-center gap-2">
@@ -106,12 +110,12 @@ const OrderQueue = ({
       <div className="overflow-y-auto flex-1 min-h-0 p-3 space-y-3">
         {filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center px-4">
-            <div className="p-4 rounded-full bg-white/60 mb-3">
-              <EmptyIcon className="h-8 w-8 text-slate-400" />
+            <div className={cn('p-4 rounded-full mb-3', kiosk ? 'bg-neutral-800' : 'bg-white/60')}>
+              <EmptyIcon className={cn('h-8 w-8', kiosk ? 'text-neutral-500' : 'text-slate-400')} />
             </div>
-            <p className="text-sm font-medium text-slate-600">{config.emptyTitle}</p>
+            <p className={cn('text-sm font-medium', kiosk ? 'text-neutral-300' : 'text-slate-600')}>{config.emptyTitle}</p>
             {config.emptyDescription && (
-              <p className="text-xs text-slate-400 mt-1">{config.emptyDescription}</p>
+              <p className={cn('text-xs mt-1', kiosk ? 'text-neutral-500' : 'text-slate-400')}>{config.emptyDescription}</p>
             )}
           </div>
         ) : (
@@ -123,6 +127,7 @@ const OrderQueue = ({
               onCancelOrder={onCancelOrder}
               isUpdating={updatingOrderId === order.id}
               actionTourTag={tagFirstActionForTour && idx === 0 ? 'order-actions' : undefined}
+              kiosk={kiosk}
             />
           ))
         )}

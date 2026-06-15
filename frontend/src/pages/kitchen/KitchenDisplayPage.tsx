@@ -1,26 +1,48 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle } from 'lucide-react';
 import { useOrders, useUpdateOrderStatus, useCancelKdsOrder } from '../../features/orders/ordersApi';
 import { useKitchenSocket } from '../../features/kds/useKitchenSocket';
+import { useKioskMode } from '../../hooks/useKioskMode';
 import OrderQueue from '../../components/kitchen/OrderQueue';
 import KitchenStatsHeader from '../../components/kitchen/KitchenStatsHeader';
 import { OrderStatus } from '../../types';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
-import { countUrgentOrders, sortOrdersByAge } from '../../lib/utils';
+import { countUrgentOrders, sortOrdersByAge, cn } from '../../lib/utils';
+import { kioskPage } from '../../components/kitchen/kioskTheme';
 
 const KitchenDisplayPage = () => {
   const { t } = useTranslation('kitchen');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>(OrderStatus.PENDING);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { kiosk, toggle: toggleKiosk } = useKioskMode(rootRef);
 
-  // Filter to only show active kitchen orders
-  const { data: orders, refetch, isLoading } = useOrders({
-    status: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.READY].join(',') as any,
-  });
+  const { isConnected } = useKitchenSocket();
+
+  // Filter to only show active kitchen orders. When the live socket is down
+  // we engage a ~10s polling fallback so the board keeps updating; once the
+  // socket reconnects we stop polling (socket invalidations take over again).
+  // keepPreviousData retains the last-known orders across refetches/errors so
+  // the board never blanks out under a transient failure.
+  const {
+    data: orders,
+    refetch,
+    isLoading,
+    isError,
+    dataUpdatedAt,
+  } = useOrders(
+    {
+      status: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.READY].join(',') as any,
+    },
+    {
+      refetchInterval: isConnected ? false : 10_000,
+      keepPreviousData: true,
+    }
+  );
 
   const { mutate: updateOrderStatus } = useUpdateOrderStatus();
   const { mutate: cancelOrder } = useCancelKdsOrder();
-  const { isConnected } = useKitchenSocket();
 
   // Calculate counts for each status
   const orderCounts = useMemo(() => {
@@ -63,6 +85,16 @@ const KitchenDisplayPage = () => {
     refetch();
   };
 
+  // Surface the moment the board last successfully synced, so a stale/error
+  // banner can tell the cook how old the on-screen data is.
+  const lastUpdatedLabel = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString()
+    : '—';
+
+  // First paint with no data yet: show a real skeleton instead of empty
+  // columns, so "still loading" is never mistaken for "kitchen is empty".
+  const showFirstLoadSkeleton = isLoading && !orders;
+
   const tabConfig = [
     {
       value: OrderStatus.PENDING,
@@ -88,7 +120,7 @@ const KitchenDisplayPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col">
+    <div ref={rootRef} className={cn('h-full flex flex-col', kioskPage(kiosk))}>
       {/* Stats Header */}
       <div data-tour="kitchen-stats">
         <KitchenStatsHeader
@@ -96,9 +128,47 @@ const KitchenDisplayPage = () => {
           isConnected={isConnected}
           onRefresh={handleRefresh}
           isLoading={isLoading}
+          kiosk={kiosk}
+          onToggleKiosk={toggleKiosk}
         />
       </div>
 
+      {/* Persistent error / stale banner — distinct from the empty-kitchen
+          state. Shown whenever a fetch failed; the last-known orders stay on
+          screen (keepPreviousData) so the cook isn't left blind. */}
+      {isError && (
+        <div
+          role="alert"
+          className={cn(
+            'flex items-center gap-2 px-4 py-3 mb-3 rounded-lg text-sm font-medium border flex-shrink-0',
+            kiosk
+              ? 'bg-red-500/20 border-red-500 text-red-200'
+              : 'bg-red-50 border-red-300 text-red-800'
+          )}
+        >
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>
+            {t('kitchen.loadError', 'Siparişler yüklenemedi — son güncelleme {{time}}', {
+              time: lastUpdatedLabel,
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className={cn(
+              'ml-auto underline underline-offset-2 hover:no-underline',
+              kiosk ? 'text-red-100' : 'text-red-700'
+            )}
+          >
+            {t('common:buttons.refresh', 'Yenile')}
+          </button>
+        </div>
+      )}
+
+      {showFirstLoadSkeleton ? (
+        <KdsLoadingSkeleton kiosk={kiosk} />
+      ) : (
+      <>
       {/* Desktop: 3-Column Grid */}
       <div className="hidden lg:grid lg:grid-cols-3 gap-4 md:gap-6 flex-1 min-h-0" data-tour="order-queues">
         <OrderQueue
@@ -109,6 +179,7 @@ const KitchenDisplayPage = () => {
           onCancelOrder={handleCancelOrder}
           updatingOrderId={updatingOrderId || undefined}
           tagFirstActionForTour
+          kiosk={kiosk}
         />
 
         <OrderQueue
@@ -117,6 +188,7 @@ const KitchenDisplayPage = () => {
           orders={orders || []}
           onUpdateStatus={handleUpdateStatus}
           updatingOrderId={updatingOrderId || undefined}
+          kiosk={kiosk}
         />
 
         <OrderQueue
@@ -125,6 +197,7 @@ const KitchenDisplayPage = () => {
           orders={orders || []}
           onUpdateStatus={handleUpdateStatus}
           updatingOrderId={updatingOrderId || undefined}
+          kiosk={kiosk}
         />
       </div>
 
@@ -156,6 +229,7 @@ const KitchenDisplayPage = () => {
               onCancelOrder={handleCancelOrder}
               updatingOrderId={updatingOrderId || undefined}
               status={OrderStatus.PENDING}
+              kiosk={kiosk}
             />
           </TabsContent>
 
@@ -165,6 +239,7 @@ const KitchenDisplayPage = () => {
               onUpdateStatus={handleUpdateStatus}
               updatingOrderId={updatingOrderId || undefined}
               status={OrderStatus.PREPARING}
+              kiosk={kiosk}
             />
           </TabsContent>
 
@@ -174,13 +249,45 @@ const KitchenDisplayPage = () => {
               onUpdateStatus={handleUpdateStatus}
               updatingOrderId={updatingOrderId || undefined}
               status={OrderStatus.READY}
+              kiosk={kiosk}
             />
           </TabsContent>
         </Tabs>
       </div>
+      </>
+      )}
     </div>
   );
 };
+
+// First-load skeleton: three placeholder columns so empty columns are never
+// confused with "still loading". Respects the kiosk dark theme.
+const KdsLoadingSkeleton = ({ kiosk }: { kiosk: boolean }) => (
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 flex-1 min-h-0" aria-busy="true">
+    {[0, 1, 2].map((col) => (
+      <div
+        key={col}
+        className={cn(
+          'rounded-xl border h-full flex flex-col min-h-0 overflow-hidden',
+          kiosk ? 'border-neutral-800 bg-neutral-900' : 'border-slate-200/60 bg-slate-50/80'
+        )}
+      >
+        <div className={cn('h-12 animate-pulse', kiosk ? 'bg-neutral-800' : 'bg-slate-200')} />
+        <div className="p-3 space-y-3">
+          {[0, 1, 2].map((row) => (
+            <div
+              key={row}
+              className={cn(
+                'h-28 rounded-xl animate-pulse',
+                kiosk ? 'bg-neutral-800' : 'bg-white'
+              )}
+            />
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 // Mobile Order List Component
 import OrderCard from '../../components/kitchen/OrderCard';
@@ -193,6 +300,7 @@ interface MobileOrderListProps {
   onCancelOrder?: (orderId: string) => void;
   updatingOrderId?: string;
   status: OrderStatus;
+  kiosk?: boolean;
 }
 
 const MobileOrderList = ({
@@ -201,6 +309,7 @@ const MobileOrderList = ({
   onCancelOrder,
   updatingOrderId,
   status,
+  kiosk = false,
 }: MobileOrderListProps) => {
   const { t } = useTranslation('kitchen');
   const sortedOrders = sortOrdersByAge(orders);
@@ -240,12 +349,12 @@ const MobileOrderList = ({
   if (sortedOrders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center px-4">
-        <div className="p-4 rounded-full bg-slate-100 mb-3">
-          <EmptyIcon className="h-10 w-10 text-slate-400" />
+        <div className={cn('p-4 rounded-full mb-3', kiosk ? 'bg-neutral-800' : 'bg-slate-100')}>
+          <EmptyIcon className={cn('h-10 w-10', kiosk ? 'text-neutral-500' : 'text-slate-400')} />
         </div>
-        <p className="text-base font-medium text-slate-600">{emptyConfig.title}</p>
+        <p className={cn('text-base font-medium', kiosk ? 'text-neutral-300' : 'text-slate-600')}>{emptyConfig.title}</p>
         {emptyConfig.description && (
-          <p className="text-sm text-slate-400 mt-1">{emptyConfig.description}</p>
+          <p className={cn('text-sm mt-1', kiosk ? 'text-neutral-500' : 'text-slate-400')}>{emptyConfig.description}</p>
         )}
       </div>
     );
@@ -260,6 +369,7 @@ const MobileOrderList = ({
           onUpdateStatus={onUpdateStatus}
           onCancelOrder={onCancelOrder}
           isUpdating={updatingOrderId === order.id}
+          kiosk={kiosk}
         />
       ))}
     </div>

@@ -3,6 +3,8 @@ import {
   calculateItemTotal,
   calculateSubtotal,
   calculateTotal,
+  computeChangeDue,
+  isTenderSufficient,
   canProceedToPayment,
   paymentBlockedReason,
   resolvePaymentTarget,
@@ -75,6 +77,48 @@ describe('posCart money math', () => {
     it('equals subtotal when discount is 0', () => {
       const items: PosCartItem[] = [{ price: 3, quantity: 4 }];
       expect(calculateTotal(items, 0)).toBe(calculateSubtotal(items));
+    });
+  });
+
+  describe('computeChangeDue', () => {
+    it('returns 0 for an exact payment', () => {
+      expect(computeChangeDue(100, 100)).toBe(0);
+    });
+
+    it('returns the difference when over-paying', () => {
+      expect(computeChangeDue(73, 100)).toBe(27);
+    });
+
+    it('never returns a negative when under-paying', () => {
+      expect(computeChangeDue(100, 60)).toBe(0);
+    });
+
+    it('returns 0 when both total and tender are 0', () => {
+      expect(computeChangeDue(0, 0)).toBe(0);
+    });
+
+    it('handles decimal amounts and rounds to 2 places (no float noise)', () => {
+      // 100.30 - 100.10 = 0.2 but float subtraction yields 0.1999999...
+      expect(computeChangeDue(100.1, 100.3)).toBe(0.2);
+      expect(computeChangeDue(12.55, 20)).toBe(7.45);
+    });
+  });
+
+  describe('isTenderSufficient', () => {
+    it('is true for an exact payment', () => {
+      expect(isTenderSufficient(50, 50)).toBe(true);
+    });
+
+    it('is true when over-paying', () => {
+      expect(isTenderSufficient(50, 100)).toBe(true);
+    });
+
+    it('is false when under-paying', () => {
+      expect(isTenderSufficient(50, 49.99)).toBe(false);
+    });
+
+    it('is true at zero total with zero tender', () => {
+      expect(isTenderSufficient(0, 0)).toBe(true);
     });
   });
 });

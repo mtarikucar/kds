@@ -1,15 +1,17 @@
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import Select from '../ui/Select';
 import Input from '../ui/Input';
+import NumericKeypad from './NumericKeypad';
 import { PaymentMethod } from '../../types';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { useTranslation } from 'react-i18next';
 import { isValidPhone } from '../../utils/validation';
 import { CreditCard, Banknote, Smartphone } from 'lucide-react';
+import { computeChangeDue, isTenderSufficient } from '../../pages/pos/posCart';
 
 const createPaymentSchema = (t: (key: string) => string) => z.object({
   method: z.nativeEnum(PaymentMethod),
@@ -58,6 +60,35 @@ const PaymentModal = ({
   });
 
   const paymentMethod = watch('method');
+
+  // Cash-tender entry ("alınan tutar"). Kept as a raw string so the keypad can
+  // drive it directly; parsed to a number for the change-due math.
+  const [tenderedRaw, setTenderedRaw] = useState('');
+  const tendered = parseFloat(tenderedRaw) || 0;
+  const isCash = paymentMethod === PaymentMethod.CASH;
+
+  // Reset the tendered amount whenever the modal (re)opens or the method
+  // switches away from cash, so a stale value never carries into a new sale.
+  useEffect(() => {
+    if (!isOpen || !isCash) setTenderedRaw('');
+  }, [isOpen, isCash]);
+
+  const changeDue = useMemo(
+    () => computeChangeDue(total, tendered),
+    [total, tendered],
+  );
+  const tenderEntered = tenderedRaw !== '';
+  const tenderSufficient = isTenderSufficient(total, tendered);
+  // Block confirm only once the cashier has started entering an (insufficient)
+  // amount — an untouched field shouldn't disable the button on open.
+  const cashBlocked = isCash && tenderEntered && !tenderSufficient;
+
+  // Quick-cash chips: "exact" plus the next round notes above the total.
+  const quickCashOptions = useMemo(() => {
+    const rounds = [50, 100, 200, 500];
+    const ups = rounds.filter((r) => r >= total).slice(0, 3);
+    return ups;
+  }, [total]);
 
   const paymentMethodOptions = [
     { value: PaymentMethod.CASH, label: t('payment.methods.cash') },
@@ -150,6 +181,80 @@ const PaymentModal = ({
           />
         )}
 
+        {/* CASH: amount-tendered keypad + auto change-due */}
+        {isCash && (
+          <div className="space-y-3">
+            {/* Amount tendered display */}
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-slate-700">
+                {t('payment.amountTendered', 'Alınan Tutar')}
+              </label>
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl border-2 border-slate-200 bg-white">
+                <span className="text-sm text-slate-500">
+                  {t('payment.methods.cash')}
+                </span>
+                <span className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {tenderEntered ? formatPrice(tendered) : formatPrice(0)}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick-cash chips */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setTenderedRaw(String(total))}
+                className="px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors active:scale-95"
+              >
+                {t('payment.exactAmount', 'Tam')}
+              </button>
+              {quickCashOptions.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => setTenderedRaw(String(amount))}
+                  className="px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50 transition-colors active:scale-95"
+                >
+                  {formatPrice(amount)}
+                </button>
+              ))}
+            </div>
+
+            {/* Keypad */}
+            <NumericKeypad
+              value={tenderedRaw}
+              onChange={setTenderedRaw}
+              ariaLabel={t('payment.amountTendered', 'Alınan Tutar')}
+            />
+
+            {/* Change due ("Para üstü") */}
+            <div
+              className={`flex items-center justify-between p-4 rounded-xl border ${
+                cashBlocked
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-emerald-50 border-emerald-200'
+              }`}
+            >
+              <span
+                className={`text-sm font-medium ${
+                  cashBlocked ? 'text-red-700' : 'text-emerald-700'
+                }`}
+              >
+                {cashBlocked
+                  ? t('payment.insufficientCash', 'Tutar yetersiz')
+                  : t('payment.changeDue', 'Para üstü')}
+              </span>
+              <span
+                className={`text-2xl font-bold tabular-nums ${
+                  cashBlocked ? 'text-red-600' : 'text-emerald-600'
+                }`}
+              >
+                {formatPrice(changeDue)}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           <Button
             type="button"
@@ -169,7 +274,10 @@ const PaymentModal = ({
             // a double-tap on touch screens would fire two submits
             // and the backend dedupes via idempotency key, but the
             // second call still consumes a slot in the throttler.
-            disabled={isLoading}
+            // Cash sales are additionally blocked while the tendered amount
+            // is insufficient (tendered < total) so we never confirm a
+            // payment that can't cover the bill.
+            disabled={isLoading || cashBlocked}
           >
             {t('payment.confirmPayment')}
           </Button>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Users, Search } from 'lucide-react';
 import api from '../../lib/api';
 import type { PublicTable, TableStatus } from '../../types';
+import { getTableStatusConfig, getTableStatusLabel } from '../../lib/tableStatus';
 
 interface TableSelectionModalProps {
   isOpen: boolean;
@@ -64,24 +65,18 @@ export default function TableSelectionModal({
     }
   };
 
-  const getStatusColor = (status: TableStatus) => {
-    switch (status) {
-      case 'AVAILABLE':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'OCCUPIED':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      default:
-        return 'bg-slate-100 text-slate-800 border-slate-300';
-    }
-  };
+  // Shared palette: available=emerald, occupied=red, reserved=amber.
+  // Replaces the old green/yellow/slate set that had no RESERVED branch.
+  const getStatusColor = (status: TableStatus) =>
+    getTableStatusConfig(status).chip;
 
-  const getStatusLabel = (status: TableStatus) => {
-    return t(`tableSelection.${status.toLowerCase()}`);
-  };
+  // The customer picker stores labels under tableSelection.<status>
+  // (common ns) but lacked a `reserved` key — the shared helper supplies
+  // a Turkish default so RESERVED no longer renders a raw key.
+  const getStatusLabel = (status: TableStatus) =>
+    getTableStatusLabel(status, t, `tableSelection.${status.toLowerCase()}`);
 
   if (!isOpen) return null;
-
-  const useGridLayout = tables.length < 12;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -132,23 +127,27 @@ export default function TableSelectionModal({
 
           {!loading && !error && tables.length > 0 && (
             <>
-              {/* Search (only for dropdown layout) */}
-              {!useGridLayout && (
-                <div className="mb-4 relative">
-                  <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('tableSelection.searchPlaceholder')}
-                    className="w-full pl-10 pr-4 rtl:pl-4 rtl:pr-10 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ ['--tw-ring-color' as any]: primaryColor }}
-                  />
-                </div>
-              )}
+              {/* Search — always available so the visual grid stays
+                  usable even with many tables (no more degrading to a
+                  bare native <select> at >=12 tables). */}
+              <div className="mb-4 relative">
+                <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('tableSelection.searchPlaceholder')}
+                  className="w-full pl-10 pr-4 rtl:pl-4 rtl:pr-10 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{ ['--tw-ring-color' as any]: primaryColor }}
+                />
+              </div>
 
-              {/* Grid Layout (<12 tables) */}
-              {useGridLayout && (
+              {/* Visual grid at every size — search keeps it scannable. */}
+              {filteredTables.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-500">{t('tableSelection.noTablesAvailable')}</p>
+                </div>
+              ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
                   {filteredTables.map((table) => (
                     <button
@@ -186,25 +185,6 @@ export default function TableSelectionModal({
                       </div>
                     </button>
                   ))}
-                </div>
-              )}
-
-              {/* Dropdown Layout (≥12 tables) */}
-              {!useGridLayout && (
-                <div className="space-y-2">
-                  <select
-                    value={selectedTableId || ''}
-                    onChange={(e) => setSelectedTableId(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ ['--tw-ring-color' as any]: primaryColor }}
-                  >
-                    <option value="">{t('tableSelection.selectDropdown')}</option>
-                    {filteredTables.map((table) => (
-                      <option key={table.id} value={table.id}>
-                        {t('tableSelection.tableNumber')} {table.number} - {t('tableSelection.capacity')}: {table.capacity} - {getStatusLabel(table.status)}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               )}
             </>

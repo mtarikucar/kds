@@ -27,6 +27,17 @@ vi.mock('../../features/kds/useKitchenSocket', () => ({
   useKitchenSocket: () => ({ isConnected: true }),
 }));
 
+// OrderCard fires a sonner Undo toast after a confirmed cancel; capture it
+// so the toast doesn't reach a real (absent) Toaster.
+const toastFn = vi.fn();
+vi.mock('sonner', () => ({
+  toast: Object.assign((...a: unknown[]) => toastFn(...a), {
+    success: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
 // Stats header is a presentational child with its own time logic — stub it
 // to a probe that surfaces the order count + connection status.
 vi.mock('../../components/kitchen/KitchenStatsHeader', () => ({
@@ -136,14 +147,14 @@ describe('KitchenDisplayPage', () => {
     });
   });
 
-  it('cancels a pending order via the kds cancel mutation (order id only)', () => {
+  it('defers the kds cancel behind an Undo window and only commits on toast timeout', () => {
     ordersData.push(
       makeOrder({ id: 'pend-9', orderNumber: '4004', status: OrderStatus.PENDING }),
     );
 
     render(<KitchenDisplayPage />);
 
-    // Open the first card's "more options" dropdown, then click cancel.
+    // Open the first card's "more options" dropdown, then arm the cancel.
     const moreButtons = screen.getAllByRole('button', {
       name: 'kitchen.moreOptions',
     });
@@ -152,10 +163,61 @@ describe('KitchenDisplayPage', () => {
     const cancelItem = screen.getByText('kitchen.cancelOrder');
     fireEvent.click(cancelItem);
 
+    // Arming the cancel does NOT yet fire the mutation — confirmation first.
+    expect(cancelOrder).not.toHaveBeenCalled();
+
+    // Confirm "Evet" → shows the Undo toast but does NOT send the cancel yet
+    // (CANCELLED is terminal server-side; the only safe undo is to defer).
+    fireEvent.click(screen.getAllByText('kitchen.confirmYes')[0]);
+    expect(toastFn).toHaveBeenCalledTimes(1);
+    expect(cancelOrder).not.toHaveBeenCalled();
+
+    // The toast naturally timing out (no Undo) commits the cancel.
+    const opts = toastFn.mock.calls[0][1] as { onAutoClose: () => void };
+    opts.onAutoClose();
     expect(cancelOrder).toHaveBeenCalledTimes(1);
     expect(cancelOrder.mock.calls[0][0]).toBe('pend-9');
-    // Cancel must NOT also fire a status update.
+    // Cancel must NOT fire a status update (no CANCELLED→PENDING flip).
     expect(updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('aborts the cancel when "Geri al" (undo) is tapped before the window elapses', () => {
+    ordersData.push(
+      makeOrder({ id: 'pend-9', orderNumber: '4004', status: OrderStatus.PENDING }),
+    );
+
+    render(<KitchenDisplayPage />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'kitchen.moreOptions' })[0]);
+    fireEvent.click(screen.getByText('kitchen.cancelOrder'));
+    fireEvent.click(screen.getAllByText('kitchen.confirmYes')[0]);
+
+    // Tap Undo, then let the toast close → cancel must never be sent.
+    const opts = toastFn.mock.calls[0][1] as {
+      action: { onClick: () => void };
+      onAutoClose: () => void;
+    };
+    opts.action.onClick();
+    opts.onAutoClose();
+    expect(cancelOrder).not.toHaveBeenCalled();
+    expect(updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('aborts a cancel when the confirm step is declined', () => {
+    ordersData.push(
+      makeOrder({ id: 'pend-7', orderNumber: '5005', status: OrderStatus.PENDING }),
+    );
+
+    render(<KitchenDisplayPage />);
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'kitchen.moreOptions' })[0],
+    );
+    fireEvent.click(screen.getByText('kitchen.cancelOrder'));
+    // Decline with "Hayır".
+    fireEvent.click(screen.getAllByText('kitchen.confirmNo')[0]);
+
+    expect(cancelOrder).not.toHaveBeenCalled();
   });
 
   it('calls refetch when the stats header refresh is invoked', () => {

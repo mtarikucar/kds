@@ -26,7 +26,7 @@ import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import { useResponsive } from '../../hooks/useResponsive';
+import { useResponsive, BREAKPOINTS } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
@@ -76,8 +76,22 @@ const POSPage = () => {
   const [isBillSplitModalOpen, setIsBillSplitModalOpen] = useState(false);
   const [isProgressiveModalOpen, setIsProgressiveModalOpen] = useState(false);
 
-  // Responsive hook
-  const { isDesktop } = useResponsive();
+  // Responsive hook. `width` lets us pick the POS split threshold independently
+  // of the shared `isDesktop` (>=1024) flag: landscape tablets (>=768/md) now
+  // get the side-by-side menu+cart layout instead of falling back to the mobile
+  // drawer. Phones (<768) keep the drawer. `width` may be undefined under the
+  // POSPage unit test (which stubs useResponsive); we fall back to isDesktop.
+  const { isDesktop, width } = useResponsive();
+  const useSideBySideLayout =
+    typeof width === 'number' ? width >= BREAKPOINTS.md : isDesktop;
+
+  // A device rotating/resizing from the drawer band (<md) into the
+  // side-by-side band (>=md) would otherwise leave the cart drawer open WHILE
+  // the side panel also renders the cart — two carts plus a stuck body
+  // scroll-lock. Close the drawer whenever the side-by-side layout activates.
+  useEffect(() => {
+    if (useSideBySideLayout && isCartDrawerOpen) setIsCartDrawerOpen(false);
+  }, [useSideBySideLayout, isCartDrawerOpen]);
 
   // Socket.IO for real-time updates
   usePosSocket();
@@ -258,6 +272,37 @@ const POSPage = () => {
 
   const handleRemoveItem = (productId: string) => {
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
+  };
+
+  // In-cart quantity per product id (summed across lines) for the MenuPanel
+  // card badges. Built from the live cart so the badge tracks adds/removes.
+  const cartQuantities = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const item of cartItems) {
+      map[item.id] = (map[item.id] ?? 0) + item.quantity;
+    }
+    return map;
+  }, [cartItems]);
+
+  // Inline +/- from a MenuPanel card. Only wired for non-modifier items (the
+  // panel hides the steppers for required-modifier products), which always
+  // collapse to a single cart line, so targeting by product id is safe.
+  const handleMenuIncrement = (productId: string) => {
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.id === productId ? { ...item, quantity: item.quantity + 1 } : item,
+      ),
+    );
+  };
+
+  const handleMenuDecrement = (productId: string) => {
+    setCartItems((prev) =>
+      prev.flatMap((item) => {
+        if (item.id !== productId) return [item];
+        // Drop the line when it would hit zero, otherwise decrement.
+        return item.quantity <= 1 ? [] : [{ ...item, quantity: item.quantity - 1 }];
+      }),
+    );
   };
 
   const handleClearCart = () => {
@@ -594,7 +639,7 @@ const POSPage = () => {
   };
 
   return (
-    <div className="h-full pb-20 lg:pb-0">
+    <div className="h-full pb-20 md:pb-0">
       {/* Notification Bar */}
       <NotificationBar
         onShowPendingOrders={() => setIsPendingOrdersPanelOpen(true)}
@@ -762,8 +807,8 @@ const POSPage = () => {
                 )}
               </p>
             </div>
-            {/* Cart indicator for mobile */}
-            {!isDesktop && hasCartItems && (
+            {/* Cart indicator for mobile (only when the side cart is hidden) */}
+            {!useSideBySideLayout && hasCartItems && (
               <button
                 onClick={() => setIsCartDrawerOpen(true)}
                 className="relative p-2 bg-primary-50 text-primary-700 rounded-lg"
@@ -785,9 +830,9 @@ const POSPage = () => {
             />
           )}
 
-          {/* DESKTOP: 2/3 Menu + 1/3 Cart Layout */}
-          {isDesktop && (
-            <div className="flex-1 grid grid-cols-3 gap-6 min-h-0">
+          {/* DESKTOP + LANDSCAPE TABLET (>=768): 2/3 Menu + 1/3 Cart Layout */}
+          {useSideBySideLayout && (
+            <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6 min-h-0">
               {/* Menu Panel - 2/3 width */}
               <div className="col-span-2" data-tour="menu-panel">
                 <Card className="h-full">
@@ -795,7 +840,12 @@ const POSPage = () => {
                     <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
                   </CardHeader>
                   <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
-                    <MenuPanel onAddItem={handleAddItem} />
+                    <MenuPanel
+                      onAddItem={handleAddItem}
+                      cartQuantities={cartQuantities}
+                      onIncrement={handleMenuIncrement}
+                      onDecrement={handleMenuDecrement}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -832,15 +882,20 @@ const POSPage = () => {
             </div>
           )}
 
-          {/* MOBILE/TABLET: Full-screen Menu */}
-          {!isDesktop && (
+          {/* PHONE: Full-screen Menu (cart lives in the drawer) */}
+          {!useSideBySideLayout && (
             <div className="flex-1 min-h-0">
               <Card className="h-full">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
-                  <MenuPanel onAddItem={handleAddItem} />
+                  <MenuPanel
+                    onAddItem={handleAddItem}
+                    cartQuantities={cartQuantities}
+                    onIncrement={handleMenuIncrement}
+                    onDecrement={handleMenuDecrement}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -848,8 +903,9 @@ const POSPage = () => {
         </div>
       )}
 
-      {/* STICKY BOTTOM CART BAR - Mobile/Tablet only (order view) */}
-      {currentView === 'order' && (
+      {/* STICKY BOTTOM CART BAR - phones only (order view); hidden once the
+          side-by-side cart is shown (>=768) so a tablet doesn't get two carts. */}
+      {currentView === 'order' && !useSideBySideLayout && (
         <StickyCartBar
           itemCount={cartItems.length}
           total={total}
