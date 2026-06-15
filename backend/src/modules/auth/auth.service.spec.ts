@@ -644,6 +644,36 @@ describe('AuthService', () => {
 
       await expect(service.getProfile('nonexistent')).rejects.toThrow(UnauthorizedException);
     });
+
+    it('falls back to the tenant home branch when an owner ADMIN has a null primaryBranchId', async () => {
+      // Pre-v3.0.0 owner: never backfilled, no assignments. /me must hand the
+      // SPA a concrete primaryBranchId so a profile refetch does NOT re-null
+      // branchScopeStore and re-break every branch-scoped request.
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'owner-1',
+        email: 'owner@test.com',
+        firstName: 'Owner',
+        lastName: 'Admin',
+        role: UserRole.ADMIN,
+        tenantId: 'tenant-1',
+        primaryBranchId: null,
+        branchAssignments: [],
+      } as any);
+      prisma.branch.findFirst.mockResolvedValue({ id: 'branch-main' } as any);
+
+      const result = await service.getProfile('owner-1');
+
+      expect(result).toMatchObject({
+        id: 'owner-1',
+        primaryBranchId: 'branch-main',
+        allowedBranchIds: [],
+      });
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { tenantId: 'tenant-1', status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+    });
   });
 
   // Regression: a new Google/Apple signup must get the SAME provisioning as

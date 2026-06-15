@@ -25,6 +25,7 @@ import { UserRole } from '../../common/constants/roles.enum';
 describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
   let prisma: MockPrismaClient;
   let svc: TablesService;
+  let availability: { resolvePublicBranchId: jest.Mock };
 
   const scope: BranchScope = {
     tenantId: 't1',
@@ -42,7 +43,10 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
       emitTableUnmerge: jest.fn(),
       emitTableMerge: jest.fn(),
     } as any;
-    svc = new TablesService(prisma as any, kdsGateway);
+    // ReservationAvailabilityService — only resolvePublicBranchId is
+    // consumed (the public customer-table-listing branch resolver).
+    availability = { resolvePublicBranchId: jest.fn() };
+    svc = new TablesService(prisma as any, kdsGateway, availability as any);
     // Forward $transaction work onto the prisma mock so assertions on
     // .table / .order calls inside the tx still work.
     (prisma.$transaction as any).mockImplementation(async (work: any) => work(prisma));
@@ -219,6 +223,152 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
       await expect(
         svc.mergeTables(scope, { tableIds: ['tab-a', 'tab-cross-branch'] }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  /**
+   * v3 read-leak fix: GET /tables/public/:tenantId (anonymous customer
+   * table listing) used to filter by tenantId ONLY, exposing EVERY
+   * branch's tables to anonymous callers. The fix resolves a single
+   * branch via ReservationAvailabilityService.resolvePublicBranchId and
+   * pins the findMany to that (tenantId, branchId).
+   */
+  describe('findAvailableForCustomers (public branch-leak fix)', () => {
+    it('filters findMany by the resolved (tenantId, branchId) + status', async () => {
+      availability.resolvePublicBranchId.mockResolvedValue('b-main');
+      let findWhere: any = null;
+      (prisma.table.findMany as any).mockImplementation(async ({ where }: any) => {
+        findWhere = where;
+        return [];
+      });
+
+      await svc.findAvailableForCustomers('t1');
+
+      // Load-bearing: branchId MUST be in the WHERE or the listing leaks
+      // every branch's tables to the anonymous customer endpoint.
+      expect(findWhere.tenantId).toBe('t1');
+      expect(findWhere.branchId).toBe('b-main');
+      expect(findWhere.status).toEqual({
+        in: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
+      });
+    });
+
+    it('forwards an explicit branchId to resolvePublicBranchId (validation/fallback owned there)', async () => {
+      availability.resolvePublicBranchId.mockResolvedValue('b-2');
+      (prisma.table.findMany as any).mockResolvedValue([]);
+
+      await svc.findAvailableForCustomers('t1', 'b-2');
+
+      expect(availability.resolvePublicBranchId).toHaveBeenCalledWith('t1', 'b-2');
+    });
+
+    it('falls back to the resolver when no branchId is supplied (undefined passed through)', async () => {
+      availability.resolvePublicBranchId.mockResolvedValue('b-oldest-active');
+      let findWhere: any = null;
+      (prisma.table.findMany as any).mockImplementation(async ({ where }: any) => {
+        findWhere = where;
+        return [];
+      });
+
+      await svc.findAvailableForCustomers('t1');
+
+      expect(availability.resolvePublicBranchId).toHaveBeenCalledWith('t1', undefined);
+      // The resolver's oldest-active fallback id is what scopes the query.
+      expect(findWhere.branchId).toBe('b-oldest-active');
+    });
+  });
+
+  /**
+   * v3 branch-isolation FOUNDATION: table numbers are unique PER BRANCH,
+   * not per tenant. The schema constraint moved from
+   * @@unique([tenantId, number]) to @@unique([tenantId, branchId, number]).
+   * These specs pin the service-layer uniqueness check to the new compound
+   * key on BOTH create and update.
+   */
+  describe('v3 per-branch table-number uniqueness', () => {
+    const scopeB1: BranchScope = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: UserRole.MANAGER };
+    const scopeB2: BranchScope = { tenantId: 't1', branchId: 'b2', userId: 'u1', role: UserRole.MANAGER };
+
+    it('create: dup-check keys on the compound (tenantId, branchId, number)', async () => {
+      let dupWhere: any = null;
+      (prisma.table.findUnique as any).mockImplementation(async ({ where }: any) => {
+        dupWhere = where;
+        return null;
+      });
+      (prisma.table.create as any).mockResolvedValue({ id: 'tab-new' } as any);
+
+      await svc.create(scopeB1, { number: '1', capacity: 4 } as any);
+
+      // Load-bearing: the dedupe must scope by branchId so branch B can
+      // still claim number 1 even when branch A already has it.
+      expect(dupWhere).toEqual({
+        tenantId_branchId_number: { tenantId: 't1', branchId: 'b1', number: '1' },
+      });
+    });
+
+    it('create: same number in a DIFFERENT branch is ALLOWED', async () => {
+      // Branch A owns table #1. The dup-check is keyed on (tenant, branch,
+      // number); querying branch B's slot returns null, so the create
+      // proceeds. We assert the create fired with branch B's branchId.
+      (prisma.table.findUnique as any).mockImplementation(async ({ where }: any) => {
+        const { branchId, number } = where.tenantId_branchId_number;
+        // Only branch A already has number 1.
+        if (branchId === 'b1' && number === '1') {
+          return { id: 'tab-a1', tenantId: 't1', branchId: 'b1', number: '1' } as any;
+        }
+        return null;
+      });
+      let createData: any = null;
+      (prisma.table.create as any).mockImplementation(async ({ data }: any) => {
+        createData = data;
+        return { id: 'tab-b1', ...data } as any;
+      });
+
+      const out = await svc.create(scopeB2, { number: '1', capacity: 2 } as any);
+
+      expect(createData).toMatchObject({ tenantId: 't1', branchId: 'b2', number: '1' });
+      expect(out).toBeTruthy();
+    });
+
+    it('create: same number in the SAME branch is rejected (409)', async () => {
+      (prisma.table.findUnique as any).mockResolvedValue({
+        id: 'tab-a1', tenantId: 't1', branchId: 'b1', number: '1',
+      } as any);
+
+      await expect(
+        svc.create(scopeB1, { number: '1', capacity: 4 } as any),
+      ).rejects.toThrow(ConflictException);
+
+      // The collision must short-circuit before any write.
+      expect((prisma.table.create as any).mock.calls.length).toBe(0);
+    });
+
+    it('update: rename dup-check keys on the compound (tenantId, branchId, number)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', number: '1' } as any);
+      let dupWhere: any = null;
+      (prisma.table.findUnique as any).mockImplementation(async ({ where }: any) => {
+        dupWhere = where;
+        return null; // no collision
+      });
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.update(scopeB1, 'tab-1', { number: '7' } as any);
+
+      expect(dupWhere).toEqual({
+        tenantId_branchId_number: { tenantId: 't1', branchId: 'b1', number: '7' },
+      });
+    });
+
+    it('update: rename onto a number used by ANOTHER table in the same branch is rejected (409)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', number: '1' } as any);
+      // A different table already owns number 7 in the same branch.
+      (prisma.table.findUnique as any).mockResolvedValue({
+        id: 'tab-other', tenantId: 't1', branchId: 'b1', number: '7',
+      } as any);
+
+      await expect(
+        svc.update(scopeB1, 'tab-1', { number: '7' } as any),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

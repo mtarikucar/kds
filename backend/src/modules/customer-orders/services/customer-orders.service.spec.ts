@@ -177,6 +177,16 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
    * ACKNOWLEDGED (keep the existing ack metadata untouched).
    */
   describe('iter-86 complete-request acknowledger preservation', () => {
+    // v3 branch-scope: the complete* methods now take a BranchScope, not a
+    // bare tenantId. These iter-86 assertions are unchanged in intent; the
+    // scope just carries the same tenant plus the branch fence.
+    const scope = {
+      tenantId: 't1',
+      branchId: 'b1',
+      userId: 'completer-user',
+      role: 'WAITER',
+    } as any;
+
     it('completeWaiterRequest from PENDING stamps completer as the implicit acknowledger', async () => {
       (prisma.waiterRequest.findFirst as any).mockResolvedValue({
         id: 'wr-1',
@@ -196,7 +206,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
       });
       (prisma.waiterRequest.findFirstOrThrow as any).mockResolvedValue({ id: 'wr-1' });
 
-      await svc.completeWaiterRequest('wr-1', 'completer-user', 't1');
+      await svc.completeWaiterRequest('wr-1', 'completer-user', scope);
 
       // Exactly one updateMany call against the PENDING branch.
       const pendingCalls = updates.filter((u) => u.where.status === 'PENDING');
@@ -231,7 +241,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
       });
       (prisma.waiterRequest.findFirstOrThrow as any).mockResolvedValue({ id: 'wr-2' });
 
-      await svc.completeWaiterRequest('wr-2', 'completer-user', 't1');
+      await svc.completeWaiterRequest('wr-2', 'completer-user', scope);
 
       // The ACKNOWLEDGED-branch update must NOT touch acknowledgedById
       // or acknowledgedAt. That's the load-bearing preservation.
@@ -259,7 +269,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
       });
       (prisma.billRequest.findFirstOrThrow as any).mockResolvedValue({ id: 'br-1' });
 
-      await svc.completeBillRequest('br-1', 'completer-user', 't1');
+      await svc.completeBillRequest('br-1', 'completer-user', scope);
 
       const acked = updates.find((u) => u.where.status === 'ACKNOWLEDGED');
       expect(acked).toBeDefined();
@@ -268,6 +278,13 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
   });
 
   describe('iter-86 active-listing take cap', () => {
+    const scope = {
+      tenantId: 't1',
+      branchId: 'b1',
+      userId: 'u1',
+      role: 'WAITER',
+    } as any;
+
     it('getActiveWaiterRequests caps the listing at 200', async () => {
       let captured: any = null;
       (prisma.waiterRequest.findMany as any).mockImplementation(async (args: any) => {
@@ -275,7 +292,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
         return [];
       });
 
-      await svc.getActiveWaiterRequests('t1');
+      await svc.getActiveWaiterRequests(scope);
 
       expect(captured.take).toBe(200);
     });
@@ -287,9 +304,188 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
         return [];
       });
 
-      await svc.getActiveBillRequests('t1');
+      await svc.getActiveBillRequests(scope);
 
       expect(captured.take).toBe(200);
+    });
+  });
+
+  /**
+   * v3 branch-scope cross-branch read-leak close.
+   *
+   * Pre-fix, the staff active-listing and the acknowledge/complete
+   * mutations fenced on `tenantId` ONLY. A WAITER signed into branch B
+   * could read branch A's open waiter/bill requests (PII: table, names)
+   * and could acknowledge/complete a request id belonging to another
+   * branch of the same tenant.
+   *
+   * The fix spreads `branchScope(scope)` → { tenantId, branchId } into
+   * every where clause. These specs pin the branch-fenced predicate and
+   * prove a cross-branch id is NOT acted on (updateMany matches zero
+   * rows → BadRequest, never a silent cross-branch write).
+   */
+  describe('v3 branch-scope read-leak close', () => {
+    const scope = {
+      tenantId: 't1',
+      branchId: 'b1',
+      userId: 'staff-1',
+      role: 'WAITER',
+    } as any;
+
+    it('getActiveWaiterRequests fences on BOTH tenantId AND branchId', async () => {
+      let captured: any = null;
+      (prisma.waiterRequest.findMany as any).mockImplementation(async (args: any) => {
+        captured = args;
+        return [];
+      });
+
+      await svc.getActiveWaiterRequests(scope);
+
+      expect(captured.where.tenantId).toBe('t1');
+      expect(captured.where.branchId).toBe('b1');
+      expect(captured.where.status).toEqual({ in: ['PENDING', 'ACKNOWLEDGED'] });
+    });
+
+    it('getActiveBillRequests fences on BOTH tenantId AND branchId', async () => {
+      let captured: any = null;
+      (prisma.billRequest.findMany as any).mockImplementation(async (args: any) => {
+        captured = args;
+        return [];
+      });
+
+      await svc.getActiveBillRequests(scope);
+
+      expect(captured.where.tenantId).toBe('t1');
+      expect(captured.where.branchId).toBe('b1');
+      expect(captured.where.status).toEqual({ in: ['PENDING', 'ACKNOWLEDGED'] });
+    });
+
+    it('acknowledgeWaiterRequest updateMany is fenced on id + tenantId + branchId', async () => {
+      let captured: any = null;
+      (prisma.waiterRequest.updateMany as any).mockImplementation(async (args: any) => {
+        captured = args;
+        return { count: 1 };
+      });
+      (prisma.waiterRequest.findFirstOrThrow as any).mockResolvedValue({
+        id: 'wr-1',
+        branchId: 'b1',
+      });
+
+      await svc.acknowledgeWaiterRequest('wr-1', 'staff-1', scope);
+
+      expect(captured.where.id).toBe('wr-1');
+      expect(captured.where.tenantId).toBe('t1');
+      expect(captured.where.branchId).toBe('b1');
+      expect(captured.where.status).toBe('PENDING');
+    });
+
+    it('acknowledgeWaiterRequest does NOT act on a cross-branch id (updateMany matches 0 → BadRequest)', async () => {
+      // Real Prisma updateMany returns count:0 when the row's branchId
+      // does not match the fence. Simulate that: the id exists but in
+      // another branch, so the (tenantId, branchId) predicate misses.
+      (prisma.waiterRequest.updateMany as any).mockResolvedValue({ count: 0 });
+
+      await expect(
+        svc.acknowledgeWaiterRequest('wr-other-branch', 'staff-1', scope),
+      ).rejects.toThrow('Waiter request not found or already acknowledged');
+
+      // The fence the DB evaluated must have carried this caller's branchId,
+      // never a tenant-only predicate.
+      const where = (prisma.waiterRequest.updateMany as any).mock.calls[0][0].where;
+      expect(where.branchId).toBe('b1');
+      // And crucially: no post-mutation read/emit happened for the
+      // cross-branch row.
+      expect((prisma.waiterRequest.findFirstOrThrow as any).mock.calls.length).toBe(0);
+    });
+
+    it('acknowledgeBillRequest updateMany is fenced on id + tenantId + branchId', async () => {
+      let captured: any = null;
+      (prisma.billRequest.updateMany as any).mockImplementation(async (args: any) => {
+        captured = args;
+        return { count: 1 };
+      });
+      (prisma.billRequest.findFirstOrThrow as any).mockResolvedValue({
+        id: 'br-1',
+        branchId: 'b1',
+      });
+
+      await svc.acknowledgeBillRequest('br-1', 'staff-1', scope);
+
+      expect(captured.where.id).toBe('br-1');
+      expect(captured.where.tenantId).toBe('t1');
+      expect(captured.where.branchId).toBe('b1');
+      expect(captured.where.status).toBe('PENDING');
+    });
+
+    it('acknowledgeBillRequest does NOT act on a cross-branch id', async () => {
+      (prisma.billRequest.updateMany as any).mockResolvedValue({ count: 0 });
+
+      await expect(
+        svc.acknowledgeBillRequest('br-other-branch', 'staff-1', scope),
+      ).rejects.toThrow('Bill request not found or already acknowledged');
+
+      const where = (prisma.billRequest.updateMany as any).mock.calls[0][0].where;
+      expect(where.branchId).toBe('b1');
+      expect((prisma.billRequest.findFirstOrThrow as any).mock.calls.length).toBe(0);
+    });
+
+    it('completeWaiterRequest snapshot read is branch-fenced — a cross-branch id reads as not found', async () => {
+      // findFirst returns null because the (tenantId, branchId) fence
+      // excludes the other branch's row. Service must 404, never reach
+      // the transaction.
+      (prisma.waiterRequest.findFirst as any).mockResolvedValue(null);
+
+      await expect(
+        svc.completeWaiterRequest('wr-other-branch', 'staff-1', scope),
+      ).rejects.toThrow('Waiter request not found');
+
+      const where = (prisma.waiterRequest.findFirst as any).mock.calls[0][0].where;
+      expect(where.id).toBe('wr-other-branch');
+      expect(where.tenantId).toBe('t1');
+      expect(where.branchId).toBe('b1');
+      // Never opened a transaction for a row outside the branch.
+      expect((prisma.$transaction as any).mock.calls.length).toBe(0);
+    });
+
+    it('completeWaiterRequest transaction updateMany branches both carry the branch fence', async () => {
+      (prisma.waiterRequest.findFirst as any).mockResolvedValue({
+        id: 'wr-1',
+        tenantId: 't1',
+        branchId: 'b1',
+        status: 'PENDING',
+      });
+      (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
+      const updates: any[] = [];
+      (prisma.waiterRequest.updateMany as any).mockImplementation(async (args: any) => {
+        updates.push(args);
+        if (args.where.status === 'PENDING') return { count: 1 };
+        return { count: 0 };
+      });
+      (prisma.waiterRequest.findFirstOrThrow as any).mockResolvedValue({
+        id: 'wr-1',
+        branchId: 'b1',
+      });
+
+      await svc.completeWaiterRequest('wr-1', 'staff-1', scope);
+
+      for (const u of updates) {
+        expect(u.where.tenantId).toBe('t1');
+        expect(u.where.branchId).toBe('b1');
+      }
+    });
+
+    it('completeBillRequest snapshot read is branch-fenced — a cross-branch id reads as not found', async () => {
+      (prisma.billRequest.findFirst as any).mockResolvedValue(null);
+
+      await expect(
+        svc.completeBillRequest('br-other-branch', 'staff-1', scope),
+      ).rejects.toThrow('Bill request not found');
+
+      const where = (prisma.billRequest.findFirst as any).mock.calls[0][0].where;
+      expect(where.id).toBe('br-other-branch');
+      expect(where.tenantId).toBe('t1');
+      expect(where.branchId).toBe('b1');
+      expect((prisma.$transaction as any).mock.calls.length).toBe(0);
     });
   });
 });

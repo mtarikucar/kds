@@ -33,6 +33,7 @@ import {
   isLocationWithinRange,
   isValidCoordinates,
 } from "../../../common/utils/geolocation.util";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class CustomerOrdersService {
@@ -455,13 +456,20 @@ export class CustomerOrdersService {
     });
   }
 
-  async getActiveWaiterRequests(tenantId: string) {
+  async getActiveWaiterRequests(scope: BranchScope) {
     // Iter-86: cap matches the per-session listings above (50 is plenty
     // for any single dashboard tick on an event-night tenant; 200 here
     // gives headroom for a large chain summary while still bounding
     // the payload + PII surface).
+    //
+    // v3 branch-scope: fence on (tenantId, branchId) — a previous
+    // tenant-only filter leaked every branch's active requests into
+    // each branch dashboard.
     return this.prisma.waiterRequest.findMany({
-      where: { tenantId, status: { in: ["PENDING", "ACKNOWLEDGED"] } },
+      where: {
+        ...branchScope(scope),
+        status: { in: ["PENDING", "ACKNOWLEDGED"] },
+      },
       include: {
         table: true,
         acknowledgedBy: {
@@ -473,9 +481,17 @@ export class CustomerOrdersService {
     });
   }
 
-  async acknowledgeWaiterRequest(id: string, userId: string, tenantId: string) {
+  async acknowledgeWaiterRequest(
+    id: string,
+    userId: string,
+    scope: BranchScope,
+  ) {
+    // v3 branch-scope: the updateMany fence is (id, tenantId, branchId)
+    // so a request id belonging to another branch is never acted on —
+    // updateMany simply matches zero rows and we surface the same
+    // "not found" error a stranger id would get.
     const result = await this.prisma.waiterRequest.updateMany({
-      where: { id, tenantId, status: "PENDING" },
+      where: { id, ...branchScope(scope), status: "PENDING" },
       data: {
         status: "ACKNOWLEDGED",
         acknowledgedById: userId,
@@ -488,7 +504,7 @@ export class CustomerOrdersService {
       );
     }
     const updated = await this.prisma.waiterRequest.findFirstOrThrow({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         table: true,
         acknowledgedBy: {
@@ -497,16 +513,18 @@ export class CustomerOrdersService {
       },
     });
     this.kdsGateway.emitWaiterRequestUpdated(
-      tenantId,
+      scope.tenantId,
       updated.branchId,
       updated,
     );
     return updated;
   }
 
-  async completeWaiterRequest(id: string, userId: string, tenantId: string) {
+  async completeWaiterRequest(id: string, userId: string, scope: BranchScope) {
+    // v3 branch-scope: every read/write below is fenced on
+    // (tenantId, branchId) so a cross-branch id is treated as not found.
     const request = await this.prisma.waiterRequest.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
     if (!request) throw new NotFoundException("Waiter request not found");
     if (request.status === "COMPLETED") {
@@ -535,7 +553,7 @@ export class CustomerOrdersService {
       // metadata from this user (the completer is implicitly also
       // the acknowledger when nobody acknowledged separately).
       const fromPending = await tx.waiterRequest.updateMany({
-        where: { id, tenantId, status: "PENDING" },
+        where: { id, ...branchScope(scope), status: "PENDING" },
         data: {
           status: "COMPLETED",
           completedAt: now,
@@ -549,7 +567,7 @@ export class CustomerOrdersService {
       // NOT touch acknowledgedById / acknowledgedAt; that is the
       // load-bearing change.
       const fromAcked = await tx.waiterRequest.updateMany({
-        where: { id, tenantId, status: "ACKNOWLEDGED" },
+        where: { id, ...branchScope(scope), status: "ACKNOWLEDGED" },
         data: { status: "COMPLETED", completedAt: now },
       });
       if (fromAcked.count !== 1) {
@@ -560,7 +578,7 @@ export class CustomerOrdersService {
     });
 
     const updated = await this.prisma.waiterRequest.findFirstOrThrow({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         table: true,
         acknowledgedBy: {
@@ -569,7 +587,7 @@ export class CustomerOrdersService {
       },
     });
     this.kdsGateway.emitWaiterRequestUpdated(
-      tenantId,
+      scope.tenantId,
       updated.branchId,
       updated,
     );
@@ -669,10 +687,15 @@ export class CustomerOrdersService {
     });
   }
 
-  async getActiveBillRequests(tenantId: string) {
+  async getActiveBillRequests(scope: BranchScope) {
     // Iter-86: same cap rationale as getActiveWaiterRequests above.
+    // v3 branch-scope: fence on (tenantId, branchId) — same cross-branch
+    // leak close as getActiveWaiterRequests.
     return this.prisma.billRequest.findMany({
-      where: { tenantId, status: { in: ["PENDING", "ACKNOWLEDGED"] } },
+      where: {
+        ...branchScope(scope),
+        status: { in: ["PENDING", "ACKNOWLEDGED"] },
+      },
       include: {
         table: true,
         acknowledgedBy: {
@@ -684,9 +707,11 @@ export class CustomerOrdersService {
     });
   }
 
-  async acknowledgeBillRequest(id: string, userId: string, tenantId: string) {
+  async acknowledgeBillRequest(id: string, userId: string, scope: BranchScope) {
+    // v3 branch-scope: (id, tenantId, branchId) fence — a cross-branch
+    // id matches zero rows and surfaces "not found".
     const result = await this.prisma.billRequest.updateMany({
-      where: { id, tenantId, status: "PENDING" },
+      where: { id, ...branchScope(scope), status: "PENDING" },
       data: {
         status: "ACKNOWLEDGED",
         acknowledgedById: userId,
@@ -699,7 +724,7 @@ export class CustomerOrdersService {
       );
     }
     const updated = await this.prisma.billRequest.findFirstOrThrow({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         table: true,
         acknowledgedBy: {
@@ -707,13 +732,18 @@ export class CustomerOrdersService {
         },
       },
     });
-    this.kdsGateway.emitBillRequestUpdated(tenantId, updated.branchId, updated);
+    this.kdsGateway.emitBillRequestUpdated(
+      scope.tenantId,
+      updated.branchId,
+      updated,
+    );
     return updated;
   }
 
-  async completeBillRequest(id: string, userId: string, tenantId: string) {
+  async completeBillRequest(id: string, userId: string, scope: BranchScope) {
+    // v3 branch-scope: every read/write fenced on (tenantId, branchId).
     const request = await this.prisma.billRequest.findFirst({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
     });
     if (!request) throw new NotFoundException("Bill request not found");
     if (request.status === "COMPLETED") {
@@ -727,7 +757,7 @@ export class CustomerOrdersService {
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       const fromPending = await tx.billRequest.updateMany({
-        where: { id, tenantId, status: "PENDING" },
+        where: { id, ...branchScope(scope), status: "PENDING" },
         data: {
           status: "COMPLETED",
           completedAt: now,
@@ -738,7 +768,7 @@ export class CustomerOrdersService {
       if (fromPending.count === 1) return;
 
       const fromAcked = await tx.billRequest.updateMany({
-        where: { id, tenantId, status: "ACKNOWLEDGED" },
+        where: { id, ...branchScope(scope), status: "ACKNOWLEDGED" },
         data: { status: "COMPLETED", completedAt: now },
       });
       if (fromAcked.count !== 1) {
@@ -748,7 +778,7 @@ export class CustomerOrdersService {
       }
     });
     const updated = await this.prisma.billRequest.findFirstOrThrow({
-      where: { id, tenantId },
+      where: { id, ...branchScope(scope) },
       include: {
         table: true,
         acknowledgedBy: {
@@ -756,7 +786,11 @@ export class CustomerOrdersService {
         },
       },
     });
-    this.kdsGateway.emitBillRequestUpdated(tenantId, updated.branchId, updated);
+    this.kdsGateway.emitBillRequestUpdated(
+      scope.tenantId,
+      updated.branchId,
+      updated,
+    );
     return updated;
   }
 

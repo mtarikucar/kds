@@ -42,15 +42,18 @@ export class StockItemsController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get all stock items with optional filtering" })
-  findAll(@Request() req, @Query() query: StockItemQueryDto) {
-    return this.service.findAll(req.tenantId, query);
+  findAll(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: StockItemQueryDto,
+  ) {
+    return this.service.findAll(scope, query);
   }
 
   @Get("low-stock")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get items at or below minimum stock level" })
-  findLowStock(@Request() req) {
-    return this.service.findLowStockItems(req.tenantId);
+  findLowStock(@CurrentScope() scope: BranchScope) {
+    return this.service.findLowStockItems(scope);
   }
 
   @Get("expiring-soon")
@@ -61,9 +64,12 @@ export class StockItemsController {
     required: false,
     description: "Days until expiry (default 3)",
   })
-  findExpiringSoon(@Request() req, @Query("days") days?: string) {
+  findExpiringSoon(
+    @CurrentScope() scope: BranchScope,
+    @Query("days") days?: string,
+  ) {
     return this.service.findExpiringSoon(
-      req.tenantId,
+      scope,
       days ? parseInt(days) : undefined,
     );
   }
@@ -71,8 +77,8 @@ export class StockItemsController {
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get a stock item by ID" })
-  findOne(@Param("id") id: string, @Request() req) {
-    return this.service.findOne(id, req.tenantId);
+  findOne(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.findOne(id, scope);
   }
 
   @Post()
@@ -92,15 +98,15 @@ export class StockItemsController {
   update(
     @Param("id") id: string,
     @Body() dto: UpdateStockItemDto,
-    @Request() req,
+    @CurrentScope() scope: BranchScope,
   ) {
-    return this.service.update(id, dto, req.tenantId);
+    return this.service.update(id, dto, scope);
   }
 
   @Delete(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Delete a stock item" })
-  remove(@Param("id") id: string, @Request() req) {
-    return this.service.remove(id, req.tenantId);
+  remove(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.remove(id, scope);
   }
 }

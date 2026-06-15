@@ -41,6 +41,7 @@ import { TokenService } from "./services/token.service";
 import { PasswordService } from "./services/password.service";
 import { EmailVerificationService } from "./services/email-verification.service";
 import { AuthProvisioningService } from "./services/auth-provisioning.service";
+import { resolvePrimaryBranchId } from "./services/resolve-primary-branch";
 
 /**
  * AuthService — thin facade over the extracted auth sub-services:
@@ -589,8 +590,18 @@ export class AuthService {
     }
 
     const { branchAssignments, ...rest } = user;
+    // Mirror token.service: an owner ADMIN/MANAGER with a null primaryBranchId
+    // (pre-v3.0.0, never backfilled) must still receive a concrete home
+    // branch here, or the SPA's /me refetch re-nulls branchScopeStore and
+    // re-bricks every branch-scoped request after the login fallback fixed it.
+    const primaryBranchId = await resolvePrimaryBranchId(
+      this.prisma,
+      user.tenantId,
+      user.primaryBranchId,
+    );
     return {
       ...rest,
+      primaryBranchId,
       allowedBranchIds: branchAssignments.map((a) => a.branchId),
     };
   }

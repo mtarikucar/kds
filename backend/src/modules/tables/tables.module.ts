@@ -3,9 +3,14 @@ import { TablesService } from "./tables.service";
 import { TablesController } from "./tables.controller";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { KdsModule } from "../kds/kds.module";
+import { ReservationsModule } from "../reservations/reservations.module";
 
 @Module({
-  imports: [PrismaModule, KdsModule],
+  // ReservationsModule re-exports ReservationAvailabilityService, which owns
+  // the shared public branch resolver (resolvePublicBranchId). The public
+  // customer table listing routes through it so the branch a guest sees
+  // matches the public reservation flow.
+  imports: [PrismaModule, KdsModule, ReservationsModule],
   controllers: [TablesController],
   providers: [TablesService],
   exports: [TablesService],

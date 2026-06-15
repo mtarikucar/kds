@@ -35,6 +35,13 @@ import { ReservationNotificationService } from "./services/reservation-notificat
     // existing @nestjs/schedule scanner picks it up at bootstrap.
     ReservationSchedulerService,
   ],
-  exports: [ReservationsService, ReservationSettingsService],
+  // ReservationAvailabilityService is exported so TablesModule's public
+  // customer table listing can reuse resolvePublicBranchId (the single
+  // canonical public branch resolver) rather than re-deriving it.
+  exports: [
+    ReservationsService,
+    ReservationSettingsService,
+    ReservationAvailabilityService,
+  ],
 })
 export class ReservationsModule {}

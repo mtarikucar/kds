@@ -104,3 +104,110 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
     expect(txMock.stockItem.updateMany).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * v3 branch-isolation FOUNDATION: a product carries one recipe PER BRANCH
+ * (@@unique([productId, branchId])), so the Product.recipe relation became
+ * one-to-many (Product.recipes). buildDeductions must select the recipe
+ * belonging to THIS order's branch — deducting from another branch's recipe
+ * would draw down the wrong branch's stock.
+ */
+describe('StockDeductionService.deductForOrder (v3 per-branch recipe selection)', () => {
+  let prisma: MockPrismaClient;
+  let svc: StockDeductionService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      get: jest.fn().mockResolvedValue({
+        enableAutoDeduction: true,
+        deductOnStatus: null,
+        allowNegativeStock: true,
+      }),
+    };
+    svc = new StockDeductionService(prisma as any, settings);
+  });
+
+  it('deducts ONLY the ingredients of the recipe matching the order branch', async () => {
+    // Product p1 has two recipes: one for branch b1, one for branch b2.
+    // The order is in branch b2, so only b2's recipe (sugar) must deduct;
+    // b1's recipe (flour) must be ignored.
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'ord-1',
+      orderNumber: 'ORD-1',
+      tenantId: 't1',
+      branchId: 'b2',
+      stockDeducted: false,
+      orderItems: [
+        {
+          quantity: 1,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1',
+                yield: 1,
+                ingredients: [
+                  { stockItemId: 'flour', quantity: '100', stockItem: { name: 'Flour' } },
+                ],
+              },
+              {
+                branchId: 'b2',
+                yield: 1,
+                ingredients: [
+                  { stockItemId: 'sugar', quantity: '50', stockItem: { name: 'Sugar' } },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any);
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: { findFirst: jest.fn().mockResolvedValue(null) },
+      stockBatch: { findMany: jest.fn().mockResolvedValue([]) },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    const result: any = await svc.deductForOrder('ord-1', 't1', undefined, 'user-1');
+
+    // Exactly one deduction, and it is the BRANCH-b2 ingredient (sugar),
+    // never branch-b1's flour.
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0].stockItemId).toBe('sugar');
+  });
+
+  it('deducts nothing when no recipe matches the order branch', async () => {
+    // Product only has a recipe for branch b1, but the order is in b2.
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'ord-2',
+      orderNumber: 'ORD-2',
+      tenantId: 't1',
+      branchId: 'b2',
+      stockDeducted: false,
+      orderItems: [
+        {
+          quantity: 1,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1',
+                yield: 1,
+                ingredients: [
+                  { stockItemId: 'flour', quantity: '100', stockItem: { name: 'Flour' } },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any);
+
+    // No deductions => the service returns early before opening a txn.
+    const result = await svc.deductForOrder('ord-2', 't1', undefined, 'user-1');
+    expect(result).toBeUndefined();
+    expect((prisma.$transaction as any).mock.calls.length).toBe(0);
+  });
+});

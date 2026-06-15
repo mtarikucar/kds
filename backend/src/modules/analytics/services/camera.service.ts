@@ -41,25 +41,13 @@ export class CameraService {
     dto: CreateCameraDto,
   ): Promise<CameraResponseDto> {
     const { tenantId } = scope;
-    // Check for duplicate name
-    const existing = await this.prisma.camera.findFirst({
-      where: {
-        tenantId,
-        name: dto.name,
-      },
-    });
-
-    if (existing) {
-      throw new ConflictException(
-        `Camera with name "${dto.name}" already exists`,
-      );
-    }
 
     // v3.0.0 — every operational row carries branchId. Derive from the
     // referenced edge device so a camera always lives in the same
     // branch as its host device. The WRITTEN branchId is the device's
     // home branch (correct write-path derivation), not the acting
-    // scope's branch.
+    // scope's branch. We resolve it FIRST because the duplicate-name
+    // check below is now per-branch and must use the same branchId.
     const edgeDevice = await this.prisma.edgeDevice.findFirst({
       where: { id: dto.edgeDeviceId, tenantId },
       select: { branchId: true },
@@ -67,6 +55,25 @@ export class CameraService {
     if (!edgeDevice) {
       throw new NotFoundException(
         `Edge device with ID ${dto.edgeDeviceId} not found`,
+      );
+    }
+
+    // v3 branch-scope: camera names are unique PER BRANCH
+    // (@@unique([tenantId, branchId, name])), so two branches may each
+    // have a "Front Door" camera. Check against the device's home branch.
+    const existing = await this.prisma.camera.findUnique({
+      where: {
+        tenantId_branchId_name: {
+          tenantId,
+          branchId: edgeDevice.branchId,
+          name: dto.name,
+        },
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Camera with name "${dto.name}" already exists`,
       );
     }
 
@@ -147,12 +154,16 @@ export class CameraService {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
 
-    // Check for duplicate name if name is being changed. Names are unique
-    // per tenant, so the dedupe stays tenant-scoped.
+    // Check for duplicate name if name is being changed. v3 branch-scope:
+    // names are unique PER BRANCH (@@unique([tenantId, branchId, name])),
+    // so the dedupe is scoped to this camera's branch. The update never
+    // moves the row across branches (branchId is not in the write data),
+    // so camera.branchId is the correct collision scope.
     if (dto.name && dto.name !== camera.name) {
       const existing = await this.prisma.camera.findFirst({
         where: {
           tenantId,
+          branchId: camera.branchId,
           name: dto.name,
           id: { not: cameraId },
         },

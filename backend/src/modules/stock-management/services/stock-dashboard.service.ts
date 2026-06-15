@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { StockAlertsService } from "./stock-alerts.service";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 // Iter-95: same window cap reasoning as iter-92 (waste-logs +
 // ingredient-movements) and iter-89 (analytics). 366 days covers
@@ -53,7 +54,7 @@ export class StockDashboardService {
     private stockAlerts: StockAlertsService,
   ) {}
 
-  async getDashboard(tenantId: string) {
+  async getDashboard(scope: BranchScope) {
     const [
       totalItems,
       activeItems,
@@ -63,12 +64,21 @@ export class StockDashboardService {
       recentWaste,
       pendingPOs,
     ] = await Promise.all([
-      this.prisma.stockItem.count({ where: { tenantId } }),
-      this.prisma.stockItem.count({ where: { tenantId, isActive: true } }),
-      this.stockAlerts.checkLowStock(tenantId),
-      this.stockAlerts.checkExpiringBatches(tenantId),
+      this.prisma.stockItem.count({ where: { ...branchScope(scope) } }),
+      this.prisma.stockItem.count({
+        where: { ...branchScope(scope), isActive: true },
+      }),
+      // Pass branchId so the dashboard's low-stock + expiry feeds are
+      // fenced to the caller's branch (the scheduler still calls these
+      // tenant-wide with branchId omitted).
+      this.stockAlerts.checkLowStock(scope.tenantId, scope.branchId),
+      this.stockAlerts.checkExpiringBatches(
+        scope.tenantId,
+        undefined,
+        scope.branchId,
+      ),
       this.prisma.ingredientMovement.findMany({
-        where: { tenantId },
+        where: { ...branchScope(scope) },
         include: {
           stockItem: { select: { id: true, name: true, unit: true } },
         },
@@ -77,7 +87,7 @@ export class StockDashboardService {
       }),
       this.prisma.wasteLog.aggregate({
         where: {
-          tenantId,
+          ...branchScope(scope),
           createdAt: {
             gte: new Date(new Date().setDate(new Date().getDate() - 30)),
           },
@@ -87,7 +97,7 @@ export class StockDashboardService {
       }),
       this.prisma.purchaseOrder.count({
         where: {
-          tenantId,
+          ...branchScope(scope),
           status: { in: ["DRAFT", "SUBMITTED", "PARTIALLY_RECEIVED"] },
         },
       }),
@@ -109,9 +119,9 @@ export class StockDashboardService {
     };
   }
 
-  async getValuation(tenantId: string) {
+  async getValuation(scope: BranchScope) {
     const items = await this.prisma.stockItem.findMany({
-      where: { tenantId, isActive: true },
+      where: { ...branchScope(scope), isActive: true },
       select: {
         id: true,
         name: true,
@@ -139,11 +149,11 @@ export class StockDashboardService {
   }
 
   async getMovementSummary(
-    tenantId: string,
+    scope: BranchScope,
     startDate?: string,
     endDate?: string,
   ) {
-    const where: any = { tenantId };
+    const where: any = { ...branchScope(scope) };
     const window = parseWindow(startDate, endDate);
     if (window.gte || window.lte) where.createdAt = window;
 

@@ -20,6 +20,7 @@ function makeJwt() {
 function makePrisma() {
   return {
     user: { findUnique: jest.fn() },
+    branch: { findFirst: jest.fn() },
     refreshToken: {
       findUnique: jest.fn(),
       create: jest.fn().mockResolvedValue({}),
@@ -46,6 +47,54 @@ describe('TokenService.hashToken', () => {
     const svc = new TokenService(makePrisma() as any, makeJwt() as any, config);
     const expected = createHash('sha256').update('abc').digest('hex');
     expect(svc.hashToken('abc')).toBe(expected);
+  });
+});
+
+describe('TokenService.generateTokens branch scope', () => {
+  const loginUser = { id: 'u1', email: 'u@test.com', role: 'ADMIN', tenantId: 't1' } as any;
+
+  it('surfaces the stored primaryBranchId and does not query for a fallback', async () => {
+    const jwt = makeJwt();
+    const prisma = makePrisma();
+    prisma.user.findUnique.mockResolvedValue({
+      tokenVersion: 0,
+      primaryBranchId: 'branch-1',
+      branchAssignments: [{ branchId: 'branch-1' }, { branchId: 'branch-2' }],
+    });
+    const svc = new TokenService(prisma as any, jwt as any, config);
+    const res = await svc.generateTokens(loginUser);
+    expect(res.user.primaryBranchId).toBe('branch-1');
+    expect(res.user.allowedBranchIds).toEqual(['branch-1', 'branch-2']);
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the tenant home branch when an owner ADMIN has a null primaryBranchId', async () => {
+    const jwt = makeJwt();
+    const prisma = makePrisma();
+    // Pre-v3.0.0 owner: never backfilled, no assignments → null + [].
+    prisma.user.findUnique.mockResolvedValue({
+      tokenVersion: 0,
+      primaryBranchId: null,
+      branchAssignments: [],
+    });
+    prisma.branch.findFirst.mockResolvedValue({ id: 'branch-main' });
+    const svc = new TokenService(prisma as any, jwt as any, config);
+    const res = await svc.generateTokens(loginUser);
+    // The login/refresh response must hand the SPA a concrete branch so its
+    // branchScopeStore resolves a non-null branchId (else every branch-scoped
+    // request is rejected client-side).
+    expect(res.user.primaryBranchId).toBe('branch-main');
+    expect(res.user.allowedBranchIds).toEqual([]);
+    expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: 't1', status: 'active' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    // JWT claims (primaryBranchId + activeBranchId) must carry the fallback too,
+    // so the BranchGuard and the issued token agree with the response body.
+    const accessPayload = jwt.sign.mock.calls[0][0];
+    expect(accessPayload.primaryBranchId).toBe('branch-main');
+    expect(accessPayload.activeBranchId).toBe('branch-main');
   });
 });
 

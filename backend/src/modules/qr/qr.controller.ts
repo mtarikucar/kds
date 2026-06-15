@@ -17,6 +17,8 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
+import { CurrentScope } from "../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../common/scoping/branch-scope";
 import { QrService } from "./qr.service";
 import { CreateQrSettingsDto } from "./dto/create-qr-settings.dto";
 import { UpdateQrSettingsDto } from "./dto/update-qr-settings.dto";
@@ -69,7 +71,7 @@ export class QrController {
     summary: "Get all QR codes (tenant and tables) with data URLs",
   })
   @ApiResponse({ status: 200, description: "QR codes generated successfully" })
-  getQrCodes(@Request() req) {
+  getQrCodes(@Request() req, @CurrentScope() scope: BranchScope) {
     // Get frontend URL from environment or construct from request
     let baseUrl = process.env.FRONTEND_URL;
 
@@ -90,6 +92,10 @@ export class QrController {
       }
     }
 
-    return this.qrService.getQrCodes(req.tenantId, baseUrl);
+    // Branch-scoped: the table QR sheet must only list THIS branch's
+    // tables, so the service takes the full BranchScope (tenant lookup +
+    // QrMenuSettings stay tenant-wide; only table.findMany is branch-
+    // filtered). Previously passed req.tenantId only — the leak.
+    return this.qrService.getQrCodes(scope, baseUrl);
   }
 }

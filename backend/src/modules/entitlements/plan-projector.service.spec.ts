@@ -74,8 +74,10 @@ describe('PlanProjectorService.projectTenant', () => {
         reservationSystem: true,
         personnelManagement: true,
         deliveryIntegration: true,
+        posAccess: true,
         maxUsers: 15,
         maxTables: 50,
+        maxBranches: 3,
         maxProducts: 500,
         maxCategories: 50,
         maxMonthlyOrders: 2000,
@@ -96,8 +98,10 @@ describe('PlanProjectorService.projectTenant', () => {
     // means "not enabled" in the engine.
     expect(featureKeys).toContain('feature.advancedReports');
     expect(featureKeys).toContain('feature.kdsIntegration');
+    expect(featureKeys).toContain('feature.posAccess');
     expect(featureKeys).not.toContain('feature.apiAccess');
     expect(featureKeys).toContain('limit.maxUsers');
+    expect(featureKeys).toContain('limit.maxBranches');
     expect(featureKeys).toContain('limit.maxMonthlyOrders');
 
     const limitMax = grants.find((g) => g.key === 'limit.maxUsers');

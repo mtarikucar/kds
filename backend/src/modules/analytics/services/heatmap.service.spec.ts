@@ -31,8 +31,8 @@ describe('HeatmapService', () => {
   describe('getOccupancyHeatmap', () => {
     it('bins world coordinates into the right cell and normalizes a 2-value grid to 0..1', async () => {
       // cache miss
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue(null);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
       // gridWidth=gridDepth=20, cellSize=1 => offsetX=offsetZ=10
       // cellX = floor(positionX + 10), cellZ = floor(positionZ + 10)
       // Two records at (0,0) -> cell (10,10) appears 3x; one at (1,1) -> cell (11,11) 1x
@@ -61,7 +61,7 @@ describe('HeatmapService', () => {
 
     it('returns a cached heatmap (no occupancy query) when an unexpired cache row exists', async () => {
       const future = new Date(Date.now() + 60 * 60 * 1000);
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue({
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue({
         metric: 'OCCUPANCY',
         granularity: 'HOURLY',
         startTime: start,
@@ -85,7 +85,7 @@ describe('HeatmapService', () => {
 
     it('ignores an expired cache row and recomputes from records', async () => {
       const past = new Date(Date.now() - 60 * 1000);
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue({
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue({
         metric: 'OCCUPANCY',
         granularity: 'HOURLY',
         startTime: start,
@@ -99,7 +99,7 @@ describe('HeatmapService', () => {
         expiresAt: past,
       });
       (prisma.occupancyRecord.findMany as any).mockResolvedValue([]);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
 
       const res = await svc.getOccupancyHeatmap(t, b, start, end);
 
@@ -111,9 +111,9 @@ describe('HeatmapService', () => {
     });
 
     it('clamps a hostile gridWidth to MAX_GRID_DIMENSION (100)', async () => {
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue(null);
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
       (prisma.occupancyRecord.findMany as any).mockResolvedValue([]);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
 
       const res = await svc.getOccupancyHeatmap(t, b, start, end, {
         gridWidth: 10000,
@@ -128,9 +128,9 @@ describe('HeatmapService', () => {
     });
 
     it('falls back to the default dimension when given a non-finite gridWidth', async () => {
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue(null);
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
       (prisma.occupancyRecord.findMany as any).mockResolvedValue([]);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
 
       const res = await svc.getOccupancyHeatmap(t, b, start, end, {
         gridWidth: NaN,
@@ -143,9 +143,9 @@ describe('HeatmapService', () => {
     });
 
     it('scopes both the cache lookup and the record fetch by tenant + branch', async () => {
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue(null);
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
       (prisma.occupancyRecord.findMany as any).mockResolvedValue([]);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
 
       await svc.getOccupancyHeatmap(t, b, start, end);
 
@@ -153,25 +153,55 @@ describe('HeatmapService', () => {
         .where;
       expect(recWhere.tenantId).toBe(t);
       expect(recWhere.branchId).toBe(b);
-      const cacheWhere = (prisma.analyticsHeatmapCache.findFirst as any).mock
+      // v3 branch-scope: the cache read is a findUnique on the compound key
+      // @@unique([tenantId, branchId, startTime, endTime, granularity,
+      // metric]) — branchId is the 2nd key element, so a branch-A read can
+      // never return branch-B's cached heatmap.
+      const cacheWhere = (prisma.analyticsHeatmapCache.findUnique as any).mock
         .calls[0][0].where;
-      expect(cacheWhere.tenantId).toBe(t);
-      expect(cacheWhere.branchId).toBe(b);
+      const compound =
+        cacheWhere.tenantId_branchId_startTime_endTime_granularity_metric;
+      expect(compound.tenantId).toBe(t);
+      expect(compound.branchId).toBe(b);
+    });
+
+    it('writes the cache via an upsert keyed on the per-branch compound key', async () => {
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
+      (prisma.occupancyRecord.findMany as any).mockResolvedValue([]);
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
+
+      await svc.getOccupancyHeatmap(t, b, start, end);
+
+      // v3 branch-scope: with branchId now in the @@unique, the cache
+      // write is a single concurrency-safe upsert keyed on the compound —
+      // each branch keeps its own row instead of clobbering a sibling's.
+      const upsertArgs = (prisma.analyticsHeatmapCache.upsert as any).mock
+        .calls[0][0];
+      const key =
+        upsertArgs.where.tenantId_branchId_startTime_endTime_granularity_metric;
+      expect(key.tenantId).toBe(t);
+      expect(key.branchId).toBe(b);
+      // create payload also carries the branchId for the insert path.
+      expect(upsertArgs.create.branchId).toBe(b);
     });
   });
 
   describe('cache TTL by granularity', () => {
     async function ttlForGranularity(granularity: HeatmapGranularity) {
-      (prisma.analyticsHeatmapCache.findFirst as any)
-        .mockResolvedValueOnce(null) // initial read miss
-        .mockResolvedValueOnce(null); // cacheHeatmap's existence check
+      // v3 branch-scope: the cache read is now a single findUnique on the
+      // compound key (branchId is in the @@unique), and the write is a
+      // single upsert — so only ONE cache read happens (no separate
+      // existence check).
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
       (prisma.occupancyRecord.findMany as any).mockResolvedValue([]);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
 
       const before = Date.now();
       await svc.getOccupancyHeatmap(t, b, start, end, { granularity });
-      const data = (prisma.analyticsHeatmapCache.create as any).mock.calls[0][0]
-        .data;
+      // The TTL lives on the upsert's create payload (expiresAt is only
+      // set on insert; an existing row's update also carries it).
+      const data = (prisma.analyticsHeatmapCache.upsert as any).mock.calls[0][0]
+        .create;
       const hours = (data.expiresAt.getTime() - before) / (60 * 60 * 1000);
       return hours;
     }
@@ -197,8 +227,8 @@ describe('HeatmapService', () => {
 
   describe('getTrafficHeatmap', () => {
     it('sums personCount per (cellZ,cellX) and drops out-of-bounds cells', async () => {
-      (prisma.analyticsHeatmapCache.findFirst as any).mockResolvedValue(null);
-      (prisma.analyticsHeatmapCache.create as any).mockResolvedValue({});
+      (prisma.analyticsHeatmapCache.findUnique as any).mockResolvedValue(null);
+      (prisma.analyticsHeatmapCache.upsert as any).mockResolvedValue({});
       (prisma.trafficFlowRecord.findMany as any).mockResolvedValue([
         { cellX: 2, cellZ: 3, personCount: 4 },
         { cellX: 2, cellZ: 3, personCount: 6 }, // same cell -> sums to 10

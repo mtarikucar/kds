@@ -604,16 +604,20 @@ export class HeatmapService {
     metric: HeatmapMetric,
     granularity: HeatmapGranularity,
   ): Promise<HeatmapResponseDto | null> {
-    // v3.0.0 — branchId is not part of the @@unique key, so we filter by
-    // findFirst (per-branch) to avoid cross-branch cache collisions.
-    const cached = await this.prisma.analyticsHeatmapCache.findFirst({
+    // v3 branch-scope: branchId is now the 2nd element of the @@unique key
+    // (@@unique([tenantId, branchId, startTime, endTime, granularity,
+    // metric])), so a single cache row is uniquely identified by the
+    // compound key — read it with findUnique.
+    const cached = await this.prisma.analyticsHeatmapCache.findUnique({
       where: {
-        tenantId,
-        branchId,
-        startTime,
-        endTime,
-        granularity,
-        metric,
+        tenantId_branchId_startTime_endTime_granularity_metric: {
+          tenantId,
+          branchId,
+          startTime,
+          endTime,
+          granularity,
+          metric,
+        },
       },
     });
 
@@ -650,50 +654,45 @@ export class HeatmapService {
 
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
-    // v3.0.0 — branchId is not part of the @@unique composite, so an
-    // upsert keyed on (tenantId, startTime, endTime, granularity, metric)
-    // would collide across branches. Use findFirst + update/create so
-    // each branch keeps its own cache row.
-    const existing = await this.prisma.analyticsHeatmapCache.findFirst({
+    // v3 branch-scope: branchId is now the 2nd element of the @@unique
+    // composite (@@unique([tenantId, branchId, startTime, endTime,
+    // granularity, metric])), so a per-branch cache row is addressable by
+    // the compound key. The prior findFirst + update/create dance existed
+    // only because branchId was NOT in the key; with the new key we use a
+    // single, concurrency-safe upsert keyed on the compound — each branch
+    // keeps its own row and a concurrent re-cache no longer races.
+    await this.prisma.analyticsHeatmapCache.upsert({
       where: {
-        tenantId,
-        branchId,
-        startTime: heatmap.startTime,
-        endTime: heatmap.endTime,
-        granularity: heatmap.granularity,
-        metric: heatmap.metric,
-      },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await this.prisma.analyticsHeatmapCache.update({
-        where: { id: existing.id },
-        data: {
-          heatmapData: heatmap.data,
-          maxValue: heatmap.maxValue,
-          minValue: heatmap.minValue,
-          expiresAt,
-        },
-      });
-    } else {
-      await this.prisma.analyticsHeatmapCache.create({
-        data: {
+        tenantId_branchId_startTime_endTime_granularity_metric: {
           tenantId,
           branchId,
           startTime: heatmap.startTime,
           endTime: heatmap.endTime,
           granularity: heatmap.granularity,
           metric: heatmap.metric,
-          gridWidth: heatmap.gridWidth,
-          gridDepth: heatmap.gridDepth,
-          cellSize: heatmap.cellSize,
-          heatmapData: heatmap.data,
-          maxValue: heatmap.maxValue,
-          minValue: heatmap.minValue,
-          expiresAt,
         },
-      });
-    }
+      },
+      update: {
+        heatmapData: heatmap.data,
+        maxValue: heatmap.maxValue,
+        minValue: heatmap.minValue,
+        expiresAt,
+      },
+      create: {
+        tenantId,
+        branchId,
+        startTime: heatmap.startTime,
+        endTime: heatmap.endTime,
+        granularity: heatmap.granularity,
+        metric: heatmap.metric,
+        gridWidth: heatmap.gridWidth,
+        gridDepth: heatmap.gridDepth,
+        cellSize: heatmap.cellSize,
+        heatmapData: heatmap.data,
+        maxValue: heatmap.maxValue,
+        minValue: heatmap.minValue,
+        expiresAt,
+      },
+    });
   }
 }

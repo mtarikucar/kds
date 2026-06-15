@@ -100,6 +100,7 @@ import UpsellCard from './components/subscriptions/UpsellCard';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useBranchChangeInvalidation } from './hooks/useBranchChangeInvalidation';
+import { useBranchScopeFallback } from './hooks/useBranchScopeFallback';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
 import { useBranchScopeStore } from './store/branchScopeStore';
@@ -122,6 +123,13 @@ function App() {
   // stale data from the previous branch can't show up for the staleTime window.
   // Extracted to a unit-tested hook (useBranchChangeInvalidation).
   useBranchChangeInvalidation();
+
+  // v3.1.x safety net — if the active branch can't be resolved from the
+  // login/profile response (owner ADMIN/MANAGER with a null primaryBranchId),
+  // fetch the tenant's branches and auto-select the first active one so the
+  // api-client never hard-rejects every branch-scoped request (blank KDS /
+  // generic "failed" toasts on everything).
+  useBranchScopeFallback();
 
   // Detect subdomain access
   const subdomainInfo = useMemo(() => detectSubdomain(), []);

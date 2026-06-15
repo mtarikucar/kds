@@ -217,12 +217,13 @@ export class MockDataGeneratorService {
     }
 
     if (records.length > 0) {
-      // Use upsert for traffic flow records (unique constraint on tenant+hour+cell)
+      // v3 branch-scope: unique constraint is now tenant+branch+hour+cell.
       for (const record of records) {
         await this.prisma.trafficFlowRecord.upsert({
           where: {
-            tenantId_hourBucket_cellX_cellZ: {
+            tenantId_branchId_hourBucket_cellX_cellZ: {
               tenantId: record.tenantId,
+              branchId: record.branchId,
               hourBucket: record.hourBucket,
               cellX: record.cellX,
               cellZ: record.cellZ,

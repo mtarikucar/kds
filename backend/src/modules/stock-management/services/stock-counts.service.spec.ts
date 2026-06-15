@@ -6,6 +6,16 @@ import {
   StockCountStatus,
 } from '../../../common/constants/stock-management.enum';
 
+// v3 branch-scope: read/finalize/cancel take a BranchScope. branchScope(scope)
+// fences every where on (tenantId, branchId); branchId 'b1' matches the
+// item.stockItem.branchId used in these fixtures so movement rows stay 'b1'.
+const SCOPE = {
+  tenantId: 't1',
+  branchId: 'b1',
+  userId: 'u1',
+  role: 'ADMIN',
+} as const;
+
 /**
  * Iter-94 regression for StockCountsService.finalize.
  *
@@ -72,7 +82,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
     setupTx();
     tx.stockItem.findFirst.mockResolvedValue({ id: 's1', currentStock: new Prisma.Decimal(90) });
 
-    await svc.finalize('c1', 't1');
+    await svc.finalize('c1', SCOPE);
 
     // Status flip must happen BEFORE any per-item write. updateMany on
     // stockCount is the very first tx call.
@@ -80,12 +90,25 @@ describe('StockCountsService.finalize (iter-94)', () => {
     const stockItemUpdateOrder = tx.stockItem.updateMany.mock.invocationCallOrder[0];
     expect(stockCountUpdateOrder).toBeLessThan(stockItemUpdateOrder);
 
-    // Claim has compound WHERE on status.
+    // Claim has compound WHERE on status, branch-fenced on (tenantId,
+    // branchId) — a cross-branch finalize can never flip this row.
     const claim = tx.stockCount.updateMany.mock.calls[0][0];
     expect(claim.where).toMatchObject({
       id: 'c1',
       tenantId: 't1',
+      branchId: 'b1',
       status: StockCountStatus.IN_PROGRESS,
+    });
+    // The per-item lookup + adjustment are also branch-fenced.
+    expect(tx.stockItem.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: 's1',
+      tenantId: 't1',
+      branchId: 'b1',
+    });
+    expect(tx.stockItem.updateMany.mock.calls[0][0].where).toMatchObject({
+      id: 's1',
+      tenantId: 't1',
+      branchId: 'b1',
     });
   });
 
@@ -100,7 +123,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
     });
     setupTx(0); // claim.count = 0 — someone else already finalized
 
-    await expect(svc.finalize('c1', 't1')).rejects.toBeInstanceOf(ConflictException);
+    await expect(svc.finalize('c1', SCOPE)).rejects.toBeInstanceOf(ConflictException);
     // No per-item adjustments should have been issued.
     expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
     expect(tx.ingredientMovement.create).not.toHaveBeenCalled();
@@ -119,7 +142,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
     setupTx();
     tx.stockItem.findFirst.mockResolvedValue({ id: 's1', currentStock: new Prisma.Decimal(90) });
 
-    await svc.finalize('c1', 't1');
+    await svc.finalize('c1', SCOPE);
 
     // Adjustment was 95 - 90 = +5. The write must be an increment, not
     // an absolute set — that's what makes a concurrent decrement
@@ -145,7 +168,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
     setupTx();
     tx.stockItem.findFirst.mockResolvedValue({ id: 's1', currentStock: new Prisma.Decimal(100) });
 
-    await svc.finalize('c1', 't1');
+    await svc.finalize('c1', SCOPE);
     // Zero-variance item: no write, no movement row.
     expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
     expect(tx.ingredientMovement.create).not.toHaveBeenCalled();
@@ -164,7 +187,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
     setupTx();
     tx.stockItem.findFirst.mockResolvedValue({ id: 's1', currentStock: new Prisma.Decimal(90) });
 
-    await svc.finalize('c1', 't1');
+    await svc.finalize('c1', SCOPE);
     const move = tx.ingredientMovement.create.mock.calls[0][0].data;
     expect(move.type).toBe(IngredientMovementType.COUNT_ADJUSTMENT);
     expect(move.referenceType).toBe('STOCK_COUNT');
@@ -187,18 +210,22 @@ describe('StockCountsService.findAll status allowlist (iter-94)', () => {
   });
 
   it('rejects an unknown status string (the typo-silent-empty trap)', async () => {
-    await expect(svc.findAll('t1', 'DONE' as any)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.findAll(SCOPE, 'DONE' as any)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('forwards a valid status to Prisma', async () => {
-    await svc.findAll('t1', StockCountStatus.IN_PROGRESS);
+  it('forwards a valid status to Prisma on a branch-fenced where', async () => {
+    await svc.findAll(SCOPE, StockCountStatus.IN_PROGRESS);
     const where = prisma.stockCount.findMany.mock.calls[0][0].where;
     expect(where.status).toBe(StockCountStatus.IN_PROGRESS);
+    expect(where.tenantId).toBe('t1');
+    expect(where.branchId).toBe('b1');
   });
 
-  it('allows no status (lists all)', async () => {
-    await svc.findAll('t1');
+  it('allows no status (lists all) but still fences by branch', async () => {
+    await svc.findAll(SCOPE);
     const where = prisma.stockCount.findMany.mock.calls[0][0].where;
     expect(where.status).toBeUndefined();
+    expect(where.tenantId).toBe('t1');
+    expect(where.branchId).toBe('b1');
   });
 });

@@ -15,6 +15,16 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
   let prisma: MockPrismaClient;
   let svc: PurchaseOrdersService;
 
+  // v3 branch-scope: read/submit/receive/cancel take a BranchScope.
+  // branchScope(scope) fences the PO read on (tenantId, branchId), so a
+  // cross-branch PO id can never be received/cancelled (stock mutated).
+  const SCOPE = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'user-1',
+    role: 'ADMIN',
+  } as const;
+
   beforeEach(() => {
     prisma = mockPrismaClient();
     svc = new PurchaseOrdersService(prisma as any);
@@ -72,7 +82,7 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
     await svc.receive(
       'po-1',
       { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 5 }] } as any,
-      't1',
+      SCOPE,
       'user-1',
     );
 
@@ -87,6 +97,38 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
         }),
       }),
     );
+
+    // The PO pre-flight read is branch-fenced — findOne builds its where
+    // from branchScope(scope), so receive can only mutate stock for a PO
+    // that belongs to the caller's (tenantId, branchId).
+    expect(prisma.purchaseOrder.findFirst.mock.calls[0][0].where).toEqual({
+      id: 'po-1',
+      tenantId: 't1',
+      branchId: 'b1',
+    });
+    // Stock + movement writes carry the scope's branchId (not re-derived).
+    expect(txMock.stockBatch.create.mock.calls[0][0].data.branchId).toBe('b1');
+    expect(
+      txMock.ingredientMovement.create.mock.calls[0][0].data.branchId,
+    ).toBe('b1');
+  });
+
+  it('does NOT receive (mutate stock for) a cross-branch PO id', async () => {
+    // findOne is branch-fenced; a PO that lives in another branch is not
+    // visible, so findFirst returns null → NotFound before any txn.
+    (prisma.purchaseOrder.findFirst as any).mockResolvedValue(null);
+    const { NotFoundException } = require('@nestjs/common');
+
+    await expect(
+      svc.receive(
+        'cross-branch-po',
+        { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 5 }] } as any,
+        SCOPE,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    // No stock-mutating transaction may run for a cross-branch PO.
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('rejects over-receive based on the FRESHLY-READ alreadyReceived (not the stale snapshot)', async () => {
@@ -134,7 +176,7 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
       svc.receive(
         'po-1',
         { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 5 }] } as any,
-        't1',
+        SCOPE,
       ),
     ).rejects.toThrow(BadRequestException);
 
