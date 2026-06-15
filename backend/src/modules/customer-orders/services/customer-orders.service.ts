@@ -33,10 +33,7 @@ import {
   isLocationWithinRange,
   isValidCoordinates,
 } from "../../../common/utils/geolocation.util";
-import {
-  BranchScope,
-  branchScope,
-} from "../../../common/scoping/branch-scope";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class CustomerOrdersService {
