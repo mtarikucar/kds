@@ -206,7 +206,7 @@ describe('storeApi mutations', () => {
   });
 
   it('useConfirmCheckout surfaces a server error', async () => {
-    h.post.mockRejectedValue({ response: { data: { message: 'declined' } } });
+    h.post.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'declined' } } });
     const { result } = renderHook(() => useConfirmCheckout(), { wrapper });
     await result.current
       .mutateAsync({ cart: { items: [] }, paymentRef: 'x' })

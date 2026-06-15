@@ -2,8 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
 import SuperAdminLoginPage from './SuperAdminLoginPage';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
+
+// getApiErrorMessage only reads the body off genuine AxiosErrors
+// (isAxiosError gate), so the fixtures construct a real one carrying the
+// server message rather than a bare { response } literal.
+function axiosErrorWithMessage(message: string): AxiosError {
+  const err = new AxiosError('Request failed');
+  err.response = { data: { message } } as AxiosError['response'];
+  return err;
+}
 
 const loginMutate = vi.fn();
 let loginState: { isError: boolean; error: unknown; isPending: boolean };
@@ -15,6 +25,9 @@ vi.mock('../../features/superadmin/api/superAdminApi', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+// getApiErrorMessage imports i18n/config, which would eagerly re-init i18next
+// against the partial react-i18next mock. Stub it.
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 function resetStore() {
   useSuperAdminAuthStore.setState({
@@ -99,7 +112,7 @@ describe('SuperAdminLoginPage', () => {
   it('renders the server error message when the login mutation errors', () => {
     loginState = {
       isError: true,
-      error: { response: { data: { message: 'Bad creds' } } },
+      error: axiosErrorWithMessage('Bad creds'),
       isPending: false,
     };
     renderAt();

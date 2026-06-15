@@ -75,7 +75,7 @@ describe('useUpdateEmail', () => {
   });
 
   it('surfaces the server error on failure', async () => {
-    patchMock.mockRejectedValue({ response: { data: { message: 'wrong password' } } });
+    patchMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'wrong password' } } });
     const client = makeClient();
     const { result } = renderHook(() => useUpdateEmail(), { wrapper: wrapper(client) });
     result.current.mutate({ email: 'x@x.com', currentPassword: 'bad' });

@@ -22,6 +22,9 @@ vi.mock('sonner', () => ({
   toast: { success: (...a: unknown[]) => toastSuccess(...a), error: (...a: unknown[]) => toastError(...a) },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
+// getApiErrorMessage (reached via the catch path) imports i18n/config, which
+// would eagerly re-init i18next against the partial react-i18next mock. Stub it.
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 const navigate = vi.fn();
 let tableIdParam: string | null = 'tbl-5';

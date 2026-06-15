@@ -1,8 +1,10 @@
-import { Controller, Post, Body, Req, HttpCode } from "@nestjs/common";
+import { Controller, Post, Get, Body, Req, HttpCode } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 import { PaymentsService } from "./payments.service";
+import { BankTransferService } from "./services/bank-transfer.service";
 import { CreateIntentDto } from "./dto/create-intent.dto";
+import { CreateBankTransferIntentDto } from "./dto/bank-transfer.dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 import { getClientIp } from "../../common/helpers/client-ip.helper";
@@ -16,7 +18,10 @@ import { getClientIp } from "../../common/helpers/client-ip.helper";
 @ApiBearerAuth()
 @Controller("payments")
 export class PaymentsController {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly payments: PaymentsService,
+    private readonly bankTransfer: BankTransferService,
+  ) {}
 
   @Post("create-intent")
   @HttpCode(200)
@@ -51,5 +56,37 @@ export class PaymentsController {
       userIp,
       userAgent,
     );
+  }
+
+  /** Public-facing platform bank details for the checkout havale screen. */
+  @Get("bank-transfer/details")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async bankTransferDetails() {
+    return this.bankTransfer.getPublicDetails();
+  }
+
+  /** Reserve a manual bank-transfer (havale) payment for a plan. */
+  @Post("bank-transfer/intent")
+  @HttpCode(200)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Throttle({ long: { ttl: 60_000, limit: 5 } })
+  async bankTransferIntent(
+    @Body() dto: CreateBankTransferIntentDto,
+    @Req() req: any,
+  ) {
+    const userIp = getClientIp(req) || req.socket?.remoteAddress || "0.0.0.0";
+    const userAgent =
+      typeof req.headers["user-agent"] === "string"
+        ? (req.headers["user-agent"] as string).slice(0, 500)
+        : undefined;
+    return this.bankTransfer.createIntent({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      planId: dto.planId,
+      billingCycle: dto.billingCycle,
+      acceptedDocumentIds: dto.acceptedDocumentIds,
+      userIp,
+      userAgent,
+    });
   }
 }

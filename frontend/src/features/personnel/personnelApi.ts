@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 import i18n from '../../i18n/config';
 import { toast } from 'sonner';
@@ -84,7 +85,7 @@ export const useClockIn = () => {
       toast.success(i18n.t('personnel:attendance.clockedIn'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -101,7 +102,7 @@ export const useClockOut = () => {
       toast.success(i18n.t('personnel:attendance.clockedOut'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -118,7 +119,7 @@ export const useStartBreak = () => {
       toast.success(i18n.t('personnel:attendance.breakStarted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -135,7 +136,7 @@ export const useEndBreak = () => {
       toast.success(i18n.t('personnel:attendance.breakEnded'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -167,7 +168,7 @@ export const useCreateShiftTemplate = () => {
       toast.success(i18n.t('personnel:shifts.created'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -184,7 +185,7 @@ export const useUpdateShiftTemplate = () => {
       toast.success(i18n.t('personnel:shifts.updated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -201,7 +202,7 @@ export const useDeleteShiftTemplate = () => {
       toast.success(i18n.t('personnel:shifts.deleted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -240,7 +241,7 @@ export const useAssignShift = () => {
       toast.success(i18n.t('personnel:schedule.assigned'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -257,7 +258,7 @@ export const useRemoveAssignment = () => {
       toast.success(i18n.t('personnel:schedule.removed'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -289,7 +290,7 @@ export const useCreateSwapRequest = () => {
       toast.success(i18n.t('personnel:swap.requested'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -307,7 +308,7 @@ export const useApproveSwap = () => {
       toast.success(i18n.t('personnel:swap.approved'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -324,7 +325,7 @@ export const useRejectSwap = () => {
       toast.success(i18n.t('personnel:swap.rejected'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };

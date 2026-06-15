@@ -11,6 +11,7 @@ import { useCartStore } from '../../store/cartStore';
 import { buildQRMenuUrl } from '../../utils/subdomain';
 import { formatCurrency } from '../../lib/utils';
 import { RTL_LANGUAGES } from '../../i18n/config';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 // Helper to normalize image URLs
 const normalizeImageUrl = (url: string | null | undefined): string | null => {
@@ -138,9 +139,9 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
         const response = await axios.get(url);
         setMenuData(response.data);
         setIsLoading(false);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching menu data:', err);
-        setError(err.response?.data?.message || t('messages.operationFailed'));
+        setError(getApiErrorMessage(err, t('messages.operationFailed')));
         setIsLoading(false);
       }
     };

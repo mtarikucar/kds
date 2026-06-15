@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import CheckoutPage from './CheckoutPage';
 
@@ -7,12 +7,42 @@ import CheckoutPage from './CheckoutPage';
 // createIntent.mutate is the money mutation we assert fires (and with
 // which accepted-document-ids) only after the consent gate passes.
 const createIntentMutate = vi.fn();
+const createBankTransferMutate = vi.fn();
 const updateProfileMutate = vi.fn();
+// Toggled per-test to control whether the havale channel is offered.
+let bankTransferEnabled = false;
 
 vi.mock('../../api/paymentsApi', () => ({
   useCreatePaymentIntent: () => ({
     mutate: createIntentMutate,
     isPending: false,
+  }),
+  useBankTransferDetails: () => ({
+    data: bankTransferEnabled
+      ? {
+          enabled: true,
+          bankName: 'Test Bank',
+          accountHolder: 'HummyTummy A.Ş.',
+          iban: 'TR000000000000000000000000',
+          instructions: 'Açıklamaya referans kodunu yazın.',
+        }
+      : { enabled: false, bankName: null, accountHolder: null, iban: null, instructions: null },
+    isLoading: false,
+    error: null,
+  }),
+  useCreateBankTransferIntent: () => ({
+    mutate: createBankTransferMutate,
+    isPending: false,
+  }),
+}));
+
+// Plans query — provides the selected plan's currency. Default plan is TRY
+// so the card option is available alongside havale.
+vi.mock('../../features/subscriptions/subscriptionsApi', () => ({
+  useGetPlans: () => ({
+    data: [{ id: 'plan-pro', currency: 'TRY' }],
+    isLoading: false,
+    error: null,
   }),
 }));
 
@@ -58,7 +88,9 @@ function renderCheckout(planId = 'plan-pro') {
 describe('CheckoutPage consent gate', () => {
   beforeEach(() => {
     createIntentMutate.mockClear();
+    createBankTransferMutate.mockClear();
     updateProfileMutate.mockClear();
+    bankTransferEnabled = false;
   });
 
   it('blocks the payment intent until all three consents are checked', () => {
@@ -100,5 +132,63 @@ describe('CheckoutPage consent gate', () => {
       billingCycle: 'MONTHLY',
       acceptedDocumentIds: ['doc-KVKK', 'doc-DISTANCE_SALES', 'doc-REFUND_POLICY'],
     });
+    // Card is the default method → the card mutation fires, not havale.
+    expect(createBankTransferMutate).not.toHaveBeenCalled();
+  });
+
+  it('does not offer the havale option when the channel is disabled', () => {
+    bankTransferEnabled = false;
+    renderCheckout('plan-pro');
+    expect(screen.queryByRole('button', { name: /Havale \/ EFT/i })).toBeNull();
+  });
+
+  it('selecting Havale + submitting calls the bank-transfer intent and shows IBAN + reference', () => {
+    bankTransferEnabled = true;
+    renderCheckout('plan-pro');
+
+    // The havale method option is offered alongside card.
+    const havale = screen.getByRole('button', { name: /Havale \/ EFT/i });
+    fireEvent.click(havale);
+
+    // Accept all consents.
+    screen.getAllByRole('checkbox').forEach((box) => fireEvent.click(box));
+
+    const proceed = screen.getByRole('button', {
+      name: /Devam et — Havale bilgilerini gör/i,
+    });
+    expect(proceed).toBeEnabled();
+    fireEvent.click(proceed);
+
+    // The havale intent fires (not the card one) with the same consent ids.
+    expect(createBankTransferMutate).toHaveBeenCalledTimes(1);
+    expect(createIntentMutate).not.toHaveBeenCalled();
+    const [payload, callbacks] = createBankTransferMutate.mock.calls[0];
+    expect(payload).toMatchObject({
+      planId: 'plan-pro',
+      billingCycle: 'MONTHLY',
+      acceptedDocumentIds: ['doc-KVKK', 'doc-DISTANCE_SALES', 'doc-REFUND_POLICY'],
+    });
+
+    // Drive the success callback → instructions panel renders.
+    act(() => {
+      callbacks.onSuccess({
+        provider: 'BANK_TRANSFER',
+        reference: 'HT-REF-12345',
+        amount: 499,
+        currency: 'TRY',
+        planName: 'Pro',
+        bankDetails: {
+          bankName: 'Test Bank',
+          accountHolder: 'HummyTummy A.Ş.',
+          iban: 'TR000000000000000000000000',
+          instructions: 'Açıklamaya referans kodunu yazın.',
+        },
+      });
+    });
+
+    // The IBAN and the prominent reference code are shown.
+    expect(screen.getByText('TR000000000000000000000000')).toBeInTheDocument();
+    expect(screen.getByText('HT-REF-12345')).toBeInTheDocument();
+    expect(screen.getByText(/499 TRY/)).toBeInTheDocument();
   });
 });

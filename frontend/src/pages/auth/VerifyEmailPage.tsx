@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useVerifyEmail, useResendVerificationEmail } from '../../features/auth/authApi';
+import { getApiErrorMessage } from '../../lib/api-error';
 import Button from '../../components/ui/Button';
 import { useAuthStore } from '../../store/authStore';
 
@@ -40,11 +41,10 @@ const VerifyEmailPage = () => {
             navigate(isAuthenticated ? '/dashboard' : '/login');
           }, 2000);
         },
-        onError: (error: any) => {
+        onError: (error) => {
           setState('error');
           setErrorMessage(
-            error.response?.data?.message ||
-              'Verification failed. The code may be expired or invalid.',
+            getApiErrorMessage(error, 'Verification failed. The code may be expired or invalid.'),
           );
         },
       },

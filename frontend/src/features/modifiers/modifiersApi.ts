@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   ModifierGroup,
@@ -55,7 +56,7 @@ export const useCreateModifierGroup = () => {
       toast.success(i18n.t('common:notifications.modifierGroupCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -79,7 +80,7 @@ export const useUpdateModifierGroup = () => {
       toast.success(i18n.t('common:notifications.modifierGroupUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -96,7 +97,7 @@ export const useDeleteModifierGroup = () => {
       toast.success(i18n.t('common:notifications.modifierGroupDeletedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -144,7 +145,7 @@ export const useCreateModifier = () => {
       toast.success(i18n.t('common:notifications.modifierCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -169,7 +170,7 @@ export const useUpdateModifier = () => {
       toast.success(i18n.t('common:notifications.modifierUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -187,7 +188,7 @@ export const useDeleteModifier = () => {
       toast.success(i18n.t('common:notifications.modifierDeletedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -227,7 +228,7 @@ export const useAssignModifiersToProduct = () => {
       toast.success(i18n.t('common:notifications.productModifiersUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -251,7 +252,7 @@ export const useRemoveModifierGroupFromProduct = () => {
       toast.success(i18n.t('common:notifications.modifierGroupRemovedFromProduct'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };

@@ -92,7 +92,7 @@ describe('marketplace add-on hooks', () => {
   });
 
   it('useSaCreateAddOn surfaces a server error', async () => {
-    h.post.mockRejectedValue({ response: { data: { message: 'dup code' } } });
+    h.post.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'dup code' } } });
     const { result } = renderHook(() => useSaCreateAddOn(), { wrapper });
     await result.current.mutateAsync({ code: 'x' } as never).catch(() => undefined);
     expect(h.toastError).toHaveBeenCalledWith('dup code');

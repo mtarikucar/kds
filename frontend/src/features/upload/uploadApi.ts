@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import {
   ProductImage,
   UploadProductImageResponse,
@@ -29,8 +30,8 @@ export const useUploadProductImage = () => {
       queryClient.invalidateQueries({ queryKey: ['unused-images'] });
       toast.success(i18n.t('common:notifications.imageUploadedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.imageUploadFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.imageUploadFailed')));
     },
   });
 };
@@ -58,8 +59,8 @@ export const useUploadProductImages = () => {
       queryClient.invalidateQueries({ queryKey: ['unused-images'] });
       toast.success(i18n.t('common:notifications.imagesUploadedSuccessfully', { count: data.count }));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.imagesUploadFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.imagesUploadFailed')));
     },
   });
 };
@@ -100,8 +101,8 @@ export const useDeleteProductImage = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success(i18n.t('common:notifications.imageDeletedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.imageDeleteFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.imageDeleteFailed')));
     },
   });
 };
@@ -141,8 +142,8 @@ export const useReorderProductImages = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success(i18n.t('common:notifications.imagesReorderedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.imagesReorderFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.imagesReorderFailed')));
     },
   });
 };
@@ -169,8 +170,8 @@ export const useRemoveImageFromProduct = () => {
       queryClient.invalidateQueries({ queryKey: ['unused-images'] });
       toast.success(i18n.t('common:notifications.imageRemovedFromProduct'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.imageRemoveFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.imageRemoveFailed')));
     },
   });
 };

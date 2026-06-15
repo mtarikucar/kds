@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export interface WebhookSubscription {
   id: string;
@@ -40,7 +41,7 @@ export const useCreateWebhook = () => {
       qc.invalidateQueries({ queryKey: webhookKeys.all });
       toast.success('Webhook subscription created. Save the secret — it is shown once.');
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Failed')),
   });
 };
 

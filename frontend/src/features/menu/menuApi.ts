@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   Category,
@@ -50,7 +51,7 @@ export const useCreateCategory = () => {
       toast.success(i18n.t('common:notifications.categoryCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -74,7 +75,7 @@ export const useUpdateCategory = () => {
       toast.success(i18n.t('common:notifications.categoryUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -91,7 +92,7 @@ export const useDeleteCategory = () => {
       toast.success(i18n.t('common:notifications.categoryDeletedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -133,7 +134,7 @@ export const useCreateProduct = () => {
       toast.success(i18n.t('common:notifications.productCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -157,7 +158,7 @@ export const useUpdateProduct = () => {
       toast.success(i18n.t('common:notifications.productUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -174,7 +175,7 @@ export const useDeleteProduct = () => {
       toast.success(i18n.t('common:notifications.productDeletedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -222,7 +223,7 @@ export const useReorderCategories = () => {
       if (context?.previousCategories) {
         queryClient.setQueryData(categoriesKey, context.previousCategories);
       }
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
     // NOTE: We intentionally do NOT invalidate queries here.
   });
@@ -263,7 +264,7 @@ export const useReorderProducts = () => {
     },
     onError: (error: any) => {
       console.error('Reorder products error:', error);
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };

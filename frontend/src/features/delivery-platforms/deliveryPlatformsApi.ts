@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import type { DeliveryPlatformConfig, DeliveryPlatformLog } from '../../types';
@@ -51,9 +52,9 @@ export const useCreatePlatformConfig = () => {
       queryClient.invalidateQueries({ queryKey: ['deliveryPlatformConfigs'] });
       toast.success(tt('onlineOrders.toast.configCreated'));
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(
-        error.response?.data?.message || tt('onlineOrders.toast.configCreateFailed'),
+        getApiErrorMessage(error, tt('onlineOrders.toast.configCreateFailed')),
       );
     },
   });
@@ -83,9 +84,9 @@ export const useUpdatePlatformConfig = () => {
       queryClient.invalidateQueries({ queryKey: ['deliveryPlatformConfigs'] });
       toast.success(tt('onlineOrders.toast.configUpdated'));
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(
-        error.response?.data?.message || tt('onlineOrders.toast.configUpdateFailed'),
+        getApiErrorMessage(error, tt('onlineOrders.toast.configUpdateFailed')),
       );
     },
   });
@@ -104,9 +105,9 @@ export const useDeletePlatformConfig = () => {
       queryClient.invalidateQueries({ queryKey: ['deliveryPlatformConfigs'] });
       toast.success(tt('onlineOrders.toast.configDeleted'));
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(
-        error.response?.data?.message || tt('onlineOrders.toast.configDeleteFailed'),
+        getApiErrorMessage(error, tt('onlineOrders.toast.configDeleteFailed')),
       );
     },
   });
@@ -131,9 +132,9 @@ export const useTestPlatformConnection = () => {
         toast.error(tt('onlineOrders.toast.connectionFailed'));
       }
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(
-        error.response?.data?.message || tt('onlineOrders.toast.connectionTestFailed'),
+        getApiErrorMessage(error, tt('onlineOrders.toast.connectionTestFailed')),
       );
     },
   });
@@ -161,9 +162,9 @@ export const useToggleRestaurant = () => {
         variables.open ? tt('onlineOrders.toast.restaurantOpened') : tt('onlineOrders.toast.restaurantClosed'),
       );
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(
-        error.response?.data?.message || tt('onlineOrders.toast.toggleFailed'),
+        getApiErrorMessage(error, tt('onlineOrders.toast.toggleFailed')),
       );
     },
   });
@@ -203,9 +204,9 @@ export const useSyncMenu = () => {
     onSuccess: () => {
       toast.success(tt('onlineOrders.toast.menuSyncStarted'));
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast.error(
-        error.response?.data?.message || tt('onlineOrders.toast.menuSyncFailed'),
+        getApiErrorMessage(error, tt('onlineOrders.toast.menuSyncFailed')),
       );
     },
   });

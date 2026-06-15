@@ -111,7 +111,7 @@ describe('useReorderCategories — optimistic cache rewrite', () => {
 
 describe('useReorderCategories — error rollback', () => {
   it('restores the previous snapshot and surfaces a toast when a PATCH rejects', async () => {
-    patchMock.mockRejectedValue({ response: { data: { message: 'boom' } } });
+    patchMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'boom' } } });
     const client = new QueryClient();
     const key = ['categories', 'b-1'];
     const original = [cat('c1', 0), cat('c2', 1)];

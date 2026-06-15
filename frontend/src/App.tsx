@@ -15,6 +15,7 @@ const TenantDetailPage = lazy(() => import('./pages/superadmin/TenantDetailPage'
 const AllUsersPage = lazy(() => import('./pages/superadmin/AllUsersPage'));
 const PlansPage = lazy(() => import('./pages/superadmin/PlansPage'));
 const SubscriptionsPage = lazy(() => import('./pages/superadmin/SubscriptionsPage'));
+const BankTransferPage = lazy(() => import('./pages/superadmin/BankTransferPage'));
 const AuditLogsPage = lazy(() => import('./pages/superadmin/AuditLogsPage'));
 const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminSettingsPage'));
 const MarketplaceAdminPage = lazy(() => import('./pages/superadmin/MarketplaceAdminPage'));
@@ -380,6 +381,7 @@ function App() {
           <Route path="/superadmin/plans" element={<PlansPage />} />
           <Route path="/superadmin/marketplace" element={<MarketplaceAdminPage />} />
           <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/superadmin/bank-transfer" element={<BankTransferPage />} />
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         </Route>

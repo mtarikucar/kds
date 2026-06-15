@@ -16,6 +16,7 @@ import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { getApiErrorMessage } from '../../lib/api-error';
 import {
   FileText,
   Download,
@@ -78,8 +79,8 @@ const ZReportsPage = () => {
       toast.success(t('zReports.generateSuccess', 'Z-Report generated successfully'));
       setShowGenerateModal(false);
       queryClient.invalidateQueries({ queryKey: ['z-reports'] });
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('zReports.generateError', 'Failed to generate Z-Report'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('zReports.generateError', 'Failed to generate Z-Report')));
     }
   };
 
@@ -102,8 +103,8 @@ const ZReportsPage = () => {
       } else {
         toast.error(result.message);
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('zReports.emailError', 'Failed to send email'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('zReports.emailError', 'Failed to send email')));
     }
   };
 

@@ -76,7 +76,7 @@ describe('useCreateCustomer', () => {
   });
 
   it('toasts the server message on error', async () => {
-    apiPost.mockRejectedValue({ response: { data: { message: 'Name taken' } } });
+    apiPost.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'Name taken' } } });
     const client = makeClient();
     const { result } = renderHook(() => useCreateCustomer(), { wrapper: wrap(client) });
 

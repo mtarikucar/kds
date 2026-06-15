@@ -9,6 +9,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { useGeolocation } from '../../hooks';
 import { buildQRMenuUrl } from '../../utils/subdomain';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 interface SubdomainCartPageProps {
   subdomain: string;
@@ -92,8 +93,8 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
 
       const ordersUrl = buildQRMenuUrl('orders', { subdomain, tableId, sessionId });
       navigate(ordersUrl);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('messages.operationFailed'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('messages.operationFailed')));
     } finally {
       setIsSubmitting(false);
     }

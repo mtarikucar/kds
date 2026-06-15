@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Order } from '../../types';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 const OrderTrackingPage = () => {
   const { t } = useTranslation('common');
@@ -63,8 +64,8 @@ const OrderTrackingPage = () => {
         sessionId,
       });
       toast.success(t('waiter.callSuccess'));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('waiter.callError'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('waiter.callError')));
     }
   };
 
@@ -82,8 +83,8 @@ const OrderTrackingPage = () => {
         sessionId,
       });
       toast.success(t('bill.requestSuccess'));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('bill.requestError'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('bill.requestError')));
     }
   };
 

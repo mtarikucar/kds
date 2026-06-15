@@ -14,6 +14,7 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import FormSelect from '../../components/ui/FormSelect';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 const UserManagementPage = () => {
   const { t } = useTranslation(['common', 'subscriptions']);
@@ -128,8 +129,8 @@ const UserManagementPage = () => {
       setLoading(true);
       const response = await usersApi.getAll();
       setUsers(response.data);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('app:app.error'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('app:app.error')));
     } finally {
       setLoading(false);
     }
@@ -198,8 +199,8 @@ const UserManagementPage = () => {
 
       handleCloseModal();
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('app:app.error'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('app:app.error')));
     }
   };
 
@@ -217,8 +218,8 @@ const UserManagementPage = () => {
       setShowDeleteDialog(false);
       setUserToDelete(null);
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('admin.userDeleteFailed'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('admin.userDeleteFailed')));
     }
   };
 
@@ -245,8 +246,8 @@ const UserManagementPage = () => {
       await usersApi.approveUser(user.id);
       toast.success(t('admin.userApproved'));
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('admin.userApproveFailed'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('admin.userApproveFailed')));
     }
   };
 
@@ -255,8 +256,8 @@ const UserManagementPage = () => {
       await usersApi.rejectUser(user.id);
       toast.success(t('admin.userRejected'));
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('admin.userRejectFailed'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('admin.userRejectFailed')));
     }
   };
 
@@ -265,8 +266,8 @@ const UserManagementPage = () => {
       await usersApi.reactivateUser(user.id);
       toast.success(t('admin.userReactivated', 'Kullanıcı aktif edildi'));
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('admin.userReactivateFailed', 'Kullanıcı aktif edilemedi'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('admin.userReactivateFailed', 'Kullanıcı aktif edilemedi')));
     }
   };
 

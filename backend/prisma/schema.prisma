@@ -1141,6 +1141,28 @@ model SubscriptionPayment {
 }
 
 /**
+ * Platform-level (HummyTummy) bank account shown to tenants paying a
+ * subscription by manual bank transfer (havale/EFT). A SINGLETON — one row,
+ * id pinned to "default" — edited by the superadmin. Not per-tenant: this is
+ * the SaaS operator's own account that subscription payments are sent to.
+ */
+model BankTransferSettings {
+  id            String  @id @default("default")
+  enabled       Boolean @default(false)
+  bankName      String?
+  accountHolder String?
+  iban          String?
+  // Optional free-text the customer sees (branch, SWIFT, extra steps).
+  instructions  String?
+
+  updatedByEmail String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("bank_transfer_settings")
+}
+
+/**
  * Holds an upgrade target between intent creation and webhook confirmation.
  * When a tenant initiates a plan change that requires payment, we record
  * the target here keyed by merchantOid. The webhook reads it on success

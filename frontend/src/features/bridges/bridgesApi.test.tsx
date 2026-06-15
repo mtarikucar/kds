@@ -73,7 +73,7 @@ describe('bridgesApi', () => {
   });
 
   it('useCreateBridge surfaces server errors', async () => {
-    h.post.mockRejectedValue({ response: { data: { message: 'no quota' } } });
+    h.post.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'no quota' } } });
     const { result } = renderHook(() => useCreateBridge(), { wrapper });
     await result.current.mutateAsync({ branchId: 'b' }).catch(() => undefined);
     expect(h.toastError).toHaveBeenCalledWith('no quota');

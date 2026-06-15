@@ -28,6 +28,10 @@ export enum BillingCycle {
 // so a single switch entry is enough to plug a new processor in.
 export enum PaymentProvider {
   PAYTR = "PAYTR",
+  // Manual bank transfer (havale/EFT) — used for non-TRY plans (PayTR only
+  // collects TRY) and as an alternative method on TRY plans. Activated by
+  // superadmin confirmation, not a webhook.
+  BANK_TRANSFER = "BANK_TRANSFER",
 }
 
 export enum PaymentStatus {

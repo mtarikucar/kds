@@ -39,6 +39,9 @@ vi.mock('react-i18next', () => ({
     },
   }),
 }));
+// getApiErrorMessage imports i18n/config, which would eagerly re-init i18next
+// against the partial react-i18next mock. Stub it.
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');

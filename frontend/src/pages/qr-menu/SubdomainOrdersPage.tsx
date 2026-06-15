@@ -8,6 +8,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { Order } from '../../types';
 import { buildQRMenuUrl } from '../../utils/subdomain';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 interface SubdomainOrdersPageProps {
   subdomain: string;
@@ -69,8 +70,8 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
         sessionId,
       });
       toast.success(t('waiter.callSuccess'));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('waiter.callError'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('waiter.callError')));
     }
   };
 
@@ -90,8 +91,8 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
         sessionId,
       });
       toast.success(t('bill.requestSuccess'));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('bill.requestError'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('bill.requestError')));
     }
   };
 

@@ -8,6 +8,7 @@ import { PaytrWebhookController } from "./webhooks/paytr-webhook.controller";
 import { PaytrIpAllowlistGuard } from "./webhooks/paytr-ip-allowlist.guard";
 import { PaytrAdapterModule } from "./adapters/paytr-adapter.module";
 import { PaytrSettlementModule } from "./services/paytr-settlement.module";
+import { BankTransferModule } from "./services/bank-transfer.module";
 import { CustomerOrdersModule } from "../customer-orders/customer-orders.module";
 import { CheckoutModule } from "../checkout/checkout.module";
 
@@ -23,6 +24,9 @@ import { CheckoutModule } from "../checkout/checkout.module";
     // SubscriptionsModule); pulled into its own module to break the
     // Payments ↔ Subscriptions cycle.
     PaytrSettlementModule,
+    // Manual bank-transfer (havale) flow — also imported by SuperadminModule
+    // for the confirm/reject + settings endpoints.
+    BankTransferModule,
     // PayTR webhook routes "SP" prefix merchantOids into
     // CustomerSelfPayService for the customer self-pay flow.
     forwardRef(() => CustomerOrdersModule),

@@ -22,6 +22,11 @@ vi.mock('sonner', () => ({
     error: (m: string) => h.toastError(m),
   },
 }));
+// getApiErrorMessage (via the onError handlers) imports i18n/config, which
+// would eagerly init i18next with all namespaces and make the key-based
+// assertions resolve to real English copy. Stub it to a key-echo no-op so the
+// global test-setup i18next instance (errors/common/auth only) stays active.
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 vi.mock('../../components/settings/SubdomainSettings', () => ({
   default: () => <div data-testid="subdomain-settings" />,
 }));

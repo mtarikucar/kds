@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 export const useMyProfile = () => {
   return useQuery({
@@ -32,8 +33,8 @@ export const useUpdateProfile = (options?: { silent?: boolean }) => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
       if (!silent) toast.success(i18n.t('common:notifications.profileUpdatedSuccessfully'));
     },
-    onError: (error: any) => {
-      if (!silent) toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      if (!silent) toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };
@@ -50,8 +51,8 @@ export const useUpdateEmail = () => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
       toast.success(i18n.t('common:notifications.updatedSuccessfully'));
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
   });
 };

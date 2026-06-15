@@ -11,6 +11,11 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { SuperAdminSubscriptionsService } from "../services/superadmin-subscriptions.service";
+import { BankTransferService } from "../../payments/services/bank-transfer.service";
+import {
+  UpdateBankTransferSettingsDto,
+  RejectBankTransferDto,
+} from "../../payments/dto/bank-transfer.dto";
 import {
   SubscriptionFilterDto,
   CreatePlanDto,
@@ -32,6 +37,7 @@ import { CurrentSuperAdmin } from "../decorators/current-superadmin.decorator";
 export class SuperAdminSubscriptionsController {
   constructor(
     private readonly subscriptionsService: SuperAdminSubscriptionsService,
+    private readonly bankTransfer: BankTransferService,
   ) {}
 
   // Plans
@@ -190,5 +196,49 @@ export class SuperAdminSubscriptionsController {
       actorId,
       actorEmail,
     );
+  }
+
+  // --- Bank transfer (havale) -------------------------------------------------
+
+  @Get("bank-transfer/settings")
+  @ApiOperation({ summary: "Get the platform bank-transfer settings" })
+  async getBankTransferSettings() {
+    return this.bankTransfer.getSettings();
+  }
+
+  @Patch("bank-transfer/settings")
+  @ApiOperation({ summary: "Update the platform bank-transfer settings" })
+  async updateBankTransferSettings(
+    @Body() dto: UpdateBankTransferSettingsDto,
+    @CurrentSuperAdmin("email") actorEmail: string,
+  ) {
+    return this.bankTransfer.updateSettings(dto, actorEmail);
+  }
+
+  @Get("bank-transfer/pending")
+  @ApiOperation({ summary: "List pending bank-transfer payments" })
+  async listPendingBankTransfers() {
+    return this.bankTransfer.listPending();
+  }
+
+  @Post("bank-transfer/:paymentId/confirm")
+  @ApiOperation({
+    summary: "Confirm a received bank transfer (activates the subscription)",
+  })
+  async confirmBankTransfer(
+    @Param("paymentId") paymentId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
+  ) {
+    return this.bankTransfer.confirm(paymentId, actorEmail);
+  }
+
+  @Post("bank-transfer/:paymentId/reject")
+  @ApiOperation({ summary: "Reject a pending bank transfer" })
+  async rejectBankTransfer(
+    @Param("paymentId") paymentId: string,
+    @Body() dto: RejectBankTransferDto,
+    @CurrentSuperAdmin("email") actorEmail: string,
+  ) {
+    return this.bankTransfer.reject(paymentId, dto.reason, actorEmail);
   }
 }

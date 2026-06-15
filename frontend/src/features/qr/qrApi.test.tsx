@@ -76,7 +76,7 @@ describe('useUpdateQrSettings', () => {
   });
 
   it('surfaces the server error message on failure', async () => {
-    patchMock.mockRejectedValue({ response: { data: { message: 'invalid color' } } });
+    patchMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'invalid color' } } });
     const client = makeClient();
     const { result } = renderHook(() => useUpdateQrSettings(), { wrapper: wrapper(client) });
     result.current.mutate({ themeColor: 'bad' } as any);

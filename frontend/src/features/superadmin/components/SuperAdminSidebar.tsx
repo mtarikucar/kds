@@ -10,6 +10,7 @@ import {
   FileText,
   Settings,
   Layers,
+  Banknote,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ const navigation = [
   { nameKey: 'nav.plans', href: '/superadmin/plans', icon: Layers },
   { nameKey: 'nav.marketplace', href: '/superadmin/marketplace', icon: Layers },
   { nameKey: 'nav.subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
+  { nameKey: 'nav.bankTransfer', href: '/superadmin/bank-transfer', icon: Banknote, defaultLabel: 'Havale' },
   { nameKey: 'nav.auditLogs', href: '/superadmin/audit-logs', icon: FileText },
   { nameKey: 'nav.settings', href: '/superadmin/settings', icon: Settings },
 ];
@@ -63,7 +65,9 @@ export default function SuperAdminSidebar() {
             }
           >
             <item.icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
-            {t(item.nameKey)}
+            {'defaultLabel' in item && item.defaultLabel
+              ? t(item.nameKey, item.defaultLabel)
+              : t(item.nameKey)}
           </NavLink>
         ))}
       </nav>

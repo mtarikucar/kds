@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Eye, Send, PackageCheck, XCircle, X, Trash2 } from 'lucide-react';
+import { Plus, Eye, Send, PackageCheck, XCircle, Trash2 } from 'lucide-react';
 import {
   usePurchaseOrders, useCreatePurchaseOrder, useSubmitPurchaseOrder,
   useReceivePurchaseOrder, useCancelPurchaseOrder, useSuppliers, useStockItems,
 } from '../stockManagementApi';
 import { PurchaseOrderStatus, type PurchaseOrder } from '../types';
+import Modal from '../../../components/ui/Modal';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
@@ -126,12 +127,7 @@ const PurchaseOrdersTab = () => {
 
       {/* View PO Modal */}
       {viewOrder && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{viewOrder.orderNumber}</h3>
-              <button onClick={() => setViewOrder(null)} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-            </div>
+        <Modal isOpen onClose={() => setViewOrder(null)} title={viewOrder.orderNumber} size="md">
             <div className="space-y-2 text-sm mb-4">
               <p><span className="text-gray-500">{t('purchaseOrders.supplier')}:</span> {viewOrder.supplier?.name}</p>
               <p><span className="text-gray-500">{t('purchaseOrders.status')}:</span> {statusLabel(viewOrder.status)}</p>
@@ -158,8 +154,7 @@ const PurchaseOrdersTab = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Receive PO Modal */}
@@ -203,13 +198,8 @@ function CreatePOForm({ suppliers, stockItems, onSave, onClose, isLoading, t }: 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-semibold">{t('purchaseOrders.create')}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={t('purchaseOrders.create')} size="md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('purchaseOrders.supplier')} *</label>
             <select required value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
@@ -255,8 +245,7 @@ function CreatePOForm({ suppliers, stockItems, onSave, onClose, isLoading, t }: 
             <button type="submit" disabled={isLoading} className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{t('common.save')}</button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -288,13 +277,8 @@ function ReceivePOForm({ order, onSave, onClose, isLoading, t }: any) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-semibold">{t('purchaseOrders.receiveItems')} — {order.orderNumber}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal isOpen onClose={onClose} title={`${t('purchaseOrders.receiveItems')} — ${order.orderNumber}`} size="md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {order.items.map((item: any, idx: number) => (
             <div key={item.id} className="border rounded-lg p-3 space-y-2">
               <div className="flex justify-between text-sm">
@@ -322,8 +306,7 @@ function ReceivePOForm({ order, onSave, onClose, isLoading, t }: any) {
             <button type="submit" disabled={isLoading} className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{t('purchaseOrders.receive')}</button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

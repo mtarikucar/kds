@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 import {
   Order,
@@ -74,7 +75,7 @@ export const useCreateOrder = () => {
       toast.success(i18n.t('pos:orderCreated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:orderCreateFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:orderCreateFailed')));
     },
   });
 };
@@ -103,7 +104,7 @@ export const useUpdateOrder = () => {
       toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:orderUpdateFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:orderUpdateFailed')));
     },
   });
 };
@@ -132,7 +133,7 @@ export const useUpdateOrderStatus = () => {
       toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:orderUpdateFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:orderUpdateFailed')));
     },
   });
 };
@@ -155,7 +156,7 @@ export const useCancelOrder = () => {
       toast.success(i18n.t('pos:orderCancelled'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:orderCancelFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:orderCancelFailed')));
     },
   });
 };
@@ -179,7 +180,7 @@ export const useCancelKdsOrder = () => {
       toast.success(i18n.t('pos:orderCancelled'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:orderCancelFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:orderCancelFailed')));
     },
   });
 };
@@ -217,7 +218,7 @@ export const useCreatePayment = () => {
       toast.success(i18n.t('pos:paymentRecorded'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:paymentRecordFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:paymentRecordFailed')));
     },
   });
 };
@@ -253,7 +254,7 @@ export const useSplitBill = () => {
       toast.success(i18n.t('pos:billSplit.splitSuccess'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:billSplit.splitFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:billSplit.splitFailed')));
     },
   });
 };
@@ -320,7 +321,7 @@ export const usePayByItems = () => {
     },
     onError: (error: any) => {
       toast.error(
-        error.response?.data?.message || i18n.t('pos:progressive.paymentFailed'),
+        getApiErrorMessage(error, i18n.t('pos:progressive.paymentFailed')),
       );
     },
   });
@@ -362,7 +363,7 @@ export const useApproveOrder = () => {
       toast.success(i18n.t('common:notifications.orderApprovedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.orderApproveFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.orderApproveFailed')));
     },
   });
 };
@@ -399,7 +400,7 @@ export const useAcknowledgeWaiterRequest = () => {
       toast.success(i18n.t('common:notifications.waiterRequestAcknowledged'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestAcknowledgeFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.requestAcknowledgeFailed')));
     },
   });
 };
@@ -420,7 +421,7 @@ export const useCompleteWaiterRequest = () => {
       toast.success(i18n.t('common:notifications.waiterRequestCompleted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestCompleteFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.requestCompleteFailed')));
     },
   });
 };
@@ -457,7 +458,7 @@ export const useAcknowledgeBillRequest = () => {
       toast.success(i18n.t('common:notifications.billRequestAcknowledged'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestAcknowledgeFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.requestAcknowledgeFailed')));
     },
   });
 };
@@ -478,7 +479,7 @@ export const useCompleteBillRequest = () => {
       toast.success(i18n.t('common:notifications.billRequestCompleted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestCompleteFailed'));
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.requestCompleteFailed')));
     },
   });
 };
@@ -521,7 +522,7 @@ export const useTransferTableOrders = () => {
       }));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || i18n.t('pos:transfer.failed'));
+      toast.error(getApiErrorMessage(error, i18n.t('pos:transfer.failed')));
     },
   });
 };
