@@ -28,7 +28,13 @@ import Badge from '../../components/ui/Badge';
 import { SubscriptionStatus, BillingCycle, InvoiceStatus } from '../../types';
 import { formatCurrency } from '../../lib/currency';
 
-const SubscriptionSettingsPage = () => {
+/**
+ * Subscription + billing management. Formerly the standalone
+ * /subscription/manage page; now rendered as a SECTION inside
+ * PlanAndAccessPage (/admin/plan) so plan, quotas, add-ons, billing and
+ * invoices live on one page. The old routes redirect to /admin/plan.
+ */
+const SubscriptionManagementSection = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -132,17 +138,7 @@ const SubscriptionSettingsPage = () => {
   const currentPlan = plans?.find((p) => p.id === currentSubscription.planId);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="mb-8">
-          <h1 className="text-2xl font-heading font-bold text-slate-900">{t('subscriptions.title')}</h1>
-          <p className="text-slate-500 mt-1">{t('subscriptions.manageSubscription')}</p>
-        </div>
-        <Button variant="outline" onClick={() => navigate('/subscription/plans')}>
-          {t('subscriptions.viewAllPlans')}
-        </Button>
-      </div>
-
+    <div className="space-y-6">
       {/* Scheduled Downgrade Alert */}
       {scheduledDowngrade && currentSubscription && (
         <ScheduledDowngradeAlert
@@ -413,4 +409,4 @@ const SubscriptionSettingsPage = () => {
   );
 };
 
-export default SubscriptionSettingsPage;
+export default SubscriptionManagementSection;

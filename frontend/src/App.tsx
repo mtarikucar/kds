@@ -73,7 +73,6 @@ const POSSettingsPage = lazy(() => import('./pages/settings/POSSettingsPage'));
 const QRMenuSettingsPage = lazy(() => import('./pages/settings/QRMenuSettingsPage'));
 const ReportsSettingsPage = lazy(() => import('./pages/settings/ReportsSettingsPage'));
 const BrandingSettingsPage = lazy(() => import('./pages/settings/BrandingSettingsPage'));
-const SubscriptionSettingsPage = lazy(() => import('./pages/settings/SubscriptionSettingsPage'));
 const IntegrationsSettingsPage = lazy(() => import('./pages/settings/IntegrationsSettingsPage'));
 const DesktopAppSettingsPage = lazy(() => import('./pages/settings/DesktopAppSettingsPage'));
 const ReservationSettingsPage = lazy(() => import('./pages/settings/ReservationSettingsPage'));
@@ -268,7 +267,7 @@ function App() {
               downgrade) now lives standalone at /subscription/manage, linked
               from Plan & Erişim. This old settings URL redirects there so any
               existing bookmark keeps working. */}
-          <Route path="subscription" element={<Navigate to="/subscription/manage" replace />} />
+          <Route path="subscription" element={<Navigate to="/admin/plan" replace />} />
           <Route path="pos" element={<POSSettingsPage />} />
           <Route path="qr-menu" element={<QRMenuSettingsPage />} />
           <Route path="reports" element={<ReportsSettingsPage />} />
@@ -319,7 +318,9 @@ function App() {
 
         {/* Legacy redirects */}
         <Route path="/admin/pos-settings" element={<Navigate to="/admin/settings/pos" replace />} />
-        <Route path="/subscription/manage" element={<SubscriptionSettingsPage />} />
+        {/* v3.1.6 — billing/subscription management folded into Plan & Erişim
+            (/admin/plan); old links/bookmarks redirect there. */}
+        <Route path="/subscription/manage" element={<Navigate to="/admin/plan" replace />} />
 
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />

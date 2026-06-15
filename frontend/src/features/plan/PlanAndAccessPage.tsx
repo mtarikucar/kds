@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  CreditCard,
   Users,
   Building2,
   Package,
@@ -10,7 +9,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  ArrowRight,
   Store,
 } from 'lucide-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
@@ -22,6 +20,7 @@ import {
   type MarketplaceAddOn,
 } from '../marketplace/marketplaceApi';
 import { useGetUsageSnapshot, type UsageDimension } from './planApi';
+import SubscriptionManagementSection from '../../pages/settings/SubscriptionSettingsPage';
 
 /**
  * v2.8.88 — top-level Plan & Erişim sayfası.
@@ -76,59 +75,11 @@ export default function PlanAndAccessPage() {
         </p>
       </header>
 
-      {/* Current plan card */}
-      <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50 to-white p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
-              <CreditCard className="h-3.5 w-3.5" />
-              {t('plan.current', { defaultValue: 'Mevcut plan' })}
-            </div>
-            <div className="mt-1 text-2xl font-semibold text-slate-900">
-              {plan?.displayName ?? plan?.name ?? '—'}
-            </div>
-            {subscription?.currentPeriodEnd && (
-              <div className="mt-1 text-xs text-slate-600">
-                {t('plan.nextBilling', {
-                  defaultValue: 'Sonraki tahsilat: {{date}}',
-                  date: new Date(
-                    subscription.currentPeriodEnd,
-                  ).toLocaleDateString('tr-TR'),
-                })}
-              </div>
-            )}
-            {subscription?.status === 'TRIALING' && subscription?.trialEnd && (
-              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                {t('plan.trialEnds', {
-                  defaultValue: 'Deneme bitiş: {{date}}',
-                  date: new Date(subscription.trialEnd).toLocaleDateString(
-                    'tr-TR',
-                  ),
-                })}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col items-stretch gap-2">
-            <Link
-              to="/subscription/plans"
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              {t('plan.changePlanCta', { defaultValue: 'Planı değiştir' })}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            {/* v3.0.5: billing detail (invoices / cancel / reactivate) moved
-                out of Settings → reached from here. */}
-            <Link
-              to="/subscription/manage"
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              {t('plan.manageBillingCta', {
-                defaultValue: 'Fatura & abonelik yönetimi',
-              })}
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Subscription + billing management (current plan, billing cycle,
+          cancel/reactivate/renew, scheduled downgrade, plan limits, and the
+          invoice history). v3.1.6 — folded in from the old standalone
+          /subscription/manage page so plan + billing live on ONE page. */}
+      <SubscriptionManagementSection />
 
       {/* Quota grid */}
       <section>
