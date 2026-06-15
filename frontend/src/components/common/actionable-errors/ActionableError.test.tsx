@@ -38,34 +38,36 @@ describe('ActionableError inline-fix flow', () => {
     const onResume = vi.fn();
     renderWithProvider(phoneError(), onResume);
 
-    // No prompt until the error is handled.
-    expect(screen.queryByPlaceholderText('+90 555 123 45 67')).toBeNull();
+    // No prompt until the error is handled. (PhoneInput's label resolves to the
+    // en string 'Phone number'.)
+    expect(screen.queryByLabelText('Phone number')).toBeNull();
 
     fireEvent.click(screen.getByText('trigger'));
 
-    const input = await screen.findByPlaceholderText('+90 555 123 45 67');
-    fireEvent.change(input, { target: { value: '+90 555 123 45 67' } });
+    // Type a natural Turkish format; the PhoneInput normalizes to E.164.
+    const input = await screen.findByLabelText('Phone number');
+    fireEvent.change(input, { target: { value: '0555 123 45 67' } });
     fireEvent.click(screen.getByRole('button', { name: /Save & continue/i }));
 
-    await waitFor(() => expect(patch).toHaveBeenCalledWith('/users/me/profile', { phone: '+90 555 123 45 67' }));
+    await waitFor(() => expect(patch).toHaveBeenCalledWith('/users/me/profile', { phone: '+905551234567' }));
     await waitFor(() => expect(onResume).toHaveBeenCalledTimes(1));
     // Prompt closes after resume.
-    await waitFor(() => expect(screen.queryByPlaceholderText('+90 555 123 45 67')).toBeNull());
+    await waitFor(() => expect(screen.queryByLabelText('Phone number')).toBeNull());
   });
 
-  it('blocks save + does not call the API on an obviously invalid phone', async () => {
+  it('blocks save + does not call the API on an incomplete phone (PhoneInput emits no E.164)', async () => {
     const onResume = vi.fn();
     renderWithProvider(phoneError(), onResume);
     fireEvent.click(screen.getByText('trigger'));
 
-    const input = await screen.findByPlaceholderText('+90 555 123 45 67');
-    fireEvent.change(input, { target: { value: '123' } });
+    const input = await screen.findByLabelText('Phone number');
+    fireEvent.change(input, { target: { value: '0555' } });
     fireEvent.click(screen.getByRole('button', { name: /Save & continue/i }));
 
     expect(patch).not.toHaveBeenCalled();
     expect(onResume).not.toHaveBeenCalled();
     // still open
-    expect(screen.getByPlaceholderText('+90 555 123 45 67')).toBeInTheDocument();
+    expect(screen.getByLabelText('Phone number')).toBeInTheDocument();
   });
 
   it('returns false (no prompt) for an error without a known actionable code', () => {
@@ -95,6 +97,6 @@ describe('ActionableError inline-fix flow', () => {
     );
     fireEvent.click(screen.getByText('go'));
     expect(handled).toEqual([false]);
-    expect(screen.queryByPlaceholderText('+90 555 123 45 67')).toBeNull();
+    expect(screen.queryByLabelText('Phone number')).toBeNull();
   });
 });

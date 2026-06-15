@@ -9,6 +9,9 @@
       "invalid": "Geçerli bir telefon numarası girin (örn. +90 555 123 45 67)."
     }
   },
+  "phoneInput": {
+    "country": "Ülke kodu"
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "Yükleniyor...",

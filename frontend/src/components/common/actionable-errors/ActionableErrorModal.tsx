@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from '../../ui/Modal';
 import Input from '../../ui/Input';
+import PhoneInput from '../../ui/PhoneInput';
 import Button from '../../ui/Button';
 import { useUpdateProfile } from '../../../features/users/usersApi';
 import { getApiErrorMessage } from '../../../lib/api-error';
@@ -63,19 +64,30 @@ const ActionableErrorModal = ({ spec, onCancel, onResolved }: ActionableErrorMod
     <Modal isOpen title={t(spec.titleKey)} onClose={onCancel} size="sm">
       <div className="space-y-4">
         <p className="text-sm text-slate-600">{t(spec.bodyKey)}</p>
-        <Input
-          label={t(spec.labelKey)}
-          type={spec.inputType}
-          inputMode={spec.field === 'phone' ? 'tel' : undefined}
-          placeholder={spec.placeholder}
-          value={value}
-          autoFocus
-          error={fieldError ?? undefined}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !saving) handleSave();
-          }}
-        />
+        {spec.field === 'phone' ? (
+          // Professional phone field: country selector + natural-format entry,
+          // emits canonical E.164 so the save can't be rejected for "format".
+          <PhoneInput
+            label={t(spec.labelKey)}
+            value={value}
+            autoFocus
+            error={fieldError ?? undefined}
+            onChange={setValue}
+          />
+        ) : (
+          <Input
+            label={t(spec.labelKey)}
+            type={spec.inputType}
+            placeholder={spec.placeholder}
+            value={value}
+            autoFocus
+            error={fieldError ?? undefined}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !saving) handleSave();
+            }}
+          />
+        )}
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onCancel} disabled={saving}>
             {t('app.cancel', 'İptal')}
