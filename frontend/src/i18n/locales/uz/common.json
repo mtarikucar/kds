@@ -1,4 +1,14 @@
 {
+  "actionableErrors": {
+    "saveAndContinue": "Saqlash va davom etish",
+    "saveFailed": "Saqlab bo‘lmadi. Iltimos, qayta urinib ko‘ring.",
+    "phone": {
+      "title": "Telefon raqamingizni qo‘shing",
+      "body": "Davom etish uchun telefon raqami kerak. Uni shu yerga kiriting, qoldirgan joyingizdan davom etamiz.",
+      "label": "Telefon raqami",
+      "invalid": "To‘g‘ri telefon raqamini kiriting (masalan, +90 555 123 45 67)."
+    }
+  },
   "app": {
     "name": "HummyTummy",
     "loading": "Yuklanmoqda...",

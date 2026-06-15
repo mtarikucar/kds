@@ -5,17 +5,41 @@ import { useProducts } from '../../features/menu/menuApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Product } from '../../types';
-import { Card } from '../ui/Card';
 import Spinner from '../ui/Spinner';
-import { Plus, Grid3x3, List, Search, Package, AlertCircle, Sparkles } from 'lucide-react';
+import { Plus, Minus, Grid3x3, List, Search, Package, AlertCircle, Sparkles } from 'lucide-react';
 
 interface MenuPanelProps {
   onAddItem: (product: Product) => void;
+  /**
+   * Quantity of each product currently in the cart, keyed by product id.
+   * When a product is present (>0) its card shows an in-cart badge with
+   * inline +/- so quantity changes don't require opening the cart.
+   */
+  cartQuantities?: Record<string, number>;
+  /** Increment a product already in the cart (no modal). */
+  onIncrement?: (productId: string) => void;
+  /** Decrement a product already in the cart (down to removal at 0). */
+  onDecrement?: (productId: string) => void;
 }
 
 type ViewMode = 'grid' | 'list';
 
-const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
+/**
+ * Whether a product has at least one required modifier group. Mirrors the
+ * detection in POSPage.handleAddItem so the card's inline-stepper decision
+ * stays in sync with which products force the ProductOptionsModal path.
+ */
+const hasRequiredModifiers = (product: Product): boolean =>
+  !!product.modifierGroups?.some(
+    (group) => group.isRequired || group.minSelections > 0,
+  );
+
+const MenuPanel = ({
+  onAddItem,
+  cartQuantities = {},
+  onIncrement,
+  onDecrement,
+}: MenuPanelProps) => {
   const { t } = useTranslation('pos');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -161,71 +185,164 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
         ) : viewMode === 'grid' ? (
           /* Grid View */
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="group bg-white rounded-xl border border-slate-200/60 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-              >
-                {/* Image */}
-                <div className="aspect-[4/3] bg-slate-100 overflow-hidden relative">
-                  {showImages && product.images && product.images.length > 0 ? (
-                    <img
-                      src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
-                        ? product.images[0].url
-                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-50">
-                      <Package className="h-12 w-12 text-slate-300" />
+            {filteredProducts.map((product) => {
+              const inCartQty = cartQuantities[product.id] ?? 0;
+              const requiresModifiers = hasRequiredModifiers(product);
+              // The whole card is the add target (fast path) unless it's a
+              // required-modifier item that's already in the cart — for those
+              // the inline badge would be ambiguous about which modifier set
+              // to bump, so we keep the explicit modal-opening add button.
+              const cardActsAsAdd = product.currentStock !== 0;
+              const showInlineSteppers =
+                inCartQty > 0 && !requiresModifiers && !!onIncrement && !!onDecrement;
+
+              return (
+                <div
+                  key={product.id}
+                  role={cardActsAsAdd ? 'button' : undefined}
+                  tabIndex={cardActsAsAdd ? 0 : undefined}
+                  onClick={cardActsAsAdd ? () => onAddItem(product) : undefined}
+                  onKeyDown={
+                    cardActsAsAdd
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onAddItem(product);
+                          }
+                        }
+                      : undefined
+                  }
+                  aria-label={cardActsAsAdd ? `${t('addToOrder')}: ${product.name}` : undefined}
+                  className={`group relative bg-white rounded-xl border overflow-hidden transition-all duration-200 min-h-[44px] ${
+                    inCartQty > 0 ? 'border-primary-300 ring-1 ring-primary-200' : 'border-slate-200/60'
+                  } ${
+                    cardActsAsAdd
+                      ? 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:outline-none'
+                      : 'opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  {/* In-cart quantity badge */}
+                  {inCartQty > 0 && (
+                    <div className="absolute top-2 left-2 z-10 bg-primary-600 text-white text-xs font-bold rounded-full h-6 min-w-[1.5rem] px-1.5 flex items-center justify-center shadow ring-2 ring-white">
+                      {inCartQty}
                     </div>
                   )}
 
-                  {/* Stock Badge */}
-                  {product.currentStock !== null && product.currentStock <= 5 && (
-                    <div className="absolute top-2 right-2">
-                      <div className={`text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 ${
-                        product.currentStock === 0 ? 'bg-red-500' : 'bg-amber-500'
-                      }`}>
-                        <AlertCircle className="h-3 w-3" />
-                        {product.currentStock === 0 ? t('outOfStock') : product.currentStock}
+                  {/* Image */}
+                  <div className="aspect-[4/3] bg-slate-100 overflow-hidden relative">
+                    {showImages && product.images && product.images.length > 0 ? (
+                      <img
+                        src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
+                          ? product.images[0].url
+                          : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-50">
+                        <Package className="h-12 w-12 text-slate-300" />
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {/* Content */}
-                <div className="p-4">
-                  <h3 className="font-semibold text-slate-900 truncate">{product.name}</h3>
-                  {product.description && (
-                    <p className="text-sm text-slate-500 mt-1 line-clamp-1">{product.description}</p>
-                  )}
-                  <div className="flex items-center justify-between mt-3">
-                    <p className="text-primary-600 font-bold text-lg">{formatPrice(product.price)}</p>
-                    <button
-                      onClick={() => onAddItem(product)}
-                      disabled={product.currentStock === 0}
-                      className={`p-2 rounded-lg transition-all duration-200 ${
-                        product.currentStock === 0
-                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                          : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm hover:shadow active:scale-95'
-                      }`}
-                    >
-                      <Plus className="h-5 w-5" />
-                    </button>
+                    {/* Stock Badge */}
+                    {product.currentStock !== null && product.currentStock <= 5 && (
+                      <div className="absolute top-2 right-2">
+                        <div className={`text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 ${
+                          product.currentStock === 0 ? 'bg-red-500' : 'bg-amber-500'
+                        }`}>
+                          <AlertCircle className="h-3 w-3" />
+                          {product.currentStock === 0 ? t('outOfStock') : product.currentStock}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-4">
+                    <h3 className="font-semibold text-slate-900 truncate">{product.name}</h3>
+                    {product.description && (
+                      <p className="text-sm text-slate-500 mt-1 line-clamp-1">{product.description}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-3">
+                      <p className="text-primary-600 font-bold text-lg">{formatPrice(product.price)}</p>
+                      {showInlineSteppers ? (
+                        /* Inline +/- stepper for an in-cart item (no modal) */
+                        <div
+                          className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => onDecrement!(product.id)}
+                            aria-label={t('menu.decrease', 'Azalt')}
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className="w-6 text-center font-semibold text-sm text-slate-900 tabular-nums">
+                            {inCartQty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onIncrement!(product.id)}
+                            aria-label={t('menu.increase', 'Artır')}
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-all duration-200 ${
+                            product.currentStock === 0
+                              ? 'bg-slate-100 text-slate-400'
+                              : 'bg-primary-500 text-white group-hover:bg-primary-600 shadow-sm'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          <Plus className="h-5 w-5" />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           /* List View */
           <div className="space-y-3">
-            {filteredProducts.map((product) => (
+            {filteredProducts.map((product) => {
+              const inCartQty = cartQuantities[product.id] ?? 0;
+              const requiresModifiers = hasRequiredModifiers(product);
+              const cardActsAsAdd = product.currentStock !== 0;
+              const showInlineSteppers =
+                inCartQty > 0 && !requiresModifiers && !!onIncrement && !!onDecrement;
+
+              return (
               <div
                 key={product.id}
-                className="bg-white rounded-xl border border-slate-200/60 overflow-hidden hover:shadow-md transition-all duration-200 flex"
+                role={cardActsAsAdd ? 'button' : undefined}
+                tabIndex={cardActsAsAdd ? 0 : undefined}
+                onClick={cardActsAsAdd ? () => onAddItem(product) : undefined}
+                onKeyDown={
+                  cardActsAsAdd
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onAddItem(product);
+                        }
+                      }
+                    : undefined
+                }
+                aria-label={cardActsAsAdd ? `${t('addToOrder')}: ${product.name}` : undefined}
+                className={`bg-white rounded-xl border overflow-hidden transition-all duration-200 flex ${
+                  inCartQty > 0 ? 'border-primary-300 ring-1 ring-primary-200' : 'border-slate-200/60'
+                } ${
+                  cardActsAsAdd
+                    ? 'cursor-pointer hover:shadow-md active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:outline-none'
+                    : 'opacity-60 cursor-not-allowed'
+                }`}
               >
                 {/* Image */}
                 <div className="w-32 h-28 flex-shrink-0 bg-slate-100 overflow-hidden relative">
@@ -272,24 +389,51 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                     </div>
                   </div>
 
-                  {/* Add Button */}
-                  <button
-                    onClick={() => onAddItem(product)}
-                    disabled={product.currentStock === 0}
-                    className={`px-4 py-2.5 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
-                      product.currentStock === 0
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm hover:shadow active:scale-95'
-                    }`}
-                  >
-                    <Plus className="h-5 w-5" />
-                    <span className="hidden md:inline text-sm">
-                      {product.currentStock === 0 ? t('outOfStock') : t('addToOrder')}
+                  {/* Add / inline stepper */}
+                  {showInlineSteppers ? (
+                    <div
+                      className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-0.5 flex-shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onDecrement!(product.id)}
+                        aria-label={t('menu.decrease', 'Azalt')}
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="w-7 text-center font-semibold text-sm text-slate-900 tabular-nums">
+                        {inCartQty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onIncrement!(product.id)}
+                        aria-label={t('menu.increase', 'Artır')}
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-slate-100 transition-colors text-slate-600"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className={`px-4 py-2.5 min-h-[44px] rounded-lg font-medium transition-all duration-200 flex items-center gap-2 flex-shrink-0 ${
+                        product.currentStock === 0
+                          ? 'bg-slate-100 text-slate-400'
+                          : 'bg-primary-500 text-white group-hover:bg-primary-600 shadow-sm'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <Plus className="h-5 w-5" />
+                      <span className="hidden md:inline text-sm">
+                        {product.currentStock === 0 ? t('outOfStock') : t('addToOrder')}
+                      </span>
                     </span>
-                  </button>
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -668,7 +668,7 @@ export class SuperAdminSubscriptionsService {
       throw new BadRequestException({
         statusCode: 400,
         error: "Refund Partially Applied",
-        code: "REFUND_APPLIED_DB_INCONSISTENT",
+        errorCode: "REFUND_APPLIED_DB_INCONSISTENT",
         message:
           "PayTR refund succeeded but local payment state could not be updated. " +
           "Ops has been alerted — do NOT retry the refund (PayTR will reject as duplicate).",

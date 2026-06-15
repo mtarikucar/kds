@@ -1,15 +1,20 @@
-import { Clock, RefreshCw, Users, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
+import { Clock, RefreshCw, Users, AlertTriangle, Wifi, WifiOff, Maximize, Minimize } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Order } from '../../types';
-import { calculateAverageWaitTime, countUrgentOrders, formatWaitTime } from '../../lib/utils';
+import { calculateAverageWaitTime, countUrgentOrders, formatWaitTime, cn } from '../../lib/utils';
 import Button from '../ui/Button';
 import { useState, useEffect } from 'react';
+import { kioskHeadingText } from './kioskTheme';
 
 interface KitchenStatsHeaderProps {
   orders: Order[];
   isConnected: boolean;
   onRefresh: () => void;
   isLoading: boolean;
+  // Dark high-contrast theme for kiosk mode. Default false = today's look.
+  kiosk?: boolean;
+  // Kiosk-mode toggle. When provided, a Maximize/Minimize button is shown.
+  onToggleKiosk?: () => void;
 }
 
 const KitchenStatsHeader = ({
@@ -17,6 +22,8 @@ const KitchenStatsHeader = ({
   isConnected,
   onRefresh,
   isLoading,
+  kiosk = false,
+  onToggleKiosk,
 }: KitchenStatsHeaderProps) => {
   const { t } = useTranslation('kitchen');
   const [avgWaitTime, setAvgWaitTime] = useState('0s');
@@ -66,13 +73,36 @@ const KitchenStatsHeader = ({
 
   return (
     <div className="mb-4 md:mb-6 flex-shrink-0">
+      {/* Escalated disconnect bar — a full-width amber alert that the polling
+          fallback is keeping the board fresh while the live socket is down.
+          Far harder to miss than the small status pill. */}
+      {!isConnected && (
+        <div
+          role="alert"
+          className={cn(
+            'flex items-center gap-2 px-4 py-2.5 mb-3 rounded-lg text-sm font-medium border',
+            kiosk
+              ? 'bg-amber-500/20 border-amber-500 text-amber-200'
+              : 'bg-amber-100 border-amber-300 text-amber-900'
+          )}
+        >
+          <WifiOff className="h-4 w-4 flex-shrink-0" />
+          <span>
+            {t(
+              'kitchen.socketDownBanner',
+              'Canlı bağlantı kesildi — pano her ~10 sn yenileniyor'
+            )}
+          </span>
+        </div>
+      )}
+
       {/* Title Row */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-slate-900">
+          <h1 className={kioskHeadingText(kiosk)}>
             {t('kitchen.title')}
           </h1>
-          <p className="text-sm md:text-base text-slate-600">
+          <p className={cn('text-sm md:text-base', kiosk ? 'text-neutral-400' : 'text-slate-600')}>
             {t('kitchen.realtimeTracking')}
           </p>
         </div>
@@ -107,6 +137,33 @@ const KitchenStatsHeader = ({
             <RefreshCw className="h-4 w-4" />
             <span className="hidden md:inline">{t('common:buttons.refresh')}</span>
           </Button>
+
+          {/* Kiosk-mode Toggle */}
+          {onToggleKiosk && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleKiosk}
+              className="gap-1.5"
+              aria-label={
+                kiosk
+                  ? t('kitchen.exitKiosk', 'Kiosk modundan çık')
+                  : t('kitchen.enterKiosk', 'Kiosk modu')
+              }
+              title={
+                kiosk
+                  ? t('kitchen.exitKiosk', 'Kiosk modundan çık')
+                  : t('kitchen.enterKiosk', 'Kiosk modu')
+              }
+            >
+              {kiosk ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              <span className="hidden md:inline">
+                {kiosk
+                  ? t('kitchen.exitKiosk', 'Kiosk modundan çık')
+                  : t('kitchen.enterKiosk', 'Kiosk modu')}
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -115,19 +172,21 @@ const KitchenStatsHeader = ({
         {stats.map((stat, index) => (
           <div
             key={index}
-            className={`relative rounded-xl p-3 md:p-4 transition-all ${stat.bgColor} ${
-              stat.highlight ? 'ring-2 ring-red-200 animate-pulse' : ''
-            }`}
+            className={cn(
+              'relative rounded-xl p-3 md:p-4 transition-all',
+              kiosk ? 'bg-neutral-900 border border-neutral-800' : stat.bgColor,
+              stat.highlight && (kiosk ? 'ring-2 ring-red-500 animate-pulse' : 'ring-2 ring-red-200 animate-pulse')
+            )}
           >
             <div className="flex items-center gap-2 md:gap-3">
-              <div className={`p-2 rounded-lg bg-white/80 ${stat.iconColor}`}>
+              <div className={cn('p-2 rounded-lg', kiosk ? 'bg-neutral-800' : 'bg-white/80', stat.iconColor)}>
                 <stat.icon className="h-4 w-4 md:h-5 md:w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className={`text-lg md:text-2xl font-bold ${stat.color} truncate`}>
+                <p className={cn('text-lg md:text-2xl font-bold truncate', kiosk ? 'text-white' : stat.color)}>
                   {stat.value}
                 </p>
-                <p className="text-xs md:text-sm text-slate-500 truncate">
+                <p className={cn('text-xs md:text-sm truncate', kiosk ? 'text-neutral-400' : 'text-slate-500')}>
                   {stat.label}
                 </p>
               </div>

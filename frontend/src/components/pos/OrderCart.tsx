@@ -1,14 +1,18 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart, Combine, Split, Users } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart, Combine, Split, Users, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { Product } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { calculateItemTotal, calculateSubtotal } from '../../pages/pos/posCart';
+import type { SelectedModifier } from './ProductOptionsModal';
 
 interface CartItem extends Product {
   quantity: number;
   notes?: string;
+  modifiers?: SelectedModifier[];
 }
 
 interface OrderCartProps {
@@ -62,8 +66,17 @@ const OrderCart = ({
 }: OrderCartProps) => {
   const { t } = useTranslation('pos');
   const formatPrice = useFormatCurrency();
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Subtotal via the shared, tested money-math helper so modifier prices are
+  // included (the old inline `price * quantity` silently dropped them).
+  const subtotal = calculateSubtotal(items);
   const total = subtotal - discount;
+
+  // Optional customer-name / notes / discount inputs are collapsed behind a
+  // disclosure so the fast path (add → pay) stays unobstructed. Auto-open it
+  // when any detail already has a value so a loaded order doesn't hide them.
+  const hasDetails = !!customerName || !!orderNotes || discount > 0;
+  const [showDetails, setShowDetails] = useState(false);
+  const detailsOpen = showDetails || hasDetails;
 
   return (
     <Card className="h-full flex flex-col overflow-hidden">
@@ -147,15 +160,34 @@ const OrderCart = ({
           <>
             {/* Cart Items - Scrollable area */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
-              {items.map((item) => (
+              {items.map((item) => {
+                const lineModifiers = item.modifiers ?? [];
+                const lineTotal = calculateItemTotal(
+                  Number(item.price),
+                  lineModifiers,
+                  item.quantity,
+                );
+                return (
                 <div
                   key={item.id}
                   className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100"
                 >
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-sm text-slate-900 truncate">{item.name}</h4>
-                    <p className="text-sm text-slate-500">
+                    {/* Selected modifiers as sub-text */}
+                    {lineModifiers.length > 0 && (
+                      <p className="text-xs text-slate-400 truncate mt-0.5">
+                        {lineModifiers
+                          .map((m) =>
+                            m.quantity > 1 ? `${m.name} ×${m.quantity}` : m.name,
+                          )
+                          .join(', ')}
+                      </p>
+                    )}
+                    <p className="text-sm text-slate-500 mt-0.5">
                       {formatPrice(item.price)} × {item.quantity}
+                      {/* Line extended total (incl. modifiers) */}
+                      <span className="text-slate-700 font-medium"> = {formatPrice(lineTotal)}</span>
                     </p>
                   </div>
 
@@ -186,63 +218,89 @@ const OrderCart = ({
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Order Details & Checkout - Always visible at bottom */}
-            <div className="flex-shrink-0 p-4 space-y-4 border-t border-slate-100 bg-slate-50/30">
-              <Input
-                label={t('customerNameLabel')}
-                type="text"
-                placeholder={t('customerNamePlaceholder')}
-                value={customerName}
-                onChange={(e) => onUpdateCustomerName(e.target.value)}
-              />
-
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">
-                  {t('orderNotesLabel')}
-                </label>
-                <textarea
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm resize-none shadow-sm"
-                  placeholder={t('orderNotesPlaceholder')}
-                  rows={2}
-                  value={orderNotes}
-                  onChange={(e) => onUpdateOrderNotes(e.target.value)}
+            {/* Optional details — collapsed behind a disclosure so the fast
+                path (add → pay) is unobstructed. */}
+            <div className="flex-shrink-0 px-4 pt-3 border-t border-slate-100 bg-slate-50/30">
+              <button
+                type="button"
+                onClick={() => setShowDetails((v) => !v)}
+                aria-expanded={detailsOpen}
+                className="w-full flex items-center justify-between gap-2 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  {t('addDetails', 'Detay ekle')}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${detailsOpen ? 'rotate-180' : ''}`}
                 />
-              </div>
+              </button>
 
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">{t('subtotal')}:</span>
-                <span className="font-medium text-slate-900">{formatPrice(subtotal)}</span>
-              </div>
+              {detailsOpen && (
+                <div className="space-y-4 pb-3 pt-1">
+                  <Input
+                    label={t('customerNameLabel')}
+                    type="text"
+                    placeholder={t('customerNamePlaceholder')}
+                    value={customerName}
+                    onChange={(e) => onUpdateCustomerName(e.target.value)}
+                  />
 
-              <Input
-                label={t('discount')}
-                type="number"
-                min="0"
-                max={subtotal}
-                step="0.01"
-                value={discount}
-                // `min`/`max` HTML attributes are advisory only and not
-                // enforced by mobile keyboards — a user typing `-50` would
-                // sail through. Clamp on every keystroke so the discount
-                // can never go negative (creating a surcharge / negative
-                // payment downstream) or exceed the subtotal.
-                onChange={(e) => {
-                  const raw = parseFloat(e.target.value) || 0;
-                  onUpdateDiscount(Math.max(0, Math.min(raw, subtotal)));
-                }}
-              />
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-slate-700">
+                      {t('orderNotesLabel')}
+                    </label>
+                    <textarea
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm resize-none shadow-sm"
+                      placeholder={t('orderNotesPlaceholder')}
+                      rows={2}
+                      value={orderNotes}
+                      onChange={(e) => onUpdateOrderNotes(e.target.value)}
+                    />
+                  </div>
 
-              <div className="flex justify-between text-lg font-bold border-t border-slate-200 pt-4">
+                  <Input
+                    label={t('discount')}
+                    type="number"
+                    min="0"
+                    max={subtotal}
+                    step="0.01"
+                    value={discount}
+                    // `min`/`max` HTML attributes are advisory only and not
+                    // enforced by mobile keyboards — a user typing `-50` would
+                    // sail through. Clamp on every keystroke so the discount
+                    // can never go negative (creating a surcharge / negative
+                    // payment downstream) or exceed the subtotal.
+                    onChange={(e) => {
+                      const raw = parseFloat(e.target.value) || 0;
+                      onUpdateDiscount(Math.max(0, Math.min(raw, subtotal)));
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* STICKY CHECKOUT FOOTER — total + primary CTA always visible. */}
+            <div className="flex-shrink-0 sticky bottom-0 p-4 space-y-3 border-t border-slate-200 bg-white/95 backdrop-blur-md shadow-[0_-2px_8px_rgba(15,23,42,0.04)]">
+              {discount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{t('subtotal')}:</span>
+                  <span className="font-medium text-slate-900">{formatPrice(subtotal)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-lg font-bold">
                 <span className="text-slate-900">{t('total')}:</span>
                 <span className="text-primary-600">{formatPrice(total)}</span>
               </div>
 
               {/* Conditional button rendering based on checkout mode */}
               {isTwoStepCheckout ? (
-                <div className="space-y-2 pt-2">
+                <div className="space-y-2">
                   {/* Create Order button */}
                   <Button
                     variant="secondary"

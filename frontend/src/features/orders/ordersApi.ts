@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
@@ -20,7 +20,18 @@ import {
   PayableItemsSummary,
 } from '../../types';
 
-export const useOrders = (filters?: OrderFilters) => {
+// Opt-in tuning for the orders list. Used by the Kitchen Display board so it
+// can (a) keep the last-known orders on screen across refetches/errors and
+// (b) engage a polling fallback when its realtime socket drops. Defaults keep
+// every existing caller's behavior identical (no polling, no placeholder).
+export interface UseOrdersOptions {
+  /** ms between background refetches, or false to disable polling. */
+  refetchInterval?: number | false;
+  /** Retain the previous query result while a new fetch is in flight. */
+  keepPreviousData?: boolean;
+}
+
+export const useOrders = (filters?: OrderFilters, options?: UseOrdersOptions) => {
   const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
     queryKey: ['orders', filters, branchId],
@@ -28,6 +39,8 @@ export const useOrders = (filters?: OrderFilters) => {
       const response = await api.get<Order[]>('/orders', { params: filters });
       return response.data;
     },
+    refetchInterval: options?.refetchInterval ?? false,
+    placeholderData: options?.keepPreviousData ? keepPreviousData : undefined,
   });
 };
 

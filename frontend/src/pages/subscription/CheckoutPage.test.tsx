@@ -31,6 +31,10 @@ vi.mock('../../features/legal/legalApi', () => ({
 }));
 
 vi.mock('react-i18next', () => ({
+  // CheckoutPage now imports the actionable-error helpers, which transitively
+  // load the real i18n/config (it calls `.use(initReactI18next)`). Provide a
+  // no-op plugin so that import doesn't throw under this mock.
+  initReactI18next: { type: '3rdParty', init: () => {} },
   useTranslation: () => ({
     // Mirror i18next's two default-value forms used in CheckoutPage:
     //   t(key, 'Positional default')  and  t(key, { defaultValue: '...' })

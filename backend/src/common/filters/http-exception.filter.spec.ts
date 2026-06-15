@@ -87,6 +87,60 @@ describe('HttpExceptionFilter', () => {
       expect(response.statusCode).toBe(HttpStatus.NOT_FOUND);
     });
 
+    it('preserves a machine-readable errorCode from a BadRequestException body', () => {
+      // Regression: the payment "missing phone" gate throws
+      // `new BadRequestException({ message, error, errorCode: 'PROFILE_PHONE_REQUIRED' })`.
+      // Pre-fix the filter copied only message+error and DROPPED the code,
+      // so the SPA's inline phone-prompt branch (keyed on data.errorCode)
+      // never fired in prod and the user fell through to a generic warning.
+      const exception = new HttpException(
+        {
+          statusCode: 400,
+          error: 'Profile Phone Required',
+          errorCode: 'PROFILE_PHONE_REQUIRED',
+          message: 'Telefon numarası gereklidir.',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+
+      filter.catch(exception, mockArgumentsHost);
+
+      const response = mockResponse.json.mock.calls[0][0];
+      expect(response.errorCode).toBe('PROFILE_PHONE_REQUIRED');
+      expect(response.message).toBe('Telefon numarası gereklidir.');
+    });
+
+    it('accepts the legacy `code` alias on the exception body as errorCode', () => {
+      const exception = new HttpException(
+        { error: 'Unsupported Currency', code: 'PAYTR_ONLY_SUPPORTS_TRY', message: 'x' },
+        HttpStatus.BAD_REQUEST,
+      );
+
+      filter.catch(exception, mockArgumentsHost);
+
+      const response = mockResponse.json.mock.calls[0][0];
+      expect(response.errorCode).toBe('PAYTR_ONLY_SUPPORTS_TRY');
+    });
+
+    it('surfaces the BusinessException errorCode in the dedicated errorCode field too', () => {
+      const exception = new BusinessException(
+        'Quota exceeded',
+        ErrorCode.QUOTA_EXCEEDED,
+        HttpStatus.FORBIDDEN,
+      );
+
+      filter.catch(exception, mockArgumentsHost);
+
+      const response = mockResponse.json.mock.calls[0][0];
+      expect(response.errorCode).toBe(ErrorCode.QUOTA_EXCEEDED);
+    });
+
+    it('omits errorCode when the exception carries none', () => {
+      filter.catch(new HttpException('plain', HttpStatus.BAD_REQUEST), mockArgumentsHost);
+      const response = mockResponse.json.mock.calls[0][0];
+      expect(response.errorCode).toBeUndefined();
+    });
+
     it('should handle ResourceNotFoundException', () => {
       const exception = new ResourceNotFoundException('User', 'user-123');
 

@@ -5,6 +5,7 @@ import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import { Clock, User, Receipt, Combine } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getTableStatusConfig, getTableStatusLabel } from '../../lib/tableStatus';
 
 interface TableGridProps {
   selectedTable: Table | null;
@@ -28,19 +29,6 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
   if (isLoading) {
     return <Spinner />;
   }
-
-  const getTableVariant = (status: TableStatus) => {
-    switch (status) {
-      case TableStatus.AVAILABLE:
-        return 'success';
-      case TableStatus.OCCUPIED:
-        return 'danger';
-      case TableStatus.RESERVED:
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-3 md:gap-4">
@@ -92,10 +80,15 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
                 {table.number}
               </div>
 
-              {/* Status Badge */}
+              {/* Status Badge — shared palette via tableStatusConfig
+                  (available=emerald, occupied=red, reserved=amber). The
+                  pos namespace keeps its own label key. */}
               <div className="mb-3">
-                <Badge variant={getTableVariant(table.status)} className="text-sm px-3 py-1">
-                  {t(`tableGrid.status.${table.status}`)}
+                <Badge
+                  variant={getTableStatusConfig(table.status).variant}
+                  className="text-sm px-3 py-1"
+                >
+                  {getTableStatusLabel(table.status, t, `tableGrid.status.${table.status}`)}
                 </Badge>
               </div>
 

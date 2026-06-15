@@ -61,6 +61,37 @@ export function calculateTotal(items: PosCartItem[], discount: number): number {
 }
 
 /**
+ * Change due ("para üstü") for a cash payment: how much to hand back when the
+ * customer tenders `tendered` against an order `total`.
+ *
+ * Rules:
+ *  - Never negative — if the customer under-pays (tendered < total) the change
+ *    is 0, not a negative number. The UI separately blocks confirm in that case
+ *    (see `isTenderSufficient`), but the math stays clamped regardless.
+ *  - Exact payment → 0.
+ *  - Over payment → tendered − total.
+ *  - Rounded to 2 decimals so floating-point noise (e.g. 0.1 + 0.2) never leaks
+ *    a 0.30000000000000004-style value into the displayed change.
+ *
+ * Pure money math kept here so it shares the same tested surface as the rest
+ * of the cart arithmetic.
+ */
+export function computeChangeDue(total: number, tendered: number): number {
+  const diff = tendered - total;
+  if (diff <= 0) return 0;
+  return Math.round(diff * 100) / 100;
+}
+
+/**
+ * Whether the tendered cash covers the order total. A separate predicate from
+ * `computeChangeDue` so the confirm-button gate and the change display can't
+ * drift. Equal amounts (exact payment) are sufficient.
+ */
+export function isTenderSufficient(total: number, tendered: number): boolean {
+  return tendered >= total;
+}
+
+/**
  * Stable identity key for a cart line: product id is implicit (caller already
  * matched on it); this keys the *modifier set* so the same product with
  * different modifiers stays a separate line. Modifier ids are sorted so order
