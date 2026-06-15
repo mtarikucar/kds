@@ -68,6 +68,6 @@ export class ScheduleController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Remove shift assignment" })
   remove(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
-    return this.scheduleService.remove(id, scope.tenantId);
+    return this.scheduleService.remove(scope, id);
   }
 }

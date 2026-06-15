@@ -120,44 +120,18 @@ export class ZReportSchedulerService {
       // Match if current time is within 0-14 minutes after closing time
       const minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
       if (minutesSinceClosing >= 0 && minutesSinceClosing < 15) {
-        // Check if we haven't already sent a report today IN THE TENANT'S
-        // TIMEZONE. ZReportsService.generateReport writes `reportDate` as
-        // the tenant-local midnight instant; using server-local midnight
-        // here would miss-match for any non-UTC tenant and the scheduler
-        // would then re-enter generateReport every 15min during the
-        // closing window, each time throwing a BadRequestException that
-        // polluted the error logs.
-        // Shared helper — the service-side write path uses the same
-        // import (iter-35) so the dedup-read and the generate-and-
-        // send-write key off the same UTC instant for tenant-local
-        // midnight. Previously this class duplicated the function;
-        // keeping one source of truth prevents the two from drifting.
-        const tenantTzMidnight = getTenantMidnight(
-          now,
-          tenant.timezone || "UTC",
-        );
-
-        // Check `isFinalized` instead of `emailSent` only — if the report
-        // was finalized but the email send failed, the previous filter
-        // re-entered the entire generate-and-send loop every 15 minutes
-        // (and re-finalized would no-op via the atomic claim, but the
-        // wasted DB + email-send work polluted logs and risked duplicate
-        // emails when transient SMTP errors recovered).
-        const existingReport = await this.prisma.zReport.findFirst({
-          where: {
-            tenantId: tenant.id,
-            reportDate: tenantTzMidnight,
-            isFinalized: true,
-          },
-        });
-
-        if (!existingReport) {
-          matchingTenants.push(tenant);
-        } else {
-          this.logger.debug(
-            `Report already sent today for tenant ${tenant.name}`,
-          );
-        }
+        // Window match only. The "already done today" dedup is now done
+        // PER BRANCH in runForBranch(), keyed on (tenantId, branchId,
+        // reportDate, isFinalized).
+        //
+        // The old tenant-level dedup checked only {tenantId, reportDate,
+        // isFinalized} with NO branchId, so the instant the FIRST branch
+        // under a multi-branch tenant finalized its report, this filter
+        // saw "a finalized report exists for today" and dropped the WHOLE
+        // tenant from matchingTenants — every other branch was then
+        // silently skipped for the rest of the closing window. Z-Reports
+        // are per-branch fiscal records; the done-check must be too.
+        matchingTenants.push(tenant);
       }
     }
 
@@ -210,7 +184,11 @@ export class ZReportSchedulerService {
    * primary branch is used only as a fallback when a tenant has a single
    * active branch.
    */
-  private async processEndOfDayReport(tenant: { id: string; name: string }) {
+  private async processEndOfDayReport(tenant: {
+    id: string;
+    name: string;
+    timezone?: string | null;
+  }) {
     this.logger.log(`Processing end-of-day report for tenant: ${tenant.name}`);
 
     try {
@@ -264,11 +242,41 @@ export class ZReportSchedulerService {
   }
 
   private async runForBranch(
-    tenant: { id: string; name: string },
+    tenant: { id: string; name: string; timezone?: string | null },
     branchId: string,
     userId: string,
   ) {
     try {
+      // PER-BRANCH dedup: skip only THIS branch if it already has a
+      // finalized report for today (tenant-tz midnight). Each branch
+      // closes independently, so one branch being done must NOT skip the
+      // others — that was the leak when the check lived at tenant level.
+      //
+      // Tenant-tz midnight: ZReportsService writes `reportDate` as the
+      // tenant-local midnight instant via the same getTenantMidnight
+      // helper, so the dedup-read and the generate-and-send-write key off
+      // the same UTC instant. isFinalized (not emailSent) is the dedup
+      // axis: a finalized-but-email-failed report must NOT re-enter the
+      // whole generate-and-send loop every 15 minutes.
+      const tenantTzMidnight = getTenantMidnight(
+        new Date(),
+        tenant.timezone || "UTC",
+      );
+      const existingReport = await this.prisma.zReport.findFirst({
+        where: {
+          tenantId: tenant.id,
+          branchId,
+          reportDate: tenantTzMidnight,
+          isFinalized: true,
+        },
+      });
+      if (existingReport) {
+        this.logger.debug(
+          `Report already sent today for tenant ${tenant.name} branch ${branchId}`,
+        );
+        return;
+      }
+
       const result = await this.zReportsService.generateAndSendReport(
         tenant.id,
         branchId,
