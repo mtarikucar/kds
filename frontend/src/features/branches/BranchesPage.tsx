@@ -1,7 +1,30 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreateBranch, useListBranches } from './branchesApi';
+import { Link } from 'react-router-dom';
+import {
+  Building2,
+  Plus,
+  Clock3,
+  Hash,
+  Infinity as InfinityIcon,
+  Network,
+  ArrowUpRight,
+  CheckCircle2,
+  Store,
+} from 'lucide-react';
+import { useCreateBranch, useListBranches, type Branch } from './branchesApi';
 import { useGetUsageSnapshot } from '../plan/planApi';
+import Card from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import Badge from '../../components/ui/Badge';
+import Input from '../../components/ui/Input';
+import EmptyState from '../../components/ui/EmptyState';
+
+const STATUS_VARIANT: Record<Branch['status'], 'success' | 'warning' | 'default'> = {
+  active: 'success',
+  suspended: 'warning',
+  archived: 'default',
+};
 
 export default function BranchesPage() {
   const { t } = useTranslation('common');
@@ -10,33 +33,50 @@ export default function BranchesPage() {
   const create = useCreateBranch();
   const [draft, setDraft] = useState({ name: '', code: '', timezone: 'Europe/Istanbul' });
 
-  // v3.0.0 — surface the engine-resolved `branches: {current, max}`
-  // dimension from the snapshot. -1 means unlimited (BUSINESS / cap
-  // overrides); render an infinity glyph instead of a numerator.
-  // The "at limit" state disables the create CTA in the form below
-  // and points the user at the marketplace add-on.
+  // v3.0.0 — engine-resolved branches usage. -1 = unlimited (BUSINESS / cap
+  // override). "At limit" disables the create CTA and points to the add-on.
   const usage = snapshot?.branches;
   const max = usage?.max ?? Number.POSITIVE_INFINITY;
   const current = usage?.current ?? branches.length;
   const isUnlimited = max === -1;
   const atLimit = !isUnlimited && current >= max;
+  const activeCount = branches.filter((b) => b.status === 'active').length;
+  const pct =
+    isUnlimited || !usage || max <= 0
+      ? 0
+      : Math.min(100, Math.round((current / max) * 100));
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t('hummytummy.branches.title')}</h1>
-        {/* v3.0.0 usage meter — shows "Used X/Y" or "Used X/∞" so the
-            tenant can self-diagnose before hitting a 403 on create. */}
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+            <Network className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">
+              {t('hummytummy.branches.title')}
+            </h1>
+            <p className="text-sm text-slate-500">
+              {t('hummytummy.branches.pageSubtitle', {
+                defaultValue:
+                  'Restoran zincirinizin tüm şubelerini tek yerden yönetin.',
+              })}
+            </p>
+          </div>
+        </div>
         {usage ? (
           <span
             className={
-              'rounded-full px-3 py-1 text-xs font-medium ' +
+              'inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-xs font-medium ' +
               (atLimit
                 ? 'bg-amber-100 text-amber-800'
-                : 'bg-gray-100 text-gray-700')
+                : 'bg-slate-100 text-slate-700')
             }
             data-testid="branches-usage"
           >
+            <Building2 className="h-3.5 w-3.5" />
             {t('hummytummy.branches.usage', {
               current,
               max: isUnlimited ? '∞' : max,
@@ -48,87 +88,224 @@ export default function BranchesPage() {
         ) : null}
       </div>
 
-      <form
-        className="flex flex-wrap items-end gap-2 rounded border bg-white p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!draft.name || atLimit) return;
-          create.mutate(draft, {
-            onSuccess: () => setDraft({ name: '', code: '', timezone: 'Europe/Istanbul' }),
-          });
-        }}
-      >
-        <Field label={t('hummytummy.branches.name')} value={draft.name} onChange={(v) => setDraft((d) => ({ ...d, name: v }))} />
-        <Field label={t('hummytummy.branches.code')} value={draft.code} onChange={(v) => setDraft((d) => ({ ...d, code: v }))} placeholder="IST-01" />
-        <Field label={t('hummytummy.branches.timezone')} value={draft.timezone} onChange={(v) => setDraft((d) => ({ ...d, timezone: v }))} />
-        <button
-          type="submit"
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={create.isPending || atLimit}
-          // Tooltip explains the disabled state when the tenant is
-          // at-cap; otherwise the disabled button is a dead-end.
-          title={
-            atLimit
-              ? t('hummytummy.branches.atLimitHint', {
-                  defaultValue:
-                    'Branch limit reached. Upgrade your plan or buy the extra-branch add-on to add more.',
-                })
-              : undefined
-          }
-        >
-          {t('hummytummy.branches.add')}
-        </button>
-      </form>
+      {/* Overview stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card variant="bordered" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">
+                {t('hummytummy.branches.statTotal', { defaultValue: 'Toplam şube' })}
+              </p>
+              <p className="text-xl font-semibold text-slate-900">{branches.length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card variant="bordered" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">
+                {t('hummytummy.branches.statActive', { defaultValue: 'Aktif şube' })}
+              </p>
+              <p className="text-xl font-semibold text-slate-900">{activeCount}</p>
+            </div>
+          </div>
+        </Card>
+        <Card variant="bordered" className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+                {isUnlimited ? (
+                  <InfinityIcon className="h-5 w-5" />
+                ) : (
+                  <Network className="h-5 w-5" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">
+                  {t('hummytummy.branches.statCapacity', { defaultValue: 'Kapasite' })}
+                </p>
+                <p className="text-xl font-semibold text-slate-900">
+                  {current}
+                  <span className="text-sm font-normal text-slate-400">
+                    {' / '}
+                    {isUnlimited ? '∞' : max}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+          {usage && !isUnlimited ? (
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={
+                  'h-full rounded-full transition-all ' +
+                  (atLimit ? 'bg-amber-500' : 'bg-primary-500')
+                }
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          ) : null}
+        </Card>
+      </div>
 
+      {/* At-limit upsell */}
       {atLimit ? (
-        <p className="text-xs text-amber-700" data-testid="branches-at-limit-hint">
-          {t('hummytummy.branches.atLimitHint', {
-            defaultValue:
-              'Branch limit reached. Upgrade your plan or buy the extra-branch add-on to add more.',
-          })}
-        </p>
+        <Card
+          variant="bordered"
+          className="border-amber-200 bg-amber-50 p-4"
+          data-testid="branches-at-limit-hint"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Store className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  {t('hummytummy.branches.atLimitTitle', {
+                    defaultValue: 'Şube limitine ulaştınız',
+                  })}
+                </p>
+                <p className="text-sm text-amber-800">
+                  {t('hummytummy.branches.atLimitHint', {
+                    defaultValue:
+                      'Branch limit reached. Upgrade your plan or buy the extra-branch add-on to add more.',
+                  })}
+                </p>
+              </div>
+            </div>
+            <Link to="/admin/marketplace?focus=extra_branch" className="sm:flex-shrink-0">
+              <Button variant="primary" size="sm" className="w-full sm:w-auto">
+                {t('hummytummy.branches.goToMarketplace', {
+                  defaultValue: 'Pazaryerine git',
+                })}
+                <ArrowUpRight className="ml-1.5 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </Card>
       ) : null}
 
+      {/* Create branch */}
+      <Card variant="bordered" className="p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Plus className="h-4 w-4 text-slate-400" />
+          <h2 className="text-sm font-semibold text-slate-900">
+            {t('hummytummy.branches.addTitle', { defaultValue: 'Yeni şube ekle' })}
+          </h2>
+        </div>
+        <form
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!draft.name || atLimit) return;
+            create.mutate(draft, {
+              onSuccess: () =>
+                setDraft({ name: '', code: '', timezone: 'Europe/Istanbul' }),
+            });
+          }}
+        >
+          <Input
+            label={t('hummytummy.branches.name')}
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder={t('hummytummy.branches.namePlaceholder', {
+              defaultValue: 'Kadıköy Şubesi',
+            })}
+          />
+          <Input
+            label={t('hummytummy.branches.code')}
+            value={draft.code}
+            onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
+            placeholder="IST-01"
+          />
+          <Input
+            label={t('hummytummy.branches.timezone')}
+            value={draft.timezone}
+            onChange={(e) => setDraft((d) => ({ ...d, timezone: e.target.value }))}
+          />
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={create.isPending}
+            disabled={create.isPending || atLimit}
+            title={
+              atLimit
+                ? t('hummytummy.branches.atLimitHint', {
+                    defaultValue:
+                      'Branch limit reached. Upgrade your plan or buy the extra-branch add-on to add more.',
+                  })
+                : undefined
+            }
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            {t('hummytummy.branches.add')}
+          </Button>
+        </form>
+      </Card>
+
+      {/* Branch list */}
       {isLoading ? (
-        <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Card key={i} variant="bordered" className="h-28 animate-pulse p-4">
+              <div className="h-4 w-1/2 rounded bg-slate-100" />
+              <div className="mt-3 h-3 w-1/3 rounded bg-slate-100" />
+            </Card>
+          ))}
+        </div>
+      ) : branches.length === 0 ? (
+        <EmptyState
+          icon={Building2}
+          title={t('hummytummy.branches.emptyTitle', {
+            defaultValue: 'Henüz şube eklenmemiş',
+          })}
+          description={t('hummytummy.branches.emptyDesc', {
+            defaultValue:
+              'İlk şubenizi yukarıdaki formdan ekleyin; ardından her şubeyi ayrı ayrı yönetebilirsiniz.',
+          })}
+        />
       ) : (
-        <table className="w-full divide-y rounded border text-sm">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="px-3 py-2 font-medium">{t('hummytummy.branches.name')}</th>
-              <th className="px-3 py-2 font-medium">{t('hummytummy.branches.code')}</th>
-              <th className="px-3 py-2 font-medium">{t('hummytummy.branches.timezone')}</th>
-              <th className="px-3 py-2 font-medium">{t('hummytummy.branches.status')}</th>
-              <th className="px-3 py-2 font-medium">{t('hummytummy.branches.created')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {branches.map((b) => (
-              <tr key={b.id}>
-                <td className="px-3 py-2 font-medium">{b.name}</td>
-                <td className="px-3 py-2 font-mono">{b.code ?? '—'}</td>
-                <td className="px-3 py-2">{b.timezone}</td>
-                <td className="px-3 py-2">{b.status}</td>
-                <td className="px-3 py-2 text-xs text-gray-500">{new Date(b.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {branches.map((b) => (
+            <Card key={b.id} variant="bordered" className="p-4 transition-shadow hover:shadow-md">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="truncate font-semibold text-slate-900">{b.name}</h3>
+                </div>
+                <Badge variant={STATUS_VARIANT[b.status]} size="sm">
+                  {t(`hummytummy.branches.statusLabel.${b.status}`, {
+                    defaultValue: b.status,
+                  })}
+                </Badge>
+              </div>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Hash className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                  <span className="font-mono">{b.code ?? '—'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Clock3 className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                  <span>{b.timezone}</span>
+                </div>
+              </dl>
+              <p className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-400">
+                {t('hummytummy.branches.created')}:{' '}
+                {new Date(b.createdAt).toLocaleDateString()}
+              </p>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
-  );
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <label className="flex flex-col text-xs text-gray-600">
-      {label}
-      <input
-        className="mt-1 rounded border px-2 py-1 text-sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
   );
 }
