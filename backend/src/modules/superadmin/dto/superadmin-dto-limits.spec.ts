@@ -67,9 +67,19 @@ describe('SuperAdmin DTO length caps (iter-47)', () => {
       expect(msgs.some((m) => /refreshToken/i.test(m))).toBe(true);
     });
 
-    it('rejects empty refreshToken', async () => {
-      const msgs = await validateDto(SuperAdminRefreshTokenDto, { refreshToken: '' });
-      expect(msgs.length).toBeGreaterThan(0);
+    // The refresh token now rides an httpOnly cookie (primary); this body
+    // field is an optional backward-compatible fallback, so an empty/omitted
+    // value is valid at the DTO layer. The controller enforces "cookie OR
+    // body token present" and 401s otherwise. The MaxLength cap — the actual
+    // concern of this spec — still applies (see the >4096 case above).
+    it('accepts an omitted refreshToken (cookie is the primary source)', async () => {
+      expect(await validateDto(SuperAdminRefreshTokenDto, {})).toEqual([]);
+    });
+
+    it('accepts an empty refreshToken (optional fallback field)', async () => {
+      expect(
+        await validateDto(SuperAdminRefreshTokenDto, { refreshToken: '' }),
+      ).toEqual([]);
     });
 
     it('accepts a normal refresh token', async () => {

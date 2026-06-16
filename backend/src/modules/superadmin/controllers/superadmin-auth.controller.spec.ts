@@ -1,4 +1,4 @@
-import { Request } from "express";
+import { Request, Response } from "express";
 import { SuperAdminAuthController } from "./superadmin-auth.controller";
 import { SuperAdminAuthService } from "../services/superadmin-auth.service";
 
@@ -12,12 +12,18 @@ import { SuperAdminAuthService } from "../services/superadmin-auth.service";
 describe("SuperAdminAuthController", () => {
   let svc: Record<string, jest.Mock>;
   let ctrl: SuperAdminAuthController;
+  let res: Response & { cookie: jest.Mock; clearCookie: jest.Mock };
   const req = {
     ip: "9.9.9.9",
     headers: { "user-agent": "jest" },
+    cookies: {},
   } as unknown as Request;
 
   beforeEach(() => {
+    res = {
+      cookie: jest.fn(),
+      clearCookie: jest.fn(),
+    } as unknown as Response & { cookie: jest.Mock; clearCookie: jest.Mock };
     svc = {
       login: jest.fn().mockResolvedValue({}),
       verify2FA: jest.fn().mockResolvedValue({}),
@@ -35,13 +41,29 @@ describe("SuperAdminAuthController", () => {
 
   it("login forwards the dto + resolved ip + user agent", async () => {
     const dto = { email: "root@x.com", password: "p" } as any;
-    await ctrl.login(dto, req);
+    await ctrl.login(dto, req, res);
     expect(svc.login).toHaveBeenCalledWith(dto, "9.9.9.9", "jest");
+  });
+
+  it("login sets the httpOnly refresh cookie when the service returns one", async () => {
+    svc.login.mockResolvedValue({ accessToken: "at", refreshToken: "rt" });
+    await ctrl.login({ email: "root@x.com", password: "p" } as any, req, res);
+    expect(res.cookie).toHaveBeenCalledWith(
+      "superAdminRefreshToken",
+      "rt",
+      expect.objectContaining({ httpOnly: true, path: "/api/superadmin/auth" }),
+    );
+  });
+
+  it("login leaves the cookie untouched on the 2FA-tempToken branch", async () => {
+    svc.login.mockResolvedValue({ tempToken: "tmp", requires2FA: true });
+    await ctrl.login({ email: "root@x.com", password: "p" } as any, req, res);
+    expect(res.cookie).not.toHaveBeenCalled();
   });
 
   it("verify2FA forwards the dto + ip + user agent", async () => {
     const dto = { code: "123456" } as any;
-    await ctrl.verify2FA(dto, req);
+    await ctrl.verify2FA(dto, req, res);
     expect(svc.verify2FA).toHaveBeenCalledWith(dto, "9.9.9.9", "jest");
   });
 
@@ -50,14 +72,51 @@ describe("SuperAdminAuthController", () => {
     expect(svc.disable2FA).toHaveBeenCalledWith("sa-1", "p", "123456");
   });
 
-  it("refresh forwards just the refresh token", async () => {
-    await ctrl.refresh({ refreshToken: "rt" } as any);
-    expect(svc.refreshToken).toHaveBeenCalledWith("rt");
+  it("refresh prefers the httpOnly cookie over the body token", async () => {
+    svc.refreshToken.mockResolvedValue({ accessToken: "new-at" });
+    const cookieReq = {
+      cookies: { superAdminRefreshToken: "cookie-rt" },
+    } as unknown as Request;
+    await ctrl.refresh({ refreshToken: "body-rt" } as any, cookieReq, res);
+    expect(svc.refreshToken).toHaveBeenCalledWith("cookie-rt");
   });
 
-  it("logout threads the super-admin id + ip + user agent", async () => {
-    await ctrl.logout("sa-1", req);
+  it("refresh falls back to the body token when no cookie is present", async () => {
+    svc.refreshToken.mockResolvedValue({ accessToken: "new-at" });
+    await ctrl.refresh({ refreshToken: "body-rt" } as any, req, res);
+    expect(svc.refreshToken).toHaveBeenCalledWith("body-rt");
+  });
+
+  it("refresh rotates the cookie when the service returns a new refresh token", async () => {
+    svc.refreshToken.mockResolvedValue({
+      accessToken: "new-at",
+      refreshToken: "rotated-rt",
+    });
+    const cookieReq = {
+      cookies: { superAdminRefreshToken: "cookie-rt" },
+    } as unknown as Request;
+    await ctrl.refresh({} as any, cookieReq, res);
+    expect(res.cookie).toHaveBeenCalledWith(
+      "superAdminRefreshToken",
+      "rotated-rt",
+      expect.objectContaining({ httpOnly: true }),
+    );
+  });
+
+  it("refresh rejects when neither a cookie nor a body token is present", async () => {
+    await expect(ctrl.refresh({} as any, req, res)).rejects.toThrow(
+      /missing refresh token/i,
+    );
+    expect(svc.refreshToken).not.toHaveBeenCalled();
+  });
+
+  it("logout threads the super-admin id + ip + user agent and clears the cookie", async () => {
+    await ctrl.logout("sa-1", req, res);
     expect(svc.logout).toHaveBeenCalledWith("sa-1", "9.9.9.9", "jest");
+    expect(res.clearCookie).toHaveBeenCalledWith(
+      "superAdminRefreshToken",
+      expect.objectContaining({ path: "/api/superadmin/auth" }),
+    );
   });
 
   it("getProfile echoes the guard-attached principal", async () => {

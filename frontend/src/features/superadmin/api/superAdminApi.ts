@@ -30,6 +30,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 // pipeline instead of each one rebuilding the interceptor stack.
 export const superAdminApi = axios.create({
   baseURL: API_BASE_URL,
+  // Send/receive the httpOnly superadmin refresh cookie so a session survives
+  // a page reload without the access/refresh tokens ever touching localStorage.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -50,17 +53,29 @@ superAdminApi.interceptors.request.use((config) => {
 let inFlightRefresh: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
+  // The refresh token lives in an httpOnly cookie (sent via withCredentials),
+  // so this works even after a reload when no in-memory token exists. The
+  // in-memory token, when present, is passed as a backward-compatible fallback.
   const refreshToken = useSuperAdminAuthStore.getState().refreshToken;
-  if (!refreshToken) {
-    throw new Error('No refresh token');
-  }
   const response = await axios.post(
     `${API_BASE_URL}/superadmin/auth/refresh`,
-    { refreshToken },
+    refreshToken ? { refreshToken } : {},
+    { withCredentials: true },
   );
   const { accessToken } = response.data;
   useSuperAdminAuthStore.getState().setAccessToken(accessToken);
   return accessToken;
+}
+
+/**
+ * Re-mint the access token from the httpOnly refresh cookie. Called once on
+ * superadmin app load (see SuperAdminProtectedRoute): after a reload the store
+ * rehydrates `isAuthenticated` but the in-memory token is gone, so we restore
+ * the session silently instead of bouncing the operator to /login. Rejects
+ * when there is no valid cookie (genuinely logged out / expired).
+ */
+export async function restoreSuperAdminSession(): Promise<void> {
+  await refreshAccessToken();
 }
 
 superAdminApi.interceptors.response.use(
