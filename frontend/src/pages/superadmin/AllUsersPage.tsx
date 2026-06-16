@@ -101,7 +101,8 @@ export default function AllUsersPage() {
 
           {/* Users Table */}
           <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-zinc-100">
                   <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
@@ -162,6 +163,7 @@ export default function AllUsersPage() {
                 )}
               </tbody>
             </table>
+            </div>
 
             {/* Pagination */}
             {usersData && usersData.meta.totalPages > 1 && (
@@ -193,7 +195,8 @@ export default function AllUsersPage() {
 
       {activeTab === 'activity' && (
         <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-zinc-100">
                 <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
@@ -260,6 +263,7 @@ export default function AllUsersPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

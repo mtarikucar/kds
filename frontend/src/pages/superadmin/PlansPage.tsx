@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Tag, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { usePlans, useCreatePlan, useUpdatePlan, useDeletePlan } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionPlan } from '../../features/superadmin/types';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { discountedMonthlyPrice } from './plans.helpers';
 
 export default function PlansPage() {
@@ -21,7 +23,11 @@ export default function PlansPage() {
 
   const handleDelete = (id: string) => {
     if (window.confirm(t('plans.confirmDelete'))) {
-      deleteMutation.mutate(id);
+      deleteMutation.mutate(id, {
+        onSuccess: () => toast.success(t('plans.deleted', 'Plan silindi.')),
+        onError: (err) =>
+          toast.error(getApiErrorMessage(err, t('plans.deleteFailed', 'Plan silinemedi.'))),
+      });
     }
   };
 
@@ -218,14 +224,26 @@ export default function PlansPage() {
       {isModalOpen && (
         <PlanModal
           plan={editingPlan}
+          isSaving={createMutation.isPending || updateMutation.isPending}
           onClose={() => setIsModalOpen(false)}
           onSave={(data) => {
+            // Surface success/failure instead of optimistically closing: a
+            // 400/network error used to close the modal silently, which read
+            // as "the update did nothing". On error we keep the modal open so
+            // the operator's input is preserved.
+            const opts = {
+              onSuccess: () => {
+                setIsModalOpen(false);
+                toast.success(t('plans.saved', 'Plan kaydedildi.'));
+              },
+              onError: (err: unknown) =>
+                toast.error(getApiErrorMessage(err, t('plans.saveFailed', 'Plan kaydedilemedi.'))),
+            };
             if (editingPlan) {
-              updateMutation.mutate({ id: editingPlan.id, ...data });
+              updateMutation.mutate({ id: editingPlan.id, ...data }, opts);
             } else {
-              createMutation.mutate(data);
+              createMutation.mutate(data, opts);
             }
-            setIsModalOpen(false);
           }}
         />
       )}
@@ -235,10 +253,12 @@ export default function PlansPage() {
 
 function PlanModal({
   plan,
+  isSaving,
   onClose,
   onSave,
 }: {
   plan: SubscriptionPlan | null;
+  isSaving: boolean;
   onClose: () => void;
   onSave: (data: Partial<SubscriptionPlan>) => void;
 }) {
@@ -274,6 +294,7 @@ function PlanModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     onSave(formData);
   };
 
@@ -285,7 +306,7 @@ function PlanModal({
       size="md"
     >
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1.5">
                   {t('plans.modal.internalName')}
@@ -312,7 +333,7 @@ function PlanModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1.5">
                   {t('plans.modal.monthlyPrice')}
@@ -362,7 +383,7 @@ function PlanModal({
               )}
             </div>
 
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.maxUsers')}</label>
                 <input
@@ -518,7 +539,7 @@ function PlanModal({
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.discountPercent')}</label>
                   <input
@@ -565,15 +586,21 @@ function PlanModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+                disabled={isSaving}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {t('plans.modal.cancel')}
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition-colors"
+                disabled={isSaving}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {plan ? t('plans.modal.update') : t('plans.modal.create')}
+                {isSaving
+                  ? t('plans.modal.saving', 'Kaydediliyor...')
+                  : plan
+                    ? t('plans.modal.update')
+                    : t('plans.modal.create')}
               </button>
             </div>
           </form>

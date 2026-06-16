@@ -269,7 +269,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       method: request.method,
       url: request.url,
       statusCode,
-      userId: (request as any).user?.id ?? "anonymous",
+      // SuperAdminGuard attaches its principal to request.superAdmin (not
+      // request.user), so without this fallback EVERY superadmin error —
+      // even fully authenticated ones — logged userId:"anonymous" and looked
+      // like a tokenless request during triage.
+      userId:
+        (request as any).user?.id ??
+        (request as any).superAdmin?.id ??
+        "anonymous",
       tenant: (request as any).user?.tenantId || "N/A",
       userAgent: request.headers["user-agent"],
       ip: request.ip,

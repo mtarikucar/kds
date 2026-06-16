@@ -51,7 +51,7 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <select
           value={status}
           onChange={(e) => {
@@ -87,7 +87,8 @@ export default function SubscriptionsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px]">
           <thead>
             <tr className="border-b border-zinc-100">
               <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-5 py-3">
@@ -166,6 +167,7 @@ export default function SubscriptionsPage() {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination */}
         {data && data.meta.totalPages > 1 && (

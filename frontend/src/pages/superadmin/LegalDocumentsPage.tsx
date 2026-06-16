@@ -83,7 +83,8 @@ export default function LegalDocumentsPage() {
             </h2>
             <span className="text-xs text-slate-500">{t('legal.versionCount', { count: items.length })}</span>
           </header>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
             <thead className="text-xs text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-2 text-left">{t('legal.col.version')}</th>
@@ -138,6 +139,7 @@ export default function LegalDocumentsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       ))}
 
@@ -180,7 +182,7 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
   return (
     <Modal isOpen onClose={onClose} title={t('legal.publishNewVersion')} size="full">
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="block">
               <span className="text-xs font-medium text-slate-700">{t('legal.modal.kind')}</span>
               <select
