@@ -227,6 +227,16 @@ export default function PlansPage() {
           isSaving={createMutation.isPending || updateMutation.isPending}
           onClose={() => setIsModalOpen(false)}
           onSave={(data) => {
+            // Never send empty-string discount dates: an empty string is not a
+            // valid ISO date, so the optional @IsDateString validators reject
+            // it. Coerce blank -> undefined so the field is OMITTED from the
+            // JSON body and treated as "not provided" (defence-in-depth with
+            // the backend's blank->undefined coercion).
+            const payload: Partial<SubscriptionPlan> = {
+              ...data,
+              discountStartDate: data.discountStartDate || undefined,
+              discountEndDate: data.discountEndDate || undefined,
+            };
             // Surface success/failure instead of optimistically closing: a
             // 400/network error used to close the modal silently, which read
             // as "the update did nothing". On error we keep the modal open so
@@ -240,9 +250,9 @@ export default function PlansPage() {
                 toast.error(getApiErrorMessage(err, t('plans.saveFailed', 'Plan kaydedilemedi.'))),
             };
             if (editingPlan) {
-              updateMutation.mutate({ id: editingPlan.id, ...data }, opts);
+              updateMutation.mutate({ id: editingPlan.id, ...payload }, opts);
             } else {
-              createMutation.mutate(data, opts);
+              createMutation.mutate(payload, opts);
             }
           }}
         />
