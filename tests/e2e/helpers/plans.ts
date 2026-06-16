@@ -243,10 +243,12 @@ export async function clearFeatureOverrides(
         reservationSystem: null,
         personnelManagement: null,
         deliveryIntegration: null,
+        posAccess: null,
       },
       limitOverrides: {
         maxUsers: null,
         maxTables: null,
+        maxBranches: null,
         maxProducts: null,
         maxCategories: null,
         maxMonthlyOrders: null,

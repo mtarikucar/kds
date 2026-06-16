@@ -405,6 +405,24 @@ export class SuperAdminSubscriptionsService {
           where: { id: existing.tenantId },
           data: { currentPlanId: updateData.planId },
         });
+        // Reproject entitlements in the SAME transaction. Without this a
+        // superadmin plan change moved subscription.planId +
+        // tenant.currentPlanId but left the engine's feature.*/limit.* grants
+        // (and its cache) on the OLD plan, so the tenant kept stale feature
+        // access until the nightly reconcile. Mirrors the tenant-side
+        // activation + bank-transfer confirm paths.
+        await this.subscriptionService.emitSubscriptionReprojection(
+          {
+            id: sub.id,
+            tenantId: existing.tenantId,
+            plan: sub.plan,
+            currentPeriodStart: (sub as { currentPeriodStart?: Date | null })
+              .currentPeriodStart,
+            currentPeriodEnd: (sub as { currentPeriodEnd?: Date | null })
+              .currentPeriodEnd,
+          },
+          tx,
+        );
       }
       return sub;
     });
