@@ -13,6 +13,10 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { scrollDirection, isAtTop } = useScrollDirection(80);
   const t = useTranslations('nav');
+  // Reuse the already-translated footer privacy label (all 5 locales) so the
+  // homepage carries a prominent, top-level link to the privacy policy — a
+  // Google OAuth "homepage requirements" item, in addition to the footer link.
+  const tf = useTranslations('footer');
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -29,6 +33,7 @@ export default function Navbar() {
     { href: '#pricing', label: t('pricing'), kind: 'anchor' },
     { href: '#security', label: t('security'), kind: 'anchor' },
     { href: '/store', label: t('store'), kind: 'page' },
+    { href: '/privacy', label: tf('links.privacy'), kind: 'page' },
   ];
 
   const isHidden = scrollDirection === 'down' && !isAtTop && !isMenuOpen;
