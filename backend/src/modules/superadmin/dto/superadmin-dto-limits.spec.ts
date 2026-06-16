@@ -18,6 +18,24 @@ describe('SuperAdmin DTO length caps (iter-47)', () => {
     return errors.flatMap((e) => Object.values(e.constraints ?? {}));
   }
 
+  // Faithful to the GLOBAL ValidationPipe (main.ts): transform with
+  // enableImplicitConversion + whitelist. A transform regression that only
+  // bites under implicit conversion is invisible to the plain validateDto
+  // above — exactly the gap that let the discount-date 400 ship twice.
+  async function validateDtoProd(
+    cls: any,
+    input: Record<string, unknown>,
+  ): Promise<string[]> {
+    const dto = plainToInstance(cls, input, {
+      enableImplicitConversion: true,
+    }) as object;
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: false,
+    });
+    return errors.flatMap((e) => Object.values(e.constraints ?? {}));
+  }
+
   describe('SuperAdminLoginDto', () => {
     const base = { email: 'sa@x.com', password: 'Passw0rd1' };
 
@@ -133,6 +151,65 @@ describe('SuperAdmin DTO length caps (iter-47)', () => {
       const msgs = await validateDto(CreatePlanDto, {
         ...base,
         discountStartDate: 'not-a-date',
+      });
+      expect(msgs.some((m) => /discountStartDate/i.test(m))).toBe(true);
+    });
+  });
+
+  // Same cases but through the GLOBAL ValidationPipe's transformOptions
+  // (enableImplicitConversion). This is what actually runs in prod; the
+  // plain plainToInstance path can mask an implicit-conversion-only bug.
+  describe('discount dates under prod ValidationPipe options', () => {
+    const fullForm = {
+      name: 'pro',
+      displayName: 'Pro',
+      description: '',
+      monthlyPrice: 100,
+      yearlyPrice: 1000,
+      currency: 'TRY',
+      maxUsers: 1,
+      maxTables: 5,
+      maxProducts: 50,
+      maxCategories: 10,
+      maxMonthlyOrders: 100,
+      advancedReports: false,
+      kdsIntegration: true,
+      isActive: true,
+      discountPercentage: 0,
+      discountLabel: '',
+      discountStartDate: '',
+      discountEndDate: '',
+      isDiscountActive: false,
+    };
+
+    it('accepts the full create form payload with blank dates', async () => {
+      expect(await validateDtoProd(CreatePlanDto, fullForm)).toEqual([]);
+    });
+
+    it('accepts the full update (PATCH) form payload with blank dates', async () => {
+      expect(await validateDtoProd(UpdatePlanDto, fullForm)).toEqual([]);
+    });
+
+    it('accepts omitted discount dates on PATCH', async () => {
+      expect(
+        await validateDtoProd(UpdatePlanDto, { monthlyPrice: 200 }),
+      ).toEqual([]);
+    });
+
+    it('accepts real ISO discount dates', async () => {
+      expect(
+        await validateDtoProd(UpdatePlanDto, {
+          discountStartDate: '2026-06-16',
+          discountEndDate: '2026-07-16',
+          isDiscountActive: true,
+        }),
+      ).toEqual([]);
+    });
+
+    it('still rejects a genuinely malformed discount date', async () => {
+      const msgs = await validateDtoProd(CreatePlanDto, {
+        ...fullForm,
+        discountStartDate: '16/06/2026',
       });
       expect(msgs.some((m) => /discountStartDate/i.test(m))).toBe(true);
     });
