@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsString, MaxLength } from "class-validator";
+import { IsOptional, IsString, MaxLength } from "class-validator";
 
 /**
  * Body for POST /superadmin/auth/refresh.
@@ -19,8 +19,11 @@ import { IsNotEmpty, IsString, MaxLength } from "class-validator";
  */
 export class SuperAdminRefreshTokenDto {
   @ApiProperty({ description: "Refresh token issued at the end of verify-2fa" })
+  // Optional: the refresh token now travels in an httpOnly cookie (primary).
+  // This body field is a backward-compatible fallback. MaxLength still caps
+  // the input to bound jwt.verify CPU on pathological payloads.
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(4096)
-  refreshToken!: string;
+  refreshToken?: string;
 }
