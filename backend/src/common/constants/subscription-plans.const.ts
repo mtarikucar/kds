@@ -11,6 +11,7 @@ export interface PlanConfig {
   limits: {
     maxUsers: number;
     maxTables: number;
+    maxBranches: number;
     maxProducts: number;
     maxCategories: number;
     maxMonthlyOrders: number;
@@ -26,6 +27,7 @@ export interface PlanConfig {
     reservationSystem: boolean;
     personnelManagement: boolean;
     deliveryIntegration: boolean;
+    posAccess: boolean;
   };
 }
 
@@ -41,6 +43,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
     limits: {
       maxUsers: 2,
       maxTables: 5,
+      maxBranches: 1,
       maxProducts: 25,
       maxCategories: 5,
       maxMonthlyOrders: 50,
@@ -56,6 +59,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       reservationSystem: false,
       personnelManagement: false,
       deliveryIntegration: false,
+      posAccess: false,
     },
   },
   [SubscriptionPlanType.BASIC]: {
@@ -71,6 +75,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
     limits: {
       maxUsers: 5,
       maxTables: 20,
+      maxBranches: 1,
       maxProducts: 100,
       maxCategories: 20,
       maxMonthlyOrders: 500,
@@ -86,6 +91,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       reservationSystem: false,
       personnelManagement: false,
       deliveryIntegration: false,
+      posAccess: true,
     },
   },
   [SubscriptionPlanType.PRO]: {
@@ -100,6 +106,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
     limits: {
       maxUsers: 15,
       maxTables: 50,
+      maxBranches: 3,
       maxProducts: 500,
       maxCategories: 50,
       maxMonthlyOrders: 2000,
@@ -115,6 +122,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
     },
   },
   [SubscriptionPlanType.BUSINESS]: {
@@ -129,6 +137,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
     limits: {
       maxUsers: -1, // unlimited
       maxTables: -1,
+      maxBranches: -1,
       maxProducts: -1,
       maxCategories: -1,
       maxMonthlyOrders: -1,
@@ -144,6 +153,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
     },
   },
 };

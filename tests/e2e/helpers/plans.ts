@@ -20,6 +20,7 @@ export const PLAN_FEATURES: Record<PlanName, Record<string, boolean>> = {
     reservationSystem: false,
     personnelManagement: false,
     deliveryIntegration: false,
+    posAccess: false,
   },
   BASIC: {
     advancedReports: false,
@@ -32,6 +33,7 @@ export const PLAN_FEATURES: Record<PlanName, Record<string, boolean>> = {
     reservationSystem: false,
     personnelManagement: false,
     deliveryIntegration: false,
+    posAccess: true,
   },
   PRO: {
     advancedReports: true,
@@ -44,6 +46,7 @@ export const PLAN_FEATURES: Record<PlanName, Record<string, boolean>> = {
     reservationSystem: true,
     personnelManagement: true,
     deliveryIntegration: true,
+    posAccess: true,
   },
   BUSINESS: {
     advancedReports: true,
@@ -56,17 +59,18 @@ export const PLAN_FEATURES: Record<PlanName, Record<string, boolean>> = {
     reservationSystem: true,
     personnelManagement: true,
     deliveryIntegration: true,
+    posAccess: true,
   },
 };
 
 export const PLAN_LIMITS: Record<
   PlanName,
-  { maxUsers: number; maxTables: number; maxProducts: number; maxCategories: number; maxMonthlyOrders: number }
+  { maxUsers: number; maxTables: number; maxBranches: number; maxProducts: number; maxCategories: number; maxMonthlyOrders: number }
 > = {
-  FREE: { maxUsers: 2, maxTables: 5, maxProducts: 25, maxCategories: 5, maxMonthlyOrders: 50 },
-  BASIC: { maxUsers: 5, maxTables: 20, maxProducts: 100, maxCategories: 20, maxMonthlyOrders: 500 },
-  PRO: { maxUsers: 15, maxTables: 50, maxProducts: 500, maxCategories: 50, maxMonthlyOrders: 2000 },
-  BUSINESS: { maxUsers: -1, maxTables: -1, maxProducts: -1, maxCategories: -1, maxMonthlyOrders: -1 },
+  FREE: { maxUsers: 2, maxTables: 5, maxBranches: 1, maxProducts: 25, maxCategories: 5, maxMonthlyOrders: 50 },
+  BASIC: { maxUsers: 5, maxTables: 20, maxBranches: 1, maxProducts: 100, maxCategories: 20, maxMonthlyOrders: 500 },
+  PRO: { maxUsers: 15, maxTables: 50, maxBranches: 3, maxProducts: 500, maxCategories: 50, maxMonthlyOrders: 2000 },
+  BUSINESS: { maxUsers: -1, maxTables: -1, maxBranches: -1, maxProducts: -1, maxCategories: -1, maxMonthlyOrders: -1 },
 };
 
 interface PlanRow {
@@ -262,4 +266,7 @@ export const FEATURE_PROBE_ROUTES: { feature: keyof (typeof PLAN_FEATURES)['FREE
   { feature: 'deliveryIntegration', method: 'GET', path: 'delivery-platforms/configs' },
   { feature: 'apiAccess', method: 'GET', path: 'admin/settings/integrations' },
   { feature: 'advancedReports', method: 'GET', path: 'reports/sales' },
+  // v3.0.0 — posAccess is tier-gated (FREE post-trial loses POS). The
+  // pos-settings controller is class-gated @RequiresFeature(POS_ACCESS).
+  { feature: 'posAccess', method: 'GET', path: 'pos-settings' },
 ];

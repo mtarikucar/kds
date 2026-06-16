@@ -109,6 +109,7 @@ async function main() {
       trialDays: 14,
       maxUsers: -1,
       maxTables: -1,
+      maxBranches: -1,
       maxProducts: -1,
       maxCategories: -1,
       maxMonthlyOrders: -1,
@@ -121,6 +122,8 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
+      posAccess: true,
       isActive: true,
     },
   });

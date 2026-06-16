@@ -117,6 +117,7 @@ export class AuthProvisioningService {
     reservationSystem?: boolean | null;
     personnelManagement?: boolean | null;
     deliveryIntegration?: boolean | null;
+    posAccess?: boolean | null;
   }) {
     return {
       advancedReports: !!businessPlan.advancedReports,
@@ -129,6 +130,9 @@ export class AuthProvisioningService {
       reservationSystem: !!businessPlan.reservationSystem,
       personnelManagement: !!businessPlan.personnelManagement,
       deliveryIntegration: !!businessPlan.deliveryIntegration,
+      // posAccess was historically omitted here (the v3.0.7 bug), which
+      // briefly hid POS on a fresh BUSINESS tenant during projector warm-up.
+      posAccess: !!businessPlan.posAccess,
     };
   }
 
