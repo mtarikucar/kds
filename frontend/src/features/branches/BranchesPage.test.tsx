@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 const h = vi.hoisted(() => ({
   branches: { data: [] as any[], isLoading: false },
@@ -15,6 +16,15 @@ vi.mock('../plan/planApi', () => ({
 }));
 
 import BranchesPage from './BranchesPage';
+
+// The at-limit upsell renders a react-router <Link>, so the page needs a
+// Router context.
+const renderPage = () =>
+  render(
+    <MemoryRouter>
+      <BranchesPage />
+    </MemoryRouter>,
+  );
 
 beforeEach(() => {
   h.branches.data = [];
@@ -36,13 +46,13 @@ describe('BranchesPage', () => {
         createdAt: '2024-01-01T00:00:00Z',
       },
     ];
-    render(<BranchesPage />);
+    renderPage();
     expect(screen.getByText('Main')).toBeInTheDocument();
     expect(screen.getByText('IST-01')).toBeInTheDocument();
   });
 
   it('submits a new branch via the create mutation', () => {
-    render(<BranchesPage />);
+    renderPage();
     const nameInput = screen.getAllByRole('textbox')[0];
     fireEvent.change(nameInput, { target: { value: 'Kadikoy' } });
     fireEvent.submit(nameInput.closest('form')!);
@@ -51,7 +61,7 @@ describe('BranchesPage', () => {
   });
 
   it('does not submit when the name is empty', () => {
-    render(<BranchesPage />);
+    renderPage();
     const form = screen.getAllByRole('textbox')[0].closest('form')!;
     fireEvent.submit(form);
     expect(h.create.mutate).not.toHaveBeenCalled();
@@ -59,7 +69,7 @@ describe('BranchesPage', () => {
 
   it('disables the add button and shows the hint when at the branch limit', () => {
     h.snapshot.data = { branches: { current: 2, max: 2 } };
-    render(<BranchesPage />);
+    renderPage();
     expect(
       screen.getByTestId('branches-at-limit-hint'),
     ).toBeInTheDocument();
@@ -72,7 +82,7 @@ describe('BranchesPage', () => {
 
   it('treats max === -1 as unlimited (no at-limit hint)', () => {
     h.snapshot.data = { branches: { current: 5, max: -1 } };
-    render(<BranchesPage />);
+    renderPage();
     expect(
       screen.queryByTestId('branches-at-limit-hint'),
     ).not.toBeInTheDocument();
