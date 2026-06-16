@@ -3,6 +3,7 @@ import { validate } from 'class-validator';
 import { SuperAdminLoginDto } from './login.dto';
 import { Verify2FADto } from './verify-2fa.dto';
 import { SuperAdminRefreshTokenDto } from './refresh-token.dto';
+import { CreatePlanDto, UpdatePlanDto } from './subscription-filter.dto';
 
 /**
  * Iter-47 regression: every auth-shaped field on the superadmin API
@@ -86,6 +87,54 @@ describe('SuperAdmin DTO length caps (iter-47)', () => {
       expect(
         await validateDto(SuperAdminRefreshTokenDto, { refreshToken: 'a'.repeat(800) }),
       ).toEqual([]);
+    });
+  });
+
+  // Regression: the superadmin Plans form sends EVERY field on save,
+  // including discountStartDate/discountEndDate as '' (empty string) when no
+  // discount is configured. @IsOptional() only skips undefined/null, so a
+  // bare @IsDateString() rejected '' with a 400 and blocked ALL plan edits.
+  // The DTO now coerces '' -> undefined for these optional date fields.
+  describe('CreatePlanDto discount dates', () => {
+    const base = {
+      name: 'pro',
+      displayName: 'Pro',
+      monthlyPrice: 100,
+      yearlyPrice: 1000,
+    };
+
+    it('accepts empty-string discount dates (coerced to undefined)', async () => {
+      const msgs = await validateDto(CreatePlanDto, {
+        ...base,
+        discountStartDate: '',
+        discountEndDate: '',
+      });
+      expect(msgs).toEqual([]);
+    });
+
+    it('accepts empty-string discount dates on UpdatePlanDto (PATCH)', async () => {
+      const msgs = await validateDto(UpdatePlanDto, {
+        discountStartDate: '',
+        discountEndDate: '',
+      });
+      expect(msgs).toEqual([]);
+    });
+
+    it('accepts a real ISO discount date', async () => {
+      const msgs = await validateDto(CreatePlanDto, {
+        ...base,
+        discountStartDate: '2026-06-16',
+        discountEndDate: '2026-07-16',
+      });
+      expect(msgs).toEqual([]);
+    });
+
+    it('still rejects a non-date, non-empty discount date', async () => {
+      const msgs = await validateDto(CreatePlanDto, {
+        ...base,
+        discountStartDate: 'not-a-date',
+      });
+      expect(msgs.some((m) => /discountStartDate/i.test(m))).toBe(true);
     });
   });
 });

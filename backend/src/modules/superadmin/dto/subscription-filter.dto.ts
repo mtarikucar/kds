@@ -14,7 +14,14 @@ import {
   MaxLength,
 } from "class-validator";
 import { PartialType } from "@nestjs/swagger";
-import { Type } from "class-transformer";
+import { Type, Transform } from "class-transformer";
+
+// Optional date fields: HTML <input type="date"> (and forms that resend
+// every field on save) emit "" when cleared. @IsOptional() only skips
+// undefined/null, so a bare @IsDateString() would 400 on "". Coerce blank
+// strings to undefined BEFORE validation so they read as "not provided".
+const emptyToUndefined = ({ value }: { value: unknown }) =>
+  value === "" ? undefined : value;
 
 const SUBSCRIPTION_STATUSES = [
   "ACTIVE",
@@ -202,11 +209,13 @@ export class CreatePlanDto {
   discountLabel?: string;
 
   @ApiPropertyOptional({ description: "Discount start date (ISO string)" })
+  @Transform(emptyToUndefined)
   @IsOptional()
   @IsDateString()
   discountStartDate?: string;
 
   @ApiPropertyOptional({ description: "Discount end date (ISO string)" })
+  @Transform(emptyToUndefined)
   @IsOptional()
   @IsDateString()
   discountEndDate?: string;
@@ -253,6 +262,7 @@ export class UpdateSubscriptionDto {
       "Override trial end timestamp (ISO 8601). Support uses this to extend a trial; " +
       "E2E tests use it to fast-forward the trial-expiry sweep.",
   })
+  @Transform(emptyToUndefined)
   @IsOptional()
   @IsDateString()
   trialEnd?: string;
@@ -261,6 +271,7 @@ export class UpdateSubscriptionDto {
     description:
       "Override trial start timestamp (ISO 8601). Paired with trialEnd for trial-window edits.",
   })
+  @Transform(emptyToUndefined)
   @IsOptional()
   @IsDateString()
   trialStart?: string;
