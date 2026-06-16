@@ -27,6 +27,11 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+// PlansPage now imports getApiErrorMessage (lib/api-error), which pulls in
+// i18n/config; stub it so the partial react-i18next mock above doesn't trip
+// over initReactI18next at import time (mirrors SuperAdminLoginPage.test).
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
+
 function plan(over: Partial<any> = {}) {
   return {
     id: 'p1',
@@ -111,7 +116,8 @@ describe('PlansPage — delete flow', () => {
     const buttons = within(card).getAllByRole('button');
     fireEvent.click(buttons[buttons.length - 1]);
     expect(window.confirm).toHaveBeenCalledWith('plans.confirmDelete');
-    expect(deleteMutate).toHaveBeenCalledWith('plan-del');
+    // delete now passes success/error toast callbacks alongside the id.
+    expect(deleteMutate).toHaveBeenCalledWith('plan-del', expect.any(Object));
   });
 
   it('does NOT delete when confirm is declined', () => {

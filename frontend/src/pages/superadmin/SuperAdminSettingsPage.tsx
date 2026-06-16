@@ -47,17 +47,17 @@ export default function SuperAdminSettingsPage() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
         <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('settings.profile')}</h2>
         <dl className="space-y-3">
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <dt className="text-gray-500 dark:text-gray-400">{t('settings.email')}</dt>
             <dd className="text-gray-900 dark:text-white">{superAdmin?.email}</dd>
           </div>
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <dt className="text-gray-500 dark:text-gray-400">{t('settings.name')}</dt>
             <dd className="text-gray-900 dark:text-white">
               {superAdmin?.firstName} {superAdmin?.lastName}
             </dd>
           </div>
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <dt className="text-gray-500 dark:text-gray-400">{t('settings.status')}</dt>
             <dd className="text-gray-900 dark:text-white">{superAdmin?.status}</dd>
           </div>
@@ -69,7 +69,7 @@ export default function SuperAdminSettingsPage() {
         <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('settings.security')}</h2>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <p className="font-medium text-gray-900 dark:text-white">{t('settings.twoFactorAuth')}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">

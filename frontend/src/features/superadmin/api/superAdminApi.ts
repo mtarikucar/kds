@@ -50,21 +50,43 @@ superAdminApi.interceptors.request.use((config) => {
 // Single-flight refresh: when N requests race a 401 we serialize on a
 // shared promise so only one `/refresh` call actually hits the wire. The
 // others wait for its result and retry with the new access token.
+//
+// This is LOAD-BEARING, not just an optimization: the backend rotates the
+// refresh token on every refresh (atomic tokenVersion bump). Two concurrent
+// refreshes present the same cookie; exactly one wins and the loser gets a
+// "Session revoked" 401 -> forced logout. Every refresh path (the 401
+// interceptor AND the on-load restore) MUST funnel through this one promise.
 let inFlightRefresh: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
   // The refresh token lives in an httpOnly cookie (sent via withCredentials),
-  // so this works even after a reload when no in-memory token exists. The
-  // in-memory token, when present, is passed as a backward-compatible fallback.
-  const refreshToken = useSuperAdminAuthStore.getState().refreshToken;
+  // so this works even after a reload when no in-memory token exists.
   const response = await axios.post(
     `${API_BASE_URL}/superadmin/auth/refresh`,
-    refreshToken ? { refreshToken } : {},
+    {},
     { withCredentials: true },
   );
-  const { accessToken } = response.data;
-  useSuperAdminAuthStore.getState().setAccessToken(accessToken);
+  const { accessToken, refreshToken: rotated } = response.data;
+  const store = useSuperAdminAuthStore.getState();
+  // The backend rotates the refresh token too; keep the in-memory copy in
+  // sync so it never goes stale against the DB tokenVersion. (The httpOnly
+  // cookie remains the real source of truth.)
+  if (rotated) {
+    store.setTokens(accessToken, rotated);
+  } else {
+    store.setAccessToken(accessToken);
+  }
   return accessToken;
+}
+
+// Funnel EVERY refresh through one in-flight promise (see inFlightRefresh).
+function refreshAccessTokenOnce(): Promise<string> {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshAccessToken().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
 }
 
 /**
@@ -72,10 +94,11 @@ async function refreshAccessToken(): Promise<string> {
  * superadmin app load (see SuperAdminProtectedRoute): after a reload the store
  * rehydrates `isAuthenticated` but the in-memory token is gone, so we restore
  * the session silently instead of bouncing the operator to /login. Rejects
- * when there is no valid cookie (genuinely logged out / expired).
+ * when there is no valid cookie (genuinely logged out / expired). Shares the
+ * single-flight promise so it never races a 401-triggered refresh.
  */
 export async function restoreSuperAdminSession(): Promise<void> {
-  await refreshAccessToken();
+  await refreshAccessTokenOnce();
 }
 
 superAdminApi.interceptors.response.use(
@@ -86,12 +109,7 @@ superAdminApi.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        if (!inFlightRefresh) {
-          inFlightRefresh = refreshAccessToken().finally(() => {
-            inFlightRefresh = null;
-          });
-        }
-        const accessToken = await inFlightRefresh;
+        const accessToken = await refreshAccessTokenOnce();
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return superAdminApi(originalRequest);
       } catch (refreshError) {
@@ -108,6 +126,10 @@ superAdminApi.interceptors.response.use(
             if (here && !here.startsWith('/superadmin/login')) {
               window.sessionStorage.setItem('superAdminPostLoginReturn', here);
             }
+            // Flag the forced logout so the login page can explain WHY the
+            // operator landed there, instead of a silent bounce that reads
+            // as "the Save button did nothing".
+            window.sessionStorage.setItem('superAdminSessionExpired', '1');
           }
         } catch {
           // Private-mode / sandbox iframe: non-fatal.

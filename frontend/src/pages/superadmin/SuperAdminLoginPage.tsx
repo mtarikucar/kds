@@ -24,6 +24,22 @@ export default function SuperAdminLoginPage() {
     return resolvePostLoginTarget(candidate);
   }, []);
 
+  // Was this a forced logout (refresh failed / session expired) rather than a
+  // deliberate sign-out? The api interceptor stashes a flag; read+clear it so
+  // we explain the bounce instead of silently dropping the operator here.
+  const sessionExpired = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      if (window.sessionStorage.getItem('superAdminSessionExpired')) {
+        window.sessionStorage.removeItem('superAdminSessionExpired');
+        return true;
+      }
+    } catch {
+      // Private-mode / sandbox: non-fatal.
+    }
+    return false;
+  }, []);
+
   if (isAuthenticated) {
     return <Navigate to={postLoginTarget} replace />;
   }
@@ -58,6 +74,14 @@ export default function SuperAdminLoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {sessionExpired && !loginMutation.isError && (
+              <div className="bg-amber-50 border border-amber-100 text-amber-700 text-sm px-4 py-3 rounded-lg">
+                {t(
+                  'login.sessionExpired',
+                  'Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.',
+                )}
+              </div>
+            )}
             {loginMutation.isError && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-lg">
                 {getApiErrorMessage(loginMutation.error, t('login.invalidCredentials'))}

@@ -81,7 +81,8 @@ function AddOnsSection() {
       {isLoading ? (
         <div className="text-sm text-gray-500">{tr('marketplace.loading')}</div>
       ) : (
-        <table className="w-full divide-y rounded border text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full divide-y rounded border text-sm min-w-[640px]">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.code')}</th>
@@ -133,6 +134,7 @@ function AddOnsSection() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {(creating || editing) && (
@@ -207,7 +209,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
       title={initial ? tr('marketplace.addons.editTitle') : tr('marketplace.addons.newTitle')}
       size="xl"
     >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label={tr('marketplace.addons.fields.code')}>
             <input
               className="rounded border px-2 py-1 text-sm font-mono w-full"
@@ -308,7 +310,8 @@ function ProductsSection() {
       {isLoading ? (
         <div className="text-sm text-gray-500">{tr('marketplace.loading')}</div>
       ) : (
-        <table className="w-full divide-y rounded border text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full divide-y rounded border text-sm min-w-[640px]">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th className="px-3 py-2 font-medium">{tr('marketplace.products.col.sku')}</th>
@@ -373,6 +376,7 @@ function ProductsSection() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {creating && (
@@ -427,7 +431,7 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
 
   return (
     <Modal isOpen onClose={onClose} title={tr('marketplace.products.newTitle')} size="xl">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label={tr('marketplace.products.fields.sku')}><input className="rounded border px-2 py-1 text-sm font-mono w-full" value={form.sku} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))} /></Field>
           <Field label={tr('marketplace.products.fields.name')}><input className="rounded border px-2 py-1 text-sm w-full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
           <Field label={tr('marketplace.products.fields.category')}>

@@ -203,3 +203,103 @@ describe('SuperAdminSubscriptionsService.refundPayment', () => {
     expect(prisma.subscriptionPayment.update).toHaveBeenCalled();
   });
 });
+
+/**
+ * Regression: the superadmin Plans form sends 5 discount fields
+ * (discountPercentage/Label/StartDate/EndDate + isDiscountActive) and the
+ * DTO validates them, but createPlan/updatePlan never mapped them into the
+ * Prisma write — so a discount edit returned 200 OK and silently vanished.
+ */
+describe('SuperAdminSubscriptionsService plan discount persistence', () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let svc: SuperAdminSubscriptionsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      {} as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it('createPlan writes the discount fields (dates coerced to Date)', async () => {
+    prisma.subscriptionPlan.create.mockResolvedValue({ id: 'plan-1' });
+
+    await svc.createPlan(
+      {
+        name: 'pro',
+        displayName: 'Pro',
+        monthlyPrice: 100,
+        yearlyPrice: 1000,
+        discountPercentage: 25,
+        discountLabel: 'Launch',
+        discountStartDate: '2026-06-16',
+        discountEndDate: '2026-07-16',
+        isDiscountActive: true,
+      } as any,
+      'a1',
+      'a@x',
+    );
+
+    expect(prisma.subscriptionPlan.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          discountPercentage: 25,
+          discountLabel: 'Launch',
+          discountStartDate: new Date('2026-06-16'),
+          discountEndDate: new Date('2026-07-16'),
+          isDiscountActive: true,
+        }),
+      }),
+    );
+  });
+
+  it('updatePlan writes the discount fields (dates coerced to Date)', async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'plan-1' });
+    prisma.subscriptionPlan.update.mockResolvedValue({ id: 'plan-1' });
+
+    await svc.updatePlan(
+      'plan-1',
+      {
+        discountPercentage: 30,
+        discountLabel: 'Sale',
+        discountStartDate: '2026-06-16',
+        discountEndDate: '2026-07-16',
+        isDiscountActive: true,
+      } as any,
+      'a1',
+      'a@x',
+    );
+
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          discountPercentage: 30,
+          discountLabel: 'Sale',
+          discountStartDate: new Date('2026-06-16'),
+          discountEndDate: new Date('2026-07-16'),
+          isDiscountActive: true,
+        }),
+      }),
+    );
+  });
+
+  it('updatePlan leaves discount dates untouched (undefined) when omitted', async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'plan-1' });
+    prisma.subscriptionPlan.update.mockResolvedValue({ id: 'plan-1' });
+
+    await svc.updatePlan('plan-1', { monthlyPrice: 200 } as any, 'a1', 'a@x');
+
+    const data = prisma.subscriptionPlan.update.mock.calls[0][0].data;
+    expect(data.discountStartDate).toBeUndefined();
+    expect(data.discountEndDate).toBeUndefined();
+  });
+});

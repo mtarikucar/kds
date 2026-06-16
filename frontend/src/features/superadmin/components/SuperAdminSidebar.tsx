@@ -29,7 +29,13 @@ const navigation = [
   { nameKey: 'nav.settings', href: '/superadmin/settings', icon: Settings },
 ];
 
-export default function SuperAdminSidebar() {
+export default function SuperAdminSidebar({
+  isOpen = false,
+  onClose = () => {},
+}: {
+  isOpen?: boolean;
+  onClose?: () => void;
+} = {}) {
   const { t } = useTranslation('superadmin');
   const { superAdmin } = useSuperAdminAuthStore();
   const logoutMutation = useSuperAdminLogout();
@@ -39,7 +45,20 @@ export default function SuperAdminSidebar() {
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-zinc-200 flex flex-col">
+    <>
+      {/* Mobile backdrop — tap to dismiss the drawer */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          aria-hidden="true"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white border-r border-zinc-200 flex flex-col transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-zinc-100">
         <div className="flex items-center gap-2">
@@ -56,6 +75,7 @@ export default function SuperAdminSidebar() {
           <NavLink
             key={item.nameKey}
             to={item.href}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                 isActive
@@ -117,6 +137,7 @@ export default function SuperAdminSidebar() {
           </Transition>
         </Menu>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -109,6 +109,18 @@ export class SuperAdminSubscriptionsService {
         personnelManagement: createDto.personnelManagement ?? false,
         deliveryIntegration: createDto.deliveryIntegration ?? false,
         isActive: createDto.isActive ?? true,
+        // Discount block — previously omitted, so plan discounts created via
+        // the superadmin form silently never persisted. Dates arrive as ISO
+        // strings (the DTO coerces blank -> undefined); map to Date.
+        discountPercentage: createDto.discountPercentage,
+        discountLabel: createDto.discountLabel,
+        discountStartDate: createDto.discountStartDate
+          ? new Date(createDto.discountStartDate)
+          : undefined,
+        discountEndDate: createDto.discountEndDate
+          ? new Date(createDto.discountEndDate)
+          : undefined,
+        isDiscountActive: createDto.isDiscountActive ?? false,
       },
     });
 
@@ -164,6 +176,19 @@ export class SuperAdminSubscriptionsService {
         personnelManagement: updateDto.personnelManagement,
         deliveryIntegration: updateDto.deliveryIntegration,
         isActive: updateDto.isActive,
+        // Discount block — previously omitted, so discount edits returned 200
+        // but never saved. PATCH semantics: undefined leaves the column
+        // untouched. Dates arrive as ISO strings (DTO coerces blank ->
+        // undefined); map present ones to Date.
+        discountPercentage: updateDto.discountPercentage,
+        discountLabel: updateDto.discountLabel,
+        discountStartDate: updateDto.discountStartDate
+          ? new Date(updateDto.discountStartDate)
+          : undefined,
+        discountEndDate: updateDto.discountEndDate
+          ? new Date(updateDto.discountEndDate)
+          : undefined,
+        isDiscountActive: updateDto.isDiscountActive,
       },
     });
 
