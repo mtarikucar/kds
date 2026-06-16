@@ -61,6 +61,11 @@ export class FeatureOverridesDto {
   @IsOptional()
   @IsBoolean()
   deliveryIntegration?: boolean | null;
+
+  @StringToBoolean()
+  @IsOptional()
+  @IsBoolean()
+  posAccess?: boolean | null;
 }
 
 export class LimitOverridesDto {
@@ -75,6 +80,12 @@ export class LimitOverridesDto {
   @IsInt()
   @Min(0)
   maxTables?: number | null;
+
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxBranches?: number | null;
 
   @EmptyStringToNumber()
   @IsOptional()

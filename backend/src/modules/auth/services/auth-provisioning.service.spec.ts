@@ -89,10 +89,13 @@ describe('AuthProvisioningService.buildPlanFeatureOverrides', () => {
     expect(overrides.inventoryTracking).toBe(true);
   });
 
-  it('always returns the full set of ten feature flags as booleans', () => {
+  it('always returns the full set of eleven feature flags as booleans (incl. posAccess)', () => {
     const overrides = svc.buildPlanFeatureOverrides({});
     const keys = Object.keys(overrides);
-    expect(keys).toHaveLength(10);
+    // posAccess was historically omitted (v3.0.7 bug); it MUST be present so a
+    // fresh BUSINESS tenant's override fallback never hides POS during warm-up.
+    expect(keys).toContain('posAccess');
+    expect(keys).toHaveLength(11);
     for (const v of Object.values(overrides)) {
       expect(typeof v).toBe('boolean');
     }

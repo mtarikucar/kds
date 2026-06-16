@@ -27,7 +27,8 @@ type PlanFeatureKey =
   | "kdsIntegration"
   | "reservationSystem"
   | "personnelManagement"
-  | "deliveryIntegration";
+  | "deliveryIntegration"
+  | "posAccess";
 const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "advancedReports",
   "multiLocation",
@@ -39,17 +40,20 @@ const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "reservationSystem",
   "personnelManagement",
   "deliveryIntegration",
+  "posAccess",
 ];
 
 type PlanLimitKey =
   | "maxUsers"
   | "maxTables"
+  | "maxBranches"
   | "maxProducts"
   | "maxCategories"
   | "maxMonthlyOrders";
 const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxUsers",
   "maxTables",
+  "maxBranches",
   "maxProducts",
   "maxCategories",
   "maxMonthlyOrders",

@@ -176,6 +176,29 @@ export class SubscriptionService {
   }
 
   /**
+   * Public reproject trigger for out-of-band plan mutations (e.g. a
+   * superadmin force-changing a tenant's plan). Emits the same
+   * SubscriptionActivated lifecycle event the normal activation paths use,
+   * so the entitlement projector reprojects `feature.*`/`limit.*` grants and
+   * the engine cache invalidates. Without this a superadmin plan change left
+   * the tenant on its OLD feature set until the nightly reconcile. Pass the
+   * caller's `tx` so the event lands in the same transaction as the
+   * (subscription, tenant.currentPlanId) mutation.
+   */
+  async emitSubscriptionReprojection(
+    sub: {
+      id: string;
+      tenantId: string;
+      plan?: { name?: string } | null;
+      currentPeriodStart?: Date | null;
+      currentPeriodEnd?: Date | null;
+    },
+    tx?: any,
+  ): Promise<void> {
+    await this.emitLifecycle(EventTypes.SubscriptionActivated, sub, tx);
+  }
+
+  /**
    * Best-effort trial-started email. Always called post-commit so a
    * mail-server hiccup never blocks the subscription create. Looks up
    * the tenant's ADMIN to find a recipient — if none exists, we silently
