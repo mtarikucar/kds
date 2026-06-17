@@ -65,21 +65,23 @@ vi.mock('../../lib/utils', () => ({ formatCurrency: (n: number) => `$${n}` }));
 vi.mock('../../i18n/config', () => ({ RTL_LANGUAGES: ['ar', 'he'], default: {} }));
 
 const initializeSession = vi.fn();
+let mockStoreSessionId: string | null = 'sess-1';
 vi.mock('../../store/cartStore', () => ({
   useCartStore: (selector: any) => selector({
-    sessionId: 'sess-1',
+    sessionId: mockStoreSessionId,
     items: [],
     getTotal: () => 0,
     initializeSession,
   }),
 }));
 
+let mockParams: Record<string, string | null> = {};
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<any>('react-router-dom');
   return {
     ...actual,
     useParams: () => ({ tenantId: 't-1' }),
-    useSearchParams: () => [{ get: () => null }],
+    useSearchParams: () => [{ get: (k: string) => mockParams[k] ?? null }],
     useNavigate: () => vi.fn(),
   };
 });
@@ -104,7 +106,11 @@ const menuData = {
   categories: [],
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockStoreSessionId = 'sess-1';
+  mockParams = {};
+});
 
 describe('QRMenuLayout — loading', () => {
   it('shows the spinner before data resolves', () => {
@@ -132,6 +138,22 @@ describe('QRMenuLayout — successful fetch', () => {
     get.mockResolvedValue({ data: menuData });
     renderLayout({ subdomain: 'acme' });
     await waitFor(() => expect(get).toHaveBeenCalledWith(expect.stringContaining('/qr-menu/by-subdomain/acme')));
+  });
+});
+
+describe('QRMenuLayout — session is not hijackable from the URL (FH5)', () => {
+  it('ignores ?sessionId on a fresh device and never exposes it via onSessionIdChange', async () => {
+    // Attacker appends ?sessionId=<victim>; this device has no stored session.
+    mockParams = { sessionId: 'victim-session' };
+    mockStoreSessionId = null;
+    get.mockResolvedValue({ data: menuData });
+    const onSessionIdChange = vi.fn();
+    renderLayout({ onSessionIdChange });
+
+    await waitFor(() => expect(get).toHaveBeenCalled());
+    // The victim's URL session must never become this device's identity (it
+    // would otherwise drive order/loyalty PII fetches for the victim).
+    expect(onSessionIdChange).not.toHaveBeenCalledWith('victim-session');
   });
 });
 

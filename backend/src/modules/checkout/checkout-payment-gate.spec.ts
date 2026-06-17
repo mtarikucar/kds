@@ -80,12 +80,38 @@ describe("CheckoutService — confirmAndProvision payment gate (C1)", () => {
   });
 
   it("provisions when the CheckoutIntent is settled (succeeded)", async () => {
-    prisma.checkoutIntent.findFirst.mockResolvedValue({ status: "succeeded" });
+    prisma.checkoutIntent.findFirst.mockResolvedValue({
+      status: "succeeded",
+      cartJson: { items: [] },
+    });
 
     await expect(
       svc.confirmAndProvision("t-1", { items: [] as any }, "CK-ok"),
     ).resolves.toBeDefined();
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  // deep-review C1 verification follow-up — the cart-swap / amount-mismatch
+  // hole the status-only gate left open: pay for a cheap cart, then /confirm
+  // an expensive one under the SAME settled ref. The server must provision the
+  // cart that was actually paid for (intent.cartJson), never the client cart.
+  it("provisions intent.cartJson, not a swapped client cart, for a settled ref", async () => {
+    const paidCart = {
+      items: [{ type: "plan", code: "PRO", billingCycle: "MONTHLY" }],
+    };
+    prisma.checkoutIntent.findFirst.mockResolvedValue({
+      status: "succeeded",
+      cartJson: paidCart,
+    });
+
+    const swappedCart = {
+      items: [{ type: "hardware", sku: "EXPENSIVE", qty: 5 }],
+    };
+    await svc.confirmAndProvision("t-1", swappedCart as any, "CK-paid");
+
+    // Priced + provisioned the PAID cart, never the attacker's swapped cart.
+    expect(quoteSvc.quote).toHaveBeenCalledWith(paidCart);
+    expect(quoteSvc.quote).not.toHaveBeenCalledWith(swappedCart);
   });
 
   it("allows the null-paymentRef internal comp path without an intent lookup", async () => {

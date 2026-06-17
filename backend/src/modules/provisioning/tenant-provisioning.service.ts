@@ -105,7 +105,22 @@ export class TenantProvisioningService implements CoreProvisioningPort {
     // offer a trial or be collected through real PayTR checkout — mirror the
     // register/social loadBusinessPlanOrThrow `trialDays <= 0` guard. FREE
     // plans (amount 0) are unaffected and provision ACTIVE as before.
-    if (planRow && !canTrial && Number(subscriptionAmount ?? 0) > 0) {
+    // The guard keys on the PLAN's real price, NOT the caller-supplied
+    // amountOverride (deep-review H8 + verification follow-up). amountOverride
+    // is a marketing-owned offer term (offer.customPrice) with no positivity
+    // validation; an amountOverride of 0 — or a negative value — would slip a
+    // paid plan past an `amount > 0` check and mint a free (or negative) ACTIVE
+    // paid subscription, which plan-projector grants full entitlements for.
+    const planIsPaid = !!planRow && Number(planRow.monthlyPrice) > 0;
+    if (planIsPaid && !canTrial) {
+      throw new CoreProvisioningPlanInvalidError(planRow!.id);
+    }
+    // A negative override is never valid (no negative-amount subscriptions).
+    if (
+      planRow &&
+      command.plan?.amountOverride != null &&
+      Number(command.plan.amountOverride) < 0
+    ) {
       throw new CoreProvisioningPlanInvalidError(planRow.id);
     }
 

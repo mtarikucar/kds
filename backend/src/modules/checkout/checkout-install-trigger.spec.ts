@@ -62,7 +62,7 @@ describe("CheckoutService — installation trigger (v2.8.87)", () => {
       // C1 payment gate: a supplied paymentRef must resolve to a settled
       // CheckoutIntent before provisioning.
       checkoutIntent: {
-        findFirst: jest.fn().mockResolvedValue({ status: "succeeded" }),
+        findFirst: jest.fn().mockResolvedValue({ status: "succeeded", cartJson: { items: [] } }),
       },
       hardwareOrder: { findFirst: jest.fn().mockResolvedValue(null) },
       tenantAddOn: { findMany: jest.fn().mockResolvedValue([]) },

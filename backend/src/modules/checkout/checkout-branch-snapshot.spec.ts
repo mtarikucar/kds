@@ -101,7 +101,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
         branchId: "branch-istanbul",
         shippingAddress: { line1: "Atatürk Cad. 12", city: "İstanbul" },
       },
-      "pay-ref-1",
+      null,
     );
 
     // Look-up was tenant-scoped + status=active.
@@ -130,7 +130,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
           items: [] as any,
           branchId: "foreign-tenant-branch",
         },
-        "pay-ref-2",
+        null,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(createdOrder).toBeNull();
@@ -145,7 +145,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
       svc.confirmAndProvision(
         "t-1",
         { items: [] as any, branchId: "archived-branch" },
-        "pay-ref-3",
+        null,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -159,7 +159,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
         items: [] as any,
         shippingAddress: { line1: "Custom address", city: "Bursa" },
       },
-      "pay-ref-4",
+      null,
     );
 
     // No branch lookup at all on the manual-address path.

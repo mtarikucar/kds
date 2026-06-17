@@ -160,6 +160,51 @@ describe("TenantProvisioningService", () => {
     expect(prisma.tenant.create).not.toHaveBeenCalled();
   });
 
+  // deep-review H8 verification follow-up — the grant-before-pay bypass. The
+  // amount-based guard (`subscriptionAmount > 0`) is defeated by a marketing
+  // offer.customPrice of 0 (or negative) on a PAID, no-trial plan: it mints a
+  // free ACTIVE paid subscription. The guard must key on the PLAN's real price.
+  it("refuses a free ACTIVE paid sub via amountOverride=0 on a no-trial plan (H8 bypass)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+      monthlyPrice: new Prisma.Decimal(1299),
+      currency: "TRY",
+      trialDays: 0, // no trial
+      commissionRate: new Prisma.Decimal(0.15),
+    } as any);
+
+    await expect(
+      svc.provisionTenantForLead({
+        ...command,
+        plan: { planId: "plan-pro", amountOverride: 0, trialDaysOverride: null },
+      }),
+    ).rejects.toBeInstanceOf(CoreProvisioningPlanInvalidError);
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
+    expect(prisma.tenant.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a negative amountOverride on a paid plan", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+      monthlyPrice: new Prisma.Decimal(1299),
+      currency: "TRY",
+      trialDays: 14,
+      commissionRate: new Prisma.Decimal(0.15),
+    } as any);
+
+    await expect(
+      svc.provisionTenantForLead({
+        ...command,
+        plan: { planId: "plan-pro", amountOverride: -1, trialDaysOverride: null },
+      }),
+    ).rejects.toBeInstanceOf(CoreProvisioningPlanInvalidError);
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
+  });
+
   it("converges on the winner when a concurrent provision wins the ledger unique (P2002)", async () => {
     const p2002 = new Prisma.PrismaClientKnownRequestError("unique violation", {
       code: "P2002",

@@ -37,7 +37,7 @@ describe("CheckoutService — checkout_provisions_total counter", () => {
       // CheckoutIntent before provisioning. These metric tests use a real
       // paymentRef, so default the intent to 'succeeded'.
       checkoutIntent: {
-        findFirst: jest.fn().mockResolvedValue({ status: "succeeded" }),
+        findFirst: jest.fn().mockResolvedValue({ status: "succeeded", cartJson: { items: [] } }),
       },
       hardwareOrder: { findFirst: jest.fn().mockResolvedValue(null) },
       tenantAddOn: { findMany: jest.fn().mockResolvedValue([]) },

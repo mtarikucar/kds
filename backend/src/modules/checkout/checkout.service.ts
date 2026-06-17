@@ -56,32 +56,36 @@ export class CheckoutService {
     hardwareOrderId?: string;
     addOnIds: string[];
   }> {
-    const quote = await this.quoteSvc.quote(cart);
-
-    // SECURITY (deep-review C1): a non-null paymentRef is NOT proof of
-    // payment on its own. The tenant-facing POST /v1/checkout/confirm
-    // endpoint is gated only by @Roles(ADMIN, MANAGER) — ordinary
-    // tenant-realm roles every restaurant owner holds — and forwards a
-    // client-supplied paymentRef straight here. Without this gate a tenant
-    // admin could POST an arbitrary cart with any made-up ref and have us
-    // allocate/ship hardware, grant paid add-on entitlements, and request a
-    // plan upgrade with ZERO money collected (repeatable with each new ref).
+    // SECURITY (deep-review C1 + verification follow-up): a non-null
+    // paymentRef is NOT proof of payment, AND a settled ref must only
+    // provision the cart that was actually PAID FOR. The tenant-facing POST
+    // /v1/checkout/confirm endpoint is gated only by @Roles(ADMIN, MANAGER) —
+    // ordinary tenant-realm roles every restaurant owner holds — and forwards
+    // BOTH a client-supplied cart and paymentRef straight here. Two holes if
+    // we trust them:
+    //   1. Forged ref -> allocate/ship hardware, grant paid add-ons, request a
+    //      plan upgrade with ZERO money collected (repeatable per made-up ref).
+    //   2. Cart swap   -> pay for a cheap (e.g. plan-only) cart, then /confirm
+    //      an EXPENSIVE hardware+add-on cart under the same settled ref. A
+    //      plan-only purchase mints no HardwareOrder, so the idempotency guard
+    //      below does NOT early-return and the swapped hardware ships for free.
     //
     // The only legitimate way a paymentRef reaches provisioning is through
-    // CheckoutSettlementService.handleSuccess, which is driven by the
-    // HMAC-authenticated PayTR webhook and flips the CheckoutIntent
-    // 'pending' -> 'succeeded' BEFORE calling us. So we require a settled
-    // CheckoutIntent for (tenantId, paymentRef). A forged ref has no intent
-    // row -> rejected; an already-provisioned ref is allowed so idempotent
-    // replays still return the cached order below.
+    // CheckoutSettlementService.handleSuccess (HMAC-authenticated PayTR
+    // webhook), which flips the CheckoutIntent 'pending' -> 'succeeded' and
+    // passes intent.cartJson. So: require a settled CheckoutIntent for
+    // (tenantId, paymentRef), and provision THAT intent's persisted cart —
+    // ignoring whatever cart the client sent. A forged ref has no intent row
+    // -> rejected; an already-provisioned ref is allowed so idempotent replays
+    // still return the cached order below.
     //
-    // paymentRef === null is the internal operator-comp path (no caller
-    // passes null today — the controller DTO forbids an empty ref — so this
-    // gate intentionally only fires for client-supplied refs).
+    // paymentRef === null is the internal operator-comp path (no caller passes
+    // null today — the controller DTO forbids an empty ref).
+    let effectiveCart: Cart = cart;
     if (paymentRef) {
       const intent = await this.prisma.checkoutIntent.findFirst({
         where: { tenantId, paymentRef },
-        select: { status: true },
+        select: { status: true, cartJson: true },
       });
       if (
         !intent ||
@@ -94,7 +98,11 @@ export class CheckoutService {
           "No settled payment was found for this reference",
         );
       }
+      // Provision exactly what was paid for, never the client-supplied cart.
+      effectiveCart = intent.cartJson as unknown as Cart;
     }
+
+    const quote = await this.quoteSvc.quote(effectiveCart);
 
     // Idempotency: webhook retries and double-clicks on the success page
     // both replay confirmAndProvision with the same paymentRef. Without
@@ -134,21 +142,21 @@ export class CheckoutService {
 
     // v2.8.99.3 — tenant-scoped active-branch validation. The buyer
     // picked a branch in the shipping form; we trust the SPA to copy
-    // the branch's address into cart.shippingAddress (snapshot) but
+    // the branch's address into effectiveCart.shippingAddress (snapshot) but
     // re-validate the branchId here so a forged or stale request
     // can't stamp another tenant's branch onto this HardwareOrder.
     // Archived branches are rejected too — re-activating an archived
     // branch is a deliberate operator action, not something a
     // checkout flow should resurrect by proxy.
     let validatedBranchId: string | null = null;
-    if (cart.branchId) {
+    if (effectiveCart.branchId) {
       const branch = await this.prisma.branch.findFirst({
-        where: { id: cart.branchId, tenantId, status: "active" },
+        where: { id: effectiveCart.branchId, tenantId, status: "active" },
         select: { id: true },
       });
       if (!branch) {
         throw new BadRequestException(
-          `branchId ${cart.branchId} is not an active branch for this tenant`,
+          `branchId ${effectiveCart.branchId} is not an active branch for this tenant`,
         );
       }
       validatedBranchId = branch.id;
@@ -201,8 +209,8 @@ export class CheckoutService {
               hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) +
               quote.shippingCents,
             currency: quote.currency,
-            shippingAddress: cart.shippingAddress as any,
-            billingAddress: cart.billingAddress as any,
+            shippingAddress: effectiveCart.shippingAddress as any,
+            billingAddress: effectiveCart.billingAddress as any,
             installation: onsiteServiceLines.length > 0 ? "requested" : null,
             paymentRef,
           },
