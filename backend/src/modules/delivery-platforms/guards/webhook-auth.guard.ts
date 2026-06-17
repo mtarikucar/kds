@@ -261,12 +261,31 @@ export class WebhookAuthGuard implements CanActivate {
       } catch {
         parsedBody = undefined;
       }
+      // TODO(trendyol-binding): the candidate field names below
+      // (restaurantId/supplierId/storeId/restaurant.id) are a best-guess
+      // set — the EXACT field that carries the restaurant identifier on a
+      // live Trendyol webhook body has NOT been confirmed against a real
+      // payload. Capture a production webhook body and pin the correct
+      // field here; until then the binding is best-effort and the WARN
+      // below makes a no-op observable in prod logs.
       const bodyRestaurant =
         parsedBody?.restaurantId ??
         parsedBody?.supplierId ??
         parsedBody?.storeId ??
         parsedBody?.restaurant?.id;
-      if (bodyRestaurant != null && String(bodyRestaurant) !== urlRemoteId) {
+      if (bodyRestaurant == null) {
+        // None of the candidate fields was present, so the cross-tenant
+        // binding silently did nothing. Surface it so ops can spot the
+        // gap and supply the real field name — but do NOT reject, since
+        // a body that legitimately lacks the field would break live
+        // traffic (reject-on-positive-mismatch only).
+        this.logger.warn(
+          "Trendyol webhook body carries none of the known restaurant-id " +
+            "fields (restaurantId/supplierId/storeId/restaurant.id) — " +
+            "cross-tenant URL binding could not be enforced. Confirm the " +
+            "real field against a live Trendyol payload (see TODO).",
+        );
+      } else if (String(bodyRestaurant) !== urlRemoteId) {
         throw new UnauthorizedException(
           "Webhook body restaurant does not match URL",
         );

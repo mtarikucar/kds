@@ -114,11 +114,34 @@ describe("CheckoutService — confirmAndProvision payment gate (C1)", () => {
     expect(quoteSvc.quote).not.toHaveBeenCalledWith(swappedCart);
   });
 
-  it("allows the null-paymentRef internal comp path without an intent lookup", async () => {
+  it("allows the null-paymentRef internal comp path only with an explicit allowComp flag", async () => {
     await expect(
-      svc.confirmAndProvision("t-1", { items: [] as any }, null),
+      svc.confirmAndProvision("t-1", { items: [] as any }, null, {
+        allowComp: true,
+      }),
     ).resolves.toBeDefined();
     expect(prisma.checkoutIntent.findFirst).not.toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  // deep-review C1 residual — the null branch is the operator-comp path that
+  // SKIPS the settled-CheckoutIntent gate and provisions the client-supplied
+  // cart. Today it's safe only because the public DTO forbids an empty ref —
+  // an implicit, fragile contract. Make the trust boundary EXPLICIT: a null
+  // ref WITHOUT the internal allowComp flag (i.e. anything a future caller
+  // might forward from client input) must be rejected, never silently
+  // provisioned for free.
+  it("rejects a null paymentRef when the internal allowComp flag is not set", async () => {
+    await expect(
+      svc.confirmAndProvision("t-1", { items: [] as any }, null),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty-string paymentRef as if it were an ungated comp", async () => {
+    await expect(
+      svc.confirmAndProvision("t-1", { items: [] as any }, ""),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

@@ -102,6 +102,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
         shippingAddress: { line1: "Atatürk Cad. 12", city: "İstanbul" },
       },
       null,
+      { allowComp: true },
     );
 
     // Look-up was tenant-scoped + status=active.
@@ -131,6 +132,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
           branchId: "foreign-tenant-branch",
         },
         null,
+        { allowComp: true },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(createdOrder).toBeNull();
@@ -146,6 +148,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
         "t-1",
         { items: [] as any, branchId: "archived-branch" },
         null,
+        { allowComp: true },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -160,6 +163,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
         shippingAddress: { line1: "Custom address", city: "Bursa" },
       },
       null,
+      { allowComp: true },
     );
 
     // No branch lookup at all on the manual-address path.

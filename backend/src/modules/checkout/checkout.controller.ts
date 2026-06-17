@@ -1,4 +1,12 @@
-import { Body, Controller, Ip, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Ip,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -110,6 +118,14 @@ export class CheckoutController {
       "Confirm a paid cart (ADMIN, MANAGER). Idempotent on (tenant, paymentRef).",
   })
   confirm(@Req() req: any, @Body() body: ConfirmCheckoutDto) {
+    // Belt-and-suspenders: ConfirmCheckoutDto already enforces a non-empty
+    // paymentRef, but assert it here too so this public endpoint can NEVER
+    // forward client input through confirmAndProvision's ungated comp branch
+    // (that branch is reachable only via the internal allowComp flag, which
+    // this controller deliberately never sets).
+    if (!body.paymentRef) {
+      throw new BadRequestException("paymentRef is required");
+    }
     return this.checkoutSvc.confirmAndProvision(
       req.user.tenantId,
       body.cart as unknown as Cart,

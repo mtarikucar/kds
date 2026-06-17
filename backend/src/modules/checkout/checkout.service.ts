@@ -11,7 +11,7 @@ import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
-import { Cart, CartQuote, PricedLine } from "./checkout.types";
+import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 
 /**
@@ -46,16 +46,42 @@ export class CheckoutService {
     @Optional() private readonly metrics?: MetricsService,
   ) {}
 
-  /** Re-price the cart at confirm time so the user can't tamper with totals. */
+  /**
+   * Re-price the cart at confirm time so the user can't tamper with totals.
+   *
+   * @param paymentRef gateway-supplied settlement id, or `null` for the
+   *   operator-comp path. A null ref SKIPS the settled-CheckoutIntent gate and
+   *   provisions the client-supplied `cart` for free, so it is an INTERNAL-ONLY
+   *   capability: it is reachable only when the caller ALSO passes
+   *   `opts.allowComp === true`. The public POST /v1/checkout/confirm
+   *   controller can never set that flag (and already forwards a DTO-validated
+   *   non-empty ref), so client input can never reach the comp branch — even
+   *   if a future caller forwards an empty/null ref by mistake.
+   */
   async confirmAndProvision(
     tenantId: string,
     cart: Cart,
     paymentRef: string | null,
+    opts?: { allowComp?: boolean },
   ): Promise<{
     quote: CartQuote;
     hardwareOrderId?: string;
     addOnIds: string[];
   }> {
+    // C1 residual — make the comp trust boundary EXPLICIT, not implicit in the
+    // public DTO's @IsNotEmpty. The only ungated (no settled-intent) path is a
+    // deliberate operator comp, which an internal caller opts into via
+    // allowComp. Any falsy ref WITHOUT that flag — null OR '' that slipped past
+    // validation, OR client input a future caller forwarded here — is rejected
+    // before we touch the DB, so nothing ever provisions for free by accident.
+    if (!paymentRef && !opts?.allowComp) {
+      this.logger.warn(
+        `Rejected confirmAndProvision for tenant=${tenantId}: empty paymentRef without internal allowComp flag`,
+      );
+      throw new ForbiddenException(
+        "No settled payment was found for this reference",
+      );
+    }
     // SECURITY (deep-review C1 + verification follow-up): a non-null
     // paymentRef is NOT proof of payment, AND a settled ref must only
     // provision the cart that was actually PAID FOR. The tenant-facing POST
@@ -79,8 +105,8 @@ export class CheckoutService {
     // -> rejected; an already-provisioned ref is allowed so idempotent replays
     // still return the cached order below.
     //
-    // paymentRef === null is the internal operator-comp path (no caller passes
-    // null today — the controller DTO forbids an empty ref).
+    // paymentRef === null is the internal operator-comp path, now explicitly
+    // gated above by opts.allowComp (no public caller can reach it).
     let effectiveCart: Cart = cart;
     if (paymentRef) {
       const intent = await this.prisma.checkoutIntent.findFirst({

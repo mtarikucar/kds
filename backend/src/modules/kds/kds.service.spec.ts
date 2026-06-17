@@ -267,6 +267,63 @@ describe("KdsService item-bump auto-promotion (H11/M17)", () => {
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
     expect(gateway.emitOrderItemStatusChange).toHaveBeenCalled();
   });
+
+  it("isolates an inner updateOrderStatus rejection mid-promotion: error is swallowed + logged, the item bump still resolves and WS-emits", async () => {
+    // The item being bumped, on a PENDING order with every item now READY so
+    // the auto-promotion path runs.
+    (prisma.orderItem.findFirst as any).mockResolvedValue({
+      id: "i-1",
+      orderId: "o-1",
+      status: "PREPARING",
+      order: {
+        id: "o-1",
+        status: "PENDING",
+        requiresApproval: false,
+        branchId: "b-1",
+      },
+    });
+    (prisma.orderItem.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.orderItem.findUniqueOrThrow as any).mockResolvedValue({
+      id: "i-1",
+      status: "READY",
+      order: { id: "o-1", branchId: "b-1" },
+    });
+    (prisma.orderItem.findMany as any).mockResolvedValue([{ status: "READY" }]);
+    // After the PENDING→PREPARING hop, the fresh re-read reports PREPARING so
+    // canTransition(PREPARING, READY) is true and the READY promotion fires.
+    (prisma.order.findUnique as any).mockResolvedValue({ status: "PREPARING" });
+
+    // Force the inner promotion to REJECT: the first updateOrderStatus call
+    // (the PENDING→PREPARING hop) succeeds, but the second (PREPARING→READY)
+    // throws — pinning that the failure-isolation catch swallows it.
+    const updateSpy = jest
+      .spyOn(svc, "updateOrderStatus")
+      .mockResolvedValueOnce(undefined as any)
+      .mockRejectedValueOnce(new Error("promotion blew up"));
+
+    const warnSpy = jest
+      .spyOn((svc as any).logger, "warn")
+      .mockImplementation(() => undefined);
+
+    // The mid-promotion rejection must NOT abort the item bump.
+    await expect(
+      svc.updateOrderItemStatus(scope, "i-1", "READY" as any),
+    ).resolves.toBeDefined();
+
+    // Both inner promotion hops were attempted (the second one rejected).
+    expect(updateSpy).toHaveBeenCalledTimes(2);
+    // The swallowed failure was logged.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("promotion blew up"),
+    );
+    // The item-status WS emit must STILL fire after the isolated failure.
+    expect(gateway.emitOrderItemStatusChange).toHaveBeenCalledWith(
+      "t-1",
+      "b-1",
+      "i-1",
+      "READY",
+    );
+  });
 });
 
 /**

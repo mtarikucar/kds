@@ -68,12 +68,23 @@ describe("HeartbeatDto", () => {
 });
 
 describe("EnqueueCommandDto", () => {
-  it("accepts a lowercase dot-separated kind with an object payload", async () => {
+  it("accepts a canonical CommandKind with an object payload", async () => {
     const dto = plainToInstance(EnqueueCommandDto, {
-      kind: "print.receipt",
+      kind: "print_receipt",
       payload: { orderId: "o1" },
     });
     expect(await errs(dto)).toEqual([]);
+  });
+
+  it("rejects a non-canonical (dot-form) kind that would bypass the double-charge guard", async () => {
+    // `charge.card` / `print.receipt` pass the old free-form regex but do
+    // NOT match the canonical underscore-form CommandKind the no-auto-requeue
+    // guard keys on — enqueuing under such an alias would bypass the guard
+    // and risk a double charge. Must be rejected at the DTO boundary.
+    for (const kind of ["charge.card", "print.receipt", "open.drawer"]) {
+      const dto = plainToInstance(EnqueueCommandDto, { kind, payload: {} });
+      expect((await errs(dto)).some((m) => /kind/.test(m))).toBe(true);
+    }
   });
 
   it("rejects an uppercase/invalid kind", async () => {
@@ -86,7 +97,7 @@ describe("EnqueueCommandDto", () => {
 
   it("rejects a non-object payload (bridge dispatcher crash guard)", async () => {
     const dto = plainToInstance(EnqueueCommandDto, {
-      kind: "print.receipt",
+      kind: "print_receipt",
       payload: "not-an-object",
     });
     expect((await errs(dto)).some((m) => /payload/.test(m))).toBe(true);

@@ -212,3 +212,166 @@ describe("WebhookAuthGuard — Yemeksepeti JWT (iter-27)", () => {
     ).toBe(true);
   });
 });
+
+const TY_SECRET = "test-trendyol-secret";
+
+function makeTrendyolGuard(): WebhookAuthGuard {
+  const config = {
+    get: (key: string) =>
+      key === "TRENDYOL_WEBHOOK_SECRET" ? TY_SECRET : undefined,
+  } as ConfigService;
+  const reflector = {
+    getAllAndOverride: (key: string) =>
+      key === WEBHOOK_PLATFORM_KEY ? "TRENDYOL" : undefined,
+  } as any as Reflector;
+  return new WebhookAuthGuard(config, reflector);
+}
+
+/**
+ * Build a Trendyol request context. The HMAC is over `${timestamp}.${rawBody}`
+ * (sha256, hex) and rawBody is captured as a Buffer, matching the guard's
+ * byte-for-byte verification contract.
+ */
+function makeTrendyolContext(
+  bodyObj: Record<string, any>,
+  opts: {
+    secret?: string;
+    timestamp?: number;
+    tamperSignature?: boolean;
+    omitSignature?: boolean;
+    params?: Record<string, string>;
+  } = {},
+): ExecutionContext {
+  const timestamp =
+    opts.timestamp ?? Math.floor(Date.now() / 1000);
+  const rawBody = Buffer.from(JSON.stringify(bodyObj), "utf8");
+  const signedPayload = `${timestamp}.${rawBody.toString("utf8")}`;
+  let signature = createHmac("sha256", opts.secret ?? TY_SECRET)
+    .update(signedPayload)
+    .digest("hex");
+  if (opts.tamperSignature) {
+    signature = signature.replace(/.$/, (c) => (c === "0" ? "1" : "0"));
+  }
+  const headers: Record<string, string> = {
+    "x-webhook-timestamp": String(timestamp),
+  };
+  if (!opts.omitSignature) {
+    headers["x-webhook-signature"] = signature;
+  }
+  const req = { headers, params: opts.params ?? {}, rawBody };
+  return {
+    switchToHttp: () => ({ getRequest: () => req }),
+    getHandler: () => undefined,
+    getClass: () => undefined,
+  } as any as ExecutionContext;
+}
+
+describe("WebhookAuthGuard — Trendyol HMAC (B-webhook-auth)", () => {
+  it("accepts a body with a valid sha256 HMAC signature", () => {
+    const guard = makeTrendyolGuard();
+    expect(
+      guard.canActivate(makeTrendyolContext({ orderNumber: "123" })),
+    ).toBe(true);
+  });
+
+  it("rejects a tampered signature", () => {
+    const guard = makeTrendyolGuard();
+    expect(() =>
+      guard.canActivate(
+        makeTrendyolContext({ orderNumber: "123" }, { tamperSignature: true }),
+      ),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects a signature computed with the wrong secret", () => {
+    const guard = makeTrendyolGuard();
+    expect(() =>
+      guard.canActivate(
+        makeTrendyolContext({ orderNumber: "123" }, { secret: "wrong-secret" }),
+      ),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects when the signature header is missing", () => {
+    const guard = makeTrendyolGuard();
+    expect(() =>
+      guard.canActivate(
+        makeTrendyolContext({ orderNumber: "123" }, { omitSignature: true }),
+      ),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("rejects a stale timestamp outside the freshness window", () => {
+    const guard = makeTrendyolGuard();
+    const tenMinAgo = Math.floor(Date.now() / 1000) - 10 * 60;
+    expect(() =>
+      guard.canActivate(
+        makeTrendyolContext({ orderNumber: "123" }, { timestamp: tenMinAgo }),
+      ),
+    ).toThrow(UnauthorizedException);
+  });
+
+  // B-webhook-auth — body→restaurant binding: a verified body whose
+  // restaurant id does not match the URL remoteId must be rejected.
+  it("rejects when the body restaurant id does not match the URL remoteId", () => {
+    const guard = makeTrendyolGuard();
+    expect(() =>
+      guard.canActivate(
+        makeTrendyolContext(
+          { restaurantId: "restaurant-A" },
+          { params: { remoteId: "restaurant-B" } },
+        ),
+      ),
+    ).toThrow(UnauthorizedException);
+  });
+
+  it("accepts when the body restaurant id matches the URL remoteId", () => {
+    const guard = makeTrendyolGuard();
+    expect(
+      guard.canActivate(
+        makeTrendyolContext(
+          { supplierId: "restaurant-A" },
+          { params: { remoteId: "restaurant-A" } },
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  // B-webhook-auth — observability: when the body carries NONE of the
+  // candidate restaurant-id fields, the binding is a silent no-op. The
+  // guard must still pass (reject-on-positive-mismatch only) but emit a
+  // WARN so ops can detect the gap in prod and supply the real field.
+  it("passes but logs a WARN when no candidate restaurant field is present", () => {
+    const guard = makeTrendyolGuard();
+    const warnSpy = jest
+      .spyOn((guard as any).logger, "warn")
+      .mockImplementation(() => undefined);
+
+    expect(
+      guard.canActivate(
+        makeTrendyolContext(
+          { orderNumber: "123" },
+          { params: { remoteId: "restaurant-B" } },
+        ),
+      ),
+    ).toBe(true);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toMatch(/none of the known restaurant-id/i);
+    warnSpy.mockRestore();
+  });
+
+  it("does not WARN when no remoteId is in the URL (binding not attempted)", () => {
+    const guard = makeTrendyolGuard();
+    const warnSpy = jest
+      .spyOn((guard as any).logger, "warn")
+      .mockImplementation(() => undefined);
+
+    expect(
+      guard.canActivate(makeTrendyolContext({ orderNumber: "123" })),
+    ).toBe(true);
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});

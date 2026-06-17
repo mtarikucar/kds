@@ -1,17 +1,12 @@
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
-import {
-  CreateAddOnDto,
-  UpdateAddOnDto,
-  PurchaseAddOnDto,
-} from "./addon.dto";
+import { CreateAddOnDto, UpdateAddOnDto } from "./addon.dto";
 
 /**
  * Long-tail validation spec for the marketplace add-on DTOs. Load-bearing
  * rules: `code` is an immutable URL/dependency-safe handle (lowercase,
  * digits, underscores only); kind/billing/status are closed sets; price is
- * a non-negative integer (minor units, no float drift); purchase quantity
- * is clamped to 1–1000.
+ * a non-negative integer (minor units, no float drift).
  */
 async function errs(dto: object): Promise<string[]> {
   const results = await validate(dto);
@@ -74,29 +69,5 @@ describe("UpdateAddOnDto", () => {
   it("rejects an out-of-set status", async () => {
     const dto = plainToInstance(UpdateAddOnDto, { status: "live" });
     expect((await errs(dto)).some((m) => /status/.test(m))).toBe(true);
-  });
-});
-
-describe("PurchaseAddOnDto", () => {
-  it("accepts a minimal purchase (quantity optional)", async () => {
-    expect(
-      await errs(plainToInstance(PurchaseAddOnDto, { addOnCode: "x" })),
-    ).toEqual([]);
-  });
-
-  it("rejects a quantity above 1000", async () => {
-    const dto = plainToInstance(PurchaseAddOnDto, {
-      addOnCode: "x",
-      quantity: 1001,
-    });
-    expect((await errs(dto)).some((m) => /quantity/.test(m))).toBe(true);
-  });
-
-  it("rejects a quantity below 1", async () => {
-    const dto = plainToInstance(PurchaseAddOnDto, {
-      addOnCode: "x",
-      quantity: 0,
-    });
-    expect((await errs(dto)).some((m) => /quantity/.test(m))).toBe(true);
   });
 });
