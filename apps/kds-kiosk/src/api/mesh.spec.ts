@@ -4,6 +4,7 @@ import {
   heartbeat,
   claimNextCommand,
   ackCommand,
+  DeviceAuthError,
   type DeviceCommand,
   type PairOut,
 } from './mesh';
@@ -108,6 +109,12 @@ describe('claimNextCommand', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse('', { ok: false, status: 503 }));
     await expect(claimNextCommand(token)).rejects.toThrow('next-command 503');
   });
+
+  // deep-review NH8: 401/403 must be a distinct, recoverable auth error.
+  it('throws DeviceAuthError on a 401 next-command response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse('', { ok: false, status: 401 }));
+    await expect(claimNextCommand(token)).rejects.toBeInstanceOf(DeviceAuthError);
+  });
 });
 
 describe('heartbeat', () => {
@@ -135,5 +142,33 @@ describe('ackCommand', () => {
     expect(init.method).toBe('POST');
     expect((init.headers as Headers).get('Authorization')).toBe('Device secret-token');
     expect(JSON.parse(init.body as string)).toEqual({ status: 'done', result: { printed: true } });
+  });
+
+  // deep-review NM3: a failed ack must throw, not be treated as success, so the
+  // poll loop retries it instead of abandoning the command to redelivery.
+  it('throws on a 500 ack response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse('', { ok: false, status: 500 }));
+    await expect(ackCommand(token, 'cmd-42', { status: 'done' })).rejects.toThrow('ack 500');
+  });
+
+  // deep-review NH8/NM3: 401 on ack is the typed auth error so the loop re-pairs.
+  it('throws DeviceAuthError on a 401 ack response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse('', { ok: false, status: 401 }));
+    await expect(ackCommand(token, 'cmd-42', { status: 'done' })).rejects.toBeInstanceOf(
+      DeviceAuthError,
+    );
+  });
+});
+
+describe('heartbeat auth', () => {
+  // deep-review NH8: heartbeat previously ignored res.ok entirely.
+  it('throws DeviceAuthError on a 403 heartbeat response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse('', { ok: false, status: 403 }));
+    await expect(heartbeat(token, { queueDepth: 1 })).rejects.toBeInstanceOf(DeviceAuthError);
+  });
+
+  it('does not throw on a non-auth non-ok heartbeat response (best-effort)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse('', { ok: false, status: 500 }));
+    await expect(heartbeat(token, { queueDepth: 1 })).resolves.toBeUndefined();
   });
 });

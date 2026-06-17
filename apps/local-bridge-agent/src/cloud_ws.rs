@@ -39,6 +39,13 @@ pub enum FetchResponse {
     /// Any non-success status. Carried so the client can log it and move on
     /// without treating a transient 5xx as fatal.
     NonSuccess(u16),
+    /// deep-review NH2/NH6: a 2xx whose body could not be decoded into a command
+    /// batch (schema drift, truncated body, weird LAN proxy interstitial). This
+    /// is NOT an empty batch — the cloud may actually have queued
+    /// payment/print commands. Surfaced as its own variant so `fetch_more` can
+    /// back off and leave the commands server-side for re-offer, instead of the
+    /// old `unwrap_or_default()` which silently dropped the whole batch.
+    DecodeError,
 }
 
 /// The transport seam over the cloud HTTP API.
@@ -106,6 +113,14 @@ impl CloudClient {
             FetchResponse::NonSuccess(status) => {
                 warn!(status, "cloud fetch_more non-success");
                 Ok(())
+            }
+            FetchResponse::DecodeError => {
+                // deep-review NH2/NH6: do NOT treat an undecodable body as "no
+                // work". Return Err so the main loop logs it and engages its 5s
+                // backoff; the commands were never acked, so the cloud re-offers
+                // them on the next poll instead of being silently lost.
+                warn!("cloud fetch_more: undecodable command body — backing off, commands stay queued server-side");
+                anyhow::bail!("undecodable commands/next body")
             }
             FetchResponse::Commands(commands) => {
                 for c in commands {
@@ -192,8 +207,20 @@ impl CloudTransport for ReqwestTransport {
         if !resp.status().is_success() {
             return Ok(FetchResponse::NonSuccess(resp.status().as_u16()));
         }
-        let commands: Vec<PendingCommand> = resp.json().await.unwrap_or_default();
-        Ok(FetchResponse::Commands(commands))
+        // deep-review NH2/NH6: never `unwrap_or_default()` a command-bearing 2xx
+        // body — that silently turned schema drift / a truncated body into "0
+        // commands", losing whole batches of queued payment/print commands with
+        // no log. Read the bytes (network error still propagates via `?`), then
+        // decode explicitly and surface a decode failure as `DecodeError` so the
+        // loop backs off and the commands remain server-side for re-offer.
+        let body = resp.bytes().await?;
+        match serde_json::from_slice::<Vec<PendingCommand>>(&body) {
+            Ok(commands) => Ok(FetchResponse::Commands(commands)),
+            Err(e) => {
+                warn!(error = %e, len = body.len(), "commands/next body failed to decode; treating as fetch failure, not empty");
+                Ok(FetchResponse::DecodeError)
+            }
+        }
     }
 
     async fn post_ack(&self, cmd_id: &str, outcome: &CommandOutcome) -> Result<()> {
@@ -346,6 +373,29 @@ mod tests {
             .await
             .expect("non-success is tolerated, not fatal");
         assert!(queue.pop_next().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn fetch_more_errors_on_decode_failure_and_enqueues_nothing() {
+        // deep-review NH2/NH6: an undecodable 2xx body must NOT look like "no
+        // work". fetch_more returns Err (so main.rs backs off) and queues nothing
+        // — the commands stay server-side for re-offer rather than being lost.
+        let dir = TempDir::new().unwrap();
+        let queue = CommandQueue::open(dir.path().join("q.db")).unwrap();
+        let (client, _) = client_with(FakeTransport {
+            next: Mutex::new(Some(FetchResponse::DecodeError)),
+            ..Default::default()
+        });
+
+        let err = client
+            .fetch_more(&queue)
+            .await
+            .expect_err("decode failure must surface as Err, not silent empty");
+        assert!(err.to_string().contains("undecodable"));
+        assert!(
+            queue.pop_next().await.unwrap().is_none(),
+            "nothing enqueued on decode failure"
+        );
     }
 
     #[tokio::test]

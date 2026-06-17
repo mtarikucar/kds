@@ -4,6 +4,46 @@ import type { DeviceToken } from '../store/deviceToken';
 import { normalizePairCode } from './pairingLogic';
 
 /**
+ * Allow-list of hostnames the kiosk may pair against. The pair code is a
+ * bearer secret that mints a long-lived device token; without this gate an
+ * operator (or someone with brief physical access to the unattended pairing
+ * screen) could point the kiosk at a malicious host and exfiltrate the code.
+ * deep-review NM5.
+ *
+ * A host matches if it equals an allow-listed entry or is a subdomain of one.
+ * To support genuine private/LAN self-host, extend this list at build time.
+ */
+const ALLOWED_API_HOSTS = ['hummytummy.com'] as const;
+
+function hostAllowed(host: string): boolean {
+  const h = host.toLowerCase();
+  return ALLOWED_API_HOSTS.some((allowed) => h === allowed || h.endsWith(`.${allowed}`));
+}
+
+/**
+ * Validate an operator-entered API URL before the pair code is sent to it:
+ * must parse, must be https, and the host must be allow-listed. Returns a
+ * normalized origin+path or throws with an operator-readable message.
+ * deep-review NM5.
+ */
+export function validateApiUrl(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw new Error('Invalid API URL');
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error('API URL must use https');
+  }
+  if (!hostAllowed(url.hostname)) {
+    throw new Error(`API host not allowed: ${url.hostname}`);
+  }
+  // Strip any trailing slash so the joined `${apiUrl}/v1/...` stays well-formed.
+  return raw.trim().replace(/\/+$/, '');
+}
+
+/**
  * First-boot screen. The operator scans (or types) the 6-character pair
  * code displayed in the admin UI. The kiosk POSTs to /v1/devices/pair on
  * the configured API URL and stores the returned token in the keyring.
@@ -24,13 +64,17 @@ export default function PairingScreen({ onPaired }: { onPaired: (token: DeviceTo
     setSubmitting(true);
     setError(null);
     try {
-      const out = await pairDevice(apiUrl, normalizePairCode(pairCode));
+      // deep-review NM5: validate (https + host allow-list) BEFORE the pair
+      // code leaves the device, so a malicious/typo'd API URL can never
+      // receive the bearer secret.
+      const safeUrl = validateApiUrl(apiUrl);
+      const out = await pairDevice(safeUrl, normalizePairCode(pairCode));
       // Persist ONLY after the server has accepted the pair. The earlier
       // version wrote pre-pair, so a typo or attacker URL became the
       // persisted default even on failure — the next pair attempt's
       // code would then leak to that server.
-      localStorage.setItem('kds_api_url', apiUrl);
-      onPaired({ ...out, apiUrl });
+      localStorage.setItem('kds_api_url', safeUrl);
+      onPaired({ ...out, apiUrl: safeUrl });
     } catch (e: any) {
       setError(e?.message ?? 'Pair failed');
     } finally {
