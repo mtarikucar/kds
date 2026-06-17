@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Settings2 } from 'lucide-react';
 import { ModifierGroupCard } from '../../../components/modifiers';
@@ -33,6 +34,14 @@ const ModifiersTab = ({
 }: ModifiersTabProps) => {
   const { t } = useTranslation(['menu', 'common']);
 
+  // deep-review FL5: copy before sorting so we never mutate the react-query
+  // cache array in place (in-place sort defeats structural-sharing / isStale
+  // referential checks). Memoized so the sort isn't recomputed every render.
+  const sortedGroups = useMemo(
+    () => (modifierGroups ? [...modifierGroups].sort((a, b) => a.displayOrder - b.displayOrder) : []),
+    [modifierGroups],
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -64,19 +73,17 @@ const ModifiersTab = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {modifierGroups
-              .sort((a, b) => a.displayOrder - b.displayOrder)
-              .map((group) => (
-                <ModifierGroupCard
-                  key={group.id}
-                  group={group}
-                  onEditGroup={onEditGroup}
-                  onDeleteGroup={onDeleteGroup}
-                  onAddModifier={(groupId) => onAddModifier(groupId)}
-                  onEditModifier={(modifier) => onEditModifier(modifier)}
-                  onDeleteModifier={onDeleteModifier}
-                />
-              ))}
+            {sortedGroups.map((group) => (
+              <ModifierGroupCard
+                key={group.id}
+                group={group}
+                onEditGroup={onEditGroup}
+                onDeleteGroup={onDeleteGroup}
+                onAddModifier={(groupId) => onAddModifier(groupId)}
+                onEditModifier={(modifier) => onEditModifier(modifier)}
+                onDeleteModifier={onDeleteModifier}
+              />
+            ))}
           </div>
         )}
       </CardContent>

@@ -42,6 +42,14 @@ vi.mock('../../store/authStore', () => ({
   useAuthStore: (selector: (s: any) => unknown) => selector(storeState),
 }));
 
+// deep-review FL1 — useLogout must also clear the persisted branch scope.
+const branchScopeClearFn = vi.fn();
+vi.mock('../../store/branchScopeStore', () => ({
+  useBranchScopeStore: {
+    getState: () => ({ clear: branchScopeClearFn }),
+  },
+}));
+
 import {
   useLogin,
   useRegister,
@@ -137,6 +145,8 @@ describe('useLogout', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(logoutFn).toHaveBeenCalled();
     expect(clearSpy).toHaveBeenCalled();
+    // deep-review FL1 — branch scope is dropped on a clean logout.
+    expect(branchScopeClearFn).toHaveBeenCalled();
   });
 
   it('logs out and clears the cache EVEN when the API call fails', async () => {
@@ -149,6 +159,8 @@ describe('useLogout', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(logoutFn).toHaveBeenCalled();
     expect(clearSpy).toHaveBeenCalled();
+    // deep-review FL1 — branch scope is dropped even when the API errors.
+    expect(branchScopeClearFn).toHaveBeenCalled();
   });
 });
 

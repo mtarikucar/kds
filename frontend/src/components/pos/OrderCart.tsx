@@ -38,6 +38,11 @@ interface OrderCartProps {
   hasSelectedTable?: boolean;
   canProceedToPayment?: boolean;
   paymentBlockedReason?: string | null;
+  // deep-review FH2: true when the cart/discount/notes diverged from the saved
+  // order. Disables "Proceed to Payment" so the cashier is steered to "Update
+  // Order" first — otherwise two-step checkout would charge the stale server
+  // amount and drop the newly added items from the bill/kitchen.
+  cartDirty?: boolean;
 }
 
 const OrderCart = ({
@@ -63,6 +68,7 @@ const OrderCart = ({
   hasSelectedTable = false,
   canProceedToPayment = true,
   paymentBlockedReason = null,
+  cartDirty = false,
 }: OrderCartProps) => {
   const { t } = useTranslation('pos');
   const formatPrice = useFormatCurrency();
@@ -313,16 +319,25 @@ const OrderCart = ({
                     {hasActiveOrder ? t('updateOrder') : t('createOrder')}
                   </Button>
 
-                  {/* Payment button - uses canProceedToPayment for eligibility */}
+                  {/* Payment button - uses canProceedToPayment for eligibility.
+                      deep-review FH2: also blocked while the cart diverged from
+                      the saved order, so we never charge the stale amount. */}
                   <Button
                     variant="primary"
                     className="w-full"
                     size="lg"
                     onClick={onCheckout}
-                    disabled={!hasActiveOrder || !canProceedToPayment}
+                    disabled={!hasActiveOrder || !canProceedToPayment || cartDirty}
                   >
                     {t('proceedToPayment')}
                   </Button>
+
+                  {/* deep-review FH2: steer the cashier to re-sync first. */}
+                  {hasActiveOrder && canProceedToPayment && cartDirty && (
+                    <p className="text-sm text-amber-600 text-center">
+                      {t('updateOrderBeforePayment', 'Önce siparişi güncelleyin')}
+                    </p>
+                  )}
 
                   {/* Show blocked reason when payment not allowed */}
                   {hasActiveOrder && !canProceedToPayment && paymentBlockedReason && (

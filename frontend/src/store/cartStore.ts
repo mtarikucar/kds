@@ -2,15 +2,28 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CartItem, Product, CartModifier } from '../types';
 
+// deep-review FM3: dine-in turnover is fast, so the persisted customer cart
+// self-expires well before the staff 12h window. A stale cart left on a shared
+// QR kiosk/tablet must never rehydrate into the next guest's session.
+const CART_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 interface CartState {
   items: CartItem[];
   sessionId: string | null;
   tenantId: string | null;
   tableId: string | null;
   currency: string | null;
+  // deep-review FM3: wall-clock timestamp of the last mutating write; used to
+  // expire stale carts on rehydrate.
+  savedAt: number | null;
 
   // Actions
-  initializeSession: (tenantId: string, tableId: string | null, currency?: string) => void;
+  initializeSession: (
+    tenantId: string,
+    tableId: string | null,
+    currency?: string,
+    urlSessionId?: string | null
+  ) => void;
   setTableId: (tableId: string) => void;
   setCurrency: (currency: string) => void;
   addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => void;
@@ -44,14 +57,40 @@ const calculateItemTotal = (
 
 export const useCartStore = create<CartState>()(
   persist(
-    (set, get) => ({
+    (rawSet, get) => {
+      // deep-review FM3: every mutating write stamps savedAt so the persisted
+      // cart can self-expire on rehydrate. Wrap set instead of touching every
+      // call site.
+      const set: typeof rawSet = ((partial: unknown, replace?: boolean) => {
+        if (typeof partial === 'function') {
+          return (rawSet as (p: unknown, r?: boolean) => void)(
+            (state: CartState) => ({
+              ...(partial as (s: CartState) => Partial<CartState>)(state),
+              savedAt: Date.now(),
+            }),
+            replace as never
+          );
+        }
+        return (rawSet as (p: unknown, r?: boolean) => void)(
+          { ...(partial as Partial<CartState>), savedAt: Date.now() },
+          replace as never
+        );
+      }) as typeof rawSet;
+
+      return {
       items: [],
       sessionId: null,
       tenantId: null,
       tableId: null,
       currency: null,
+      savedAt: null,
 
-      initializeSession: (tenantId: string, tableId: string | null, currency?: string) => {
+      initializeSession: (
+        tenantId: string,
+        tableId: string | null,
+        currency?: string,
+        urlSessionId?: string | null
+      ) => {
         const currentSession = get().sessionId;
         const currentTenantId = get().tenantId;
         const currentTableId = get().tableId;
@@ -59,7 +98,7 @@ export const useCartStore = create<CartState>()(
         // If changing tenant, clear cart and create new session
         if (currentTenantId !== tenantId) {
           set({
-            sessionId: generateSessionId(),
+            sessionId: urlSessionId || generateSessionId(),
             tenantId,
             tableId,
             currency: currency || null,
@@ -68,14 +107,25 @@ export const useCartStore = create<CartState>()(
         } else if (!currentSession) {
           // First time initialization
           set({
-            sessionId: generateSessionId(),
+            sessionId: urlSessionId || generateSessionId(),
             tenantId,
             tableId,
             currency: currency || null,
           });
+        } else if (urlSessionId && urlSessionId !== currentSession) {
+          // deep-review FM3: the kiosk/server issued a fresh per-guest session
+          // id that differs from the stored one => new guest. Start a clean cart
+          // even on a tenant-wide QR where tableId can't distinguish guests.
+          set({
+            sessionId: urlSessionId,
+            tableId,
+            items: [],
+          });
         } else if (tableId && currentTableId !== tableId) {
-          // Update tableId if provided and different (but keep cart items)
-          set({ tableId });
+          // deep-review FM3: a different table on the same device is a new guest
+          // on a shared kiosk/tablet. Previously this preserved the cart, which
+          // leaked the prior guest's items. Start a clean cart + new session.
+          set({ sessionId: generateSessionId(), tableId, items: [] });
         } else if (tableId === null && currentTableId !== null) {
           // Clear tableId when using tenant-wide QR (no tableId in URL)
           // This ensures table selection modal appears for general QR codes
@@ -210,7 +260,8 @@ export const useCartStore = create<CartState>()(
         // For now, total = subtotal. Tax/service charges can be added later
         return get().getSubtotal();
       },
-    }),
+      };
+    },
     {
       name: 'customer-cart-storage', // LocalStorage key
       storage: createJSONStorage(() => localStorage),
@@ -220,7 +271,18 @@ export const useCartStore = create<CartState>()(
         tenantId: state.tenantId,
         tableId: state.tableId,
         currency: state.currency,
+        savedAt: state.savedAt,
       }),
+      // deep-review FM3: expire stale carts on rehydrate so a previous guest's
+      // items/session/table never surface to the next guest on a shared device.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        if (!state.savedAt || Date.now() - state.savedAt > CART_TTL_MS) {
+          state.items = [];
+          state.sessionId = null;
+          state.tableId = null;
+        }
+      },
     }
   )
 );

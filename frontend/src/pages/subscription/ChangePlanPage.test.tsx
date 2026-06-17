@@ -19,6 +19,7 @@ const currentSub = {
   currentPeriodEnd: '2026-12-31T00:00:00.000Z',
 };
 const plans = [
+  { id: 'plan-lite', name: 'STARTER', displayName: 'Lite', monthlyPrice: '50', yearlyPrice: '500', currency: 'TRY' },
   { id: 'plan-basic', name: 'BASIC', displayName: 'Basic', monthlyPrice: '100', yearlyPrice: '1000', currency: 'TRY' },
   { id: 'plan-pro', name: 'PRO', displayName: 'Pro', monthlyPrice: '500', yearlyPrice: '5000', currency: 'TRY' },
 ];
@@ -95,5 +96,15 @@ describe('ChangePlanPage — honors the plan picked on the plans page', () => {
     renderPage('?newPlanId=plan-basic&billingCycle=MONTHLY');
     expect(screen.queryByText('subscriptions.confirmUpgrade')).not.toBeInTheDocument();
     expect(screen.queryByText('subscriptions.confirmDowngrade')).not.toBeInTheDocument();
+  });
+
+  // deep-review FM2: a MONTHLY sub (amount=100) toggled to YEARLY and picking a
+  // CHEAPER tier (Lite, monthly 50 / yearly 500) must classify as a DOWNGRADE.
+  // The old logic compared the sub's monthly amount (100) against the toggle's
+  // yearly price (500) and wrongly framed it as an upgrade.
+  it('classifies a cheaper tier as a downgrade even when the YEARLY toggle is active', () => {
+    renderPage('?newPlanId=plan-lite&billingCycle=YEARLY');
+    expect(screen.getByText('subscriptions.confirmDowngrade')).toBeInTheDocument();
+    expect(screen.queryByText('subscriptions.confirmUpgrade')).not.toBeInTheDocument();
   });
 });

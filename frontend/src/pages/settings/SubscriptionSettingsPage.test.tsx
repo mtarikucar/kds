@@ -60,13 +60,15 @@ vi.mock('../../components/subscriptions/ScheduledDowngradeAlert', () => ({ defau
 vi.mock('../../components/subscriptions/CancelSubscriptionModal', () => ({ default: () => null }));
 
 describe('SubscriptionSettingsPage current-plan price', () => {
-  it("renders the plan's live catalog price (₺7999.00), not the frozen amount", () => {
+  it("renders the plan's live catalog price (₺7.999,00 tr-TR), not the frozen amount", () => {
+    // deep-review FM12: money now renders in app-wide tr-TR format
+    // (₺7.999,00) instead of the US-style ₺7999.00.
     render(<SubscriptionSettingsPage />);
-    expect(screen.getByText(/₺7999\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/₺7\.999,00/)).toBeInTheDocument();
   });
 
-  it('does not render the stale frozen subscription amount (₺79.99)', () => {
+  it('does not render the stale frozen subscription amount (₺79,99)', () => {
     render(<SubscriptionSettingsPage />);
-    expect(screen.queryByText(/₺79\.99/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/₺79,99/)).not.toBeInTheDocument();
   });
 });

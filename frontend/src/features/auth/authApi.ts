@@ -4,6 +4,7 @@ import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-error';
 import { useAuthStore } from '../../store/authStore';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '../../types';
 
 export const useLogin = () => {
@@ -94,12 +95,28 @@ export const useLogout = () => {
     },
     onSuccess: () => {
       logout();
+      // deep-review FL1: mirror the 401-interceptor cleanup (lib/api.ts)
+      // so a user-initiated logout also drops the persisted branch scope.
+      // Otherwise a same-tenant account switch on a shared device leaves
+      // the prior session's branchId/allowedBranchIds in localStorage
+      // until App's hydrateFromUser effect later re-scopes it.
+      try {
+        useBranchScopeStore.getState().clear();
+      } catch {
+        // storage/hydration race — non-fatal
+      }
       queryClient.clear();
       toast.success(i18n.t('common:notifications.logoutSuccessful'));
     },
     onError: () => {
       // Logout anyway even if API call fails
       logout();
+      // deep-review FL1: clear branch scope here too — see onSuccess.
+      try {
+        useBranchScopeStore.getState().clear();
+      } catch {
+        // non-fatal
+      }
       queryClient.clear();
     },
   });

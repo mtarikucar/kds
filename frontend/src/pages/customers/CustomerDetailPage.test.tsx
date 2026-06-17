@@ -27,6 +27,13 @@ vi.mock('../../features/customers/customersApi', () => ({
   useDeleteCustomer: () => ({ mutate: deleteCustomer }),
 }));
 
+// deep-review FM6: the page now reads the tenant currency via useCurrency
+// (react-query under the hood) — mock it so specs render without a
+// QueryClientProvider. Money fields then format as TRY (₺) instead of '$'.
+vi.mock('../../hooks/useCurrency', () => ({
+  useCurrency: () => 'TRY',
+}));
+
 let lastModalProps: any;
 vi.mock('../../components/customers/CustomerFormModal', () => ({
   default: (props: any) => {
@@ -96,6 +103,16 @@ describe('CustomerDetailPage — loaded render', () => {
     expect(screen.getByText('ORD-1')).toBeInTheDocument();
     expect(screen.getByText('vip')).toBeInTheDocument();
     expect(screen.getByText('Allergic to nuts')).toBeInTheDocument();
+  });
+
+  // deep-review FM6: money fields render in TRY with Turkish grouping (₺123,50),
+  // never the old hard-coded USD '$'.
+  it('renders money fields in TRY, not USD', () => {
+    renderPage();
+    expect(screen.getByText('₺123,50')).toBeInTheDocument(); // totalSpent
+    expect(screen.getByText('₺17,60')).toBeInTheDocument(); // averageOrder
+    expect(screen.getByText('₺50,00')).toBeInTheDocument(); // order finalAmount
+    expect(screen.queryByText(/\$\d/)).toBeNull();
   });
 
   it('shows the no-orders placeholder when the customer has no orders', () => {

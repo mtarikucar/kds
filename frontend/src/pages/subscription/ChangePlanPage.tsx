@@ -94,14 +94,19 @@ const ChangePlanPage = () => {
     return [...plans].sort((a, b) => Number(a.monthlyPrice) - Number(b.monthlyPrice));
   }, [plans]);
 
-  // Determine if selected plan is upgrade or downgrade
-  const getChangeType = (newPlan: Plan): 'upgrade' | 'downgrade' => {
-    if (!currentSubscription) return 'upgrade';
-    const currentPrice = Number(currentSubscription.amount);
-    const newPrice =
-      billingCycle === BillingCycle.MONTHLY
-        ? Number(newPlan.monthlyPrice)
-        : Number(newPlan.yearlyPrice);
+  // Determine if selected plan is upgrade or downgrade.
+  // deep-review FM2: compare tier-to-tier in the SAME cycle (monthly price) so a
+  // billing-cycle toggle (e.g. MONTHLY->YEARLY) never flips a lower-tier pick into
+  // a misleading "upgrade". Comparing the sub's own-cycle amount against the
+  // toggle-selected cycle made a cheaper yearly plan (~12x monthly) read as an
+  // upgrade. This also keeps the modal consistent with the PlanCard button label.
+  const getChangeType = (
+    newPlan: Plan,
+    current: Plan | undefined
+  ): 'upgrade' | 'downgrade' => {
+    if (!currentSubscription || !current) return 'upgrade';
+    const newPrice = Number(newPlan.monthlyPrice);
+    const currentPrice = Number(current.monthlyPrice);
     return newPrice > currentPrice ? 'upgrade' : 'downgrade';
   };
 
@@ -157,7 +162,7 @@ const ChangePlanPage = () => {
   }
 
   const currentPlan = plans?.find((p) => p.id === currentSubscription.planId);
-  const changeType = selectedPlan ? getChangeType(selectedPlan) : null;
+  const changeType = selectedPlan ? getChangeType(selectedPlan, currentPlan) : null;
 
   return (
     <div className="max-w-7xl mx-auto p-6">

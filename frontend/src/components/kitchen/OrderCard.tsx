@@ -2,7 +2,7 @@ import { Clock, MoreVertical, X, Check } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import Button from '../ui/Button';
 import { getOrderUrgency, getUrgencyStyles, cn } from '../../lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
@@ -37,7 +37,22 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTou
   // "Emin misiniz?" row commits or aborts. Prevents one-tap mis-cancels on a
   // busy touch screen.
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  // deep-review FM5: track the active Undo toast so an unmounting card (e.g.
+  // removed by a realtime invalidation) can dismiss it before its timer fires.
+  // toast.dismiss does NOT call onAutoClose, so this safely aborts a deferred
+  // commit from a card that is no longer on the board.
+  const cancelToastIdRef = useRef<string | number | null>(null);
   const { t } = useTranslation('kitchen');
+
+  // deep-review FM5: on unmount, dismiss any pending Undo toast so a removed
+  // card cannot commit a phantom cancel after the fact.
+  useEffect(() => {
+    return () => {
+      if (cancelToastIdRef.current !== null) {
+        toast.dismiss(cancelToastIdRef.current);
+      }
+    };
+  }, []);
 
   // Update elapsed time and urgency every second
   useEffect(() => {
@@ -118,7 +133,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTou
     if (!onCancelOrder) return;
     setConfirmingCancel(false);
     let aborted = false;
-    toast(
+    const id = toast(
       t('kitchen.cancellingToast', '#{{n}} siparişi iptal ediliyor…', { n: order.orderNumber }),
       {
         duration: 5000,
@@ -131,10 +146,13 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTou
         // Only a natural timeout commits the cancel; an Undo tap or manual
         // dismiss leaves `aborted`/no-autoclose so the order is untouched.
         onAutoClose: () => {
+          cancelToastIdRef.current = null;
           if (!aborted) onCancelOrder(order.id);
         },
       }
     );
+    // deep-review FM5: remember the active toast so unmount can dismiss it.
+    cancelToastIdRef.current = id;
   };
 
   return (

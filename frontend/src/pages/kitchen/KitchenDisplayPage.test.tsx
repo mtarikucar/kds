@@ -30,11 +30,18 @@ vi.mock('../../features/kds/useKitchenSocket', () => ({
 // OrderCard fires a sonner Undo toast after a confirmed cancel; capture it
 // so the toast doesn't reach a real (absent) Toaster.
 const toastFn = vi.fn();
+const toastWarning = vi.fn();
+const toastDismiss = vi.fn();
 vi.mock('sonner', () => ({
   toast: Object.assign((...a: unknown[]) => toastFn(...a), {
     success: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
+    // deep-review FM5: OrderCard dismisses a pending Undo toast on unmount and
+    // KitchenDisplayPage warns when a deferred cancel commits on a no-longer
+    // PENDING order — stub both so the toast never reaches a real Toaster.
+    warning: (...a: unknown[]) => toastWarning(...a),
+    dismiss: (...a: unknown[]) => toastDismiss(...a),
   }),
 }));
 
@@ -68,6 +75,9 @@ describe('KitchenDisplayPage', () => {
     updateOrderStatus.mockClear();
     cancelOrder.mockClear();
     refetch.mockClear();
+    toastFn.mockClear();
+    toastWarning.mockClear();
+    toastDismiss.mockClear();
   });
 
   it('renders order data into the stats header and the pending column card', () => {
@@ -179,6 +189,30 @@ describe('KitchenDisplayPage', () => {
     expect(cancelOrder.mock.calls[0][0]).toBe('pend-9');
     // Cancel must NOT fire a status update (no CANCELLED→PENDING flip).
     expect(updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('does NOT commit a deferred cancel if the order is no longer PENDING at commit time (deep-review FM5)', () => {
+    const order = makeOrder({ id: 'pend-stale', orderNumber: '6006', status: OrderStatus.PENDING });
+    ordersData.push(order);
+
+    render(<KitchenDisplayPage />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'kitchen.moreOptions' })[0]);
+    fireEvent.click(screen.getByText('kitchen.cancelOrder'));
+    fireEvent.click(screen.getAllByText('kitchen.confirmYes')[0]);
+    expect(toastFn).toHaveBeenCalledTimes(1);
+
+    // Another station advances the order during the Undo window: the cache
+    // (same live ordersData reference returned by useOrders) flips off PENDING.
+    order.status = OrderStatus.PREPARING;
+
+    // The toast times out and tries to commit — the parent's status gate must
+    // bail (no cancel, a warning instead) so work-in-progress isn't voided.
+    const opts = toastFn.mock.calls[0][1] as { onAutoClose: () => void };
+    opts.onAutoClose();
+
+    expect(cancelOrder).not.toHaveBeenCalled();
+    expect(toastWarning).toHaveBeenCalledTimes(1);
   });
 
   it('aborts the cancel when "Geri al" (undo) is tapped before the window elapses', () => {

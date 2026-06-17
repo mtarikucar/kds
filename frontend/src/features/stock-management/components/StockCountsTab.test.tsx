@@ -5,7 +5,9 @@ import enStock from '../../../i18n/locales/en/stock.json';
 
 const counts: { data: any[]; isLoading: boolean } = { data: [], isLoading: false };
 let lastStatus: unknown = undefined;
-const noop = { mutateAsync: vi.fn(), isPending: false };
+const noop = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
+const finalizeMock = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
+const cancelMock = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 
 vi.mock('../stockManagementApi', () => ({
   useStockCounts: (status: unknown) => {
@@ -15,8 +17,8 @@ vi.mock('../stockManagementApi', () => ({
   useStockCount: () => ({ data: null, isLoading: false }),
   useCreateStockCount: () => noop,
   useUpdateStockCountItem: () => noop,
-  useFinalizeStockCount: () => noop,
-  useCancelStockCount: () => noop,
+  useFinalizeStockCount: () => finalizeMock,
+  useCancelStockCount: () => cancelMock,
 }));
 
 import StockCountsTab from './StockCountsTab';
@@ -29,6 +31,8 @@ beforeEach(() => {
   counts.data = [];
   counts.isLoading = false;
   lastStatus = undefined;
+  finalizeMock.mutate.mockClear();
+  cancelMock.mutate.mockClear();
 });
 
 describe('StockCountsTab', () => {
@@ -63,5 +67,26 @@ describe('StockCountsTab', () => {
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: 'COMPLETED' } });
     expect(lastStatus).toBe('COMPLETED');
+  });
+
+  // deep-review FL4: finalize/cancel must confirm before firing the inventory-mutating action
+  it('only finalizes a stock count after the user confirms', () => {
+    counts.data = [
+      { id: 'c1', name: 'June count', status: 'IN_PROGRESS', items: [{ id: 'x' }], createdAt: new Date().toISOString() },
+    ];
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<StockCountsTab />);
+    const row = screen.getByText('June count').closest('tr')!;
+    const finalizeBtn = within(row).getByTitle('Finalize');
+
+    fireEvent.click(finalizeBtn);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(finalizeMock.mutate).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(finalizeBtn);
+    expect(finalizeMock.mutate).toHaveBeenCalledWith('c1');
+
+    confirmSpy.mockRestore();
   });
 });

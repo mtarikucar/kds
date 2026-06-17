@@ -63,6 +63,12 @@ const POSPage = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [currentOrderAmount, setCurrentOrderAmount] = useState<number | null>(null);
+  // deep-review FH2: tracks whether the cart/discount/notes diverged from the
+  // persisted order since it was last created/updated. While dirty, the
+  // two-step "Proceed to Payment" path must re-persist (and re-price) instead
+  // of charging the stale server amount. Set on every bill-affecting mutation
+  // (below), cleared on every successful create/update + on order clear/reset.
+  const [cartDirtySinceOrder, setCartDirtySinceOrder] = useState(false);
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [payingOrderAmount, setPayingOrderAmount] = useState<number | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
@@ -92,6 +98,16 @@ const POSPage = () => {
   useEffect(() => {
     if (useSideBySideLayout && isCartDrawerOpen) setIsCartDrawerOpen(false);
   }, [useSideBySideLayout, isCartDrawerOpen]);
+
+  // deep-review FH2: whenever the active order identity changes — a new order
+  // is created/loaded (e.g. selecting an OCCUPIED table) or the order is
+  // cleared — the cart is freshly synced to the server, so it is no longer
+  // dirty. This also prevents a stale `true` from a prior table carrying over
+  // when the cashier switches tables (the table-selection reset lives in
+  // useTableSelection, which has no handle on this flag).
+  useEffect(() => {
+    setCartDirtySinceOrder(false);
+  }, [currentOrderId]);
 
   // Socket.IO for real-time updates
   usePosSocket();
@@ -249,10 +265,18 @@ const POSPage = () => {
     addItemToCart(product, 1, []);
   };
 
+  // deep-review FH2: flag the cart as diverged from the persisted order. No-op
+  // when no order exists yet (the first create captures the current cart). Used
+  // to force a re-persist before the two-step payment modal opens.
+  const markCartDirty = useCallback(() => {
+    if (currentOrderId) setCartDirtySinceOrder(true);
+  }, [currentOrderId]);
+
   const addItemToCart = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
     // Dedup/merge rule (same product + same modifier set → increment) lives in
     // posCart.mergeCartItem (unit-tested).
     setCartItems((prev) => mergeCartItem(prev, product, quantity, modifiers));
+    markCartDirty();
   };
 
   const handleAddItemWithModifiers = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
@@ -268,10 +292,12 @@ const POSPage = () => {
         item.id === productId ? { ...item, quantity } : item
       )
     );
+    markCartDirty();
   };
 
   const handleRemoveItem = (productId: string) => {
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
+    markCartDirty();
   };
 
   // In-cart quantity per product id (summed across lines) for the MenuPanel
@@ -293,6 +319,7 @@ const POSPage = () => {
         item.id === productId ? { ...item, quantity: item.quantity + 1 } : item,
       ),
     );
+    markCartDirty();
   };
 
   const handleMenuDecrement = (productId: string) => {
@@ -303,11 +330,25 @@ const POSPage = () => {
         return item.quantity <= 1 ? [] : [{ ...item, quantity: item.quantity - 1 }];
       }),
     );
+    markCartDirty();
+  };
+
+  // deep-review FH2: discount/notes edits also change the bill → mark dirty so
+  // the two-step payment path re-persists before charging.
+  const handleUpdateDiscount = (value: number) => {
+    setDiscount(value);
+    markCartDirty();
+  };
+
+  const handleUpdateOrderNotes = (notes: string) => {
+    setOrderNotes(notes);
+    markCartDirty();
   };
 
   const handleClearCart = () => {
     setCartItems([]);
     setDiscount(0);
+    setCartDirtySinceOrder(false);
   };
 
   // Create or update order (for two-step checkout)
@@ -323,12 +364,13 @@ const POSPage = () => {
       return;
     }
 
+    // deep-review FL3: never submit a discount larger than the live subtotal.
     const orderData = buildOrderData({
       isTablelessMode,
       selectedTable,
       customerName,
       orderNotes,
-      discount,
+      discount: Math.max(0, Math.min(discount, calculateSubtotal(cartItems))),
       cartItems,
     });
 
@@ -342,6 +384,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderAmount(Number(order.finalAmount));
+            setCartDirtySinceOrder(false); // deep-review FH2
             toast.success(t('orderUpdated'));
           },
         }
@@ -354,6 +397,7 @@ const POSPage = () => {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
             setCurrentOrderAmount(Number(order.finalAmount));
+            setCartDirtySinceOrder(false); // deep-review FH2
             toast.success(t('orderCreatedSuccess', { orderNumber: order.orderNumber }));
 
             // Mark table as occupied after successful order creation (if table mode)
@@ -382,18 +426,25 @@ const POSPage = () => {
       return;
     }
 
-    // If two-step checkout is enabled and order already exists, just open payment
-    if (isTwoStepCheckout && currentOrderId) {
+    // deep-review FH2: in two-step checkout, only short-circuit straight to the
+    // payment modal when the cart has NOT diverged from the saved order. If the
+    // cashier added items / changed the discount after the order was created,
+    // we must fall through to the updateOrder path below — which persists the
+    // edits and opens payment with the authoritative server finalAmount —
+    // otherwise we'd charge the stale amount and drop the new items from the
+    // bill and kitchen ticket.
+    if (isTwoStepCheckout && currentOrderId && !cartDirtySinceOrder) {
       setIsPaymentModalOpen(true);
       return;
     }
 
+    // deep-review FL3: never submit a discount larger than the live subtotal.
     const orderData = buildOrderData({
       isTablelessMode,
       selectedTable,
       customerName,
       orderNotes,
-      discount,
+      discount: Math.max(0, Math.min(discount, calculateSubtotal(cartItems))),
       cartItems,
     });
 
@@ -407,6 +458,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderAmount(Number(order.finalAmount));
+            setCartDirtySinceOrder(false);
             setIsPaymentModalOpen(true);
             toast.success(t('orderUpdated'));
           },
@@ -420,6 +472,7 @@ const POSPage = () => {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
             setCurrentOrderAmount(Number(order.finalAmount));
+            setCartDirtySinceOrder(false); // deep-review FH2
             setIsPaymentModalOpen(true);
 
             // Mark table as occupied after successful order creation (if table mode)
@@ -530,6 +583,7 @@ const POSPage = () => {
             setDiscount(0);
             setCustomerName('');
             setOrderNotes('');
+            setCartDirtySinceOrder(false); // deep-review FH2
           }
 
           toast.success(t('orderCompletedSuccess'));
@@ -564,6 +618,7 @@ const POSPage = () => {
           setOrderNotes('');
           setCurrentOrderId(null);
           setCurrentOrderAmount(null);
+          setCartDirtySinceOrder(false); // deep-review FH2
         },
       }
     );
@@ -608,7 +663,14 @@ const POSPage = () => {
   // posCart.ts so it shares a single tested arithmetic surface with
   // cartStore.calculateItemTotal and can never drift.
   const subtotal = calculateSubtotal(cartItems);
-  const total = subtotal - discount;
+  // deep-review FL3: re-clamp the stored discount to the LIVE subtotal at the
+  // single source of truth. The OrderCart input clamps on keystroke, but if the
+  // cashier sets a discount then removes items (shrinking the subtotal below the
+  // discount), the stored `discount` stays stale — producing a negative total in
+  // the UI and an over-discount sent to the server. Deriving the effective
+  // discount here keeps display, create, and checkout all consistent.
+  const effectiveDiscount = Math.max(0, Math.min(discount, subtotal));
+  const total = subtotal - effectiveDiscount;
   const hasCartItems = cartItems.length > 0;
 
   // Table card status styles
@@ -855,14 +917,14 @@ const POSPage = () => {
                 <div className="sticky top-0 h-full">
                   <OrderCart
                     items={cartItems}
-                    discount={discount}
+                    discount={effectiveDiscount}
                     customerName={customerName}
                     orderNotes={orderNotes}
                     onUpdateQuantity={handleUpdateQuantity}
                     onRemoveItem={handleRemoveItem}
-                    onUpdateDiscount={setDiscount}
+                    onUpdateDiscount={handleUpdateDiscount}
                     onUpdateCustomerName={setCustomerName}
-                    onUpdateOrderNotes={setOrderNotes}
+                    onUpdateOrderNotes={handleUpdateOrderNotes}
                     onClearCart={handleClearCart}
                     onCheckout={handleCheckout}
                     onCreateOrder={handleCreateOrder}
@@ -876,6 +938,7 @@ const POSPage = () => {
                     hasSelectedTable={!!selectedTable}
                     canProceedToPayment={canProceedToPayment}
                     paymentBlockedReason={paymentBlockedReason}
+                    cartDirty={cartDirtySinceOrder}
                   />
                 </div>
               </div>
@@ -927,14 +990,14 @@ const POSPage = () => {
       >
         <OrderCart
           items={cartItems}
-          discount={discount}
+          discount={effectiveDiscount}
           customerName={customerName}
           orderNotes={orderNotes}
           onUpdateQuantity={handleUpdateQuantity}
           onRemoveItem={handleRemoveItem}
-          onUpdateDiscount={setDiscount}
+          onUpdateDiscount={handleUpdateDiscount}
           onUpdateCustomerName={setCustomerName}
-          onUpdateOrderNotes={setOrderNotes}
+          onUpdateOrderNotes={handleUpdateOrderNotes}
           onClearCart={handleClearCart}
           onCheckout={() => {
             setIsCartDrawerOpen(false);
@@ -951,6 +1014,7 @@ const POSPage = () => {
           hasSelectedTable={!!selectedTable}
           canProceedToPayment={canProceedToPayment}
           paymentBlockedReason={paymentBlockedReason}
+          cartDirty={cartDirtySinceOrder}
         />
       </CartDrawer>
 

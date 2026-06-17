@@ -7,11 +7,15 @@ import Button from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import CustomerFormModal from '../../components/customers/CustomerFormModal';
 import { Customer } from '../../types';
+// deep-review FM6: TRY-only currency regression — money fields hard-coded '$'.
+import { useCurrency } from '../../hooks/useCurrency';
+import { formatCurrency } from '../../lib/utils';
 
 const CustomerDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation('customers');
+  const currencyCode = useCurrency(); // deep-review FM6: tenant currency (TRY)
   const { data: customer, isLoading } = useCustomer(id || '');
   const { mutate: deleteCustomer } = useDeleteCustomer();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -119,7 +123,7 @@ const CustomerDetailPage = () => {
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <span className="text-xl font-bold text-green-600">
-                  ${parseFloat(String(typedCustomer.totalSpent || 0)).toFixed(2)}
+                  {formatCurrency(parseFloat(String(typedCustomer.totalSpent || 0)), currencyCode)}
                 </span>
                 <p className="text-xs text-slate-600">{t('customers.totalSpent')}</p>
               </div>
@@ -130,7 +134,7 @@ const CustomerDetailPage = () => {
               </div>
               <div className="text-center p-3 bg-orange-50 rounded-lg">
                 <span className="text-xl font-bold text-orange-600">
-                  ${parseFloat(String(typedCustomer.averageOrder || 0)).toFixed(2)}
+                  {formatCurrency(parseFloat(String(typedCustomer.averageOrder || 0)), currencyCode)}
                 </span>
                 <p className="text-xs text-slate-600">{t('customers.avgOrder', 'Avg Order')}</p>
               </div>
@@ -203,7 +207,7 @@ const CustomerDetailPage = () => {
                           {order.status}
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-right">${parseFloat(order.finalAmount || order.totalAmount || 0).toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(parseFloat(String(order.finalAmount || order.totalAmount || 0)), currencyCode)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -50,6 +50,12 @@ export const useKitchenSocket = () => {
     const handleConnect = () => {
       console.log('Kitchen socket connected');
       setIsConnected(true);
+      // deep-review FH4: socket.io does NOT replay events emitted while the
+      // socket was disconnected, so any order:new/updated/status-changed that
+      // fired during a drop is permanently lost and the board goes stale.
+      // Refetch the orders truth on every (re)connect so the kitchen board
+      // reconciles after a reconnect (and on first connect, harmless).
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     };
 
     const handleDisconnect = () => {

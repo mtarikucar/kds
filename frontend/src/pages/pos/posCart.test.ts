@@ -14,8 +14,9 @@ import {
   type PosCartItem,
 } from './posCart';
 import type { CartItem } from './posTypes';
-import { OrderType, OrderStatus, type Order, type OrderItem, type Product } from '../../types';
+import { OrderType, OrderStatus, type Order, type OrderItem, type Product, type OrderItemModifier, type Modifier } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
+import { buildOrderData } from './buildOrderData';
 
 const mod = (priceAdjustment: number, quantity = 1): SelectedModifier =>
   ({ modifierId: `m-${priceAdjustment}-${quantity}`, priceAdjustment, quantity } as SelectedModifier);
@@ -386,6 +387,103 @@ describe('mapOrderItemsToCart', () => {
 
   it('returns [] when there are no items', () => {
     expect(mapOrderItemsToCart({} as Pick<Order, 'orderItems' | 'items'>)).toEqual([]);
+  });
+
+  // deep-review FH3: loading an existing order must round-trip line-item
+  // modifiers, or continuing an OCCUPIED table strips paid modifiers →
+  // wrong kitchen ticket + undercharge.
+  describe('FH3: modifiers round-trip', () => {
+    const orderItemMod = (over: Partial<OrderItemModifier>): OrderItemModifier =>
+      ({
+        id: 'oim-1',
+        orderItemId: 'oi-1',
+        modifierId: 'mod-1',
+        quantity: 1,
+        priceAdjustment: 2.5,
+        modifier: { id: 'mod-1', name: 'Extra Cheese', priceAdjustment: 2.5 } as Modifier,
+        createdAt: '2026-01-01T00:00:00Z',
+        ...over,
+      } as OrderItemModifier);
+
+    it('maps each OrderItem modifier into the SelectedModifier cart shape', () => {
+      const cart = mapOrderItemsToCart({
+        orderItems: [
+          orderItem({
+            quantity: 2,
+            product: { id: 'p-1', name: 'Burger', price: 10 } as Product,
+            modifiers: [
+              orderItemMod({ modifierId: 'mod-1', quantity: 1, priceAdjustment: 2.5 }),
+              orderItemMod({
+                id: 'oim-2',
+                modifierId: 'mod-2',
+                quantity: 2,
+                priceAdjustment: 1,
+                modifier: { id: 'mod-2', name: 'Large', priceAdjustment: 1 } as Modifier,
+              }),
+            ],
+          }),
+        ],
+      } as Pick<Order, 'orderItems' | 'items'>);
+
+      expect(cart[0].modifiers).toEqual([
+        { modifierId: 'mod-1', name: 'Extra Cheese', priceAdjustment: 2.5, quantity: 1 },
+        { modifierId: 'mod-2', name: 'Large', priceAdjustment: 1, quantity: 2 },
+      ]);
+    });
+
+    it('coerces a string priceAdjustment (Decimal serialization) to a number', () => {
+      const cart = mapOrderItemsToCart({
+        orderItems: [
+          orderItem({
+            modifiers: [orderItemMod({ priceAdjustment: '3.75' as unknown as number })],
+          }),
+        ],
+      } as Pick<Order, 'orderItems' | 'items'>);
+      expect(cart[0].modifiers?.[0].priceAdjustment).toBe(3.75);
+    });
+
+    it('falls back to an empty name when the modifier relation is absent', () => {
+      const cart = mapOrderItemsToCart({
+        orderItems: [orderItem({ modifiers: [orderItemMod({ modifier: undefined })] })],
+      } as Pick<Order, 'orderItems' | 'items'>);
+      expect(cart[0].modifiers?.[0].name).toBe('');
+    });
+
+    it('round-trips modifiers through buildOrderData as {modifierId, quantity}', () => {
+      const cart = mapOrderItemsToCart({
+        orderItems: [
+          orderItem({
+            modifiers: [orderItemMod({ modifierId: 'mod-1', quantity: 3 })],
+          }),
+        ],
+      } as Pick<Order, 'orderItems' | 'items'>);
+
+      const built = buildOrderData({
+        isTablelessMode: false,
+        selectedTable: { id: 't-1' } as never,
+        customerName: '',
+        orderNotes: '',
+        discount: 0,
+        cartItems: cart,
+        generateId: () => 'fixed-id',
+      });
+
+      expect(built.items[0].modifiers).toEqual([{ modifierId: 'mod-1', quantity: 3 }]);
+    });
+
+    it('calculateSubtotal on the loaded cart includes the modifier contribution (no undercharge)', () => {
+      const cart = mapOrderItemsToCart({
+        orderItems: [
+          orderItem({
+            quantity: 2,
+            product: { id: 'p-1', name: 'Burger', price: 10 } as Product,
+            // (10 + 2.5*1) * 2 = 25  — base-only would be 20 (the silent undercharge)
+            modifiers: [orderItemMod({ priceAdjustment: 2.5, quantity: 1 })],
+          }),
+        ],
+      } as Pick<Order, 'orderItems' | 'items'>);
+      expect(calculateSubtotal(cart)).toBe(25);
+    });
   });
 });
 

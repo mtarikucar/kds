@@ -102,7 +102,15 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
   const urlSessionId = searchParams.get('sessionId');
 
   const storeSessionId = useCartStore(state => state.sessionId);
-  const sessionId = urlSessionId || storeSessionId;
+  // deep-review FH5: the QR session id is the only identity on the public QR
+  // menu, so it is effectively a bearer credential. It must NOT be overridable
+  // from the URL — otherwise appending `?sessionId=<victim>` to a link the
+  // customer already has open would hijack their order history / self-pay.
+  // Resolve from the persisted (per-device) store first; the URL value is only
+  // a one-time bootstrap for a device that has no session yet (e.g. a fresh
+  // same-device deep link). Combined with buildQRMenuUrl no longer emitting
+  // the id, shareable links no longer carry the credential at all.
+  const sessionId = storeSessionId || urlSessionId;
 
   const [menuData, setMenuData] = useState<MenuData | null>(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -204,17 +204,19 @@ const MenuManagementPage = () => {
         { id: editingProduct.id, data: submitData },
         {
           onSuccess: () => {
-            if (selectedModifierGroupIds.length > 0) {
-              assignModifiersToProduct({
-                productId: editingProduct.id,
-                data: {
-                  modifierGroups: selectedModifierGroupIds.map((groupId, index) => ({
-                    groupId,
-                    displayOrder: index,
-                  })),
-                },
-              });
-            }
+            // deep-review FM7: always re-assign so an empty selection clears
+            // all groups (assign does an atomic deleteMany + createMany; an
+            // empty array correctly means "replace with none"). The previous
+            // length>0 guard silently dropped attempts to remove all groups.
+            assignModifiersToProduct({
+              productId: editingProduct.id,
+              data: {
+                modifierGroups: selectedModifierGroupIds.map((groupId, index) => ({
+                  groupId,
+                  displayOrder: index,
+                })),
+              },
+            });
             setProductModalOpen(false);
             setProductImages([]);
             setSelectedModifierGroupIds([]);

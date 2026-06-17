@@ -5,7 +5,8 @@ import enStock from '../../../i18n/locales/en/stock.json';
 
 const orders: { data: any[]; isLoading: boolean } = { data: [], isLoading: false };
 let lastStatus: unknown = undefined;
-const noop = { mutateAsync: vi.fn(), isPending: false };
+const noop = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
+const cancelMock = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 
 vi.mock('../stockManagementApi', () => ({
   usePurchaseOrders: (status: unknown) => {
@@ -15,7 +16,7 @@ vi.mock('../stockManagementApi', () => ({
   useCreatePurchaseOrder: () => noop,
   useSubmitPurchaseOrder: () => noop,
   useReceivePurchaseOrder: () => noop,
-  useCancelPurchaseOrder: () => noop,
+  useCancelPurchaseOrder: () => cancelMock,
   useSuppliers: () => ({ data: [] }),
   useStockItems: () => ({ data: [] }),
 }));
@@ -30,6 +31,7 @@ beforeEach(() => {
   orders.data = [];
   orders.isLoading = false;
   lastStatus = undefined;
+  cancelMock.mutate.mockClear();
 });
 
 describe('PurchaseOrdersTab', () => {
@@ -65,5 +67,26 @@ describe('PurchaseOrdersTab', () => {
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: 'DRAFT' } });
     expect(lastStatus).toBe('DRAFT');
+  });
+
+  // deep-review FM8: cancel must confirm before firing the destructive mutation
+  it('only cancels a purchase order after the user confirms', () => {
+    orders.data = [
+      { id: 'po1', orderNumber: 'PO-001', status: 'SUBMITTED', supplier: { name: 'Acme' }, items: [{ id: 'x' }], expectedDate: null },
+    ];
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PurchaseOrdersTab />);
+    const row = screen.getByText('PO-001').closest('tr')!;
+    const cancelBtn = within(row).getByTitle('Cancel');
+
+    fireEvent.click(cancelBtn);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(cancelMock.mutate).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(cancelBtn);
+    expect(cancelMock.mutate).toHaveBeenCalledWith('po1');
+
+    confirmSpy.mockRestore();
   });
 });

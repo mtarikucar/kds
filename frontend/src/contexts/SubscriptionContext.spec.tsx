@@ -90,3 +90,35 @@ describe('SubscriptionContext.hasIntegration (v2.8.88)', () => {
     expect(screen.getByTestId('ready')).toBeInTheDocument();
   });
 });
+
+/**
+ * deep-review FL2 — gates must fail CLOSED when effective-features is
+ * unavailable (still loading, or persistently errored). effective-features
+ * is the documented source of truth (it folds in per-tenant featureOverrides),
+ * so we must never fall back to the raw plan, which ignores negative overrides
+ * and would over-grant a feature an admin/abuse override has disabled.
+ */
+describe('SubscriptionContext fail-closed gating (deep-review FL2)', () => {
+  it('hasFeature returns false when effectiveFeatures is unavailable', () => {
+    const ctx = renderWith(undefined);
+    expect(ctx.hasFeature('posAccess' as any)).toBe(false);
+  });
+
+  it('checkLimit denies (limit 0) when effectiveFeatures is unavailable', () => {
+    const ctx = renderWith(undefined);
+    const result = ctx.checkLimit('maxBranches' as any, 0);
+    expect(result.allowed).toBe(false);
+    expect(result.limit).toBe(0);
+    expect(result.remaining).toBe(0);
+  });
+
+  it('hasFeature honors a negative override from effectiveFeatures', () => {
+    const ctx = renderWith({ features: { posAccess: false }, limits: {} });
+    expect(ctx.hasFeature('posAccess' as any)).toBe(false);
+  });
+
+  it('hasFeature grants when effectiveFeatures enables it', () => {
+    const ctx = renderWith({ features: { posAccess: true }, limits: {} });
+    expect(ctx.hasFeature('posAccess' as any)).toBe(true);
+  });
+});
