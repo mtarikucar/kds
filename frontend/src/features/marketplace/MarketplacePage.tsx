@@ -17,7 +17,7 @@ import {
   useCancelAddOn,
   useListAddOns,
   useListMyAddOns,
-  usePurchaseAddOn,
+  usePurchaseAddOnViaCheckout,
   type MarketplaceAddOn,
 } from './marketplaceApi';
 import Card from '../../components/ui/Card';
@@ -58,7 +58,7 @@ export default function MarketplacePage() {
   const [kind, setKind] = useState<string | undefined>(undefined);
   const { data: catalog = [], isLoading: catalogLoading } = useListAddOns(kind);
   const { data: mine = [], isLoading: mineLoading } = useListMyAddOns();
-  const purchase = usePurchaseAddOn();
+  const purchase = usePurchaseAddOnViaCheckout();
   const cancel = useCancelAddOn();
 
   const [purchasingCode, setPurchasingCode] = useState<string | null>(null);
@@ -94,6 +94,23 @@ export default function MarketplacePage() {
   }, [purchase.isPending]);
 
   const handlePurchase = (code: string) => {
+    // Paid flow: confirm the price, then hand off to PayTR's hosted page. The
+    // add-on is granted by the webhook only after the payment settles — no
+    // more free comps from the storefront button.
+    const addon = catalog.find((a: MarketplaceAddOn) => a.code === code);
+    const price = addon
+      ? (addon.priceCents / 100).toLocaleString('tr-TR', {
+          style: 'currency',
+          currency: addon.currency || 'TRY',
+        })
+      : '';
+    const suffix = addon?.billing === 'recurring' ? '/ay' : '';
+    const message = t('hummytummy.marketplace.purchaseConfirm', {
+      defaultValue: `Bu eklenti ${price}${suffix}. Ödemeyi tamamlamak için güvenli ödeme sayfasına yönlendirileceksiniz. Devam edilsin mi?`,
+      price,
+      suffix,
+    });
+    if (window.confirm(message) === false) return;
     setPurchasingCode(code);
     purchase.mutate({ addOnCode: code });
   };

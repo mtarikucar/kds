@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { entitlementKeys } from '../entitlements/entitlementsApi';
 import { getApiErrorMessage } from '../../lib/api-error';
 import i18n from '../../i18n/config';
+import { useAuthStore } from '../../store/authStore';
 
 export interface MarketplaceAddOn {
   code: string;
@@ -71,6 +72,70 @@ export const usePurchaseAddOn = () => {
       toast.success(
         i18n.t('marketplace:purchase.success', { defaultValue: 'Add-on purchased.' }),
       );
+    },
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('marketplace:purchase.failed', { defaultValue: 'Purchase failed' }),
+        ),
+      ),
+  });
+};
+
+export interface AddOnCheckoutIntent {
+  paymentRef: string;
+  paymentLink: string;
+  amountCents: number;
+  currency: string;
+}
+
+/**
+ * Paid add-on purchase. Instead of the free `/addons/purchase` grant, this
+ * trades the add-on for a PayTR checkout intent — a single `addon` line in a
+ * mixed cart (POST /v1/checkout/intent) — then sends the buyer to PayTR's
+ * hosted payment page. The add-on is provisioned by the `CK-` webhook
+ * (CheckoutSettlementService → confirmAndProvision → tenantMarketplace.purchase
+ * with the settled paymentRef) ONLY after the money is collected. Mirrors the
+ * hardware-store checkout flow. The free grant endpoint stays for superadmin
+ * comps; the storefront button uses this.
+ */
+export const usePurchaseAddOnViaCheckout = () => {
+  return useMutation({
+    mutationFn: async (input: {
+      addOnCode: string;
+      qty?: number;
+      branchId?: string;
+    }): Promise<AddOnCheckoutIntent> => {
+      const user = useAuthStore.getState().user;
+      if (!user) throw new Error('Not authenticated');
+      const r = await api.post('/v1/checkout/intent', {
+        cart: {
+          items: [
+            {
+              type: 'addon',
+              code: input.addOnCode,
+              qty: input.qty ?? 1,
+              branchId: input.branchId,
+            },
+          ],
+        },
+        buyer: {
+          email: user.email,
+          name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
+          // `phone` isn't on the auth-store User type but is present on the
+          // hydrated profile (same cast the hardware-store checkout uses).
+          phone: (user as { phone?: string }).phone ?? '',
+        },
+        // PayTR bounces the buyer back here after the hosted page closes; the
+        // add-on lands on the Plan & Erişim page once the webhook provisions it.
+        returnUrl: `${window.location.origin}/admin/plan`,
+      });
+      return r.data;
+    },
+    onSuccess: (data) => {
+      // Full-page hand-off to PayTR's hosted page — the iframe owns the tab.
+      if (data.paymentLink) window.location.assign(data.paymentLink);
     },
     onError: (e) =>
       toast.error(

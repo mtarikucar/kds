@@ -23,7 +23,7 @@ vi.mock('./marketplaceApi', () => ({
     return { data: catalog, isLoading: catalogLoading };
   },
   useListMyAddOns: () => ({ data: mine }),
-  usePurchaseAddOn: () => ({ mutate: purchaseMutate, isPending: purchasePending }),
+  usePurchaseAddOnViaCheckout: () => ({ mutate: purchaseMutate, isPending: purchasePending }),
   useCancelAddOn: () => ({ mutate: cancelMutate }),
 }));
 
@@ -101,13 +101,27 @@ describe('MarketplacePage kind filter', () => {
 });
 
 describe('MarketplacePage purchase', () => {
-  it('purchases the add-on by code on click', () => {
+  it('starts a paid checkout for the add-on after the confirm prompt', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     catalog = [addon({ code: 'pos-pro', name: 'POS Pro' })];
     render(<MarketplacePage />);
 
     const card = screen.getByText('POS Pro').closest('article') as HTMLElement;
     fireEvent.click(within(card).getByText('hummytummy.marketplace.purchase'));
+    expect(confirmSpy).toHaveBeenCalled();
     expect(purchaseMutate).toHaveBeenCalledWith({ addOnCode: 'pos-pro' });
+    confirmSpy.mockRestore();
+  });
+
+  it('does not start checkout if the confirm prompt is cancelled', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    catalog = [addon({ code: 'pos-pro', name: 'POS Pro' })];
+    render(<MarketplacePage />);
+
+    const card = screen.getByText('POS Pro').closest('article') as HTMLElement;
+    fireEvent.click(within(card).getByText('hummytummy.marketplace.purchase'));
+    expect(purchaseMutate).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it('disables the purchase button while a purchase is in flight', () => {
