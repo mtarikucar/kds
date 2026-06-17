@@ -100,6 +100,11 @@ private:
     cudaStream_t stream_ = nullptr;
     void* device_input_ = nullptr;
     void* device_output_ = nullptr;
+
+    // Resolved IO tensor names (deep-review NM6): cached by IOMode in
+    // allocate_buffers() so detect() never hardcodes getIOTensorName(0/1).
+    std::string input_name_;
+    std::string output_name_;
     std::vector<float> host_input_;
     std::vector<float> host_output_;
 

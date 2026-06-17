@@ -3,7 +3,6 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useListAddOns,
-  usePurchaseAddOn,
   usePurchaseAddOnViaCheckout,
   useCancelAddOn,
   marketplaceKeys,
@@ -114,35 +113,6 @@ describe('usePurchaseAddOnViaCheckout', () => {
     result.current.mutate({ addOnCode: 'kds_extra_screen' });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(apiPost).not.toHaveBeenCalledWith('/v1/marketplace/addons/purchase', expect.anything());
-  });
-});
-
-describe('usePurchaseAddOn', () => {
-  it('posts the input and invalidates mine + entitlements + effective-features on success', async () => {
-    apiPost.mockResolvedValue({ data: { id: 'ta1' } });
-    const client = makeClient();
-    const invalidate = vi.spyOn(client, 'invalidateQueries');
-    const { result } = renderHook(() => usePurchaseAddOn(), { wrapper: wrap(client) });
-
-    result.current.mutate({ addOnCode: 'pos-pro' });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(apiPost).toHaveBeenCalledWith('/v1/marketplace/addons/purchase', { addOnCode: 'pos-pro' });
-    const invalidatedKeys = invalidate.mock.calls.map((c) => (c[0] as any).queryKey);
-    expect(invalidatedKeys).toContainEqual(['marketplace', 'mine']);
-    expect(invalidatedKeys).toContainEqual(['entitlements', 'me']);
-    expect(invalidatedKeys).toContainEqual(['subscriptions', 'effective-features']);
-    expect(toastSuccess).toHaveBeenCalled();
-  });
-
-  it('surfaces the fallback error message via toast on failure', async () => {
-    apiPost.mockRejectedValue(new Error('nope'));
-    const client = makeClient();
-    const { result } = renderHook(() => usePurchaseAddOn(), { wrapper: wrap(client) });
-
-    result.current.mutate({ addOnCode: 'x' });
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(toastError).toHaveBeenCalledWith('Purchase failed');
   });
 });
 

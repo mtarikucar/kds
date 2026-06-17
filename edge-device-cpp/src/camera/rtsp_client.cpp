@@ -4,6 +4,9 @@
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
 
+#include <algorithm>  // deep-review NH11: std::max for fps clamp
+#include <cstddef>
+
 namespace kds {
 
 // Initialize GStreamer once
@@ -33,13 +36,15 @@ bool RTSPClient::start() {
         return true;
     }
 
-    LOG_INFO("Starting RTSP client: {}", current_url_);
+    // deep-review NH12: read a locked snapshot of the URL, never the shared member.
+    const std::string url = get_url();
+    LOG_INFO("Starting RTSP client: {}", url);
 
     // Reset statistics
     {
         std::lock_guard<std::mutex> lock(stats_mutex_);
         stats_ = CameraStats{};
-        stats_.url = current_url_;
+        stats_.url = url;
     }
 
     if (!create_pipeline()) {
@@ -121,17 +126,29 @@ bool RTSPClient::reconnect() {
 }
 
 void RTSPClient::set_url(const std::string& url) {
-    current_url_ = url;
+    // deep-review NH12: take the lock only for the write and release it before
+    // reconnect(), which calls stop()/join(). Holding url_mutex_ across the join
+    // would needlessly serialize against the capture thread (which also reads
+    // the URL via get_url()) and risk a deadlock. set_url runs on the ws/io
+    // thread, so the join itself is safe.
+    {
+        std::lock_guard<std::mutex> lock(url_mutex_);
+        current_url_ = url;
+    }
     if (running_) {
         reconnect();
     }
 }
 
 bool RTSPClient::create_pipeline() {
+    // deep-review NH12: build the pipeline from one locked snapshot of the URL
+    // so a concurrent set_url() on the ws thread can't tear the std::string read.
+    const std::string url = get_url();
+
     // Build GStreamer pipeline string
     // Use hardware decoding if available (NVDEC for Jetson)
     std::string pipeline_str =
-        "rtspsrc location=\"" + current_url_ + "\" "
+        "rtspsrc location=\"" + url + "\" "
         "latency=100 buffer-mode=auto ! "
         "rtph264depay ! "
         "h264parse ! ";
@@ -226,9 +243,14 @@ void RTSPClient::capture_loop() {
             break;
         }
 
-        // Pull sample with timeout
+        // Pull sample with timeout.
+        // deep-review NH11: clamp fps to >= 1 before dividing. A misconfigured or
+        // SIGHUP-reloaded config with fps == 0 would otherwise be integer
+        // division by zero (SIGFPE); a negative fps would wrap to a huge unsigned
+        // GstClockTime timeout and hang the capture loop.
+        const int fps = std::max(1, config_.fps);
         GstSample* sample = gst_app_sink_try_pull_sample(
-            GST_APP_SINK(appsink_), GST_SECOND / config_.fps);
+            GST_APP_SINK(appsink_), GST_SECOND / fps);
 
         if (!sample) {
             consecutive_errors++;
@@ -292,7 +314,10 @@ bool RTSPClient::process_sample(GstSample* sample) {
     gst_structure_get_int(structure, "width", &width);
     gst_structure_get_int(structure, "height", &height);
 
-    if (width == 0 || height == 0) {
+    // deep-review NM7: reject non-positive dims. The old `== 0` check let a
+    // negative-but-nonzero width/height from malicious/buggy caps through and
+    // into the cv::Mat allocation.
+    if (width <= 0 || height <= 0) {
         LOG_WARN("Invalid frame dimensions: {}x{}", width, height);
         return false;
     }
@@ -304,8 +329,24 @@ bool RTSPClient::process_sample(GstSample* sample) {
         return false;
     }
 
-    // Create OpenCV Mat from buffer data
-    cv::Mat frame(height, width, CV_8UC3, map.data);
+    // deep-review NM7: validate the mapped buffer is large enough for the
+    // negotiated frame before constructing the Mat, otherwise frame.clone()
+    // reads out-of-bounds past map.data (OOB read / crash) on a short buffer
+    // from a malformed stream or stride/padding mismatch. GStreamer BGR rows
+    // are padded up to a 4-byte boundary, so account for the real stride.
+    const std::size_t stride = GST_ROUND_UP_4(static_cast<std::size_t>(width) * 3);
+    const std::size_t expected = stride * static_cast<std::size_t>(height);
+    if (map.size < expected) {
+        LOG_WARN("Buffer too small: have {} need {} ({}x{} BGR)",
+                 map.size, expected, width, height);
+        gst_buffer_unmap(buffer, &map);  // NM7: don't leak the map on early return
+        return false;
+    }
+
+    // Create OpenCV Mat from buffer data.
+    // deep-review NM7: pass the real stride so a padded buffer isn't misread as
+    // tight-packed (which would read past the row for non-4-aligned widths).
+    cv::Mat frame(height, width, CV_8UC3, map.data, stride);
 
     // Update latest frame
     {

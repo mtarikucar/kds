@@ -111,4 +111,44 @@ describe('socket switchBranch emit', () => {
 
     expect(fake.emit).toHaveBeenCalledWith('switchBranch', { branchId: 'b-2' });
   });
+
+  /**
+   * deep-review FM1/FM4 — the store subscriptions are registered ONCE at module
+   * load, so an init→disconnect→init cycle must NOT accumulate a second
+   * subscriber. A single accessToken rotation therefore reconnects the live
+   * socket exactly once, not once per cycle.
+   */
+  it('reconnects on accessToken change exactly once after an init/disconnect/init cycle', async () => {
+    const { io } = await import('socket.io-client');
+    // disconnect() must be chainable because prod calls .disconnect().connect()
+    const fake: FakeSocket = {
+      connected: true,
+      auth: {},
+      emit: vi.fn(),
+      on: vi.fn(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    fake.disconnect.mockReturnValue(fake);
+    (io as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fake);
+
+    const socketModule = await import('./socket');
+    const { useAuthStore } = await import('../store/authStore');
+
+    socketModule.initializeSocket();
+    socketModule.disconnectSocket();
+    socketModule.initializeSocket();
+
+    // Ignore the disconnect/connect churn from the init/disconnect cycle above;
+    // only the reconnect triggered by the token rotation matters here.
+    fake.disconnect.mockClear();
+    fake.connect.mockClear();
+
+    useAuthStore.setState({ accessToken: 'rotated-token' });
+
+    // Exactly one reconnect — would be 2+ if a stale subscription leaked
+    // (one extra disconnect().connect() per init/disconnect/init cycle).
+    expect(fake.disconnect).toHaveBeenCalledTimes(1);
+    expect(fake.connect).toHaveBeenCalledTimes(1);
+  });
 });

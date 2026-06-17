@@ -1405,7 +1405,31 @@ export class PaymentsService {
               totalPaid._sum.amount ?? 0,
             );
             const orderAmount = new Prisma.Decimal(order.finalAmount);
-            const fullyPaid = totalPaidAmount.gte(orderAmount);
+            // deep-review M13 — drive the PAID transition off the same
+            // ±PAYMENT_TOLERANCE the rest of the module uses (and an
+            // explicit all-units-allocated check), not a strict gte.
+            // Each per-entry amount is independently rounded to 2dp, so
+            // the SUM of the closing per-item totals can fall a sub-kuruş
+            // short of finalAmount even when every unit is paid. A strict
+            // gte left such an order stranded in SERVED forever (table
+            // never released, no invoice/loyalty) while the response said
+            // orderFullyPaid:true. We compute allUnitsAllocated inside the
+            // tx from the already-loaded order.orderItems + paidByItem
+            // (folding in this payment's allocations) so the authoritative
+            // "all units paid" signal also flips the order.
+            const allocatedByItem = new Map<string, number>(paidByItem);
+            for (const row of allocationRows) {
+              allocatedByItem.set(
+                row.orderItemId,
+                (allocatedByItem.get(row.orderItemId) ?? 0) + row.quantity,
+              );
+            }
+            const allUnitsAllocated = order.orderItems.every(
+              (oi) => (allocatedByItem.get(oi.id) ?? 0) >= oi.quantity,
+            );
+            const fullyPaid =
+              totalPaidAmount.gte(orderAmount.sub(PAYMENT_TOLERANCE)) ||
+              allUnitsAllocated;
 
             if (fullyPaid) {
               // bumpCustomerStats:false because each progressive

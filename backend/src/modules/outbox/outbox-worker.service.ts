@@ -45,6 +45,15 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   // re-dispatches, short enough that configuring the URL drains the
   // backlog within half an hour.
   private readonly UNCONFIGURED_PARK_MS = 30 * 60_000;
+  // deep-review H16 — how long a row may sit in 'dispatching' before we
+  // treat it as orphaned (worker crashed/OOM/SIGKILL between claiming the
+  // batch and writing the terminal status) and reclaim it to 'queued'.
+  // Comfortably above the worst-case single-dispatch + marketing-relay HTTP
+  // latency so we never race a still-live in-flight dispatch. Re-dispatch is
+  // safe: consumers dedupe on idempotencyKey (documented at-least-once
+  // contract). The claim already burned an attempt, so a reclaimed crash
+  // counts as one attempt — poison pills still converge on the DLQ.
+  private readonly STUCK_TIMEOUT_MS = 5 * 60_000;
 
   private timer: NodeJS.Timeout | null = null;
   private pruneTimer: NodeJS.Timeout | null = null;
@@ -155,6 +164,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     }
     this.running = true;
     try {
+      // deep-review H16: reclaim orphaned 'dispatching' rows before draining
+      // so a crashed-worker's in-flight batch re-enters the queue on the very
+      // next poll of whichever replica picks it up. Cheap (indexed status
+      // predicate, almost always a no-op) and idempotent across replicas.
+      await this.reclaimStuck();
       const drained = await this.drainOnce();
       // If we drained a full batch, immediately try again — backlog catch-up.
       // Otherwise sleep until the next poll cycle.
@@ -165,6 +179,58 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  /**
+   * deep-review H16 — reclaim outbox rows orphaned in status='dispatching'.
+   *
+   * If the worker process dies (OOM, SIGKILL during a deploy/rollout, pod
+   * eviction) after the claim UPDATE flips a batch to 'dispatching' but
+   * before each row's terminal write, those rows would otherwise stay
+   * 'dispatching' forever: drainOnce() only selects 'queued', pruneOnce()
+   * only deletes 'dispatched', and the superadmin requeue only targets
+   * 'failed'. The events — including payment.succeeded.v1 (commission
+   * crediting) and subscription/entitlement reprojection — would be silently
+   * lost. This reaper flips any 'dispatching' row whose claim timestamp
+   * (stamped into nextAttemptAt by the claim UPDATE) has aged past
+   * STUCK_TIMEOUT_MS back to 'queued'.
+   *
+   * We deliberately do NOT decrement attempts: the claim already burned one,
+   * and counting the crash as an attempt keeps a genuine poison pill (one
+   * that reliably kills the worker mid-dispatch) converging on the DLQ
+   * instead of looping forever. Re-dispatch is safe under the at-least-once
+   * contract — consumers dedupe on idempotencyKey.
+   */
+  private async reclaimStuck(): Promise<number> {
+    const cutoff = new Date(Date.now() - this.STUCK_TIMEOUT_MS);
+    const reclaimed = await this.prisma.$executeRaw`
+      UPDATE "outbox_events"
+         SET "status" = 'queued',
+             "nextAttemptAt" = NULL,
+             "lastError" = 'reclaimed: stuck in dispatching past timeout (worker likely crashed)'
+       WHERE "status" = 'dispatching'
+         AND "nextAttemptAt" IS NOT NULL
+         AND "nextAttemptAt" < ${cutoff}
+    `;
+    if (reclaimed > 0) {
+      // Loud on purpose: a non-zero reclaim means a worker died mid-dispatch.
+      // Ops should correlate with a crash/OOM/eviction around this time.
+      this.logger.warn(
+        `outbox reclaim: re-queued ${reclaimed} row(s) orphaned in 'dispatching' past ${this.STUCK_TIMEOUT_MS}ms (worker likely crashed)`,
+      );
+      // deep-review H16: expose reclaims to Prometheus so an alert can fire
+      // when this is non-zero (the existing outbox_dlq_depth gauge only ever
+      // catches status='failed' and would never have surfaced this state).
+      // A counter is used because MetricsService has a generic incCounter but
+      // no generic gauge setter; a sustained non-zero rate is the alert
+      // signal. (A dedicated `outbox_dispatching_depth` gauge would need a
+      // MetricsService change — out of scope for this file; see deviations.)
+      this.metrics?.incCounter(
+        "outbox_events_reclaimed_total",
+        "Outbox events reclaimed from a stuck 'dispatching' state (worker crash recovery)",
+      );
+    }
+    return reclaimed;
   }
 
   private async drainOnce(): Promise<number> {
@@ -185,7 +251,16 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       }>
     >`
       UPDATE "outbox_events"
-         SET "status" = 'dispatching', "attempts" = "attempts" + 1
+         SET "status" = 'dispatching',
+             "attempts" = "attempts" + 1,
+             -- deep-review H16: stamp the claim time onto the row (reusing
+             -- nextAttemptAt, the only mutable timestamp column on
+             -- OutboxEvent) so reclaimStuck() can detect rows orphaned in
+             -- 'dispatching' by a worker crash. A clean terminal write
+             -- below overwrites/clears this; a crash leaves it as the claim
+             -- instant, and once it ages past STUCK_TIMEOUT_MS the reaper
+             -- re-queues the row.
+             "nextAttemptAt" = ${now}
        WHERE "id" IN (
          SELECT "id" FROM "outbox_events"
           WHERE "status" = 'queued'

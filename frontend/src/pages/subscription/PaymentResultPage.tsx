@@ -39,6 +39,23 @@ const PaymentResultPage = ({ outcome }: PaymentResultPageProps) => {
   const isLive =
     subscription?.status === 'ACTIVE' || subscription?.status === 'TRIALING';
 
+  // deep-review FH1: useGetCurrentSubscription inherits the global 5-minute
+  // staleTime, so on mount this page would render the PRE-checkout cached
+  // subscription and could show a green "payment successful" for a payment
+  // that actually failed / is still pending (the cached status was already
+  // ACTIVE/TRIALING). Force a fresh read on mount so the result reflects the
+  // post-webhook truth, not stale cache. (A complete fix that correlates to
+  // THIS specific checkout needs a backend payment-status-by-merchantOid
+  // endpoint — tracked as a follow-up; this closes the stale-cache window.)
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+    queryClient.invalidateQueries({
+      queryKey: subscriptionKeys.effectiveFeatures(),
+    });
+    // mount-only: a one-shot fresh read; the poll loop below handles the rest.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (outcome !== 'success' || isLive) return;
     const start = Date.now();

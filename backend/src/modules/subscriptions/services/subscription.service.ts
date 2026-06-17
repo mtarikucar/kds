@@ -332,6 +332,23 @@ export class SubscriptionService {
       plan.name !== SubscriptionPlanType.FREE;
     const isTrialPeriod = canUseTrial;
 
+    // SECURITY (deep-review H3): this is the public ADMIN-facing creation
+    // entry point (POST /subscriptions). It must never mint a PAID,
+    // immediately-ACTIVE subscription — that is grant-before-pay. A paid
+    // plan only becomes ACTIVE after PayTR/havale settlement transitions an
+    // existing subscription (paytr-settlement / bank-transfer). The only
+    // states this path may create are a TRIALING trial or a FREE (amount 0)
+    // subscription. Without this gate a tenant whose per-plan trial slot is
+    // used and whose live subscription was cancelled/expired could POST a
+    // paid planId and self-activate paid access for free (the partial unique
+    // index only blocks while a live ACTIVE/TRIALING row already exists).
+    if (!isTrialPeriod && plan.name !== SubscriptionPlanType.FREE) {
+      throw new BadRequestException(
+        "Paid plans must be activated through checkout/payment. " +
+          "Start a trial or use the upgrade flow to pay for this plan.",
+      );
+    }
+
     // Use date-fns so DST transitions don't skew the period end by an hour.
     const now = new Date();
     const trialStart = isTrialPeriod ? now : null;
@@ -808,6 +825,22 @@ export class SubscriptionService {
         ? newPlan.monthlyPrice
         : newPlan.yearlyPrice;
 
+    // deep-review H1: roll the billing period forward as part of the same
+    // atomic claim. The downgrade cron runs at 01:00 and the period-end
+    // sweep at 02:00 on the same day; without advancing currentPeriodEnd the
+    // just-downgraded row still has a past period end, so the 02:00 sweep
+    // immediately flips it to PAST_DUE (then EXPIRED after the 7-day grace) —
+    // silently dropping a customer who scheduled a downgrade (requiresPayment
+    // = false) off the cheaper plan they meant to keep. This is a
+    // manual-renewal merchant, and the "scheduled for period end" contract
+    // already promises the cheaper plan continues, so granting the next cycle
+    // is the correct behaviour.
+    const now = new Date();
+    const newPeriodEnd =
+      billingCycle === BillingCycle.MONTHLY
+        ? addMonths(now, 1)
+        : addYears(now, 1);
+
     // v2.8.94 — wrap the claim + tenant.currentPlanId flip + lifecycle
     // event in a single $transaction. Pre-fix the subscription.planId
     // and tenant.currentPlanId could land in separate commits and the
@@ -833,6 +866,11 @@ export class SubscriptionService {
           billingCycle,
           amount: newAmount,
           currency: newPlan.currency,
+          // H1: advance the period so the period-end sweep no longer matches
+          // this row (its own currentPeriodEnd <= now guard then prevents the
+          // downgrade cron re-firing).
+          currentPeriodStart: now,
+          currentPeriodEnd: newPeriodEnd,
           scheduledDowngradePlanId: null,
           scheduledDowngradeBillingCycle: null,
         },
@@ -1417,6 +1455,9 @@ export class SubscriptionService {
     freePeriodEnd.setFullYear(freePeriodEnd.getFullYear() + 10);
 
     let failed = 0;
+    // deep-review H2: rows that were concurrently paid/cancelled between the
+    // findMany snapshot and the per-row claim are skipped, not failed.
+    let skipped = 0;
     for (const subscription of expiredTrials) {
       try {
         // Atomic transition: move the SAME subscription row from TRIALING
@@ -1425,9 +1466,21 @@ export class SubscriptionService {
         // (tenantId) WHERE status IN (ACTIVE, TRIALING) index, which
         // would fire if we tried to create a fresh FREE row alongside
         // the TRIALING one.
-        await this.prisma.$transaction(async (tx) => {
-          await tx.subscription.update({
-            where: { id: subscription.id },
+        //
+        // H2: the write is a CONDITIONAL claim (updateMany scoped to the
+        // still-TRIALING state), not an unconditional id update. If a PayTR
+        // webhook (applySuccess) flipped this row to ACTIVE+paid in the
+        // window after findMany, claim.count===0 and we MUST NOT clobber the
+        // just-paid subscription back to FREE (amount 0) — the customer was
+        // charged. The tenant.currentPlanId flip lives inside the won-claim
+        // branch so a skipped row never downgrades the tenant pointer either.
+        const transitioned = await this.prisma.$transaction(async (tx) => {
+          const claim = await tx.subscription.updateMany({
+            where: {
+              id: subscription.id,
+              status: SubscriptionStatus.TRIALING,
+              isTrialPeriod: true,
+            },
             data: {
               planId: freePlan.id,
               status: SubscriptionStatus.ACTIVE,
@@ -1438,11 +1491,22 @@ export class SubscriptionService {
               currentPeriodEnd: freePeriodEnd,
             },
           });
+          if (claim.count === 0) return false;
           await tx.tenant.update({
             where: { id: subscription.tenantId },
             data: { currentPlanId: freePlan.id },
           });
+          return true;
         });
+
+        if (!transitioned) {
+          skipped += 1;
+          this.logger.log(
+            `Trial ${subscription.id} skipped — no longer TRIALING (concurrently settled/cancelled); not downgraded to FREE`,
+          );
+          continue;
+        }
+
         this.logger.log(
           `Trial subscription ${subscription.id} expired → tenant ${subscription.tenantId} dropped to FREE`,
         );
@@ -1484,6 +1548,8 @@ export class SubscriptionService {
         );
       }
     }
-    return { processed: expiredTrials.length - failed, failed };
+    // processed = rows actually transitioned to FREE; skipped rows were
+    // concurrently paid/cancelled and are intentionally excluded from both.
+    return { processed: expiredTrials.length - failed - skipped, failed };
   }
 }

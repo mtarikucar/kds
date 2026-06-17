@@ -72,7 +72,19 @@ public:
 
 private:
     CameraConfig config_;
-    std::string current_url_;
+
+    // deep-review NH12: current_url_ is read on the capture thread (pipeline
+    // build / auto-reconnect) and written on the ws/io thread (set_url from a
+    // backend config push). Guard it with a dedicated mutex; never touch the
+    // shared std::string directly — always go through get_url() for a locked
+    // snapshot.
+    mutable std::mutex url_mutex_;
+    std::string current_url_;  // guarded by url_mutex_
+
+    std::string get_url() const {
+        std::lock_guard<std::mutex> lock(url_mutex_);
+        return current_url_;
+    }
 
     // State
     std::atomic<bool> running_{false};

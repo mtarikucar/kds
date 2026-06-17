@@ -90,7 +90,13 @@ const PurchaseOrdersTab = () => {
                         <Eye className="h-4 w-4" />
                       </button>
                       {order.status === 'DRAFT' && (
-                        <button onClick={() => submitMutation.mutate(order.id)} className="p-1 text-gray-400 hover:text-blue-600" title={t('purchaseOrders.submit')}>
+                        // deep-review FM8: disable submit while a state transition is in flight to prevent double-fire
+                        <button
+                          onClick={() => submitMutation.mutate(order.id)}
+                          disabled={submitMutation.isPending || cancelMutation.isPending}
+                          className="p-1 text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none"
+                          title={t('purchaseOrders.submit')}
+                        >
                           <Send className="h-4 w-4" />
                         </button>
                       )}
@@ -100,7 +106,17 @@ const PurchaseOrdersTab = () => {
                         </button>
                       )}
                       {order.status !== 'RECEIVED' && order.status !== 'CANCELLED' && (
-                        <button onClick={() => cancelMutation.mutate(order.id)} className="p-1 text-gray-400 hover:text-red-600" title={t('purchaseOrders.cancel')}>
+                        // deep-review FM8: confirm the destructive cancel (voids supplier order + reverses stock) and guard against double-fire
+                        <button
+                          onClick={() => {
+                            if (window.confirm(t('purchaseOrders.confirmCancel', { orderNumber: order.orderNumber, defaultValue: 'Cancel order {{orderNumber}}? Received stock will be reversed.' }))) {
+                              cancelMutation.mutate(order.id);
+                            }
+                          }}
+                          disabled={submitMutation.isPending || cancelMutation.isPending}
+                          className="p-1 text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:pointer-events-none"
+                          title={t('purchaseOrders.cancel')}
+                        >
                           <XCircle className="h-4 w-4" />
                         </button>
                       )}

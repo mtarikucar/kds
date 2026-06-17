@@ -313,5 +313,50 @@ describe('cartStore', () => {
       expect(s.tableId).toBeNull();
       expect(s.items).toHaveLength(1);
     });
+
+    // deep-review FM3: a different table on the same shared device is a new
+    // guest — the previous guest's cart must NOT leak across.
+    it('wipes the cart and rotates the session when the table changes', () => {
+      const store = useCartStore.getState();
+      store.initializeSession('t-1', 'table-1');
+      store.addItem(makeProduct(), 1, []);
+      const firstSession = useCartStore.getState().sessionId;
+      store.initializeSession('t-1', 'table-2');
+      const s = useCartStore.getState();
+      expect(s.tableId).toBe('table-2');
+      expect(s.items).toHaveLength(0);
+      expect(s.sessionId).not.toBe(firstSession);
+    });
+
+    // deep-review FM3: an externally-issued per-guest session id that differs
+    // from the stored one forces a clean cart, even on a tenant-wide QR (no
+    // tableId) where the table check can't tell guests apart.
+    it('wipes the cart when a new url-issued sessionId is provided', () => {
+      const store = useCartStore.getState();
+      store.initializeSession('t-1', null, 'TRY', 'sess-A');
+      store.addItem(makeProduct(), 1, []);
+      expect(useCartStore.getState().sessionId).toBe('sess-A');
+      store.initializeSession('t-1', null, 'TRY', 'sess-B');
+      const s = useCartStore.getState();
+      expect(s.sessionId).toBe('sess-B');
+      expect(s.items).toHaveLength(0);
+    });
+
+    it('adopts the url-issued sessionId on first init', () => {
+      useCartStore.getState().initializeSession('t-1', 'table-1', 'TRY', 'sess-X');
+      expect(useCartStore.getState().sessionId).toBe('sess-X');
+    });
+  });
+
+  // deep-review FM3: stamp savedAt on mutating writes so the persisted cart can
+  // self-expire on rehydrate.
+  describe('cart freshness (TTL)', () => {
+    it('stamps savedAt when items are added', () => {
+      const before = Date.now();
+      useCartStore.getState().addItem(makeProduct(), 1, []);
+      const savedAt = useCartStore.getState().savedAt;
+      expect(savedAt).toBeTruthy();
+      expect(savedAt as number).toBeGreaterThanOrEqual(before);
+    });
   });
 });

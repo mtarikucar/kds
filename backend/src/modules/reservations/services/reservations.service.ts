@@ -542,6 +542,32 @@ export class ReservationsService {
   async update(scope: BranchScope, id: string, dto: UpdateReservationDto) {
     const reservation = await this.findOne(scope, id);
 
+    // [M22] Validate any incoming tableId against the caller's scope before
+    // writing, mirroring createPublicReservation. The table FK is
+    // tenant-agnostic, so without this an ADMIN/MANAGER scoped to branch A
+    // could PATCH tableId to a table belonging to branch B / another tenant —
+    // the write would succeed (leaving branchId stale/inconsistent) and the
+    // include:{table:true} response would leak the foreign table's fields.
+    // branchScope(scope) pins (tenantId, branchId), so a found table is
+    // guaranteed in the SAME tenant AND branch as the reservation — no
+    // branchId rewrite is needed (and must NOT be allowed, lest a foreign
+    // branchId leak in). This also keeps the overlap query (which already
+    // filters by branchScope) accurate.
+    if (dto.tableId && dto.tableId !== reservation.tableId) {
+      const table = await this.prisma.table.findFirst({
+        where: { id: dto.tableId, ...branchScope(scope) },
+      });
+      if (!table) {
+        throw new NotFoundException("Table not found");
+      }
+      // Keep guestCount within the new table's capacity, using the effective
+      // guest count (incoming dto value, else the existing row).
+      const effectiveGuestCount = dto.guestCount ?? reservation.guestCount;
+      if (effectiveGuestCount > table.capacity) {
+        throw new BadRequestException(`Table capacity is ${table.capacity}`);
+      }
+    }
+
     const data: any = { ...dto };
     if (dto.date) {
       data.date = new Date(dto.date);

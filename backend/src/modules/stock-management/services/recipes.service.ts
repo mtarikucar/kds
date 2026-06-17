@@ -146,10 +146,16 @@ export class RecipesService {
         "A recipe already exists for this product in this branch",
       );
 
-    // Verify all stock items exist
+    // deep-review H12: scope the stock-item existence check to the
+    // recipe's branch (mirrors update() and PO create). A recipe whose
+    // ingredient referenced another branch's stock item would, on order
+    // deduction, drive down the WRONG branch's stock/batches/cost basis
+    // — silent cross-branch inventory corruption. Filtering on branchId
+    // here makes the length check below reject any ingredient not in the
+    // recipe's branch.
     const stockItemIds = dto.ingredients.map((i) => i.stockItemId);
     const stockItems = await this.prisma.stockItem.findMany({
-      where: { id: { in: stockItemIds }, tenantId },
+      where: { id: { in: stockItemIds }, tenantId, branchId },
     });
     if (stockItems.length !== stockItemIds.length) {
       throw new BadRequestException("One or more stock items not found");

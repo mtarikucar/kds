@@ -25,6 +25,43 @@ import { captureSwallowedEmit } from "../../common/observability/capture-swallow
 export class CommandQueueService {
   private readonly logger = new Logger(CommandQueueService.name);
   private static readonly MAX_ATTEMPTS = 5;
+
+  /**
+   * deep-review M19/M21 — side-effecting, NON-idempotent command kinds.
+   *
+   * These move real-world money or produce legally-binding artefacts:
+   *   - charge_card    → contacts the acquirer; a re-delivery double-charges.
+   *   - fiscal_receipt → prints a yazarkasa fiscal receipt; a duplicate is a
+   *                      tax/legal exposure.
+   *   - fiscal_cancel  → fiscal void; double-void corrupts the fiscal journal.
+   *   - open_drawer    → physically re-opens the cash drawer.
+   *   - print_receipt  → emits a customer receipt (cosmetic but undesirable
+   *                      to duplicate; included so the agent gets a stable
+   *                      no-auto-retry contract for all paper-emitting kinds).
+   *
+   * For these, the server NEVER auto-redelivers after a failed/lost ack: the
+   * device may already have executed the side effect with no surviving ack
+   * (terminal charged → app crashed → no result reached us). Re-queuing would
+   * charge the customer / print the receipt a second time. Instead they
+   * terminate in `failed` and an operator reconciles with an explicit
+   * compensating command. Safe/idempotent kinds (show_order, clear_order,
+   * capability_probe, reboot, noop, …) keep the normal retry path.
+   *
+   * NOTE: kinds use the DTO's dot/underscore identifier space; we match the
+   * canonical forms the bridge dispatcher actually executes today. New
+   * side-effecting kinds MUST be added here.
+   */
+  private static readonly NON_RETRYABLE_KINDS = new Set<string>([
+    "charge_card",
+    "fiscal_receipt",
+    "fiscal_cancel",
+    "open_drawer",
+    "print_receipt",
+  ]);
+
+  private static isNonRetryableKind(kind: string): boolean {
+    return CommandQueueService.NON_RETRYABLE_KINDS.has(kind);
+  }
   // 30 minutes — long enough for slow ESC/POS prints + occasional yazarkasa
   // network blips, short enough that operators see stuck commands cleared.
   // Override via DEVICE_COMMAND_TTL_MS.
@@ -50,9 +87,23 @@ export class CommandQueueService {
       priority?: number;
       idempotencyKey?: string;
     },
+    // deep-review H14 — branch-scope constraint on the device lookup.
+    // When the caller passes a `branchId` (non-wildcard, e.g. a MANAGER
+    // limited to a single branch), the target device MUST live in that
+    // branch or the lookup returns null → 404. ADMINs acting tenant-wide
+    // pass `undefined` and retain the tenant-wide reach. Omitting the
+    // arg preserves the pre-fix behaviour (tenant-wide) so existing
+    // callers compile unchanged; the controller is expected to forward
+    // the branch scope so a branch-restricted manager can't drive payment
+    // terminals / cash drawers / fiscal printers in another branch.
+    branchId?: string,
   ) {
     const device = await this.prisma.device.findFirst({
-      where: { id: deviceId, tenantId },
+      where: {
+        id: deviceId,
+        tenantId,
+        ...(branchId ? { branchId } : {}),
+      },
       select: { id: true, status: true, branchId: true },
     });
     if (!device) throw new NotFoundException("Device not found");
@@ -162,10 +213,19 @@ export class CommandQueueService {
 
     // Failed commands with retries remaining go back to `queued`; otherwise
     // they terminate in `failed`. Done commands are terminal regardless.
+    //
+    // deep-review M21 — side-effecting (non-idempotent) kinds are NEVER
+    // auto-requeued on a failed/lost ack. A terminal that charged the
+    // acquirer then lost its result on the way back must NOT be re-issued
+    // — that double-charges the customer / duplicates the fiscal receipt.
+    // Such commands terminate directly in `failed` (ackedAt set, error
+    // surfaced) and emit device.command.failed.v1 for an operator to
+    // reconcile with an explicit compensating command.
     let nextStatus: "done" | "failed" | "queued" = input.status;
     if (
       input.status === "failed" &&
-      cmd.attempts < CommandQueueService.MAX_ATTEMPTS
+      cmd.attempts < CommandQueueService.MAX_ATTEMPTS &&
+      !CommandQueueService.isNonRetryableKind(cmd.kind)
     ) {
       nextStatus = "queued";
     }
@@ -233,12 +293,13 @@ export class CommandQueueService {
    * would sweep a slow-claim queue: a command created an hour ago that
    * JUST went inflight 10s ago would be wrongly marked stuck.
    *
-   * Implemented as two updateMany calls — one per attempts branch —
-   * rather than the previous findMany + per-row update loop. The old
-   * shape was an N+1 (one round-trip per stuck command), so a sweep
-   * with 10K stale rows held the connection for as many serialised
-   * writes; the new shape is two statements regardless of N and lets
-   * Postgres pick the index path it likes.
+   * Implemented as a fixed set of updateMany calls (one per branch:
+   * requeue / give-up / side-effecting-fail / expired) rather than the
+   * previous findMany + per-row update loop. The old shape was an N+1
+   * (one round-trip per stuck command), so a sweep with 10K stale rows
+   * held the connection for as many serialised writes; the new shape is
+   * a constant number of statements regardless of N and lets Postgres
+   * pick the index path it likes.
    */
   async sweepStuck(): Promise<number> {
     const cutoff = new Date(Date.now() - 5 * 60 * 1000);
@@ -248,35 +309,69 @@ export class CommandQueueService {
     // in `queued` status with expiresAt in the past (where claimNext
     // silently skips them and nobody is alerted). The `expired` row
     // still carries the original payload for forensic review.
-    const [requeue, fail, expired] = await this.prisma.$transaction([
-      this.prisma.deviceCommand.updateMany({
-        where: {
-          status: "inflight",
-          updatedAt: { lt: cutoff },
-          attempts: { lt: CommandQueueService.MAX_ATTEMPTS },
-        },
-        data: { status: "queued", error: "No ack received; requeued" },
-      }),
-      this.prisma.deviceCommand.updateMany({
-        where: {
-          status: "inflight",
-          updatedAt: { lt: cutoff },
-          attempts: { gte: CommandQueueService.MAX_ATTEMPTS },
-        },
-        data: { status: "failed", error: "No ack received; giving up" },
-      }),
-      this.prisma.deviceCommand.updateMany({
-        where: {
-          status: "queued",
-          expiresAt: { lt: now, not: null },
-        },
-        data: { status: "expired", error: "TTL expired before device claimed" },
-      }),
-    ]);
-    const total = requeue.count + fail.count + expired.count;
+    // deep-review M19/M21 — the sweeper is the MORE dangerous redelivery
+    // path (crash-after-charge with no surviving ack), so the kind guard
+    // applied in ack() MUST also apply here or the TTL sweeper silently
+    // bypasses it. The inflight-requeue branch therefore excludes the
+    // non-idempotent kinds (`kind: { notIn }`); those are routed instead
+    // to a terminal `failed` state regardless of attempts — a stuck
+    // inflight charge_card/fiscal_receipt is never put back on the queue.
+    // Operators see the `failed` row + device.command.failed.v1 (emitted
+    // by the ack path / surfaced via the admin view) and reconcile with an
+    // explicit compensating command rather than the server blindly
+    // re-charging.
+    const nonRetryable = [...CommandQueueService.NON_RETRYABLE_KINDS];
+    const [requeue, fail, sideEffectFail, expired] =
+      await this.prisma.$transaction([
+        this.prisma.deviceCommand.updateMany({
+          where: {
+            status: "inflight",
+            updatedAt: { lt: cutoff },
+            attempts: { lt: CommandQueueService.MAX_ATTEMPTS },
+            kind: { notIn: nonRetryable },
+          },
+          data: { status: "queued", error: "No ack received; requeued" },
+        }),
+        this.prisma.deviceCommand.updateMany({
+          where: {
+            status: "inflight",
+            updatedAt: { lt: cutoff },
+            attempts: { gte: CommandQueueService.MAX_ATTEMPTS },
+            kind: { notIn: nonRetryable },
+          },
+          data: { status: "failed", error: "No ack received; giving up" },
+        }),
+        // Side-effecting kinds: terminate in `failed` regardless of
+        // attempts. Never auto-retried — the device may already have
+        // moved real money / printed a fiscal receipt.
+        this.prisma.deviceCommand.updateMany({
+          where: {
+            status: "inflight",
+            updatedAt: { lt: cutoff },
+            kind: { in: nonRetryable },
+          },
+          data: {
+            status: "failed",
+            error:
+              "No ack received; not auto-retried (side-effecting) — requires manual compensating command",
+          },
+        }),
+        this.prisma.deviceCommand.updateMany({
+          where: {
+            status: "queued",
+            expiresAt: { lt: now, not: null },
+          },
+          data: {
+            status: "expired",
+            error: "TTL expired before device claimed",
+          },
+        }),
+      ]);
+    const total =
+      requeue.count + fail.count + sideEffectFail.count + expired.count;
     if (total > 0) {
       this.logger.warn(
-        `Swept ${total} stuck device commands (requeued=${requeue.count} failed=${fail.count} expired=${expired.count})`,
+        `Swept ${total} stuck device commands (requeued=${requeue.count} failed=${fail.count} sideEffectFailed=${sideEffectFail.count} expired=${expired.count})`,
       );
     }
     return total;
@@ -286,11 +381,18 @@ export class CommandQueueService {
     tenantId: string,
     deviceId: string,
     filters?: { status?: string; limit?: number },
+    // deep-review H14 — same branch-scope guard as enqueue(). A
+    // branch-restricted caller (non-wildcard `branchId`) can only inspect
+    // command queues for devices in their own branch; a cross-branch
+    // deviceId yields an empty list rather than leaking another branch's
+    // command history. ADMINs acting tenant-wide pass undefined.
+    branchId?: string,
   ) {
     return this.prisma.deviceCommand.findMany({
       where: {
         tenantId,
         deviceId,
+        ...(branchId ? { branchId } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
       },
       orderBy: { createdAt: "desc" },

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { differenceInDays } from "date-fns";
@@ -26,6 +27,15 @@ import { captureException } from "../../../sentry.config";
 @Injectable()
 export class SuperAdminSubscriptionsService {
   private readonly logger = new Logger(SuperAdminSubscriptionsService.name);
+
+  /**
+   * Non-terminal claim state used by refundPayment to atomically reserve a
+   * payment before calling PayTR (deep-review H17). Lives as a local string
+   * literal because SubscriptionPayment.status is a free-form String column
+   * (not a Prisma enum), so no migration is needed; the shared PaymentStatus
+   * TS enum only models the terminal states.
+   */
+  private static readonly REFUNDING_STATUS = "REFUNDING";
 
   constructor(
     private prisma: PrismaService,
@@ -647,13 +657,45 @@ export class SuperAdminSubscriptionsService {
       }
     }
 
-    const result = await this.paytr.refund({
-      merchantOid: payment.paytrMerchantOid,
-      amount: refundAmount,
-      referenceNo: payment.id,
+    // Atomically claim the payment BEFORE touching PayTR (deep-review H17).
+    // The read-then-check above can be raced: two ops requests (double-click,
+    // retry, two operators) could both read status=SUCCEEDED, both pass the
+    // guard, and both call paytr.refund(). A full+full pair is caught by
+    // PayTR's duplicate rejection, but two DIFFERENT partial amounts (or a
+    // full + a partial) can BOTH succeed at PayTR — moving real money twice.
+    // updateMany with status in the WHERE is a single conditional write, so
+    // only one caller can flip SUCCEEDED→REFUNDING and proceed; the rest get
+    // a 409. No FOR UPDATE / explicit transaction needed.
+    const claim = await this.prisma.subscriptionPayment.updateMany({
+      where: { id: payment.id, status: PaymentStatus.SUCCEEDED },
+      data: { status: SuperAdminSubscriptionsService.REFUNDING_STATUS },
     });
+    if (claim.count !== 1) {
+      throw new ConflictException({
+        errorCode: "REFUND_IN_PROGRESS_OR_DONE",
+        message:
+          "A refund for this payment is already in progress or completed.",
+      });
+    }
+
+    let result: Awaited<ReturnType<PaytrAdapter["refund"]>>;
+    try {
+      result = await this.paytr.refund({
+        merchantOid: payment.paytrMerchantOid,
+        amount: refundAmount,
+        referenceNo: payment.id,
+      });
+    } catch (err) {
+      // PayTR call threw (network/timeout) — no confirmed money move. Release
+      // the claim so the payment can be retried, then rethrow.
+      await this.releaseRefundClaim(payment.id);
+      throw err;
+    }
 
     if (result.status !== "success") {
+      // PayTR rejected — no money moved. Roll the claim back REFUNDING→SUCCEEDED
+      // so the payment can be retried, then surface the rejection (H17).
+      await this.releaseRefundClaim(payment.id);
       throw new BadRequestException(
         `PayTR refund rejected: ${result.reason ?? "unknown"}`,
       );
@@ -715,6 +757,36 @@ export class SuperAdminSubscriptionsService {
         message:
           "PayTR refund succeeded but local payment state could not be updated. " +
           "Ops has been alerted — do NOT retry the refund (PayTR will reject as duplicate).",
+      });
+    }
+  }
+
+  /**
+   * Roll a refund claim back REFUNDING→SUCCEEDED when PayTR did NOT move money
+   * (threw or rejected) so the payment becomes refundable again (deep-review
+   * H17). Guarded on the REFUNDING state so it only ever touches the row this
+   * request claimed. A failure to release is logged + reported but never
+   * masks the original PayTR error — worst case the row is stuck in REFUNDING
+   * and a human un-sticks it, which is strictly safer than an unclaimed
+   * double-refund.
+   */
+  private async releaseRefundClaim(paymentId: string): Promise<void> {
+    try {
+      await this.prisma.subscriptionPayment.updateMany({
+        where: {
+          id: paymentId,
+          status: SuperAdminSubscriptionsService.REFUNDING_STATUS,
+        },
+        data: { status: PaymentStatus.SUCCEEDED },
+      });
+    } catch (releaseErr: any) {
+      this.logger.error(
+        `Failed to release refund claim for payment=${paymentId}; row may be stuck in REFUNDING: ${releaseErr?.message ?? releaseErr}`,
+      );
+      captureException(releaseErr, {
+        severity: "warning",
+        context: "refund-claim-release-failed",
+        paymentId,
       });
     }
   }

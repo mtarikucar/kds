@@ -64,15 +64,18 @@ export function buildQRMenuUrl(
     sessionId?: string | null;
   }
 ): string {
-  const { subdomain, tenantId, tableId, sessionId } = options;
+  // deep-review FH5: `sessionId` is intentionally NOT read here anymore.
+  // It used to be emitted into shareable orders/loyalty links, turning the
+  // link into a bearer credential for the order history. The active session
+  // lives in the persisted per-device cart store, so the pages work without
+  // it. The option is kept in the type for caller compatibility.
+  const { subdomain, tenantId, tableId } = options;
 
   // Subdomain access - use root paths
   if (subdomain) {
     const params = new URLSearchParams();
     if (tableId) params.set('tableId', tableId);
-    if (sessionId && (page === 'orders' || page === 'loyalty')) {
-      params.set('sessionId', sessionId);
-    }
+    // FH5: sessionId is no longer emitted into the URL (bearer-credential leak).
     const queryString = params.toString();
 
     switch (page) {
@@ -92,9 +95,7 @@ export function buildQRMenuUrl(
     const baseUrl = `/qr-menu/${tenantId}`;
     const params = new URLSearchParams();
     if (tableId) params.set('tableId', tableId);
-    if (sessionId && (page === 'orders' || page === 'loyalty')) {
-      params.set('sessionId', sessionId);
-    }
+    // FH5: sessionId is no longer emitted into the URL (bearer-credential leak).
     const queryString = params.toString();
 
     switch (page) {

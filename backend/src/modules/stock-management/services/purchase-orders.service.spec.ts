@@ -1,7 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
-import { PurchaseOrdersService } from './purchase-orders.service';
-import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
-import { PurchaseOrderStatus } from '../../../common/constants/stock-management.enum';
+import { BadRequestException } from "@nestjs/common";
+import { PurchaseOrdersService } from "./purchase-orders.service";
+import {
+  mockPrismaClient,
+  MockPrismaClient,
+} from "../../../common/test/prisma-mock.service";
+import { PurchaseOrderStatus } from "../../../common/constants/stock-management.enum";
 
 /**
  * Iter-34 regression: the per-line poItem read in receive() MUST
@@ -11,7 +14,7 @@ import { PurchaseOrderStatus } from '../../../common/constants/stock-management.
  * `alreadyReceived=N`, both computed `N+their_qty`, and the second
  * UPDATE clobbered the first (lost update). Pin the query shape.
  */
-describe('PurchaseOrdersService.receive (iter-34)', () => {
+describe("PurchaseOrdersService.receive (iter-34)", () => {
   let prisma: MockPrismaClient;
   let svc: PurchaseOrdersService;
 
@@ -19,10 +22,10 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
   // branchScope(scope) fences the PO read on (tenantId, branchId), so a
   // cross-branch PO id can never be received/cancelled (stock mutated).
   const SCOPE = {
-    tenantId: 't1',
-    branchId: 'b1',
-    userId: 'user-1',
-    role: 'ADMIN',
+    tenantId: "t1",
+    branchId: "b1",
+    userId: "user-1",
+    role: "ADMIN",
   } as const;
 
   beforeEach(() => {
@@ -30,21 +33,21 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
     svc = new PurchaseOrdersService(prisma as any);
   });
 
-  it('re-reads poItem on the txn client inside the transaction', async () => {
+  it("re-reads poItem on the txn client inside the transaction", async () => {
     // Outside-txn findOne (pre-flight status check)
     (prisma.purchaseOrder.findFirst as any).mockResolvedValue({
-      id: 'po-1',
-      tenantId: 't1',
+      id: "po-1",
+      tenantId: "t1",
       status: PurchaseOrderStatus.SUBMITTED,
-      orderNumber: 'PO-00001',
+      orderNumber: "PO-00001",
       items: [
         {
-          id: 'poi-1',
-          stockItemId: 'stock-1',
-          stockItem: { name: 'Flour' },
-          quantityReceived: '0',
-          quantityOrdered: '10',
-          unitPrice: '5',
+          id: "poi-1",
+          stockItemId: "stock-1",
+          stockItem: { name: "Flour" },
+          quantityReceived: "0",
+          quantityOrdered: "10",
+          unitPrice: "5",
         },
       ],
     });
@@ -53,23 +56,25 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
       purchaseOrderItem: {
         // In-txn re-read — load-bearing for the lost-update fix.
         findFirst: jest.fn().mockResolvedValue({
-          id: 'poi-1',
-          stockItemId: 'stock-1',
-          stockItem: { name: 'Flour' },
-          quantityReceived: '0',
-          quantityOrdered: '10',
-          unitPrice: '5',
+          id: "poi-1",
+          stockItemId: "stock-1",
+          stockItem: { name: "Flour" },
+          quantityReceived: "0",
+          quantityOrdered: "10",
+          unitPrice: "5",
         }),
         update: jest.fn().mockResolvedValue({}),
-        findMany: jest.fn().mockResolvedValue([
-          { quantityReceived: '5', quantityOrdered: '10' },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { quantityReceived: "5", quantityOrdered: "10" },
+          ]),
       },
       stockItem: {
         findUnique: jest.fn().mockResolvedValue({
-          id: 'stock-1',
-          currentStock: '0',
-          costPerUnit: '0',
+          id: "stock-1",
+          currentStock: "0",
+          costPerUnit: "0",
         }),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -77,13 +82,15 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
       ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
       purchaseOrder: { update: jest.fn().mockResolvedValue({}) },
     };
-    (prisma.$transaction as any).mockImplementation(async (cb: any, _opts: any) => cb(txMock));
+    (prisma.$transaction as any).mockImplementation(
+      async (cb: any, _opts: any) => cb(txMock),
+    );
 
     await svc.receive(
-      'po-1',
-      { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 5 }] } as any,
+      "po-1",
+      { items: [{ purchaseOrderItemId: "poi-1", quantityReceived: 5 }] } as any,
       SCOPE,
-      'user-1',
+      "user-1",
     );
 
     // Load-bearing assertion: the second findFirst (per-line) lands on
@@ -92,8 +99,8 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
     expect(txMock.purchaseOrderItem.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          id: 'poi-1',
-          purchaseOrderId: 'po-1',
+          id: "poi-1",
+          purchaseOrderId: "po-1",
         }),
       }),
     );
@@ -102,50 +109,52 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
     // from branchScope(scope), so receive can only mutate stock for a PO
     // that belongs to the caller's (tenantId, branchId).
     expect(prisma.purchaseOrder.findFirst.mock.calls[0][0].where).toEqual({
-      id: 'po-1',
-      tenantId: 't1',
-      branchId: 'b1',
+      id: "po-1",
+      tenantId: "t1",
+      branchId: "b1",
     });
     // Stock + movement writes carry the scope's branchId (not re-derived).
-    expect(txMock.stockBatch.create.mock.calls[0][0].data.branchId).toBe('b1');
+    expect(txMock.stockBatch.create.mock.calls[0][0].data.branchId).toBe("b1");
     expect(
       txMock.ingredientMovement.create.mock.calls[0][0].data.branchId,
-    ).toBe('b1');
+    ).toBe("b1");
   });
 
-  it('does NOT receive (mutate stock for) a cross-branch PO id', async () => {
+  it("does NOT receive (mutate stock for) a cross-branch PO id", async () => {
     // findOne is branch-fenced; a PO that lives in another branch is not
     // visible, so findFirst returns null → NotFound before any txn.
     (prisma.purchaseOrder.findFirst as any).mockResolvedValue(null);
-    const { NotFoundException } = require('@nestjs/common');
+    const { NotFoundException } = require("@nestjs/common");
 
     await expect(
       svc.receive(
-        'cross-branch-po',
-        { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 5 }] } as any,
+        "cross-branch-po",
+        {
+          items: [{ purchaseOrderItemId: "poi-1", quantityReceived: 5 }],
+        } as any,
         SCOPE,
-        'user-1',
+        "user-1",
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     // No stock-mutating transaction may run for a cross-branch PO.
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('rejects over-receive based on the FRESHLY-READ alreadyReceived (not the stale snapshot)', async () => {
+  it("rejects over-receive based on the FRESHLY-READ alreadyReceived (not the stale snapshot)", async () => {
     // Outside-txn snapshot says quantityReceived=0 (the stale view).
     (prisma.purchaseOrder.findFirst as any).mockResolvedValue({
-      id: 'po-1',
-      tenantId: 't1',
+      id: "po-1",
+      tenantId: "t1",
       status: PurchaseOrderStatus.SUBMITTED,
-      orderNumber: 'PO-00001',
+      orderNumber: "PO-00001",
       items: [
         {
-          id: 'poi-1',
-          stockItemId: 'stock-1',
-          stockItem: { name: 'Flour' },
-          quantityReceived: '0',
-          quantityOrdered: '10',
-          unitPrice: '5',
+          id: "poi-1",
+          stockItemId: "stock-1",
+          stockItem: { name: "Flour" },
+          quantityReceived: "0",
+          quantityOrdered: "10",
+          unitPrice: "5",
         },
       ],
     });
@@ -155,12 +164,12 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
         // In-txn fresh read says we ALREADY received 8 (a concurrent
         // call landed). New attempt of 5 would push us to 13 > 10.
         findFirst: jest.fn().mockResolvedValue({
-          id: 'poi-1',
-          stockItemId: 'stock-1',
-          stockItem: { name: 'Flour' },
-          quantityReceived: '8',
-          quantityOrdered: '10',
-          unitPrice: '5',
+          id: "poi-1",
+          stockItemId: "stock-1",
+          stockItem: { name: "Flour" },
+          quantityReceived: "8",
+          quantityOrdered: "10",
+          unitPrice: "5",
         }),
         update: jest.fn(),
         findMany: jest.fn(),
@@ -170,12 +179,16 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
       ingredientMovement: { create: jest.fn() },
       purchaseOrder: { update: jest.fn() },
     };
-    (prisma.$transaction as any).mockImplementation(async (cb: any, _opts: any) => cb(txMock));
+    (prisma.$transaction as any).mockImplementation(
+      async (cb: any, _opts: any) => cb(txMock),
+    );
 
     await expect(
       svc.receive(
-        'po-1',
-        { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 5 }] } as any,
+        "po-1",
+        {
+          items: [{ purchaseOrderItemId: "poi-1", quantityReceived: 5 }],
+        } as any,
         SCOPE,
       ),
     ).rejects.toThrow(BadRequestException);
@@ -184,5 +197,159 @@ describe('PurchaseOrdersService.receive (iter-34)', () => {
     // mutation, so the over-receive race is properly closed.
     expect(txMock.stockItem.update).not.toHaveBeenCalled();
     expect(txMock.stockBatch.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * deep-review M18 regression: cancel() must run under Serializable, re-read
+ * the PO/items/batches INSIDE the txn, and reverse only the un-consumed
+ * batch remainder — NOT the gross quantityReceived from the outside-txn
+ * findOne snapshot. The prior code zeroed all batches and decremented by the
+ * gross received qty, double-counting any stock FIFO had already consumed
+ * (and missing receives that committed after findOne).
+ */
+describe("PurchaseOrdersService.cancel (deep-review M18)", () => {
+  let prisma: MockPrismaClient;
+  let svc: PurchaseOrdersService;
+
+  const SCOPE = {
+    tenantId: "t1",
+    branchId: "b1",
+    userId: "user-1",
+    role: "ADMIN",
+  } as const;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new PurchaseOrdersService(prisma as any);
+  });
+
+  it("reverses only the un-consumed batch remainder, not the gross received qty", async () => {
+    // Pre-flight findOne snapshot: 5 received.
+    (prisma.purchaseOrder.findFirst as any).mockResolvedValue({
+      id: "po-1",
+      tenantId: "t1",
+      branchId: "b1",
+      status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
+      orderNumber: "PO-00001",
+      items: [
+        {
+          id: "poi-1",
+          stockItemId: "stock-1",
+          quantityReceived: "5",
+          unitPrice: "5",
+        },
+      ],
+    });
+
+    const txMock: any = {
+      // In-txn re-claim — load-bearing for the M18 fix.
+      purchaseOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "po-1",
+          status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
+          orderNumber: "PO-00001",
+          items: [
+            {
+              id: "poi-1",
+              stockItemId: "stock-1",
+              quantityReceived: "5",
+              unitPrice: "5",
+            },
+          ],
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      // FIFO already consumed 2 of the 5 → only 3 remain on hand.
+      stockBatch: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "batch-1", quantity: "3" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockItem: { update: jest.fn().mockResolvedValue({}) },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+      purchaseOrderItem: { update: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(
+      async (cb: any, _opts: any) => cb(txMock),
+    );
+
+    await svc.cancel("po-1", SCOPE, "user-1");
+
+    // The PO is re-claimed inside the txn (not trusting the outer snapshot).
+    expect(txMock.purchaseOrder.findFirst).toHaveBeenCalledTimes(1);
+
+    // Stock is decremented by the REMAINING 3, never the gross 5.
+    expect(
+      txMock.stockItem.update.mock.calls[0][0].data.currentStock.decrement.toString(),
+    ).toBe("3");
+
+    // The reversal movement records the actual reversed qty (-3).
+    expect(
+      txMock.ingredientMovement.create.mock.calls[0][0].data.quantity.toString(),
+    ).toBe("-3");
+
+    // Serializable isolation is requested (write-vs-write race → 40001).
+    const opts = (prisma.$transaction as any).mock.calls[0][1];
+    expect(opts.isolationLevel).toBe("Serializable");
+  });
+
+  it("skips stock reversal entirely when no batch quantity remains", async () => {
+    (prisma.purchaseOrder.findFirst as any).mockResolvedValue({
+      id: "po-1",
+      tenantId: "t1",
+      branchId: "b1",
+      status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
+      orderNumber: "PO-00001",
+      items: [
+        {
+          id: "poi-1",
+          stockItemId: "stock-1",
+          quantityReceived: "5",
+          unitPrice: "5",
+        },
+      ],
+    });
+
+    const txMock: any = {
+      purchaseOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "po-1",
+          status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
+          orderNumber: "PO-00001",
+          items: [
+            {
+              id: "poi-1",
+              stockItemId: "stock-1",
+              quantityReceived: "5",
+              unitPrice: "5",
+            },
+          ],
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      // Fully consumed by FIFO — nothing left to reverse.
+      stockBatch: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "batch-1", quantity: "0" }]),
+        updateMany: jest.fn(),
+      },
+      stockItem: { update: jest.fn() },
+      ingredientMovement: { create: jest.fn() },
+      purchaseOrderItem: { update: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(
+      async (cb: any, _opts: any) => cb(txMock),
+    );
+
+    await svc.cancel("po-1", SCOPE, "user-1");
+
+    // No phantom decrement / movement when remaining is zero.
+    expect(txMock.stockItem.update).not.toHaveBeenCalled();
+    expect(txMock.ingredientMovement.create).not.toHaveBeenCalled();
+    // quantityReceived is still cleared so the PO can't be re-cancelled into stock.
+    expect(txMock.purchaseOrderItem.update).toHaveBeenCalled();
   });
 });

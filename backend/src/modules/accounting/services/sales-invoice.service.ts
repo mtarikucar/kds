@@ -57,11 +57,33 @@ export class SalesInvoiceService {
     // the transaction short.
     const settings = await this.settingsService.findByTenant(tenantId);
 
-    const invoiceItems = order.orderItems.map((item) => {
-      const lineTotal = Number(item.subtotal);
-      const taxRate = item.taxRate ?? 10;
-      const tax = this.taxService.extractTax(lineTotal, taxRate);
+    // deep-review M11: the order may carry an order-level discount
+    // (order.totalAmount = gross, order.finalAmount = net, the delta is
+    // order.discount). Pre-fix we built each line from its GROSS subtotal
+    // but persisted header totalAmount = finalAmount (net). That made the
+    // invoice internally inconsistent: sum(line totals) == gross while the
+    // header total == net, so e-fatura providers that validate
+    // sum(lines)==total reject the document or mis-book the net.
+    //
+    // Fix: apportion the order-level discount across the lines pro-rata by
+    // each line's gross share, in Decimal, so sum(net line totals) ==
+    // finalAmount EXACTLY (the rounding remainder is pushed onto the
+    // largest line). Each line's subtotal/taxAmount are then re-extracted
+    // from its NET gross at the line's own KDV rate, and the header
+    // subtotal/taxAmount/taxBreakdown are recomputed from the adjusted
+    // lines — never the pre-discount ones.
+    const D = (v: Prisma.Decimal | number | string) => new Prisma.Decimal(v);
+    const round2 = (d: Prisma.Decimal) =>
+      d.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 
+    const orderGross = D(order.totalAmount);
+    const orderDiscount = D(order.discount);
+    // Guard div-by-zero: a fully-comped (gross 0) order with a discount is
+    // nonsensical, but if gross is 0 there is nothing to apportion against.
+    const hasDiscount = orderDiscount.gt(0) && orderGross.gt(0);
+
+    // First pass: validate quantities and capture each line's gross.
+    const lineGross = order.orderItems.map((item) => {
       // quantity===0 would back-calc unitPrice as NaN and persist into the
       // Decimal column, breaking downstream math and tax-authority XML.
       if (!item.quantity || item.quantity <= 0) {
@@ -69,6 +91,37 @@ export class SalesInvoiceService {
           `Invoice cannot be generated: order item "${item.product?.name ?? item.id}" has non-positive quantity`,
         );
       }
+      return D(item.subtotal);
+    });
+
+    // Apportion the discount across lines pro-rata by gross share, rounding
+    // each apportioned discount to 2dp. Track the largest line so the
+    // rounding remainder lands there and the net lines sum to finalAmount
+    // to the cent.
+    const netLineGross: Prisma.Decimal[] = lineGross.map((g) => g);
+    if (hasDiscount) {
+      let allocated = D(0);
+      let largestIdx = 0;
+      for (let i = 0; i < lineGross.length; i++) {
+        const share = round2(lineGross[i].div(orderGross).mul(orderDiscount));
+        netLineGross[i] = lineGross[i].sub(share);
+        allocated = allocated.add(share);
+        if (lineGross[i].gt(lineGross[largestIdx])) largestIdx = i;
+      }
+      // Push the rounding remainder (orderDiscount − Σ apportioned) onto the
+      // largest line so Σ(net line gross) == finalAmount exactly.
+      const remainder = orderDiscount.sub(allocated);
+      if (!remainder.isZero()) {
+        netLineGross[largestIdx] = netLineGross[largestIdx].sub(remainder);
+      }
+    }
+
+    const invoiceItems = order.orderItems.map((item, i) => {
+      const taxRate = item.taxRate ?? 10;
+      // extractTax pulls the KDV component out of the (now net) inclusive
+      // line gross, so subtotal/taxAmount reconcile to the discounted total.
+      const netGross = round2(netLineGross[i]).toNumber();
+      const tax = this.taxService.extractTax(netGross, taxRate);
 
       return {
         description: item.product?.name || "Ürün",
@@ -78,7 +131,7 @@ export class SalesInvoiceService {
         taxRate,
         taxAmount: tax.taxAmount,
         subtotal: tax.subtotalExcludingTax,
-        total: lineTotal,
+        total: netGross,
       };
     });
 
@@ -275,9 +328,15 @@ export class SalesInvoiceService {
             subtotal: Math.round(subtotal * 100) / 100,
             taxAmount: Math.round(taxAmount * 100) / 100,
             totalAmount,
-            // Pro-rata discount portion of this payment, derived from
-            // (totalAmount − subtotal − taxAmount). Negative noise is
-            // clamped at 0.
+            // deep-review M11: no order-level discount line here. Each
+            // OrderItemPayment.amount is, by definition, "this allocation's
+            // contribution to Payment.amount" — i.e. already net of any
+            // order discount that was distributed at payment time. The
+            // lines are derived from those allocation amounts, so
+            // Σ(line totals) == Σ(alloc.amount) == payment.amount ==
+            // totalAmount, and there is nothing left to discount on the
+            // invoice. (Pre-fix this carried a misleading comment claiming
+            // a pro-rata discount it never actually computed.)
             discount: 0,
             taxBreakdown,
             orderId: payment.orderId,

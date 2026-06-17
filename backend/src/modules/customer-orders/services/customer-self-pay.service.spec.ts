@@ -12,6 +12,9 @@ import { CustomerSelfPayService } from "./customer-self-pay.service";
 // without redefining a frozen property.
 jest.mock("@sentry/node", () => ({
   captureException: jest.fn(),
+  // deep-review M12 — webhook success-path amount-drift alert uses
+  // captureMessage; stub it so the reconciliation branch never throws.
+  captureMessage: jest.fn(),
 }));
 import {
   mockPrismaClient,
@@ -178,9 +181,7 @@ describe("CustomerSelfPayService (characterization)", () => {
 
     it("requires exact (not substring/regex) origin match — phishing host falls back", () => {
       // The pre-v2.8.94 loose regex risk: attacker.com/.example.com#
-      expect(
-        call("https://attacker.com/.restaurant.hummytummy.com#"),
-      ).toEqual({
+      expect(call("https://attacker.com/.restaurant.hummytummy.com#")).toEqual({
         okUrl: "https://fallback.example.com/payment-result",
         failUrl: "https://fallback.example.com/payment-result",
       });
@@ -496,7 +497,12 @@ describe("CustomerSelfPayService (characterization)", () => {
     (prisma.pendingSelfPayment.update as any).mockResolvedValue({});
     wireTransaction();
 
-    return svc.createPayIntent(SESSION_ID, { items: dtoItems } as any, "1.2.3.4", returnOrigin);
+    return svc.createPayIntent(
+      SESSION_ID,
+      { items: dtoItems } as any,
+      "1.2.3.4",
+      returnOrigin,
+    );
   }
 
   describe("createPayIntent — happy path", () => {
@@ -508,8 +514,8 @@ describe("CustomerSelfPayService (characterization)", () => {
       // FOR UPDATE row lock issued for the touched order.
       expect(prisma.$queryRaw).toHaveBeenCalled();
       // Intent persisted PENDING with branchId + amount.
-      const created = (prisma.pendingSelfPayment.create as any).mock
-        .calls[0][0].data;
+      const created = (prisma.pendingSelfPayment.create as any).mock.calls[0][0]
+        .data;
       expect(created.status).toBe("PENDING");
       expect(created.branchId).toBe(BRANCH_ID);
       expect(created.tenantId).toBe(TENANT_ID);
@@ -522,8 +528,7 @@ describe("CustomerSelfPayService (characterization)", () => {
       });
       expect(res).toEqual({
         merchantOid: expect.stringMatching(/^SP/),
-        paymentLink:
-          "https://www.paytr.com/odeme/guvenli/paytr-token-xyz",
+        paymentLink: "https://www.paytr.com/odeme/guvenli/paytr-token-xyz",
         amount: "25.00", // 50 subtotal / 2 qty * 1 unit
         currency: "TRY",
       });
@@ -532,8 +537,7 @@ describe("CustomerSelfPayService (characterization)", () => {
     it("marks the intent FAILED and rethrows if PayTR token mint fails", async () => {
       paytrAdapter.getIframeToken.mockRejectedValue(new Error("paytr boom"));
       await expect(runHappyPathIntent()).rejects.toThrow("paytr boom");
-      const updateCalls = (prisma.pendingSelfPayment.update as any).mock
-        .calls;
+      const updateCalls = (prisma.pendingSelfPayment.update as any).mock.calls;
       const failUpdate = updateCalls.find(
         (c: any[]) => c[0].data.status === "FAILED",
       );
@@ -903,9 +907,9 @@ describe("CustomerSelfPayService (characterization)", () => {
         failureReason: null,
         expiresAt: new Date(Date.now() + 60_000),
       });
-      await expect(
-        svc.getPayStatus(SESSION_ID, "SPx"),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(svc.getPayStatus(SESSION_ID, "SPx")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
 
     it("lazily flips an expired PENDING intent to EXPIRED on read", async () => {
@@ -962,6 +966,10 @@ describe("CustomerSelfPayService (characterization)", () => {
     });
 
     it("settles every bucket via payByItems with per-order idempotency key, then flips PENDING→SUCCEEDED", async () => {
+      // deep-review M16 — pre-validate now runs inside a FOR-UPDATE
+      // $transaction; wire it to run against the mock and stub the
+      // row-lock query.
+      wireTransaction();
       (prisma.pendingSelfPayment.findUnique as any).mockResolvedValue({
         id: "intent-1",
         merchantOid: "SPx",
@@ -969,6 +977,7 @@ describe("CustomerSelfPayService (characterization)", () => {
         tenantId: TENANT_ID,
         sessionId: SESSION_ID,
         customerPhone: "+905551112233",
+        amount: new Prisma.Decimal("0"),
         itemsByOrder: [
           { orderId: "order-A", items: [{ orderItemId: "oi-1", quantity: 1 }] },
         ],
@@ -977,6 +986,10 @@ describe("CustomerSelfPayService (characterization)", () => {
       (prisma.orderItem.findMany as any).mockResolvedValue([
         { id: "oi-1", quantity: 2, orderItemPayments: [] },
       ]);
+      // deep-review M12 — booked-sum reconciliation read on the success path.
+      (prisma.payment.aggregate as any).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal("0") },
+      });
       (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
         count: 1,
       });
@@ -992,17 +1005,20 @@ describe("CustomerSelfPayService (characterization)", () => {
       expect(body.transactionId).toBe("SPx");
       expect(body.method).toBe("CARD");
       expect(body.notes).toBe("Self-pay via PayTR (card)");
-      // TOCTOU-safe success write: compound WHERE on PENDING.
+      // TOCTOU-safe success write: compound WHERE on PENDING (and now also
+      // PARTIALLY_SETTLED so a healed retry is promoted — deep-review H10).
       const successWrite = (
         prisma.pendingSelfPayment.updateMany as any
       ).mock.calls.find((c: any[]) => c[0].data.status === "SUCCEEDED");
       expect(successWrite[0].where).toEqual({
         id: "intent-1",
-        status: "PENDING",
+        status: { in: ["PENDING", "PARTIALLY_SETTLED"] },
       });
     });
 
     it("pre-validate detects an item paid by someone else → marks intent FAILED, no payByItems", async () => {
+      // deep-review M16 — pre-validate runs inside a FOR-UPDATE tx.
+      wireTransaction();
       (prisma.pendingSelfPayment.findUnique as any).mockResolvedValue({
         id: "intent-1",
         merchantOid: "SPx",
@@ -1010,6 +1026,7 @@ describe("CustomerSelfPayService (characterization)", () => {
         tenantId: TENANT_ID,
         sessionId: SESSION_ID,
         customerPhone: null,
+        amount: new Prisma.Decimal("25.00"),
         itemsByOrder: [
           { orderId: "order-A", items: [{ orderItemId: "oi-1", quantity: 2 }] },
         ],
@@ -1022,6 +1039,11 @@ describe("CustomerSelfPayService (characterization)", () => {
           orderItemPayments: [{ quantity: 2 }],
         },
       ]);
+      // deep-review H10 — nothing was booked (pre-validate threw before any
+      // payByItems), so the failure-classifier sees 0 booked → FAILED.
+      (prisma.payment.aggregate as any).mockResolvedValue({
+        _sum: { amount: null },
+      });
       (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
         count: 1,
       });
@@ -1040,6 +1062,57 @@ describe("CustomerSelfPayService (characterization)", () => {
       });
       expect(failWrite[0].data.failureReason).toBe("settlement_error");
       expect(Sentry.captureException).toHaveBeenCalled();
+    });
+
+    it("partial settlement (bucket #2 fails after bucket #1 booked) → PARTIALLY_SETTLED, not FAILED (deep-review H10)", async () => {
+      // deep-review H10/M16 — a transient failure on a later bucket after an
+      // earlier one already committed a Payment must leave the intent
+      // recoverable (PARTIALLY_SETTLED) so a PayTR retry re-enters and
+      // settles the remainder, instead of sticky-FAILED with a partial
+      // charge and no auto-recovery.
+      wireTransaction();
+      (prisma.pendingSelfPayment.findUnique as any).mockResolvedValue({
+        id: "intent-1",
+        merchantOid: "SPx",
+        status: "PENDING",
+        tenantId: TENANT_ID,
+        sessionId: SESSION_ID,
+        customerPhone: null,
+        amount: new Prisma.Decimal("50.00"),
+        itemsByOrder: [
+          { orderId: "order-A", items: [{ orderItemId: "oi-1", quantity: 1 }] },
+          { orderId: "order-B", items: [{ orderItemId: "oi-2", quantity: 1 }] },
+        ],
+      });
+      // Pre-validate passes for both buckets.
+      (prisma.orderItem.findMany as any).mockResolvedValue([
+        { id: "oi-1", quantity: 1, orderItemPayments: [] },
+        { id: "oi-2", quantity: 1, orderItemPayments: [] },
+      ]);
+      // Bucket #1 books fine; bucket #2 throws (e.g. waiter took cash).
+      paymentsService.payByItems
+        .mockResolvedValueOnce({ id: "pay-A" })
+        .mockRejectedValueOnce(new Error("transient settle failure"));
+      // 25 of the 50 actually booked → SOME booked → recoverable.
+      (prisma.payment.aggregate as any).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal("25.00") },
+      });
+      (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+
+      await svc.handleWebhookSuccess("SPx");
+
+      const partialWrite = (
+        prisma.pendingSelfPayment.updateMany as any
+      ).mock.calls.find((c: any[]) => c[0].data.status === "PARTIALLY_SETTLED");
+      expect(partialWrite).toBeDefined();
+      expect(partialWrite[0].data.failureReason).toBe("partial_settlement");
+      // It must NOT have flipped to a terminal FAILED.
+      const failWrite = (
+        prisma.pendingSelfPayment.updateMany as any
+      ).mock.calls.find((c: any[]) => c[0].data.status === "FAILED");
+      expect(failWrite).toBeUndefined();
     });
   });
 
@@ -1114,6 +1187,8 @@ describe("CustomerSelfPayService (characterization)", () => {
     });
 
     it("records result=success after a settled webhook success", async () => {
+      // deep-review M16/M12 — pre-validate FOR-UPDATE tx + booked-sum read.
+      wireTransaction();
       (prisma.pendingSelfPayment.findUnique as any).mockResolvedValue({
         id: "intent-1",
         merchantOid: "SPx",
@@ -1121,6 +1196,7 @@ describe("CustomerSelfPayService (characterization)", () => {
         tenantId: TENANT_ID,
         sessionId: SESSION_ID,
         customerPhone: null,
+        amount: new Prisma.Decimal("0"),
         itemsByOrder: [
           { orderId: "order-A", items: [{ orderItemId: "oi-1", quantity: 1 }] },
         ],
@@ -1128,6 +1204,9 @@ describe("CustomerSelfPayService (characterization)", () => {
       (prisma.orderItem.findMany as any).mockResolvedValue([
         { id: "oi-1", quantity: 2, orderItemPayments: [] },
       ]);
+      (prisma.payment.aggregate as any).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal("0") },
+      });
       (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
         count: 1,
       });

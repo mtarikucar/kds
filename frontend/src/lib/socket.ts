@@ -15,6 +15,44 @@ let notificationSocket: Socket | null = null;
 let socketRefCount = 0;
 let notificationRefCount = 0;
 
+// deep-review FM1/FM4 — register the store subscriptions ONCE at module load
+// instead of inside initializeSocket/initializeNotificationSocket. Previously
+// every mount/unmount or logout→login cycle re-created the sockets and added a
+// fresh, never-released pair of Zustand subscriptions. Over a long-lived
+// kiosk/KDS session that leaked memory and meant a single accessToken rotation
+// fired N stale reconnects and a branch switch emitted N duplicate
+// `switchBranch` events. The callbacks already null-check the global sockets
+// and no-op when null, so a single module-lifetime subscription pair is
+// sufficient — count stays at exactly one pair regardless of socket churn.
+useAuthStore.subscribe((state, prev) => {
+  if (state.accessToken === prev.accessToken) return;
+  if (socket) {
+    (socket.auth as any).token = state.accessToken ?? undefined;
+    if (socket.connected) {
+      socket.disconnect().connect();
+    }
+  }
+  if (notificationSocket) {
+    (notificationSocket.auth as any).token = state.accessToken ?? undefined;
+    if (notificationSocket.connected) {
+      notificationSocket.disconnect().connect();
+    }
+  }
+});
+
+// v3.0.0 — react to BranchPicker changes by emitting `switchBranch` to the live
+// socket(s). The backend moves the connection between rooms without a reconnect
+// and acks/nacks via its allow-list check.
+useBranchScopeStore.subscribe((state, prev) => {
+  if (state.branchId === prev.branchId || !state.branchId) return;
+  if (socket?.connected) {
+    socket.emit('switchBranch', { branchId: state.branchId });
+  }
+  if (notificationSocket?.connected) {
+    notificationSocket.emit('switchBranch', { branchId: state.branchId });
+  }
+});
+
 export const initializeSocket = (): Socket => {
   socketRefCount += 1;
 
@@ -38,25 +76,6 @@ export const initializeSocket = (): Socket => {
   socket = io(`${SOCKET_URL}/kds`, {
     auth: { token, branchId },
     transports: ['websocket', 'polling'],
-  });
-
-  useAuthStore.subscribe((state, prev) => {
-    if (state.accessToken !== prev.accessToken && socket) {
-      (socket.auth as any).token = state.accessToken ?? undefined;
-      if (socket.connected) {
-        socket.disconnect().connect();
-      }
-    }
-  });
-
-  // v3.0.0 — react to BranchPicker changes by emitting `switchBranch`
-  // to the live socket. The backend moves the connection between
-  // rooms without a reconnect; the SPA gets a clean ack/nack from
-  // the server's allow-list check.
-  useBranchScopeStore.subscribe((state, prev) => {
-    if (state.branchId !== prev.branchId && socket?.connected && state.branchId) {
-      socket.emit('switchBranch', { branchId: state.branchId });
-    }
   });
 
   socket.on('connect_error', (error) => {
@@ -105,28 +124,6 @@ export const initializeNotificationSocket = (
   notificationSocket = io(`${SOCKET_URL}/notifications`, {
     auth: { token, branchId },
     transports: ['websocket', 'polling'],
-  });
-
-  useAuthStore.subscribe((state, prev) => {
-    if (state.accessToken !== prev.accessToken && notificationSocket) {
-      (notificationSocket.auth as any).token = state.accessToken ?? undefined;
-      if (notificationSocket.connected) {
-        notificationSocket.disconnect().connect();
-      }
-    }
-  });
-
-  // Branch switch over the notifications socket — same shape as the
-  // KDS socket. The backend updates the tenant:${tenantId}:branch:${branchId}
-  // room membership atomically.
-  useBranchScopeStore.subscribe((state, prev) => {
-    if (
-      state.branchId !== prev.branchId &&
-      notificationSocket?.connected &&
-      state.branchId
-    ) {
-      notificationSocket.emit('switchBranch', { branchId: state.branchId });
-    }
   });
 
   notificationSocket.on('connect_error', (error) => {

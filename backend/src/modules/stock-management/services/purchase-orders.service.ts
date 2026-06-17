@@ -402,6 +402,10 @@ export class PurchaseOrdersService {
    * warning and left stock inflated forever.
    */
   async cancel(id: string, scope: BranchScope, userId?: string) {
+    // Cheap pre-flight rejection so the obvious "wrong status" case
+    // doesn't burn a Serializable txn — the in-txn re-claim below is
+    // what actually guards the race. findOne is branch-fenced, so a
+    // cross-branch PO id is rejected before any stock is mutated.
     const po = await this.findOne(id, scope);
     if (
       po.status === PurchaseOrderStatus.RECEIVED ||
@@ -412,51 +416,103 @@ export class PurchaseOrdersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      for (const item of po.items) {
-        const received = new Prisma.Decimal(item.quantityReceived);
-        if (received.lte(0)) continue;
+    // deep-review M18: mirror receive(). The prior implementation
+    // reversed stock from the OUTSIDE-txn findOne snapshot under the
+    // default READ COMMITTED isolation. Two failure modes:
+    //   (1) a receive() that committed between findOne and this txn was
+    //       invisible — cancel decremented currentStock by the stale
+    //       (smaller) quantityReceived yet zeroed ALL batches, leaving
+    //       stock inflated / batches wrongly nulled; and
+    //   (2) even with no concurrency, batches already partially consumed
+    //       by FIFO deduction were force-zeroed and the gross
+    //       quantityReceived was decremented — double-counting the
+    //       consumption and potentially driving stock negative.
+    // Fix: run under Serializable, re-read the PO/items/batches INSIDE
+    // the txn, and reverse only the un-consumed batch remainder.
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Re-claim the PO inside the txn so a receive that committed
+        // after the outer findOne is observed, and a concurrent cancel
+        // can't double-reverse.
+        const claimed = await tx.purchaseOrder.findFirst({
+          where: { id, ...branchScope(scope) },
+          include: { items: true },
+        });
+        if (!claimed) throw new NotFoundException("Purchase order not found");
+        if (
+          claimed.status === PurchaseOrderStatus.RECEIVED ||
+          claimed.status === PurchaseOrderStatus.CANCELLED
+        ) {
+          throw new BadRequestException(
+            `Cannot cancel a purchase order with status "${claimed.status}".`,
+          );
+        }
 
-        await tx.stockItem.update({
-          where: { id: item.stockItemId },
-          data: { currentStock: { decrement: received as any } },
-        });
-        await tx.stockBatch.updateMany({
-          where: { purchaseOrderItemId: item.id },
-          data: { quantity: 0 as any },
-        });
-        await tx.ingredientMovement.create({
-          data: {
-            type: IngredientMovementType.PO_CANCEL_REVERSAL,
-            quantity: received.neg() as any,
-            costPerUnit: item.unitPrice,
-            notes: `PO ${po.orderNumber} cancelled — reversing received stock`,
-            referenceType: "PURCHASE_ORDER",
-            referenceId: po.id,
-            stockItemId: item.stockItemId,
-            branchId: scope.branchId,
-            tenantId: scope.tenantId,
-            createdById: userId,
-          },
-        });
-        await tx.purchaseOrderItem.update({
-          where: { id: item.id },
-          data: { quantityReceived: 0 as any },
-        });
-      }
+        for (const item of claimed.items) {
+          const received = new Prisma.Decimal(item.quantityReceived);
+          if (received.lte(0)) continue;
 
-      return tx.purchaseOrder.update({
-        where: { id },
-        data: { status: PurchaseOrderStatus.CANCELLED },
-        include: {
-          supplier: { select: { id: true, name: true } },
-          items: {
-            include: {
-              stockItem: { select: { id: true, name: true, unit: true } },
+          // Reverse only what is still on hand in this PO's batches —
+          // FIFO may have already consumed part of them. Sum the
+          // remaining batch quantity and zero only that, so currentStock
+          // is decremented by the actually-reversible amount, never
+          // below what consumption already removed.
+          const batches = await tx.stockBatch.findMany({
+            where: { purchaseOrderItemId: item.id },
+          });
+          const remaining = batches.reduce(
+            (acc, b) => acc.add(new Prisma.Decimal(b.quantity)),
+            new Prisma.Decimal(0),
+          );
+          if (remaining.gt(0)) {
+            await tx.stockItem.update({
+              where: { id: item.stockItemId },
+              data: { currentStock: { decrement: remaining as any } },
+            });
+            await tx.stockBatch.updateMany({
+              where: { purchaseOrderItemId: item.id },
+              data: { quantity: 0 as any },
+            });
+            await tx.ingredientMovement.create({
+              data: {
+                type: IngredientMovementType.PO_CANCEL_REVERSAL,
+                // Record the actual reversed qty, not the gross received.
+                quantity: remaining.neg() as any,
+                costPerUnit: item.unitPrice,
+                notes: `PO ${claimed.orderNumber} cancelled — reversing un-consumed received stock`,
+                referenceType: "PURCHASE_ORDER",
+                referenceId: claimed.id,
+                stockItemId: item.stockItemId,
+                branchId: scope.branchId,
+                tenantId: scope.tenantId,
+                createdById: userId,
+              },
+            });
+          }
+          await tx.purchaseOrderItem.update({
+            where: { id: item.id },
+            data: { quantityReceived: 0 as any },
+          });
+        }
+
+        return tx.purchaseOrder.update({
+          where: { id },
+          data: { status: PurchaseOrderStatus.CANCELLED },
+          include: {
+            supplier: { select: { id: true, name: true } },
+            items: {
+              include: {
+                stockItem: { select: { id: true, name: true, unit: true } },
+              },
             },
           },
-        },
-      });
-    });
+        });
+      },
+      // Mirrors receive(): the reversal's read-modify-write on
+      // quantityReceived / currentStock / batches races a concurrent
+      // receive. Serializable promotes the write-vs-write race into a
+      // 40001 that Prisma retries against a fresh snapshot.
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }

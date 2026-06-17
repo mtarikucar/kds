@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { getApiErrorMessage } from '../../../lib/api-error';
 import { useSuperAdminAuthStore } from '../../../store/superAdminAuthStore';
 import {
   SuperAdminLoginRequest,
@@ -327,6 +329,10 @@ export const useUpdateTenantStatus = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants'] });
     },
+    // deep-review FM10: surface failed suspend/activate/delete so the
+    // destructive lifecycle action never fails silently (mirrors the
+    // superadminBankTransferApi sonner + getApiErrorMessage convention).
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Durum güncellenemedi.')),
   });
 };
 

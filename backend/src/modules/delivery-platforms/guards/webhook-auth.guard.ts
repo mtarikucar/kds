@@ -41,18 +41,32 @@ export class WebhookAuthGuard implements CanActivate {
       throw new UnauthorizedException("Webhook platform not declared");
     }
     const request = context.switchToHttp().getRequest();
+    // deep-review H15 — the per-platform secret is global, so a valid
+    // signature/JWT issued for one tenant must additionally be bound to
+    // the restaurant in the URL or it can be replayed against another
+    // tenant's webhook path (cross-tenant order spoofing / cancellation).
+    // The `:remoteId` path param identifies the target restaurant; we
+    // pass it down and reject when the signed material self-identifies a
+    // *different* restaurant.
+    const urlRemoteId =
+      typeof request.params?.remoteId === "string"
+        ? request.params.remoteId
+        : undefined;
     switch (platform) {
       case "YEMEKSEPETI":
-        return this.validateYemeksepetiWebhook(request);
+        return this.validateYemeksepetiWebhook(request, urlRemoteId);
       case "TRENDYOL":
-        return this.validateTrendyolWebhook(request);
+        return this.validateTrendyolWebhook(request, urlRemoteId);
       default:
         this.logger.warn(`Unknown webhook platform: ${platform}`);
         throw new UnauthorizedException("Unknown webhook platform");
     }
   }
 
-  private validateYemeksepetiWebhook(request: any): boolean {
+  private validateYemeksepetiWebhook(
+    request: any,
+    urlRemoteId?: string,
+  ): boolean {
     const authHeader = request.headers["authorization"];
     if (!authHeader) {
       throw new UnauthorizedException("Missing authorization header");
@@ -133,6 +147,31 @@ export class WebhookAuthGuard implements CanActivate {
         throw new Error("Token issued-at in the future");
       }
 
+      // deep-review H15 — bind the JWT to the restaurant in the URL.
+      // The secret is global across tenants, so a JWT minted for tenant A
+      // must not be replayable against tenant B's `/yemeksepeti/:remoteId`
+      // path. Yemeksepeti tokens carry the chain/vendor/restaurant in a
+      // subject-style claim; when such a claim is present it MUST equal
+      // the path `remoteId`. We only reject on a *positive mismatch* so a
+      // token that legitimately omits the claim is not broken — the
+      // attack we close is a captured/issued-for-A token retargeted at B,
+      // where the token's own claim still names A.
+      if (urlRemoteId) {
+        const claimedRestaurant =
+          decoded.sub ??
+          decoded.restaurantId ??
+          decoded.chainId ??
+          decoded.chainCode ??
+          decoded.vendor ??
+          decoded.vendorId;
+        if (
+          claimedRestaurant != null &&
+          String(claimedRestaurant) !== urlRemoteId
+        ) {
+          throw new Error("Token restaurant claim does not match URL");
+        }
+      }
+
       return true;
     } catch (error: any) {
       this.logger.warn(`Yemeksepeti webhook auth failed: ${error.message}`);
@@ -140,7 +179,7 @@ export class WebhookAuthGuard implements CanActivate {
     }
   }
 
-  private validateTrendyolWebhook(request: any): boolean {
+  private validateTrendyolWebhook(request: any, urlRemoteId?: string): boolean {
     const webhookSecret = this.configService.get<string>(
       "TRENDYOL_WEBHOOK_SECRET",
     );
@@ -203,6 +242,35 @@ export class WebhookAuthGuard implements CanActivate {
     const expBuf = Buffer.from(expectedSignature, "utf8");
     if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
       throw new UnauthorizedException("Invalid webhook signature");
+    }
+
+    // deep-review H15 — bind the verified body to the restaurant in the
+    // URL. The HMAC only covers `${timestamp}.${body}` with a global
+    // secret, so a signature captured within the freshness window could
+    // otherwise be replayed against a *different* tenant's
+    // `/trendyol/order/:remoteId` path. Changing the signed contract to
+    // include the remoteId would require sender coordination and would
+    // break all live senders, so we instead assert the restaurant
+    // identifier carried inside the (now signature-verified) body matches
+    // the path param. We reject only on a positive mismatch so bodies
+    // that don't self-identify the restaurant are not broken.
+    if (urlRemoteId) {
+      let parsedBody: any;
+      try {
+        parsedBody = JSON.parse(body);
+      } catch {
+        parsedBody = undefined;
+      }
+      const bodyRestaurant =
+        parsedBody?.restaurantId ??
+        parsedBody?.supplierId ??
+        parsedBody?.storeId ??
+        parsedBody?.restaurant?.id;
+      if (bodyRestaurant != null && String(bodyRestaurant) !== urlRemoteId) {
+        throw new UnauthorizedException(
+          "Webhook body restaurant does not match URL",
+        );
+      }
     }
 
     return true;

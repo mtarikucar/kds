@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Eye, CheckCircle, XCircle, X } from 'lucide-react';
 import {
@@ -84,11 +84,22 @@ const StockCountsTab = () => {
                         <Eye className="h-4 w-4" />
                       </button>
                       {count.status === 'IN_PROGRESS' && (
+                        // deep-review FL4: confirm + pending-guard the inventory-mutating finalize/cancel against accidental and double clicks
                         <>
-                          <button onClick={() => finalizeMutation.mutate(count.id)} className="p-1 text-gray-400 hover:text-emerald-600" title={t('counts.finalize')}>
+                          <button
+                            onClick={() => { if (window.confirm(t('counts.confirmFinalize', { defaultValue: 'Finalize this stock count? Counted quantities will be committed as inventory adjustments and this cannot be undone.' }))) finalizeMutation.mutate(count.id); }}
+                            disabled={finalizeMutation.isPending || cancelMutation.isPending}
+                            className="p-1 text-gray-400 hover:text-emerald-600 disabled:opacity-50 disabled:pointer-events-none"
+                            title={t('counts.finalize')}
+                          >
                             <CheckCircle className="h-4 w-4" />
                           </button>
-                          <button onClick={() => cancelMutation.mutate(count.id)} className="p-1 text-gray-400 hover:text-red-600" title={t('counts.cancel')}>
+                          <button
+                            onClick={() => { if (window.confirm(t('counts.confirmCancel', { defaultValue: 'Cancel this stock count? This cannot be undone.' }))) cancelMutation.mutate(count.id); }}
+                            disabled={finalizeMutation.isPending || cancelMutation.isPending}
+                            className="p-1 text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:pointer-events-none"
+                            title={t('counts.cancel')}
+                          >
                             <XCircle className="h-4 w-4" />
                           </button>
                         </>
@@ -183,8 +194,10 @@ function StockCountSession({ countId, onClose }: { countId: string; onClose: () 
           <div className="flex items-center gap-2">
             {count.status === 'IN_PROGRESS' && allCounted && (
               <button
-                onClick={() => { finalizeMutation.mutate(countId); onClose(); }}
-                className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                // deep-review FL4: confirm + pending-guard the session-modal finalize too
+                onClick={() => { if (window.confirm(t('counts.confirmFinalize', { defaultValue: 'Finalize this stock count? Counted quantities will be committed as inventory adjustments and this cannot be undone.' }))) { finalizeMutation.mutate(countId); onClose(); } }}
+                disabled={finalizeMutation.isPending}
+                className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
               >
                 {t('counts.finalize')}
               </button>
@@ -214,18 +227,9 @@ function StockCountSession({ countId, onClose }: { countId: string; onClose: () 
                     <td className="px-4 py-3 text-right text-gray-600">{Number(item.expectedQty).toFixed(2)}</td>
                     <td className="px-4 py-3 text-right">
                       {count.status === 'IN_PROGRESS' ? (
-                        <input
-                          type="number"
-                          step="0.001"
-                          value={item.countedQty ?? ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                            if (val != null) {
-                              updateItemMutation.mutate({ countId, itemId: item.id, data: { countedQty: val } });
-                            }
-                          }}
-                          className="w-24 border rounded-lg px-2 py-1 text-sm text-right"
-                          placeholder="—"
+                        <CountedQtyInput
+                          committed={item.countedQty ?? null}
+                          onCommit={(v) => updateItemMutation.mutate({ countId, itemId: item.id, data: { countedQty: v } })}
                         />
                       ) : (
                         <span className="text-gray-600">{item.countedQty != null ? Number(item.countedQty).toFixed(2) : '—'}</span>
@@ -244,6 +248,43 @@ function StockCountSession({ countId, onClose }: { countId: string; onClose: () 
         </div>
       </div>
     </div>
+  );
+}
+
+// deep-review FM9: decouple the count input's display value from the committed value and
+// persist only on blur/Enter (not on every keystroke). This sends one PATCH per field edit
+// instead of one per keystroke and eliminates mid-typing out-of-order overwrites, because the
+// draft is local and only reconciles with the server value when the field is not being edited.
+// NOTE: clearing the field back to "uncounted" (null) is intentionally NOT committed here — the
+// updateStockCountItem mutation/endpoint only accepts `{ countedQty: number }`; supporting null
+// requires a backend + API-type change (out of scope for this file).
+function CountedQtyInput({ committed, onCommit }: { committed: number | null; onCommit: (v: number) => void }) {
+  const [draft, setDraft] = useState<string>(committed != null ? String(committed) : '');
+  // re-sync when the server value changes while the field isn't actively being edited
+  useEffect(() => {
+    setDraft(committed != null ? String(committed) : '');
+  }, [committed]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed === '') return; // empty -> leave as-is (cannot reset to uncounted yet)
+    const next = Number.parseFloat(trimmed);
+    if (Number.isNaN(next)) return; // ignore garbage
+    if (next === committed) return; // no-op, avoids a redundant PATCH
+    onCommit(next);
+  };
+
+  return (
+    <input
+      type="number"
+      step="0.001"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      className="w-24 border rounded-lg px-2 py-1 text-sm text-right"
+      placeholder="—"
+    />
   );
 }
 

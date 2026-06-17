@@ -55,7 +55,42 @@ async fn main() -> Result<()> {
     // The command queue is the single source of truth for "what does this
     // bridge owe?". It outlives the cloud connection, so the agent keeps
     // working through transient internet outages.
-    let queue = command_queue::CommandQueue::open(cfg.data_dir.join("command_queue.db"))?;
+    // Arc-wrapped so a low-frequency retention sweep can run alongside the main
+    // loop without moving the queue. open() also runs crash recovery (NH1/NH4):
+    // inflight rows orphaned by a previous crash are requeued (safe kinds) or
+    // parked in needs_review (money/fiscal kinds).
+    let queue = std::sync::Arc::new(command_queue::CommandQueue::open(
+        cfg.data_dir.join("command_queue.db"),
+    )?);
+
+    // deep-review NM2: bounded retention sweep on a low-frequency cadence so the
+    // SQLite file does not grow without bound (eventually disk-full → all new
+    // charges/prints fail). Drops only fully-settled rows (acked/failed) older
+    // than 48h and reclaims pages via incremental_vacuum.
+    let _sweep_handle = {
+        let q = queue.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
+            const RETENTION_MS: i64 = 48 * 3600 * 1000;
+            loop {
+                tick.tick().await;
+                match q.sweep(RETENTION_MS).await {
+                    Ok(n) if n > 0 => info!(swept = n, "command_queue retention sweep"),
+                    Ok(_) => {}
+                    Err(e) => warn!(error = %e, "command_queue retention sweep failed"),
+                }
+            }
+        })
+    };
+    // Surface any rows parked for human reconciliation at boot so a stranded
+    // charge/fiscal receipt is operator-visible rather than silent (NH1).
+    match queue.needs_review_count().await {
+        Ok(n) if n > 0 => warn!(
+            needs_review = n,
+            "command_queue: commands parked for reconciliation (likely interrupted money/fiscal ops)"
+        ),
+        _ => {}
+    }
 
     // The drivers registry resolves device kinds → executors at runtime.
     // A driver that fails to initialise (e.g. printer not yet wired) is
@@ -78,18 +113,51 @@ async fn main() -> Result<()> {
     // -D warnings.
     let _heartbeat_handle = telemetry::spawn_heartbeat(cloud.clone());
 
-    // Main loop: pull next queued command, dispatch, ack.
+    // Main loop: retry outstanding acks, then pull next queued command,
+    // dispatch, ack.
     loop {
+        // deep-review NH3/NH7: an executed-but-unacked command is NOT settled.
+        // Before fetching new work, drain any outcomes that were persisted by a
+        // previous dispatch but whose ack failed (network blip / 5xx / crash
+        // before ack). Without this, the cloud still considers the command
+        // outstanding and re-issues it — often under a NEW command id that the
+        // local INSERT-OR-IGNORE dedup misses — re-executing the charge/print.
+        for (acked_cmd, outcome) in queue.pending_acks(32).await? {
+            match cloud.ack(&acked_cmd, &outcome).await {
+                Ok(()) => queue.mark_acked(&acked_cmd.id).await?,
+                Err(e) => {
+                    warn!(cmd = %acked_cmd.id, error = %e, "ack retry failed — outcome still not confirmed to cloud");
+                    // Leave the row in 'done' so it is retried on the next pass.
+                    // Back off so we don't spin while the cloud is unreachable.
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    break;
+                }
+            }
+        }
+
         if let Some(cmd) = queue.pop_next().await? {
             match drivers.dispatch(&cmd).await {
                 Ok(outcome) => {
+                    // Persist the outcome first (durable), THEN ack. On ack
+                    // failure the row stays 'done' and the pending-acks drain
+                    // above retries it — never silently lose the outcome.
                     queue.mark_done(&cmd.id, &outcome).await?;
-                    let _ = cloud.ack(&cmd, &outcome).await;
+                    match cloud.ack(&cmd, &outcome).await {
+                        Ok(()) => queue.mark_acked(&cmd.id).await?,
+                        Err(e) => {
+                            warn!(cmd = %cmd.id, error = %e, "ack failed — outcome persisted, will retry");
+                        }
+                    }
                 }
                 Err(e) => {
                     warn!(cmd = %cmd.id, error = %e, "command failed");
+                    // mark_failed is kind-aware: side-effecting (money/fiscal)
+                    // kinds are parked in 'needs_review' here rather than
+                    // requeued, so the ack_failed below does not race a retry.
                     queue.mark_failed(&cmd.id, &e.to_string()).await?;
-                    let _ = cloud.ack_failed(&cmd, &e.to_string()).await;
+                    if let Err(ack_err) = cloud.ack_failed(&cmd, &e.to_string()).await {
+                        warn!(cmd = %cmd.id, error = %ack_err, "ack_failed not confirmed to cloud");
+                    }
                 }
             }
         } else if let Err(e) = cloud.fetch_more(&queue).await {
@@ -101,10 +169,11 @@ async fn main() -> Result<()> {
         tokio::task::yield_now().await;
     }
 
-    // (_heartbeat_handle drops with the process; the OS reclaims it.)
+    // (background task handles drop with the process; the OS reclaims them.)
     #[allow(unreachable_code)]
     {
         drop(_heartbeat_handle);
+        drop(_sweep_handle);
         Ok(())
     }
 }

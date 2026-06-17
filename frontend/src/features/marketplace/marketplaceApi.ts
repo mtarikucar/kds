@@ -53,35 +53,11 @@ export const useListMyAddOns = () =>
     },
   });
 
-export const usePurchaseAddOn = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { addOnCode: string; quantity?: number; branchId?: string }): Promise<TenantAddOn> => {
-      const r = await api.post('/v1/marketplace/addons/purchase', input);
-      return r.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: marketplaceKeys.mine });
-      qc.invalidateQueries({ queryKey: entitlementKeys.me });
-      // v2.8.88: effective-features is the source of truth for the
-      // SubscriptionContext (hasFeature/hasIntegration). Without this
-      // invalidation a buyer waits up to 30s for the cached snapshot
-      // to expire — they'd click "purchase" and see no UI change
-      // until they hard-refresh.
-      qc.invalidateQueries({ queryKey: ['subscriptions', 'effective-features'] });
-      toast.success(
-        i18n.t('marketplace:purchase.success', { defaultValue: 'Add-on purchased.' }),
-      );
-    },
-    onError: (e) =>
-      toast.error(
-        getApiErrorMessage(
-          e,
-          i18n.t('marketplace:purchase.failed', { defaultValue: 'Purchase failed' }),
-        ),
-      ),
-  });
-};
+// SECURITY (deep-review C2): the free-grant hook `usePurchaseAddOn`
+// (POST /v1/marketplace/addons/purchase) was removed together with its
+// backend endpoint — it granted paid add-ons without collecting payment.
+// All add-on purchases now go through `usePurchaseAddOnViaCheckout` below,
+// which routes through the PayTR checkout rail.
 
 export interface AddOnCheckoutIntent {
   paymentRef: string;
@@ -97,8 +73,8 @@ export interface AddOnCheckoutIntent {
  * hosted payment page. The add-on is provisioned by the `CK-` webhook
  * (CheckoutSettlementService → confirmAndProvision → tenantMarketplace.purchase
  * with the settled paymentRef) ONLY after the money is collected. Mirrors the
- * hardware-store checkout flow. The free grant endpoint stays for superadmin
- * comps; the storefront button uses this.
+ * hardware-store checkout flow. This is the ONLY add-on purchase path; the
+ * free-grant endpoint was removed (deep-review C2).
  */
 export const usePurchaseAddOnViaCheckout = () => {
   return useMutation({

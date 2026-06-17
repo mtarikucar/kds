@@ -46,15 +46,21 @@ export class EfaturaFiscalProvider implements FiscalProvider, OnModuleInit {
     // Translate the line items into the existing SalesInvoice shape. The
     // accounting module owns finalisation/GİB submission; we are only the
     // bridge that turns "fiscal issuance request" into one of its rows.
-    const subtotal = req.lines.reduce(
+    // Prices are KDV-inclusive, so each line's (qty*unitPrice - discount) is
+    // the GROSS amount actually charged. deep-review H9: the invoice's
+    // `subtotal` must be the taxable BASE (net = gross - extracted KDV), not
+    // the gross — previously subtotal was set to the tax-inclusive amount,
+    // overstating the taxable base on every e-Arşiv invoice.
+    const grossCents = req.lines.reduce(
       (acc, l) =>
         acc + Math.round(l.qty * l.unitPriceCents) - (l.discountCents ?? 0),
       0,
     );
-    const taxAmount = req.lines.reduce((acc, l) => {
-      const lineNet = l.qty * l.unitPriceCents - (l.discountCents ?? 0);
-      return acc + Math.round((lineNet * l.vatRate) / (100 + l.vatRate));
+    const taxCents = req.lines.reduce((acc, l) => {
+      const lineGross = l.qty * l.unitPriceCents - (l.discountCents ?? 0);
+      return acc + Math.round((lineGross * l.vatRate) / (100 + l.vatRate));
     }, 0);
+    const netCents = grossCents - taxCents;
 
     // Invoice numbers were previously `EARS-${year}-${Date.now().slice(-8)}`.
     // Two issuances in the same millisecond produced an identical number,
@@ -71,34 +77,45 @@ export class EfaturaFiscalProvider implements FiscalProvider, OnModuleInit {
     // so the caller marks the receipt 'failed' and the ops manual-recovery
     // panel picks it up.
     try {
-      await (this.prisma as any).salesInvoice.create({
+      // deep-review M9: write the ACTUAL SalesInvoice columns. The model has
+      // no `kind` and no `total` field and `totalAmount` is required (no
+      // default) — the previous shape made EVERY e-Arşiv issuance throw an
+      // "Unknown arg"/"missing totalAmount" Prisma error (masked by the
+      // `as any` cast), so every receipt fell into manual-recovery. The
+      // e-Arşiv vs e-Fatura `kind` is recorded via externalProvider/type
+      // rather than a non-existent column.
+      await this.prisma.salesInvoice.create({
         data: {
           id: uuidv7(),
           tenantId: req.tenantId,
           orderId: req.orderId,
           invoiceNumber: fiscalNo,
-          kind: req.kind ?? "earsiv",
+          type: "SALES",
+          externalProvider: this.id,
           issueDate: new Date(),
-          subtotal: subtotal / 100,
-          taxAmount: taxAmount / 100,
-          total: subtotal / 100,
+          subtotal: netCents / 100,
+          taxAmount: taxCents / 100,
+          totalAmount: grossCents / 100,
           currency: "TRY",
           status: "pending",
           items: {
-            create: req.lines.map((l) => ({
-              description: l.name,
-              quantity: l.qty,
-              unitPrice: l.unitPriceCents / 100,
-              taxRate: l.vatRate,
-              taxAmount:
-                ((l.qty * l.unitPriceCents - (l.discountCents ?? 0)) *
-                  l.vatRate) /
-                (100 + l.vatRate) /
-                100,
-              subtotal:
-                (l.qty * l.unitPriceCents - (l.discountCents ?? 0)) / 100,
-              total: (l.qty * l.unitPriceCents - (l.discountCents ?? 0)) / 100,
-            })),
+            create: req.lines.map((l) => {
+              const lineGross =
+                l.qty * l.unitPriceCents - (l.discountCents ?? 0);
+              const lineTax = Math.round(
+                (lineGross * l.vatRate) / (100 + l.vatRate),
+              );
+              return {
+                description: l.name,
+                quantity: l.qty,
+                unitPrice: l.unitPriceCents / 100,
+                taxRate: l.vatRate,
+                taxAmount: lineTax / 100,
+                // subtotal = taxable base (net); total = gross charged.
+                subtotal: (lineGross - lineTax) / 100,
+                total: lineGross / 100,
+              };
+            }),
           },
         },
       });

@@ -1,6 +1,8 @@
 #include "websocket_client.hpp"
 #include "../utils/logger.hpp"
 
+#include <boost/asio/ssl/host_name_verification.hpp>  // deep-review NH14
+
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -68,15 +70,54 @@ std::shared_ptr<boost::asio::ssl::context> WebSocketClient::on_tls_init() {
         // Use system default certificates
         ctx->set_default_verify_paths();
 
-        // For development, you might want to skip verification
-        // ctx->set_verify_mode(boost::asio::ssl::verify_none);
         ctx->set_verify_mode(boost::asio::ssl::verify_peer);
+
+        // deep-review NH14: verify_peer only validates the cert chains to a
+        // trusted CA — it does NOT check the cert's hostname. Without this any
+        // CA-valid cert for the WRONG host (or a DNS-redirected MITM) would
+        // complete the handshake and capture the device's long-lived Bearer
+        // auth_token. Install RFC2818 hostname verification against the host
+        // parsed from the backend URL. (Boost.Asio does not do this under
+        // verify_peer by default.)
+        const std::string host = parse_host(config_.url);
+        if (!host.empty()) {
+            ctx->set_verify_callback(boost::asio::ssl::host_name_verification(host));
+        } else {
+            LOG_ERROR("Could not parse host from backend URL for TLS hostname "
+                      "verification: {}", config_.url);
+        }
 
     } catch (const std::exception& e) {
         LOG_ERROR("TLS init error: {}", e.what());
     }
 
     return ctx;
+}
+
+// deep-review NH14: extract the bare hostname from a ws(s)://host[:port][/path]
+// (or with a query string) URL. Returns "" if no host can be found.
+std::string WebSocketClient::parse_host(const std::string& url) {
+    std::string s = url;
+
+    // Strip scheme (ws://, wss://, http://, https://, ...).
+    const auto scheme_pos = s.find("://");
+    if (scheme_pos != std::string::npos) {
+        s = s.substr(scheme_pos + 3);
+    }
+
+    // Strip any userinfo (user:pass@host) if present.
+    const auto at_pos = s.find('@');
+    if (at_pos != std::string::npos) {
+        s = s.substr(at_pos + 1);
+    }
+
+    // Host ends at the first of '/', ':' (port) or '?' (query).
+    const auto end = s.find_first_of("/:?");
+    if (end != std::string::npos) {
+        s = s.substr(0, end);
+    }
+
+    return s;
 }
 
 bool WebSocketClient::connect() {
@@ -111,7 +152,12 @@ bool WebSocketClient::connect() {
         con->append_header("Authorization", "Bearer " + config_.auth_token);
     }
 
-    connection_ = con->get_handle();
+    {
+        // deep-review NH15: serialize the connection_ write against send_raw/
+        // disconnect reads on other threads.
+        std::lock_guard<std::mutex> lk(conn_mutex_);
+        connection_ = con->get_handle();
+    }
     client_.connect(con);
 
     return true;
@@ -124,8 +170,15 @@ void WebSocketClient::disconnect() {
 
     LOG_INFO("Disconnecting from backend");
 
+    // deep-review NH15: copy the handle under the lock before the network call.
+    ConnectionHdl hdl;
+    {
+        std::lock_guard<std::mutex> lk(conn_mutex_);
+        hdl = connection_;
+    }
+
     websocketpp::lib::error_code ec;
-    client_.close(connection_, websocketpp::close::status::normal, "Client closing", ec);
+    client_.close(hdl, websocketpp::close::status::normal, "Client closing", ec);
 
     if (ec) {
         LOG_ERROR("Close error: {}", ec.message());
@@ -175,6 +228,12 @@ void WebSocketClient::stop() {
     running_ = false;
     disconnect();
 
+    // deep-review NH13: cancel the pending registration timer before stopping
+    // the io_service so its callback can't fire against a tearing-down client.
+    if (register_timer_) {
+        register_timer_->cancel();
+    }
+
     // Stop the io_service
     client_.stop();
 
@@ -184,31 +243,60 @@ void WebSocketClient::stop() {
 
 void WebSocketClient::on_open(ConnectionHdl hdl) {
     LOG_INFO("WebSocket connection opened");
-    connection_ = hdl;
+    {
+        // deep-review NH15: serialize the connection_ write against sender-thread
+        // reads in send_raw/disconnect.
+        std::lock_guard<std::mutex> lk(conn_mutex_);
+        connection_ = hdl;
+    }
     connected_ = true;
 
     // Socket.IO open packet
     send_raw("40/analytics-edge,");
 
-    // Register device after brief delay
-    std::thread([this]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    // deep-review NH13: schedule the delayed device registration on the
+    // io_service's own timer instead of a detached std::thread. The old detached
+    // thread captured `this` and ran 500ms later — if the client was destroyed
+    // within that window (shutdown), it dereferenced freed memory (use-after-
+    // free), and every reconnect spawned a fresh thread (thread churn on a
+    // reconnect storm). This timer is owned by, and cancelled with, the client:
+    // its callback runs on the same io thread that stop()+join() drains, so by
+    // the time the object is destroyed no callback can still be pending.
+    // Cancel any in-flight timer first so reconnects don't accumulate timers.
+    if (register_timer_) {
+        register_timer_->cancel();
+    }
+    register_timer_ = client_.set_timer(500, [this](const websocketpp::lib::error_code& ec) {
+        if (ec) {
+            return;  // cancelled (e.g. on stop) — bail
+        }
         if (connected_) {
             register_device();
         }
-    }).detach();
+    });
 }
 
 void WebSocketClient::on_close(ConnectionHdl /*hdl*/) {
     LOG_INFO("WebSocket connection closed");
     connected_ = false;
     registered_ = false;
+    // deep-review NH15: clear the stale handle so nothing is sent on a dead
+    // connection after a drop.
+    {
+        std::lock_guard<std::mutex> lk(conn_mutex_);
+        connection_ = ConnectionHdl();
+    }
 }
 
 void WebSocketClient::on_fail(ConnectionHdl /*hdl*/) {
     LOG_ERROR("WebSocket connection failed");
     connected_ = false;
     registered_ = false;
+    // deep-review NH15: clear the stale handle (see on_close).
+    {
+        std::lock_guard<std::mutex> lk(conn_mutex_);
+        connection_ = ConnectionHdl();
+    }
 }
 
 void WebSocketClient::on_message(ConnectionHdl /*hdl*/, MessagePtr msg) {
@@ -236,8 +324,16 @@ bool WebSocketClient::send_raw(const std::string& message) {
     }
 
     try {
+        // deep-review NH15: copy the handle under the lock, then send outside it
+        // so the network call isn't serialized behind conn_mutex_.
+        ConnectionHdl hdl;
+        {
+            std::lock_guard<std::mutex> lk(conn_mutex_);
+            hdl = connection_;
+        }
+
         websocketpp::lib::error_code ec;
-        client_.send(connection_, message, websocketpp::frame::opcode::text, ec);
+        client_.send(hdl, message, websocketpp::frame::opcode::text, ec);
 
         if (ec) {
             LOG_ERROR("Send error: {}", ec.message());

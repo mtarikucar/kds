@@ -251,5 +251,17 @@ export function mapOrderItemsToCart(
     ...(item.product as Product),
     quantity: item.quantity,
     notes: item.notes || undefined,
+    // deep-review FH3: round-trip line-item modifiers into the SelectedModifier
+    // shape the cart + buildOrderData expect. Without this, continuing an
+    // OCCUPIED table's order stripped every paid modifier (wrong kitchen
+    // ticket + undercharge). priceAdjustment may serialize as a string from the
+    // Decimal column, hence Number(...). `name` is display-only; buildOrderData
+    // re-emits only {modifierId, quantity} and the backend re-prices server-side.
+    modifiers: item.modifiers?.map((m) => ({
+      modifierId: m.modifierId,
+      name: m.modifier?.name ?? '',
+      priceAdjustment: Number(m.priceAdjustment),
+      quantity: m.quantity,
+    })),
   }));
 }

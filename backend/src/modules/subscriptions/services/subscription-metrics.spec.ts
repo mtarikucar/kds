@@ -33,7 +33,9 @@ describe("SubscriptionService — subscription_billing_total counter", () => {
     metrics = { incCounter: jest.fn() };
     const notifications = {
       sendTrialStarted: jest.fn().mockResolvedValue(undefined),
-      sendSubscriptionCancelledImmediate: jest.fn().mockResolvedValue(undefined),
+      sendSubscriptionCancelledImmediate: jest
+        .fn()
+        .mockResolvedValue(undefined),
       sendSubscriptionWillCancel: jest.fn().mockResolvedValue(undefined),
       sendPlanChangeConfirmation: jest.fn().mockResolvedValue(undefined),
     } as any;
@@ -80,12 +82,16 @@ describe("SubscriptionService — subscription_billing_total counter", () => {
       role: "ADMIN",
       emailVerified: true,
     } as any);
+    // deep-review H3: createSubscription only creates TRIALING or FREE rows
+    // (paid activation goes through settlement). Use a trial-eligible PRO
+    // plan so this is a valid TRIALING creation that still records the
+    // billing-event metric.
     prisma.subscriptionPlan.findUnique.mockResolvedValue({
       id: "plan-pro",
       name: "PRO",
       displayName: "Pro",
       isActive: true,
-      trialDays: 0,
+      trialDays: 14,
       monthlyPrice: new Prisma.Decimal(100),
       yearlyPrice: new Prisma.Decimal(1000),
       currency: "TRY",

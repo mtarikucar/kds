@@ -99,10 +99,20 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
   const { tenantId: urlTenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
   const tableId = searchParams.get('tableId');
-  const urlSessionId = searchParams.get('sessionId');
 
   const storeSessionId = useCartStore(state => state.sessionId);
-  const sessionId = urlSessionId || storeSessionId;
+  // deep-review FH5 (+ verification follow-up): the QR session id is the only
+  // identity on the public QR menu, so it is effectively a bearer credential.
+  // It must NEVER be sourced from the URL — appending `?sessionId=<victim>`
+  // would otherwise let an attacker drive THIS device's order-history /
+  // self-pay PII fetches as the victim. The earlier `storeSessionId ||
+  // urlSessionId` fallback still leaked on a FRESH device (null store), where
+  // the URL value won before initializeSession minted a real id. The identity
+  // is now ONLY the per-device store session (minted locally by
+  // initializeSession); a fresh device simply has no session until then.
+  // Combined with buildQRMenuUrl no longer emitting the id, shareable links
+  // carry no credential at all.
+  const sessionId = storeSessionId;
 
   const [menuData, setMenuData] = useState<MenuData | null>(null);
   const [isLoading, setIsLoading] = useState(true);

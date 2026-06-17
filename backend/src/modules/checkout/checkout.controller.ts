@@ -94,10 +94,15 @@ export class CheckoutController {
   // v2.8.85: the production payment path is now /intent → PayTR iframe →
   // PaytrWebhookController dispatches CK- prefix → CheckoutSettlementService
   // → confirmAndProvision (so the user's browser never reaches /confirm
-  // with a free-text paymentRef). /confirm stays as the admin-comp /
-  // super-admin override path; the @Roles(ADMIN, MANAGER) gate keeps a
-  // forged paymentRef from a tenant user from succeeding because the
-  // matching CheckoutIntent row would not exist for arbitrary refs.
+  // with a free-text paymentRef).
+  //
+  // SECURITY (deep-review C1): @Roles(ADMIN, MANAGER) is NOT a payment
+  // control — ADMIN/MANAGER are ordinary tenant-realm roles any restaurant
+  // owner holds, so this endpoint is reachable by every tenant. A forged
+  // paymentRef is rejected because confirmAndProvision now REQUIRES a
+  // settled CheckoutIntent for (tenantId, paymentRef) before provisioning
+  // anything — see CheckoutService.confirmAndProvision. Do not rely on the
+  // role gate alone.
   @Post("confirm")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({

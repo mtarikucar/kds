@@ -65,9 +65,18 @@ interface SubscriptionProviderProps {
 export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) => {
   const { data: subscription, isLoading: subLoading } = useGetCurrentSubscription();
   const { data: plans, isLoading: plansLoading } = useGetPlans();
-  const { data: effectiveFeatures } = useGetEffectiveFeatures();
+  const {
+    data: effectiveFeatures,
+    isLoading: effLoading,
+    isError: effError,
+  } = useGetEffectiveFeatures();
 
-  const isLoading = subLoading || plansLoading;
+  // deep-review FL2 — effective-features is the documented source of truth for
+  // gates (it folds in per-tenant featureOverrides, including negative/abuse
+  // overrides). Treat its load as part of `isLoading` so FeatureGate's loading
+  // short-circuit covers the window and we never flash content gated only by
+  // the raw plan.features (which ignores overrides).
+  const isLoading = subLoading || plansLoading || effLoading;
 
   // Find the current plan from plans list
   const plan = useMemo(() => {
@@ -77,21 +86,19 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
 
   // Check if a feature is enabled (effective features = plan + overrides)
   const hasFeature = (feature: keyof PlanFeatures): boolean => {
-    // Use effective features if available (includes overrides)
-    if (effectiveFeatures) {
-      return effectiveFeatures.features[feature] ?? false;
-    }
-    // Fallback to plan data while effective features are loading
-    if (!plan) return false;
-    return plan.features[feature] ?? false;
+    // deep-review FL2 — fail closed when effective-features is unavailable
+    // (still loading, or persistently errored after retry). Do NOT fall back
+    // to raw plan.features: it ignores per-tenant featureOverrides and would
+    // over-grant a feature an admin/abuse override has explicitly disabled.
+    if (!effectiveFeatures) return false;
+    return effectiveFeatures.features[feature] ?? false;
   };
 
   // Check if a resource limit allows creating more items (effective limits = plan + overrides)
   const checkLimit = (resource: keyof PlanLimits, currentCount: number): LimitCheckResult => {
-    // Use effective limits if available (includes overrides)
-    const limit = effectiveFeatures
-      ? effectiveFeatures.limits[resource]
-      : plan?.limits[resource];
+    // deep-review FL2 — fail closed: only consult effective limits (plan +
+    // overrides), never the raw plan when overrides may have lowered the cap.
+    const limit = effectiveFeatures ? effectiveFeatures.limits[resource] : undefined;
 
     if (limit === undefined || limit === null) {
       return { allowed: false, current: currentCount, limit: 0, remaining: 0 };
@@ -142,7 +149,18 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
       isSubscriptionActive,
       isInGracePeriod,
     }),
-    [subscription, plan, isLoading, isSubscriptionActive, isInGracePeriod, effectiveFeatures]
+    // deep-review FL2 — effLoading/effError included so consumers re-render
+    // when the effective-features query settles (gate opens once it resolves).
+    [
+      subscription,
+      plan,
+      isLoading,
+      isSubscriptionActive,
+      isInGracePeriod,
+      effectiveFeatures,
+      effLoading,
+      effError,
+    ]
   );
 
   return (

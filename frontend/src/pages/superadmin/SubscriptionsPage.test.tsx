@@ -7,6 +7,10 @@ const extendMutate = vi.fn();
 const cancelMutate = vi.fn();
 let subsData: any;
 let subsArg: any;
+// deep-review FM11: mutable so a test can simulate an in-flight extend on a
+// specific row (mutate carries the id; isPending alone can't identify the row).
+let extendState: any = { isPending: false, variables: undefined };
+let cancelState: any = { isPending: false, variables: undefined };
 
 vi.mock('../../features/superadmin/api/superAdminApi', () => ({
   useSubscriptions: (filters: any) => {
@@ -14,8 +18,8 @@ vi.mock('../../features/superadmin/api/superAdminApi', () => ({
     return { data: subsData, isLoading: false };
   },
   usePlans: () => ({ data: [{ id: 'p1', displayName: 'Pro Plan' }] }),
-  useExtendSubscription: () => ({ mutate: extendMutate, isPending: false }),
-  useCancelSubscription: () => ({ mutate: cancelMutate, isPending: false }),
+  useExtendSubscription: () => ({ mutate: extendMutate, ...extendState }),
+  useCancelSubscription: () => ({ mutate: cancelMutate, ...cancelState }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -27,6 +31,10 @@ vi.mock('react-i18next', () => ({
       return key;
     },
   }),
+  // deep-review FM11: the page now surfaces errors via getApiErrorMessage,
+  // which pulls in i18n/config.ts → `.use(initReactI18next)`. Provide the
+  // plugin shape so the i18n module initialises under the mock.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
 }));
 
 function sub(over: Partial<any> = {}) {
@@ -62,6 +70,8 @@ describe('SubscriptionsPage — extend-days NaN guard', () => {
   beforeEach(() => {
     extendMutate.mockReset();
     cancelMutate.mockReset();
+    extendState = { isPending: false, variables: undefined };
+    cancelState = { isPending: false, variables: undefined };
     subsData = payload([sub()]);
   });
   afterEach(() => vi.restoreAllMocks());
@@ -71,7 +81,11 @@ describe('SubscriptionsPage — extend-days NaN guard', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
     expect(extendMutate).toHaveBeenCalledTimes(1);
-    expect(extendMutate).toHaveBeenCalledWith({ id: 'sub-1', days: 30 });
+    // deep-review FM11: mutate now passes per-call onSuccess/onError options.
+    expect(extendMutate).toHaveBeenCalledWith(
+      { id: 'sub-1', days: 30 },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
   });
 
   it('does NOT extend when the prompt is cancelled (null)', () => {
@@ -100,6 +114,8 @@ describe('SubscriptionsPage — cancel-reason flow', () => {
   beforeEach(() => {
     extendMutate.mockReset();
     cancelMutate.mockReset();
+    extendState = { isPending: false, variables: undefined };
+    cancelState = { isPending: false, variables: undefined };
     subsData = payload([sub({ status: 'ACTIVE' })]);
   });
   afterEach(() => vi.restoreAllMocks());
@@ -110,7 +126,10 @@ describe('SubscriptionsPage — cancel-reason flow', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancel' }));
     expect(window.confirm).toHaveBeenCalledWith('subscriptions.confirmCancel');
-    expect(cancelMutate).toHaveBeenCalledWith({ id: 'sub-1', reason: 'Non-payment' });
+    expect(cancelMutate).toHaveBeenCalledWith(
+      { id: 'sub-1', reason: 'Non-payment' },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
   });
 
   it('cancels with reason=undefined when the reason prompt is left blank', () => {
@@ -118,7 +137,10 @@ describe('SubscriptionsPage — cancel-reason flow', () => {
     vi.spyOn(window, 'prompt').mockReturnValue('');
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancel' }));
-    expect(cancelMutate).toHaveBeenCalledWith({ id: 'sub-1', reason: undefined });
+    expect(cancelMutate).toHaveBeenCalledWith(
+      { id: 'sub-1', reason: undefined },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
   });
 
   it('does NOT prompt or cancel when the confirm is declined', () => {
@@ -141,6 +163,8 @@ describe('SubscriptionsPage — cancel-reason flow', () => {
 
 describe('SubscriptionsPage — listing & filters', () => {
   beforeEach(() => {
+    extendState = { isPending: false, variables: undefined };
+    cancelState = { isPending: false, variables: undefined };
     subsData = payload([sub()]);
   });
   afterEach(() => vi.restoreAllMocks());
@@ -157,5 +181,33 @@ describe('SubscriptionsPage — listing & filters', () => {
     const statusSelect = screen.getAllByRole('combobox')[0];
     fireEvent.change(statusSelect, { target: { value: 'TRIALING' } });
     expect(subsArg).toMatchObject({ status: 'TRIALING', page: 1 });
+  });
+});
+
+describe('SubscriptionsPage — in-flight double-submit guard (FM11)', () => {
+  beforeEach(() => {
+    extendMutate.mockReset();
+    cancelMutate.mockReset();
+    extendState = { isPending: false, variables: undefined };
+    cancelState = { isPending: false, variables: undefined };
+    subsData = payload([sub({ id: 'sub-1' })]);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('disables that row Extend/Cancel while its extend is in flight', () => {
+    extendState = { isPending: true, variables: { id: 'sub-1', days: 30 } };
+    renderPage();
+    expect(screen.getByRole('button', { name: 'subscriptions.extend' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'subscriptions.cancel' })).toBeDisabled();
+  });
+
+  it('does not re-open the prompt when an extend is already in flight', () => {
+    extendState = { isPending: true, variables: { id: 'sub-1', days: 30 } };
+    const promptSpy = vi.spyOn(window, 'prompt');
+    renderPage();
+    // Button is disabled, but assert the handler short-circuit even if invoked.
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(extendMutate).not.toHaveBeenCalled();
   });
 });

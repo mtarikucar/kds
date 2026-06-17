@@ -82,8 +82,24 @@ export class TenantProvisioningService implements CoreProvisioningPort {
     }
 
     const now = new Date();
+    // SECURITY (deep-review H8 + verification follow-up #2): a caller-supplied
+    // trialDaysOverride (a marketing offer term, unvalidated upstream) may only
+    // REDUCE the plan's server-defined trial — NEVER extend it. Left unbounded
+    // it was a grant-before-pay vector: trialDaysOverride=3650 on a paid plan
+    // mints a ~10-year free TRIALING subscription (TRIALING grants full paid
+    // entitlements). This mirrors auth-provisioning, which trusts only the
+    // server-owned plan.trialDays. A plan offering no trial (trialDays=0) can
+    // never become trialable via the override -> trialDays clamps to 0 -> the
+    // paid-plan guard below rejects the grant-before-pay.
+    const planTrialDays = Number(planRow?.trialDays ?? 0);
     const trialDays = planRow
-      ? (command.plan!.trialDaysOverride ?? planRow.trialDays ?? 0)
+      ? Math.max(
+          0,
+          Math.min(
+            Number(command.plan!.trialDaysOverride ?? planTrialDays),
+            planTrialDays,
+          ),
+        )
       : 0;
     const canTrial = !!planRow && trialDays > 0 && planRow.name !== "FREE";
     const trialStart = canTrial ? now : null;
@@ -96,6 +112,33 @@ export class TenantProvisioningService implements CoreProvisioningPort {
     const subscriptionAmount: Prisma.Decimal | number | null = planRow
       ? (command.plan!.amountOverride ?? planRow.monthlyPrice)
       : null;
+
+    // SECURITY (deep-review H8): never mint a paid, immediately-ACTIVE
+    // subscription here — that is grant-before-pay. If a lead is converted
+    // onto a paid plan with no trial (canTrial=false) and a positive amount,
+    // the tenant would get full paid access for free until the next renewal
+    // cycle (PlanFeatureGuard treats ACTIVE as live). A paid plan must either
+    // offer a trial or be collected through real PayTR checkout — mirror the
+    // register/social loadBusinessPlanOrThrow `trialDays <= 0` guard. FREE
+    // plans (amount 0) are unaffected and provision ACTIVE as before.
+    // The guard keys on the PLAN's real price, NOT the caller-supplied
+    // amountOverride (deep-review H8 + verification follow-up). amountOverride
+    // is a marketing-owned offer term (offer.customPrice) with no positivity
+    // validation; an amountOverride of 0 — or a negative value — would slip a
+    // paid plan past an `amount > 0` check and mint a free (or negative) ACTIVE
+    // paid subscription, which plan-projector grants full entitlements for.
+    const planIsPaid = !!planRow && Number(planRow.monthlyPrice) > 0;
+    if (planIsPaid && !canTrial) {
+      throw new CoreProvisioningPlanInvalidError(planRow!.id);
+    }
+    // A negative override is never valid (no negative-amount subscriptions).
+    if (
+      planRow &&
+      command.plan?.amountOverride != null &&
+      Number(command.plan.amountOverride) < 0
+    ) {
+      throw new CoreProvisioningPlanInvalidError(planRow.id);
+    }
 
     const baseSubdomain = command.tenantName
       .toLowerCase()
@@ -126,6 +169,23 @@ export class TenantProvisioningService implements CoreProvisioningPort {
           },
         });
 
+        // deep-review H7: every signup path MUST seed a Main branch and
+        // point the ADMIN's primaryBranchId at it (new-tenant provisioning
+        // parity). Without this the converted tenant has zero branches and a
+        // null primaryBranchId, so resolve-primary-branch returns null, the
+        // SPA resolves branchId=null, and the api interceptor hard-rejects
+        // every branch-scoped request — the documented "null primaryBranchId
+        // bricked the app" state. Mirror AuthProvisioningService exactly.
+        const mainBranch = await tx.branch.create({
+          data: {
+            tenantId: tenant.id,
+            name: "Main",
+            status: "active",
+            timezone: "UTC",
+          },
+          select: { id: true },
+        });
+
         const adminUser = await tx.user.create({
           data: {
             email: command.admin.email,
@@ -136,6 +196,7 @@ export class TenantProvisioningService implements CoreProvisioningPort {
             status: "ACTIVE",
             emailVerified: true,
             tenantId: tenant.id,
+            primaryBranchId: mainBranch.id,
           },
         });
 

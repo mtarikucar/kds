@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { useSubscriptions, useExtendSubscription, useCancelSubscription, usePlans } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionListItem } from '../../features/superadmin/types';
+import { getApiErrorMessage } from '../../lib/api-error';
 import { isValidExtendDays } from './subscriptions.helpers';
 
 const statusStyles: Record<string, string> = {
@@ -28,17 +30,45 @@ export default function SubscriptionsPage() {
   const extendMutation = useExtendSubscription();
   const cancelMutation = useCancelSubscription();
 
+  // deep-review FM11: mutate() carries the id, so isPending alone can't tell
+  // WHICH row is busy — track the active id to disable that row's buttons.
+  const pendingId = extendMutation.isPending
+    ? extendMutation.variables?.id
+    : cancelMutation.isPending
+      ? cancelMutation.variables?.id
+      : undefined;
+
   const handleExtend = (id: string) => {
+    // deep-review FM11: never re-open the blocking prompt while a mutation is
+    // in flight — the +N-days extend is non-idempotent, so a double-submit
+    // would drift the billing period.
+    if (extendMutation.isPending || cancelMutation.isPending) return;
     const days = prompt(t('subscriptions.promptExtendDays'));
     if (isValidExtendDays(days)) {
-      extendMutation.mutate({ id, days: Number(days) });
+      extendMutation.mutate(
+        { id, days: Number(days) },
+        {
+          // deep-review FM11: surface success/failure — previously a failed
+          // extend gave no feedback and the operator assumed it worked.
+          onSuccess: () => toast.success(t('subscriptions.extendSuccess', 'Abonelik uzatıldı.')),
+          onError: (err) => toast.error(getApiErrorMessage(err, t('subscriptions.extendFailed', 'Abonelik uzatılamadı.'))),
+        },
+      );
     }
   };
 
   const handleCancel = (id: string) => {
+    // deep-review FM11: short-circuit so a second click can't fire two cancels.
+    if (extendMutation.isPending || cancelMutation.isPending) return;
     if (window.confirm(t('subscriptions.confirmCancel'))) {
       const reason = prompt(t('subscriptions.promptCancelReason'));
-      cancelMutation.mutate({ id, reason: reason || undefined });
+      cancelMutation.mutate(
+        { id, reason: reason || undefined },
+        {
+          onSuccess: () => toast.success(t('subscriptions.cancelSuccess', 'Abonelik iptal edildi.')),
+          onError: (err) => toast.error(getApiErrorMessage(err, t('subscriptions.cancelFailed', 'Abonelik iptal edilemedi.'))),
+        },
+      );
     }
   };
 
@@ -148,14 +178,16 @@ export default function SubscriptionsPage() {
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => handleExtend(sub.id)}
-                        className="text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+                        disabled={pendingId === sub.id}
+                        className="text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('subscriptions.extend')}
                       </button>
                       {sub.status === 'ACTIVE' && (
                         <button
                           onClick={() => handleCancel(sub.id)}
-                          className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors"
+                          disabled={pendingId === sub.id}
+                          className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {t('subscriptions.cancel')}
                         </button>

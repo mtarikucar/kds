@@ -682,6 +682,15 @@ export class AuthService {
     let email: string;
     let firstName: string;
     let lastName: string;
+    // SECURITY (deep-review C3): Google permits accounts whose email is NOT
+    // verified (e.g. a Workspace/Cloud-Identity domain whose admin set an
+    // arbitrary primary email). Trusting payload.email for account linking
+    // without checking email_verified is the canonical Google Sign-In
+    // account-takeover vector. We capture the claim from whichever path
+    // (ID token / access-token userinfo) verifies the credential, then
+    // enforce it AFTER the try/catch below — never throw inside the inner
+    // ID-token try, or the access-token catch would swallow it.
+    let emailVerified = false;
 
     try {
       // Try to verify as ID token first
@@ -697,6 +706,9 @@ export class AuthService {
           email = payload.email;
           firstName = payload.given_name || "User";
           lastName = payload.family_name || "";
+          // payload.email_verified is boolean | undefined; strict === true
+          // rejects undefined too.
+          emailVerified = payload.email_verified === true;
         }
       } catch (idTokenError) {
         // If ID token verification fails, treat the credential as an access
@@ -733,10 +745,23 @@ export class AuthService {
         email = userInfo.email;
         firstName = userInfo.given_name || "User";
         lastName = userInfo.family_name || "";
+        // The /oauth2/v3/userinfo endpoint returns email_verified as either
+        // a boolean or the string "true"/"false" depending on path — coerce
+        // both. Anything else (including undefined) is treated as unverified.
+        emailVerified =
+          userInfo.email_verified === true ||
+          userInfo.email_verified === "true";
       }
 
       if (!email) {
         throw new BadRequestException("Email not provided by Google");
+      }
+
+      // SECURITY (deep-review C3): reject before any findUnique-by-email
+      // linking or new-user creation. An unverified Google email must not be
+      // trusted to identify a kds account.
+      if (!emailVerified) {
+        throw new UnauthorizedException("Google email is not verified");
       }
 
       // Check if user exists by googleId
@@ -870,6 +895,18 @@ export class AuthService {
 
       if (!email) {
         throw new BadRequestException("Email not provided by Apple");
+      }
+
+      // SECURITY (deep-review C3, Apple parity): Apple controls the email it
+      // issues (real Apple-ID address or a private relay), so it is verified
+      // by construction — unlike Google Workspace custom domains. We still
+      // refuse an explicitly-unverified email as defence in depth, but do NOT
+      // reject a missing claim (some Apple tokens omit it) to avoid breaking
+      // legitimate sign-ins. email_verified arrives as boolean or "true"/"false".
+      const appleEmailVerified = (applePayload as { email_verified?: unknown })
+        .email_verified;
+      if (appleEmailVerified === false || appleEmailVerified === "false") {
+        throw new UnauthorizedException("Apple email is not verified");
       }
 
       // Check if user exists by appleId

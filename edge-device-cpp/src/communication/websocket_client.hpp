@@ -96,8 +96,19 @@ private:
 
     // WebSocket client
     Client client_;
-    ConnectionHdl connection_;
+
+    // deep-review NH15: connection_ (a weak_ptr) is written on the io thread
+    // (on_open/connect) and read on the sender thread (send_raw/disconnect).
+    // weak_ptr copy is not atomic, so guard every access with this mutex.
+    mutable std::mutex conn_mutex_;
+    ConnectionHdl connection_;  // guarded by conn_mutex_
+
     std::thread io_thread_;
+
+    // deep-review NH13: delayed device-registration timer, owned by the
+    // io_service so it is cancelled when the client stops — replaces the old
+    // detached std::thread that could dereference a freed `this`.
+    Client::timer_ptr register_timer_;
 
     // State
     std::atomic<bool> running_{false};
@@ -131,6 +142,10 @@ private:
 
     // TLS context setup
     std::shared_ptr<boost::asio::ssl::context> on_tls_init();
+
+    // deep-review NH14: extract the hostname from a ws(s):// URL for RFC2818
+    // hostname verification. static so it is unit-testable in isolation.
+    static std::string parse_host(const std::string& url);
 
     // Reconnection logic
     void reconnect();

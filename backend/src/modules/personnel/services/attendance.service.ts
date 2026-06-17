@@ -22,23 +22,82 @@ export class AttendanceService {
   ) {}
 
   /**
-   * Resolve the tenant-local-midnight UTC instant for "today". Same
-   * helper z-reports uses (iter-35). Without this, server-local
-   * midnight diverges from the tenant's "today" — a user clocking
-   * in at 02:00 TR on a UTC container gets stamped with the previous
-   * server date, which then breaks payroll-export day boundaries
-   * and the shift-late calculation against shiftTemplate.startTime.
+   * Resolve the tenant-local calendar day for "today" as a date-only
+   * value anchored at UTC-midnight (YYYY-MM-DDT00:00:00Z).
+   *
+   * deep-review H6/M7: the `date` columns on Attendance and
+   * ShiftAssignment are `@db.Date`, which truncates the stored instant
+   * to its UTC calendar date. The previous implementation stamped the
+   * `getTenantMidnight` *instant* (e.g. Istanbul 2026-06-17 00:00 =
+   * 2026-06-16T21:00Z) which `@db.Date`-truncates to the PREVIOUS day
+   * for every positive-offset tenant (TR is UTC+3, the primary market).
+   * That stored the row one day early AND broke the clockIn ->
+   * shiftAssignment join (schedule.service writes its `@db.Date` from
+   * `new Date(dto.date)` which truncates to the true calendar day), so
+   * isLate / lateMinutes / overtimeMinutes were silently always 0.
+   *
+   * By anchoring the tenant-local YYYY-MM-DD at UTC-midnight, the
+   * `@db.Date` truncation yields exactly the tenant's real calendar day
+   * and the round-trip stays symmetric with the schedule writer.
    */
-  private async tenantToday(tenantId: string): Promise<Date> {
+  private async tenantTimezone(tenantId: string): Promise<string> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { timezone: true },
     });
-    return getTenantMidnight(new Date(), tenant?.timezone || "UTC");
+    return tenant?.timezone || "UTC";
+  }
+
+  /**
+   * Tenant-local calendar day for `now`, anchored at UTC-midnight so the
+   * `@db.Date` column stores the tenant's actual day (deep-review H6/M7).
+   */
+  private tenantDateOnly(now: Date, timezone: string): Date {
+    try {
+      const ymd = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(now);
+      return new Date(`${ymd}T00:00:00.000Z`);
+    } catch {
+      // Unknown tz: fall back to the server-local calendar day at
+      // UTC-midnight (still date-only correct on a UTC container).
+      const fallback = new Date(
+        Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+      );
+      return fallback;
+    }
+  }
+
+  /**
+   * The UTC instant for a tenant-local wall-clock HH:MM on the calendar
+   * day represented by `dateOnly` (a UTC-anchored date-only value).
+   *
+   * deep-review H6 (secondary): shift template start/end times are
+   * tenant-local wall clock ("09:00"). The old code built shiftStart via
+   * `new Date(today); setHours(...)` using SERVER-local hours, so even
+   * once the join matched the late/grace comparison was tz-skewed. We
+   * anchor on the tenant midnight (via the shared helper, DST-safe) and
+   * add the wall-clock offset.
+   */
+  private tenantWallClockInstant(
+    dateOnly: Date,
+    hour: number,
+    minute: number,
+    timezone: string,
+  ): Date {
+    // Anchor at noon so a DST jump (which happens at night) cannot push
+    // getTenantMidnight onto the adjacent day — mirrors getTenantDayBounds.
+    const noonUtc = new Date(dateOnly.getTime() + 12 * 60 * 60 * 1000);
+    const midnight = getTenantMidnight(noonUtc, timezone);
+    return new Date(midnight.getTime() + (hour * 60 + minute) * 60000);
   }
 
   async clockIn(tenantId: string, userId: string, notes?: string) {
-    const today = await this.tenantToday(tenantId);
+    const timezone = await this.tenantTimezone(tenantId);
+    const today = this.tenantDateOnly(new Date(), timezone);
 
     // Check no existing active record for today
     const existing = await this.prisma.attendance.findFirst({
@@ -71,8 +130,14 @@ export class AttendanceService {
         .map(Number);
       const gracePeriod = shiftAssignment.shiftTemplate.gracePeriodMinutes;
 
-      const shiftStart = new Date(today);
-      shiftStart.setHours(shiftHour, shiftMin, 0, 0);
+      // deep-review H6: build shiftStart in the TENANT timezone, not
+      // server-local, so isLate/lateMinutes are accurate on a UTC pod.
+      const shiftStart = this.tenantWallClockInstant(
+        today,
+        shiftHour,
+        shiftMin,
+        timezone,
+      );
 
       const graceEnd = new Date(shiftStart.getTime() + gracePeriod * 60000);
 
@@ -133,7 +198,10 @@ export class AttendanceService {
   }
 
   async clockOut(tenantId: string, userId: string) {
-    const today = await this.tenantToday(tenantId);
+    const today = this.tenantDateOnly(
+      new Date(),
+      await this.tenantTimezone(tenantId),
+    );
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -206,7 +274,10 @@ export class AttendanceService {
   }
 
   async breakStart(tenantId: string, userId: string) {
-    const today = await this.tenantToday(tenantId);
+    const today = this.tenantDateOnly(
+      new Date(),
+      await this.tenantTimezone(tenantId),
+    );
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -251,7 +322,10 @@ export class AttendanceService {
   }
 
   async breakEnd(tenantId: string, userId: string) {
-    const today = await this.tenantToday(tenantId);
+    const today = this.tenantDateOnly(
+      new Date(),
+      await this.tenantTimezone(tenantId),
+    );
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -308,13 +382,22 @@ export class AttendanceService {
   }
 
   async getMyStatus(scope: BranchScope) {
-    const today = await this.tenantToday(scope.tenantId);
+    const today = this.tenantDateOnly(
+      new Date(),
+      await this.tenantTimezone(scope.tenantId),
+    );
 
-    // Self-scoped to the acting user, but still pinned to the active
-    // branch: a user only sees their record within the branch they are
-    // operating in (matches the v3.0.0 branch-scope design).
+    // deep-review M8: the self-status read is intentionally NOT pinned
+    // to the active branch. Attendance is one-row-per-user-per-day
+    // (@@unique([userId, date])) and clockIn pins the row to the user's
+    // PRIMARY branch. A roaming ADMIN/MANAGER whose active branch != their
+    // primary branch would otherwise see themselves as NOT_CLOCKED_IN,
+    // be blocked from clocking in again, and break clock-out/break. This
+    // stays safe from IDOR: it is still self-scoped (userId) AND
+    // tenant-scoped. (Roster reads below remain branch-scoped by design;
+    // worked-branch vs home-branch attribution is a deferred product call.)
     const attendance = await this.prisma.attendance.findFirst({
-      where: { ...branchScope(scope), userId: scope.userId, date: today },
+      where: { tenantId: scope.tenantId, userId: scope.userId, date: today },
       include: {
         shiftAssignment: { include: { shiftTemplate: true } },
         user: {
@@ -327,7 +410,10 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(scope: BranchScope) {
-    const today = await this.tenantToday(scope.tenantId);
+    const today = this.tenantDateOnly(
+      new Date(),
+      await this.tenantTimezone(scope.tenantId),
+    );
 
     return this.prisma.attendance.findMany({
       where: { ...branchScope(scope), date: today },

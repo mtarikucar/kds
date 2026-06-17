@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 import { useOrders, useUpdateOrderStatus, useCancelKdsOrder } from '../../features/orders/ordersApi';
 import { useKitchenSocket } from '../../features/kds/useKitchenSocket';
@@ -73,6 +74,22 @@ const KitchenDisplayPage = () => {
   };
 
   const handleCancelOrder = (orderId: string) => {
+    // deep-review FM5: the cancel is deferred behind a 5s Undo window in
+    // OrderCard, so by the time it commits another station may have already
+    // advanced/served/cancelled this order. Re-validate against the latest
+    // cache and only proceed if it is STILL PENDING — this closes the window
+    // where a stale closure would wrongfully void work-in-progress (CANCELLED
+    // is terminal server-side and reverses stock).
+    const current = (orders || []).find((o) => o.id === orderId);
+    if (!current || current.status !== OrderStatus.PENDING) {
+      toast.warning(
+        t(
+          'kitchen.cancelStale',
+          'Sipariş artık beklemede değil; iptal edilmedi.'
+        )
+      );
+      return;
+    }
     setUpdatingOrderId(orderId);
     cancelOrder(orderId, {
       onSettled: () => {
