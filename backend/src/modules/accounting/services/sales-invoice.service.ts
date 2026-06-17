@@ -135,10 +135,43 @@ export class SalesInvoiceService {
       };
     });
 
-    const subtotal = invoiceItems.reduce((s, i) => s + i.subtotal, 0);
-    const taxAmount = invoiceItems.reduce((s, i) => s + i.taxAmount, 0);
     const totalAmount = Number(order.finalAmount);
     const discount = Number(order.discount);
+
+    // CONCERN B-fiscal (delivery reconciliation): the header total is
+    // order.finalAmount. For DELIVERY orders the external platform folds a
+    // delivery fee (and the value of any items it never mapped to our
+    // catalogue, which delivery-order.service drops) into finalAmount, so
+    // Σ(line.total) lands BELOW the header total. An e-Arşiv/e-fatura
+    // document whose lines don't sum to its header total is rejected by the
+    // provider. When the computed line sum is short, append ONE reconciling
+    // "Teslimat / Diğer" line for the difference so Σ(lines) == totalAmount.
+    // Dine-in/takeaway lines already reconcile (Σ == finalAmount), so the
+    // gap is zero and nothing is appended — their behaviour is unchanged.
+    const lineTotalSum = invoiceItems.reduce((s, i) => s.add(D(i.total)), D(0));
+    const reconcileGap = round2(D(totalAmount).sub(lineTotalSum));
+    // Only positive gaps are reconciled. A line sum ABOVE the header total
+    // is a different (discount-side) concern handled by the M11 apportioning
+    // above; we never silently trim real lines here.
+    if (reconcileGap.gt(0)) {
+      // Treat the delivery/other amount as KDV-inclusive at the standard
+      // rate so the header subtotal/taxAmount/taxBreakdown also reconcile.
+      const reconcileRate = 20;
+      const reconcileGross = reconcileGap.toNumber();
+      const tax = this.taxService.extractTax(reconcileGross, reconcileRate);
+      invoiceItems.push({
+        description: "Teslimat / Diğer",
+        quantity: 1,
+        unitPrice: tax.subtotalExcludingTax,
+        taxRate: reconcileRate,
+        taxAmount: tax.taxAmount,
+        subtotal: tax.subtotalExcludingTax,
+        total: reconcileGross,
+      });
+    }
+
+    const subtotal = invoiceItems.reduce((s, i) => s + i.subtotal, 0);
+    const taxAmount = invoiceItems.reduce((s, i) => s + i.taxAmount, 0);
 
     const taxBreakdown: Record<
       number,

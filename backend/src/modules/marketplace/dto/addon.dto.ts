@@ -127,21 +127,3 @@ export class UpdateAddOnDto {
   @IsIn(STATUS as any)
   status?: (typeof STATUS)[number];
 }
-
-export class PurchaseAddOnDto {
-  @ApiProperty()
-  @IsString()
-  addOnCode!: string;
-
-  @ApiPropertyOptional({ default: 1 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  quantity?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  branchId?: string;
-}

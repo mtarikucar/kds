@@ -147,3 +147,124 @@ describe("SalesInvoiceService.createFromOrder discount consistency (deep-review 
     expect(invoice.discount).toBe(10);
   });
 });
+
+/**
+ * CONCERN B-fiscal: for DELIVERY orders the header finalAmount carries a
+ * delivery fee (and possibly the value of items the platform didn't map),
+ * so Σ(line.total) is BELOW the header total. An e-Arşiv/e-fatura document
+ * whose lines don't sum to its header total is rejected. When the computed
+ * line sum is short, append one reconciling "Teslimat / Diğer" line for the
+ * difference so Σ(lines) == header total. Dine-in/takeaway (lines already
+ * reconcile) must be left untouched — no extra line.
+ */
+describe("SalesInvoiceService.createFromOrder delivery reconciliation (CONCERN B-fiscal)", () => {
+  let prisma: MockPrismaClient;
+  let svc: SalesInvoiceService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      findByTenant: jest.fn().mockResolvedValue({
+        defaultPaymentTermDays: 0,
+        autoSync: false,
+        provider: "NONE",
+      }),
+      getNextInvoiceNumber: jest.fn().mockResolvedValue("INV-002"),
+    };
+    svc = new SalesInvoiceService(
+      prisma as any,
+      settings,
+      new TaxCalculationService(),
+    );
+
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => {
+      const tx: any = {
+        salesInvoice: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockImplementation(async ({ data }: any) => ({
+            id: "inv-2",
+            ...data,
+            items: data.items.create,
+          })),
+        },
+      };
+      return cb(tx);
+    });
+  });
+
+  it("appends a reconciling line when the line sum is below the header total (delivery fee)", async () => {
+    // One mapped 10% KDV item of 80. Header finalAmount 100 carries a 20 TRY
+    // delivery fee that has no matching order item. Lines sum to 80 < 100,
+    // so a reconciling line for 20 must be appended.
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: "order-d",
+      tenantId: "t1",
+      customerName: "Delivery Co",
+      customerPhone: null,
+      totalAmount: 80,
+      discount: 0,
+      finalAmount: 100,
+      payments: [{ method: "DIGITAL" }],
+      salesInvoices: [],
+      orderItems: [
+        {
+          id: "oi-1",
+          quantity: 1,
+          subtotal: 80,
+          taxRate: 10,
+          product: { name: "Burger" },
+        },
+      ],
+    });
+
+    const invoice: any = await svc.createFromOrder("order-d", "t1");
+
+    const lineTotalSum = invoice.items.reduce(
+      (s: number, i: any) => s + i.total,
+      0,
+    );
+
+    // One real line + one reconciling line.
+    expect(invoice.items).toHaveLength(2);
+    // Lines must now reconcile to the header total.
+    expect(Math.round(lineTotalSum * 100) / 100).toBe(invoice.totalAmount);
+    expect(invoice.totalAmount).toBe(100);
+
+    const reconciling = invoice.items[invoice.items.length - 1];
+    expect(reconciling.description).toBe("Teslimat / Diğer");
+    expect(reconciling.total).toBe(20);
+  });
+
+  it("does NOT append a reconciling line when lines already reconcile (dine-in/takeaway)", async () => {
+    // Lines sum to 100 and finalAmount is 100 — nothing to reconcile.
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: "order-n",
+      tenantId: "t1",
+      customerName: "Walk-in",
+      customerPhone: null,
+      totalAmount: 100,
+      discount: 0,
+      finalAmount: 100,
+      payments: [{ method: "CASH" }],
+      salesInvoices: [],
+      orderItems: [
+        {
+          id: "oi-1",
+          quantity: 1,
+          subtotal: 100,
+          taxRate: 10,
+          product: { name: "Pizza" },
+        },
+      ],
+    });
+
+    const invoice: any = await svc.createFromOrder("order-n", "t1");
+
+    expect(invoice.items).toHaveLength(1);
+    const lineTotalSum = invoice.items.reduce(
+      (s: number, i: any) => s + i.total,
+      0,
+    );
+    expect(Math.round(lineTotalSum * 100) / 100).toBe(invoice.totalAmount);
+  });
+});

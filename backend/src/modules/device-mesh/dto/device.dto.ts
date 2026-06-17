@@ -13,6 +13,27 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+import type { CommandKind } from "../device-mesh.types";
+
+// Canonical command kinds the bridge dispatcher actually executes. This MUST
+// stay in lock-step with the `CommandKind` union (the `satisfies` below fails
+// the build if they drift). Validating the DTO's `kind` against this closed
+// set is load-bearing: the no-auto-requeue / double-charge guard in
+// CommandQueueService keys on these exact underscore-form identifiers, so a
+// free-form alias (e.g. `charge.card`) must never reach the queue.
+const COMMAND_KINDS = [
+  "print_receipt",
+  "open_drawer",
+  "fiscal_receipt",
+  "fiscal_cancel",
+  "charge_card",
+  "show_order",
+  "clear_order",
+  "reboot",
+  "firmware_update",
+  "capability_probe",
+  "noop",
+] as const satisfies readonly CommandKind[];
 
 const KINDS = [
   "tablet_waiter",
@@ -132,16 +153,18 @@ export class HeartbeatDto {
 }
 
 export class EnqueueCommandDto {
-  // `kind` is a short identifier the bridge agent dispatches on
-  // (`print.receipt`, `cash_drawer.open`, …). Anything longer is
-  // either a bug or an attempt to bloat the JSONB log row.
-  @ApiProperty()
+  // `kind` is a canonical CommandKind the bridge agent dispatches on
+  // (`print_receipt`, `charge_card`, …). It MUST be one of the closed,
+  // underscore-form set — free-form aliases (e.g. `charge.card`) would slip
+  // past the double-charge / no-auto-requeue guard in CommandQueueService,
+  // which keys on these exact identifiers, so we reject anything else here.
+  @ApiProperty({ enum: COMMAND_KINDS })
   @IsString()
   @MaxLength(64)
-  @Matches(/^[a-z0-9._-]+$/, {
-    message: "kind must be lowercase dot-separated identifier (a-z0-9._-)",
+  @IsIn(COMMAND_KINDS, {
+    message: `kind must be one of: ${COMMAND_KINDS.join(", ")}`,
   })
-  kind!: string;
+  kind!: CommandKind;
 
   // Payload is JSONB; the body-parser limit (currently 100KB on this
   // route) bounds the total request size, but @IsObject keeps non-

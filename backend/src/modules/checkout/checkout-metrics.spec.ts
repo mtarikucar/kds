@@ -84,7 +84,11 @@ describe("CheckoutService — checkout_provisions_total counter", () => {
 
   it('records result="comped" when paymentRef is null (force-complete)', async () => {
     emptyQuote();
-    await svc.confirmAndProvision("t-1", { items: [] as any }, null);
+    // The operator-comp path now requires the explicit internal allowComp
+    // flag (C1 residual hardening); client input can never reach it.
+    await svc.confirmAndProvision("t-1", { items: [] as any }, null, {
+      allowComp: true,
+    });
     expect(metrics.incCounter).toHaveBeenCalledWith(
       "checkout_provisions_total",
       expect.any(String),

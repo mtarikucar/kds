@@ -430,6 +430,34 @@ describe("CommandQueueService", () => {
       },
     );
 
+    /**
+     * concern B-device-mesh. The no-auto-requeue guard keys on the canonical
+     * underscore-form kinds. A dot-form alias (`charge.card`) is NOT
+     * recognised as non-retryable — so such an alias must never be allowed to
+     * reach the queue (it would bypass the guard and double-charge). That is
+     * exactly why EnqueueCommandDto pins `kind` to the canonical CommandKind
+     * set; this asserts both halves of the contract at the service boundary.
+     */
+    it("treats canonical side-effecting kinds as non-retryable but not dot-form aliases (guard contract)", () => {
+      const isNonRetryable = (k: string) =>
+        (CommandQueueService as any).isNonRetryableKind(k) as boolean;
+      // Canonical side-effecting kinds → non-retryable (guard fires).
+      for (const k of [
+        "charge_card",
+        "fiscal_receipt",
+        "fiscal_cancel",
+        "open_drawer",
+        "print_receipt",
+      ]) {
+        expect(isNonRetryable(k)).toBe(true);
+      }
+      // Dot-form aliases would slip past the guard — DTO validation must
+      // reject them before they ever get here.
+      for (const k of ["charge.card", "open.drawer", "print.receipt"]) {
+        expect(isNonRetryable(k)).toBe(false);
+      }
+    });
+
     it("still requeues an idempotent kind (print/show_order) on failed ack with retries left", async () => {
       prisma.deviceCommand.findFirst.mockResolvedValue({
         id: "c-1",
