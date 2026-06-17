@@ -205,6 +205,56 @@ describe("TenantProvisioningService", () => {
     expect(prisma.subscription.create).not.toHaveBeenCalled();
   });
 
+  // deep-review H8 verification follow-up #2 — the RESIDUAL grant-before-pay
+  // vector: an unbounded caller-supplied trialDaysOverride fakes a multi-year
+  // free TRIALING subscription on a paid plan. A plan that offers NO trial
+  // (trialDays=0) must not become trialable via the override.
+  it("refuses a faked trial via trialDaysOverride on a no-trial paid plan", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+      monthlyPrice: new Prisma.Decimal(1299),
+      currency: "TRY",
+      trialDays: 0, // plan offers no trial
+      commissionRate: new Prisma.Decimal(0.15),
+    } as any);
+
+    await expect(
+      svc.provisionTenantForLead({
+        ...command,
+        plan: { planId: "plan-pro", amountOverride: null, trialDaysOverride: 3650 },
+      }),
+    ).rejects.toBeInstanceOf(CoreProvisioningPlanInvalidError);
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
+  });
+
+  // The override may shorten a trial but never extend it past the plan's own.
+  it("clamps trialDaysOverride to the plan's server-owned trial length", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+      monthlyPrice: new Prisma.Decimal(1299),
+      currency: "TRY",
+      trialDays: 14,
+      commissionRate: new Prisma.Decimal(0.15),
+    } as any);
+
+    await svc.provisionTenantForLead({
+      ...command,
+      plan: { planId: "plan-pro", amountOverride: null, trialDaysOverride: 3650 },
+    });
+
+    const data = (prisma.subscription.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.status).toBe("TRIALING");
+    const span =
+      (new Date(data.trialEnd).getTime() -
+        new Date(data.currentPeriodStart).getTime()) /
+      86_400_000;
+    expect(Math.round(span)).toBe(14); // clamped to the plan's 14, not 3650
+  });
+
   it("converges on the winner when a concurrent provision wins the ledger unique (P2002)", async () => {
     const p2002 = new Prisma.PrismaClientKnownRequestError("unique violation", {
       code: "P2002",

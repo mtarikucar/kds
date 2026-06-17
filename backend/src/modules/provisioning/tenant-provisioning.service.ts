@@ -82,8 +82,24 @@ export class TenantProvisioningService implements CoreProvisioningPort {
     }
 
     const now = new Date();
+    // SECURITY (deep-review H8 + verification follow-up #2): a caller-supplied
+    // trialDaysOverride (a marketing offer term, unvalidated upstream) may only
+    // REDUCE the plan's server-defined trial — NEVER extend it. Left unbounded
+    // it was a grant-before-pay vector: trialDaysOverride=3650 on a paid plan
+    // mints a ~10-year free TRIALING subscription (TRIALING grants full paid
+    // entitlements). This mirrors auth-provisioning, which trusts only the
+    // server-owned plan.trialDays. A plan offering no trial (trialDays=0) can
+    // never become trialable via the override -> trialDays clamps to 0 -> the
+    // paid-plan guard below rejects the grant-before-pay.
+    const planTrialDays = Number(planRow?.trialDays ?? 0);
     const trialDays = planRow
-      ? (command.plan!.trialDaysOverride ?? planRow.trialDays ?? 0)
+      ? Math.max(
+          0,
+          Math.min(
+            Number(command.plan!.trialDaysOverride ?? planTrialDays),
+            planTrialDays,
+          ),
+        )
       : 0;
     const canTrial = !!planRow && trialDays > 0 && planRow.name !== "FREE";
     const trialStart = canTrial ? now : null;
