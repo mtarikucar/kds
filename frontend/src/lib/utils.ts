@@ -6,8 +6,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+// The platform collects in Turkish Lira only (PayTR is TRY-only), so money
+// defaults to TRY and renders with Turkish grouping/decimals (₺2.999,00). A
+// non-TRY `currency` is still honoured for the multi-currency code paths that
+// remain (e.g. the bank-transfer/havale plan rendering).
+export function formatCurrency(amount: number, currency: string = 'TRY'): string {
+  return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency,
   }).format(amount);

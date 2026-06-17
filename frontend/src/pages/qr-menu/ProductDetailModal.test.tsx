@@ -70,14 +70,14 @@ describe('ProductDetailModal — render gating', () => {
 });
 
 describe('ProductDetailModal — money + visibility toggles', () => {
-  it('formats the price as USD when showPrices is on', () => {
+  it('formats the price in Turkish Lira when showPrices is on', () => {
     render(<ProductDetailModal {...baseProps} product={makeProduct({ price: 19.5 })} />);
-    expect(screen.getByText('$19.50')).toBeInTheDocument();
+    expect(screen.getByText('₺19,50')).toBeInTheDocument();
   });
 
   it('hides the price block when showPrices is off', () => {
     render(<ProductDetailModal {...baseProps} showPrices={false} product={makeProduct({ price: 19.5 })} />);
-    expect(screen.queryByText('$19.50')).not.toBeInTheDocument();
+    expect(screen.queryByText('₺19,50')).not.toBeInTheDocument();
   });
 
   it('shows description when present and showDescription is on', () => {

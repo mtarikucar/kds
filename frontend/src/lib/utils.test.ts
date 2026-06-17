@@ -3,6 +3,7 @@ import {
   calculateAverageWaitTime,
   calculateOrderTotal,
   countUrgentOrders,
+  formatCurrency,
   formatWaitTime,
   getElapsedTime,
   getOrderUrgency,
@@ -11,6 +12,23 @@ import {
   sortOrdersByAge,
   truncate,
 } from './utils';
+
+// The platform collects in TRY only (PayTR is TRY-only); the money formatter
+// must default to Turkish Lira, never US dollars. A USD default here used to
+// leak "$" onto TRY storefronts (QR menu) — the exact bug this guards.
+describe('formatCurrency', () => {
+  it('defaults to Turkish Lira when no currency is given', () => {
+    expect(formatCurrency(19.5)).toBe('₺19,50');
+  });
+
+  it('groups thousands the Turkish way', () => {
+    expect(formatCurrency(2999)).toBe('₺2.999,00');
+  });
+
+  it('still honours an explicit non-TRY currency (multi-currency capability kept)', () => {
+    expect(formatCurrency(100, 'USD')).toBe('$100,00');
+  });
+});
 
 // A fixed "now" makes every Date.now()-based helper deterministic.
 const NOW = new Date('2026-06-14T12:00:00.000Z').getTime();

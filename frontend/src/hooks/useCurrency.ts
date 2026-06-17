@@ -52,13 +52,12 @@ export interface UpdateTenantSettingsDto {
   taxId?: string | null;
 }
 
+// The platform operates in Turkish Lira only — PayTR (the card processor)
+// collects TRY exclusively, so the storefront/POS currency is not selectable.
+// The broader symbol map still lives in src/lib/currency.ts for the
+// bank-transfer/havale code paths that can still render a legacy non-TRY plan.
 export const SUPPORTED_CURRENCIES = [
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
   { code: 'TRY', name: 'Turkish Lira', symbol: '₺' },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
 ] as const;
 
 export type SupportedCurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]['code'];

@@ -34,10 +34,11 @@ vi.mock('../../features/customers/customersApi', () => ({
   useUpdateCustomer: () => ({ mutate: updateCustomer, isPending: false }),
 }));
 
-// Pin the currency so formatCurrency is deterministic (EUR → € symbol).
+// TRY-only platform: the tenant currency is always Turkish Lira, so spend
+// formats with the ₺ symbol.
 vi.mock('../../hooks/useCurrency', async () => {
   const actual = await vi.importActual<any>('../../hooks/useCurrency');
-  return { ...actual, useCurrency: () => 'EUR' };
+  return { ...actual, useCurrency: () => 'TRY' };
 });
 
 vi.mock('../../components/ui/ErrorState', () => ({
@@ -110,7 +111,7 @@ describe('CustomersPage statistics', () => {
   it('aggregates totals across all customers and formats spend with the tenant currency', () => {
     renderPage();
     // Aggregate spend: 100.5 + 50 + 0 = 150.50, formatted with EUR symbol.
-    expect(screen.getByText('€150.50')).toBeInTheDocument();
+    expect(screen.getByText('₺150.50')).toBeInTheDocument();
 
     // Each stat tile is a label paired with its value; assert via the
     // label's tile so per-row numbers don't collide with the aggregate.

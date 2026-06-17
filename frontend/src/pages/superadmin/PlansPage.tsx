@@ -279,7 +279,7 @@ function PlanModal({
     description: plan?.description || '',
     monthlyPrice: plan?.monthlyPrice || 0,
     yearlyPrice: plan?.yearlyPrice || 0,
-    currency: plan?.currency || 'TRY',
+    currency: 'TRY', // TRY-only platform — never carry a legacy non-TRY value forward
     maxUsers: plan?.maxUsers || 1,
     maxTables: plan?.maxTables || 5,
     maxProducts: plan?.maxProducts || 50,
@@ -374,23 +374,17 @@ function PlanModal({
               <label className="block text-sm font-medium text-zinc-700 mb-1.5">
                 {t('plans.modal.currency', 'Para birimi')}
               </label>
+              {/* TRY-only: PayTR collects Turkish Lira exclusively, so plans are
+                  priced in TRY. The currency is fixed (not selectable) to keep
+                  the catalog consistent with what the platform can actually
+                  charge. */}
               <select
-                value={formData.currency}
-                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                value="TRY"
+                disabled
+                className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-lg text-sm text-zinc-600 cursor-not-allowed focus:outline-none"
               >
                 <option value="TRY">TRY (₺)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
               </select>
-              {formData.currency !== 'TRY' && (
-                <p className="mt-1.5 text-xs text-amber-600">
-                  {t(
-                    'plans.modal.nonTryCurrencyNote',
-                    'TRY dışı planlar yalnızca havale ile ödenebilir; havale ayarlarını açın.',
-                  )}
-                </p>
-              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
