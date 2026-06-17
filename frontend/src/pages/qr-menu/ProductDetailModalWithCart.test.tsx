@@ -130,7 +130,7 @@ const baseProps = {
   showDescription: true,
   showPrices: true,
   enableCustomerOrdering: true,
-  currency: 'USD',
+  currency: 'TRY',
 };
 
 beforeEach(() => {
@@ -174,7 +174,7 @@ describe('ProductDetailModalWithCart — money total', () => {
   it('shows the bare product price when no modifiers/quantity changes', () => {
     render(<ProductDetailModalWithCart {...baseProps} product={makeProduct({ price: 12.5 })} />);
     // Add button label contains the running total.
-    expect(screen.getByRole('button', { name: /\$12\.50/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺12,50/ })).toBeInTheDocument();
   });
 
   it('multiplies (price + modifier adjustments) by quantity', () => {
@@ -197,11 +197,11 @@ describe('ProductDetailModalWithCart — money total', () => {
     // select +$2 modifier -> base 12
     expandGroup(/Extras/);
     fireEvent.click(screen.getByRole('button', { name: /Cheese/ }));
-    expect(screen.getByRole('button', { name: /\$12\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺12,00/ })).toBeInTheDocument();
 
     // bump quantity to 2 -> (10 + 2) * 2 = 24
     fireEvent.click(stepperButtons().plus);
-    expect(screen.getByRole('button', { name: /\$24\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺24,00/ })).toBeInTheDocument();
   });
 });
 
@@ -212,7 +212,7 @@ describe('ProductDetailModalWithCart — quantity stepper', () => {
     expect(minus).toBeDisabled();
     fireEvent.click(minus);
     // total still single-quantity price = $10.00
-    expect(screen.getByRole('button', { name: /\$10\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺10,00/ })).toBeInTheDocument();
     expect(stepperButtons().value).toBe('1');
   });
 });
@@ -237,10 +237,10 @@ describe('ProductDetailModalWithCart — single-select modifier group', () => {
     expandGroup(/Size/);
     fireEvent.click(screen.getByRole('button', { name: /Large/ }));
     // +3 reflected
-    expect(screen.getByRole('button', { name: /\$13\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺13,00/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Small/ }));
     // back to base 10 — Large was replaced, not added
-    expect(screen.getByRole('button', { name: /\$10\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺10,00/ })).toBeInTheDocument();
   });
 
   it('clicking the selected single option again deselects it', () => {
@@ -248,9 +248,9 @@ describe('ProductDetailModalWithCart — single-select modifier group', () => {
     expandGroup(/Size/);
     const large = screen.getByRole('button', { name: /Large/ });
     fireEvent.click(large);
-    expect(screen.getByRole('button', { name: /\$13\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺13,00/ })).toBeInTheDocument();
     fireEvent.click(large);
-    expect(screen.getByRole('button', { name: /\$10\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺10,00/ })).toBeInTheDocument();
   });
 });
 
@@ -277,11 +277,11 @@ describe('ProductDetailModalWithCart — multi-select max enforcement', () => {
     fireEvent.click(screen.getByRole('button', { name: /Bacon/ }));
     fireEvent.click(screen.getByRole('button', { name: /Egg/ }));
     // 10 + 1 + 1 = 12
-    expect(screen.getByRole('button', { name: /\$12\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺12,00/ })).toBeInTheDocument();
     // third one is a no-op (still $12, not $13)
     fireEvent.click(screen.getByRole('button', { name: /Onion/ }));
-    expect(screen.getByRole('button', { name: /\$12\.00/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /\$13\.00/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺12,00/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /₺13,00/ })).not.toBeInTheDocument();
   });
 
   it('deselecting frees a slot so a different option can be chosen', () => {
@@ -291,7 +291,7 @@ describe('ProductDetailModalWithCart — multi-select max enforcement', () => {
     fireEvent.click(screen.getByRole('button', { name: /Egg/ }));
     fireEvent.click(screen.getByRole('button', { name: /Bacon/ })); // deselect bacon
     fireEvent.click(screen.getByRole('button', { name: /Onion/ })); // now allowed
-    expect(screen.getByRole('button', { name: /\$12\.00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /₺12,00/ })).toBeInTheDocument();
   });
 });
 

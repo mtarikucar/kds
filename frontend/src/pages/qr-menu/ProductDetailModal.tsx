@@ -166,7 +166,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   className="text-4xl font-black"
                   style={{ color: primaryColor }}
                 >
-                  {formatCurrency(product.price, 'USD')}
+                  {formatCurrency(product.price)}
                 </p>
               </div>
             )}

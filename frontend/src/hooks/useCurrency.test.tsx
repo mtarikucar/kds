@@ -37,15 +37,8 @@ describe('useCurrency hooks', () => {
     patchMock.mockReset();
   });
 
-  it('exposes the canonical supported currency list', () => {
-    expect(SUPPORTED_CURRENCIES.map((c) => c.code)).toEqual([
-      'USD',
-      'EUR',
-      'GBP',
-      'TRY',
-      'CAD',
-      'AUD',
-    ]);
+  it('exposes only Turkish Lira (TRY-only platform)', () => {
+    expect(SUPPORTED_CURRENCIES.map((c) => c.code)).toEqual(['TRY']);
   });
 
   it('useGetTenantSettings calls the settings endpoint and returns data', async () => {
