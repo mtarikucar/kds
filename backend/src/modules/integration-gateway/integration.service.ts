@@ -11,6 +11,7 @@ import {
   createHash,
 } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
@@ -307,26 +308,23 @@ export class IntegrationService {
     // requiring a schema change. 24h window is conservative; providers
     // that legitimately resend identical bodies more than a day apart
     // (e.g. daily heartbeats) won't trip the gate.
-    if (signature) {
-      const recentDuplicate =
-        await this.prisma.integrationWebhookEvent.findFirst({
-          where: {
-            tenantId,
-            providerId,
-            signature,
-            receivedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
-          },
-          select: { id: true, receivedAt: true },
-        });
-      if (recentDuplicate) {
-        this.logger.warn(
-          `Replay rejected: duplicate signature for provider=${providerId} tenant=${tenantId} ` +
-            `— original event ${recentDuplicate.id} received at ${recentDuplicate.receivedAt.toISOString()}`,
-        );
-        return { ignored: true, reason: "duplicate" };
-      }
-    }
-
+    //
+    // deep-review M20: the dedup used to be a bare findFirst followed by a
+    // separate create — a read-then-write TOCTOU. Two identical webhooks
+    // arriving concurrently (provider retry storm / attacker replay) each
+    // ran findFirst before the other committed, so neither saw the peer's
+    // row and BOTH created an event + emitted to the outbox, double-firing
+    // downstream order/payment consumers. A plain @@unique can't fix this
+    // cleanly here: signature is nullable (null-sig rows are intentionally
+    // never deduped — Postgres treats NULLs as distinct anyway) and a full
+    // unique index would also kill the deliberate 24h-resend escape hatch
+    // for daily-heartbeat bodies. Instead we run the dup-check + create in
+    // a single Serializable transaction (same pattern as Iter-68 in
+    // tenant-marketplace). Postgres detects the overlapping read/write
+    // predicate sets and aborts one of the two concurrent transactions;
+    // the loser surfaces as a serialization failure (40001 / P2034), which
+    // we map to the same { ignored, reason: "duplicate" } the sequential
+    // path returns — so only the winner ever appends to the outbox.
     let parsed: any = {};
     try {
       parsed = JSON.parse(raw.toString("utf8"));
@@ -335,18 +333,71 @@ export class IntegrationService {
       parsed = { _raw: raw.toString("utf8") };
     }
 
-    const row = await this.prisma.integrationWebhookEvent.create({
-      data: {
-        id: uuidv7(),
-        tenantId,
-        connectionId: connection.id,
-        providerId,
-        type: parsed?.type ?? parsed?.event ?? "unknown",
-        signature,
-        payload: parsed as any,
-        result: "received",
-      },
-    });
+    // `null` is the in-txn sentinel for a sequential-duplicate hit (the txn
+    // unwinds without writing); the non-null branch is the created row.
+    let row: Awaited<
+      ReturnType<typeof this.prisma.integrationWebhookEvent.create>
+    > | null;
+    try {
+      row = await this.prisma.$transaction(
+        async (tx) => {
+          if (signature) {
+            const recentDuplicate = await tx.integrationWebhookEvent.findFirst({
+              where: {
+                tenantId,
+                providerId,
+                signature,
+                receivedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
+              },
+              select: { id: true, receivedAt: true },
+            });
+            if (recentDuplicate) {
+              this.logger.warn(
+                `Replay rejected: duplicate signature for provider=${providerId} tenant=${tenantId} ` +
+                  `— original event ${recentDuplicate.id} received at ${recentDuplicate.receivedAt.toISOString()}`,
+              );
+              // Sentinel: unwind the txn without writing, distinguished from
+              // a real serialization abort by the P2034 check below.
+              return null;
+            }
+          }
+
+          return tx.integrationWebhookEvent.create({
+            data: {
+              id: uuidv7(),
+              tenantId,
+              connectionId: connection.id,
+              providerId,
+              type: parsed?.type ?? parsed?.event ?? "unknown",
+              signature,
+              payload: parsed as any,
+              result: "received",
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      // deep-review M20: the loser of a concurrent dup race aborts here with
+      // a Postgres serialization failure (40001 → Prisma P2034). Treat it as
+      // a duplicate so the loser neither retries nor touches the outbox.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2034"
+      ) {
+        this.logger.warn(
+          `Replay rejected (serialization conflict): concurrent duplicate ` +
+            `signature for provider=${providerId} tenant=${tenantId}`,
+        );
+        return { ignored: true, reason: "duplicate" };
+      }
+      throw err;
+    }
+
+    // Sequential duplicate caught inside the txn (recentDuplicate hit).
+    if (row === null) {
+      return { ignored: true, reason: "duplicate" };
+    }
 
     await this.outbox
       .append({

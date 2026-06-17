@@ -9,7 +9,10 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OrderStatus } from "../../common/constants/order-status.enum";
-import { validateTransition } from "../../common/utils/order-state-machine";
+import {
+  validateTransition,
+  canTransition,
+} from "../../common/utils/order-state-machine";
 import { OrderItemStatus } from "./dto/update-order-item-status.dto";
 import { KdsGateway } from "./kds.gateway";
 import { DeliveryStatusSyncService } from "../delivery-platforms/services/delivery-status-sync.service";
@@ -314,15 +317,58 @@ export class KdsService {
     const allReady = allItems.every(
       (item) => item.status === OrderItemStatus.READY,
     );
-    if (allReady && orderItem.order.status !== OrderStatus.READY) {
-      if (
-        !orderItem.order.requiresApproval ||
-        orderItem.order.status !== OrderStatus.PENDING_APPROVAL
-      ) {
-        await this.updateOrderStatus(
-          scope,
-          orderItem.orderId,
-          OrderStatus.READY,
+    // deep-review H11/M17: when the kitchen bumps the LAST item to READY,
+    // auto-promote the ticket — but the state machine forbids PENDING→READY
+    // directly, and the item write above is ALREADY committed (no enclosing
+    // $transaction). The old code called updateOrderStatus(PENDING→READY)
+    // unconditionally, which threw a 400 from validateTransition AFTER the
+    // item committed, leaving the ticket stuck/lost on the KDS even though
+    // every item is done. Two fixes:
+    //   1) Bridge the intermediate hop: PENDING needs a PREPARING step first
+    //      so READY becomes reachable (driven by canTransition, not hardcoded).
+    //   2) Make the promotion fault-tolerant — guard with canTransition AND
+    //      swallow a still-invalid transition so the item bump itself always
+    //      succeeds (the WS emit below must fire) instead of bubbling a 400.
+    // An order in PENDING_APPROVAL must NEVER auto-promote, regardless of the
+    // requiresApproval flag.
+    const cur = orderItem.order.status as OrderStatus;
+    if (
+      allReady &&
+      cur !== OrderStatus.READY &&
+      cur !== OrderStatus.PENDING_APPROVAL
+    ) {
+      try {
+        // PENDING has no direct edge to READY — hop through PREPARING first.
+        if (cur === OrderStatus.PENDING) {
+          await this.updateOrderStatus(
+            scope,
+            orderItem.orderId,
+            OrderStatus.PREPARING,
+          );
+        }
+        // Only promote if READY is now reachable from the order's CURRENT
+        // (post-hop) status; otherwise skip silently rather than throw.
+        const fresh = await this.prisma.order.findUnique({
+          where: { id: orderItem.orderId },
+          select: { status: true },
+        });
+        if (
+          fresh &&
+          canTransition(fresh.status as OrderStatus, OrderStatus.READY)
+        ) {
+          await this.updateOrderStatus(
+            scope,
+            orderItem.orderId,
+            OrderStatus.READY,
+          );
+        }
+      } catch (error: any) {
+        // The item bump itself succeeded and is committed; a failed/raced
+        // auto-promotion (invalid transition, concurrent-change claim, etc.)
+        // must not surface a 400 to the KDS — log and let the WS emit fire so
+        // the screen still updates. A waiter/kitchen can advance the ticket.
+        this.logger.warn(
+          `KDS auto-promotion to READY skipped for order ${orderItem.orderId}: ${error?.message}`,
         );
       }
     }

@@ -12,7 +12,10 @@ describe("DevicesController", () => {
   let devices: Record<string, jest.Mock>;
   let queue: Record<string, jest.Mock>;
   let ctrl: DevicesController;
-  const userReq = { user: { tenantId: "t1" } };
+  // deep-review H14: branch-scoped surface — the global BranchGuard sets
+  // req.scope.branchId, which the controller forwards so device commands stay
+  // within the caller's validated branch.
+  const userReq = { user: { tenantId: "t1" }, scope: { branchId: "branch-a" } };
   const deviceReq = { device: { id: "dev-1" } };
 
   beforeEach(() => {
@@ -53,15 +56,21 @@ describe("DevicesController", () => {
   it("enqueueCommand threads tenantId, device id and dto", () => {
     const dto = { kind: "print.receipt", payload: {} } as any;
     ctrl.enqueueCommand(userReq, "dev-9", dto);
-    expect(queue.enqueue).toHaveBeenCalledWith("t1", "dev-9", dto);
+    // H14: branch scope (branch-a) threaded through as the 4th arg.
+    expect(queue.enqueue).toHaveBeenCalledWith("t1", "dev-9", dto, "branch-a");
   });
 
   it("listCommands parses the limit to int", () => {
     ctrl.listCommands(userReq, "dev-9", "queued", "20");
-    expect(queue.listForDevice).toHaveBeenCalledWith("t1", "dev-9", {
-      status: "queued",
-      limit: 20,
-    });
+    expect(queue.listForDevice).toHaveBeenCalledWith(
+      "t1",
+      "dev-9",
+      {
+        status: "queued",
+        limit: 20,
+      },
+      "branch-a",
+    );
   });
 
   it("pair forwards the dto (public, device not yet known)", () => {

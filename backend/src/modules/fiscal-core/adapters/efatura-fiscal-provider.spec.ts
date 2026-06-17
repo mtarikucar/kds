@@ -13,7 +13,9 @@ import { FiscalReceiptRequest } from "../fiscal-provider.interface";
  */
 describe("EfaturaFiscalProvider", () => {
   function makeProvider(createImpl: jest.Mock) {
-    const registry = { register: jest.fn() } as unknown as FiscalProviderRegistry;
+    const registry = {
+      register: jest.fn(),
+    } as unknown as FiscalProviderRegistry;
     const prisma = {
       salesInvoice: { create: createImpl },
     } as unknown as PrismaService;
@@ -54,8 +56,15 @@ describe("EfaturaFiscalProvider", () => {
     expect(data.tenantId).toBe("t1");
     expect(data.currency).toBe("TRY");
     expect(data.status).toBe("pending");
-    // 2 * 5000 cents = 10000 cents = 100.00 TRY
-    expect(data.subtotal).toBe(100);
+    // deep-review H9/M9: prices are KDV-inclusive, so 2 * 5000 = 10000 cents =
+    // 100.00 TRY is the GROSS (totalAmount). The taxable base (subtotal) is
+    // net = gross - extracted KDV; at 20% that is 100 - round(100*20/120) =
+    // 100 - 16.67 = 83.33. The row now writes the real SalesInvoice columns
+    // (subtotal/taxAmount/totalAmount), not the non-existent `kind`/`total`.
+    expect(data.totalAmount).toBe(100);
+    expect(data.subtotal).toBeCloseTo(83.33, 2);
+    expect(data.taxAmount).toBeCloseTo(16.67, 2);
+    expect(data.type).toBe("SALES");
     expect(data.items.create).toHaveLength(1);
   });
 
@@ -71,10 +80,9 @@ describe("EfaturaFiscalProvider", () => {
     const registry = {
       register: jest.fn(),
     } as unknown as FiscalProviderRegistry;
-    const provider = new EfaturaFiscalProvider(
-      registry,
-      { salesInvoice: { create: jest.fn() } } as unknown as PrismaService,
-    );
+    const provider = new EfaturaFiscalProvider(registry, {
+      salesInvoice: { create: jest.fn() },
+    } as unknown as PrismaService);
     provider.onModuleInit();
     expect(registry.register).toHaveBeenCalledWith(provider);
   });

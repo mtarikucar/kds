@@ -97,6 +97,18 @@ export class TenantProvisioningService implements CoreProvisioningPort {
       ? (command.plan!.amountOverride ?? planRow.monthlyPrice)
       : null;
 
+    // SECURITY (deep-review H8): never mint a paid, immediately-ACTIVE
+    // subscription here — that is grant-before-pay. If a lead is converted
+    // onto a paid plan with no trial (canTrial=false) and a positive amount,
+    // the tenant would get full paid access for free until the next renewal
+    // cycle (PlanFeatureGuard treats ACTIVE as live). A paid plan must either
+    // offer a trial or be collected through real PayTR checkout — mirror the
+    // register/social loadBusinessPlanOrThrow `trialDays <= 0` guard. FREE
+    // plans (amount 0) are unaffected and provision ACTIVE as before.
+    if (planRow && !canTrial && Number(subscriptionAmount ?? 0) > 0) {
+      throw new CoreProvisioningPlanInvalidError(planRow.id);
+    }
+
     const baseSubdomain = command.tenantName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -126,6 +138,23 @@ export class TenantProvisioningService implements CoreProvisioningPort {
           },
         });
 
+        // deep-review H7: every signup path MUST seed a Main branch and
+        // point the ADMIN's primaryBranchId at it (new-tenant provisioning
+        // parity). Without this the converted tenant has zero branches and a
+        // null primaryBranchId, so resolve-primary-branch returns null, the
+        // SPA resolves branchId=null, and the api interceptor hard-rejects
+        // every branch-scoped request — the documented "null primaryBranchId
+        // bricked the app" state. Mirror AuthProvisioningService exactly.
+        const mainBranch = await tx.branch.create({
+          data: {
+            tenantId: tenant.id,
+            name: "Main",
+            status: "active",
+            timezone: "UTC",
+          },
+          select: { id: true },
+        });
+
         const adminUser = await tx.user.create({
           data: {
             email: command.admin.email,
@@ -136,6 +165,7 @@ export class TenantProvisioningService implements CoreProvisioningPort {
             status: "ACTIVE",
             emailVerified: true,
             tenantId: tenant.id,
+            primaryBranchId: mainBranch.id,
           },
         });
 

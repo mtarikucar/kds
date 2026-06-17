@@ -90,7 +90,13 @@ export class DevicesController {
     @Param("id") id: string,
     @Body() dto: EnqueueCommandDto,
   ) {
-    return this.queue.enqueue(req.user.tenantId, id, dto);
+    // deep-review H14: /v1/devices is a branch-scoped surface, so the global
+    // BranchGuard has already validated req.scope.branchId ∈ the caller's
+    // allowed branches. Forward it so a branch-restricted MANAGER can only
+    // drive devices in the branch they are scoped to — closing the
+    // cross-branch "enqueue charge_card/open_drawer/fiscal_receipt to another
+    // branch's terminal" vector. A device outside the scoped branch 404s.
+    return this.queue.enqueue(req.user.tenantId, id, dto, req.scope?.branchId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -104,10 +110,17 @@ export class DevicesController {
     @Query("status") status?: string,
     @Query("limit") limit?: string,
   ) {
-    return this.queue.listForDevice(req.user.tenantId, id, {
-      status,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+    return this.queue.listForDevice(
+      req.user.tenantId,
+      id,
+      {
+        status,
+        limit: limit ? parseInt(limit, 10) : undefined,
+      },
+      // deep-review H14: scope command-queue inspection to the caller's
+      // validated branch (same rationale as enqueueCommand above).
+      req.scope?.branchId,
+    );
   }
 
   // -- Device-side (device-token auth) endpoints ---------------------------

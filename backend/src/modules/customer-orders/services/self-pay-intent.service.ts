@@ -279,8 +279,19 @@ export class SelfPayIntentService {
         );
       }
 
+      // deep-review M12 — round each line to 2dp BEFORE summing
+      // (round-then-sum) so the charged amount matches what payByItems
+      // books per entry (it rounds each entry's amount toDecimalPlaces(2)
+      // — payments.service.ts:1289). Pre-fix this summed full-precision
+      // perUnit×qty and rounded once at the end, which for qty>1 /
+      // discounted lines could diverge from the per-entry-rounded booked
+      // total by a few kuruş, leaving PayTR payouts and KDS accounting
+      // out of sync (and occasionally an order a kuruş short of PAID).
+      // The webhook's reconciliation alert (sumBookedPayments vs amount)
+      // surfaces any residual divergence on the last-units residual path
+      // that this round-then-sum still can't fully predict.
       const perUnit = this.paymentsService.derivePerUnitNet(item, item.order);
-      const lineAmount = perUnit.mul(entry.quantity);
+      const lineAmount = perUnit.mul(entry.quantity).toDecimalPlaces(2);
       totalAmount = totalAmount.add(lineAmount);
 
       const bucket = itemsByOrder.get(item.orderId) ?? {

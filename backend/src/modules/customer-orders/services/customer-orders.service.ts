@@ -835,6 +835,32 @@ export class CustomerOrdersService {
       if (!product) continue;
 
       const itemModifierIds = (item.modifiers || []).map((m) => m.modifierId);
+
+      // deep-review H13/M14 — enforce modifier-belongs-to-product on the
+      // public QR path, mirroring the staff guard in orders.service
+      // (createInner cross-references each modifier's group against the
+      // product's ProductModifierGroup). Without this a customer could
+      // attach a modifier defined for ANOTHER product (e.g. one with a
+      // negative/promo priceAdjustment, or a free add-on) to lower the
+      // line total — a direct underpay vector on the unauthenticated
+      // path — and produce wrong kitchen tickets. The product fetch
+      // already eager-loads active groups → modifiers{id} filtered by
+      // isAvailable:true (lines 808-820), so the allowed set costs no
+      // extra query and already excludes inactive groups / unavailable
+      // modifiers. Reject before the pricing pass at 887-899.
+      const allowedModifierIds = new Set<string>();
+      for (const pmg of product.modifierGroups) {
+        if (!pmg.group.isActive) continue;
+        for (const m of pmg.group.modifiers) allowedModifierIds.add(m.id);
+      }
+      for (const id of itemModifierIds) {
+        if (!allowedModifierIds.has(id)) {
+          throw new BadRequestException(
+            `Modifier ${id} is not allowed on product "${product.name}"`,
+          );
+        }
+      }
+
       for (const pmg of product.modifierGroups) {
         const group = pmg.group;
         if (!group.isActive) continue;

@@ -26,6 +26,7 @@ describe("OutboxWorkerService — drainOnce", () => {
 
   let prisma: {
     $queryRaw: jest.Mock;
+    $executeRaw: jest.Mock;
     outboxEvent: { update: jest.Mock };
   };
   let bus: { dispatch: jest.Mock };
@@ -41,6 +42,7 @@ describe("OutboxWorkerService — drainOnce", () => {
   beforeEach(() => {
     prisma = {
       $queryRaw: jest.fn().mockResolvedValue([row()]),
+      $executeRaw: jest.fn().mockResolvedValue(0),
       outboxEvent: { update: jest.fn().mockResolvedValue({}) },
     };
     bus = { dispatch: jest.fn().mockResolvedValue(undefined) };
@@ -146,6 +148,31 @@ describe("OutboxWorkerService — drainOnce", () => {
       const { data } = prisma.outboxEvent.update.mock.calls[0][0];
       expect(data.status).toBe("failed");
       expect(data.nextAttemptAt).toBeNull();
+    });
+  });
+
+  // deep-review H16: rows orphaned in 'dispatching' by a worker crash must be
+  // reclaimed back to 'queued' so the events (payment.succeeded.v1 commission
+  // crediting, entitlement reprojection, …) aren't lost forever.
+  describe("reclaimStuck (worker-crash recovery)", () => {
+    const reclaimStuck = () =>
+      (worker as unknown as { reclaimStuck(): Promise<number> }).reclaimStuck();
+
+    it("re-queues orphaned 'dispatching' rows aged past the timeout", async () => {
+      // Simulate a crash: a prior tick claimed a batch (flipping rows to
+      // 'dispatching') and died before the terminal write. The next tick's
+      // reclaim pass runs the reaper UPDATE, which reports 2 affected rows.
+      prisma.$executeRaw.mockResolvedValue(2);
+
+      await expect(reclaimStuck()).resolves.toBe(2);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it("is a no-op when nothing is stuck (returns 0, no terminal writes)", async () => {
+      prisma.$executeRaw.mockResolvedValue(0);
+
+      await expect(reclaimStuck()).resolves.toBe(0);
+      expect(prisma.outboxEvent.update).not.toHaveBeenCalled();
     });
   });
 });

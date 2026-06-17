@@ -179,4 +179,61 @@ describe("CustomerOrdersService.createOrder — guards", () => {
       expect(arg.orderBy).toEqual({ createdAt: "asc" });
     });
   });
+
+  // deep-review H13/M14 — the public QR path must enforce
+  // modifier-belongs-to-product (parity with the staff path). A customer
+  // attaching a modifier defined for a DIFFERENT product (e.g. a free /
+  // negative-price add-on) must be rejected before pricing so it can't
+  // lower the line total or pollute the kitchen ticket.
+  describe("modifier-belongs-to-product guard (deep-review H13/M14)", () => {
+    it("rejects a foreign modifier not in any of the product's groups", async () => {
+      tenantNoGeo();
+      (prisma.table.findFirst as any).mockResolvedValue({
+        id: "tb-1",
+        branchId: "b1",
+      });
+      // Product "Cola" has a single active group whose only allowed
+      // modifier is "mod-allowed". The DTO attaches "mod-foreign", which
+      // belongs to another product entirely.
+      (prisma.product.findMany as any).mockResolvedValue([
+        {
+          id: "p-cola",
+          name: "Cola",
+          price: 10,
+          modifierGroups: [
+            {
+              group: {
+                isActive: true,
+                isRequired: false,
+                minSelections: 0,
+                maxSelections: 0,
+                displayName: "Extras",
+                modifiers: [{ id: "mod-allowed" }],
+              },
+            },
+          ],
+        },
+      ]);
+
+      await expect(
+        svc.createOrder({
+          ...baseDto,
+          tableId: "tb-1",
+          items: [
+            {
+              productId: "p-cola",
+              quantity: 1,
+              modifiers: [{ modifierId: "mod-foreign", quantity: 1 }],
+            },
+          ],
+        } as any),
+      ).rejects.toThrow(/Modifier mod-foreign is not allowed/);
+
+      // Guard fires before the pricing-pass modifier fetch — the foreign
+      // modifier's priceAdjustment never gets a chance to reach the total.
+      expect((prisma.modifier.findMany as any).mock.calls.length).toBe(0);
+      // And no order row is created.
+      expect((prisma.order.create as any).mock.calls.length).toBe(0);
+    });
+  });
 });
