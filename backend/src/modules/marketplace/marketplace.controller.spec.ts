@@ -47,13 +47,11 @@ describe("MarketplaceController", () => {
     expect(tenant.listMine).toHaveBeenCalledWith("t1");
   });
 
-  it("purchase forwards tenantId + the destructured purchase fields", () => {
-    ctrl.purchase(req, { addOnCode: "x", quantity: 2, branchId: "b1" } as any);
-    expect(tenant.purchase).toHaveBeenCalledWith("t1", {
-      addOnCode: "x",
-      quantity: 2,
-      branchId: "b1",
-    });
+  it("does NOT expose a free-grant purchase endpoint (deep-review C2)", () => {
+    // The tenant-facing POST /addons/purchase free-grant endpoint was
+    // removed — it let any tenant ADMIN activate paid add-ons without
+    // payment. All purchases now flow through the PayTR checkout rail.
+    expect((ctrl as any).purchase).toBeUndefined();
   });
 
   it("cancel parses immediate=true into a boolean", () => {

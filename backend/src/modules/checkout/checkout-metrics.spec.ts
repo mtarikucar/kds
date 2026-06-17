@@ -33,6 +33,12 @@ describe("CheckoutService — checkout_provisions_total counter", () => {
       outboxEvent: { create: jest.fn() },
     };
     prisma = {
+      // C1 payment gate: a supplied paymentRef must resolve to a settled
+      // CheckoutIntent before provisioning. These metric tests use a real
+      // paymentRef, so default the intent to 'succeeded'.
+      checkoutIntent: {
+        findFirst: jest.fn().mockResolvedValue({ status: "succeeded" }),
+      },
       hardwareOrder: { findFirst: jest.fn().mockResolvedValue(null) },
       tenantAddOn: { findMany: jest.fn().mockResolvedValue([]) },
       branch: { findFirst: jest.fn() },

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -16,10 +17,13 @@ import { AddOnCatalogService } from "./addon-catalog.service";
  *
  * Purchase is **provisioning-only** here — it creates the TenantAddOn row,
  * emits AddOnPurchased on the outbox, and trusts the entitlement projector
- * to fold in the new grants. The *payment* side of the transaction is
- * separate (Phase 5 cart flow); for MVP we accept that admins can create
- * comp add-ons via this endpoint and treat paid purchases as the same call
- * after PaymentCompleted.
+ * to fold in the new grants. Payment is collected upstream: the only
+ * caller that grants a PAID add-on is CheckoutService.confirmAndProvision,
+ * which runs after the PayTR webhook settles and passes the settled
+ * paymentRef. As a hard guard (deep-review C2) purchase() refuses to grant
+ * any add-on with priceCents > 0 unless a paymentRef is supplied, so a
+ * free grant cannot be minted even if a future caller forgets to route
+ * through checkout. Only zero-priced add-ons may be provisioned for free.
  *
  * Dependency check rule: every entry in `deps` must currently apply to the
  * tenant. Plan deps (`plan:PRO`) match Tenant.currentPlan.name. Add-on deps
@@ -57,6 +61,20 @@ export class TenantMarketplaceService {
           : addOn.status === "draft"
             ? "This add-on is not yet published"
             : `Add-on is not available for purchase (status=${addOn.status})`,
+      );
+    }
+
+    // SECURITY (deep-review C2): never mint a PAID add-on without proof of
+    // payment. The only legitimate caller that grants a paid add-on is the
+    // checkout/PayTR settlement path (CheckoutService.confirmAndProvision),
+    // which always passes the settled paymentRef. A paid add-on with no
+    // paymentRef is a free grant — reject it here so the service is safe
+    // regardless of which controller calls it (defence in depth behind the
+    // removal of the tenant-facing free /addons/purchase endpoint). Free
+    // add-ons (priceCents === 0) may still be provisioned without payment.
+    if (addOn.priceCents > 0 && !input.paymentRef) {
+      throw new ForbiddenException(
+        `Add-on "${addOn.code}" requires payment; purchase it through checkout.`,
       );
     }
 

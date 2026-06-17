@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   Optional,
@@ -56,6 +57,44 @@ export class CheckoutService {
     addOnIds: string[];
   }> {
     const quote = await this.quoteSvc.quote(cart);
+
+    // SECURITY (deep-review C1): a non-null paymentRef is NOT proof of
+    // payment on its own. The tenant-facing POST /v1/checkout/confirm
+    // endpoint is gated only by @Roles(ADMIN, MANAGER) — ordinary
+    // tenant-realm roles every restaurant owner holds — and forwards a
+    // client-supplied paymentRef straight here. Without this gate a tenant
+    // admin could POST an arbitrary cart with any made-up ref and have us
+    // allocate/ship hardware, grant paid add-on entitlements, and request a
+    // plan upgrade with ZERO money collected (repeatable with each new ref).
+    //
+    // The only legitimate way a paymentRef reaches provisioning is through
+    // CheckoutSettlementService.handleSuccess, which is driven by the
+    // HMAC-authenticated PayTR webhook and flips the CheckoutIntent
+    // 'pending' -> 'succeeded' BEFORE calling us. So we require a settled
+    // CheckoutIntent for (tenantId, paymentRef). A forged ref has no intent
+    // row -> rejected; an already-provisioned ref is allowed so idempotent
+    // replays still return the cached order below.
+    //
+    // paymentRef === null is the internal operator-comp path (no caller
+    // passes null today — the controller DTO forbids an empty ref — so this
+    // gate intentionally only fires for client-supplied refs).
+    if (paymentRef) {
+      const intent = await this.prisma.checkoutIntent.findFirst({
+        where: { tenantId, paymentRef },
+        select: { status: true },
+      });
+      if (
+        !intent ||
+        (intent.status !== "succeeded" && intent.status !== "provisioned")
+      ) {
+        this.logger.warn(
+          `Rejected confirmAndProvision for tenant=${tenantId} ref=${paymentRef}: no settled CheckoutIntent (status=${intent?.status ?? "none"})`,
+        );
+        throw new ForbiddenException(
+          "No settled payment was found for this reference",
+        );
+      }
+    }
 
     // Idempotency: webhook retries and double-clicks on the success page
     // both replay confirmAndProvision with the same paymentRef. Without

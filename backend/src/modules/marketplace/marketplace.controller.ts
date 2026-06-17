@@ -1,10 +1,8 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
   Param,
-  Post,
   Query,
   Req,
   UseGuards,
@@ -17,7 +15,6 @@ import { UserRole } from "../../common/constants/roles.enum";
 import { Public } from "../auth/decorators/public.decorator";
 import { AddOnCatalogService } from "./addon-catalog.service";
 import { TenantMarketplaceService } from "./tenant-marketplace.service";
-import { PurchaseAddOnDto } from "./dto/addon.dto";
 
 @ApiTags("Marketplace")
 @Controller("v1/marketplace")
@@ -57,20 +54,17 @@ export class MarketplaceController {
     return this.tenant.listMine(req.user.tenantId);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @Post("addons/purchase")
-  @ApiOperation({
-    summary: "Purchase / activate an add-on (ADMIN only — billing event)",
-  })
-  purchase(@Req() req: any, @Body() dto: PurchaseAddOnDto) {
-    return this.tenant.purchase(req.user.tenantId, {
-      addOnCode: dto.addOnCode,
-      quantity: dto.quantity,
-      branchId: dto.branchId,
-    });
-  }
+  // SECURITY (deep-review C2): the tenant-facing free-grant endpoint
+  // POST /v1/marketplace/addons/purchase has been REMOVED. It was guarded
+  // only by @Roles(ADMIN) (an ordinary tenant-realm role) and called
+  // tenant.purchase() with no paymentRef, so any restaurant owner could
+  // activate a paid add-on (capacity packs, integrations) for free via
+  // curl, bypassing the PayTR checkout rail wired in v3.2.11. Tenant-
+  // initiated purchases now go ONLY through POST /v1/checkout/intent →
+  // PayTR webhook → CheckoutSettlementService → tenant.purchase(paymentRef).
+  // tenant.purchase() additionally refuses any priceCents>0 grant without a
+  // paymentRef as defence in depth. Operator comps belong on the SuperAdmin
+  // surface, not here.
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
