@@ -364,6 +364,24 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
             </div>
           </div>
         </div>
+
+        {/* Legal footer — visible on every auth screen (login is the public
+            home page at hummytummy.com → /login). Keeps a crawlable link to
+            the privacy policy & terms, which Google's OAuth verification
+            requires the home page to carry. */}
+        <footer className="px-4 pb-5 pt-2">
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-500">
+            <Link to="/privacy" className="hover:text-primary-600 transition-colors">
+              {t('auth:register.privacyPolicy', 'Privacy Policy')}
+            </Link>
+            <span className="text-slate-300">•</span>
+            <Link to="/terms" className="hover:text-primary-600 transition-colors">
+              {t('auth:register.termsOfService', 'Terms of Service')}
+            </Link>
+            <span className="text-slate-300">•</span>
+            <span>&copy; {new Date().getFullYear()} HummyTummy</span>
+          </nav>
+        </footer>
       </div>
     </div>
   );

@@ -11,6 +11,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Crawlable legal links in the raw HTML shell. The SPA renders a visible
+         footer with these links once mounted; this noscript fallback guarantees
+         a privacy-policy link is present even for crawlers that don't execute
+         JavaScript (required by Google's OAuth homepage verification). -->
+    <noscript>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
