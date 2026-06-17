@@ -42,11 +42,6 @@ vi.mock('../../features/auth/authApi', () => ({
   useGoogleAuth: () => ({ mutate: googleAuth, isPending: false }),
 }));
 
-// useGoogleLogin returns a click handler; capture & invoke it from the test.
-const googleLoginTrigger = vi.fn();
-vi.mock('@react-oauth/google', () => ({
-  useGoogleLogin: () => googleLoginTrigger,
-}));
 
 // Stub framer-motion: render the real underlying tag (motion.form → <form>,
 // motion.div → <div>) so submit/click semantics survive, dropping only the
@@ -79,8 +74,13 @@ vi.mock('../../components/ui/Checkbox', () => ({
   default: (props: any) => <input type="checkbox" {...props} />,
 }));
 vi.mock('../../components/ui/SocialLoginButtons', () => ({
-  default: ({ onGoogleClick, disabled }: any) => (
-    <button type="button" data-testid="social-google" disabled={disabled} onClick={onGoogleClick}>
+  default: ({ onGoogleSuccess, disabled }: any) => (
+    <button
+      type="button"
+      data-testid="social-google"
+      disabled={disabled}
+      onClick={() => onGoogleSuccess('fake-id-token')}
+    >
       Google
     </button>
   ),
@@ -189,10 +189,10 @@ describe('LoginPage pending-approval banner', () => {
   });
 });
 
-describe('LoginPage Google sign-in guard', () => {
-  it('triggers the Google popup flow on click when idle', () => {
+describe('LoginPage Google sign-in', () => {
+  it('exchanges the Google ID token credential via googleAuth on success', () => {
     renderLogin();
     fireEvent.click(screen.getByTestId('social-google'));
-    expect(googleLoginTrigger).toHaveBeenCalledTimes(1);
+    expect(googleAuth).toHaveBeenCalledWith('fake-id-token', expect.any(Object));
   });
 });

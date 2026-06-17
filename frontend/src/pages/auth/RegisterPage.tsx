@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { useGoogleLogin } from '@react-oauth/google';
 import { useRegister, useGoogleAuth } from '../../features/auth/authApi';
 import { useGetPublicTenants } from '../../api/tenantsApi';
 import Button from '../../components/ui/Button';
@@ -117,20 +116,16 @@ const RegisterPage = () => {
     }));
   }, [tenants]);
 
-  // Google OAuth handler - uses popup flow with access token
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
-      googleAuth(tokenResponse.access_token, {
-        onSuccess: () => {
-          navigate('/dashboard');
-        },
-      });
-    },
-    onError: (error) => {
-      console.error('Google signup error:', error);
-    },
-    flow: 'implicit',
-  });
+  // Google sign-up: the official Google Identity Services button hands us an
+  // ID token (credential), verified by the backend. Secure flow — no access
+  // token in the browser.
+  const handleGoogleSuccess = (credential: string) => {
+    googleAuth(credential, {
+      onSuccess: () => {
+        navigate('/dashboard');
+      },
+    });
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -287,9 +282,8 @@ const RegisterPage = () => {
           <motion.div variants={itemVariants}>
             <SocialLoginButtons
               variant="register"
-              onGoogleClick={() => handleGoogleLogin()}
-              disabled={isPending}
-              isLoading={isGooglePending}
+              onGoogleSuccess={handleGoogleSuccess}
+              disabled={isPending || isGooglePending}
             />
           </motion.div>
 

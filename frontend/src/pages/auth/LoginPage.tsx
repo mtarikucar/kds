@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { useGoogleLogin } from '@react-oauth/google';
 import { useLogin, useGoogleAuth } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -117,20 +116,16 @@ const LoginPage = () => {
     });
   };
 
-  // Google OAuth handler - uses popup flow with access token
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
-      googleAuth(tokenResponse.access_token, {
-        onSuccess: () => {
-          navigate(postLoginTarget, { replace: true });
-        },
-      });
-    },
-    onError: (error) => {
-      console.error('Google login error:', error);
-    },
-    flow: 'implicit',
-  });
+  // Google sign-in: the official Google Identity Services button hands us an
+  // ID token (credential), which the backend verifies (audience + signature).
+  // Secure flow — no access token in the browser.
+  const handleGoogleSuccess = (credential: string) => {
+    googleAuth(credential, {
+      onSuccess: () => {
+        navigate(postLoginTarget, { replace: true });
+      },
+    });
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -245,18 +240,10 @@ const LoginPage = () => {
           <motion.div variants={itemVariants}>
             <SocialLoginButtons
               variant="login"
-              onGoogleClick={() => {
-                // v2.8.97 — disable while either auth path is already in
-                // flight. Pre-fix a quick double-click on the Google
-                // button while the popup was opening (or a stale ref
-                // re-firing) would queue a second mutation; the cache
-                // clear in useGoogleAuth would land twice, and the
-                // navigate() would race the prior one.
-                if (isPending || isGooglePending) return;
-                handleGoogleLogin();
-              }}
+              onGoogleSuccess={handleGoogleSuccess}
+              // Disable while either auth path is already in flight so a
+              // double sign-in can't queue two mutations.
               disabled={isPending || isGooglePending}
-              isLoading={isGooglePending}
             />
           </motion.div>
 
