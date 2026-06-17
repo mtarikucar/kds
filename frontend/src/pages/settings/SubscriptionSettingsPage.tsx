@@ -189,7 +189,22 @@ const SubscriptionManagementSection = () => {
                 <div className="flex items-center text-sm">
                   <CreditCard className="h-4 w-4 text-slate-400 mr-2" />
                   <span className="text-slate-600">
-                    {formatCurrency(Number(currentSubscription.amount), currentSubscription.currency)} /{' '}
+                    {/* Show the plan's CURRENT catalog price (and currency),
+                        not the subscription's frozen `amount`. The stored amount
+                        is a snapshot from signup that drifts when the superadmin
+                        re-prices a plan (it once showed a stale "$199.99" then a
+                        stale "₺79.99" while the live Business plan was ₺7.999).
+                        New subs, plan changes and renewals all bill the live
+                        plan price, so that's the honest figure to display. */}
+                    {formatCurrency(
+                      Number(
+                        currentSubscription.billingCycle === BillingCycle.MONTHLY
+                          ? currentPlan?.monthlyPrice ?? currentSubscription.amount
+                          : currentPlan?.yearlyPrice ?? currentSubscription.amount,
+                      ),
+                      planCurrency,
+                    )}{' '}
+                    /{' '}
                     {currentSubscription.billingCycle === BillingCycle.MONTHLY
                       ? t('subscriptions.month')
                       : t('subscriptions.year')}
