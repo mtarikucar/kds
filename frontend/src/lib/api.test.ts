@@ -32,6 +32,11 @@ describe('isTenantWidePath', () => {
       // pos-settings is class-level @SkipBranchScope on the backend
       // (one settings row per tenant) — it must fly without X-Branch-Id.
       '/pos-settings',
+      // The public tenant list drives the registration "select restaurant"
+      // dropdown — it is fetched UNAUTHENTICATED (no branch resolved), so it
+      // must fly without X-Branch-Id or the interceptor rejects it and the
+      // dropdown is stuck disabled.
+      '/tenants/public',
     ]) {
       expect(isTenantWidePath(url), url).toBe(true);
     }
@@ -45,6 +50,10 @@ describe('isTenantWidePath', () => {
       '/menu/products/1/images',
       '/orders',
       '/tables',
+      // '/tenants/settings' is NOT public/tenant-wide here — it loads post-auth
+      // once a branch is resolved, so the bare '/tenants/public' exemption must
+      // not accidentally widen to all of /tenants.
+      '/tenants/settings',
     ]) {
       expect(isTenantWidePath(url), url).toBe(false);
     }

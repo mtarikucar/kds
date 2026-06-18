@@ -32,6 +32,12 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   // these routes must fly without a branch header. Bare (no trailing slash)
   // covers /delivery-platforms/dlq, /dlq/summary, /dlq/requeue.
   '/delivery-platforms/dlq',
+  // GET /tenants/public is the @Public registration tenant list — fetched
+  // UNAUTHENTICATED with no branch resolved. Without this exemption the request
+  // interceptor rejects it client-side, so the non-admin "restoran seçin"
+  // dropdown gets an empty list and stays disabled. Bare segment so it does NOT
+  // widen to the branch-scoped /tenants/settings routes.
+  '/tenants/public',
 ];
 
 /**
