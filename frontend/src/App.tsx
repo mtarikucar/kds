@@ -63,6 +63,9 @@ const PersonnelManagementPage = lazy(() => import('./pages/admin/PersonnelManage
 const StockManagementPage = lazy(() => import('./pages/admin/StockManagementPage'));
 const InvoicesPage = lazy(() => import('./pages/admin/invoices/InvoicesPage'));
 
+// Onboarding (lazy-loaded)
+const WelcomePage = lazy(() => import('./pages/onboarding/WelcomePage'));
+
 // Subscription & Settings Pages (lazy-loaded)
 const SubscriptionPlansPage = lazy(() => import('./pages/subscription/SubscriptionPlansPage'));
 const ChangePlanPage = lazy(() => import('./pages/subscription/ChangePlanPage'));
@@ -194,6 +197,10 @@ function App() {
       <Route path="/qr-menu/:tenantId/payment-result" element={<QrPaymentResultPage />} />
       <Route path="/reserve/:tenantId" element={<PublicReservationPage />} />
       <Route path="/reserve/:tenantId/lookup" element={<ReservationLookupPage />} />
+
+      {/* Onboarding completion (full-screen, no app chrome) — the
+          ProfileCompletionGate routes social signups missing a phone here. */}
+      <Route path="/welcome" element={<ProtectedRoute><WelcomePage /></ProtectedRoute>} />
 
       {/* Protected Routes - All authenticated users */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

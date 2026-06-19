@@ -30,6 +30,9 @@ export interface CreateUserParams {
   lastName: string;
   userRole: UserRole;
   userStatus: string;
+  // Required at registration (PayTR checkout needs it); normalized to E.164
+  // by RegisterDto's @NormalizePhone before it reaches here.
+  phone: string;
 }
 
 /**
@@ -149,14 +152,22 @@ export class AuthProvisioningService {
     txPrimaryBranchId: string,
     params: CreateUserParams,
   ) {
-    const { email, hashedPassword, firstName, lastName, userRole, userStatus } =
-      params;
+    const {
+      email,
+      hashedPassword,
+      firstName,
+      lastName,
+      userRole,
+      userStatus,
+      phone,
+    } = params;
     const created = await tx.user.create({
       data: {
         email,
         password: hashedPassword,
         firstName,
         lastName,
+        phone,
         role: userRole,
         tenantId: txTenantId,
         status: userStatus,

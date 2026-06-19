@@ -17,6 +17,7 @@ import { Throttle } from "@nestjs/throttler";
 import { Request, Response } from "express";
 import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
+import { CompleteProfileDto } from "./dto/complete-profile.dto";
 import { LoginDto } from "./dto/login.dto";
 import { GoogleAuthDto, AppleAuthDto } from "./dto/social-auth.dto";
 import { AuthResponseDto } from "./dto/auth-response.dto";
@@ -162,6 +163,22 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "User profile retrieved" })
   async getProfile(@CurrentUser("id") userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  // Post-social-login (and any incomplete-profile) onboarding: collects the
+  // required phone + optional name/business/address/tax/timezone/language.
+  // The SPA's completion gate routes here when the user has no phone yet.
+  @UseGuards(JwtAuthGuard)
+  @Post("complete-profile")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Complete onboarding (phone + business details)" })
+  @ApiResponse({ status: 200, description: "Profile completed" })
+  async completeProfile(
+    @CurrentUser("id") userId: string,
+    @CurrentUser("tenantId") tenantId: string,
+    @Body() dto: CompleteProfileDto,
+  ) {
+    return this.authService.completeProfile(userId, tenantId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

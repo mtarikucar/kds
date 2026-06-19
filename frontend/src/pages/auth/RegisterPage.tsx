@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import PasswordInput from '../../components/ui/PasswordInput';
 import PasswordStrength from '../../components/ui/PasswordStrength';
+import PhoneInput from '../../components/ui/PhoneInput';
 import Checkbox from '../../components/ui/Checkbox';
 import FormSelect from '../../components/ui/FormSelect';
 import SocialLoginButtons from '../../components/ui/SocialLoginButtons';
@@ -30,6 +31,11 @@ const RegisterPage = () => {
     password: z.string().min(8, t('validation:minLength', { count: 8 })),
     firstName: z.string().min(1, t('validation:required')),
     lastName: z.string().min(1, t('validation:required')),
+    // Required: PayTR checkout needs a phone. PhoneInput emits E.164 ("+90…")
+    // or '' — so we require a non-empty E.164 value.
+    phone: z
+      .string()
+      .regex(/^\+[1-9]\d{6,14}$/, t('auth:profile.phoneInvalid', 'Lütfen geçerli bir telefon numarası girin.')),
     role: z.nativeEnum(UserRole),
     restaurantName: z.string().optional(),
     tenantId: z.string().optional(),
@@ -52,6 +58,7 @@ const RegisterPage = () => {
     register,
     handleSubmit,
     watch,
+    control,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -74,6 +81,7 @@ const RegisterPage = () => {
       password: data.password,
       firstName: data.firstName,
       lastName: data.lastName,
+      phone: data.phone,
       role: data.role,
     };
 
@@ -209,6 +217,22 @@ const RegisterPage = () => {
               error={errors.lastName?.message}
               autoComplete="family-name"
               {...register('lastName')}
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Controller
+              name="phone"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <PhoneInput
+                  label={t('auth:register.phone', 'Telefon')}
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  error={errors.phone?.message}
+                />
+              )}
             />
           </motion.div>
 

@@ -13,6 +13,14 @@ export class UserResponseDto {
   @ApiProperty()
   lastName: string;
 
+  // Drives the onboarding completion gate (null/empty → SPA routes to /welcome).
+  @ApiProperty({ required: false, nullable: true })
+  phone?: string | null;
+
+  // Saved UI language preference (null falls back to client-side i18n).
+  @ApiProperty({ required: false, nullable: true })
+  locale?: string | null;
+
   @ApiProperty()
   role: string;
 

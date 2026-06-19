@@ -18,6 +18,11 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  /** Required from registration onward; null/empty only for a social signup
+   *  that hasn't completed onboarding yet → drives the completion gate. */
+  phone?: string | null;
+  /** Saved UI language preference (null → client-side i18n default). */
+  locale?: string | null;
   role: string;
   tenantId: string | null;
   /** v3.0.0 — the user's home branch. Hard-restricted roles
@@ -47,6 +52,8 @@ export interface RegisterRequest {
   password: string;
   firstName: string;
   lastName: string;
+  /** Required (E.164). PayTR checkout needs a phone. */
+  phone: string;
   role?: UserRole;
   restaurantName?: string;
   tenantId?: string;

@@ -17,6 +17,7 @@ import * as Sentry from "@sentry/node";
 import { addDays } from "date-fns";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
+import { CompleteProfileDto } from "./dto/complete-profile.dto";
 import { LoginDto } from "./dto/login.dto";
 import { GoogleAuthDto, AppleAuthDto } from "./dto/social-auth.dto";
 import { AuthResponseDto, UserResponseDto } from "./dto/auth-response.dto";
@@ -281,6 +282,7 @@ export class AuthService {
               lastName: registerDto.lastName,
               userRole: userRole!,
               userStatus,
+              phone: registerDto.phone,
             },
           }),
         );
@@ -365,6 +367,7 @@ export class AuthService {
             lastName: registerDto.lastName,
             userRole: userRole!,
             userStatus,
+            phone: registerDto.phone,
           },
         ),
       );
@@ -575,6 +578,11 @@ export class AuthService {
         email: true,
         firstName: true,
         lastName: true,
+        // phone drives the onboarding completion gate (a social signup lands
+        // with no phone → SPA routes to /welcome). locale carries the saved
+        // language preference.
+        phone: true,
+        locale: true,
         role: true,
         tenantId: true,
         primaryBranchId: true,
@@ -1037,5 +1045,78 @@ export class AuthService {
   }): Promise<AuthResponseDto> {
     const user = await this.provisioning.createSocialAuthUser(data);
     return this.generateTokens(user);
+  }
+
+  /**
+   * Onboarding completion. Saves the REQUIRED phone plus optional name /
+   * business name / address / tax info / timezone / language atomically across
+   * User + Tenant + the Main branch. Used by the post-social-login (and any
+   * incomplete-profile) /welcome page. Returns the refreshed profile so the
+   * SPA's completion gate sees phone populated and releases into the app.
+   */
+  async completeProfile(
+    userId: string,
+    tenantId: string,
+    dto: CompleteProfileDto,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          phone: dto.phone,
+          ...(dto.firstName ? { firstName: dto.firstName } : {}),
+          ...(dto.lastName ? { lastName: dto.lastName } : {}),
+          ...(dto.locale ? { locale: dto.locale } : {}),
+        },
+      });
+
+      const tenantData: Record<string, unknown> = {};
+      if (dto.businessName) tenantData.name = dto.businessName;
+      if (dto.taxId) tenantData.taxId = dto.taxId;
+      if (dto.taxOffice) tenantData.taxOffice = dto.taxOffice;
+      if (dto.timezone) tenantData.timezone = dto.timezone;
+      if (Object.keys(tenantData).length > 0) {
+        await tx.tenant.update({ where: { id: tenantId }, data: tenantData });
+      }
+
+      // Address lands on the tenant's Main branch (the first one created at
+      // signup), merged with any existing address JSON.
+      if (dto.addressLine || dto.city) {
+        const mainBranch = await tx.branch.findFirst({
+          where: { tenantId },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, address: true },
+        });
+        if (mainBranch) {
+          const prev =
+            (mainBranch.address as Record<string, unknown> | null) ?? {};
+          await tx.branch.update({
+            where: { id: mainBranch.id },
+            data: {
+              address: {
+                ...prev,
+                ...(dto.addressLine ? { line1: dto.addressLine } : {}),
+                ...(dto.city ? { city: dto.city } : {}),
+              } as any,
+            },
+          });
+        }
+      }
+    });
+
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        status: true,
+        tenantId: true,
+        locale: true,
+      },
+    });
   }
 }

@@ -85,6 +85,49 @@ export const useProfile = () => {
   });
 };
 
+export interface CompleteProfilePayload {
+  phone: string;
+  firstName?: string;
+  lastName?: string;
+  businessName?: string;
+  taxId?: string;
+  taxOffice?: string;
+  addressLine?: string;
+  city?: string;
+  timezone?: string;
+  locale?: string;
+}
+
+/**
+ * Post-social-login (and any incomplete-profile) onboarding submit. Saves the
+ * required phone + optional business details, then refreshes the cached profile
+ * so the ProfileCompletionGate releases into the app.
+ */
+export const useCompleteProfile = () => {
+  const setUser = useAuthStore((state) => state.setUser);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CompleteProfilePayload): Promise<User> => {
+      const response = await api.post('/auth/complete-profile', payload);
+      return response.data;
+    },
+    onSuccess: (user) => {
+      setUser(user);
+      qc.invalidateQueries({ queryKey: ['profile'] });
+      toast.success(
+        i18n.t('auth:welcome.saved', { defaultValue: 'Bilgileriniz kaydedildi.' }),
+      );
+    },
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('auth:welcome.saveFailed', { defaultValue: 'Kaydedilemedi' }),
+        ),
+      ),
+  });
+};
+
 export const useLogout = () => {
   const logout = useAuthStore((state) => state.logout);
   const queryClient = useQueryClient();

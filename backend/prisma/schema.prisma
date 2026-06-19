@@ -37,6 +37,9 @@ model Tenant {
   // Turkish tax identifier (Vergi No for B2B / TC Kimlik for B2C). Required
   // on KDV-compliant invoices for Turkish tenants.
   taxId String?
+  // Tax office (Vergi Dairesi) — paired with taxId on KDV invoices. Collected
+  // on the post-social-login onboarding page.
+  taxOffice String?
 
   // Currency settings
   currency String @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
@@ -241,6 +244,10 @@ model User {
   // Profile
   avatar    String?
   phone     String?
+  // Preferred UI language (e.g. "tr", "en") — set on the onboarding page so a
+  // user's language follows them across devices. Falls back to the SPA's
+  // client-side i18n when null.
+  locale    String?
   lastLogin DateTime?
 
   // Social Authentication
