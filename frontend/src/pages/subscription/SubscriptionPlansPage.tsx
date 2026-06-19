@@ -142,6 +142,24 @@ const SubscriptionPlansPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Onboarding-trial lock banner: the tenant's 7-day trial ended and they
+          are locked to this screen until they activate a paid plan. */}
+      {currentSubscription?.status === 'TRIAL_ENDED' && (
+        <div className="mb-8 rounded-lg border border-rose-200 bg-rose-50 p-4 text-rose-900">
+          <h3 className="font-semibold mb-1">
+            {t(
+              'subscriptions.plansPage.trialEndedTitle',
+              'Deneme süreniz sona erdi',
+            )}
+          </h3>
+          <p className="text-sm">
+            {t(
+              'subscriptions.plansPage.trialEndedBody',
+              'Kullanmaya devam etmek için aşağıdaki paketlerden birini seçin. Verileriniz güvende; bir plan etkinleştirdiğinizde kaldığınız yerden devam edersiniz.',
+            )}
+          </p>
+        </div>
+      )}
       {/* Renewal banner: surfaces when the user arrives from a PAST_DUE
           or EXPIRED CTA. Reminds them what plan they were on and gives
           permission to pick a different one. */}

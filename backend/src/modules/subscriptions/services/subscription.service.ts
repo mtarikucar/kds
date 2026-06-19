@@ -1214,8 +1214,12 @@ export class SubscriptionService {
   }
 
   async getAvailablePlans() {
+    // Onboarding-trial redesign: only PUBLIC plans are self-serve purchasable.
+    // This excludes the TRIAL onboarding plan (isPublic=false, granted at
+    // signup) and the retired FREE plan (isActive=false), so the choose-plan
+    // screen lists only BASIC/PRO/BUSINESS.
     const plans = await this.prisma.subscriptionPlan.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isPublic: true },
       orderBy: { monthlyPrice: "asc" },
     });
 
