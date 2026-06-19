@@ -115,7 +115,11 @@ export class PlanFeatureGuard implements CanActivate {
       },
     });
 
-    if (!activeSubscription && currentPlan.name !== "FREE") {
+    // Onboarding-trial redesign: FREE is retired, so there is no "always-live"
+    // plan — a tenant with no live (ACTIVE/TRIALING/PAST_DUE) subscription is
+    // gated. (The global SubscriptionStatusGuard already locks TRIAL_ENDED /
+    // EXPIRED tenants to the plan-selection flow; this is defence in depth.)
+    if (!activeSubscription) {
       throw new ForbiddenException(
         "Your subscription has expired or been cancelled. Please renew to access this feature.",
       );

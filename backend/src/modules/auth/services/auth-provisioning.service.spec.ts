@@ -1,5 +1,5 @@
-import { AuthProvisioningService } from './auth-provisioning.service';
-import { ResourceNotFoundException } from '../../../common/exceptions';
+import { AuthProvisioningService } from "./auth-provisioning.service";
+import { ResourceNotFoundException } from "../../../common/exceptions";
 
 /**
  * Spec for the standalone (non-transactional) AuthProvisioningService helpers:
@@ -16,65 +16,81 @@ function makePrisma() {
   };
 }
 
-describe('AuthProvisioningService.allocateSubdomain', () => {
-  it('returns the preferred slug when it is free', async () => {
+describe("AuthProvisioningService.allocateSubdomain", () => {
+  it("returns the preferred slug when it is free", async () => {
     const prisma = makePrisma();
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.allocateSubdomain('acme')).resolves.toBe('acme');
+    await expect(svc.allocateSubdomain("acme")).resolves.toBe("acme");
   });
 
   it('defaults a blank base to "restaurant"', async () => {
     const prisma = makePrisma();
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.allocateSubdomain('')).resolves.toBe('restaurant');
+    await expect(svc.allocateSubdomain("")).resolves.toBe("restaurant");
   });
 
-  it('appends a random suffix when the preferred slug is already taken', async () => {
+  it("appends a random suffix when the preferred slug is already taken", async () => {
     const prisma = makePrisma();
     // preferred lookup returns a row (taken); suffixed candidates are free
     prisma.tenant.findUnique
-      .mockResolvedValueOnce({ id: 'existing' }) // preferred taken
+      .mockResolvedValueOnce({ id: "existing" }) // preferred taken
       .mockResolvedValue(null); // candidates free
     const svc = new AuthProvisioningService(prisma as any);
-    const result = await svc.allocateSubdomain('acme');
+    const result = await svc.allocateSubdomain("acme");
     expect(result).toMatch(/^acme-[0-9a-f]{6}$/);
   });
 
-  it('throws after exhausting suffix attempts', async () => {
+  it("throws after exhausting suffix attempts", async () => {
     const prisma = makePrisma();
-    prisma.tenant.findUnique.mockResolvedValue({ id: 'always-taken' });
+    prisma.tenant.findUnique.mockResolvedValue({ id: "always-taken" });
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.allocateSubdomain('acme')).rejects.toThrow(/Could not allocate/);
+    await expect(svc.allocateSubdomain("acme")).rejects.toThrow(
+      /Could not allocate/,
+    );
   });
 });
 
-describe('AuthProvisioningService.loadBusinessPlanOrThrow', () => {
-  it('returns the plan when seeded with a positive trial', async () => {
+describe("AuthProvisioningService.loadTrialPlanOrThrow", () => {
+  // Onboarding-trial redesign: new tenants start on the dedicated TRIAL plan,
+  // not BUSINESS. The guard now loads/validates the TRIAL plan.
+  it("returns the TRIAL plan when seeded with a positive trial", async () => {
     const prisma = makePrisma();
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({ name: 'BUSINESS', trialDays: 14 });
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      name: "TRIAL",
+      trialDays: 7,
+    });
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.loadBusinessPlanOrThrow()).resolves.toMatchObject({ trialDays: 14 });
+    await expect(svc.loadTrialPlanOrThrow()).resolves.toMatchObject({
+      trialDays: 7,
+    });
   });
 
-  it('throws when the BUSINESS plan is missing (seed misconfig)', async () => {
+  it("throws when the TRIAL plan is missing (seed/migration misconfig)", async () => {
     const prisma = makePrisma();
     prisma.subscriptionPlan.findUnique.mockResolvedValue(null);
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.loadBusinessPlanOrThrow()).rejects.toBeInstanceOf(ResourceNotFoundException);
+    await expect(svc.loadTrialPlanOrThrow()).rejects.toBeInstanceOf(
+      ResourceNotFoundException,
+    );
   });
 
-  it('throws when the plan has no trialDays', async () => {
+  it("throws when the TRIAL plan has no trialDays", async () => {
     const prisma = makePrisma();
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({ name: 'BUSINESS', trialDays: 0 });
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      name: "TRIAL",
+      trialDays: 0,
+    });
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.loadBusinessPlanOrThrow()).rejects.toBeInstanceOf(ResourceNotFoundException);
+    await expect(svc.loadTrialPlanOrThrow()).rejects.toBeInstanceOf(
+      ResourceNotFoundException,
+    );
   });
 });
 
-describe('AuthProvisioningService.buildPlanFeatureOverrides', () => {
+describe("AuthProvisioningService.buildPlanFeatureOverrides", () => {
   const svc = new AuthProvisioningService(makePrisma() as any);
 
-  it('coerces truthy flags to true and null/undefined to false', () => {
+  it("coerces truthy flags to true and null/undefined to false", () => {
     const overrides = svc.buildPlanFeatureOverrides({
       advancedReports: true,
       multiLocation: false,
@@ -89,15 +105,15 @@ describe('AuthProvisioningService.buildPlanFeatureOverrides', () => {
     expect(overrides.inventoryTracking).toBe(true);
   });
 
-  it('always returns the full set of eleven feature flags as booleans (incl. posAccess)', () => {
+  it("always returns the full set of eleven feature flags as booleans (incl. posAccess)", () => {
     const overrides = svc.buildPlanFeatureOverrides({});
     const keys = Object.keys(overrides);
     // posAccess was historically omitted (v3.0.7 bug); it MUST be present so a
     // fresh BUSINESS tenant's override fallback never hides POS during warm-up.
-    expect(keys).toContain('posAccess');
+    expect(keys).toContain("posAccess");
     expect(keys).toHaveLength(11);
     for (const v of Object.values(overrides)) {
-      expect(typeof v).toBe('boolean');
+      expect(typeof v).toBe("boolean");
     }
   });
 });

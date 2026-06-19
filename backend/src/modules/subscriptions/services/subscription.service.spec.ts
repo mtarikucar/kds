@@ -932,8 +932,45 @@ describe("SubscriptionService — deep-review money-path regressions", () => {
 
     const res = await svc.expireTrials();
 
-    // Skipped, not failed; tenant pointer NOT downgraded to FREE.
+    // Skipped, not failed; tenant is NOT locked (the just-paid sub is untouched).
     expect(prisma.tenant.update).not.toHaveBeenCalled();
     expect(res).toEqual({ processed: 0, failed: 0 });
+  });
+
+  it("expireTrials LOCKS an expired trial → TRIAL_ENDED (onboarding redesign)", async () => {
+    const now = new Date();
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: "sub-1",
+        tenantId: TENANT_ID,
+        trialEnd: new Date(now.getTime() - 1000),
+        currentPeriodStart: new Date(now.getTime() - 7 * 86_400_000),
+        currentPeriodEnd: new Date(now.getTime() - 1000),
+        plan: { name: "TRIAL", displayName: "Deneme" },
+        tenant: { name: "X" },
+      },
+    ] as any);
+    // Conditional claim wins → row flips to TRIAL_ENDED.
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.user.findFirst.mockResolvedValue(null as any); // no admin email → skip email
+
+    const res = await svc.expireTrials();
+
+    // The claim sets status TRIAL_ENDED (no plan change, no FREE landing).
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "TRIALING",
+          isTrialPeriod: true,
+        }),
+        data: expect.objectContaining({
+          status: "TRIAL_ENDED",
+          isTrialPeriod: false,
+        }),
+      }),
+    );
+    // No FREE plan lookup, no tenant.currentPlanId rewrite.
+    expect(prisma.tenant.update).not.toHaveBeenCalled();
+    expect(res).toEqual({ processed: 1, failed: 0 });
   });
 });

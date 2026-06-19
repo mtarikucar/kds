@@ -243,26 +243,23 @@ export class AuthService {
 
       const finalSubdomain = await this.allocateSubdomain(baseSubdomain);
 
-      // Every new tenant gets a 14-day BUSINESS trial — the top-tier
-      // plan with every premium feature open — at zero charge. Trial is
-      // a one-time per-tenant benefit; the SchedulerService.expireTrials
-      // job downgrades the tenant to FREE at trialEnd. We need the
-      // BUSINESS plan here, not FREE, so the new tenant boots into a
-      // fully-featured workspace from the first dashboard load.
-      const businessPlan = await this.provisioning.loadBusinessPlanOrThrow();
+      // Every new tenant starts on the dedicated 7-day onboarding TRIAL plan —
+      // full premium, zero charge. At trialEnd SchedulerService.expireTrials
+      // flips the subscription to TRIAL_ENDED (locked) and the tenant must
+      // activate a paid plan to continue (no FREE landing). Using a dedicated
+      // TRIAL plan decouples signup from any paid tier.
+      const trialPlan = await this.provisioning.loadTrialPlanOrThrow();
 
-      // Tenant + TRIALING BUSINESS subscription must be created
-      // atomically so other modules never observe a tenant without a
-      // matching subscription.
+      // Tenant + TRIALING TRIAL subscription must be created atomically so
+      // other modules never observe a tenant without a matching subscription.
       const now = new Date();
-      const trialEnd = addDays(now, businessPlan.trialDays);
+      const trialEnd = addDays(now, trialPlan.trialDays);
 
-      // Seed `featureOverrides` with the BUSINESS plan's flag set so
-      // PlanFeatureGuard's fallback path resolves correctly during the
-      // first ~30 seconds while the entitlement engine projector is
-      // still warming up.
+      // Seed `featureOverrides` with the plan's flag set so PlanFeatureGuard's
+      // fallback path resolves correctly during the first ~30 seconds while the
+      // entitlement engine projector is still warming up.
       const planFeatureOverrides =
-        this.provisioning.buildPlanFeatureOverrides(businessPlan);
+        this.provisioning.buildPlanFeatureOverrides(trialPlan);
 
       try {
         const txResult = await this.prisma.$transaction(async (tx) =>
@@ -273,7 +270,7 @@ export class AuthService {
           this.provisioning.provisionNewTenantWithAdmin(tx, {
             restaurantName: registerDto.restaurantName,
             finalSubdomain,
-            businessPlan,
+            trialPlan,
             planFeatureOverrides,
             now,
             trialEnd,

@@ -79,26 +79,26 @@ export class AuthProvisioningService {
   }
 
   /**
-   * Load the BUSINESS plan and assert it is seeded with a positive trial.
-   * Throws (rather than silently landing the tenant on FREE) when the seed
-   * is misconfigured — identical to the original register() guard.
+   * Load the dedicated onboarding TRIAL plan and assert it is seeded with a
+   * positive trial length. Every new tenant starts on this plan (full-premium
+   * 7-day trial) instead of the old "trial on the BUSINESS plan" coupling —
+   * which made signup depend on BUSINESS.trialDays and caused silent
+   * trial→FREE transitions. Throws (refusing to register) if the seed/migration
+   * for the TRIAL plan is missing or misconfigured.
    */
-  async loadBusinessPlanOrThrow() {
-    const businessPlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: "BUSINESS" },
+  async loadTrialPlanOrThrow() {
+    const trialPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { name: "TRIAL" },
     });
-    if (!businessPlan) {
-      // Seed misconfigured — refuse to register rather than silently
-      // landing the tenant on FREE without a trial. The user will get
-      // a clear error and ops can re-seed.
-      throw new ResourceNotFoundException("BUSINESS subscription plan");
+    if (!trialPlan) {
+      throw new ResourceNotFoundException("TRIAL subscription plan");
     }
-    if (businessPlan.trialDays <= 0) {
+    if (trialPlan.trialDays <= 0) {
       throw new ResourceNotFoundException(
-        "BUSINESS plan has no trialDays configured — re-seed plans",
+        "TRIAL plan has no trialDays configured — re-seed/migrate plans",
       );
     }
-    return businessPlan;
+    return trialPlan;
   }
 
   /**
@@ -202,7 +202,7 @@ export class AuthProvisioningService {
     args: {
       restaurantName: string;
       finalSubdomain: string;
-      businessPlan: any;
+      trialPlan: any;
       planFeatureOverrides: Record<string, boolean>;
       now: Date;
       trialEnd: Date;
@@ -212,7 +212,7 @@ export class AuthProvisioningService {
     const {
       restaurantName,
       finalSubdomain,
-      businessPlan,
+      trialPlan,
       planFeatureOverrides,
       now,
       trialEnd,
@@ -223,23 +223,19 @@ export class AuthProvisioningService {
       data: {
         name: restaurantName,
         subdomain: finalSubdomain,
-        currentPlanId: businessPlan.id,
-        // Per-tenant trial bookkeeping. `trialUsed=true` is the
-        // canonical lifetime-trial gate read by
-        // PaymentsService.createIntent + SubscriptionService;
-        // once stamped, no further trials regardless of plan.
-        // `usedTrialPlanIds` is kept for audit/reporting.
+        currentPlanId: trialPlan.id,
+        // Onboarding trial bookkeeping (the single trial; per-plan
+        // usedTrialPlanIds is retired). trialEndsAt drives the lock countdown.
         trialUsed: true,
         trialStartedAt: now,
         trialEndsAt: trialEnd,
-        usedTrialPlanIds: [businessPlan.id],
         featureOverrides: planFeatureOverrides,
       },
     });
     await tx.subscription.create({
       data: {
         tenantId: created.id,
-        planId: businessPlan.id,
+        planId: trialPlan.id,
         status: "TRIALING",
         billingCycle: "MONTHLY",
         // PayTR is the only configured provider; this row is the
@@ -247,15 +243,15 @@ export class AuthProvisioningService {
         paymentProvider: PaymentProvider.PAYTR,
         startDate: now,
         currentPeriodStart: now,
-        // During trial, currentPeriodEnd == trialEnd. After
-        // expireTrials downgrades to FREE, the FREE write path
-        // resets these fields.
+        // During trial, currentPeriodEnd == trialEnd. At expiry expireTrials
+        // flips the status to TRIAL_ENDED (locked) — the plan does NOT change
+        // (no FREE landing); the tenant must activate a paid plan to continue.
         currentPeriodEnd: trialEnd,
         isTrialPeriod: true,
         trialStart: now,
         trialEnd,
-        amount: businessPlan.monthlyPrice,
-        currency: businessPlan.currency,
+        amount: trialPlan.monthlyPrice,
+        currency: trialPlan.currency,
         cancelAtPeriodEnd: false,
       },
     });
@@ -320,21 +316,17 @@ export class AuthProvisioningService {
       .replace(/^-|-$/g, "");
     const subdomain = await this.allocateSubdomain(baseSubdomain);
 
-    // Social signups get the SAME provisioning as email registration: a
-    // 14-day BUSINESS trial + an auto-created Main branch + seeded
-    // featureOverrides. Diverging here (the old FREE-plan, no-branch path)
-    // shipped the "trial never started / 'Bu özellik aboneliğinizde yok' when
-    // creating the first branch" bug for Google/Apple signups — a fresh tenant
-    // landed with no branch and a plan that gates MULTI_LOCATION. Keep this in
-    // lockstep with register()'s ADMIN scenario.
-    const businessPlan = await this.loadBusinessPlanOrThrow();
+    // Social signups get the SAME provisioning as email registration: the
+    // 7-day onboarding TRIAL plan + an auto-created Main branch + seeded
+    // featureOverrides. Keep this in lockstep with register()'s ADMIN scenario.
+    const trialPlan = await this.loadTrialPlanOrThrow();
 
     const now = new Date();
-    const trialEnd = addDays(now, businessPlan.trialDays);
+    const trialEnd = addDays(now, trialPlan.trialDays);
 
     // Seed the plan's flag set so PlanFeatureGuard's fallback resolves while
     // the entitlement projector warms up — see register() for the full story.
-    const planFeatureOverrides = this.buildPlanFeatureOverrides(businessPlan);
+    const planFeatureOverrides = this.buildPlanFeatureOverrides(trialPlan);
 
     // Tenant + subscription + Main branch + user in one transaction so a
     // failure midway does not leave orphaned rows.
@@ -345,18 +337,17 @@ export class AuthProvisioningService {
           data: {
             name: restaurantName,
             subdomain,
-            currentPlanId: businessPlan.id,
+            currentPlanId: trialPlan.id,
             trialUsed: true,
             trialStartedAt: now,
             trialEndsAt: trialEnd,
-            usedTrialPlanIds: [businessPlan.id],
             featureOverrides: planFeatureOverrides,
           },
         });
         await tx.subscription.create({
           data: {
             tenantId: tenant.id,
-            planId: businessPlan.id,
+            planId: trialPlan.id,
             status: "TRIALING",
             billingCycle: "MONTHLY",
             paymentProvider: PaymentProvider.PAYTR,
@@ -366,8 +357,8 @@ export class AuthProvisioningService {
             isTrialPeriod: true,
             trialStart: now,
             trialEnd,
-            amount: businessPlan.monthlyPrice,
-            currency: businessPlan.currency,
+            amount: trialPlan.monthlyPrice,
+            currency: trialPlan.currency,
             cancelAtPeriodEnd: false,
           },
         });
