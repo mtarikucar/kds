@@ -112,10 +112,15 @@ export class PaymentsService {
         where: { id: tenantId },
         include: {
           subscriptions: {
-            where: { status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
-            // Plan included so trial-eligibility can distinguish a real
-            // paid subscription from the auto-created FREE sub that
-            // every tenant gets on registration.
+            // Include TRIAL_ENDED (onboarding-trial redesign): when a locked
+            // tenant picks a paid plan from the choose-plan screen, createIntent
+            // must find their existing (TRIAL_ENDED) subscription so the payment
+            // + PendingPlanChange reuse that row — settlement then flips the SAME
+            // row to ACTIVE on the chosen plan and releases the lock (instead of
+            // leaving a stale TRIAL_ENDED row beside a new ACTIVE one).
+            where: {
+              status: { in: ["ACTIVE", "TRIALING", "PAST_DUE", "TRIAL_ENDED"] },
+            },
             include: { plan: true },
             take: 1,
           },

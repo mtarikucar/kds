@@ -32,6 +32,39 @@ export interface PlanConfig {
 }
 
 export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
+  // Onboarding-trial redesign: the dedicated non-purchasable onboarding plan
+  // every new tenant starts on (7-day full premium). FREE below is a retired
+  // tombstone (kept only because the enum value still exists).
+  [SubscriptionPlanType.TRIAL]: {
+    name: SubscriptionPlanType.TRIAL,
+    displayName: "Deneme",
+    description: "7 günlük tam özellikli onboarding denemesi",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    currency: "TRY",
+    trialDays: 7,
+    limits: {
+      maxUsers: -1,
+      maxTables: -1,
+      maxBranches: -1,
+      maxProducts: -1,
+      maxCategories: -1,
+      maxMonthlyOrders: -1,
+    },
+    features: {
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: true,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      reservationSystem: true,
+      personnelManagement: true,
+      deliveryIntegration: true,
+      posAccess: true,
+    },
+  },
   [SubscriptionPlanType.FREE]: {
     name: SubscriptionPlanType.FREE,
     displayName: "Ücretsiz",

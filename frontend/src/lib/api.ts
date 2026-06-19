@@ -162,6 +162,31 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Onboarding-trial lock backstop: the backend SubscriptionStatusGuard 403s a
+    // locked (TRIAL_ENDED / EXPIRED) tenant with errorCode
+    // PLAN_SELECTION_REQUIRED. The in-app SubscriptionGate already redirects on
+    // the cached status, but if the cache is stale (still ACTIVE/TRIALING) an
+    // API call surfaces the lock first — force the user to the plan-selection
+    // screen. Guard against a redirect loop while already on /subscription/*.
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.errorCode === 'PLAN_SELECTION_REQUIRED'
+    ) {
+      try {
+        if (
+          typeof window !== 'undefined' &&
+          window.location &&
+          !window.location.pathname.startsWith('/subscription')
+        ) {
+          window.location.href =
+            import.meta.env.BASE_URL + 'subscription/plans';
+        }
+      } catch {
+        // location unavailable (SSR / sandbox) — non-fatal; just reject below.
+      }
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 

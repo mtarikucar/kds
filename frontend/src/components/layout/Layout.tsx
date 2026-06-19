@@ -8,6 +8,7 @@ import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
 import { OnboardingProvider } from '../../features/onboarding';
 import { RTL_LANGUAGES } from '../../i18n/config';
 import SubscriptionStatusBanner from '../subscriptions/SubscriptionStatusBanner';
+import SubscriptionGate from '../subscriptions/SubscriptionGate';
 
 const Layout = () => {
   const { i18n } = useTranslation();
@@ -43,7 +44,11 @@ const Layout = () => {
               null when there's nothing to surface, so layout doesn't shift. */}
           <SubscriptionStatusBanner />
           <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6 lg:p-8 relative">
-            <Outlet />
+            {/* Onboarding-trial lock: redirects locked (TRIAL_ENDED) tenants to
+                plan selection, keeping recovery routes reachable. */}
+            <SubscriptionGate>
+              <Outlet />
+            </SubscriptionGate>
             {import.meta.env.VITE_APP_VERSION && (
               <div
                 className="fixed bottom-4 right-4 text-xs bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-sm border border-slate-200/60 z-10 cursor-help hover:shadow-md transition-all duration-200"

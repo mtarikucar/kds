@@ -1,8 +1,17 @@
 export enum SubscriptionPlanType {
-  FREE = "FREE",
+  // TRIAL is the dedicated, non-purchasable onboarding plan every new tenant
+  // starts on (7-day full-premium trial). It decouples the trial from any paid
+  // tier — the old design ran the trial ON the BUSINESS plan, which coupled
+  // signup to BUSINESS.trialDays and caused silent TRIALING(BUSINESS)→FREE
+  // transitions.
+  TRIAL = "TRIAL",
   BASIC = "BASIC",
   PRO = "PRO",
   BUSINESS = "BUSINESS",
+  // FREE retired (onboarding-trial redesign) — kept as a tombstone so legacy
+  // references still compile, but no FREE plan row is seeded/active and nothing
+  // lands on it. New tenants start on TRIAL and must pick a paid plan at expiry.
+  FREE = "FREE",
 }
 
 export enum SubscriptionStatus {
@@ -11,6 +20,11 @@ export enum SubscriptionStatus {
   EXPIRED = "EXPIRED",
   PAST_DUE = "PAST_DUE",
   TRIALING = "TRIALING",
+  // Onboarding trial ended without a paid subscription. The tenant is LOCKED:
+  // PlanFeatureGuard + the global SubscriptionStatusGuard treat this as
+  // not-live, so the app is gated to the plan-selection + checkout flow until a
+  // paid plan is activated. Replaces the old silent trial→FREE downgrade.
+  TRIAL_ENDED = "TRIAL_ENDED",
   // Pre-activation state used between PayTR intent creation and webhook
   // confirmation. PENDING subscriptions don't grant feature access and
   // don't appear in the partial-unique (tenantId) WHERE status IN

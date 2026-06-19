@@ -1214,8 +1214,12 @@ export class SubscriptionService {
   }
 
   async getAvailablePlans() {
+    // Onboarding-trial redesign: only PUBLIC plans are self-serve purchasable.
+    // This excludes the TRIAL onboarding plan (isPublic=false, granted at
+    // signup) and the retired FREE plan (isActive=false), so the choose-plan
+    // screen lists only BASIC/PRO/BUSINESS.
     const plans = await this.prisma.subscriptionPlan.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isPublic: true },
       orderBy: { monthlyPrice: "asc" },
     });
 
@@ -1413,10 +1417,12 @@ export class SubscriptionService {
   }
 
   /**
-   * Trial expiry cron. Trials don't auto-charge at expiry — we move them
-   * to PAST_DUE (so the tenant keeps read-only access) and notify the
-   * admin to re-checkout. Each row is wrapped in try/catch so one bad
-   * tenant does not skip everyone else's expiry.
+   * Trial expiry cron. Trials don't auto-charge at expiry — the onboarding
+   * trial LOCKS: each expired TRIALING row flips to TRIAL_ENDED (no plan
+   * change, no FREE landing), which the status guards treat as not-live so the
+   * app is gated to plan-selection + checkout. The admin is emailed to pick a
+   * plan. Each row is wrapped in try/catch so one bad tenant does not skip
+   * everyone else's expiry.
    */
   async expireTrials(): Promise<{ processed: number; failed: number }> {
     const now = new Date();
@@ -1433,93 +1439,55 @@ export class SubscriptionService {
       return { processed: 0, failed: 0 };
     }
 
-    // Look up FREE once for the whole batch. If the seed is missing
-    // FREE the entire batch fails loudly; no per-row fallback because
-    // there's no sensible alternative target.
-    const freePlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: "FREE" },
-    });
-    if (!freePlan) {
-      this.logger.error(
-        "FREE plan missing from catalog — cannot expire trials",
-      );
-      return { processed: 0, failed: expiredTrials.length };
-    }
-
-    // FREE has no real period boundary, but currentPeriodEnd is a
-    // non-null column. Project ~10 years out, matching the placeholder
-    // AuthService.register used to write for the FREE subscription it
-    // created at signup. Same intent: the column exists for plan-tier
-    // bookkeeping, not for a real billing cycle.
-    const freePeriodEnd = new Date(now);
-    freePeriodEnd.setFullYear(freePeriodEnd.getFullYear() + 10);
-
     let failed = 0;
     // deep-review H2: rows that were concurrently paid/cancelled between the
     // findMany snapshot and the per-row claim are skipped, not failed.
     let skipped = 0;
     for (const subscription of expiredTrials) {
       try {
-        // Atomic transition: move the SAME subscription row from TRIALING
-        // BUSINESS → ACTIVE FREE and update Tenant.currentPlanId in lock
-        // step. Reusing the row avoids tripping the partial-unique
-        // (tenantId) WHERE status IN (ACTIVE, TRIALING) index, which
-        // would fire if we tried to create a fresh FREE row alongside
-        // the TRIALING one.
+        // Onboarding-trial redesign: at expiry the trial does NOT downgrade to
+        // a plan — it LOCKS. Flip TRIALING → TRIAL_ENDED (status only; the plan
+        // pointer stays TRIAL, no FREE landing). The global
+        // SubscriptionStatusGuard + PlanFeatureGuard then gate the app to the
+        // plan-selection + checkout flow until a paid plan is activated.
         //
-        // H2: the write is a CONDITIONAL claim (updateMany scoped to the
-        // still-TRIALING state), not an unconditional id update. If a PayTR
-        // webhook (applySuccess) flipped this row to ACTIVE+paid in the
-        // window after findMany, claim.count===0 and we MUST NOT clobber the
-        // just-paid subscription back to FREE (amount 0) — the customer was
-        // charged. The tenant.currentPlanId flip lives inside the won-claim
-        // branch so a skipped row never downgrades the tenant pointer either.
-        const transitioned = await this.prisma.$transaction(async (tx) => {
-          const claim = await tx.subscription.updateMany({
-            where: {
-              id: subscription.id,
-              status: SubscriptionStatus.TRIALING,
-              isTrialPeriod: true,
-            },
-            data: {
-              planId: freePlan.id,
-              status: SubscriptionStatus.ACTIVE,
-              isTrialPeriod: false,
-              amount: 0,
-              currency: freePlan.currency,
-              currentPeriodStart: now,
-              currentPeriodEnd: freePeriodEnd,
-            },
-          });
-          if (claim.count === 0) return false;
-          await tx.tenant.update({
-            where: { id: subscription.tenantId },
-            data: { currentPlanId: freePlan.id },
-          });
-          return true;
+        // H2 atomic CONDITIONAL claim: only a row STILL TRIALING transitions.
+        // If a PayTR webhook flipped it to ACTIVE+paid after the findMany
+        // snapshot, claim.count===0 and we leave the just-paid subscription
+        // untouched (never lock a tenant that already paid).
+        const claim = await this.prisma.subscription.updateMany({
+          where: {
+            id: subscription.id,
+            status: SubscriptionStatus.TRIALING,
+            isTrialPeriod: true,
+          },
+          data: {
+            status: SubscriptionStatus.TRIAL_ENDED,
+            isTrialPeriod: false,
+          },
         });
 
-        if (!transitioned) {
+        if (claim.count === 0) {
           skipped += 1;
           this.logger.log(
-            `Trial ${subscription.id} skipped — no longer TRIALING (concurrently settled/cancelled); not downgraded to FREE`,
+            `Trial ${subscription.id} skipped — no longer TRIALING (concurrently settled/cancelled)`,
           );
           continue;
         }
 
         this.logger.log(
-          `Trial subscription ${subscription.id} expired → tenant ${subscription.tenantId} dropped to FREE`,
+          `Trial subscription ${subscription.id} expired → tenant ${subscription.tenantId} LOCKED (TRIAL_ENDED); must activate a paid plan`,
         );
 
-        // Plan tier changed → entitlement set needs rebuilding. Treated as a
-        // downgrade so consumers can distinguish trial-expiry from a paid
-        // upgrade if they ever need to (the projector itself doesn't care).
+        // The subscription is no longer live, so re-project entitlements to
+        // revoke the trial grants. (The status guard is the hard lock; this
+        // keeps the entitlement set consistent with the locked state.)
         await this.emitLifecycle(EventTypes.SubscriptionDowngraded, {
           id: subscription.id,
           tenantId: subscription.tenantId,
-          plan: { name: "FREE" },
-          currentPeriodStart: now,
-          currentPeriodEnd: freePeriodEnd,
+          plan: { name: subscription.plan.name },
+          currentPeriodStart: subscription.currentPeriodStart,
+          currentPeriodEnd: subscription.currentPeriodEnd,
         });
 
         // Best-effort trial-expired email; failure here mustn't block the
