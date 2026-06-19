@@ -691,10 +691,13 @@ export interface TableStatusChangedEvent {
 
 // Subscription Types
 export enum SubscriptionPlanType {
-  FREE = 'FREE',
+  /** Dedicated non-purchasable onboarding plan (7-day full premium). */
+  TRIAL = 'TRIAL',
   BASIC = 'BASIC',
   PRO = 'PRO',
   BUSINESS = 'BUSINESS',
+  /** Retired (onboarding-trial redesign) — tombstone for legacy references. */
+  FREE = 'FREE',
 }
 
 export enum SubscriptionStatus {
@@ -703,6 +706,9 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
   PAST_DUE = 'PAST_DUE',
   TRIALING = 'TRIALING',
+  /** Onboarding trial ended without payment — tenant is LOCKED to the
+   *  plan-selection + checkout flow until a paid plan is activated. */
+  TRIAL_ENDED = 'TRIAL_ENDED',
   /** Pre-activation state between PayTR intent and webhook confirmation. */
   PENDING = 'PENDING',
 }

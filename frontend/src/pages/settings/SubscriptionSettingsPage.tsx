@@ -84,6 +84,7 @@ const SubscriptionManagementSection = () => {
       [SubscriptionStatus.CANCELLED]: { variant: 'warning' as const, label: t('subscriptions.status.cancelled') },
       [SubscriptionStatus.EXPIRED]: { variant: 'danger' as const, label: t('subscriptions.status.expired') },
       [SubscriptionStatus.PAST_DUE]: { variant: 'danger' as const, label: t('subscriptions.status.pastDue') },
+      [SubscriptionStatus.TRIAL_ENDED]: { variant: 'danger' as const, label: t('subscriptions.status.trialEnded', 'Deneme bitti') },
       [SubscriptionStatus.PENDING]: { variant: 'default' as const, label: t('subscriptions.status.pending') },
     };
 

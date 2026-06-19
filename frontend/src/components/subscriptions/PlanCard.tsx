@@ -91,6 +91,7 @@ const PlanCard = ({
   };
 
   const planColors = {
+    [SubscriptionPlanType.TRIAL]: 'border-slate-300',
     [SubscriptionPlanType.FREE]: 'border-slate-300',
     [SubscriptionPlanType.BASIC]: 'border-blue-300',
     [SubscriptionPlanType.PRO]: 'border-purple-500',
