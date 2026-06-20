@@ -51,6 +51,63 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
+  backend-e2e:
+    name: Backend e2e (real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    # Real Postgres so write paths run against the actual schema. Mocked-Prisma
+    # unit tests cannot catch a create that feeds null/undefined into a NOT NULL
+    # relation FK (the engine throws "Argument `<relation>` is missing"); these
+    # e2e specs exercise the device-slot / stock-deduction / onboarding write
+    # paths against a live DB. PostGIS image matches dev/prod.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e
+          POSTGRES_DB: kds_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # REDIS_URL deliberately unset — the app boots Redis-less (the
+      # entitlement-invalidation bus warns and no-ops). Secrets come from
+      # test/setup.ts, which runs before the app boots.
+      DATABASE_URL: postgresql://e2e:e2e@localhost:5432/kds_e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Sync schema to the test DB
+        # db push (not migrate deploy): the migration history is not replayable
+        # from scratch; db push builds the current schema in one shot, which is
+        # exactly what an ephemeral test DB needs.
+        run: npx prisma db push --skip-generate --accept-data-loss
+
+      - name: E2E tests (real DB)
+        run: npm run test:e2e
+
   frontend-quality:
     name: Frontend lint + typecheck + tests
     runs-on: ubuntu-latest

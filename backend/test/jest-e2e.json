@@ -4,8 +4,9 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": ["ts-jest", { "isolatedModules": true }]
   },
+  "transformIgnorePatterns": ["node_modules/(?!(uuid)/)"],
   "collectCoverageFrom": [
     "../src/**/*.(t|j)s",
     "!../src/main.ts",
