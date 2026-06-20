@@ -1389,7 +1389,10 @@ export class OrdersService {
               quantity: item.quantity,
               reason: `Order ${order.orderNumber}`,
               productId: product.id,
-              userId: order.userId,
+              // order.userId is null for customer / QR / delivery orders.
+              // StockMovement.userId is nullable for exactly this case — a
+              // movement triggered by a userless order has no staff actor.
+              userId: order.userId ?? null,
               tenantId: order.tenantId,
               branchId: order.branchId,
             },

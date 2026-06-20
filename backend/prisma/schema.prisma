@@ -36,7 +36,7 @@ model Tenant {
 
   // Turkish tax identifier (Vergi No for B2B / TC Kimlik for B2C). Required
   // on KDV-compliant invoices for Turkish tenants.
-  taxId String?
+  taxId     String?
   // Tax office (Vergi Dairesi) — paired with taxId on KDV invoices. Collected
   // on the post-social-login onboarding page.
   taxOffice String?
@@ -921,8 +921,11 @@ model StockMovement {
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // Nullable: order-driven auto-deductions for customer / QR self-order /
+  // delivery-platform orders have no staff actor (mirrors Order.userId, which
+  // is nullable for the same reason). Staff-initiated movements still set it.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -4163,8 +4166,8 @@ model Device {
   // above; pre-fix a device's tenantId column had no DB-level integrity
   // check and orphan devices outlived their tenants.
   tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  // Optional until the device is assigned to a branch via pairing. Nullable
-  // also covers a chain admin creating slots ahead of branch deployment.
+  // Required: every device belongs to a branch (v3 branch-scope-strict made
+  // this NOT NULL). The admin creates the slot in the currently-scoped branch.
   branchId          String
   branch            Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   // tablet_waiter | tablet_customer | kds_screen | bar_screen | pos_terminal

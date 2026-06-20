@@ -1,0 +1,11 @@
+-- StockMovement.userId becomes nullable.
+--
+-- Order-driven stock auto-deductions (deductStockForOrder) inherit the
+-- order's userId, but Order.userId is nullable for customer / QR self-order /
+-- delivery-platform orders that have no staff actor. With userId NOT NULL the
+-- create fell back to Prisma's checked variant and threw "Argument `user` is
+-- missing" (or a NOT NULL violation) for those orders. Allowing NULL models
+-- the reality: a system/customer-driven movement has no acting staff user.
+--
+-- Safe, non-destructive (DROP NOT NULL never fails and loses no data).
+ALTER TABLE "stock_movements" ALTER COLUMN "userId" DROP NOT NULL;

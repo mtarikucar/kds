@@ -47,10 +47,24 @@ describe("DevicesController", () => {
     });
   });
 
-  it("create forwards tenantId + dto", () => {
+  it("create forwards tenantId + dto with the branch resolved from scope", () => {
     const dto = { kind: "kds_screen" } as any;
     ctrl.create(userReq, dto);
-    expect(devices.createSlot).toHaveBeenCalledWith("t1", dto);
+    // devices.branchId is NOT NULL — the handler fills it from req.scope
+    // (branch-a) when the body omits it.
+    expect(devices.createSlot).toHaveBeenCalledWith("t1", {
+      kind: "kds_screen",
+      branchId: "branch-a",
+    });
+  });
+
+  it("create lets an explicit body branchId override the scope", () => {
+    const dto = { kind: "kds_screen", branchId: "branch-z" } as any;
+    ctrl.create(userReq, dto);
+    expect(devices.createSlot).toHaveBeenCalledWith("t1", {
+      kind: "kds_screen",
+      branchId: "branch-z",
+    });
   });
 
   it("enqueueCommand threads tenantId, device id and dto", () => {

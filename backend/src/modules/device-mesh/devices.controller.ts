@@ -68,7 +68,12 @@ export class DevicesController {
       "Create a device slot — returns a pair code to type into the device",
   })
   create(@Req() req: any, @Body() dto: CreateDeviceSlotDto) {
-    return this.devices.createSlot(req.user.tenantId, dto);
+    // devices.branchId is NOT NULL, so a slot must always land in a concrete
+    // branch. Resolve it from the request's branch scope (BranchGuard
+    // guarantees req.scope.branchId on this branch-scoped route), with the
+    // optional body branchId as an explicit override.
+    const branchId = dto.branchId ?? req.scope?.branchId;
+    return this.devices.createSlot(req.user.tenantId, { ...dto, branchId });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

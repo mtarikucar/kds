@@ -100,13 +100,21 @@ export class DeviceService {
       ownership?: "sold" | "rented" | "byo";
     },
   ) {
-    if (input.branchId) {
-      const branch = await this.prisma.branch.findFirst({
-        where: { id: input.branchId, tenantId },
-      });
-      if (!branch) {
-        throw new BadRequestException("Branch not found for this tenant");
-      }
+    // branchId is required: v3 branch-scope-strict made devices.branchId
+    // NOT NULL, so every slot must land in a concrete branch. The admin route
+    // resolves it from the X-Branch-Id scope; reject early if it never made it
+    // through (and stop the stale `?? null` below from producing the confusing
+    // Prisma "Argument `tenant` is missing" fallback error).
+    if (!input.branchId) {
+      throw new BadRequestException(
+        "branchId is required to create a device slot",
+      );
+    }
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: input.branchId, tenantId },
+    });
+    if (!branch) {
+      throw new BadRequestException("Branch not found for this tenant");
     }
     let pairCode = this.newPairCode();
     // Retry on collision — pairCode is globally unique. 36^6 makes
@@ -137,8 +145,13 @@ export class DeviceService {
 
     const row = await this.prisma.device.create({
       data: {
-        tenantId,
-        branchId: input.branchId ?? null,
+        // Relation `connect` form rather than scalar tenantId/branchId: both
+        // Tenant and Branch are required relations, so connecting them
+        // explicitly is the unambiguous Prisma idiom and avoids the
+        // checked/unchecked-input fallback that surfaced as
+        // "Argument `tenant` is missing".
+        tenant: { connect: { id: tenantId } },
+        branch: { connect: { id: input.branchId } },
         kind: input.kind,
         capabilities: input.capabilities ?? [],
         status: "unprovisioned",
