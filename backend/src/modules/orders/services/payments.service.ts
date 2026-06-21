@@ -905,17 +905,24 @@ export class PaymentsService {
       const payments: Array<
         Awaited<ReturnType<typeof tx.payment.create>> & { __replayed?: boolean }
       > = [];
+      // Fetch the snapshot graph (tenant + full order) ONCE — it is identical
+      // for every split entry (only payment.method differs). Hoisting it out of
+      // the loop avoids 2N redundant deep order reads under the FOR UPDATE lock.
+      const snapshotGraph = await this.finalizer.fetchSnapshotGraph(
+        tx,
+        orderId,
+        tenantId,
+      );
       for (const [idx, entry] of dto.payments.entries()) {
         const key =
           entry.idempotencyKey ?? (batchKey ? `${batchKey}:${idx}` : undefined);
         try {
           // Per-split snapshot so each entry in the split has its own
-          // reprintable fiş. Method differs per entry (one diner cash,
-          // next card etc.) so the snapshot is rebuilt per loop.
-          const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
-            tx,
+          // reprintable fiş. Method differs per entry (one diner cash, next
+          // card etc.); built in-memory from the pre-fetched graph.
+          const receiptSnapshot = this.finalizer.buildReceiptSnapshotFromGraph(
+            snapshotGraph,
             orderId,
-            tenantId,
             { method: entry.method, transactionId: null },
           );
           const payment = await tx.payment.create({

@@ -108,10 +108,11 @@ export class CheckoutService {
     // paymentRef === null is the internal operator-comp path, now explicitly
     // gated above by opts.allowComp (no public caller can reach it).
     let effectiveCart: Cart = cart;
+    let chargedAmountCents: number | null = null;
     if (paymentRef) {
       const intent = await this.prisma.checkoutIntent.findFirst({
         where: { tenantId, paymentRef },
-        select: { status: true, cartJson: true },
+        select: { status: true, cartJson: true, amountCents: true },
       });
       if (
         !intent ||
@@ -126,9 +127,30 @@ export class CheckoutService {
       }
       // Provision exactly what was paid for, never the client-supplied cart.
       effectiveCart = intent.cartJson as unknown as Cart;
+      // The frozen amount PayTR actually charged (authoritative).
+      chargedAmountCents = intent.amountCents;
     }
 
     const quote = await this.quoteSvc.quote(effectiveCart);
+
+    // The cart stores only codes/qty — the re-quote re-reads LIVE prices. If a
+    // plan/add-on/hardware price changed between intent and settlement, the
+    // re-quoted total would differ from what was charged, provisioning at a
+    // price the buyer never agreed to. Refuse to provision on divergence and
+    // leave the intent 'succeeded' for manual review (settlement's catch keeps
+    // it retryable; an operator re-prices or refunds). A 1-cent tolerance
+    // absorbs benign rounding.
+    if (
+      chargedAmountCents !== null &&
+      Math.abs(quote.totalCents - chargedAmountCents) > 1
+    ) {
+      this.logger.error(
+        `Checkout amount mismatch for tenant=${tenantId} ref=${paymentRef}: charged ${chargedAmountCents} but re-quote is ${quote.totalCents} ${quote.currency} — refusing to provision (price changed since intent).`,
+      );
+      throw new BadRequestException(
+        "Checkout amount no longer matches the charged total; provisioning halted for review.",
+      );
+    }
 
     // Idempotency: webhook retries and double-clicks on the success page
     // both replay confirmAndProvision with the same paymentRef. Without
@@ -189,6 +211,7 @@ export class CheckoutService {
     }
 
     let hardwareOrderId: string | undefined;
+    let hardwareTotalCents = 0;
     const addOnIds: string[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -211,6 +234,19 @@ export class CheckoutService {
               // serviceMeta from the catalog).
               l.code.startsWith("onsite_install")),
         );
+        // Hardware tax = the quote's tax apportioned to the hardware subtotal.
+        // Compute each component once and reuse so the invariant
+        // total == subtotal + tax + shipping always holds. (Pre-fix the total
+        // omitted tax, understating the persisted/emitted order by the full
+        // KDV vs what PayTR actually charged.)
+        const hwSubtotal = hardwareLines.reduce(
+          (a, l) => a + l.subtotalCents,
+          0,
+        );
+        const hwTax = Math.round(
+          hwSubtotal * (quote.taxCents / Math.max(1, quote.subtotalCents)),
+        );
+        hardwareTotalCents = hwSubtotal + hwTax + quote.shippingCents;
         const order = await tx.hardwareOrder.create({
           data: {
             tenantId,
@@ -222,18 +258,10 @@ export class CheckoutService {
             // "orders shipping to this branch" reports.
             branchId: validatedBranchId,
             status: paymentRef ? "paid" : "pending_payment",
-            subtotalCents: hardwareLines.reduce(
-              (a, l) => a + l.subtotalCents,
-              0,
-            ),
-            taxCents: Math.round(
-              hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) *
-                (quote.taxCents / Math.max(1, quote.subtotalCents)),
-            ),
+            subtotalCents: hwSubtotal,
+            taxCents: hwTax,
             shippingCents: quote.shippingCents,
-            totalCents:
-              hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) +
-              quote.shippingCents,
+            totalCents: hardwareTotalCents,
             currency: quote.currency,
             shippingAddress: effectiveCart.shippingAddress as any,
             billingAddress: effectiveCart.billingAddress as any,
@@ -294,12 +322,19 @@ export class CheckoutService {
       // tenantMarketplace.purchase.
       for (const l of addOnLines) {
         const branchId = l.meta?.branchId;
-        const ta = await this.tenantMarketplace.purchase(tenantId, {
-          addOnCode: l.code,
-          quantity: l.qty,
-          branchId,
-          paymentRef: paymentRef ?? undefined,
-        });
+        // Pass the outer tx so the add-on grant + its outbox emit commit
+        // atomically with the hardware order / stock allocation — a later
+        // failure rolls the grant back instead of orphaning a paid entitlement.
+        const ta = await this.tenantMarketplace.purchase(
+          tenantId,
+          {
+            addOnCode: l.code,
+            quantity: l.qty,
+            branchId,
+            paymentRef: paymentRef ?? undefined,
+          },
+          tx,
+        );
         addOnIds.push(ta.id);
       }
 
@@ -363,9 +398,7 @@ export class CheckoutService {
             payload: {
               tenantId,
               hardwareOrderId,
-              totalCents:
-                hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) +
-                quote.shippingCents,
+              totalCents: hardwareTotalCents,
               currency: quote.currency,
               paymentRef,
             } as any,

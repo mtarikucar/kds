@@ -47,6 +47,10 @@ export class TenantMarketplaceService {
       branchId?: string;
       paymentRef?: string;
     },
+    // When supplied (checkout/PayTR settlement), the grant joins the caller's
+    // transaction so it rolls back atomically with the rest of the cart instead
+    // of committing on a separate connection.
+    callerTx?: Prisma.TransactionClient,
   ) {
     const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
     // Default-deny: an add-on status the catalog UI doesn't know about
@@ -132,54 +136,82 @@ export class TenantMarketplaceService {
     // overlapping read/write predicate sets and aborts one transaction;
     // the loser surfaces as a 409 the client can retry, which then sees
     // the now-committed first purchase.
-    let row: Awaited<ReturnType<typeof this.prisma.tenantAddOn.create>>;
-    try {
-      row = await this.prisma.$transaction(
-        async (tx) => {
-          // Idempotency by paymentRef — same shape, inside the txn so a
-          // concurrent provisioner for the same paymentRef commits once.
-          if (input.paymentRef) {
-            const existing = await tx.tenantAddOn.findFirst({
-              where: { tenantId, paymentRef: input.paymentRef },
-            });
-            if (existing) return existing;
-          }
+    // Core write: idempotency-check + dup-guard + create + outbox emit, all on
+    // ONE client. Folding the AddOnPurchased emit into the same transaction
+    // closes the crash window where a committed grant had no projector event
+    // (mirrors cancel()); NO .catch on the emit so a failed append rolls the
+    // grant back rather than leaving an entitlement the projector never saw.
+    const core = async (tx: Prisma.TransactionClient) => {
+      // Idempotency by paymentRef — a webhook replay returns the prior row
+      // WITHOUT re-emitting.
+      if (input.paymentRef) {
+        const existing = await tx.tenantAddOn.findFirst({
+          where: { tenantId, paymentRef: input.paymentRef },
+        });
+        if (existing) return existing;
+      }
 
-          // Tenant-scope duplicate guard.
-          const dup = await tx.tenantAddOn.findFirst({
-            where: {
-              tenantId,
-              addOnId: addOn.id,
-              branchId: input.branchId ?? null,
-              status: "active",
-            },
-          });
-          if (dup) {
-            throw new BadRequestException(
-              `Add-on "${addOn.code}" is already active for this ${input.branchId ? "branch" : "tenant"}. Cancel the existing subscription or change quantity instead.`,
-            );
-          }
-
-          return tx.tenantAddOn.create({
-            data: {
-              tenantId,
-              addOnId: addOn.id,
-              branchId: input.branchId,
-              quantity: qty,
-              status: "active",
-              activatedAt: now,
-              currentPeriodStart: now,
-              currentPeriodEnd,
-              paymentRef: input.paymentRef ?? null,
-            },
-          });
+      // Tenant-scope duplicate guard.
+      const dup = await tx.tenantAddOn.findFirst({
+        where: {
+          tenantId,
+          addOnId: addOn.id,
+          branchId: input.branchId ?? null,
+          status: "active",
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      });
+      if (dup) {
+        throw new BadRequestException(
+          `Add-on "${addOn.code}" is already active for this ${input.branchId ? "branch" : "tenant"}. Cancel the existing subscription or change quantity instead.`,
+        );
+      }
+
+      const created = await tx.tenantAddOn.create({
+        data: {
+          tenantId,
+          addOnId: addOn.id,
+          branchId: input.branchId,
+          quantity: qty,
+          status: "active",
+          activatedAt: now,
+          currentPeriodStart: now,
+          currentPeriodEnd,
+          paymentRef: input.paymentRef ?? null,
+        },
+      });
+
+      await this.outbox.append(
+        {
+          type: EventTypes.AddOnPurchased,
+          tenantId,
+          payload: {
+            tenantId,
+            addOnId: created.id,
+            addOnCode: addOn.code,
+            branchId: input.branchId ?? null,
+            quantity: qty,
+          },
+        },
+        tx,
       );
+
+      return created;
+    };
+
+    // Joined path: the caller (checkout) owns the transaction + serialization.
+    if (callerTx) {
+      return core(callerTx);
+    }
+
+    // Standalone path (superadmin comp / direct): own Serializable transaction.
+    // The table lacks a partial unique index on (tenantId, addOnId, branchId)
+    // where status='active', so Serializable is the guard against the
+    // double-grant write-skew; the loser surfaces as a retryable 409.
+    try {
+      return await this.prisma.$transaction(core, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
     } catch (err) {
-      // Postgres serialization-failure (40001 / P2034 in Prisma) when two
-      // concurrent purchases both pass the dup-check. Surface as 409 so
-      // the client retries cleanly and sees the now-committed winner.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2034"
@@ -190,24 +222,6 @@ export class TenantMarketplaceService {
       }
       throw err;
     }
-
-    await this.outbox
-      .append({
-        type: EventTypes.AddOnPurchased,
-        tenantId,
-        payload: {
-          tenantId,
-          addOnId: row.id,
-          addOnCode: addOn.code,
-          branchId: input.branchId ?? null,
-          quantity: qty,
-        },
-      })
-      .catch((e) =>
-        this.logger.warn(`AddOnPurchased emit failed: ${(e as Error).message}`),
-      );
-
-    return row;
   }
 
   async cancel(tenantId: string, tenantAddOnId: string, immediate = false) {

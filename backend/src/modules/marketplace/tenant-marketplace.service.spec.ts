@@ -114,9 +114,13 @@ describe("TenantMarketplaceService.purchase", () => {
       quantity: 3,
     });
     expect(out.quantity).toBe(3);
-    expect(outbox.append).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "addon.purchased.v1" }),
+    // Emit now folds INTO the transaction (append receives the tx client as a
+    // 2nd arg) so a failed append rolls the grant back instead of orphaning an
+    // entitlement. Assert the event was emitted (first arg).
+    const appendCall = (outbox.append as jest.Mock).mock.calls.find(
+      (c) => c[0]?.type === "addon.purchased.v1",
     );
+    expect(appendCall).toBeDefined();
   });
 
   /**

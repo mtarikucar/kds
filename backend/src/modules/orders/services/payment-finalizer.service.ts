@@ -329,32 +329,57 @@ export class PaymentFinalizer {
     tenantId: string,
     paymentInputs: { method: string; transactionId: string | null },
   ): Promise<Prisma.InputJsonValue | typeof Prisma.JsonNull> {
-    try {
-      // Early-exit on tenant lookup miss so we don't burn a wasted
-      // order.findFirst (also keeps test mock sequences stable —
-      // every extra prisma call inside the helper would shift the
-      // `mockResolvedValueOnce` cursor of every payByItems spec).
-      const tenantRow = await tx.tenant.findUnique({
-        where: { id: tenantId },
-        select: { id: true, name: true, currency: true },
-      });
-      if (!tenantRow) return Prisma.JsonNull;
-      const orderForSnap = await tx.order.findFirst({
-        where: { id: orderId, tenantId },
-        include: {
-          orderItems: {
-            include: {
-              product: true,
-              modifiers: { include: { modifier: true } },
-            },
+    const graph = await this.fetchSnapshotGraph(tx, orderId, tenantId);
+    return this.buildReceiptSnapshotFromGraph(graph, orderId, paymentInputs);
+  }
+
+  /**
+   * Fetch the loop-invariant snapshot inputs (tenant + full order graph) ONCE.
+   * splitBill builds N per-entry snapshots that differ only in payment.method;
+   * hoisting this out of the loop avoids 2N redundant deep order reads while the
+   * order row is held under FOR UPDATE. Returns null on a tenant/order miss
+   * (snapshot degrades to JsonNull, never blocking the payment write).
+   *
+   * The two queries here run in the same order as the old inline helper, so
+   * existing payByItems mock-sequence specs are unaffected.
+   */
+  async fetchSnapshotGraph(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+  ) {
+    const tenantRow = await tx.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, name: true, currency: true },
+    });
+    if (!tenantRow) return null;
+    const orderForSnap = await tx.order.findFirst({
+      where: { id: orderId, tenantId },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+            modifiers: { include: { modifier: true } },
           },
-          table: true,
         },
-      });
-      if (!orderForSnap) return Prisma.JsonNull;
+        table: true,
+      },
+    });
+    if (!orderForSnap) return null;
+    return { tenantRow, orderForSnap };
+  }
+
+  /** Pure (no-DB) snapshot build from a pre-fetched graph; degrades to JsonNull. */
+  buildReceiptSnapshotFromGraph(
+    graph: Awaited<ReturnType<PaymentFinalizer["fetchSnapshotGraph"]>>,
+    orderId: string,
+    paymentInputs: { method: string; transactionId: string | null },
+  ): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+    if (!graph) return Prisma.JsonNull;
+    try {
       return this.receiptSnapshotBuilder.buildReceiptSnapshot({
-        tenant: tenantRow,
-        order: ReceiptSnapshotBuilder.toBuilderOrder(orderForSnap),
+        tenant: graph.tenantRow,
+        order: ReceiptSnapshotBuilder.toBuilderOrder(graph.orderForSnap),
         payment: {
           method: paymentInputs.method,
           transactionId: paymentInputs.transactionId,
