@@ -16,6 +16,7 @@ import { UserRole } from "../../common/constants/roles.enum";
 import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../common/constants/subscription.enum";
+import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
 import { WebhookOutboundService } from "./webhook-outbound.service";
 
 // v2.8.88: outbound webhook subscriptions are an API-power feature
@@ -27,6 +28,11 @@ import { WebhookOutboundService } from "./webhook-outbound.service";
 @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
 @Roles(UserRole.ADMIN)
 @RequiresFeature(PlanFeature.API_ACCESS)
+// Tenant-level resource (all handlers scope by req.user.tenantId, never a
+// branch). The frontend treats it as tenant-wide — the '/subscriptions'
+// tenant-wide prefix matches '/v1/webhooks/subscriptions' — and omits
+// X-Branch-Id, so this MUST skip BranchGuard or every call 400s.
+@SkipBranchScope()
 @Controller("v1/webhooks/subscriptions")
 export class WebhooksOutboundController {
   constructor(private readonly svc: WebhookOutboundService) {}
