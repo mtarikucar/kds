@@ -1,505 +1,81 @@
 # Deployment Guide
 
-Complete guide for deploying the Restaurant POS system to different environments.
+How HummyTummy ships. This reflects the **actual** pipeline (the previous version
+of this doc described a beta/multi-server setup that no longer exists).
 
-## Table of Contents
-- [Prerequisites](#prerequisites)
-- [Environment Setup](#environment-setup)
-- [Beta Deployment](#beta-deployment)
-- [Staging Deployment](#staging-deployment)
-- [Production Deployment](#production-deployment)
-- [CI/CD Workflows](#cicd-workflows)
-- [Monitoring & Health Checks](#monitoring--health-checks)
-- [Troubleshooting](#troubleshooting)
+## Topology
 
----
+Both environments run on a **single VPS** (`38.242.233.166`) behind **Cloudflare**,
+as two isolated Docker Compose projects out of one checkout at `/root/kds`:
 
-## Prerequisites
+| | Staging | Production |
+|---|---|---|
+| Compose project | `kds-staging` | `kds-prod` |
+| Trigger | push to `test` branch | push a `vX.Y.Z` tag |
+| Workflow | `.github/workflows/test-deploy.yml` | `.github/workflows/release-deploy.yml` |
+| Hostname | `staging.hummytummy.com` | `hummytummy.com` |
+| Frontend (SPA) | `kds_frontend_staging` `127.0.0.1:5175` | `kds_frontend_prod` `127.0.0.1:8080` |
+| Backend (API) | `kds_backend_staging` `:3002` | `kds_backend_prod` `:3000` |
+| Postgres | `kds_postgres_staging` (`restaurant_pos_staging`, `127.0.0.1:5433`) | `kds_postgres_prod` (`restaurant_pos_prod`, `127.0.0.1:5432`) |
+| Redis | `kds_redis_staging` `127.0.0.1:6380` | `kds_redis_prod` |
 
-### Required Software
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- Node.js 18.x
-- PostgreSQL 14+
-- Redis 7+ (optional but recommended)
-- Git
+Separate containers, databases, volumes, and networks per environment. The DB
+and Redis ports are bound to loopback (not publicly reachable).
 
-### Required Accounts
-- GitHub account (for CI/CD)
-- Docker Hub or GitHub Container Registry account
-- Domain with SSL certificates
-- Server with SSH access
+## Edge routing
 
-### GitHub Secrets Setup
+The host nginx (Cloudflare → nginx → containers) routes each hostname to its
+environment. Both vhosts serve the **SPA at the domain root** (Vite `base: '/'`),
+with legacy `/app/*` → `301` to root, and `/api` + `/uploads` + `/socket.io` →
+the backend. The canonical vhosts are version-controlled in
+[`ops/nginx/`](../ops/nginx/) — apply with `ops/nginx/apply.sh` (it backs up,
+runs `nginx -t`, and reloads only on success). Keep them in sync with the server.
 
-Configure these secrets in GitHub repository settings:
+## Secrets (GitHub Actions repo secrets)
 
-#### SSH Access
-```
-SSH_PRIVATE_KEY          # SSH private key for server access
-SSH_KNOWN_HOSTS          # SSH known hosts file content
-```
+Shared by both deploys unless noted:
 
-#### Server Configuration
-```
-BETA_SERVER_HOST         # Beta server hostname/IP
-BETA_SERVER_USER         # SSH user for beta server
+- `POSTGRES_PASSWORD`, `ENCRYPTION_MASTER_KEY`, `INTERNAL_SERVICE_TOKEN`
+- `PAYTR_MERCHANT_ID` / `_KEY` / `_SALT` (PayTR is the only payment provider; TRY-only)
+- `EMAIL_HOST` / `_USER` / `_PASSWORD` / `_FROM`, `NETGSM_*`
+- `GOOGLE_CLIENT_ID` / `_SECRET`, `VITE_GOOGLE_CLIENT_ID`
+- `SSH_PRIVATE_KEY_BASE64`, `SSH_KNOWN_HOSTS`
+- **Production session secrets:** `JWT_SECRET`, `JWT_REFRESH_SECRET`,
+  `SUPERADMIN_JWT_SECRET`, `SUPERADMIN_JWT_REFRESH_SECRET`
+- **Staging session secrets (distinct from prod):** `STAGING_JWT_SECRET`,
+  `STAGING_JWT_REFRESH_SECRET`, `STAGING_SUPERADMIN_JWT_SECRET`,
+  `STAGING_SUPERADMIN_JWT_REFRESH_SECRET` — so a JWT minted on staging is not
+  valid on prod and vice-versa.
 
-STAGING_SERVER_HOST      # Staging server hostname/IP
-STAGING_SERVER_USER      # SSH user for staging server
+> Residual (deliberate): `POSTGRES_PASSWORD` and `ENCRYPTION_MASTER_KEY` are
+> still shared. The DBs are separate and their ports are loopback-only, so the
+> blast radius is bounded. Rotating them for staging needs a DB-side
+> `ALTER ROLE` / data re-encryption and is intentionally deferred.
 
-PRODUCTION_SERVER_HOST   # Production server hostname/IP
-PRODUCTION_SERVER_USER   # SSH user for production server
-```
+## Releasing
 
-#### Database & Services
-```
-POSTGRES_PASSWORD        # PostgreSQL password
-REDIS_PASSWORD           # Redis password
-JWT_SECRET               # JWT secret (64+ characters)
-JWT_REFRESH_SECRET       # JWT refresh secret (64+ characters)
-```
-
-#### Payment Providers
-```
-# Production Keys
-STRIPE_SECRET_KEY
-STRIPE_PUBLISHABLE_KEY
-STRIPE_WEBHOOK_SECRET
-
-IYZICO_API_KEY
-IYZICO_SECRET_KEY
-
-# Test/Sandbox Keys (for beta/staging)
-STRIPE_TEST_SECRET_KEY
-STRIPE_TEST_PUBLISHABLE_KEY
-STRIPE_TEST_WEBHOOK_SECRET
-
-IYZICO_SANDBOX_API_KEY
-IYZICO_SANDBOX_SECRET_KEY
-```
-
-#### Email Configuration
-```
-EMAIL_HOST
-EMAIL_PORT
-EMAIL_USER
-EMAIL_PASSWORD
-```
-
----
-
-## Environment Setup
-
-### 1. Server Preparation
+Per the standard flow (one tag per substantial change):
 
 ```bash
-# Connect to server
-ssh user@your-server.com
-
-# Create application directory
-sudo mkdir -p /opt/kds-{beta,staging,production}
-sudo chown $USER:$USER /opt/kds-*
-
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Verify installations
-docker --version
-docker-compose --version
+# feature branch → PR → review
+git checkout -b feat/...
+# merge to main with a "merge: vX.Y.Z — ..." commit, then:
+git tag -a vX.Y.Z -m "vX.Y.Z — ..."
+git push origin main && git push origin vX.Y.Z   # → PROD deploy
+# staging:
+git checkout test && git merge --ff-only main && git push origin test   # → STAGING deploy
 ```
 
-### 2. Clone Repository
-
-```bash
-cd /opt/kds-beta
-git clone https://github.com/YOUR_USERNAME/kds.git .
-git checkout v0.1.0-beta.1  # Or desired version
-```
-
-### 3. Configure Environment Variables
-
-```bash
-# Copy template
-cp backend/.env.production.template backend/.env
-
-# Edit environment file
-nano backend/.env
-```
-
-Fill in all required values from the template.
-
----
-
-## Beta Deployment
-
-### Automated Deployment (Recommended)
-
-Beta deployment is triggered automatically when pushing a beta tag:
-
-```bash
-# Tag a new beta release
-git tag -a v0.1.0-beta.2 -m "Beta release v0.1.0-beta.2"
-git push origin v0.1.0-beta.2
-
-# Or use workflow dispatch from GitHub Actions UI
-```
-
-The deployment workflow will:
-1. Run tests
-2. Build Docker images
-3. Push to GitHub Container Registry
-4. Deploy to beta server
-5. Run database migrations
-6. Perform health checks
-7. Create GitHub pre-release
-
-### Manual Deployment
-
-```bash
-# On beta server
-cd /opt/kds-beta
-
-# Pull latest beta tag
-git fetch --tags
-git checkout v0.1.0-beta.1
-
-# Set environment
-export IMAGE_TAG=v0.1.0-beta.1
-export GITHUB_REPOSITORY=YOUR_USERNAME/kds
-
-# Pull Docker images
-docker-compose -f docker-compose.beta.yml pull
-
-# Backup database
-./scripts/backup-database.sh beta
-
-# Deploy
-docker-compose -f docker-compose.beta.yml up -d
-
-# Run migrations
-docker-compose -f docker-compose.beta.yml exec backend npx prisma migrate deploy
-
-# Verify deployment
-./scripts/verify-deployment.sh beta https://beta.yourapp.com
-```
-
----
-
-## Staging Deployment
-
-Staging deployment is triggered automatically on pushes to `main` branch.
-
-### Manual Deployment
-
-```bash
-cd /opt/kds-staging
-
-# Pull latest
-git pull origin main
-
-# Deploy
-docker-compose -f docker-compose.staging.yml down
-docker-compose -f docker-compose.staging.yml build
-docker-compose -f docker-compose.staging.yml up -d
-
-# Migrations
-docker-compose -f docker-compose.staging.yml exec backend npx prisma migrate deploy
-
-# Verify
-./scripts/verify-deployment.sh staging https://staging.yourapp.com
-```
-
----
-
-## Production Deployment
-
-Production deployment requires manual workflow dispatch for safety.
-
-### Steps
-
-1. **Prepare Release**
-   ```bash
-   # Ensure all tests pass
-   git checkout main
-   git pull origin main
-
-   # Tag production release
-   git tag -a v1.0.0 -m "Production release v1.0.0"
-   git push origin v1.0.0
-   ```
-
-2. **Deploy via GitHub Actions**
-   - Go to GitHub Actions → "Deploy to Production"
-   - Click "Run workflow"
-   - Enter version (e.g., v1.0.0)
-   - Confirm deployment
-
-3. **Post-Deployment Verification**
-   ```bash
-   # SSH to production server
-   ssh user@production-server.com
-
-   # Verify deployment
-   cd /opt/kds
-   ./scripts/verify-deployment.sh production https://yourapp.com
-
-   # Check logs
-   docker-compose -f docker-compose.prod.yml logs -f --tail=100
-   ```
-
-4. **Rollback (if needed)**
-   ```bash
-   # Automated rollback
-   ./scripts/rollback-deployment.sh
-
-   # Or manual rollback
-   git checkout <previous-tag>
-   docker-compose -f docker-compose.prod.yml up -d --no-deps backend frontend
-   ```
-
----
-
-## CI/CD Workflows
-
-### Available Workflows
-
-#### 1. **Test & Lint** (`test.yml`)
-- Runs on: All branches, PRs to main/develop
-- Actions: Lint, test, build
-- Services: PostgreSQL, Redis
-
-#### 2. **Deploy Beta** (`deploy-beta.yml`)
-- Triggers: Push beta tags (`v*-beta.*`)
-- Actions:
-  - Run tests
-  - Build & push Docker images to GHCR
-  - Deploy to beta server
-  - Run migrations
-  - Health checks
-  - Create pre-release
-
-#### 3. **Deploy Staging** (`deploy-staging.yml`)
-- Triggers: Push to `main` branch
-- Actions:
-  - Run tests
-  - Deploy to staging server
-  - Run migrations
-  - Notify deployment status
-
-#### 4. **Deploy Production** (`deploy-production.yml`)
-- Triggers: Manual workflow dispatch only
-- Actions:
-  - Run tests
-  - Backup database
-  - Deploy with zero-downtime
-  - Run migrations
-  - Health checks
-  - Create GitHub release
-  - Automatic rollback on failure
-
-#### 5. **Health Check** (`health-check.yml`)
-- Triggers: Cron schedule (every 30 min), manual
-- Actions:
-  - Check API health endpoints
-  - Verify database connections
-  - Monitor response times
-  - Create alerts on failure
-
-### Workflow Status Badges
-
-Add to your README.md:
-
-```markdown
-![Tests](https://github.com/YOUR_USERNAME/kds/actions/workflows/test.yml/badge.svg)
-![Beta Deployment](https://github.com/YOUR_USERNAME/kds/actions/workflows/deploy-beta.yml/badge.svg)
-![Health Check](https://github.com/YOUR_USERNAME/kds/actions/workflows/health-check.yml/badge.svg)
-```
-
----
-
-## Monitoring & Health Checks
-
-### Automated Health Checks
-
-Health checks run every 30 minutes automatically:
-- API health endpoint
-- Database connectivity
-- Redis connectivity
-- Response time monitoring
-- Critical endpoint availability
-
-### Manual Health Check
-
-```bash
-# Run verification script
-./scripts/verify-deployment.sh <environment> <base_url>
-
-# Examples
-./scripts/verify-deployment.sh beta https://beta.yourapp.com
-./scripts/verify-deployment.sh production https://yourapp.com
-```
-
-### Health Endpoints
-
-```
-GET /api/health
-{
-  "status": "healthy",
-  "database": "healthy",
-  "redis": "healthy",
-  "uptime": 123456,
-  "version": "0.1.0-beta.1"
-}
-```
-
-### Monitoring Logs
-
-```bash
-# View all logs
-docker-compose -f docker-compose.<env>.yml logs -f
-
-# Backend only
-docker-compose -f docker-compose.<env>.yml logs -f backend
-
-# Last 100 lines
-docker-compose -f docker-compose.<env>.yml logs --tail=100
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Database Connection Failed
-```bash
-# Check PostgreSQL status
-docker-compose ps postgres
-
-# Check logs
-docker-compose logs postgres
-
-# Restart database
-docker-compose restart postgres
-```
-
-#### 2. Migration Errors
-```bash
-# Reset migrations (development only!)
-docker-compose exec backend npx prisma migrate reset
-
-# Deploy migrations
-docker-compose exec backend npx prisma migrate deploy
-```
-
-#### 3. Container Won't Start
-```bash
-# Check container status
-docker-compose ps
-
-# Check logs
-docker-compose logs <service-name>
-
-# Rebuild container
-docker-compose build <service-name>
-docker-compose up -d <service-name>
-```
-
-#### 4. High Response Time
-```bash
-# Check system resources
-docker stats
-
-# Check database performance
-docker-compose exec postgres psql -U postgres -c "SELECT * FROM pg_stat_activity;"
-
-# Check Redis
-docker-compose exec redis redis-cli INFO stats
-```
-
-### Rollback Procedure
-
-```bash
-# Automatic rollback (recommended)
-./scripts/rollback-deployment.sh
-
-# Manual rollback
-git checkout <previous-stable-tag>
-docker-compose down
-docker-compose up -d
-./scripts/verify-deployment.sh
-```
-
-### Emergency Contacts
-
-- **DevOps Team**: devops@yourcompany.com
-- **On-call Engineer**: See PagerDuty rotation
-- **GitHub Issues**: https://github.com/YOUR_USERNAME/kds/issues
-
----
-
-## Security Checklist
-
-Before production deployment:
-
-- [ ] All secrets rotated and secure
-- [ ] SSL/TLS certificates configured
-- [ ] Firewall rules in place
-- [ ] Database backups automated
-- [ ] Monitoring and alerting configured
-- [ ] Rate limiting enabled
-- [ ] CORS properly configured
-- [ ] Environment variables validated
-- [ ] Security headers configured
-- [ ] Dependencies up to date
-- [ ] Penetration testing completed
-- [ ] Disaster recovery plan documented
-
----
-
-## Performance Optimization
-
-### Database
-- Enable connection pooling
-- Configure proper indexes
-- Regular VACUUM and ANALYZE
-- Monitor slow queries
-
-### Redis
-- Configure appropriate eviction policy
-- Monitor memory usage
-- Enable persistence if needed
-
-### Docker
-- Use multi-stage builds
-- Optimize image layers
-- Configure resource limits
-- Enable health checks
-
-### Application
-- Enable compression
-- Configure caching
-- Optimize API queries
-- Monitor memory leaks
-
----
-
-## Additional Resources
-
-- [Environment Variables Guide](.env.production.template)
-- [Database Backup Script](../scripts/backup-database.sh)
-- [Rollback Script](../scripts/rollback-deployment.sh)
-- [Docker Compose Files](../docker-compose.*.yml)
-- [GitHub Actions Workflows](../.github/workflows/)
-
----
-
-**Last Updated:** 2025-10-21
-**Version:** 0.1.0-beta.1
+`release-deploy.yml` / `test-deploy.yml` both call the shared `quality-gates.yml`
+(backend lint/tsc/unit + real-DB e2e, frontend, contract + i18n parity drift),
+build per-environment images, render the env file, ship it, and run
+`scripts/deploy.sh <prod|staging>` on the server (`prisma migrate deploy`, no
+seed). Migrations are hand-written and applied by the deploy.
+
+## Diagnostics
+
+- Health: `https://hummytummy.com/api/health`, `https://staging.hummytummy.com/api/health`
+  (the `environment` field distinguishes them).
+- `staging-diagnose.yml` (Actions → workflow_dispatch, type `staging`) — read-only
+  dump of staging container logs + health over SSH.
+- `seed-runner.yml` (workflow_dispatch) — manual marketplace seed into a chosen env.

@@ -38,10 +38,12 @@ jobs:
       - name: Verify required secrets
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
-          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          # Staging-specific session secrets (distinct from prod) — see the
+          # Render .env.test step below for the rationale.
+          JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
+          SUPERADMIN_JWT_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_REFRESH_SECRET }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
         run: |
           set -euo pipefail
@@ -163,10 +165,14 @@ jobs:
       - name: Render .env.test
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
-          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          # Staging-specific session/superadmin secrets — DISTINCT from prod so a
+          # JWT minted on staging is NOT valid on prod (and vice-versa). Stored as
+          # repo secrets STAGING_*; rotating them only resets active staging
+          # sessions (no data-at-rest impact).
+          JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
+          SUPERADMIN_JWT_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_REFRESH_SECRET }}
           # kds-marketing service transport (Phase-5 split). Both optional:
           # core boots without them (referral resolution no-ops, event relay
           # disabled) until the marketing service is stood up.

@@ -3,7 +3,10 @@ version: '3.8'
 name: kds-staging
 
 services:
-  # PostgreSQL Database (Shared - uses staging database)
+  # PostgreSQL — DEDICATED staging database (separate container + volume from
+  # prod; NOT shared). Bound to loopback only so the staging DB port isn't
+  # reachable off-box (the Postgres password is currently shared with prod, so
+  # public exposure would widen its blast radius — keep it on 127.0.0.1).
   postgres:
     env_file:
       - .env.test
@@ -12,7 +15,7 @@ services:
     container_name: kds_postgres_staging
     restart: always
     ports:
-      - '5433:5432'
+      - '127.0.0.1:5433:5432'
     volumes:
       - postgres_data_staging:/var/lib/postgresql/data
     healthcheck:
@@ -31,7 +34,9 @@ services:
           cpus: '0.5'
           memory: 1G
 
-  # Redis Cache (Shared - uses DB 1 for staging)
+  # Redis — DEDICATED staging instance (DB 0, separate container/volume from
+  # prod). Bound to loopback only (no public 6380 exposure; staging Redis runs
+  # without a password, so it must not be reachable off-box).
   redis:
     env_file:
       - .env.test
@@ -39,7 +44,7 @@ services:
     container_name: kds_redis_staging
     restart: always
     ports:
-      - '6380:6379'
+      - '127.0.0.1:6380:6379'
     volumes:
       - redis_data_staging:/data
     healthcheck:
