@@ -27,9 +27,14 @@ import {
 export class DemoService {
   private readonly logger = new Logger(DemoService.name);
 
-  static readonly SUBDOMAIN = "demo";
+  // Reserved subdomain for the explore-demo tenant. Deliberately NOT "demo" —
+  // prisma/seed.ts already owns "demo" ("Demo Restaurant"), so creating another
+  // would hit the subdomain unique constraint ("A record with this subdomain
+  // already exists"). This one is ours alone.
+  static readonly SUBDOMAIN = "demo-explore";
   static readonly ADMIN_EMAIL = "demo-admin@demo.hummytummy.local";
   private static readonly PLAN_NAME = "DEMO";
+  private static readonly BRANCH_CODE = "MAIN";
 
   // All plan features ON so every screen is reachable in the demo. Mirrors the
   // tenant featureOverrides contract (PlanFeatureGuard fallback reads these).
@@ -95,8 +100,14 @@ export class DemoService {
       },
     });
 
-    const tenant = await this.prisma.tenant.create({
-      data: {
+    // Every step is find-or-create so the seed is idempotent AND self-healing:
+    // a re-run, a partial prior seed (tenant created but a later step threw), or
+    // two simultaneous first-clicks all converge instead of colliding. Upserts
+    // key on the unique columns (subdomain, (tenantId,code), email).
+    const tenant = await this.prisma.tenant.upsert({
+      where: { subdomain: DemoService.SUBDOMAIN },
+      update: {},
+      create: {
         name: "HummyTummy Demo Restoran",
         subdomain: DemoService.SUBDOMAIN,
         status: "ACTIVE",
@@ -105,26 +116,46 @@ export class DemoService {
       },
     });
 
-    const branch = await this.prisma.branch.create({
-      data: { tenantId: tenant.id, name: "Merkez" },
-    });
-
-    const now = new Date();
-    await this.prisma.subscription.create({
-      data: {
+    const branch = await this.prisma.branch.upsert({
+      where: {
+        tenantId_code: {
+          tenantId: tenant.id,
+          code: DemoService.BRANCH_CODE,
+        },
+      },
+      update: {},
+      create: {
         tenantId: tenant.id,
-        planId: plan.id,
-        status: "ACTIVE",
-        billingCycle: "MONTHLY",
-        paymentProvider: "EMAIL",
-        currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 3600 * 1000),
-        amount: "0.00",
+        name: "Merkez",
+        code: DemoService.BRANCH_CODE,
+        status: "active",
       },
     });
 
-    const admin = await this.prisma.user.create({
-      data: {
+    const existingSub = await this.prisma.subscription.findFirst({
+      where: { tenantId: tenant.id },
+      select: { id: true },
+    });
+    if (!existingSub) {
+      const now = new Date();
+      await this.prisma.subscription.create({
+        data: {
+          tenantId: tenant.id,
+          planId: plan.id,
+          status: "ACTIVE",
+          billingCycle: "MONTHLY",
+          paymentProvider: "EMAIL",
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 3600 * 1000),
+          amount: "0.00",
+        },
+      });
+    }
+
+    const admin = await this.prisma.user.upsert({
+      where: { email: DemoService.ADMIN_EMAIL },
+      update: {},
+      create: {
         email: DemoService.ADMIN_EMAIL,
         // Login is never used for the demo (the session is minted directly);
         // a random hash keeps the credential unusable.
@@ -150,8 +181,15 @@ export class DemoService {
       },
     });
 
-    await this.seedContent(tenant.id, branch.id, admin.id);
-    this.logger.log(`Seeded demo tenant ${tenant.id} (${tenant.subdomain})`);
+    // Showcase content once — only when the menu is still empty so re-runs
+    // don't pile up duplicate categories/products/tables.
+    const categoryCount = await this.prisma.category.count({
+      where: { tenantId: tenant.id },
+    });
+    if (categoryCount === 0) {
+      await this.seedContent(tenant.id, branch.id, admin.id);
+    }
+    this.logger.log(`Ensured demo tenant ${tenant.id} (${tenant.subdomain})`);
     return admin;
   }
 
