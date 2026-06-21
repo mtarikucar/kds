@@ -357,7 +357,11 @@ jobs:
           MARKETING_SERVICE_URL=${MARKETING_SERVICE_URL}
           INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
 
-          CORS_ORIGIN=https://hummytummy.com,https://marketing.hummytummy.com,https://landing.hummytummy.com,https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
+          # Staging origin deliberately NOT trusted by prod — staging runs its own
+          # backend with its own session secrets, so it never needs to call the
+          # prod API. (Dropped https://staging.hummytummy.com to remove the
+          # cross-environment request path.)
+          CORS_ORIGIN=https://hummytummy.com,https://marketing.hummytummy.com,https://landing.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com
 
           PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
