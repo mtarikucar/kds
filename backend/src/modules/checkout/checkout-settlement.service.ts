@@ -90,8 +90,12 @@ export class CheckoutSettlementService {
       // Roll back the status flip so a manual retry (or the recovery
       // sweeper, when v2.9.x lands) can re-attempt provisioning. The
       // succeededAt timestamp stays — we know PayTR did charge the card.
-      await this.prisma.checkoutIntent.update({
-        where: { paymentRef },
+      //
+      // Status-scoped so a LOSER of a concurrent settlement (whose tx aborted
+      // with P2034 while the WINNER already flipped the row to 'provisioned')
+      // cannot clobber that committed terminal state back to 'succeeded'.
+      await this.prisma.checkoutIntent.updateMany({
+        where: { paymentRef, status: { notIn: ["provisioned", "failed"] } },
         data: { status: "succeeded" },
       });
       this.logger.error(

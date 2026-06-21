@@ -112,11 +112,15 @@ describe('CheckoutSettlementService (v2.8.85)', () => {
         'stock allocation failed',
       );
 
-      // The error path issues a status flip back to 'succeeded' so the
-      // recovery sweep / manual retry can re-attempt the provisioning
-      // without losing the fact that PayTR did charge the card.
-      const rollback = prisma.checkoutIntent.update.mock.calls.find(
-        (c: any) => c[0].data.status === 'succeeded',
+      // The error path issues a status-scoped flip back to 'succeeded' so the
+      // recovery sweep / manual retry can re-attempt the provisioning without
+      // losing the fact that PayTR did charge the card. It uses updateMany with
+      // a status guard so a concurrent loser can't clobber a committed
+      // 'provisioned' row.
+      const rollback = prisma.checkoutIntent.updateMany.mock.calls.find(
+        (c: any) =>
+          c[0].data.status === 'succeeded' &&
+          c[0].where.status?.notIn?.includes('provisioned'),
       );
       expect(rollback).toBeDefined();
     });

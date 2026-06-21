@@ -234,6 +234,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
           error: "DatabaseTimeout",
         };
 
+      case "P2034": // Serializable transaction conflict (Postgres 40001)
+        // A serialization failure is the EXPECTED loser-outcome of a
+        // Serializable transaction under contention (checkout settlement,
+        // marketplace purchase, etc.). It's retryable and did NOT commit, so
+        // surface the same 409 every hand-rolled P2034 catch in the codebase
+        // returns instead of an opaque 500. The request can be safely retried.
+        return {
+          statusCode: HttpStatus.CONFLICT,
+          message:
+            "Concurrent update conflict — please retry. Your request did not take effect.",
+          error: "ConcurrentUpdate",
+        };
+
       case "P2000": // Value too long for the column
       case "P2020": // Value out of range for the type (e.g. numeric overflow)
         // Bad client input, not a server fault — a number/string that exceeds
