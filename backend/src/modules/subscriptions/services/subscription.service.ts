@@ -2,13 +2,16 @@ import {
   Injectable,
   Logger,
   BadRequestException,
-  ForbiddenException,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { addDays, addMonths, addYears } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  resolvePlanAmount,
+  isPlanDiscountActive,
+} from "../plan-pricing.helper";
 import { BillingService } from "./billing.service";
 import { NotificationService } from "./notification.service";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -360,10 +363,8 @@ export class SubscriptionService {
         ? addMonths(now, 1)
         : addYears(now, 1);
 
-    const amount =
-      dto.billingCycle === BillingCycle.MONTHLY
-        ? plan.monthlyPrice
-        : plan.yearlyPrice;
+    // Honor any active promotional discount — the price the buyer was shown.
+    const amount = resolvePlanAmount(plan, dto.billingCycle);
 
     // Transaction: subscription + tenant + (optional) pricing snapshot.
     // The DB has a partial unique index on (tenantId) where status IN
@@ -523,10 +524,7 @@ export class SubscriptionService {
 
     const now = new Date();
     const trialEnd = addDays(now, plan.trialDays);
-    const amount =
-      billingCycle === BillingCycle.MONTHLY
-        ? plan.monthlyPrice
-        : plan.yearlyPrice;
+    const amount = resolvePlanAmount(plan, billingCycle);
 
     try {
       const subscription = await this.prisma.$transaction(async (tx) => {
@@ -683,10 +681,7 @@ export class SubscriptionService {
       throw new BadRequestException("Invalid billing cycle");
     }
 
-    const newAmount =
-      billingCycle === BillingCycle.MONTHLY
-        ? newPlan.monthlyPrice
-        : newPlan.yearlyPrice;
+    const newAmount = resolvePlanAmount(newPlan, billingCycle);
     const currentAmount = subscription.amount;
     const isUpgrade = new Prisma.Decimal(newAmount).gt(currentAmount);
 
@@ -820,10 +815,7 @@ export class SubscriptionService {
 
     const billingCycle =
       subscription.scheduledDowngradeBillingCycle || subscription.billingCycle;
-    const newAmount =
-      billingCycle === BillingCycle.MONTHLY
-        ? newPlan.monthlyPrice
-        : newPlan.yearlyPrice;
+    const newAmount = resolvePlanAmount(newPlan, billingCycle);
 
     // deep-review H1: roll the billing period forward as part of the same
     // atomic claim. The downgrade cron runs at 01:00 and the period-end
@@ -1225,29 +1217,18 @@ export class SubscriptionService {
 
     const now = new Date();
     return plans.map((plan) => {
-      const isDiscountActive =
-        plan.isDiscountActive &&
-        plan.discountPercentage &&
-        plan.discountStartDate &&
-        plan.discountEndDate &&
-        plan.discountStartDate <= now &&
-        plan.discountEndDate >= now;
+      const isDiscountActive = isPlanDiscountActive(plan, now);
 
-      // Display-only pricing; createSubscription / applyUpgrade re-apply
-      // any active discount server-side as source of truth.
-      let discountedMonthly: Prisma.Decimal | null = null;
-      let discountedYearly: Prisma.Decimal | null = null;
-      if (isDiscountActive) {
-        const multiplier = new Prisma.Decimal(
-          100 - plan.discountPercentage!,
-        ).div(100);
-        discountedMonthly = new Prisma.Decimal(plan.monthlyPrice)
-          .mul(multiplier)
-          .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-        discountedYearly = new Prisma.Decimal(plan.yearlyPrice)
-          .mul(multiplier)
-          .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-      }
+      // Display pricing uses the SAME resolvePlanAmount the charge rails use, so
+      // the advertised discounted price provably equals what gets charged
+      // (createSubscription / startTrial / applyUpgrade / confirmDowngrade,
+      // checkout quote, havale, create-intent all route through it).
+      const discountedMonthly: Prisma.Decimal | null = isDiscountActive
+        ? resolvePlanAmount(plan, "MONTHLY", now)
+        : null;
+      const discountedYearly: Prisma.Decimal | null = isDiscountActive
+        ? resolvePlanAmount(plan, "YEARLY", now)
+        : null;
 
       return {
         id: plan.id,

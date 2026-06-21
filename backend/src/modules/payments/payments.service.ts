@@ -11,6 +11,7 @@ import { MetricsService } from "../../common/metrics/metrics.service";
 import { Prisma } from "@prisma/client";
 import { addHours } from "date-fns";
 import { PrismaService } from "../../prisma/prisma.service";
+import { resolvePlanAmount } from "../subscriptions/plan-pricing.helper";
 import { CLOCK, Clock, SystemClock } from "../../common/time/clock";
 import {
   ID_GENERATOR,
@@ -223,10 +224,8 @@ export class PaymentsService {
       userAgent,
     });
 
-    const amount =
-      dto.billingCycle === BillingCycle.MONTHLY
-        ? plan.monthlyPrice
-        : plan.yearlyPrice;
+    // Honor any active promotional discount — the price the buyer was shown.
+    const amount = resolvePlanAmount(plan, dto.billingCycle);
 
     // (1) Trial-eligible? Activate trial; no PayTR charge during trial.
     //

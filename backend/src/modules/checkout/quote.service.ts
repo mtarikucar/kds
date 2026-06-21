@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { resolvePlanAmount } from "../subscriptions/plan-pricing.helper";
 import { CatalogService } from "../catalog/catalog.service";
 import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
 import { Cart, CartQuote, PricedLine } from "./checkout.types";
@@ -61,8 +62,8 @@ export class QuoteService {
         }
         currency = plan.currency;
         const cycle = item.billingCycle ?? "MONTHLY";
-        const priceDec =
-          cycle === "YEARLY" ? plan.yearlyPrice : plan.monthlyPrice;
+        // Honor an active promotional discount — the advertised price.
+        const priceDec = resolvePlanAmount(plan, cycle);
         const unitCents = Math.round(Number(priceDec) * 100);
         lines.push({
           type: "plan",

@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { addHours, addMonths, addYears } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { resolvePlanAmount } from "../../subscriptions/plan-pricing.helper";
 import { BillingService } from "../../subscriptions/services/billing.service";
 import { ConsentService } from "../../legal/services/consent.service";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -198,10 +199,8 @@ export class BankTransferService {
       userAgent: params.userAgent,
     });
 
-    const amount =
-      params.billingCycle === BillingCycle.MONTHLY
-        ? plan.monthlyPrice
-        : plan.yearlyPrice;
+    // Honor any active promotional discount — the price the buyer was shown.
+    const amount = resolvePlanAmount(plan, params.billingCycle);
     const existingSub = tenant.subscriptions[0];
     const isUpgrade = !!existingSub && existingSub.planId !== plan.id;
     const reference = this.generateReference();
@@ -317,9 +316,7 @@ export class BankTransferService {
         ? upgrade.billingCycle
         : subscription.billingCycle;
       const finalAmount = upgrade
-        ? billingCycle === BillingCycle.MONTHLY
-          ? (upgrade.targetPlan.monthlyPrice as Prisma.Decimal)
-          : (upgrade.targetPlan.yearlyPrice as Prisma.Decimal)
+        ? resolvePlanAmount(upgrade.targetPlan, billingCycle)
         : (payment.amount as Prisma.Decimal);
       const finalCurrency = upgrade
         ? upgrade.targetPlan.currency
