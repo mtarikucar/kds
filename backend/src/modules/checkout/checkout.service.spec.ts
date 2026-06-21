@@ -33,10 +33,12 @@ describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
           meta: { productId: "p1", acquisition: "sell" },
         },
       ],
-      subtotalCents: 10000,
-      taxCents: 2000,
+      // KDV-inclusive: line gross 10000 → net 8333 + embedded tax 1667;
+      // total = gross 10000 + shipping 500.
+      subtotalCents: 8333,
+      taxCents: 1667,
       shippingCents: 500,
-      totalCents: 12500,
+      totalCents: 10500,
       currency: "TRY",
       ...over,
     };
@@ -54,7 +56,7 @@ describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
         findFirst: jest.fn().mockResolvedValue({
           status: "succeeded",
           cartJson: { branchId: undefined },
-          amountCents: 12500, // matches quote.totalCents by default
+          amountCents: 10500, // matches quote.totalCents by default
         }),
       },
       hardwareOrder: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -78,22 +80,24 @@ describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
     );
   });
 
-  it("persists a hardware total that includes tax (subtotal + tax + shipping)", async () => {
+  it("persists a KDV-inclusive hardware order (net + embedded tax + shipping = gross+shipping)", async () => {
     await svc.confirmAndProvision(TENANT, {} as any, PAYMENT_REF);
 
     expect(tx.hardwareOrder.create).toHaveBeenCalledTimes(1);
     const data = tx.hardwareOrder.create.mock.calls[0][0].data;
-    expect(data.subtotalCents).toBe(10000);
-    expect(data.taxCents).toBe(2000);
+    // gross line 10000 → net 8333 + embedded tax 1667; total = gross + shipping.
+    expect(data.subtotalCents).toBe(8333);
+    expect(data.taxCents).toBe(1667);
     expect(data.shippingCents).toBe(500);
-    expect(data.totalCents).toBe(12500); // was 10500 before the fix (tax omitted)
+    expect(data.totalCents).toBe(10500); // gross 10000 + shipping 500 — NOT 12500 (no tax on top)
+    expect(data.subtotalCents + data.taxCents + data.shippingCents).toBe(10500);
   });
 
   it("halts provisioning when the re-quote diverges from the charged amount", async () => {
     prisma.checkoutIntent.findFirst.mockResolvedValue({
       status: "succeeded",
       cartJson: { branchId: undefined },
-      amountCents: 99999, // charged ≠ re-quoted 12500
+      amountCents: 99999, // charged ≠ re-quoted 10500
     });
 
     await expect(
@@ -113,15 +117,15 @@ describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
             code: "kds_extra_screen",
             name: "Extra screen",
             qty: 1,
-            unitCents: 12500,
-            subtotalCents: 12500,
+            unitCents: 10500,
+            subtotalCents: 10500, // gross line == total
             meta: {},
           },
         ],
-        subtotalCents: 12500,
-        taxCents: 0,
+        subtotalCents: 8750, // net = round(10500 / 1.2)
+        taxCents: 1750,
         shippingCents: 0,
-        totalCents: 12500,
+        totalCents: 10500, // gross, matches the charged amountCents
       }),
     );
 

@@ -78,7 +78,11 @@ export class CheckoutIntentService {
     // single qty=1 basket entry and fold the original qty into the name
     // ("Yazarkasa Hugin Tiger T300 x2"). The buyer still sees the
     // multiplicity; we get a clean basket sum.
-    const overhead = quote.totalCents - quote.subtotalCents; // tax + shipping
+    // Line prices are KDV-inclusive (gross), so the only overhead to spread
+    // across the basket is shipping. Use the GROSS line sum (not quote.subtotal,
+    // which is now NET) so basket entries sum exactly to totalCents.
+    const grossLineSum = quote.lines.reduce((a, l) => a + l.subtotalCents, 0);
+    const overhead = quote.totalCents - grossLineSum; // shipping only
     const lineOverheads = this.distributeOverhead(
       quote.lines.map((l) => l.subtotalCents),
       overhead,

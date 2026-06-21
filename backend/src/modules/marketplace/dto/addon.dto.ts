@@ -54,6 +54,7 @@ export class CreateAddOnDto {
   @ApiPropertyOptional({ default: "TRY" })
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Z]{3}$/, { message: "currency must be a 3-letter ISO code" })
   currency?: string;
 
   // grants is free-form JSON shaped per AddOnGrants. The projector validates
@@ -109,6 +110,7 @@ export class UpdateAddOnDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Z]{3}$/, { message: "currency must be a 3-letter ISO code" })
   currency?: string;
 
   @ApiPropertyOptional()

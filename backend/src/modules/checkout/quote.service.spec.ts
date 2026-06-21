@@ -40,10 +40,15 @@ describe('QuoteService', () => {
     const q = await svc.quote({ items: [{ type: 'plan', code: 'PRO' }] });
 
     expect(q.lines).toHaveLength(1);
+    // Line prices stay gross (KDV-inclusive).
     expect(q.lines[0].subtotalCents).toBe(129900);
     expect(q.lines[0].cadence).toBe('monthly');
-    expect(q.subtotalCents).toBe(129900);
-    expect(q.taxCents).toBe(Math.round(129900 * 0.2));
+    // KDV is derived OUT of the gross, never added on top: subtotal is NET,
+    // tax is the embedded KDV, total is the gross price (== what's charged).
+    expect(q.subtotalCents).toBe(108250); // round(129900 / 1.2)
+    expect(q.taxCents).toBe(21650); // 129900 - 108250
+    expect(q.totalCents).toBe(129900); // gross, no shipping — NOT 155880
+    expect(q.subtotalCents + q.taxCents).toBe(129900);
     expect(q.shippingCents).toBe(0);   // no hardware
     expect(q.isPureRecurring).toBe(true);
   });
@@ -101,8 +106,11 @@ describe('QuoteService', () => {
     });
 
     expect(q.lines).toHaveLength(4);
-    // subtotal = 100000 + 2*5000 + 75000 + 250000 = 435000
-    expect(q.subtotalCents).toBe(435_000);
+    // gross lines = 100000 + 2*5000 + 75000 + 250000 = 435000 (KDV-inclusive).
+    // subtotal is NET, total is gross + shipping.
+    expect(q.subtotalCents).toBe(362_500); // round(435000 / 1.2)
+    expect(q.taxCents).toBe(72_500); // 435000 - 362500
+    expect(q.totalCents).toBe(440_000); // 435000 gross + 5000 shipping
     expect(q.shippingCents).toBe(5_000);
     expect(q.isPureRecurring).toBe(false);
   });
@@ -157,7 +165,9 @@ describe('QuoteService', () => {
     } as any);
     const q = await svc.quote({ items: [{ type: 'hardware', sku: 'printer-80mm', qty: 1 }] });
     expect(q.lines).toHaveLength(1);
-    expect(q.subtotalCents).toBe(50_000);
+    expect(q.lines[0].subtotalCents).toBe(50_000); // gross line
+    expect(q.subtotalCents).toBe(41_667); // net = round(50000 / 1.2)
+    expect(q.totalCents).toBe(55_000); // 50000 gross + 5000 shipping
   });
 
   // The service branch carries the same regulatory gate: a non-DIRECT_SALE
@@ -183,6 +193,24 @@ describe('QuoteService', () => {
     } as any);
     const q = await svc.quote({ items: [{ type: 'service', code: 'install-kds' }] });
     expect(q.lines).toHaveLength(1);
-    expect(q.subtotalCents).toBe(100_000);
+    expect(q.lines[0].subtotalCents).toBe(100_000); // gross line
+    expect(q.subtotalCents).toBe(83_333); // net = round(100000 / 1.2)
+    expect(q.totalCents).toBe(100_000); // gross (service ≠ hardware → no shipping)
+  });
+
+  it('does not double-count KDV: a KDV-inclusive add-on totals the displayed price', async () => {
+    addons.findByCodeOrThrow.mockResolvedValue({
+      billing: 'recurring',
+      priceCents: 49_900,
+      currency: 'TRY',
+      id: 'a-kdv',
+      kind: 'capacity',
+      status: 'published',
+    } as any);
+    const q = await svc.quote({ items: [{ type: 'addon', code: 'kds_extra' }] });
+    // ₺499 inclusive → charge ₺499, NOT ₺598.80 (the pre-fix 20%-on-top bug).
+    expect(q.totalCents).toBe(49_900);
+    expect(q.subtotalCents).toBe(41_583); // round(49900 / 1.2)
+    expect(q.taxCents).toBe(8_317); // 49900 - 41583
   });
 });

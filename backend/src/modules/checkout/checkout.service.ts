@@ -6,6 +6,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
@@ -214,201 +215,221 @@ export class CheckoutService {
     let hardwareTotalCents = 0;
     const addOnIds: string[] = [];
 
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Hardware order. Service items live on the same order as their
-      // companion hardware so the customer sees one invoice for the
-      // physical shipment + installation bundle.
-      if (hardwareLines.length > 0) {
-        // v2.8.87: any on-site service triggers the order-level
-        // `installation: requested` flag (so the SuperAdmin fulfilment
-        // dashboard surfaces it). Previously this matched only on the
-        // legacy 'onsite_install' code prefix; now we read
-        // serviceMeta.serviceType set on each service line. Each on-site
-        // line also mints its OWN InstallationRequest below — the
-        // order-level flag is just a quick filter.
-        const onsiteServiceLines = hardwareLines.filter(
-          (l) =>
-            l.type === "service" &&
-            (l.meta?.serviceMeta?.serviceType === "onsite" ||
-              // Legacy fallback (the 2 hardcoded codes don't carry
-              // serviceMeta from the catalog).
-              l.code.startsWith("onsite_install")),
-        );
-        // Hardware tax = the quote's tax apportioned to the hardware subtotal.
-        // Compute each component once and reuse so the invariant
-        // total == subtotal + tax + shipping always holds. (Pre-fix the total
-        // omitted tax, understating the persisted/emitted order by the full
-        // KDV vs what PayTR actually charged.)
-        const hwSubtotal = hardwareLines.reduce(
-          (a, l) => a + l.subtotalCents,
-          0,
-        );
-        const hwTax = Math.round(
-          hwSubtotal * (quote.taxCents / Math.max(1, quote.subtotalCents)),
-        );
-        hardwareTotalCents = hwSubtotal + hwTax + quote.shippingCents;
-        const order = await tx.hardwareOrder.create({
-          data: {
-            tenantId,
-            // v2.8.99.3 — buyer-picked branch (already validated above).
-            // Snapshot of which branch this order ships to; the actual
-            // address lives in shippingAddress Json and is frozen at
-            // create time so a later Branch.address edit can't rewrite
-            // history. branchId is for traceability + future
-            // "orders shipping to this branch" reports.
-            branchId: validatedBranchId,
-            status: paymentRef ? "paid" : "pending_payment",
-            subtotalCents: hwSubtotal,
-            taxCents: hwTax,
-            shippingCents: quote.shippingCents,
-            totalCents: hardwareTotalCents,
-            currency: quote.currency,
-            shippingAddress: effectiveCart.shippingAddress as any,
-            billingAddress: effectiveCart.billingAddress as any,
-            installation: onsiteServiceLines.length > 0 ? "requested" : null,
-            paymentRef,
-          },
-        });
-        hardwareOrderId = order.id;
-
-        for (const l of hardwareLines.filter((l) => l.type === "hardware")) {
-          const productId = l.meta?.productId as string;
-          const acquisition = l.meta?.acquisition ?? "sell";
-          // Allocate stock inside the same tx so over-selling is impossible.
-          const { serials } = await this.catalog.allocate(productId, l.qty, tx);
-          await tx.hardwareOrderItem.create({
+    await this.prisma.$transaction(
+      async (tx) => {
+        // 1. Hardware order. Service items live on the same order as their
+        // companion hardware so the customer sees one invoice for the
+        // physical shipment + installation bundle.
+        if (hardwareLines.length > 0) {
+          // v2.8.87: any on-site service triggers the order-level
+          // `installation: requested` flag (so the SuperAdmin fulfilment
+          // dashboard surfaces it). Previously this matched only on the
+          // legacy 'onsite_install' code prefix; now we read
+          // serviceMeta.serviceType set on each service line. Each on-site
+          // line also mints its OWN InstallationRequest below — the
+          // order-level flag is just a quick filter.
+          const onsiteServiceLines = hardwareLines.filter(
+            (l) =>
+              l.type === "service" &&
+              (l.meta?.serviceMeta?.serviceType === "onsite" ||
+                // Legacy fallback (the 2 hardcoded codes don't carry
+                // serviceMeta from the catalog).
+                l.code.startsWith("onsite_install")),
+          );
+          // Hardware line prices are KDV-INCLUSIVE (gross), like all catalog
+          // prices. Persist the invoice breakdown net + embedded-tax + shipping
+          // so the row adds up AND its total equals the gross amount actually
+          // charged — net + tax + shipping == gross + shipping. (Do NOT add tax
+          // on top of the gross; that would re-introduce the 20% overcharge the
+          // quote fix removes.) The rate is the quote's embedded ratio
+          // (quote.taxCents / quote.subtotalCents == rate, since subtotal is net).
+          const hwGross = hardwareLines.reduce(
+            (a, l) => a + l.subtotalCents,
+            0,
+          );
+          const rate =
+            quote.subtotalCents > 0 ? quote.taxCents / quote.subtotalCents : 0;
+          const hwNet = rate > 0 ? Math.round(hwGross / (1 + rate)) : hwGross;
+          const hwTax = hwGross - hwNet;
+          hardwareTotalCents = hwGross + quote.shippingCents;
+          const order = await tx.hardwareOrder.create({
             data: {
-              id: uuidv7(),
-              orderId: order.id,
-              productId,
-              sku: l.code,
-              name: l.name,
-              qty: l.qty,
-              unitCents: l.unitCents,
-              serials,
-              acquisition,
-            },
-          });
-        }
-
-        // v2.8.87: one InstallationRequest per on-site service line so
-        // each can be scheduled independently (a tenant may buy KDS
-        // install for branch A + WiFi survey for branch B in one cart).
-        // branchId / preferredDates / notes come from the cart line meta
-        // populated at quote time.
-        for (const l of onsiteServiceLines) {
-          const meta = l.meta ?? {};
-          await tx.installationRequest.create({
-            data: {
-              id: uuidv7(),
               tenantId,
-              hwOrderId: order.id,
-              branchId: meta.branchId ?? null,
-              status: "requested",
-              preferredDates:
-                Array.isArray(meta.preferredDates) &&
-                meta.preferredDates.length > 0
-                  ? meta.preferredDates.map((d) => new Date(d))
-                  : [],
-              notes:
-                meta.notes ?? `Auto-created from checkout (service: ${l.code})`,
-            },
-          });
-        }
-      }
-
-      // 2. Add-ons. Each line is one TenantAddOn row at the requested qty.
-      // Already-deduped by the catalog service; dependency checks run inside
-      // tenantMarketplace.purchase.
-      for (const l of addOnLines) {
-        const branchId = l.meta?.branchId;
-        // Pass the outer tx so the add-on grant + its outbox emit commit
-        // atomically with the hardware order / stock allocation — a later
-        // failure rolls the grant back instead of orphaning a paid entitlement.
-        const ta = await this.tenantMarketplace.purchase(
-          tenantId,
-          {
-            addOnCode: l.code,
-            quantity: l.qty,
-            branchId,
-            paymentRef: paymentRef ?? undefined,
-          },
-          tx,
-        );
-        addOnIds.push(ta.id);
-      }
-
-      // 3. Plan upgrades emit a request event for SubscriptionService to
-      // handle (it has the proration / per-plan trial logic). The checkout
-      // flow does NOT mutate Subscriptions directly to keep ownership clean.
-      for (const l of planLines) {
-        await tx.outboxEvent.create({
-          data: {
-            id: uuidv7(),
-            type: "subscription.upgrade.requested.v1",
-            tenantId,
-            payload: {
-              tenantId,
-              planCode: l.code,
-              billingCycle: l.meta?.billingCycle ?? "MONTHLY",
-              paymentRef,
-            } as any,
-            idempotencyKey: uuidv7(),
-            status: "queued",
-            nextAttemptAt: new Date(),
-          },
-        });
-      }
-
-      // 4. Audit event — one row per provisioned cart so ops can answer
-      // "where did this provisioning come from".
-      await tx.outboxEvent.create({
-        data: {
-          id: uuidv7(),
-          type: "checkout.completed.v1",
-          tenantId,
-          payload: {
-            tenantId,
-            paymentRef,
-            quote: {
-              lines: quote.lines,
-              totalCents: quote.totalCents,
-              currency: quote.currency,
-            },
-            hardwareOrderId,
-            addOnIds,
-          } as any,
-          idempotencyKey: uuidv7(),
-          status: "queued",
-          nextAttemptAt: new Date(),
-        },
-      });
-
-      // 5. v2.8.86: surface a hardware-specific event when the cart minted
-      // a HardwareOrder. CheckoutNotificationsService listens for this
-      // and sends the order-placed email; physical-shipment downstreams
-      // (fulfilment dashboards, carrier batching) can hook in later
-      // without having to filter checkout.completed.v1 by payload shape.
-      if (hardwareOrderId) {
-        await tx.outboxEvent.create({
-          data: {
-            id: uuidv7(),
-            type: "hardware.order.placed.v1",
-            tenantId,
-            payload: {
-              tenantId,
-              hardwareOrderId,
+              // v2.8.99.3 — buyer-picked branch (already validated above).
+              // Snapshot of which branch this order ships to; the actual
+              // address lives in shippingAddress Json and is frozen at
+              // create time so a later Branch.address edit can't rewrite
+              // history. branchId is for traceability + future
+              // "orders shipping to this branch" reports.
+              branchId: validatedBranchId,
+              status: paymentRef ? "paid" : "pending_payment",
+              subtotalCents: hwNet,
+              taxCents: hwTax,
+              shippingCents: quote.shippingCents,
               totalCents: hardwareTotalCents,
               currency: quote.currency,
+              shippingAddress: effectiveCart.shippingAddress as any,
+              billingAddress: effectiveCart.billingAddress as any,
+              installation: onsiteServiceLines.length > 0 ? "requested" : null,
               paymentRef,
+            },
+          });
+          hardwareOrderId = order.id;
+
+          for (const l of hardwareLines.filter((l) => l.type === "hardware")) {
+            const productId = l.meta?.productId as string;
+            const acquisition = l.meta?.acquisition ?? "sell";
+            // Allocate stock inside the same tx so over-selling is impossible.
+            const { serials } = await this.catalog.allocate(
+              productId,
+              l.qty,
+              tx,
+            );
+            await tx.hardwareOrderItem.create({
+              data: {
+                id: uuidv7(),
+                orderId: order.id,
+                productId,
+                sku: l.code,
+                name: l.name,
+                qty: l.qty,
+                unitCents: l.unitCents,
+                serials,
+                acquisition,
+              },
+            });
+          }
+
+          // v2.8.87: one InstallationRequest per on-site service line so
+          // each can be scheduled independently (a tenant may buy KDS
+          // install for branch A + WiFi survey for branch B in one cart).
+          // branchId / preferredDates / notes come from the cart line meta
+          // populated at quote time.
+          for (const l of onsiteServiceLines) {
+            const meta = l.meta ?? {};
+            await tx.installationRequest.create({
+              data: {
+                id: uuidv7(),
+                tenantId,
+                hwOrderId: order.id,
+                branchId: meta.branchId ?? null,
+                status: "requested",
+                preferredDates:
+                  Array.isArray(meta.preferredDates) &&
+                  meta.preferredDates.length > 0
+                    ? meta.preferredDates.map((d) => new Date(d))
+                    : [],
+                notes:
+                  meta.notes ??
+                  `Auto-created from checkout (service: ${l.code})`,
+              },
+            });
+          }
+        }
+
+        // 2. Add-ons. Each line is one TenantAddOn row at the requested qty.
+        // Already-deduped by the catalog service; dependency checks run inside
+        // tenantMarketplace.purchase.
+        for (const l of addOnLines) {
+          const branchId = l.meta?.branchId;
+          // Pass the outer tx so the add-on grant + its outbox emit commit
+          // atomically with the hardware order / stock allocation — a later
+          // failure rolls the grant back instead of orphaning a paid entitlement.
+          const ta = await this.tenantMarketplace.purchase(
+            tenantId,
+            {
+              addOnCode: l.code,
+              quantity: l.qty,
+              branchId,
+              paymentRef: paymentRef ?? undefined,
+            },
+            tx,
+          );
+          addOnIds.push(ta.id);
+        }
+
+        // 3. Plan upgrades emit a request event for SubscriptionService to
+        // handle (it has the proration / per-plan trial logic). The checkout
+        // flow does NOT mutate Subscriptions directly to keep ownership clean.
+        for (const l of planLines) {
+          await tx.outboxEvent.create({
+            data: {
+              id: uuidv7(),
+              type: "subscription.upgrade.requested.v1",
+              tenantId,
+              payload: {
+                tenantId,
+                planCode: l.code,
+                billingCycle: l.meta?.billingCycle ?? "MONTHLY",
+                paymentRef,
+              } as any,
+              idempotencyKey: uuidv7(),
+              status: "queued",
+              nextAttemptAt: new Date(),
+            },
+          });
+        }
+
+        // 4. Audit event — one row per provisioned cart so ops can answer
+        // "where did this provisioning come from".
+        await tx.outboxEvent.create({
+          data: {
+            id: uuidv7(),
+            type: "checkout.completed.v1",
+            tenantId,
+            payload: {
+              tenantId,
+              paymentRef,
+              quote: {
+                lines: quote.lines,
+                totalCents: quote.totalCents,
+                currency: quote.currency,
+              },
+              hardwareOrderId,
+              addOnIds,
             } as any,
             idempotencyKey: uuidv7(),
             status: "queued",
             nextAttemptAt: new Date(),
           },
         });
-      }
-    });
+
+        // 5. v2.8.86: surface a hardware-specific event when the cart minted
+        // a HardwareOrder. CheckoutNotificationsService listens for this
+        // and sends the order-placed email; physical-shipment downstreams
+        // (fulfilment dashboards, carrier batching) can hook in later
+        // without having to filter checkout.completed.v1 by payload shape.
+        if (hardwareOrderId) {
+          await tx.outboxEvent.create({
+            data: {
+              id: uuidv7(),
+              type: "hardware.order.placed.v1",
+              tenantId,
+              payload: {
+                tenantId,
+                hardwareOrderId,
+                totalCents: hardwareTotalCents,
+                currency: quote.currency,
+                paymentRef,
+              } as any,
+              idempotencyKey: uuidv7(),
+              status: "queued",
+              nextAttemptAt: new Date(),
+            },
+          });
+        }
+      },
+      {
+        // Serializable so a concurrent settlement (PayTR retry + the authed
+        // /confirm endpoint racing the webhook) cannot double-provision. The
+        // joined tenantMarketplace.purchase() runs under THIS tx, so without
+        // Serializable here it inherited ReadCommitted and the add-on dup-check
+        // write-skew that the standalone path's Serializable wrapper guards
+        // against re-appeared. A loser aborts with P2034 and PayTR's retry then
+        // hits the paymentRef idempotency and returns the committed first result.
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
 
     // Track 2 — record the committed provisioning for Prometheus. After the
     // $transaction commits, optional + ?.-guarded so it can never break the

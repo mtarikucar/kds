@@ -236,12 +236,16 @@ export class QuoteService {
       }
     }
 
-    const subtotalCents = lines.reduce((acc, l) => acc + l.subtotalCents, 0);
-    // Flat KDV for TR. Once the accounting service exposes a "tax for cart"
-    // helper the line item-level KDV rate (food vs. service vs. goods) plugs
-    // in here.
+    // Line prices are KDV-INCLUSIVE (gross) — see billing/kdv.helper. The tax is
+    // already INSIDE the line prices, so derive it OUT for the invoice
+    // breakdown; never add it on top. Adding 20% on top here 20%-overcharged
+    // every checkout/PayTR purchase versus the displayed price AND versus the
+    // havale rail (which charges the stored price as gross).
+    const grossLines = lines.reduce((acc, l) => acc + l.subtotalCents, 0);
     const taxRate = currency === "TRY" ? TR_KDV_RATE : 0;
-    const taxCents = Math.round(subtotalCents * taxRate);
+    const netCents =
+      taxRate > 0 ? Math.round(grossLines / (1 + taxRate)) : grossLines;
+    const taxCents = grossLines - netCents; // KDV embedded in the gross lines
     // Shipping placeholder — Phase 10 swaps this for a carrier quote.
     const hasHardware = lines.some((l) => l.type === "hardware");
     const shippingCents = hasHardware ? 5000 : 0;
@@ -249,10 +253,12 @@ export class QuoteService {
     return {
       lines,
       currency,
-      subtotalCents,
+      // subtotal is NET so the invoice adds up: net + tax + shipping == gross +
+      // shipping == the amount actually charged. Line prices stay gross.
+      subtotalCents: netCents,
       taxCents,
       shippingCents,
-      totalCents: subtotalCents + taxCents + shippingCents,
+      totalCents: grossLines + shippingCents,
       warnings,
       isPureRecurring: lines.every(
         (l) => l.type === "plan" || l.type === "addon",

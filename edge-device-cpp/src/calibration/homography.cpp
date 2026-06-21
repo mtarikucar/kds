@@ -5,22 +5,36 @@
 
 namespace kds {
 
+namespace {
+// Build a 3x3 cv::Mat from a config matrix, validating EVERY row. The old guard
+// checked only matrix[0].size(), so a ragged matrix with a 3-wide first row
+// passed and then read out of bounds on rows 1/2.
+template <typename M>
+bool build_3x3(const M& matrix, cv::Mat& out) {
+    if (matrix.size() != 3) return false;
+    for (const auto& row : matrix) {
+        if (row.size() != 3) return false;
+    }
+    out = cv::Mat(3, 3, CV_64F);
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            out.at<double>(i, j) = matrix[i][j];
+        }
+    }
+    return true;
+}
+}  // namespace
+
 Homography::Homography(const CalibrationConfig& config)
     : config_(config) {
 
     // Check if homography matrix is provided in config
     if (config.homography_matrix.has_value()) {
-        const auto& matrix = config.homography_matrix.value();
-        if (matrix.size() == 3 && matrix[0].size() == 3) {
-            homography_matrix_ = cv::Mat(3, 3, CV_64F);
-            for (int i = 0; i < 3; ++i) {
-                for (int j = 0; j < 3; ++j) {
-                    homography_matrix_.at<double>(i, j) = matrix[i][j];
-                }
-            }
-            inverse_matrix_ = homography_matrix_.inv();
-            calibrated_ = true;
-            LOG_INFO("Homography loaded from config");
+        cv::Mat m;
+        if (build_3x3(config.homography_matrix.value(), m)) {
+            set_homography_matrix(m);  // validates 3x3 + computes inverse
+        } else {
+            LOG_ERROR("Ignoring malformed homography_matrix in config (must be 3x3)");
         }
     }
 
@@ -216,6 +230,18 @@ float Homography::compute_reprojection_error() const {
 
 void Homography::set_config(const CalibrationConfig& config) {
     config_ = config;
+
+    // Apply a directly-provided matrix (runtime recalibration via edge:config).
+    // Previously this was ignored, so a pushed homography_matrix was a silent
+    // no-op. An explicit matrix takes precedence over calibration points.
+    if (config.homography_matrix.has_value()) {
+        cv::Mat m;
+        if (build_3x3(config.homography_matrix.value(), m)) {
+            set_homography_matrix(m);
+            return;
+        }
+        LOG_ERROR("Ignoring malformed homography_matrix in set_config (must be 3x3)");
+    }
 
     // Re-calibrate if points are provided
     if (!config.points.empty()) {
