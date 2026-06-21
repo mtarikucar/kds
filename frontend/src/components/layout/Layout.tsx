@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import { useUiStore } from '../../store/uiStore';
 import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
 import { OnboardingProvider } from '../../features/onboarding';
+import { DemoBanner } from '../../features/demo';
 import { RTL_LANGUAGES } from '../../i18n/config';
 import SubscriptionStatusBanner from '../subscriptions/SubscriptionStatusBanner';
 import SubscriptionGate from '../subscriptions/SubscriptionGate';
@@ -41,6 +42,8 @@ const Layout = () => {
 
         <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isRTL ? 'md:order-1' : ''}`}>
           <Header onMenuClick={toggleSidebar} />
+          {/* Demo-mode banner — renders null unless authStore.demoMode is on. */}
+          <DemoBanner />
           {/* Status banner — sits between header and main content. Renders
               null when there's nothing to surface, so layout doesn't shift. */}
           <SubscriptionStatusBanner />

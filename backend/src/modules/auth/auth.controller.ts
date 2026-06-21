@@ -30,6 +30,8 @@ import { VerifyEmailCodeDto } from "./dto/verify-email-code.dto";
 import { Public } from "./decorators/public.decorator";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { SkipBranchScope } from "./decorators/skip-branch-scope.decorator";
+import { TokenService } from "./services/token.service";
+import { DemoService } from "../demo/demo.service";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { UnauthorizedException } from "@nestjs/common";
 import { getClientIp } from "../../common/helpers/client-ip.helper";
@@ -102,7 +104,11 @@ function stripRefresh(
 // required". (@Public routes already bypass it; this covers the authed ones.)
 @SkipBranchScope()
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly demoService: DemoService,
+    private readonly tokenService: TokenService,
+  ) {}
 
   @Public()
   @Throttle(REGISTER_THROTTLE)
@@ -170,6 +176,40 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "User profile retrieved" })
   async getProfile(@CurrentUser("id") userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  /**
+   * Mint a demo-scoped access token so any logged-in user can switch into the
+   * shared demo restaurant and explore the system with real data. Returns an
+   * access token ONLY (no refresh cookie set) — the SPA keeps the real token in
+   * memory and restores it on "exit demo". The demo tenant is lazily seeded on
+   * first call so it exists everywhere with no manual seed step.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post("demo-session")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Enter the interactive demo restaurant" })
+  @ApiResponse({ status: 201, description: "Demo session token issued" })
+  async demoSession() {
+    const demoAdmin = await this.demoService.ensureDemoTenant();
+    const { accessToken, primaryBranchId } =
+      await this.tokenService.issueDemoAccessToken(demoAdmin);
+    return {
+      accessToken,
+      user: {
+        id: demoAdmin.id,
+        email: demoAdmin.email,
+        firstName: demoAdmin.firstName,
+        lastName: demoAdmin.lastName,
+        phone: demoAdmin.phone ?? null,
+        locale: demoAdmin.locale ?? null,
+        role: demoAdmin.role,
+        tenantId: demoAdmin.tenantId,
+        primaryBranchId,
+        allowedBranchIds: [] as string[],
+        isDemo: true,
+      },
+    };
   }
 
   // Post-social-login (and any incomplete-profile) onboarding: collects the

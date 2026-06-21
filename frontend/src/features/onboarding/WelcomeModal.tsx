@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Play, SkipForward } from 'lucide-react';
+import { X, Play, SkipForward, Sparkles } from 'lucide-react';
 import { FEATURE_CARDS } from './constants';
 import { Mascot } from './Mascot';
 
@@ -9,6 +9,9 @@ interface WelcomeModalProps {
   onClose: () => void;
   onStartTour: () => void;
   onSkip: () => void;
+  /** Optional — when provided, renders a "explore the demo restaurant" CTA that
+   *  switches the user into the seeded demo and auto-runs the guided tour. */
+  onExploreDemo?: () => void;
 }
 
 export function WelcomeModal({
@@ -16,6 +19,7 @@ export function WelcomeModal({
   onClose,
   onStartTour,
   onSkip,
+  onExploreDemo,
 }: WelcomeModalProps) {
   const { t } = useTranslation('onboarding');
   const modalRef = useRef<HTMLDivElement>(null);
@@ -126,6 +130,23 @@ export function WelcomeModal({
             {t('welcome.skipTour')}
           </button>
         </div>
+
+        {/* Demo CTA — explore a fully-seeded restaurant before touching your
+            own data. Only rendered when a handler is wired. */}
+        {onExploreDemo && (
+          <div className="px-8 pb-8 -mt-4 text-center">
+            <button
+              type="button"
+              onClick={onExploreDemo}
+              className="inline-flex items-center justify-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              {t('welcome.exploreDemo', {
+                defaultValue: 'Önce örnek bir restoranı (demo) keşfet',
+              })}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

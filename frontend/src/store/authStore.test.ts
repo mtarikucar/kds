@@ -116,4 +116,81 @@ describe('authStore', () => {
     expect(persisted.state.user.id).toBe('u-2');
     expect(useAuthStore.getState().user?.email).toBe('second@example.com');
   });
+
+  describe('demo mode', () => {
+    const demoUser = makeUser({
+      id: 'demo-1',
+      email: 'demo-admin@demo.hummytummy.local',
+      tenantId: 'demo-tenant',
+      primaryBranchId: 'demo-branch',
+      allowedBranchIds: [],
+      isDemo: true,
+    });
+
+    it('enterDemo swaps the active user/token to the demo and flags demoMode', () => {
+      useAuthStore.getState().login(makeUser({ email: 'real@x.com' }), 'real-token');
+      useAuthStore.getState().enterDemo(demoUser, 'demo-token');
+
+      const s = useAuthStore.getState();
+      expect(s.demoMode).toBe(true);
+      expect(s.user?.email).toBe('demo-admin@demo.hummytummy.local');
+      expect(s.accessToken).toBe('demo-token');
+      // real session stashed in memory for exit
+      expect(s.realSession?.user?.email).toBe('real@x.com');
+      expect(s.realSession?.accessToken).toBe('real-token');
+    });
+
+    it('exitDemo restores the stashed real session and clears demoMode', () => {
+      useAuthStore.getState().login(makeUser({ email: 'real@x.com' }), 'real-token');
+      useAuthStore.getState().enterDemo(demoUser, 'demo-token');
+      useAuthStore.getState().exitDemo();
+
+      const s = useAuthStore.getState();
+      expect(s.demoMode).toBe(false);
+      expect(s.realSession).toBeNull();
+      expect(s.user?.email).toBe('real@x.com');
+      expect(s.accessToken).toBe('real-token');
+    });
+
+    it('double enterDemo does not overwrite the stashed real session', () => {
+      useAuthStore.getState().login(makeUser({ email: 'real@x.com' }), 'real-token');
+      useAuthStore.getState().enterDemo(demoUser, 'demo-token-1');
+      // a second entry (e.g. button double-tap) must keep the ORIGINAL real
+      // session, not stash the demo session as the thing to restore.
+      useAuthStore.getState().enterDemo(demoUser, 'demo-token-2');
+
+      const s = useAuthStore.getState();
+      expect(s.realSession?.user?.email).toBe('real@x.com');
+      expect(s.realSession?.accessToken).toBe('real-token');
+      useAuthStore.getState().exitDemo();
+      expect(useAuthStore.getState().user?.email).toBe('real@x.com');
+      expect(useAuthStore.getState().accessToken).toBe('real-token');
+    });
+
+    it('NEVER persists the demo identity or token — reload drops to the real user', () => {
+      useAuthStore.getState().login(makeUser({ email: 'real@x.com' }), 'real-token');
+      useAuthStore.getState().enterDemo(demoUser, 'demo-token');
+
+      const raw = localStorage.getItem('auth-storage') as string;
+      const persisted = JSON.parse(raw);
+      // partialize keeps the REAL user while in demo, never the demo user.
+      expect(persisted.state.user.email).toBe('real@x.com');
+      expect(persisted.state.demoMode).toBeUndefined();
+      expect(persisted.state.realSession).toBeUndefined();
+      expect(raw).not.toContain('demo-token');
+      expect(raw).not.toContain('demo-admin@demo.hummytummy.local');
+    });
+
+    it('logout from within demo clears demoMode and realSession', () => {
+      useAuthStore.getState().login(makeUser({ email: 'real@x.com' }), 'real-token');
+      useAuthStore.getState().enterDemo(demoUser, 'demo-token');
+      useAuthStore.getState().logout();
+
+      const s = useAuthStore.getState();
+      expect(s.demoMode).toBe(false);
+      expect(s.realSession).toBeNull();
+      expect(s.user).toBeNull();
+      expect(s.accessToken).toBeNull();
+    });
+  });
 });

@@ -98,6 +98,39 @@ describe('TokenService.generateTokens branch scope', () => {
   });
 });
 
+describe('TokenService.issueDemoAccessToken', () => {
+  const demoUser = { id: 'demo-1', email: 'demo@x', role: 'ADMIN', tenantId: 'demo-t' };
+
+  it('mints an access-only 4h token flagged demo, with NO refresh row written', async () => {
+    const jwt = makeJwt();
+    const prisma = makePrisma();
+    // null primaryBranchId → resolves the tenant home branch.
+    prisma.branch.findFirst.mockResolvedValue({ id: 'demo-branch' });
+    const svc = new TokenService(prisma as any, jwt as any, config);
+
+    const res = await svc.issueDemoAccessToken(demoUser);
+
+    expect(res.accessToken).toBe('signed');
+    expect(res.primaryBranchId).toBe('demo-branch');
+    // Access-only: the demo session must never persist a refresh token (it is
+    // restored from the real in-memory session, not rotated).
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+
+    const payload = jwt.sign.mock.calls[0][0];
+    expect(payload).toMatchObject({
+      sub: 'demo-1',
+      tenantId: 'demo-t',
+      type: 'user',
+      demo: true,
+      primaryBranchId: 'demo-branch',
+      activeBranchId: 'demo-branch',
+      allowedBranchIds: [],
+    });
+    const opts = jwt.sign.mock.calls[0][1];
+    expect(opts.expiresIn).toBe('4h');
+  });
+});
+
 describe('TokenService.refreshToken', () => {
   function svcWith(jwt: any, prisma: any) {
     return new TokenService(prisma as any, jwt as any, config);

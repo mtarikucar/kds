@@ -34,6 +34,10 @@ export interface User {
   /** v3.0.0 — the allow-list BranchGuard reads on every request.
    *  ADMIN with an empty list = wildcard tenant access. */
   allowedBranchIds: string[];
+  /** True only for the synthetic demo-restaurant admin returned by
+   *  POST /auth/demo-session. The banner/source-of-truth for demo mode is
+   *  authStore.demoMode (survives a profile refetch that drops this flag). */
+  isDemo?: boolean;
   status?: UserStatus | string;
   approvedAt?: string;
   approvedById?: string;

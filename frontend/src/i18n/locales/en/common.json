@@ -1,4 +1,13 @@
 {
+  "demo": {
+    "enter": "Explore the demo",
+    "entered": "Switched to the demo restaurant. Start exploring!",
+    "exited": "Back to your own account.",
+    "enterFailed": "Could not start the demo",
+    "banner": "You're in demo mode — exploring a sample restaurant. Changes reset daily.",
+    "startTour": "Start the guided tour",
+    "exit": "Back to my account"
+  },
   "actionableErrors": {
     "saveAndContinue": "Save & continue",
     "saveFailed": "Could not save. Please try again.",

@@ -28,10 +28,19 @@ interface AuthState {
   user: User | null;
   accessToken: string | null;
   isAuthenticated: boolean;
+  // Demo mode: the user temporarily explores the shared demo restaurant. The
+  // real session is stashed in memory ONLY (never persisted) so a page reload
+  // cleanly drops back to the real account, and persistence keeps the REAL user
+  // even while in demo (see partialize). demoMode is the banner's source of
+  // truth.
+  demoMode: boolean;
+  realSession: { user: User | null; accessToken: string | null } | null;
   setUser: (user: User) => void;
   setAccessToken: (accessToken: string) => void;
   login: (user: User, accessToken: string) => void;
   logout: () => void;
+  enterDemo: (demoUser: User, demoAccessToken: string) => void;
+  exitDemo: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -40,6 +49,8 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       isAuthenticated: false,
+      demoMode: false,
+      realSession: null,
 
       setUser: (user: User) => {
         set({ user, isAuthenticated: true });
@@ -57,11 +68,36 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      enterDemo: (demoUser: User, demoAccessToken: string) => {
+        set((state) => ({
+          // Stash the real session in memory so exitDemo restores it.
+          realSession: state.demoMode
+            ? state.realSession
+            : { user: state.user, accessToken: state.accessToken },
+          user: demoUser,
+          accessToken: demoAccessToken,
+          isAuthenticated: true,
+          demoMode: true,
+        }));
+      },
+
+      exitDemo: () => {
+        set((state) => ({
+          user: state.realSession?.user ?? state.user,
+          accessToken: state.realSession?.accessToken ?? null,
+          isAuthenticated: true,
+          demoMode: false,
+          realSession: null,
+        }));
+      },
+
       logout: () => {
         set({
           user: null,
           accessToken: null,
           isAuthenticated: false,
+          demoMode: false,
+          realSession: null,
         });
         // v2.8.97 — explicitly drop the persisted snapshot. Pre-fix
         // `set({user:null})` cleared the in-memory store but Zustand's
@@ -82,9 +118,12 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Deliberately NOT persisting accessToken — memory only.
+      // Deliberately NOT persisting accessToken — memory only. Also never
+      // persist demoMode/realSession: a reload must drop back to the real
+      // account. While in demo, persist the REAL user (from realSession), not
+      // the demo user, so the boot shell shows the right identity after reload.
       partialize: (state) => ({
-        user: state.user,
+        user: state.demoMode ? (state.realSession?.user ?? null) : state.user,
         isAuthenticated: state.isAuthenticated,
       }),
     },
