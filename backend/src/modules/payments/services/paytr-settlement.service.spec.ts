@@ -142,6 +142,36 @@ describe('PaytrSettlementService — payment.succeeded emission', () => {
     });
   });
 
+  it('records the CHARGED (discounted) amount on an upgrade settlement, not the gross plan price', async () => {
+    prisma.subscriptionPayment.count.mockResolvedValue(1);
+    // payment.amount (799) is the discounted price actually charged; the target
+    // plan's gross is higher (999). The settlement must persist 799, not 999.
+    prisma.pendingPlanChange.findUnique.mockResolvedValue({
+      id: 'ppc-1',
+      merchantOid: MERCHANT_OID,
+      targetPlanId: 'plan-business',
+      billingCycle: 'MONTHLY',
+      targetPlan: {
+        id: 'plan-business',
+        name: 'BUSINESS',
+        displayName: 'Business',
+        monthlyPrice: new Prisma.Decimal('999'),
+        yearlyPrice: new Prisma.Decimal('9990'),
+        currency: 'TRY',
+        commissionRate: new Prisma.Decimal('0.15'),
+      },
+    } as any);
+
+    await svc.settlePayment(MERCHANT_OID, { kind: 'success', paymentType: 'card' });
+
+    const subUpdate = (prisma.subscription.update as any).mock.calls.find(
+      (c: any) => c[0]?.data?.amount !== undefined,
+    );
+    expect(subUpdate).toBeDefined();
+    // 799 (charged/discounted), NOT 999 (gross target price).
+    expect(Number(subUpdate[0].data.amount)).toBe(799);
+  });
+
   it('does not pass utoken-storage logic (paytrRecurringToken removed)', async () => {
     prisma.subscriptionPayment.count.mockResolvedValue(0);
 

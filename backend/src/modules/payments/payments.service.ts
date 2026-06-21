@@ -227,6 +227,16 @@ export class PaymentsService {
     // Honor any active promotional discount — the price the buyer was shown.
     const amount = resolvePlanAmount(plan, dto.billingCycle);
 
+    // A 100%-off promo (or a 0-priced plan) yields a 0 amount, which PayTR's
+    // get-token rejects opaquely. Fail fast with an actionable message — a
+    // fully-discounted plan can't be self-purchased through the paid rail (it
+    // would be a comp/trial activation, handled elsewhere).
+    if (amount.lte(0)) {
+      throw new BadRequestException(
+        "This plan has no payable amount right now (fully discounted). Please contact support to activate it.",
+      );
+    }
+
     // (1) Trial-eligible? Activate trial; no PayTR charge during trial.
     //
     // Trial is a LIFETIME-PER-TENANT benefit. Registration auto-starts

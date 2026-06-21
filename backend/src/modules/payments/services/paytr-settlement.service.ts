@@ -197,10 +197,14 @@ export class PaytrSettlementService {
         if (upgrade) {
           finalPlanId = upgrade.targetPlanId;
           billingCycle = upgrade.billingCycle;
-          finalAmount =
-            billingCycle === BillingCycle.MONTHLY
-              ? (upgrade.targetPlan.monthlyPrice as Prisma.Decimal)
-              : (upgrade.targetPlan.yearlyPrice as Prisma.Decimal);
+          // Record what was actually CHARGED (the discounted amount frozen on
+          // the payment at intent time via resolvePlanAmount), not a re-derived
+          // gross price. v3.2.26 routed createIntent through the discount helper
+          // but missed THIS settlement rail, so subscription.amount / the
+          // invoice / the upsell commission base were recorded at full price
+          // after a discounted charge. payment.amount is also robust if the
+          // promo window closed between charge and settlement.
+          finalAmount = payment.amount as Prisma.Decimal;
           finalCurrency = upgrade.targetPlan.currency;
           displayName = upgrade.targetPlan.displayName;
           commissionKind = "upsell";
