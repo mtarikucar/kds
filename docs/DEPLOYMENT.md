@@ -33,24 +33,51 @@ runs `nginx -t`, and reloads only on success). Keep them in sync with the server
 
 ## Secrets (GitHub Actions repo secrets)
 
-Shared by both deploys unless noted:
+**Staging is fully credential-isolated from prod** — no staging credential is
+valid against prod. Every secret below that can grant access or decrypt data has
+a `STAGING_*` twin consumed only by `test-deploy.yml`; `release-deploy.yml` uses
+the prod (un-prefixed) secret.
 
-- `POSTGRES_PASSWORD`, `ENCRYPTION_MASTER_KEY`, `INTERNAL_SERVICE_TOKEN`
-- `PAYTR_MERCHANT_ID` / `_KEY` / `_SALT` (PayTR is the only payment provider; TRY-only)
-- `EMAIL_HOST` / `_USER` / `_PASSWORD` / `_FROM`, `NETGSM_*`
-- `GOOGLE_CLIENT_ID` / `_SECRET`, `VITE_GOOGLE_CLIENT_ID`
-- `SSH_PRIVATE_KEY_BASE64`, `SSH_KNOWN_HOSTS`
-- **Production session secrets:** `JWT_SECRET`, `JWT_REFRESH_SECRET`,
-  `SUPERADMIN_JWT_SECRET`, `SUPERADMIN_JWT_REFRESH_SECRET`
-- **Staging session secrets (distinct from prod):** `STAGING_JWT_SECRET`,
-  `STAGING_JWT_REFRESH_SECRET`, `STAGING_SUPERADMIN_JWT_SECRET`,
-  `STAGING_SUPERADMIN_JWT_REFRESH_SECRET` — so a JWT minted on staging is not
-  valid on prod and vice-versa.
+| Concern | Prod secret | Staging secret |
+|---|---|---|
+| DB password | `POSTGRES_PASSWORD` | `STAGING_POSTGRES_PASSWORD` |
+| At-rest encryption | `ENCRYPTION_MASTER_KEY` | `STAGING_ENCRYPTION_MASTER_KEY` |
+| Marketing transport | `INTERNAL_SERVICE_TOKEN` | `STAGING_INTERNAL_SERVICE_TOKEN` |
+| User sessions | `JWT_SECRET`, `JWT_REFRESH_SECRET` | `STAGING_JWT_SECRET`, `STAGING_JWT_REFRESH_SECRET` |
+| Superadmin sessions | `SUPERADMIN_JWT_SECRET`, `SUPERADMIN_JWT_REFRESH_SECRET` | `STAGING_SUPERADMIN_JWT_SECRET`, `STAGING_SUPERADMIN_JWT_REFRESH_SECRET` |
 
-> Residual (deliberate): `POSTGRES_PASSWORD` and `ENCRYPTION_MASTER_KEY` are
-> still shared. The DBs are separate and their ports are loopback-only, so the
-> blast radius is bounded. Rotating them for staging needs a DB-side
-> `ALTER ROLE` / data re-encryption and is intentionally deferred.
+Genuinely shared (no isolation concern): `PAYTR_MERCHANT_*` (staging runs
+`PAYTR_TEST_MODE=1` → no real charges), `GOOGLE_CLIENT_*`, `SSH_*`, `NETGSM_*`
+(never rendered to staging → SMS mock). **Email:** staging does **not** render
+`EMAIL_HOST/USER/PASSWORD`, so `EmailService` runs in mock mode (logs, never
+sends) — staging testing can't deliver real mail.
+
+> `STAGING_POSTGRES_PASSWORD` note: a persistent staging volume ignores
+> `POSTGRES_PASSWORD` after first init, so `scripts/deploy.sh` runs a
+> **staging-only** `sync_db_password` (an idempotent `ALTER USER … PASSWORD` over
+> the container's trust socket) to reconcile the live role with the rendered env
+> on every staging deploy. It early-returns on prod (`[ "$ENV" = staging ]`), so
+> prod's role is never touched.
+>
+> `STAGING_ENCRYPTION_MASTER_KEY` note: rows encrypted on staging under the old
+> (shared) key become undecryptable. Self-healing paths degrade gracefully
+> (integrations → `{}`, accounting → null); the camera `streamUrl` and
+> delivery-platform credential paths throw → a 500 on those specific pages only.
+> If you hit that on stale staging data, reset the staging DB for a clean slate:
+> `docker compose -p kds-staging --env-file .env.test -f docker-compose.staging.yml down && docker volume rm kds-staging_postgres_data_staging` then re-deploy (push `test`).
+
+### Deferred isolation items (need external setup; documented, not yet done)
+- **Separate Google OAuth client for staging** — the shared prod client is mid
+  Google verification (don't edit it). Create a dedicated staging client +
+  `STAGING_GOOGLE_CLIENT_*` and render them on staging.
+- **Separate PayTR TEST merchant** — staging shares the prod merchant under
+  `PAYTR_TEST_MODE=1` (no money moves), but a test-mode webhook validates under
+  the shared HMAC salt. A dedicated test merchant (its own panel notify URL)
+  fully isolates settlement.
+- **Mailtrap/Mailpit sink** — optional upgrade over mock mode if staging needs to
+  inspect rendered emails.
+- **Sentry staging DSN** — purely additive observability (no DSN set today, so no
+  leak); add `SENTRY_ENVIRONMENT=staging` if staging error capture is wanted.
 
 ## Releasing
 

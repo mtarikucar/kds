@@ -37,14 +37,15 @@ jobs:
 
       - name: Verify required secrets
         env:
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          # Staging-specific session secrets (distinct from prod) — see the
-          # Render .env.test step below for the rationale.
+          # Staging-specific secrets (distinct from prod) — see the Render
+          # .env.test step below for the full rationale. A staging credential is
+          # never valid against prod.
+          POSTGRES_PASSWORD: ${{ secrets.STAGING_POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_REFRESH_SECRET }}
-          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.STAGING_ENCRYPTION_MASTER_KEY }}
         run: |
           set -euo pipefail
           missing=()
@@ -164,28 +165,29 @@ jobs:
 
       - name: Render .env.test
         env:
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          # Staging-specific session/superadmin secrets — DISTINCT from prod so a
-          # JWT minted on staging is NOT valid on prod (and vice-versa). Stored as
-          # repo secrets STAGING_*; rotating them only resets active staging
-          # sessions (no data-at-rest impact).
+          # Staging-specific secrets — DISTINCT from prod across the board so NO
+          # staging credential (DB password, session JWT, encryption key, service
+          # token) is ever valid against prod, and vice-versa. Stored as repo
+          # secrets STAGING_*. The DB password is reconciled with the running
+          # staging Postgres role by scripts/deploy.sh `sync_db_password`
+          # (staging-only) because a persistent volume ignores POSTGRES_PASSWORD
+          # after first init.
+          POSTGRES_PASSWORD: ${{ secrets.STAGING_POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.STAGING_SUPERADMIN_JWT_REFRESH_SECRET }}
-          # kds-marketing service transport (Phase-5 split). Both optional:
-          # core boots without them (referral resolution no-ops, event relay
-          # disabled) until the marketing service is stood up.
+          # kds-marketing transport. Distinct staging token so a staging bug can
+          # never authenticate writes into the PROD marketing service.
           MARKETING_SERVICE_URL: ${{ vars.MARKETING_SERVICE_URL }}
-          INTERNAL_SERVICE_TOKEN: ${{ secrets.INTERNAL_SERVICE_TOKEN }}
-          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          INTERNAL_SERVICE_TOKEN: ${{ secrets.STAGING_INTERNAL_SERVICE_TOKEN }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.STAGING_ENCRYPTION_MASTER_KEY }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
-          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # NOTE: EMAIL_HOST/USER/PASSWORD deliberately NOT rendered on staging →
+          # EmailService runs in mock mode (logs, never sends) so staging testing
+          # can't deliver real mail to real recipients via prod SMTP.
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
@@ -218,14 +220,12 @@ jobs:
           PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}
           PAYTR_BASE_URL=https://www.paytr.com
           PAYTR_TEST_MODE=1
+          PAYTR_OK_URL=https://staging.hummytummy.com/app/subscription/success
+          PAYTR_FAIL_URL=https://staging.hummytummy.com/app/subscription/fail
           BACKEND_URL=https://staging.hummytummy.com
 
-          EMAIL_HOST=${EMAIL_HOST}
-          EMAIL_PORT=587
-          EMAIL_SECURE=false
-          EMAIL_USER=${EMAIL_USER}
-          EMAIL_PASSWORD=${EMAIL_PASSWORD}
-          EMAIL_FROM=${EMAIL_FROM}
+          # Email intentionally unconfigured on staging → EmailService mock mode
+          # (logs instead of sending) so staging never delivers real mail.
           ADMIN_EMAIL=contact@hummytummy.com
 
           DEFAULT_TRIAL_DAYS=14

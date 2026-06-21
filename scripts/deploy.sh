@@ -278,6 +278,35 @@ ensure_data_layer() {
   return 1
 }
 
+# STAGING-ONLY. Reconcile the Postgres role password with the rendered env.
+# Staging now uses a staging-specific POSTGRES_PASSWORD (distinct from prod), but
+# a persistent data volume only honours POSTGRES_PASSWORD on FIRST init — on an
+# existing volume the stored role password stays stale, so the backend's
+# password-authed DATABASE_URL would fail at the health gate. The unix socket
+# inside the container matches the official postgres image's `local ... trust`
+# rule, so this ALTER works even when the stored password is stale. Idempotent.
+#
+# HARD-GATED to staging: prod's volume was initialised with the (unchanged)
+# shared password and must NEVER be touched here. Running it on prod would risk
+# setting the role to a value that diverges from prod's DATABASE_URL — an outage
+# path — for zero benefit. The early return makes this step a no-op on prod.
+sync_db_password() {
+  [ "$ENV" = "staging" ] || return 0
+  local db_user pg_pass
+  db_user=$(grep -E '^POSTGRES_USER=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
+  pg_pass=$(grep -E '^POSTGRES_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
+  db_user="${db_user:-postgres}"
+  if [ -z "$pg_pass" ]; then
+    warn "POSTGRES_PASSWORD empty in $ENV_FILE — skipping role-password sync"
+    return 0
+  fi
+  log "Syncing staging Postgres role password to rendered env (idempotent)"
+  # No -h / 127.0.0.1: TCP would require the very password being rotated. The
+  # local socket uses trust, so this works against a stale stored password.
+  docker exec "$POSTGRES_CONTAINER" psql -U "$db_user" -v ON_ERROR_STOP=1 \
+    -c "ALTER USER \"$db_user\" WITH PASSWORD '$pg_pass';"
+}
+
 run_migration_doctor() {
   local db_name db_user
   db_name=$(grep -E '^POSTGRES_DB=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
@@ -508,6 +537,12 @@ run_deploy() {
   step "5/10 Postgres + Redis up"        ensure_data_layer
   step "6/10 Migration doctor"           run_migration_doctor
   step "7/10 Migrate (existing backend)" run_migrations_in_existing_backend
+  # Rotate the staging DB role password AFTER the doctor + existing-backend
+  # migration (both connect via the OLD backend container's OLD password) and
+  # BEFORE swap_backend brings up the NEW backend with the NEW password. Running
+  # it earlier would break those old-container password connections. No-op on
+  # prod (staging-gated) and idempotent in staging steady state.
+  step "7b   Sync DB role password"      sync_db_password
   step "8/10 Swap backend"               swap_backend
   step "9/10 Swap frontend + landing"    swap_app_containers
   step "10/10 Verify + promote :current" verify_and_promote
