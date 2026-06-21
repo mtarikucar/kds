@@ -9,6 +9,7 @@ import { TokenService } from "./services/token.service";
 import { PasswordService } from "./services/password.service";
 import { EmailVerificationService } from "./services/email-verification.service";
 import { AuthProvisioningService } from "./services/auth-provisioning.service";
+import { DemoService } from "../demo/demo.service";
 import { LocalStrategy } from "./strategies/local.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -43,6 +44,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
     PasswordService,
     EmailVerificationService,
     AuthProvisioningService,
+    DemoService,
     LocalStrategy,
     JwtStrategy,
     {

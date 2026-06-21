@@ -129,6 +129,45 @@ export class TokenService {
   }
 
   /**
+   * Mint an ACCESS-ONLY token for the demo experience. No refresh token is
+   * issued and NO DB row is written, so switching into the demo never rotates
+   * or touches the real user's session/refresh cookie — "exit demo" just
+   * restores the real in-memory token. Longer-lived (4h) so a browse session
+   * doesn't need a refresh round-trip (which would bounce back to the real
+   * account). The demo user already carries tenant + branch context.
+   */
+  async issueDemoAccessToken(user: {
+    id: string;
+    email: string;
+    role: string;
+    tenantId: string;
+  }): Promise<{ accessToken: string; primaryBranchId: string | null }> {
+    const primaryBranchId = await resolvePrimaryBranchId(
+      this.prisma,
+      user.tenantId,
+      null,
+    );
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      type: "user" as const,
+      ver: 0,
+      primaryBranchId,
+      activeBranchId: primaryBranchId,
+      allowedBranchIds: [] as string[],
+      demo: true,
+    };
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>("JWT_SECRET"),
+      expiresIn: "4h",
+      algorithm: "HS256",
+    });
+    return { accessToken, primaryBranchId };
+  }
+
+  /**
    * Rotate the refresh token. Verifies the signed JWT, looks it up in the
    * DB by its hash, revokes it, and issues a fresh access+refresh pair.
    *

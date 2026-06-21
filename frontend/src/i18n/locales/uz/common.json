@@ -1,4 +1,13 @@
 {
+  "demo": {
+    "enter": "Demoni ko‘rib chiqing",
+    "entered": "Demo restoraniga o‘tildi. Tanishishni boshlang!",
+    "exited": "O‘z hisobingizga qaytdingiz.",
+    "enterFailed": "Demoni boshlab bo‘lmadi",
+    "banner": "Siz demo rejimidasiz — namunaviy restoranni ko‘rib chiqyapsiz. O‘zgarishlar har kuni tiklanadi.",
+    "startTour": "Tanishtiruv turini boshlash",
+    "exit": "Hisobimga qaytish"
+  },
   "actionableErrors": {
     "saveAndContinue": "Saqlash va davom etish",
     "saveFailed": "Saqlab bo‘lmadi. Iltimos, qayta urinib ko‘ring.",

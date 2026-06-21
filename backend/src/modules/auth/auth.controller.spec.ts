@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Response, Request } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { TokenService } from './services/token.service';
+import { DemoService } from '../demo/demo.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UserRole } from '../../common/constants/roles.enum';
@@ -21,6 +23,14 @@ describe('AuthController', () => {
     login: jest.fn(),
     refreshToken: jest.fn(),
     getProfile: jest.fn(),
+  };
+
+  const mockDemoService = {
+    ensureDemoTenant: jest.fn(),
+  };
+
+  const mockTokenService = {
+    issueDemoAccessToken: jest.fn(),
   };
 
   const mockAuthResponse = {
@@ -63,6 +73,14 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: DemoService,
+          useValue: mockDemoService,
+        },
+        {
+          provide: TokenService,
+          useValue: mockTokenService,
         },
       ],
     }).compile();
@@ -158,6 +176,39 @@ describe('AuthController', () => {
 
       expect(result).toEqual(userProfile);
       expect(authService.getProfile).toHaveBeenCalledWith(userId);
+    });
+  });
+
+  describe('demoSession', () => {
+    it('ensures the demo tenant, mints a demo token, and returns the demo user (isDemo)', async () => {
+      mockDemoService.ensureDemoTenant.mockResolvedValue({
+        id: 'demo-1',
+        email: 'demo-admin@demo.hummytummy.local',
+        firstName: 'Demo',
+        lastName: 'Yönetici',
+        role: UserRole.ADMIN,
+        tenantId: 'demo-tenant',
+        phone: '+905550000000',
+        locale: null,
+      });
+      mockTokenService.issueDemoAccessToken.mockResolvedValue({
+        accessToken: 'demo-access-token',
+        primaryBranchId: 'demo-branch',
+      });
+
+      const result = await controller.demoSession();
+
+      expect(mockDemoService.ensureDemoTenant).toHaveBeenCalledTimes(1);
+      expect(mockTokenService.issueDemoAccessToken).toHaveBeenCalledTimes(1);
+      expect(result.accessToken).toBe('demo-access-token');
+      expect(result.user).toMatchObject({
+        id: 'demo-1',
+        email: 'demo-admin@demo.hummytummy.local',
+        tenantId: 'demo-tenant',
+        primaryBranchId: 'demo-branch',
+        allowedBranchIds: [],
+        isDemo: true,
+      });
     });
   });
 });

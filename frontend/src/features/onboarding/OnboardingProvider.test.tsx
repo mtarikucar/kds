@@ -30,6 +30,11 @@ vi.mock('./hooks/useOnboarding', () => ({ useOnboarding: () => onboardingState }
 vi.mock('react-joyride', () => ({ default: () => <div data-testid="joyride" /> }));
 vi.mock('./WelcomeModal', () => ({ WelcomeModal: () => <div data-testid="welcome-modal" /> }));
 vi.mock('./TourTooltip', () => ({ TourTooltip: () => null }));
+// Demo hook pulls in router + react-query context; stub it so the provider can
+// render standalone here.
+vi.mock('../demo/useDemo', () => ({
+  useEnterDemo: () => ({ enterDemo: vi.fn(), isPending: false }),
+}));
 
 import { OnboardingProvider, useOnboardingContext } from './OnboardingProvider';
 

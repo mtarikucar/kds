@@ -1,4 +1,13 @@
 {
+  "demo": {
+    "enter": "Demo'yu keşfet",
+    "entered": "Demo restoranına geçildi. Keşfetmeye başlayın!",
+    "exited": "Kendi hesabınıza döndünüz.",
+    "enterFailed": "Demo başlatılamadı",
+    "banner": "Demo modundasınız — örnek bir restoranı keşfediyorsunuz. Değişiklikler her gün sıfırlanır.",
+    "startTour": "Tanıtım turunu başlat",
+    "exit": "Hesabıma dön"
+  },
   "actionableErrors": {
     "saveAndContinue": "Kaydet ve devam et",
     "saveFailed": "Kaydedilemedi. Lütfen tekrar deneyin.",

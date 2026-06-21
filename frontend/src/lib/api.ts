@@ -187,6 +187,24 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Demo sessions carry an ACCESS-ONLY token (no refresh issued). If it 401s
+    // — 4h expiry, or the demo tenant was reset/removed — do NOT refresh: the
+    // httpOnly cookie belongs to the REAL user, so a refresh would mint a real
+    // token behind a still-demo branch context (cross-tenant 403s). Cleanly
+    // drop back to the stashed real session and let the app re-resolve from
+    // there on the next action.
+    if (error.response?.status === 401 && useAuthStore.getState().demoMode) {
+      try {
+        const realUser =
+          useAuthStore.getState().realSession?.user ?? null;
+        useAuthStore.getState().exitDemo();
+        useBranchScopeStore.getState().hydrateFromUser(realUser);
+      } catch {
+        // store hydration race — non-fatal; reject below.
+      }
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 

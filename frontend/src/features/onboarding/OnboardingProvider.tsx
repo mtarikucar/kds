@@ -1,10 +1,11 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useCallback } from 'react';
 import Joyride from 'react-joyride';
 import { useOnboarding } from './hooks/useOnboarding';
 import { WelcomeModal } from './WelcomeModal';
 import { TourTooltip } from './TourTooltip';
 import { TOUR_STYLES } from './constants';
 import { TourStep } from './tours/types';
+import { useEnterDemo } from '../demo/useDemo';
 
 interface OnboardingContextValue {
   isWelcomeModalOpen: boolean;
@@ -55,6 +56,18 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     shouldShowWelcome,
   } = useOnboarding();
 
+  const { enterDemo } = useEnterDemo();
+
+  // New-user CTA: switch into the seeded demo restaurant, then auto-run the
+  // guided tour so the system introduces itself on real data. Marking the
+  // welcome as seen (closeWelcomeModal) keeps it from re-popping on the demo
+  // dashboard.
+  const exploreDemo = useCallback(async () => {
+    closeWelcomeModal();
+    const ok = await enterDemo();
+    if (ok) startTour();
+  }, [closeWelcomeModal, enterDemo, startTour]);
+
   const contextValue: OnboardingContextValue = {
     isWelcomeModalOpen,
     isTourRunning,
@@ -80,6 +93,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         onClose={closeWelcomeModal}
         onStartTour={startTour}
         onSkip={skipTour}
+        onExploreDemo={exploreDemo}
       />
 
       {/* Joyride Tour */}

@@ -34,12 +34,14 @@ import {
   Truck,
   CreditCard,
   Building2,
+  Sparkles,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useLogout } from '../../features/auth/authApi';
+import { useEnterDemo } from '../../features/demo';
 import { RTL_LANGUAGES } from '../../i18n/config';
 
 /**
@@ -319,13 +321,28 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
   } = useUiStore();
   const { hasFeature, hasIntegration } = useSubscription();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
+  const demoMode = useAuthStore((state) => state.demoMode);
+  const { enterDemo, isPending: isEnteringDemo } = useEnterDemo();
   const isRTL = isRTLProp ?? RTL_LANGUAGES.includes(i18n.language);
+
+  // "Explore the demo" is offered to owners/managers (the accounts that get the
+  // full app) and hidden once already in demo (the banner owns the exit there).
+  const canExploreDemo =
+    !demoMode &&
+    (user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER);
 
   const handleLogout = () => {
     if (window.innerWidth < 768) {
       onClose();
     }
     logout();
+  };
+
+  const handleExploreDemo = () => {
+    if (window.innerWidth < 768) {
+      onClose();
+    }
+    enterDemo();
   };
 
   const handleNavClick = () => {
@@ -397,6 +414,22 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
 
       {/* Navigation */}
       <nav className="px-3 py-4 flex-1 overflow-y-auto">
+        {canExploreDemo && (
+          <button
+            type="button"
+            onClick={handleExploreDemo}
+            disabled={isEnteringDemo}
+            className={`mb-4 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-400/10 text-amber-200 ring-1 ring-amber-400/30 transition-all duration-150 hover:from-amber-500/30 hover:to-amber-400/20 hover:text-amber-100 disabled:opacity-60 disabled:cursor-not-allowed ${
+              isSidebarCollapsed ? 'md:justify-center' : ''
+            }`}
+            title={isSidebarCollapsed ? t('demo.enter', { defaultValue: "Demo'yu keşfet" }) : undefined}
+          >
+            <Sparkles className="h-5 w-5 flex-shrink-0" />
+            <span className={`text-sm font-semibold ${isSidebarCollapsed ? 'md:hidden' : ''}`}>
+              {t('demo.enter', { defaultValue: "Demo'yu keşfet" })}
+            </span>
+          </button>
+        )}
         <div className="space-y-4">
           {visibleSections.map((section) => {
             const isCollapsed =
