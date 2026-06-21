@@ -620,30 +620,44 @@ export class SubscriptionSchedulerService {
       let recovered = 0;
       let failed = 0;
       let stillPending = 0;
+      let errored = 0;
       for (const row of stuck) {
         const oid = row.paytrMerchantOid!;
-        const inquiry = await this.paytr.inquiryStatus(oid);
-        if (inquiry.status === "success") {
-          await this.settlement.settlePayment(oid, {
-            kind: "success",
-            paymentType: inquiry.paymentType,
-            totalAmount: inquiry.paymentAmount,
-            // utoken intentionally omitted — inquiry doesn't return it.
-          });
-          recovered += 1;
-        } else if (inquiry.status === "failed") {
-          await this.settlement.settlePayment(oid, {
-            kind: "failure",
-            failureCode: inquiry.failedReasonCode,
-            failureMessage: inquiry.failedReasonMsg,
-          });
-          failed += 1;
-        } else {
-          stillPending += 1;
+        // Per-row isolation (matches every other per-row sweeper in this file).
+        // Without it a single settlePayment throw aborts the whole batch — and
+        // because rows are ordered createdAt ASC and a poison row stays PENDING,
+        // it would sit at the head every hour and permanently block recovery of
+        // all newer stuck payments (tenants charged but never activated).
+        try {
+          const inquiry = await this.paytr.inquiryStatus(oid);
+          if (inquiry.status === "success") {
+            await this.settlement.settlePayment(oid, {
+              kind: "success",
+              paymentType: inquiry.paymentType,
+              totalAmount: inquiry.paymentAmount,
+              // utoken intentionally omitted — inquiry doesn't return it.
+            });
+            recovered += 1;
+          } else if (inquiry.status === "failed") {
+            await this.settlement.settlePayment(oid, {
+              kind: "failure",
+              failureCode: inquiry.failedReasonCode,
+              failureMessage: inquiry.failedReasonMsg,
+            });
+            failed += 1;
+          } else {
+            stillPending += 1;
+          }
+        } catch (err) {
+          errored += 1;
+          this.logger.error(
+            `PayTR pending recovery failed for oid=${oid}: ${(err as Error).message}`,
+          );
+          continue;
         }
       }
       this.logger.log(
-        `PayTR pending recovery: scanned=${stuck.length} recovered=${recovered} failed=${failed} stillPending=${stillPending}`,
+        `PayTR pending recovery: scanned=${stuck.length} recovered=${recovered} failed=${failed} stillPending=${stillPending} errored=${errored}`,
       );
     });
   }

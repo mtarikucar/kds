@@ -23,11 +23,12 @@ describe('StockAlertsService — emit dedup', () => {
     prisma = mockPrismaClient();
     emit = jest.fn();
 
+    // Emits now go through the branch-aware gateway helper (the old bare-room
+    // server.to().emit reached zero clients). emit = the helper spy.
     const kdsMock = {
-      server: {
-        to: jest.fn().mockReturnThis(),
-        emit,
-      },
+      emitStockLowAlert: emit,
+      emitStockExpiryAlert: jest.fn(),
+      server: {},
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,11 +47,12 @@ describe('StockAlertsService — emit dedup', () => {
       { id: 'item-1', name: 'Tomato', unit: 'kg', currentStock: 1, minStock: 5 },
     ]);
 
-    await service.checkLowStock(tenantId);
+    await service.checkLowStock(tenantId, 'branch-1');
 
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith(
-      'stock:low-alert',
+      tenantId,
+      'branch-1',
       expect.objectContaining({ count: 1 }),
     );
   });
@@ -63,8 +65,8 @@ describe('StockAlertsService — emit dedup', () => {
       .mockResolvedValueOnce(lowStockSet)
       .mockResolvedValueOnce(lowStockSet);
 
-    await service.checkLowStock(tenantId);
-    await service.checkLowStock(tenantId);
+    await service.checkLowStock(tenantId, 'branch-1');
+    await service.checkLowStock(tenantId, 'branch-1');
 
     // First tick fires, second tick is silent — that's the dedup we want.
     expect(emit).toHaveBeenCalledTimes(1);
@@ -80,8 +82,8 @@ describe('StockAlertsService — emit dedup', () => {
         { id: 'item-2', name: 'Onion', unit: 'kg', currentStock: 2, minStock: 5 },
       ]);
 
-    await service.checkLowStock(tenantId);
-    await service.checkLowStock(tenantId);
+    await service.checkLowStock(tenantId, 'branch-1');
+    await service.checkLowStock(tenantId, 'branch-1');
 
     // Set changed: item-2 newly below threshold → second emit fires.
     expect(emit).toHaveBeenCalledTimes(2);
@@ -97,9 +99,9 @@ describe('StockAlertsService — emit dedup', () => {
         { id: 'item-2', name: 'Onion', unit: 'kg', currentStock: 2, minStock: 5 },
       ]);
 
-    await service.checkLowStock(tenantId);
-    await service.checkLowStock(tenantId);
-    await service.checkLowStock(tenantId);
+    await service.checkLowStock(tenantId, 'branch-1');
+    await service.checkLowStock(tenantId, 'branch-1');
+    await service.checkLowStock(tenantId, 'branch-1');
 
     // Tick 1: emit (new low-stock). Tick 2: silent (empty set, nothing to
     // alert about). Tick 3: emit (Onion newly dropped — fresh problem).
@@ -109,7 +111,7 @@ describe('StockAlertsService — emit dedup', () => {
   it('does not emit when the item set is empty', async () => {
     (prisma.$queryRaw as any).mockResolvedValueOnce([]);
 
-    await service.checkLowStock(tenantId);
+    await service.checkLowStock(tenantId, 'branch-1');
 
     expect(emit).not.toHaveBeenCalled();
   });
@@ -122,8 +124,8 @@ describe('StockAlertsService — emit dedup', () => {
       .mockResolvedValueOnce(sameItemSet)
       .mockResolvedValueOnce(sameItemSet);
 
-    await service.checkLowStock('tenant-A');
-    await service.checkLowStock('tenant-B');
+    await service.checkLowStock('tenant-A', 'branch-1');
+    await service.checkLowStock('tenant-B', 'branch-1');
 
     // Both tenants get their first-ever emit — no cross-tenant interference.
     expect(emit).toHaveBeenCalledTimes(2);

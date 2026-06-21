@@ -68,30 +68,32 @@ export class StockAlertsService {
       ORDER BY si."currentStock" ASC
     `);
 
+    // Emit only when we have a branch to target — the realtime rooms are
+    // branch-suffixed (kitchen/pos-${tenantId}-${branchId}); a bare-room emit
+    // reaches zero clients. The tenant-wide cron path (no branchId) just
+    // computes the list for REST consumers and does not emit.
     if (
+      branchId &&
+      lowStockItems.length > 0 &&
+      this.kdsGateway &&
       this.shouldEmitAlert(
         this.lowStockState,
         tenantId,
         lowStockItems.map((i) => i.id),
-      ) &&
-      lowStockItems.length > 0 &&
-      this.kdsGateway?.server
+      )
     ) {
-      this.kdsGateway.server
-        .to(`kitchen-${tenantId}`)
-        .to(`pos-${tenantId}`)
-        .emit("stock:low-alert", {
-          count: lowStockItems.length,
-          items: lowStockItems.map((i) => ({
-            id: i.id,
-            name: i.name,
-            unit: i.unit,
-            currentStock: i.currentStock,
-            minStock: i.minStock,
-          })),
-        });
+      this.kdsGateway.emitStockLowAlert(tenantId, branchId, {
+        count: lowStockItems.length,
+        items: lowStockItems.map((i) => ({
+          id: i.id,
+          name: i.name,
+          unit: i.unit,
+          currentStock: i.currentStock,
+          minStock: i.minStock,
+        })),
+      });
       this.logger.log(
-        `Low stock alert sent for tenant ${tenantId}: ${lowStockItems.length} items`,
+        `Low stock alert sent for tenant ${tenantId} branch ${branchId}: ${lowStockItems.length} items`,
       );
     }
 
@@ -127,29 +129,29 @@ export class StockAlertsService {
       orderBy: { expiryDate: "asc" },
     });
 
+    // Branch-targeted emit only (see checkLowStock). Cron path computes the
+    // list for REST without emitting to empty bare rooms.
     if (
+      branchId &&
+      expiringBatches.length > 0 &&
+      this.kdsGateway &&
       this.shouldEmitAlert(
         this.expiringBatchesState,
         tenantId,
         expiringBatches.map((b) => b.id),
-      ) &&
-      expiringBatches.length > 0 &&
-      this.kdsGateway?.server
+      )
     ) {
-      this.kdsGateway.server
-        .to(`kitchen-${tenantId}`)
-        .to(`pos-${tenantId}`)
-        .emit("stock:expiry-alert", {
-          count: expiringBatches.length,
-          batches: expiringBatches.map((b) => ({
-            id: b.id,
-            stockItemName: b.stockItem.name,
-            quantity: b.quantity,
-            expiryDate: b.expiryDate,
-          })),
-        });
+      this.kdsGateway.emitStockExpiryAlert(tenantId, branchId, {
+        count: expiringBatches.length,
+        batches: expiringBatches.map((b) => ({
+          id: b.id,
+          stockItemName: b.stockItem.name,
+          quantity: b.quantity,
+          expiryDate: b.expiryDate,
+        })),
+      });
       this.logger.log(
-        `Expiry alert sent for tenant ${tenantId}: ${expiringBatches.length} batches`,
+        `Expiry alert sent for tenant ${tenantId} branch ${branchId}: ${expiringBatches.length} batches`,
       );
     }
 

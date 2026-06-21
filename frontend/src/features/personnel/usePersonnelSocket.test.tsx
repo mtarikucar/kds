@@ -14,13 +14,12 @@ const fakeSocket = {
   disconnect: vi.fn(),
 };
 
-let socketToReturn: any = fakeSocket;
-const getSocket = vi.fn(() => socketToReturn);
-const initializeSocket = vi.fn(() => fakeSocket);
+const initializeSocket = vi.fn(() => fakeSocket as any);
+const disconnectSocket = vi.fn();
 
 vi.mock('../../lib/socket', () => ({
-  getSocket: () => getSocket(),
   initializeSocket: () => initializeSocket(),
+  disconnectSocket: () => disconnectSocket(),
 }));
 
 function wrapper(client: QueryClient) {
@@ -32,7 +31,7 @@ function wrapper(client: QueryClient) {
 beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(handlers)) delete handlers[k];
-  socketToReturn = fakeSocket;
+  initializeSocket.mockReturnValue(fakeSocket as any);
 });
 
 describe('usePersonnelSocket', () => {
@@ -44,15 +43,15 @@ describe('usePersonnelSocket', () => {
     expect(fakeSocket.on).toHaveBeenCalledWith('personnel:swap-request-update', expect.any(Function));
   });
 
-  it('initializes the socket when none is connected yet', () => {
-    socketToReturn = null; // getSocket() returns null → fall back to initializeSocket()
+  it('takes a socket refcount via initializeSocket on mount', () => {
     const client = new QueryClient();
     renderHook(() => usePersonnelSocket(), { wrapper: wrapper(client) });
+    // Symmetric with usePosSocket/useKitchenSocket — always initializeSocket()
+    // (which refcounts), never getSocket() without a matching release.
     expect(initializeSocket).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing (no listeners) when no socket can be obtained', () => {
-    socketToReturn = null;
     initializeSocket.mockReturnValueOnce(null as any);
     const client = new QueryClient();
     renderHook(() => usePersonnelSocket(), { wrapper: wrapper(client) });
@@ -79,14 +78,17 @@ describe('usePersonnelSocket', () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: ['personnel', 'schedule'] });
   });
 
-  it('removes its own listeners on unmount but never disconnects the shared socket', () => {
+  it('removes its listeners and releases its socket refcount on unmount', () => {
     const client = new QueryClient();
     const { unmount } = renderHook(() => usePersonnelSocket(), { wrapper: wrapper(client) });
 
     unmount();
     expect(fakeSocket.off).toHaveBeenCalledWith('personnel:attendance-update', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('personnel:swap-request-update', expect.any(Function));
-    // Shared socket must stay alive for other features.
-    expect(fakeSocket.disconnect).not.toHaveBeenCalled();
+    // Releases the refcount it took on mount (disconnectSocket only actually
+    // closes the socket when the LAST consumer unmounts — that gating lives in
+    // lib/socket, mocked here). This balances the initializeSocket() +1 that
+    // previously leaked.
+    expect(disconnectSocket).toHaveBeenCalledTimes(1);
   });
 });

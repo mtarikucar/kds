@@ -815,4 +815,22 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `stock:low-stock-alert ${items.length} items → kitchen/pos-${tenantId}`,
     );
   }
+
+  // Branch-suffixed rooms are the ONLY rooms sockets actually join (see the
+  // join handlers above). StockAlertsService used to emit to bare
+  // `kitchen-${tenantId}` rooms with no members, so the events were dropped —
+  // these helpers own the correct room naming for the stock-alert payloads.
+  emitStockLowAlert(tenantId: string, branchId: string, payload: unknown) {
+    this.server
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("stock:low-alert", payload);
+  }
+
+  emitStockExpiryAlert(tenantId: string, branchId: string, payload: unknown) {
+    this.server
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("stock:expiry-alert", payload);
+  }
 }
