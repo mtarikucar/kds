@@ -579,52 +579,78 @@ export class ReservationsService {
     const effectiveStartTime = dto.startTime ?? reservation.startTime;
     const effectiveEndTime = dto.endTime ?? reservation.endTime;
 
-    if (
-      effectiveTableId &&
+    const needsOverlapCheck =
+      !!effectiveTableId &&
       (dto.tableId !== undefined ||
         dto.date !== undefined ||
         dto.startTime !== undefined ||
-        dto.endTime !== undefined)
-    ) {
-      const existingTableReservations = await this.prisma.reservation.findMany({
-        where: {
-          ...branchScope(scope),
-          tableId: effectiveTableId,
-          date: new Date(
-            effectiveDate instanceof Date
-              ? effectiveDate.toISOString().split("T")[0]
-              : effectiveDate,
-          ),
-          status: {
-            in: [
-              ReservationStatus.PENDING,
-              ReservationStatus.CONFIRMED,
-              ReservationStatus.SEATED,
-            ],
+        dto.endTime !== undefined);
+
+    // Serializable so the overlap-check + update is atomic — mirrors
+    // createPublicReservation. Without it two concurrent PATCHes onto the same
+    // table/time both read "no conflict" and both commit (double-booking).
+    // Retry on the 40001/P2034 serialization failure a conflict raises.
+    const MAX_RETRIES = 5;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            if (needsOverlapCheck) {
+              const existingTableReservations = await tx.reservation.findMany({
+                where: {
+                  ...branchScope(scope),
+                  tableId: effectiveTableId,
+                  date: new Date(
+                    effectiveDate instanceof Date
+                      ? effectiveDate.toISOString().split("T")[0]
+                      : effectiveDate,
+                  ),
+                  status: {
+                    in: [
+                      ReservationStatus.PENDING,
+                      ReservationStatus.CONFIRMED,
+                      ReservationStatus.SEATED,
+                    ],
+                  },
+                  id: { not: id },
+                },
+              });
+
+              const requestStart = timeToMinutes(effectiveStartTime);
+              const requestEnd = timeToMinutes(effectiveEndTime);
+
+              for (const res of existingTableReservations) {
+                const resStart = timeToMinutes(res.startTime);
+                const resEnd = timeToMinutes(res.endTime);
+                if (requestStart < resEnd && requestEnd > resStart) {
+                  throw new BadRequestException(
+                    "This table is already reserved for the selected time period",
+                  );
+                }
+              }
+            }
+
+            return tx.reservation.update({
+              where: { id: reservation.id },
+              data,
+              include: { table: true },
+            });
           },
-          id: { not: id },
-        },
-      });
-
-      const requestStart = timeToMinutes(effectiveStartTime);
-      const requestEnd = timeToMinutes(effectiveEndTime);
-
-      for (const res of existingTableReservations) {
-        const resStart = timeToMinutes(res.startTime);
-        const resEnd = timeToMinutes(res.endTime);
-        if (requestStart < resEnd && requestEnd > resStart) {
-          throw new BadRequestException(
-            "This table is already reserved for the selected time period",
-          );
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2034"
+        ) {
+          lastErr = err;
+          continue; // serialization conflict — retry with a fresh read
         }
+        throw err;
       }
     }
-
-    return this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data,
-      include: { table: true },
-    });
+    throw lastErr;
   }
 
   async confirm(scope: BranchScope, id: string, userId: string) {

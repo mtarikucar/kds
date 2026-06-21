@@ -1,25 +1,25 @@
-import { useState, useEffect } from 'react';
-import QRMenuLayout, { MenuData } from './QRMenuLayout';
-import CartContent from '../../components/qr-menu/CartContent';
-import TableSelectionModal from '../../components/qr-menu/TableSelectionModal';
-import { useCartStore } from '../../store/cartStore';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import axios from 'axios';
-import { toast } from 'sonner';
-import { useGeolocation } from '../../hooks';
-import { buildQRMenuUrl } from '../../utils/subdomain';
-import { getApiErrorMessage } from '../../lib/api-error';
+import { useState, useEffect } from "react";
+import QRMenuLayout, { MenuData } from "./QRMenuLayout";
+import CartContent from "../../components/qr-menu/CartContent";
+import TableSelectionModal from "../../components/qr-menu/TableSelectionModal";
+import { useCartStore } from "../../store/cartStore";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import axios from "axios";
+import { toast } from "sonner";
+import { useGeolocation } from "../../hooks";
+import { buildQRMenuUrl } from "../../utils/subdomain";
+import { getApiErrorMessage } from "../../lib/api-error";
 
 interface SubdomainCartPageProps {
   subdomain: string;
 }
 
 const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tableId = searchParams.get('tableId');
+  const tableId = searchParams.get("tableId");
 
   const [menuData, setMenuData] = useState<MenuData | null>(null);
   const [isShowingTableSelection, setIsShowingTableSelection] = useState(false);
@@ -27,11 +27,7 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
   const [locationRequested, setLocationRequested] = useState(false);
 
   const { items, sessionId, clearCart } = useCartStore();
-  const {
-    latitude,
-    longitude,
-    getCurrentPosition,
-  } = useGeolocation();
+  const { latitude, longitude, getCurrentPosition } = useGeolocation();
 
   // Request location when page loads
   useEffect(() => {
@@ -41,18 +37,28 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
     }
   }, [locationRequested, getCurrentPosition]);
 
-  const handleSubmitOrder = async () => {
+  const handleSubmitOrder = async (selectedTableId?: string) => {
     // Prevent double submission
     if (isSubmitting) return;
 
     if (!sessionId || !menuData) {
-      toast.error(t('cart.sessionExpired'));
+      toast.error(t("cart.sessionExpired"));
       return;
     }
 
     const tenantId = menuData.tenant.id;
 
-    if (!tableId && !menuData?.enableTablelessMode) {
+    // The table can come from the QR URL OR from the TableSelectionModal the
+    // dine-in path opens when the URL has none. Without honoring the modal's
+    // pick the order could never be placed (the modal would just re-open).
+    // Type-guard the arg: this handler is also wired directly to the submit
+    // button's onClick, which would pass a MouseEvent — ignore anything that
+    // isn't an explicit string tableId.
+    const tableOverride =
+      typeof selectedTableId === "string" ? selectedTableId : undefined;
+    const effectiveTableId = tableOverride || tableId || undefined;
+
+    if (!effectiveTableId && !menuData?.enableTablelessMode) {
       setIsShowingTableSelection(true);
       return;
     }
@@ -71,16 +77,17 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
 
     setIsSubmitting(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const orderUrl = API_URL + '/customer-orders';
+      const API_URL =
+        import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+      const orderUrl = API_URL + "/customer-orders";
 
       await axios.post(orderUrl, {
         tenantId,
-        tableId: tableId || undefined,
+        tableId: effectiveTableId,
         sessionId,
         latitude: orderLat || undefined,
         longitude: orderLng || undefined,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
           modifiers: item.modifiers,
@@ -88,26 +95,34 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
         })),
       });
 
-      toast.success(t('cart.orderSubmitted'));
+      toast.success(t("cart.orderSubmitted"));
       clearCart();
 
-      const ordersUrl = buildQRMenuUrl('orders', { subdomain, tableId, sessionId });
+      const ordersUrl = buildQRMenuUrl("orders", {
+        subdomain,
+        tableId: effectiveTableId,
+        sessionId,
+      });
       navigate(ordersUrl);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('messages.operationFailed')));
+      toast.error(getApiErrorMessage(error, t("messages.operationFailed")));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <QRMenuLayout currentPage='cart' onMenuDataLoaded={setMenuData} subdomain={subdomain}>
+    <QRMenuLayout
+      currentPage="cart"
+      onMenuDataLoaded={setMenuData}
+      subdomain={subdomain}
+    >
       {menuData && (
         <>
           <CartContent
             settings={menuData.settings}
             enableCustomerOrdering={menuData.enableCustomerOrdering}
-            currency={menuData.tenant.currency || 'TRY'}
+            currency={menuData.tenant.currency || "TRY"}
             onSubmitOrder={handleSubmitOrder}
             onShowTableSelection={() => setIsShowingTableSelection(true)}
             isSubmitting={isSubmitting}
@@ -119,9 +134,9 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
             <TableSelectionModal
               isOpen={isShowingTableSelection}
               onClose={() => setIsShowingTableSelection(false)}
-              onSelectTable={() => {
+              onSelectTable={(id) => {
                 setIsShowingTableSelection(false);
-                handleSubmitOrder();
+                handleSubmitOrder(id);
               }}
               primaryColor={menuData.settings.primaryColor}
             />

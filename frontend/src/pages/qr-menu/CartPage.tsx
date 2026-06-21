@@ -1,20 +1,20 @@
-import { useState, useEffect } from 'react';
-import QRMenuLayout, { MenuData } from './QRMenuLayout';
-import CartContent from '../../components/qr-menu/CartContent';
-import TableSelectionModal from '../../components/qr-menu/TableSelectionModal';
-import { useCartStore } from '../../store/cartStore';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import axios from 'axios';
-import { toast } from 'sonner';
-import { useGeolocation } from '../../hooks';
+import { useState, useEffect } from "react";
+import QRMenuLayout, { MenuData } from "./QRMenuLayout";
+import CartContent from "../../components/qr-menu/CartContent";
+import TableSelectionModal from "../../components/qr-menu/TableSelectionModal";
+import { useCartStore } from "../../store/cartStore";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import axios from "axios";
+import { toast } from "sonner";
+import { useGeolocation } from "../../hooks";
 
 const CartPage = () => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { tenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
-  const tableId = searchParams.get('tableId');
+  const tableId = searchParams.get("tableId");
 
   const [menuData, setMenuData] = useState<MenuData | null>(null);
   const [isShowingTableSelection, setIsShowingTableSelection] = useState(false);
@@ -28,7 +28,7 @@ const CartPage = () => {
     error: locationError,
     loading: locationLoading,
     getCurrentPosition,
-    permissionStatus
+    permissionStatus,
   } = useGeolocation();
 
   // Request location when page loads
@@ -39,16 +39,25 @@ const CartPage = () => {
     }
   }, [locationRequested, getCurrentPosition]);
 
-  const handleSubmitOrder = async () => {
+  const handleSubmitOrder = async (selectedTableId?: string) => {
     // Prevent double submission
     if (isSubmitting) return;
 
     if (!sessionId) {
-      toast.error(t('cart.sessionExpired'));
+      toast.error(t("cart.sessionExpired"));
       return;
     }
 
-    if (!tableId && !menuData?.enableTablelessMode) {
+    // Honor a table chosen in the modal (dine-in path with no QR table),
+    // otherwise the modal would re-open forever and no order could be placed.
+    // Type-guard the arg: this handler is also wired directly to the submit
+    // button's onClick, which would pass a MouseEvent — ignore anything that
+    // isn't an explicit string tableId.
+    const tableOverride =
+      typeof selectedTableId === "string" ? selectedTableId : undefined;
+    const effectiveTableId = tableOverride || tableId || undefined;
+
+    if (!effectiveTableId && !menuData?.enableTablelessMode) {
       setIsShowingTableSelection(true);
       return;
     }
@@ -67,16 +76,17 @@ const CartPage = () => {
 
     setIsSubmitting(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const orderUrl = API_URL + '/customer-orders';
+      const API_URL =
+        import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+      const orderUrl = API_URL + "/customer-orders";
 
       await axios.post(orderUrl, {
         tenantId,
-        tableId: tableId || undefined,
+        tableId: effectiveTableId,
         sessionId,
         latitude: orderLat || undefined,
         longitude: orderLng || undefined,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
           modifiers: item.modifiers,
@@ -84,26 +94,32 @@ const CartPage = () => {
         })),
       });
 
-      toast.success(t('cart.orderSubmitted'));
+      toast.success(t("cart.orderSubmitted"));
       clearCart();
 
-      const ordersUrl = '/qr-menu/' + tenantId + '/orders' + (tableId ? '?tableId=' + tableId : '');
+      const ordersUrl =
+        "/qr-menu/" +
+        tenantId +
+        "/orders" +
+        (effectiveTableId ? "?tableId=" + effectiveTableId : "");
       navigate(ordersUrl);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || t('messages.operationFailed'));
+      toast.error(
+        error.response?.data?.message || t("messages.operationFailed"),
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <QRMenuLayout currentPage='cart' onMenuDataLoaded={setMenuData}>
+    <QRMenuLayout currentPage="cart" onMenuDataLoaded={setMenuData}>
       {menuData && (
         <>
           <CartContent
             settings={menuData.settings}
             enableCustomerOrdering={menuData.enableCustomerOrdering}
-            currency={menuData.tenant.currency || 'TRY'}
+            currency={menuData.tenant.currency || "TRY"}
             onSubmitOrder={handleSubmitOrder}
             onShowTableSelection={() => setIsShowingTableSelection(true)}
             isSubmitting={isSubmitting}
@@ -114,9 +130,9 @@ const CartPage = () => {
             <TableSelectionModal
               isOpen={isShowingTableSelection}
               onClose={() => setIsShowingTableSelection(false)}
-              onSelectTable={() => {
+              onSelectTable={(id) => {
                 setIsShowingTableSelection(false);
-                handleSubmitOrder();
+                handleSubmitOrder(id);
               }}
               primaryColor={menuData.settings.primaryColor}
             />

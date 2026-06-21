@@ -46,6 +46,12 @@ describe("ReservationsService.update — tableId branch-scope guard (M22)", () =
     (prisma.reservation.update as any).mockResolvedValue({
       ...existingReservation,
     });
+    // update() now runs the overlap-check + write inside a Serializable
+    // $transaction; pass the callback the same mock so tx.reservation.* are the
+    // asserted spies.
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb(prisma),
+    );
   });
 
   it("rejects a tableId that is not in the caller's scope (no foreign-table write/leak)", async () => {

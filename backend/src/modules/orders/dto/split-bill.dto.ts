@@ -9,7 +9,9 @@ import {
   MaxLength,
   ValidateNested,
   Min,
+  Max,
   ArrayMinSize,
+  ArrayMaxSize,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -30,8 +32,9 @@ export enum SplitType {
 
 export class SplitPaymentEntry {
   @ApiProperty({ description: "Payment amount for this split" })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
+  @Max(99_999_999.99)
   amount: number;
 
   @ApiProperty({ enum: PaymentMethod })
@@ -72,6 +75,7 @@ export class SplitBillDto {
   })
   @IsNumber()
   @Min(2)
+  @Max(200)
   @IsOptional()
   numberOfParts?: number;
 
@@ -83,6 +87,7 @@ export class SplitBillDto {
   @ValidateNested({ each: true })
   @Type(() => SplitPaymentEntry)
   @ArrayMinSize(1)
+  @ArrayMaxSize(200)
   payments: SplitPaymentEntry[];
 
   @ApiPropertyOptional({ description: "Customer phone for linking" })

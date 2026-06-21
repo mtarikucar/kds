@@ -234,6 +234,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
           error: "DatabaseTimeout",
         };
 
+      case "P2000": // Value too long for the column
+      case "P2020": // Value out of range for the type (e.g. numeric overflow)
+        // Bad client input, not a server fault — a number/string that exceeds
+        // the column's precision/length. Surface as 400 so the client gets an
+        // actionable validation error instead of a 500. DTO @Max/@MaxLength
+        // bounds are the first line of defense; this is the safety net for any
+        // field that slips through.
+        return {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: "A value is out of the allowed range or too long",
+          error: "ValueOutOfRange",
+          details: meta,
+        };
+
       default:
         return {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
