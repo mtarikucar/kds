@@ -315,9 +315,13 @@ export class BankTransferService {
       const billingCycle = upgrade
         ? upgrade.billingCycle
         : subscription.billingCycle;
-      const finalAmount = upgrade
-        ? resolvePlanAmount(upgrade.targetPlan, billingCycle)
-        : (payment.amount as Prisma.Decimal);
+      // Record what was actually CHARGED — the discounted amount frozen on the
+      // payment at intent time (createIntent uses resolvePlanAmount). The havale
+      // confirm can lag the request by up to 14 days, so re-deriving here would
+      // overstate the record if the promo window closed in between. True parity
+      // with the PayTR settlement rail (paytr-settlement: finalAmount =
+      // payment.amount). billingCycle is still used for the period math below.
+      const finalAmount = payment.amount as Prisma.Decimal;
       const finalCurrency = upgrade
         ? upgrade.targetPlan.currency
         : payment.currency;

@@ -93,6 +93,37 @@ describe("BankTransferService.confirm", () => {
     );
   });
 
+  it("records the CHARGED (frozen) amount on an upgrade confirm, not a re-derived gross", async () => {
+    const tx = makeTx();
+    // An upgrade to a pricier plan; the target gross (2999) is higher than what
+    // the tenant actually transferred (payment.amount 1299, frozen at intent
+    // under a promo). Confirm must persist 1299, not re-derive 2999 — robust
+    // even if the promo window closed during the 14-day confirm gap.
+    tx.pendingPlanChange.findUnique.mockResolvedValue({
+      id: "ppc-1",
+      targetPlanId: "plan-business",
+      billingCycle: BillingCycle.MONTHLY,
+      targetPlan: {
+        id: "plan-business",
+        name: "BUSINESS",
+        displayName: "Business",
+        monthlyPrice: "2999.00",
+        yearlyPrice: "29990.00",
+        currency: "TRY",
+      },
+    });
+    const { svc, prisma } = makeDeps(tx);
+    prisma.subscriptionPayment.findUnique.mockResolvedValue(pendingBankPayment); // amount 1299
+
+    await svc.confirm("pay-1", "admin@hummytummy.com");
+
+    const subUpd = tx.subscription.update.mock.calls.find(
+      (c: any) => c[0]?.data?.amount !== undefined,
+    );
+    expect(subUpd).toBeDefined();
+    expect(Number(subUpd[0].data.amount)).toBe(1299); // charged, not 2999 gross
+  });
+
   it("is idempotent — a lost atomic claim (count 0) aborts without double-activation", async () => {
     const tx = makeTx();
     tx.subscriptionPayment.updateMany.mockResolvedValue({ count: 0 });

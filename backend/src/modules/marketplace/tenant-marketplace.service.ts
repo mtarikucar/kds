@@ -269,24 +269,22 @@ export class TenantMarketplaceService {
       // cancellation leaves the row active until the nightly sweep / billing
       // cycle close transitions it.
       if (immediate) {
-        await this.outbox
-          .append(
-            {
-              type: EventTypes.AddOnCancelled,
+        // Emit INSIDE the tx with NO .catch — a failed append must roll the
+        // cancellation back (mirrors purchase()), otherwise the row flips to
+        // cancelled with no projector signal and the granted limits/features
+        // stay live until the next reconcile.
+        await this.outbox.append(
+          {
+            type: EventTypes.AddOnCancelled,
+            tenantId,
+            payload: {
               tenantId,
-              payload: {
-                tenantId,
-                addOnId: row.id,
-                addOnCode: "<lookup>", // intentionally elided — projector reads canonical state
-              },
+              addOnId: row.id,
+              addOnCode: "<lookup>", // intentionally elided — projector reads canonical state
             },
-            tx,
-          )
-          .catch((e) =>
-            this.logger.error(
-              `AddOnCancelled emit failed for addOn=${row.id} tenant=${tenantId}: ${(e as Error).message}`,
-            ),
-          );
+          },
+          tx,
+        );
       }
       return updated;
     });
