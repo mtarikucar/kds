@@ -101,10 +101,18 @@ export class ProductsService {
     tenantId: string,
     categoryId?: string,
     pagination?: { limit?: number; offset?: number },
+    isAvailable?: boolean,
   ) {
     const where: any = { tenantId };
     if (categoryId) {
       where.categoryId = categoryId;
+    }
+    // Honor the availability filter the POS/menu clients already send (and the
+    // ProductFilters type advertises). isAvailable:false is the soft-delete /
+    // out-of-stock flag, so omitting this predicate leaked unavailable products
+    // into the authenticated POS grid as clickable add-cards.
+    if (isAvailable !== undefined) {
+      where.isAvailable = isAvailable;
     }
 
     // ADDITIVE pagination (Wave-C). When limit/offset are omitted these

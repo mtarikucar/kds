@@ -67,19 +67,34 @@ export class ProductsController {
     required: false,
     description: "Optional rows to skip",
   })
+  @ApiQuery({
+    name: "isAvailable",
+    required: false,
+    description:
+      "Filter by availability (true hides soft-deleted/out-of-stock)",
+  })
   @ApiResponse({ status: 200, description: "List of all products" })
   findAll(
     @Request() req,
     @Query("categoryId") categoryId?: string,
+    @Query("isAvailable") isAvailable?: string,
     @Query() query?: ListQueryDto,
   ) {
     // ADDITIVE: limit/offset are optional. When absent the DTO leaves them
     // undefined, the service returns the full list (byte-identical default),
     // and the response stays a bare array — no {data,total} envelope.
-    return this.productsService.findAll(req.tenantId, categoryId, {
-      limit: query?.limit,
-      offset: query?.offset,
-    });
+    const availability =
+      isAvailable === "true"
+        ? true
+        : isAvailable === "false"
+          ? false
+          : undefined;
+    return this.productsService.findAll(
+      req.tenantId,
+      categoryId,
+      { limit: query?.limit, offset: query?.offset },
+      availability,
+    );
   }
 
   @Get(":id")
