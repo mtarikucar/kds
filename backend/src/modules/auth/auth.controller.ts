@@ -29,6 +29,7 @@ import {
 import { VerifyEmailCodeDto } from "./dto/verify-email-code.dto";
 import { Public } from "./decorators/public.decorator";
 import { CurrentUser } from "./decorators/current-user.decorator";
+import { SkipBranchScope } from "./decorators/skip-branch-scope.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { UnauthorizedException } from "@nestjs/common";
 import { getClientIp } from "../../common/helpers/client-ip.helper";
@@ -94,6 +95,12 @@ function stripRefresh(
 
 @ApiTags("auth")
 @Controller("auth")
+// The entire auth surface is tenant/user-level — never branch-scoped. The
+// frontend treats every '/auth/' path as tenant-wide and omits X-Branch-Id, so
+// the JWT-guarded routes here (profile, complete-profile, logout,
+// change-password) MUST skip BranchGuard or they 400 with "X-Branch-Id header
+// required". (@Public routes already bypass it; this covers the authed ones.)
+@SkipBranchScope()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
