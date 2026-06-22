@@ -265,6 +265,7 @@
       "limits": {
         "maxUsers": "Пользователи",
         "maxTables": "Столики",
+        "maxBranches": "Филиалы",
         "maxProducts": "Товары",
         "maxCategories": "Категории",
         "maxMonthlyOrders": "Заказы в месяц"
@@ -273,9 +274,11 @@
         "kdsIntegration": "Интеграция с KDS",
         "inventoryTracking": "Учёт склада",
         "advancedReports": "Расширенные отчёты",
+        "posAccess": "POS / Экран продаж",
         "reservationSystem": "Система бронирования",
         "personnelManagement": "Управление персоналом",
         "deliveryIntegration": "Платформы доставки",
+        "externalDisplay": "Удалённый экран и Partner API",
         "multiLocation": "Несколько локаций",
         "customBranding": "Свой брендинг",
         "apiAccess": "Доступ к API",

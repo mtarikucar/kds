@@ -841,7 +841,12 @@
     "featureApiAccess": "API Access",
     "featurePrioritySupport": "Priority Support",
     "featureInventoryTracking": "Inventory Tracking",
-    "featureKdsIntegration": "KDS Integration"
+    "featureKdsIntegration": "KDS Integration",
+    "featurePosAccess": "POS / Sales Screen",
+    "featureReservationSystem": "Reservation System",
+    "featurePersonnelManagement": "Personnel Management",
+    "featureDeliveryIntegration": "Delivery Platforms",
+    "featureExternalDisplay": "Remote Display & Partner API"
   },
   "landing": {
     "badge": "🚀 Now Live",

@@ -265,6 +265,7 @@
       "limits": {
         "maxUsers": "المستخدمون",
         "maxTables": "الطاولات",
+        "maxBranches": "عدد الفروع",
         "maxProducts": "المنتجات",
         "maxCategories": "الفئات",
         "maxMonthlyOrders": "الطلبات الشهرية"
@@ -273,9 +274,11 @@
         "kdsIntegration": "تكامل KDS",
         "inventoryTracking": "تتبع المخزون",
         "advancedReports": "تقارير متقدمة",
+        "posAccess": "نقطة البيع / شاشة المبيعات",
         "reservationSystem": "نظام الحجز",
         "personnelManagement": "إدارة الموظفين",
         "deliveryIntegration": "منصات التوصيل",
+        "externalDisplay": "شاشة بعيدة و واجهة API للشركاء",
         "multiLocation": "تعدد الفروع",
         "customBranding": "علامة تجارية مخصصة",
         "apiAccess": "الوصول إلى API",

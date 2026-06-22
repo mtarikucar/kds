@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { Plan } from '../../types';
+import { Plan, SubscriptionPlanType } from '../../types';
+import { cn } from '../../lib/utils';
 
 interface PlanComparisonMatrixProps {
   plans: Plan[];
 }
+
+const display = { fontFamily: '"Fraunces", Georgia, serif' } as const;
 
 /**
  * Collapsible "compare plans side-by-side" table shown under the
@@ -20,14 +23,17 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
   const sorted = [...plans].sort((a, b) => Number(a.monthlyPrice) - Number(b.monthlyPrice));
 
   // Feature keys mapped to readable labels. The plan object stores each
-  // flag as a top-level boolean on `plan.features`.
+  // flag as a top-level boolean on `plan.features`. All 12 features are
+  // listed so the matrix is an exhaustive, accurate side-by-side.
   const featureRows: Array<{ key: keyof Plan['features']; label: string }> = [
     { key: 'kdsIntegration', label: t('subscriptions.comparison.features.kdsIntegration') },
+    { key: 'posAccess', label: t('subscriptions.comparison.features.posAccess') },
     { key: 'inventoryTracking', label: t('subscriptions.comparison.features.inventoryTracking') },
     { key: 'advancedReports', label: t('subscriptions.comparison.features.advancedReports') },
     { key: 'reservationSystem', label: t('subscriptions.comparison.features.reservationSystem') },
     { key: 'personnelManagement', label: t('subscriptions.comparison.features.personnelManagement') },
     { key: 'deliveryIntegration', label: t('subscriptions.comparison.features.deliveryIntegration') },
+    { key: 'externalDisplay', label: t('subscriptions.comparison.features.externalDisplay') },
     { key: 'multiLocation', label: t('subscriptions.comparison.features.multiLocation') },
     { key: 'customBranding', label: t('subscriptions.comparison.features.customBranding') },
     { key: 'apiAccess', label: t('subscriptions.comparison.features.apiAccess') },
@@ -37,6 +43,7 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
   const limitRows: Array<{ key: keyof Plan['limits']; label: string }> = [
     { key: 'maxUsers', label: t('subscriptions.comparison.limits.maxUsers') },
     { key: 'maxTables', label: t('subscriptions.comparison.limits.maxTables') },
+    { key: 'maxBranches', label: t('subscriptions.comparison.limits.maxBranches') },
     { key: 'maxProducts', label: t('subscriptions.comparison.limits.maxProducts') },
     { key: 'maxCategories', label: t('subscriptions.comparison.limits.maxCategories') },
     { key: 'maxMonthlyOrders', label: t('subscriptions.comparison.limits.maxMonthlyOrders') },
@@ -55,26 +62,42 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
     return `${monthly.toLocaleString('tr-TR')} ${currency}`;
   };
 
+  // BUSINESS is the highlighted ("En Popüler") tier — tint its column so the
+  // matrix is visually consistent with the elevated card above.
+  const isHighlighted = (p: Plan) => p.name === SubscriptionPlanType.BUSINESS;
+
   return (
-    <div className="mt-12 border-t pt-8">
+    <div className="mt-12 border-t border-[#ece2d4] pt-8">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 mx-auto text-slate-700 hover:text-slate-900 font-medium"
+        className="flex items-center gap-2 mx-auto rounded-xl border border-[#e3d7c7] bg-white px-5 py-2.5 text-sm font-semibold text-[#1c1917] shadow-sm transition hover:border-[#f5c9a3] hover:bg-[#fff3e8]"
       >
-        {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+        {open ? <ChevronUp className="w-4 h-4 text-[#f97316]" /> : <ChevronDown className="w-4 h-4 text-[#f97316]" />}
         {t('subscriptions.comparison.toggle')}
       </button>
       {open && (
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 overflow-x-auto rounded-2xl border border-[#ece2d4] bg-white shadow-sm shadow-stone-900/5">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 pl-4 text-slate-700 font-medium">
+              <tr className="border-b border-[#ece2d4]">
+                <th className="text-left py-4 pl-5 text-[#78716c] font-medium">
                   {t('subscriptions.comparison.featureHeader')}
                 </th>
                 {sorted.map((p) => (
-                  <th key={p.id} className="text-center py-3 px-2 text-slate-900 font-semibold">
+                  <th
+                    key={p.id}
+                    className={cn(
+                      'text-center py-4 px-3 text-base font-semibold text-[#1c1917]',
+                      isHighlighted(p) && 'bg-[#fff3e8]',
+                    )}
+                    style={display}
+                  >
                     {p.displayName}
+                    {isHighlighted(p) && (
+                      <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-[#b45309]">
+                        ⭐ {t('subscriptions.comparison.popularBadge', 'En Popüler')}
+                      </span>
+                    )}
                   </th>
                 ))}
               </tr>
@@ -82,50 +105,68 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
             <tbody>
               {/* Price row — first so the cost is the top reference point
                   when scanning columns. Shows monthly price + currency. */}
-              <tr className="border-b border-slate-100">
-                <td className="py-2.5 pl-4 text-slate-700 font-medium">
+              <tr className="border-b border-[#f1e8db]">
+                <td className="py-3 pl-5 text-[#57534e] font-medium">
                   {t('subscriptions.comparison.priceRow', 'Fiyat')}
                 </td>
                 {sorted.map((p) => (
-                  <td key={p.id} className="text-center py-2.5 px-2 text-slate-900 font-semibold">
-                    {fmtPrice(p)}
-                    <span className="block text-xs font-normal text-slate-400">
+                  <td
+                    key={p.id}
+                    className={cn(
+                      'text-center py-3 px-3 font-semibold text-[#1c1917]',
+                      isHighlighted(p) && 'bg-[#fff3e8]',
+                    )}
+                  >
+                    <span style={display}>{fmtPrice(p)}</span>
+                    <span className="block text-xs font-normal text-[#a8a29e]">
                       /{t('subscriptions.comparison.perMonth', 'ay')}
                     </span>
                   </td>
                 ))}
               </tr>
               {/* Limits group */}
-              <tr className="bg-slate-50/50">
-                <td colSpan={sorted.length + 1} className="py-2 pl-4 text-xs uppercase tracking-wider text-slate-500 font-medium">
+              <tr className="bg-[#faf6f0]">
+                <td colSpan={sorted.length + 1} className="py-2 pl-5 text-xs uppercase tracking-wider text-[#a8a29e] font-semibold">
                   {t('subscriptions.comparison.limitsGroup')}
                 </td>
               </tr>
               {limitRows.map((row) => (
-                <tr key={row.key} className="border-b border-slate-100">
-                  <td className="py-2.5 pl-4 text-slate-700">{row.label}</td>
+                <tr key={row.key} className="border-b border-[#f1e8db]">
+                  <td className="py-3 pl-5 text-[#57534e]">{row.label}</td>
                   {sorted.map((p) => (
-                    <td key={p.id} className="text-center py-2.5 px-2 text-slate-900">
+                    <td
+                      key={p.id}
+                      className={cn(
+                        'text-center py-3 px-3 text-[#1c1917]',
+                        isHighlighted(p) && 'bg-[#fff3e8] font-medium',
+                      )}
+                    >
                       {fmtLimit(Number(p.limits[row.key]))}
                     </td>
                   ))}
                 </tr>
               ))}
               {/* Features group */}
-              <tr className="bg-slate-50/50">
-                <td colSpan={sorted.length + 1} className="py-2 pl-4 text-xs uppercase tracking-wider text-slate-500 font-medium">
+              <tr className="bg-[#faf6f0]">
+                <td colSpan={sorted.length + 1} className="py-2 pl-5 text-xs uppercase tracking-wider text-[#a8a29e] font-semibold">
                   {t('subscriptions.comparison.featuresGroup')}
                 </td>
               </tr>
               {featureRows.map((row) => (
-                <tr key={row.key} className="border-b border-slate-100">
-                  <td className="py-2.5 pl-4 text-slate-700">{row.label}</td>
+                <tr key={row.key} className="border-b border-[#f1e8db] last:border-0">
+                  <td className="py-3 pl-5 text-[#57534e]">{row.label}</td>
                   {sorted.map((p) => (
-                    <td key={p.id} className="text-center py-2.5 px-2">
+                    <td
+                      key={p.id}
+                      className={cn(
+                        'text-center py-3 px-3',
+                        isHighlighted(p) && 'bg-[#fff3e8]',
+                      )}
+                    >
                       {p.features[row.key] ? (
-                        <Check className="w-4 h-4 text-emerald-600 inline-block" />
+                        <Check className="w-4 h-4 text-[#f97316] inline-block" />
                       ) : (
-                        <X className="w-4 h-4 text-slate-300 inline-block" />
+                        <X className="w-4 h-4 text-[#d6ccbd] inline-block" />
                       )}
                     </td>
                   ))}

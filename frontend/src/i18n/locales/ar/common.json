@@ -838,7 +838,12 @@
     "featureApiAccess": "وصول API",
     "featurePrioritySupport": "دعم ذو أولوية",
     "featureInventoryTracking": "تتبع المخزون",
-    "featureKdsIntegration": "تكامل KDS"
+    "featureKdsIntegration": "تكامل KDS",
+    "featurePosAccess": "نقطة البيع / شاشة المبيعات",
+    "featureReservationSystem": "نظام الحجز",
+    "featurePersonnelManagement": "إدارة الموظفين",
+    "featureDeliveryIntegration": "منصات التوصيل",
+    "featureExternalDisplay": "شاشة بعيدة و واجهة API للشركاء"
   },
   "landing": {
     "badge": "متاح الآن",

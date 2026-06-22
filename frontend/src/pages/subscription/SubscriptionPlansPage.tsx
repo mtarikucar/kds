@@ -9,7 +9,6 @@ import {
 import PlanCard from '../../components/subscriptions/PlanCard';
 import PlanCardSkeleton from '../../components/subscriptions/PlanCardSkeleton';
 import PlanComparisonMatrix from '../../components/subscriptions/PlanComparisonMatrix';
-import Button from '../../components/ui/Button';
 import { useBankTransferDetails } from '../../api/paymentsApi';
 import { BillingCycle, SubscriptionPlanType, Plan } from '../../types';
 
@@ -36,7 +35,7 @@ function YearlySavingsHint({ plans }: { plans: Plan[] }) {
   }, [plans]);
   if (!example) return null;
   return (
-    <p className="mt-3 text-sm text-emerald-700">
+    <p className="mt-3 text-sm font-medium text-[#b45309]">
       💡 {t('subscriptions.plansPage.yearlySavingsHint', {
         plan: example.planName,
         savings: example.savings.toFixed(0),
@@ -110,16 +109,16 @@ const SubscriptionPlansPage = () => {
   };
 
   if (plansLoading) {
-    // Skeleton placeholders match the eventual 4-column grid so the
+    // Skeleton placeholders match the eventual 3-column grid so the
     // layout doesn't jump when plans arrive.
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="h-10 w-72 bg-slate-200 rounded mx-auto mb-4 animate-pulse" />
-          <div className="h-5 w-96 bg-slate-100 rounded mx-auto animate-pulse" />
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-12 text-center">
+          <div className="mx-auto mb-4 h-10 w-72 animate-pulse rounded bg-[#ece2d4]" />
+          <div className="mx-auto h-5 w-96 animate-pulse rounded bg-[#f1e8db]" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
             <PlanCardSkeleton key={i} />
           ))}
         </div>
@@ -129,8 +128,8 @@ const SubscriptionPlansPage = () => {
 
   if (!plans || plans.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-slate-600">{t('subscriptions.plansPage.noPlans')}</p>
+      <div className="py-12 text-center">
+        <p className="text-[#78716c]">{t('subscriptions.plansPage.noPlans')}</p>
       </div>
     );
   }
@@ -139,14 +138,15 @@ const SubscriptionPlansPage = () => {
   const sortedPlans = [...plans].sort((a, b) => a.monthlyPrice - b.monthlyPrice);
 
   const previousPlanName = currentSubscription?.plan?.displayName;
+  const display = { fontFamily: '"Fraunces", Georgia, serif' } as const;
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="mx-auto max-w-6xl px-1 pb-12">
       {/* Onboarding-trial lock banner: the tenant's 7-day trial ended and they
           are locked to this screen until they activate a paid plan. */}
       {currentSubscription?.status === 'TRIAL_ENDED' && (
-        <div className="mb-8 rounded-lg border border-rose-200 bg-rose-50 p-4 text-rose-900">
-          <h3 className="font-semibold mb-1">
+        <div className="mb-8 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-900">
+          <h3 className="mb-1 font-semibold">
             {t(
               'subscriptions.plansPage.trialEndedTitle',
               'Deneme süreniz sona erdi',
@@ -164,8 +164,8 @@ const SubscriptionPlansPage = () => {
           or EXPIRED CTA. Reminds them what plan they were on and gives
           permission to pick a different one. */}
       {isRenewFlow && (
-        <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
-          <h3 className="font-semibold mb-1">
+        <div className="mb-8 rounded-2xl border border-[#f5c9a3] bg-[#fff3e8] p-5 text-[#b45309]">
+          <h3 className="mb-1 font-semibold">
             {t('subscriptions.plansPage.renewBannerTitle', 'Aboneliğinizi yenileyin')}
           </h3>
           <p className="text-sm">
@@ -181,47 +181,61 @@ const SubscriptionPlansPage = () => {
           </p>
         </div>
       )}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-slate-900 mb-4">{t('subscriptions.plansPage.title')}</h1>
-        <p className="text-lg text-slate-600 mb-8">
+
+      {/* Warm hero header */}
+      <div className="mb-12 text-center">
+        <span className="inline-flex items-center gap-2 rounded-full border border-[#f5c9a3] bg-[#fff3e8] px-3 py-1 text-xs font-semibold text-[#b45309]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#f97316]" /> {t('subscriptions.plansPage.heroBadge', 'Esnek planlar')}
+        </span>
+        <h1 className="mt-5 text-4xl font-semibold tracking-tight text-[#1c1917] sm:text-5xl" style={display}>
+          {t('subscriptions.plansPage.title')}
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-lg text-[#57534e]">
           {t('subscriptions.plansPage.subtitle')}
         </p>
 
         {/* Billing Cycle Toggle */}
-        <div className="inline-flex items-center bg-slate-100 rounded-lg p-1">
+        <div className="mt-8 inline-flex items-center rounded-xl border border-[#ece2d4] bg-white p-1 shadow-sm">
           <button
             onClick={() => setBillingCycle(BillingCycle.MONTHLY)}
-            className={`px-6 py-2 rounded-md font-medium transition-colors ${billingCycle === BillingCycle.MONTHLY
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-              }`}
+            className={`rounded-lg px-6 py-2 text-sm font-semibold transition ${
+              billingCycle === BillingCycle.MONTHLY
+                ? 'bg-[#1c1917] text-white shadow-sm'
+                : 'text-[#57534e] hover:text-[#1c1917]'
+            }`}
           >
             {t('subscriptions.monthly')}
           </button>
           <button
             onClick={() => setBillingCycle(BillingCycle.YEARLY)}
-            className={`px-6 py-2 rounded-md font-medium transition-colors ${billingCycle === BillingCycle.YEARLY
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-              }`}
+            className={`flex items-center rounded-lg px-6 py-2 text-sm font-semibold transition ${
+              billingCycle === BillingCycle.YEARLY
+                ? 'bg-[#1c1917] text-white shadow-sm'
+                : 'text-[#57534e] hover:text-[#1c1917]'
+            }`}
           >
             {t('subscriptions.yearly')}
-            <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
+            <span
+              className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                billingCycle === BillingCycle.YEARLY
+                  ? 'bg-[#f97316] text-white'
+                  : 'bg-[#fff3e8] text-[#b45309]'
+              }`}
+            >
               {t('subscriptions.savePercent', { percent: maxSavingsPercent })}
             </span>
           </button>
         </div>
-        {/* Yearly savings transparency — show real numbers when yearly
-            is selected; abstract "%17 tasarruf" rarely converts on its
-            own. We pick the PRO plan as the canonical example since
-            it's the highlighted "popular" tier. */}
+        {/* Yearly savings transparency — show real numbers when yearly is
+            selected; abstract "%17 tasarruf" rarely converts on its own. */}
         {billingCycle === BillingCycle.YEARLY && (
           <YearlySavingsHint plans={sortedPlans} />
         )}
       </div>
 
-      {/* Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+      {/* Plans Grid — 3 equal columns on lg, stacked on mobile. The
+          BUSINESS card is elevated as the highlighted "En Popüler" tier. */}
+      <div className="mb-12 grid grid-cols-1 items-start gap-6 md:grid-cols-3 lg:gap-8 lg:pt-3">
         {sortedPlans.map((plan) => {
           // A non-TRY plan with bank transfer disabled has no usable
           // payment path → guard the CTA so the user doesn't dead-end at
@@ -235,7 +249,7 @@ const SubscriptionPlansPage = () => {
               plan={plan}
               billingCycle={billingCycle}
               isCurrentPlan={currentSubscription?.planId === plan.id}
-              isPopular={plan.name === SubscriptionPlanType.PRO}
+              isPopular={plan.name === SubscriptionPlanType.BUSINESS}
               isTrialEligible={trialEligibleIds.includes(plan.id)}
               onSelectPlan={handleSelectPlan}
               isLoading={processingPlanId === plan.id}
@@ -254,17 +268,20 @@ const SubscriptionPlansPage = () => {
 
       {/* Current Subscription Info */}
       {currentSubscription && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+        <div className="rounded-2xl border border-[#ece2d4] bg-white p-6 shadow-sm shadow-stone-900/5">
           <div className="text-center">
-            <h3 className="font-semibold text-slate-900 mb-2">
+            <h3 className="mb-2 font-semibold text-[#1c1917]">
               {t('subscriptions.plansPage.haveActiveSubscription')}
             </h3>
-            <p className="text-sm text-slate-600 mb-4">
+            <p className="mb-4 text-sm text-[#78716c]">
               {t('subscriptions.plansPage.toChangePlan')}
             </p>
-            <Button variant="primary" onClick={() => navigate('/admin/settings/subscription')}>
+            <button
+              onClick={() => navigate('/admin/settings/subscription')}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ea580c]"
+            >
               {t('subscriptions.plansPage.manageSubscription')}
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -274,35 +291,24 @@ const SubscriptionPlansPage = () => {
       <PlanComparisonMatrix plans={sortedPlans} />
 
       {/* FAQ Section */}
-      <div className="mt-16 border-t pt-12">
-        <h2 className="text-2xl font-bold text-slate-900 mb-6 text-center">
+      <div className="mt-16 border-t border-[#ece2d4] pt-12">
+        <h2 className="mb-8 text-center text-2xl font-semibold tracking-tight text-[#1c1917] sm:text-3xl" style={display}>
           {t('subscriptions.plansPage.faqTitle')}
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <div>
-            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqChangePlans')}</h3>
-            <p className="text-slate-600 text-sm">
-              {t('subscriptions.plansPage.faqChangePlansAnswer')}
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqPaymentMethods')}</h3>
-            <p className="text-slate-600 text-sm">
-              {t('subscriptions.plansPage.faqPaymentMethodsAnswer')}
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqCancelAnytime')}</h3>
-            <p className="text-slate-600 text-sm">
-              {t('subscriptions.plansPage.faqCancelAnytimeAnswer')}
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqFreeTrial')}</h3>
-            <p className="text-slate-600 text-sm">
-              {t('subscriptions.plansPage.faqFreeTrialAnswer')}
-            </p>
-          </div>
+        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
+          {[
+            { q: 'faqChangePlans', a: 'faqChangePlansAnswer' },
+            { q: 'faqPaymentMethods', a: 'faqPaymentMethodsAnswer' },
+            { q: 'faqCancelAnytime', a: 'faqCancelAnytimeAnswer' },
+            { q: 'faqFreeTrial', a: 'faqFreeTrialAnswer' },
+          ].map((item) => (
+            <div key={item.q} className="rounded-2xl border border-[#ece2d4] bg-white p-6 shadow-sm shadow-stone-900/5">
+              <h3 className="mb-2 font-semibold text-[#1c1917]">{t(`subscriptions.plansPage.${item.q}`)}</h3>
+              <p className="text-sm leading-relaxed text-[#78716c]">
+                {t(`subscriptions.plansPage.${item.a}`)}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

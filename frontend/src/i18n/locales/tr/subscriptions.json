@@ -227,6 +227,7 @@
       "limits": {
         "maxUsers": "Kullanıcı sayısı",
         "maxTables": "Masa sayısı",
+        "maxBranches": "Şube sayısı",
         "maxProducts": "Ürün sayısı",
         "maxCategories": "Kategori sayısı",
         "maxMonthlyOrders": "Aylık sipariş"
@@ -235,9 +236,11 @@
         "kdsIntegration": "KDS entegrasyonu",
         "inventoryTracking": "Stok takibi",
         "advancedReports": "Gelişmiş raporlar",
+        "posAccess": "POS / Satış ekranı",
         "reservationSystem": "Rezervasyon sistemi",
         "personnelManagement": "Personel yönetimi",
         "deliveryIntegration": "Yemek platformu entegrasyonu",
+        "externalDisplay": "Uzak ekran & Partner API",
         "multiLocation": "Çoklu şube",
         "customBranding": "Özel marka",
         "apiAccess": "API erişimi",
