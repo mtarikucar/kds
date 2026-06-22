@@ -241,6 +241,29 @@ async function bootstrap() {
       .setDescription("Cloud-based restaurant management system")
       .setVersion("1.0")
       .addBearerAuth()
+      // Partner Display API — a partner backend authenticates the screen-mint
+      // call with its key id + secret (bearer secret over TLS).
+      .addApiKey(
+        {
+          type: "apiKey",
+          name: "X-Partner-Key",
+          in: "header",
+          description:
+            "Partner API key id. Send the matching secret in X-Partner-Secret.",
+        },
+        "PartnerKey",
+      )
+      // Partner Display API — a screen presents its scoped token as
+      // `Authorization: Screen <token>` on /v1/display/* routes.
+      .addApiKey(
+        {
+          type: "apiKey",
+          name: "Authorization",
+          in: "header",
+          description: 'Screen token, formatted as "Screen <token>".',
+        },
+        "Screen",
+      )
       .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup("api/docs", app, document);

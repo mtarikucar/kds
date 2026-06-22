@@ -56,6 +56,8 @@ export class PlanProjectorService {
     // mirrored as feature.posAccess on the engine; PlanFeatureGuard +
     // <FeatureGate feature="posAccess"> both read the engine grant.
     "posAccess",
+    // Partner Display API gate — see PlanFeature.EXTERNAL_DISPLAY.
+    "externalDisplay",
   ] as const;
 
   private static readonly LIMIT_COLUMNS = [

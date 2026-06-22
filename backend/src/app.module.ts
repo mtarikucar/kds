@@ -1,7 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { MachineThrottlerGuard } from "./common/guards/machine-throttler.guard";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { RequestContextInterceptor } from "./common/context/request-context.interceptor";
 import { AppController } from "./app.controller";
@@ -56,6 +57,7 @@ import { FulfillmentModule } from "./modules/fulfillment/fulfillment.module";
 import { IntegrationGatewayModule } from "./modules/integration-gateway/integration-gateway.module";
 import { HealthDashboardModule } from "./modules/health-dashboard/health-dashboard.module";
 import { WebhooksOutboundModule } from "./modules/webhooks-outbound/webhooks-outbound.module";
+import { PartnerModule } from "./modules/partner/partner.module";
 import { KmsModule } from "./modules/kms/kms.module";
 import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
 import { MetricsModule } from "./common/metrics/metrics.module";
@@ -166,6 +168,8 @@ import { validate } from "./config/env.validation";
     HealthDashboardModule,
     // Outbound webhook delivery to tenant endpoints.
     WebhooksOutboundModule,
+    // Partner Display API — third-party/remote-screen integration.
+    PartnerModule,
     // KMS abstraction (env-derived today; AWS KMS stub for production).
     KmsModule,
   ],
@@ -174,7 +178,9 @@ import { validate } from "./config/env.validation";
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      // Per-principal tracker (api-key / screen token) instead of per-IP so a
+      // venue of partner screens behind one NAT IP doesn't share a bucket.
+      useClass: MachineThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,

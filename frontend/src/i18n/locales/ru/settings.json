@@ -7,7 +7,8 @@
     "reservations": "Reservations",
     "sms": "SMS Уведомления",
     "onlineOrders": "Онлайн-заказы",
-    "accounting": "Бухгалтерия"
+    "accounting": "Бухгалтерия",
+    "partnerKeys": "Партнёрские API-ключи"
   },
   "sms": {
     "title": "Настройки SMS уведомлений",

@@ -108,12 +108,25 @@ export class PaytrWebhookController {
     //   "CK-" → mixed-cart hardware/addon/plan checkout (v2.8.85)
     //   default → subscription settlement (the original path)
     if (merchantOid.startsWith("SP")) {
-      if (status === "success") {
-        await this.selfPay.handleWebhookSuccess(merchantOid, body.payment_type);
-      } else {
-        await this.selfPay.handleWebhookFailure(
-          merchantOid,
-          body.failed_reason_msg ?? body.failed_reason_code,
+      try {
+        if (status === "success") {
+          await this.selfPay.handleWebhookSuccess(
+            merchantOid,
+            body.payment_type,
+          );
+        } else {
+          await this.selfPay.handleWebhookFailure(
+            merchantOid,
+            body.failed_reason_msg ?? body.failed_reason_code,
+          );
+        }
+      } catch (err) {
+        // Mirror the CK- branch: a DB blip mid-settlement must NOT bubble to a
+        // non-200 (PayTR would then retry 4×). The self-pay settlement is
+        // idempotent + PARTIALLY_SETTLED-healing, so swallow + log and still
+        // return "OK"; a sweeper / next retry reconciles.
+        this.logger.error(
+          `Self-pay settlement raised for oid=${merchantOid}: ${(err as Error).message}`,
         );
       }
       return "OK";

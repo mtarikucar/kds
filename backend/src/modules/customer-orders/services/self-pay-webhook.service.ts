@@ -4,12 +4,14 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   forwardRef,
 } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { PaymentsService } from "../../orders/services/payments.service";
+import { KdsGateway } from "../../kds/kds.gateway";
 import { PaymentStatus } from "../../../common/constants/order-status.enum";
 
 interface ItemsByOrderShape {
@@ -34,6 +36,9 @@ export class SelfPayWebhookService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => PaymentsService))
     private paymentsService: PaymentsService,
+    // Optional so the existing bare-constructor unit tests stay green; when
+    // wired it pushes a settlement event to the customer/screen session.
+    @Optional() private kdsGateway?: KdsGateway,
   ) {}
 
   /**
@@ -195,6 +200,27 @@ export class SelfPayWebhookService {
         },
         data: { status: "SUCCEEDED", succeededAt: new Date() },
       });
+
+      // Push a settlement event to the customer/screen session room. Best
+      // effort only — the webhook contract is to always resolve and return OK
+      // to PayTR, so a socket failure must never flip a durable SUCCEEDED
+      // intent into the catch path. Emits AFTER the SUCCEEDED flip so a
+      // partial/failed path (below) never signals a false "paid".
+      try {
+        if (intent.sessionId) {
+          this.kdsGateway?.emitToCustomerSession(
+            intent.sessionId,
+            "customer:payment-settled",
+            {
+              merchantOid,
+              status: "SUCCEEDED",
+              orderIds: itemsByOrder.map((b) => b.orderId),
+            },
+          );
+        }
+      } catch {
+        /* best-effort; never block the webhook */
+      }
     } catch (err: any) {
       this.logger.error(
         `self-pay settlement failed for ${merchantOid}: ${err?.message ?? err}`,

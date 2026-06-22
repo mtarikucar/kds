@@ -18,6 +18,7 @@ const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
   personnelManagement: SubscriptionPlanType.PRO,
   deliveryIntegration: SubscriptionPlanType.PRO,
   apiAccess: SubscriptionPlanType.BUSINESS,
+  externalDisplay: SubscriptionPlanType.BUSINESS,
 };
 
 // Map limit types to their display names

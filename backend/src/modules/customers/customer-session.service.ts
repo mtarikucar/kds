@@ -82,6 +82,52 @@ export class CustomerSessionService {
   }
 
   /**
+   * Mint a backing CustomerSession for a Partner Display ScreenSession. Same
+   * 64-hex sessionId shape as createSession (so every customer-orders /
+   * self-pay / qr-menu path treats it identically), but the TTL is
+   * screen-controlled (the ScreenSession's refresh window) rather than the 4h
+   * default, and existence checks still apply. Returns the same minimal shape.
+   */
+  async createForScreen(
+    tenantId: string,
+    tableId: string | undefined,
+    ttlMs: number,
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) throw new UnauthorizedException("Invalid tenant");
+    if (tableId) {
+      const table = await this.prisma.table.findFirst({
+        where: { id: tableId, tenantId },
+        select: { id: true },
+      });
+      if (!table)
+        throw new UnauthorizedException("Invalid table for this tenant");
+    }
+
+    const sessionId = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + ttlMs);
+    const session = await this.prisma.customerSession.create({
+      data: { sessionId, tenantId, tableId, expiresAt, isActive: true },
+    });
+    return { sessionId: session.sessionId, expiresAt: session.expiresAt };
+  }
+
+  /**
+   * Push a backing session's expiry forward (called when a screen token is
+   * refreshed) so a long-lived screen's ordering identity never lapses
+   * mid-shift. No-op if the session is already inactive/gone.
+   */
+  async extendSession(sessionId: string, expiresAt: Date): Promise<void> {
+    await this.prisma.customerSession.updateMany({
+      where: { sessionId, isActive: true },
+      data: { expiresAt },
+    });
+  }
+
+  /**
    * Resolve a session token. Callers SHOULD supply `expectedTenantId` when a
    * tenant boundary is in scope (e.g. a staff controller acting on behalf of
    * a customer) so a guessed token from another tenant is rejected. For

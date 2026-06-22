@@ -94,6 +94,7 @@ import ProductDetailPage from './features/hardware-store/ProductDetailPage';
 import BranchesPage from './features/branches/BranchesPage';
 import HealthPage from './features/health/HealthPage';
 import WebhooksPage from './features/webhooks/WebhooksPage';
+import PartnerKeysPage from './features/partner-keys/PartnerKeysPage';
 import BridgesPage from './features/bridges/BridgesPage';
 import FiscalRecoveryPage from './features/fiscal/FiscalRecoveryPage';
 import CallerFeedPage from './features/caller/CallerFeedPage';
@@ -299,6 +300,15 @@ function App() {
           <Route path="webhooks" element={
             <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
               <WebhooksPage />
+            </FeatureGate>
+          } />
+          {/* Phase 7: Partner Display API keys — lets third-party screens/apps
+              browse menu, order, self-pay and watch status live via a
+              tenant-issued API key. Gated by the externalDisplay plan feature;
+              direct URL hit on a tenant lacking it shows the UpsellCard. */}
+          <Route path="partner-keys" element={
+            <FeatureGate feature="externalDisplay" fallback={<UpsellCard planName="BUSINESS" />}>
+              <PartnerKeysPage />
             </FeatureGate>
           } />
           <Route path="reservations" element={

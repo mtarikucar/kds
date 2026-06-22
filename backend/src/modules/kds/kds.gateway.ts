@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from "socket.io";
 import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { createHash } from "node:crypto";
 import * as Sentry from "@sentry/node";
 import { PrismaService } from "../../prisma/prisma.service";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -88,11 +89,18 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.handshake.headers.authorization?.split(" ")[1];
       const sessionId =
         client.handshake.auth.sessionId || client.handshake.query.sessionId;
+      const screenToken =
+        client.handshake.auth.screenToken || client.handshake.query.screenToken;
 
       if (token) {
         const authed = await this.tryStaffAuth(client, token);
         if (authed) return;
         // fall through — staff auth failed, customer session may still be valid
+      }
+
+      if (screenToken) {
+        const authed = await this.tryScreenAuth(client, String(screenToken));
+        if (authed) return;
       }
 
       if (sessionId) {
@@ -226,14 +234,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (payload.exp && typeof payload.exp === "number") {
       const msToExpiry = payload.exp * 1000 - Date.now();
       if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           if (client.connected) {
             this.logger.log(
               `Staff client ${client.id} token expired; disconnecting.`,
             );
             client.disconnect(true);
           }
-        }, msToExpiry).unref?.();
+        }, msToExpiry);
+        timer.unref?.();
+        client.data.expiryTimer = timer;
       }
     }
 
@@ -386,14 +396,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // `.unref()` keeps the timer from holding the process alive.
     const msToExpiry = session.expiresAt.getTime() - Date.now();
     if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (client.connected) {
           this.logger.log(
             `Customer client ${client.id} session expired; disconnecting (session=${session.sessionId}).`,
           );
           client.disconnect(true);
         }
-      }, msToExpiry).unref?.();
+      }, msToExpiry);
+      timer.unref?.();
+      client.data.expiryTimer = timer;
     }
 
     // Debounce lastActivity writes: a flaky mobile network reconnecting every
@@ -436,7 +448,94 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return true;
   }
 
+  /**
+   * Partner Display screen principal. Validates the opaque screen token
+   * (sha256-by-hash lookup, same shape as ScreenSessionService.authenticate)
+   * and joins the BACKING customer-session room so the screen receives the
+   * existing customer:order-* events with zero new emit code, plus a
+   * screen-session room for any future screen-only events. Requires the
+   * realtime:subscribe scope. Mirrors tryCustomerAuth's expiry auto-disconnect.
+   */
+  private async tryScreenAuth(
+    client: Socket,
+    screenToken: string,
+  ): Promise<boolean> {
+    const tokenHash = createHash("sha256").update(screenToken).digest("hex");
+    const screen = await this.prisma.screenSession.findFirst({
+      where: { tokenHash, status: "active" },
+      select: {
+        id: true,
+        tenantId: true,
+        branchId: true,
+        orderingSessionId: true,
+        scopes: true,
+        tokenExpiresAt: true,
+      },
+    });
+
+    if (!screen) {
+      this.logger.warn(`Screen session rejected for ${client.id}: not found`);
+      return false;
+    }
+    if (screen.tokenExpiresAt < new Date()) {
+      this.logger.warn(`Screen session rejected for ${client.id}: expired`);
+      return false;
+    }
+    if (!screen.scopes.includes("realtime:subscribe")) {
+      this.logger.warn(
+        `Screen session rejected for ${client.id}: missing realtime:subscribe scope`,
+      );
+      return false;
+    }
+
+    client.data.screenSessionId = screen.id;
+    client.data.tenantId = screen.tenantId;
+    client.data.branchId = screen.branchId;
+    client.data.sessionId = screen.orderingSessionId;
+    client.data.userType = "screen";
+    client.data.sessionExpiresAt = screen.tokenExpiresAt;
+
+    client.join(`customer-session-${screen.orderingSessionId}`);
+    client.join(`screen-session-${screen.id}`);
+
+    const msToExpiry = screen.tokenExpiresAt.getTime() - Date.now();
+    if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+      const timer = setTimeout(() => {
+        if (client.connected) {
+          this.logger.log(
+            `Screen client ${client.id} token expired; disconnecting (screen=${screen.id}).`,
+          );
+          client.disconnect(true);
+        }
+      }, msToExpiry);
+      timer.unref?.();
+      // Stored so handleDisconnect can clear it — else an early disconnect
+      // leaves the closure pinning the dead Socket until expiry.
+      client.data.expiryTimer = timer;
+    }
+
+    this.logger.log(
+      `Screen ${client.id} connected (screen=${screen.id}, branch=${screen.branchId}).`,
+    );
+    return true;
+  }
+
+  /**
+   * Force-disconnect any live sockets bound to these ordering sessions. Called
+   * on revoke so a revoked screen stops receiving events immediately instead of
+   * lingering until its access-token expiry. disconnectSockets(true) closes the
+   * underlying connection, so the socket leaves every room it joined.
+   */
+  disconnectOrderingSessions(orderingSessionIds: string[]): void {
+    for (const sid of orderingSessionIds) {
+      this.server?.in(`customer-session-${sid}`).disconnectSockets(true);
+    }
+  }
+
   handleDisconnect(client: Socket) {
+    // Clear the auth-expiry auto-disconnect timer (staff/customer/screen) so an
+    // early disconnect doesn't retain the dead Socket via the timer closure.
+    if (client.data?.expiryTimer) clearTimeout(client.data.expiryTimer);
     // Iter-81: free the per-session activity-debounce map entry on
     // disconnect. Pre-iter-81 this was a pure logger and the map grew
     // by one entry per customer connect across the lifetime of the

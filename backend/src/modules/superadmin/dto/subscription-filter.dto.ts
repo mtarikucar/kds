@@ -161,6 +161,11 @@ export class CreatePlanDto {
   @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()
+  externalDisplay?: boolean = false;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
   prioritySupport?: boolean = false;
 
   @ApiPropertyOptional({ default: false })

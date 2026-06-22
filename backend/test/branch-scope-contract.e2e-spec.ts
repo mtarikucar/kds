@@ -5,6 +5,7 @@ import { DiscoveryModule, DiscoveryService, Reflector } from "@nestjs/core";
 import { PATH_METADATA, METHOD_METADATA } from "@nestjs/common/constants";
 import { AppModule } from "../src/app.module";
 import { IS_PUBLIC_KEY } from "../src/modules/auth/decorators/public.decorator";
+import { IS_MACHINE_AUTH_KEY } from "../src/modules/auth/decorators/machine-auth.decorator";
 import { IS_SKIP_BRANCH_SCOPE_KEY } from "../src/modules/auth/decorators/skip-branch-scope.decorator";
 import {
   IS_SUPERADMIN_PUBLIC_KEY,
@@ -104,6 +105,10 @@ describe("Branch-scope contract (direction A)", () => {
         const targets = [handler, metatype];
         const exempt =
           !!reflector.getAllAndOverride(IS_PUBLIC_KEY, targets) ||
+          // @MachineAuth (partner key / screen token) bypasses the global
+          // BranchGuard via shouldBypassGlobalAuth, so these routes never need
+          // X-Branch-Id — a legitimate exemption category.
+          !!reflector.getAllAndOverride(IS_MACHINE_AUTH_KEY, targets) ||
           !!reflector.getAllAndOverride(IS_SKIP_BRANCH_SCOPE_KEY, targets) ||
           !!reflector.getAllAndOverride(IS_SUPERADMIN_PUBLIC_KEY, targets) ||
           !!reflector.getAllAndOverride(IS_SUPERADMIN_ROUTE_KEY, targets);

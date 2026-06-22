@@ -83,6 +83,17 @@ export class CreateCustomerOrderDto {
   @IsUUID()
   tableId?: string;
 
+  @ApiPropertyOptional({
+    description:
+      "Explicit branch for tableless orders (validated to belong to the tenant). " +
+      "Used by branch-bound partner screens; ignored when a tableId is given " +
+      "(branch is derived from the table). Falls back to the tenant's first " +
+      "active branch when omitted.",
+  })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
   @ApiPropertyOptional({ enum: OrderType })
   @IsEnum(OrderType)
   @IsOptional()

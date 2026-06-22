@@ -12,6 +12,7 @@ const PLAN: PlanGrantSource = {
   personnelManagement: false,
   deliveryIntegration: false,
   posAccess: true,
+  externalDisplay: false,
   maxUsers: 5,
   maxTables: 10,
   maxBranches: 1,
@@ -87,7 +88,10 @@ describe("foldPlanGrants", () => {
       PLAN,
       [
         { grants: { "integration.delivery": ["trendyol"] }, quantity: 1 },
-        { grants: { "integration.delivery": ["trendyol", "getir"] }, quantity: 1 },
+        {
+          grants: { "integration.delivery": ["trendyol", "getir"] },
+          quantity: 1,
+        },
       ],
       null,
       null,

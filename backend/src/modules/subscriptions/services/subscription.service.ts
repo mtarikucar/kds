@@ -1251,6 +1251,7 @@ export class SubscriptionService {
           multiLocation: plan.multiLocation,
           customBranding: plan.customBranding,
           apiAccess: plan.apiAccess,
+          externalDisplay: plan.externalDisplay,
           prioritySupport: plan.prioritySupport,
           inventoryTracking: plan.inventoryTracking,
           kdsIntegration: plan.kdsIntegration,

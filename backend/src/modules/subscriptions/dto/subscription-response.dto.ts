@@ -63,6 +63,7 @@ export class PlanResponseDto {
     multiLocation: boolean;
     customBranding: boolean;
     apiAccess: boolean;
+    externalDisplay: boolean;
     prioritySupport: boolean;
     inventoryTracking: boolean;
     kdsIntegration: boolean;

@@ -44,6 +44,10 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     // Exported so the orders module's PaymentsService (which consults the
     // reservation map) can inject the reservation collaborator directly.
     SelfPayReservationService,
+    // Exported so the partner /display surface can adapt these verbatim
+    // (PartnerModule imports CustomerOrdersModule).
+    SelfPayQueryService,
+    SelfPayIntentService,
   ],
 })
 export class CustomerOrdersModule {}

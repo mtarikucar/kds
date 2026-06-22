@@ -1,6 +1,7 @@
 import { ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "../../modules/auth/decorators/public.decorator";
+import { IS_MACHINE_AUTH_KEY } from "../../modules/auth/decorators/machine-auth.decorator";
 import {
   IS_SUPERADMIN_PUBLIC_KEY,
   IS_SUPERADMIN_ROUTE_KEY,
@@ -20,6 +21,7 @@ export function shouldBypassGlobalAuth(
   const targets = [context.getHandler(), context.getClass()];
   return (
     !!reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets) ||
+    !!reflector.getAllAndOverride<boolean>(IS_MACHINE_AUTH_KEY, targets) ||
     !!reflector.getAllAndOverride<boolean>(IS_SUPERADMIN_PUBLIC_KEY, targets) ||
     !!reflector.getAllAndOverride<boolean>(IS_SUPERADMIN_ROUTE_KEY, targets)
   );
