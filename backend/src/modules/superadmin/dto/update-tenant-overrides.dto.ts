@@ -35,6 +35,11 @@ export class FeatureOverridesDto {
   @StringToBoolean()
   @IsOptional()
   @IsBoolean()
+  externalDisplay?: boolean | null;
+
+  @StringToBoolean()
+  @IsOptional()
+  @IsBoolean()
   prioritySupport?: boolean | null;
 
   @StringToBoolean()

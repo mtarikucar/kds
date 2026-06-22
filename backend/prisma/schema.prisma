@@ -989,6 +989,9 @@ model SubscriptionPlan {
   // frontend /pos route both check `feature.posAccess`. Default true so
   // every new plan row inherits access unless the seed/data step flips it.
   posAccess           Boolean @default(true)
+  // Partner Display API — third-party/remote-screen integration gate. Default
+  // false; flipped true for TRIAL/BUSINESS via migration + seed.
+  externalDisplay     Boolean @default(false)
 
   // Discount settings
   discountPercentage Int? // Discount percentage (e.g., 25 for 25%)

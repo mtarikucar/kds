@@ -43,6 +43,7 @@ export class DemoService {
     multiLocation: true,
     customBranding: true,
     apiAccess: true,
+    externalDisplay: true,
     prioritySupport: true,
     inventoryTracking: true,
     kdsIntegration: true,

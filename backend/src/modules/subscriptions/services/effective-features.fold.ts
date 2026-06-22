@@ -23,6 +23,7 @@ export interface PlanGrantSource {
   personnelManagement: boolean;
   deliveryIntegration: boolean;
   posAccess: boolean;
+  externalDisplay: boolean;
   maxUsers: number;
   maxTables: number;
   maxBranches: number;
@@ -60,6 +61,7 @@ export function foldPlanGrants(
     personnelManagement: plan.personnelManagement,
     deliveryIntegration: plan.deliveryIntegration,
     posAccess: plan.posAccess,
+    externalDisplay: plan.externalDisplay,
   };
   const limits: Record<string, number> = {
     maxUsers: plan.maxUsers,

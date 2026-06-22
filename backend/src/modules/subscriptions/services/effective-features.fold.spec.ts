@@ -12,6 +12,7 @@ const PLAN: PlanGrantSource = {
   personnelManagement: false,
   deliveryIntegration: false,
   posAccess: true,
+  externalDisplay: false,
   maxUsers: 5,
   maxTables: 10,
   maxBranches: 1,

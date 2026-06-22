@@ -21,6 +21,7 @@ export interface PlanConfig {
     multiLocation: boolean;
     customBranding: boolean;
     apiAccess: boolean;
+    externalDisplay: boolean;
     prioritySupport: boolean;
     inventoryTracking: boolean;
     kdsIntegration: boolean;
@@ -56,6 +57,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       multiLocation: true,
       customBranding: true,
       apiAccess: true,
+      externalDisplay: true,
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,
@@ -86,6 +88,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       multiLocation: false,
       customBranding: false,
       apiAccess: false,
+      externalDisplay: false,
       prioritySupport: false,
       inventoryTracking: false,
       kdsIntegration: true,
@@ -118,6 +121,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       multiLocation: false,
       customBranding: false,
       apiAccess: false,
+      externalDisplay: false,
       prioritySupport: false,
       inventoryTracking: true,
       kdsIntegration: true,
@@ -149,6 +153,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       multiLocation: true,
       customBranding: true,
       apiAccess: false,
+      externalDisplay: false,
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,
@@ -180,6 +185,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       multiLocation: true,
       customBranding: true,
       apiAccess: true,
+      externalDisplay: true,
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,

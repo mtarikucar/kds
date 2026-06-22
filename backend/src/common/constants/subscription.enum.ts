@@ -75,6 +75,10 @@ export enum PlanFeature {
   PERSONNEL_MANAGEMENT = "personnelManagement",
   DELIVERY_INTEGRATION = "deliveryIntegration",
   POS_ACCESS = "posAccess",
+  // Partner Display API — third-party/remote-screen integration (table
+  // tablets that replicate the QR menu). Gates partner API-key issuance +
+  // screen-session minting. Mirrored as feature.externalDisplay on the engine.
+  EXTERNAL_DISPLAY = "externalDisplay",
 }
 
 export enum TenantStatus {

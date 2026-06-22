@@ -270,6 +270,8 @@ describe('PlanProjectorService.projectTenant', () => {
       // posAccess=false, every other tier gets true; projector mirrors
       // the column verbatim so PlanFeatureGuard can read it.
       'posAccess',
+      // Partner Display API gate — feature.externalDisplay.
+      'externalDisplay',
     ];
     // Same intent for numeric limit columns.
     const EXPECTED_LIMITS = [

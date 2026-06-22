@@ -114,6 +114,7 @@ export class AuthProvisioningService {
     multiLocation?: boolean | null;
     customBranding?: boolean | null;
     apiAccess?: boolean | null;
+    externalDisplay?: boolean | null;
     prioritySupport?: boolean | null;
     inventoryTracking?: boolean | null;
     kdsIntegration?: boolean | null;
@@ -127,6 +128,7 @@ export class AuthProvisioningService {
       multiLocation: !!businessPlan.multiLocation,
       customBranding: !!businessPlan.customBranding,
       apiAccess: !!businessPlan.apiAccess,
+      externalDisplay: !!businessPlan.externalDisplay,
       prioritySupport: !!businessPlan.prioritySupport,
       inventoryTracking: !!businessPlan.inventoryTracking,
       kdsIntegration: !!businessPlan.kdsIntegration,

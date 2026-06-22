@@ -44,24 +44,28 @@ const T = true;
 const FEATURE_MATRIX: Record<SubscriptionPlanType, FeatureFlags> = {
   [SubscriptionPlanType.FREE]: {
     advancedReports: F, multiLocation: F, customBranding: F, apiAccess: F,
+    externalDisplay: F,
     prioritySupport: F, inventoryTracking: F, kdsIntegration: T,
     reservationSystem: F, personnelManagement: F, deliveryIntegration: F,
     posAccess: F,
   },
   [SubscriptionPlanType.BASIC]: {
     advancedReports: F, multiLocation: F, customBranding: F, apiAccess: F,
+    externalDisplay: F,
     prioritySupport: F, inventoryTracking: T, kdsIntegration: T,
     reservationSystem: F, personnelManagement: F, deliveryIntegration: F,
     posAccess: T,
   },
   [SubscriptionPlanType.PRO]: {
     advancedReports: T, multiLocation: T, customBranding: T, apiAccess: F,
+    externalDisplay: F,
     prioritySupport: T, inventoryTracking: T, kdsIntegration: T,
     reservationSystem: T, personnelManagement: T, deliveryIntegration: T,
     posAccess: T,
   },
   [SubscriptionPlanType.BUSINESS]: {
     advancedReports: T, multiLocation: T, customBranding: T, apiAccess: T,
+    externalDisplay: T,
     prioritySupport: T, inventoryTracking: T, kdsIntegration: T,
     reservationSystem: T, personnelManagement: T, deliveryIntegration: T,
     posAccess: T,

@@ -22,6 +22,7 @@ type PlanFeatureKey =
   | "multiLocation"
   | "customBranding"
   | "apiAccess"
+  | "externalDisplay"
   | "prioritySupport"
   | "inventoryTracking"
   | "kdsIntegration"
@@ -34,6 +35,7 @@ const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "multiLocation",
   "customBranding",
   "apiAccess",
+  "externalDisplay",
   "prioritySupport",
   "inventoryTracking",
   "kdsIntegration",
@@ -552,6 +554,7 @@ export class SuperAdminTenantsService {
           multiLocation: plan.multiLocation,
           customBranding: plan.customBranding,
           apiAccess: plan.apiAccess,
+          externalDisplay: plan.externalDisplay,
           prioritySupport: plan.prioritySupport,
           inventoryTracking: plan.inventoryTracking,
           kdsIntegration: plan.kdsIntegration,
