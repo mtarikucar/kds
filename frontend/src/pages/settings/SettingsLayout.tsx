@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt } from 'lucide-react';
+import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt, KeyRound } from 'lucide-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import type { PlanFeatures } from '../../types';
 
@@ -54,6 +54,14 @@ const SettingsLayout = () => {
       icon: Webhook,
       label: t('webhooks'),
       gate: { feature: 'apiAccess' },
+    },
+    {
+      // Phase 7: Partner Display API keys — same "API & Integrations" grouping
+      // as Integrations/Webhooks, gated on the externalDisplay plan feature.
+      to: '/admin/settings/partner-keys',
+      icon: KeyRound,
+      label: t('nav.partnerKeys'),
+      gate: { feature: 'externalDisplay' },
     },
     {
       to: '/admin/settings/reservations',

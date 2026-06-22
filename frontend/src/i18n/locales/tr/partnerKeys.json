@@ -1,0 +1,56 @@
+{
+  "page": {
+    "title": "Partner API Anahtarları",
+    "subtitle": "Partner uygulamaların ve ekranların (masa tableti gibi) menüyü görüntüleyebilmesi, sipariş alabilmesi, ödeme yapabilmesi ve sipariş durumunu canlı izleyebilmesi için API anahtarı oluşturun."
+  },
+  "create": {
+    "button": "Anahtar oluştur",
+    "title": "API anahtarı oluştur",
+    "nameLabel": "İsim",
+    "namePlaceholder": "örn. Masa tableti — lobi",
+    "scopesLabel": "İzinler",
+    "originsLabel": "İzin verilen dönüş adresleri (isteğe bağlı)",
+    "originsPlaceholder": "https://app.partner.example",
+    "originsHint": "Self-servis ödeme sonrası partnerin yönlendirileceği adresler. Her satıra bir tane veya virgülle ayırın.",
+    "restrictBranchesLabel": "Belirli şubelerle sınırla",
+    "noBranches": "Kullanılabilir şube yok.",
+    "cancel": "İptal",
+    "submit": "Anahtar oluştur"
+  },
+  "list": {
+    "loading": "Yükleniyor…",
+    "empty": "Henüz API anahtarı yok. Bir partner ekranı veya uygulaması bağlamak için bir anahtar oluşturun.",
+    "col": {
+      "name": "İsim",
+      "keyId": "Anahtar Kimliği",
+      "scopes": "İzinler",
+      "status": "Durum",
+      "lastUsed": "Son kullanım"
+    },
+    "revoke": "İptal et",
+    "confirmRevoke": "\"{{name}}\" anahtarı iptal edilsin mi? Bu anahtarı kullanan tüm ekranlar anında çalışmayı durdurur."
+  },
+  "status": {
+    "active": "etkin",
+    "revoked": "iptal edildi"
+  },
+  "secret": {
+    "created": "API anahtarı oluşturuldu.",
+    "copiedIntro": "Gizli anahtar panonuza kopyalandı.",
+    "saveNow": "Şimdi kaydedin — bir daha gösteremeyeceğiz.",
+    "autoHiding": "{{seconds}} sn içinde gizlenecek.",
+    "keyIdLabel": "Anahtar Kimliği",
+    "show": "Göster",
+    "hide": "Gizle",
+    "copyAgain": "Tekrar kopyala",
+    "saved": "Kaydettim",
+    "toastCopied": "Gizli anahtar panoya kopyalandı",
+    "toastCopiedShort": "Kopyalandı"
+  },
+  "toast": {
+    "created": "API anahtarı oluşturuldu. Gizli anahtarı şimdi kaydedin — bir daha gösterilmeyecek.",
+    "createFailed": "API anahtarı oluşturulamadı",
+    "revoked": "API anahtarı iptal edildi",
+    "revokeFailed": "API anahtarı iptal edilemedi"
+  }
+}

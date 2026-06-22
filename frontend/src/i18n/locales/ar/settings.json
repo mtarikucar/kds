@@ -7,7 +7,8 @@
     "reservations": "Reservations",
     "sms": "إشعارات SMS",
     "onlineOrders": "الطلبات عبر الإنترنت",
-    "accounting": "المحاسبة"
+    "accounting": "المحاسبة",
+    "partnerKeys": "مفاتيح واجهة برمجة التطبيقات للشركاء"
   },
   "sms": {
     "title": "إعدادات إشعارات SMS",

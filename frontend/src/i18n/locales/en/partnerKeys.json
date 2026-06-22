@@ -1,0 +1,56 @@
+{
+  "page": {
+    "title": "Partner API Keys",
+    "subtitle": "Issue API keys so partner apps and screens (a table tablet) can browse the menu, take orders, self-pay and watch order status live."
+  },
+  "create": {
+    "button": "Create key",
+    "title": "Create API key",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Table tablet — lobby",
+    "scopesLabel": "Scopes",
+    "originsLabel": "Allowed return origins (optional)",
+    "originsPlaceholder": "https://app.partner.example",
+    "originsHint": "Where the partner is redirected back to after self-pay. One per line or comma-separated.",
+    "restrictBranchesLabel": "Restrict to specific branches",
+    "noBranches": "No branches available.",
+    "cancel": "Cancel",
+    "submit": "Create key"
+  },
+  "list": {
+    "loading": "Loading…",
+    "empty": "No API keys yet. Create one to connect a partner screen or app.",
+    "col": {
+      "name": "Name",
+      "keyId": "Key ID",
+      "scopes": "Scopes",
+      "status": "Status",
+      "lastUsed": "Last used"
+    },
+    "revoke": "Revoke",
+    "confirmRevoke": "Revoke the key \"{{name}}\"? Any screen using it stops working immediately."
+  },
+  "status": {
+    "active": "active",
+    "revoked": "revoked"
+  },
+  "secret": {
+    "created": "API key created.",
+    "copiedIntro": "The secret has been copied to your clipboard.",
+    "saveNow": "Save it now — we cannot show it again.",
+    "autoHiding": "Auto-hiding in {{seconds}}s.",
+    "keyIdLabel": "Key ID",
+    "show": "Show",
+    "hide": "Hide",
+    "copyAgain": "Copy again",
+    "saved": "I've saved it",
+    "toastCopied": "Secret copied to clipboard",
+    "toastCopiedShort": "Copied"
+  },
+  "toast": {
+    "created": "API key created. Save the secret now — it won't be shown again.",
+    "createFailed": "Could not create the API key",
+    "revoked": "API key revoked",
+    "revokeFailed": "Could not revoke the API key"
+  }
+}

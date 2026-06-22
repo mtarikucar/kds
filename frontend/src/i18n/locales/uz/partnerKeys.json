@@ -1,0 +1,56 @@
+{
+  "page": {
+    "title": "Hamkor API kalitlari",
+    "subtitle": "Hamkor ilovalar va ekranlar (stol planshetlari) menyuni ko'rishi, buyurtma berishi, o'zi to'lashi va buyurtma holatini jonli kuzatishi uchun API kalitlari yarating."
+  },
+  "create": {
+    "button": "Kalit yaratish",
+    "title": "API kaliti yaratish",
+    "nameLabel": "Nomi",
+    "namePlaceholder": "masalan, Stol plansheti — lobbi",
+    "scopesLabel": "Ruxsatlar",
+    "originsLabel": "Ruxsat etilgan qaytish manzillari (ixtiyoriy)",
+    "originsPlaceholder": "https://app.partner.example",
+    "originsHint": "O'zi to'lovdan keyin hamkor qayerga yo'naltiriladi. Har bir qatorga bittadan yoki vergul bilan ajrating.",
+    "restrictBranchesLabel": "Muayyan filiallar bilan cheklash",
+    "noBranches": "Mavjud filiallar yo'q.",
+    "cancel": "Bekor qilish",
+    "submit": "Kalit yaratish"
+  },
+  "list": {
+    "loading": "Yuklanmoqda…",
+    "empty": "Hozircha API kalitlari yo'q. Hamkor ekran yoki ilovani ulash uchun kalit yarating.",
+    "col": {
+      "name": "Nomi",
+      "keyId": "Kalit ID",
+      "scopes": "Ruxsatlar",
+      "status": "Holati",
+      "lastUsed": "Oxirgi ishlatilgan"
+    },
+    "revoke": "Bekor qilish",
+    "confirmRevoke": "\"{{name}}\" kaliti bekor qilinsinmi? Undan foydalanayotgan har qanday ekran darhol ishlamay qoladi."
+  },
+  "status": {
+    "active": "faol",
+    "revoked": "bekor qilingan"
+  },
+  "secret": {
+    "created": "API kaliti yaratildi.",
+    "copiedIntro": "Maxfiy kalit buferga nusxalandi.",
+    "saveNow": "Uni hozir saqlang — biz uni qayta ko'rsata olmaymiz.",
+    "autoHiding": "{{seconds}} soniyada yashiriladi.",
+    "keyIdLabel": "Kalit ID",
+    "show": "Ko'rsatish",
+    "hide": "Yashirish",
+    "copyAgain": "Qayta nusxalash",
+    "saved": "Saqladim",
+    "toastCopied": "Maxfiy kalit buferga nusxalandi",
+    "toastCopiedShort": "Nusxalandi"
+  },
+  "toast": {
+    "created": "API kaliti yaratildi. Maxfiy kalitni hozir saqlang — u qayta ko'rsatilmaydi.",
+    "createFailed": "API kalitini yaratib bo'lmadi",
+    "revoked": "API kaliti bekor qilindi",
+    "revokeFailed": "API kalitini bekor qilib bo'lmadi"
+  }
+}

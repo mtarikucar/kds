@@ -770,6 +770,11 @@ export interface PlanFeatures {
    *  `<FeatureGate feature="posAccess">` wraps the /pos route and the
    *  sidebar item; pos-settings endpoints also gate server-side. */
   posAccess: boolean;
+  /** Partner Display API — lets third-party apps/screens (a partner's table
+   *  tablet) browse the menu, order, self-pay and watch order status live via
+   *  a tenant-issued API key. Gates the /admin/settings/partner-keys page and
+   *  the /v1/partner/* + /v1/display/* backend surface. */
+  externalDisplay: boolean;
 }
 
 export interface Plan {

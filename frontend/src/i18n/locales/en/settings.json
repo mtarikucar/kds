@@ -7,7 +7,8 @@
     "reservations": "Reservations",
     "sms": "SMS Notifications",
     "onlineOrders": "Online Orders",
-    "accounting": "Accounting"
+    "accounting": "Accounting",
+    "partnerKeys": "Partner API Keys"
   },
   "sms": {
     "title": "SMS Notification Settings",
