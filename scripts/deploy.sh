@@ -474,6 +474,45 @@ verify_and_promote() {
   ok "All :current tags point at $VERSION"
 }
 
+# Post-migration DATA reconciliation. A `prisma migrate deploy` only changes
+# the SCHEMA — when a migration adds a new Boolean feature column to
+# SubscriptionPlan, existing tenants keep their old FeatureEntitlement rows and
+# the on-boot backfill (which skips any tenant that already has rows) never
+# surfaces the new flag. Only a full reprojection does. That gap is exactly what
+# hid the externalDisplay "Partner API Keys" page for existing tenants in
+# v3.2.32, forcing a hand-run reprojection. We now trigger it automatically here.
+#
+# We hit the internal maintenance endpoint from INSIDE the backend container so
+# the call is loopback-local and carries the container's INTERNAL_SERVICE_TOKEN
+# env (the prod image has no curl guaranteed, so we use node's global fetch).
+# The in-container listen port is NOT the same across envs: prod sets PORT=3000,
+# staging sets PORT=3002 (compose `environment:` overrides). main.ts binds to
+# `process.env.PORT || 3000`, so the node one-liner reads the SAME env var the
+# app bound to — never a hardcoded port. (The host-side port mapping is a
+# separate concern and irrelevant here since we exec inside the container.)
+#
+# NON-FATAL by design: a reproject failure must NOT abort/rollback the deploy —
+# the 03:15 UTC nightly reconcile (plan-projector.service.ts#reconcileNightly)
+# is the backstop and self-heals within ~24h. So this runs OUTSIDE the `step`
+# helper and always returns 0; we surface failures LOUDLY with warn().
+reproject_entitlements() {
+  # If the token isn't configured for this env, the endpoint's guard would 503
+  # anyway — skip with a clear warning rather than emit a confusing failure.
+  if ! grep -qE '^INTERNAL_SERVICE_TOKEN=.+' "$ENV_FILE"; then
+    warn "INTERNAL_SERVICE_TOKEN unset in $ENV_FILE — skipping entitlement reprojection (nightly reconcile is the backstop)"
+    return 0
+  fi
+
+  log "▶ Reproject all tenants' entitlements (post-migration data op)"
+  if docker exec "$BACKEND_CONTAINER" node -e "const p=process.env.PORT||3000;fetch('http://127.0.0.1:'+p+'/api/internal/entitlements/reproject-all',{method:'POST',headers:{'x-internal-token':process.env.INTERNAL_SERVICE_TOKEN}}).then(r=>{console.log('reproject',r.status);process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"; then
+    ok "✓ Entitlement reprojection triggered"
+  else
+    warn "Entitlement reprojection FAILED — a newly-added plan feature may not surface"
+    warn "for existing tenants until the 03:15 UTC nightly reconcile. Deploy NOT aborted."
+  fi
+  return 0
+}
+
 restore_image_ids() {
   if [ ! -f "$STATE_FILE" ]; then
     err "No snapshot at $STATE_FILE — cannot auto-rollback"
@@ -546,6 +585,11 @@ run_deploy() {
   step "8/10 Swap backend"               swap_backend
   step "9/10 Swap frontend + landing"    swap_app_containers
   step "10/10 Verify + promote :current" verify_and_promote
+  # Post-deploy DATA reconciliation. Runs AFTER the new backend is verified
+  # healthy + promoted (so the endpoint is live) and is deliberately NOT wrapped
+  # in `step` — it's non-fatal (returns 0 even on failure) so a reproject hiccup
+  # can never trip the ERR trap and roll back an otherwise-good deploy.
+  reproject_entitlements
   ok "=== Deploy SUCCESS: $ENV @ $VERSION ==="
 }
 

@@ -15,6 +15,7 @@ import {
   AddOnLifecyclePayload,
 } from "../outbox/event-types";
 import { EntitlementsController } from "./entitlements.controller";
+import { InternalEntitlementsController } from "./internal-entitlements.controller";
 import { EntitlementService } from "./entitlement.service";
 import { EntitlementGuard } from "./entitlement.guard";
 import { PlanProjectorService } from "./plan-projector.service";
@@ -45,7 +46,7 @@ import { EntitlementInvalidationBus } from "./entitlement-invalidation.bus";
 @Global()
 @Module({
   imports: [PrismaModule],
-  controllers: [EntitlementsController],
+  controllers: [EntitlementsController, InternalEntitlementsController],
   providers: [
     EntitlementService,
     EntitlementGuard,
