@@ -140,6 +140,8 @@ model Tenant {
   orderItemPayments   OrderItemPayment[]
   pendingSelfPayments PendingSelfPayment[]
   customerSessions    CustomerSession[]
+  partnerApiKeys      PartnerApiKey[]
+  screenSessions      ScreenSession[]
   phoneVerifications  PhoneVerification[]
   waiterRequests      WaiterRequest[]
   billRequests        BillRequest[]
@@ -1681,6 +1683,63 @@ model CustomerSession {
   @@index([tenantId])
   @@index([expiresAt])
   @@map("customer_sessions")
+}
+
+// Partner Display API — tenant-issued credential a restaurant ADMIN hands to a
+// third-party integrator so it can mint scoped per-screen tokens. Secret is
+// returned ONCE at creation and stored only as sha256(secretHash); the partner
+// backend presents X-Partner-Key + X-Partner-Secret over TLS. Plan-gated by
+// feature.externalDisplay. Revoke cascades to its ScreenSessions.
+model PartnerApiKey {
+  id                   String          @id @default(cuid())
+  tenantId             String
+  tenant               Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  keyId                String          @unique // public id, e.g. pk_live_xxx
+  secretHash           String // sha256(secret); raw never stored
+  name                 String
+  scopes               String[]        @default([])
+  allowedReturnOrigins String[]        @default([]) // PayTR self-pay return-URL allowlist
+  allowedBranchIds     String[]        @default([]) // empty = all tenant branches
+  status               String          @default("active") // active | revoked
+  lastUsedAt           DateTime?
+  createdBy            String?
+  createdAt            DateTime        @default(now())
+  revokedAt            DateTime?
+  screenSessions       ScreenSession[]
+
+  @@index([tenantId, status])
+  @@index([keyId])
+  @@map("partner_api_keys")
+}
+
+// Partner Display API — short-lived, scoped, per-screen credential minted by a
+// partner backend (authenticated via PartnerApiKey). Bound to tenant+branch
+// (+optional table). Backs a real CustomerSession (orderingSessionId, 64-hex)
+// so the existing customer-orders / self-pay / qr-menu services and the
+// customer-session-<id> realtime room are reused verbatim.
+model ScreenSession {
+  id                String        @id @default(cuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branchId          String
+  tableId           String?
+  partnerApiKeyId   String
+  partnerApiKey     PartnerApiKey @relation(fields: [partnerApiKeyId], references: [id], onDelete: Cascade)
+  orderingSessionId String        @unique // == backing CustomerSession.sessionId & Order.sessionId
+  scopes            String[]      @default([])
+  tokenHash         String        @unique // sha256(access token)
+  refreshTokenHash  String        @unique // sha256(refresh token), rotating
+  tokenExpiresAt    DateTime
+  refreshExpiresAt  DateTime
+  status            String        @default("active") // active | revoked
+  lastSeenAt        DateTime?
+  createdAt         DateTime      @default(now())
+  revokedAt         DateTime?
+
+  @@index([tenantId, branchId, status])
+  @@index([tokenHash])
+  @@index([partnerApiKeyId])
+  @@map("screen_sessions")
 }
 
 model LoyaltyTransaction {
