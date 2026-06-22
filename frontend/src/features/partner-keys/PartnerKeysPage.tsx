@@ -351,12 +351,10 @@ function SecretReveal({
   const [shown, setShown] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(90);
 
-  useEffect(() => {
-    navigator.clipboard
-      ?.writeText(secret)
-      .then(() => toast.success(t('secret.toastCopied')))
-      .catch(() => undefined);
-  }, [secret, t]);
+  // Deliberately NO auto-copy on mount: writing a live payments-capable secret
+  // to the OS clipboard without a user gesture leaves it in clipboard history /
+  // cloud-sync long after this banner is gone (esp. on shared front-of-house
+  // terminals). The operator copies explicitly via the Copy button below.
 
   // `onDismiss` is a fresh inline function each parent render; pin the latest
   // in a ref so the interval effect's deps can stay empty (no stacked timers).

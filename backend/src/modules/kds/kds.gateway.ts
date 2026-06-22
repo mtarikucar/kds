@@ -234,14 +234,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (payload.exp && typeof payload.exp === "number") {
       const msToExpiry = payload.exp * 1000 - Date.now();
       if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           if (client.connected) {
             this.logger.log(
               `Staff client ${client.id} token expired; disconnecting.`,
             );
             client.disconnect(true);
           }
-        }, msToExpiry).unref?.();
+        }, msToExpiry);
+        timer.unref?.();
+        client.data.expiryTimer = timer;
       }
     }
 
@@ -394,14 +396,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // `.unref()` keeps the timer from holding the process alive.
     const msToExpiry = session.expiresAt.getTime() - Date.now();
     if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (client.connected) {
           this.logger.log(
             `Customer client ${client.id} session expired; disconnecting (session=${session.sessionId}).`,
           );
           client.disconnect(true);
         }
-      }, msToExpiry).unref?.();
+      }, msToExpiry);
+      timer.unref?.();
+      client.data.expiryTimer = timer;
     }
 
     // Debounce lastActivity writes: a flaky mobile network reconnecting every
@@ -496,14 +500,18 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const msToExpiry = screen.tokenExpiresAt.getTime() - Date.now();
     if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (client.connected) {
           this.logger.log(
             `Screen client ${client.id} token expired; disconnecting (screen=${screen.id}).`,
           );
           client.disconnect(true);
         }
-      }, msToExpiry).unref?.();
+      }, msToExpiry);
+      timer.unref?.();
+      // Stored so handleDisconnect can clear it — else an early disconnect
+      // leaves the closure pinning the dead Socket until expiry.
+      client.data.expiryTimer = timer;
     }
 
     this.logger.log(
@@ -512,7 +520,22 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return true;
   }
 
+  /**
+   * Force-disconnect any live sockets bound to these ordering sessions. Called
+   * on revoke so a revoked screen stops receiving events immediately instead of
+   * lingering until its access-token expiry. disconnectSockets(true) closes the
+   * underlying connection, so the socket leaves every room it joined.
+   */
+  disconnectOrderingSessions(orderingSessionIds: string[]): void {
+    for (const sid of orderingSessionIds) {
+      this.server?.in(`customer-session-${sid}`).disconnectSockets(true);
+    }
+  }
+
   handleDisconnect(client: Socket) {
+    // Clear the auth-expiry auto-disconnect timer (staff/customer/screen) so an
+    // early disconnect doesn't retain the dead Socket via the timer closure.
+    if (client.data?.expiryTimer) clearTimeout(client.data.expiryTimer);
     // Iter-81: free the per-session activity-debounce map entry on
     // disconnect. Pre-iter-81 this was a pure logger and the map grew
     // by one entry per customer connect across the lifetime of the

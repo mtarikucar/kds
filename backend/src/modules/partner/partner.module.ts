@@ -4,6 +4,7 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import { CustomersModule } from "../customers/customers.module";
 import { CustomerOrdersModule } from "../customer-orders/customer-orders.module";
 import { MenuModule } from "../menu/menu.module";
+import { KdsModule } from "../kds/kds.module";
 import { PartnerApiKeyService } from "./partner-api-key.service";
 import { ScreenSessionService } from "./screen-session.service";
 import { PartnerKeyGuard } from "./guards/partner-key.guard";
@@ -26,6 +27,7 @@ import { DisplayController } from "./controllers/display.controller";
     CustomersModule,
     CustomerOrdersModule,
     MenuModule,
+    KdsModule,
   ],
   controllers: [
     PartnerApiKeysController,

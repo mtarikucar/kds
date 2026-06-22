@@ -18,16 +18,23 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 @Injectable()
 export class MachineThrottlerGuard extends ThrottlerGuard {
   protected async getTracker(req: Record<string, any>): Promise<string> {
+    const ip = req?.ips?.length ? req.ips[0] : req?.ip;
+    // SECURITY: the throttler runs BEFORE the auth guards, so the principal id
+    // here is UNVERIFIED (attacker-suppliable). If we keyed on it alone, an
+    // attacker could rotate a fresh fake prefix per request and escape IP
+    // throttling entirely (each forged bucket is new). So the principal is a
+    // SECONDARY key under the IP: a single source IP stays capped no matter
+    // how many prefixes it cycles, while a genuine NAT'd venue still gets
+    // per-screen granularity within its shared IP.
     const auth: string | undefined = req?.headers?.authorization;
     if (typeof auth === "string" && auth.startsWith("Screen ")) {
-      const token = auth.slice("Screen ".length);
-      const prefix = token.split(".")[0];
-      if (prefix) return `screen:${prefix}`;
+      const prefix = auth.slice("Screen ".length).split(".")[0];
+      if (prefix) return `${ip}:screen:${prefix}`;
     }
     const partnerKey: string | undefined = req?.headers?.["x-partner-key"];
     if (typeof partnerKey === "string" && partnerKey.length > 0) {
-      return `pk:${partnerKey}`;
+      return `${ip}:pk:${partnerKey}`;
     }
-    return req?.ips?.length ? req.ips[0] : req?.ip;
+    return ip;
   }
 }

@@ -53,7 +53,7 @@ export class DisplayController {
 
   @Get("menu")
   @RequireScope("menu:read")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ long: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: "Public menu for the screen's tenant (+ table)" })
   getMenu(@Req() req: any) {
     return this.menuQuery.getPublicMenu(req.screen.tenantId, {
@@ -63,7 +63,7 @@ export class DisplayController {
 
   @Get("orders")
   @RequireScope("orders:read")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ long: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: "Orders placed by this screen's ordering session" })
   getOrders(@Req() req: any) {
     return this.customerOrders.getSessionOrders(req.screen.orderingSessionId);
@@ -71,7 +71,7 @@ export class DisplayController {
 
   @Post("orders")
   @RequireScope("orders:write")
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ long: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: "Place an order from the screen" })
   async createOrder(@Req() req: any, @Body() body: CreateDisplayOrderDto) {
     // Geofence: createOrder 400s when the tenant has coords configured and
@@ -85,6 +85,10 @@ export class DisplayController {
     const dto: CreateCustomerOrderDto = {
       sessionId: req.screen.orderingSessionId,
       tableId: req.screen.tableId ?? undefined,
+      // Pin the screen's bound branch so a tableless screen at a non-first
+      // branch doesn't route to the tenant's oldest branch. Ignored by
+      // createOrder when tableId is set (branch derived from the table).
+      branchId: req.screen.branchId,
       items: body.items,
       type: body.type,
       notes: body.notes,
@@ -97,7 +101,7 @@ export class DisplayController {
 
   @Post("waiter-requests")
   @RequireScope("requests:write")
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ long: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: "Call a waiter for the screen's table" })
   createWaiterRequest(@Req() req: any, @Body() body: CreateDisplayRequestDto) {
     const dto: CreateWaiterRequestDto = {
@@ -110,7 +114,7 @@ export class DisplayController {
 
   @Post("bill-requests")
   @RequireScope("requests:write")
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ long: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: "Request the bill for the screen's table" })
   createBillRequest(@Req() req: any, @Body() _body: CreateDisplayRequestDto) {
     const dto: CreateBillRequestDto = {
@@ -122,7 +126,7 @@ export class DisplayController {
 
   @Get("payable-items")
   @RequireScope("payments:write")
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ long: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: "Items the screen's session can settle" })
   getPayableItems(@Req() req: any) {
     return this.selfPayQuery.getPayableItemsForSession(
@@ -132,7 +136,7 @@ export class DisplayController {
 
   @Post("pay-intent")
   @RequireScope("payments:write")
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ long: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: "Create a PayTR hosted-iframe self-pay intent" })
   async createPayIntent(
     @Req() req: any,
@@ -158,7 +162,7 @@ export class DisplayController {
 
   @Get("pay-status")
   @RequireScope("payments:write")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ long: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: "Poll a self-pay intent's status" })
   getPayStatus(@Req() req: any, @Query("oid") oid: string) {
     return this.selfPayQuery.getPayStatus(req.screen.orderingSessionId, oid);

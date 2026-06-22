@@ -2,12 +2,14 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CustomerSessionService } from "../customers/customer-session.service";
+import { KdsGateway } from "../kds/kds.gateway";
 import { PartnerScope } from "./partner.constants";
 
 // Access tokens are short-lived (the screen refreshes them); the refresh token
@@ -73,6 +75,10 @@ export class ScreenSessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customerSessions: CustomerSessionService,
+    // Optional so unit tests can construct the service with just prisma +
+    // customerSessions; when wired it force-disconnects a revoked screen's
+    // live socket instead of leaving it streaming until token expiry.
+    @Optional() private readonly kdsGateway?: KdsGateway,
   ) {}
 
   /** Machine-side: mint a screen token for a partner key. Tokens returned once. */
@@ -254,6 +260,8 @@ export class ScreenSessionService {
           data: { isActive: false },
         })
         .catch(() => undefined);
+      // Kill any live socket so a revoked screen stops receiving events now.
+      this.kdsGateway?.disconnectOrderingSessions([row.orderingSessionId]);
     }
   }
 }

@@ -167,17 +167,36 @@ export class CustomerOrdersService {
         );
       }
       orderType = dto.type || OrderType.COUNTER;
-      const mainBranch = await this.prisma.branch.findFirst({
-        where: { tenantId, status: "active" },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      });
-      if (!mainBranch) {
-        throw new BadRequestException(
-          "Tenant has no active branch — cannot accept tableless orders.",
-        );
+      // A branch-bound caller (e.g. a partner display screen) can pin the
+      // branch explicitly. Validate it belongs to the tenant + is active
+      // (tenant-scoped, so no cross-tenant routing); otherwise fall back to
+      // the tenant's first active branch. Without this, a tableless screen
+      // installed at a non-first branch silently writes orders to the OLDEST
+      // branch (wrong KDS/stock/revenue) on multi-branch tenants.
+      if (dto.branchId) {
+        const bound = await this.prisma.branch.findFirst({
+          where: { id: dto.branchId, tenantId, status: "active" },
+          select: { id: true },
+        });
+        if (!bound) {
+          throw new BadRequestException(
+            "Invalid or inactive branch for this tenant.",
+          );
+        }
+        branchId = bound.id;
+      } else {
+        const mainBranch = await this.prisma.branch.findFirst({
+          where: { tenantId, status: "active" },
+          orderBy: { createdAt: "asc" },
+          select: { id: true },
+        });
+        if (!mainBranch) {
+          throw new BadRequestException(
+            "Tenant has no active branch — cannot accept tableless orders.",
+          );
+        }
+        branchId = mainBranch.id;
       }
-      branchId = mainBranch.id;
     }
 
     const validatedItems = await this.validateAndCalculateItems(

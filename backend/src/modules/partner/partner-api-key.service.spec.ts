@@ -35,8 +35,14 @@ describe("PartnerApiKeyService", () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       screenSession: {
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      customerSession: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      // $transaction(cb) runs the callback against the same mock client.
+      $transaction: jest.fn().mockImplementation((cb: any) => cb(prisma)),
     };
     service = new PartnerApiKeyService(prisma);
   });
@@ -89,8 +95,13 @@ describe("PartnerApiKeyService", () => {
     ).resolves.toBeNull();
   });
 
-  it("revokes a key and cascades to its active screen sessions", async () => {
+  it("revokes a key, cascades to screen sessions AND deactivates their backing CustomerSessions", async () => {
+    const oid = "a".repeat(64);
+    prisma.screenSession.findMany.mockResolvedValue([
+      { orderingSessionId: oid },
+    ]);
     await service.revoke("t1", "key1");
+    expect(prisma.$transaction).toHaveBeenCalled();
     expect(prisma.partnerApiKey.updateMany).toHaveBeenCalledWith({
       where: { id: "key1", tenantId: "t1" },
       data: expect.objectContaining({ status: "revoked" }),
@@ -98,6 +109,11 @@ describe("PartnerApiKeyService", () => {
     expect(prisma.screenSession.updateMany).toHaveBeenCalledWith({
       where: { partnerApiKeyId: "key1", status: "active" },
       data: expect.objectContaining({ status: "revoked" }),
+    });
+    // The leaky gap the review caught: the backing ordering identity must die.
+    expect(prisma.customerSession.updateMany).toHaveBeenCalledWith({
+      where: { sessionId: { in: [oid] } },
+      data: { isActive: false },
     });
   });
 

@@ -3,9 +3,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { PrismaService } from "../../prisma/prisma.service";
+import { KdsGateway } from "../kds/kds.gateway";
 import { PartnerScope } from "./partner.constants";
 
 // Per-tenant cap on active partner keys. DoS guard, not a precise quota — the
@@ -51,7 +53,10 @@ function sha256Hex(raw: string): string {
 export class PartnerApiKeyService {
   private readonly logger = new Logger(PartnerApiKeyService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly kdsGateway?: KdsGateway,
+  ) {}
 
   /** ADMIN-side: create a key. Returns the raw secret EXACTLY ONCE. */
   async issue(
@@ -105,17 +110,42 @@ export class PartnerApiKeyService {
    * die on their next request.
    */
   async revoke(tenantId: string, id: string): Promise<void> {
-    const result = await this.prisma.partnerApiKey.updateMany({
-      where: { id, tenantId },
-      data: { status: "revoked", revokedAt: new Date() },
+    let revokedOrderingSessionIds: string[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.partnerApiKey.updateMany({
+        where: { id, tenantId },
+        data: { status: "revoked", revokedAt: new Date() },
+      });
+      if (result.count === 0) {
+        throw new NotFoundException("Partner API key not found");
+      }
+      // Capture the backing ordering sessions BEFORE flipping the screens so we
+      // also kill the underlying CustomerSession. The orderingSessionId is the
+      // real ordering identity (== CustomerSession.sessionId == Order.sessionId)
+      // and is held by the integrator; without this it keeps working on the
+      // PUBLIC customer surface for the full refresh window (~30d) after the key
+      // is "revoked". Mirrors ScreenSessionService.revoke()'s single-screen path.
+      const screens = await tx.screenSession.findMany({
+        where: { partnerApiKeyId: id, status: "active" },
+        select: { orderingSessionId: true },
+      });
+      await tx.screenSession.updateMany({
+        where: { partnerApiKeyId: id, status: "active" },
+        data: { status: "revoked", revokedAt: new Date() },
+      });
+      revokedOrderingSessionIds = screens.map((s) => s.orderingSessionId);
+      if (revokedOrderingSessionIds.length > 0) {
+        await tx.customerSession.updateMany({
+          where: { sessionId: { in: revokedOrderingSessionIds } },
+          data: { isActive: false },
+        });
+      }
     });
-    if (result.count === 0) {
-      throw new NotFoundException("Partner API key not found");
+    // Force-disconnect live sockets AFTER the DB commit so a revoked
+    // integrator's screens stop receiving events immediately.
+    if (revokedOrderingSessionIds.length > 0) {
+      this.kdsGateway?.disconnectOrderingSessions(revokedOrderingSessionIds);
     }
-    await this.prisma.screenSession.updateMany({
-      where: { partnerApiKeyId: id, status: "active" },
-      data: { status: "revoked", revokedAt: new Date() },
-    });
   }
 
   /**
