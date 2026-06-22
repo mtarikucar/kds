@@ -2,6 +2,7 @@ import { ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { shouldBypassGlobalAuth } from "./guard-bypass.helper";
 import { IS_PUBLIC_KEY } from "../../modules/auth/decorators/public.decorator";
+import { IS_MACHINE_AUTH_KEY } from "../../modules/auth/decorators/machine-auth.decorator";
 import {
   IS_SUPERADMIN_PUBLIC_KEY,
   IS_SUPERADMIN_ROUTE_KEY,
@@ -31,6 +32,12 @@ describe("shouldBypassGlobalAuth", () => {
     expect(shouldBypassGlobalAuth(reflectorReturning(IS_PUBLIC_KEY), ctx)).toBe(
       true,
     );
+  });
+
+  it("bypasses when @MachineAuth is present (partner/screen principals)", () => {
+    expect(
+      shouldBypassGlobalAuth(reflectorReturning(IS_MACHINE_AUTH_KEY), ctx),
+    ).toBe(true);
   });
 
   it("bypasses when the superadmin-public key is present", () => {

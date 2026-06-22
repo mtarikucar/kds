@@ -1,7 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { MachineThrottlerGuard } from "./common/guards/machine-throttler.guard";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { RequestContextInterceptor } from "./common/context/request-context.interceptor";
 import { AppController } from "./app.controller";
@@ -174,7 +175,9 @@ import { validate } from "./config/env.validation";
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      // Per-principal tracker (api-key / screen token) instead of per-IP so a
+      // venue of partner screens behind one NAT IP doesn't share a bucket.
+      useClass: MachineThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,
