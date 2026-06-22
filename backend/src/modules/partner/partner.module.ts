@@ -1,19 +1,24 @@
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
+import { CustomersModule } from "../customers/customers.module";
 import { PartnerApiKeyService } from "./partner-api-key.service";
+import { ScreenSessionService } from "./screen-session.service";
+import { PartnerKeyGuard } from "./guards/partner-key.guard";
 import { PartnerApiKeysController } from "./controllers/partner-api-keys.controller";
+import { PartnerScreenSessionsController } from "./controllers/partner-screen-sessions.controller";
 
 /**
  * Partner Display API — third-party/remote-screen integration.
  *
- * Phase 3: tenant-issued API keys (ADMIN management). Later phases add the
- * screen-session mint/refresh machine endpoints and the /display surface.
+ * - PartnerApiKey: tenant-issued credential (ADMIN management).
+ * - ScreenSession: per-screen scoped tokens minted by a partner backend.
+ * - (Phase 5) /display surface reusing customer-orders / self-pay / menu.
  */
 @Module({
-  imports: [PrismaModule, SubscriptionsModule],
-  controllers: [PartnerApiKeysController],
-  providers: [PartnerApiKeyService],
-  exports: [PartnerApiKeyService],
+  imports: [PrismaModule, SubscriptionsModule, CustomersModule],
+  controllers: [PartnerApiKeysController, PartnerScreenSessionsController],
+  providers: [PartnerApiKeyService, ScreenSessionService, PartnerKeyGuard],
+  exports: [PartnerApiKeyService, ScreenSessionService],
 })
 export class PartnerModule {}
