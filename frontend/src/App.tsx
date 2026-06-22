@@ -38,6 +38,7 @@ const SubdomainCartPage = lazy(() => import('./pages/qr-menu/SubdomainCartPage')
 const SubdomainOrdersPage = lazy(() => import('./pages/qr-menu/SubdomainOrdersPage'));
 const SubdomainLoyaltyPage = lazy(() => import('./pages/qr-menu/SubdomainLoyaltyPage'));
 
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const PublicReservationPage = lazy(() => import('./pages/reservations/PublicReservationPage'));
 const ReservationLookupPage = lazy(() => import('./pages/reservations/ReservationLookupPage'));
 const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
@@ -178,7 +179,7 @@ function App() {
       <Suspense fallback={null}>
       <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
