@@ -24,7 +24,10 @@ import { RefreshScreenSessionDto } from "../dto/refresh-screen-session.dto";
 @ApiSecurity("PartnerKey")
 @MachineAuth()
 @UseGuards(PartnerKeyGuard)
-@Throttle({ short: { ttl: 10_000, limit: 10 }, long: { ttl: 60_000, limit: 60 } })
+@Throttle({
+  short: { ttl: 10_000, limit: 10 },
+  long: { ttl: 60_000, limit: 60 },
+})
 @Controller("v1/partner/screen-sessions")
 export class PartnerScreenSessionsController {
   constructor(private readonly screenSessions: ScreenSessionService) {}

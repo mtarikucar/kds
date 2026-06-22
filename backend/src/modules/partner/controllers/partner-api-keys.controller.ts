@@ -47,12 +47,16 @@ export class PartnerApiKeysController {
   @Post()
   @ApiOperation({ summary: "Create a partner API key. Secret returned ONCE." })
   issue(@Req() req: any, @Body() dto: CreateApiKeyDto) {
-    return this.svc.issue(req.user.tenantId, req.user?.id ?? req.user?.sub ?? null, {
-      name: dto.name,
-      scopes: dto.scopes ?? [...PARTNER_SCOPES],
-      allowedReturnOrigins: dto.allowedReturnOrigins,
-      allowedBranchIds: dto.allowedBranchIds,
-    });
+    return this.svc.issue(
+      req.user.tenantId,
+      req.user?.id ?? req.user?.sub ?? null,
+      {
+        name: dto.name,
+        scopes: dto.scopes ?? [...PARTNER_SCOPES],
+        allowedReturnOrigins: dto.allowedReturnOrigins,
+        allowedBranchIds: dto.allowedBranchIds,
+      },
+    );
   }
 
   @Delete(":id")

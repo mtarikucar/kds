@@ -103,7 +103,8 @@ export class CustomerSessionService {
         where: { id: tableId, tenantId },
         select: { id: true },
       });
-      if (!table) throw new UnauthorizedException("Invalid table for this tenant");
+      if (!table)
+        throw new UnauthorizedException("Invalid table for this tenant");
     }
 
     const sessionId = randomBytes(32).toString("hex");

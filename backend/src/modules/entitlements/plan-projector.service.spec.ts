@@ -1,6 +1,9 @@
-import { PlanProjectorService } from './plan-projector.service';
-import { EntitlementService } from './entitlement.service';
-import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
+import { PlanProjectorService } from "./plan-projector.service";
+import { EntitlementService } from "./entitlement.service";
+import {
+  mockPrismaClient,
+  MockPrismaClient,
+} from "../../common/test/prisma-mock.service";
 
 /**
  * Behavior-level tests for the projector. We don't talk to a real database;
@@ -13,12 +16,12 @@ import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-moc
  *    with the __replace wrapper so the engine treats them as REPLACE.
  *  - Switching plan revokes the previous plan source.
  */
-describe('PlanProjectorService.projectTenant', () => {
+describe("PlanProjectorService.projectTenant", () => {
   let prisma: MockPrismaClient;
   let entitlements: jest.Mocked<EntitlementService>;
   let svc: PlanProjectorService;
 
-  const TENANT = 'tenant-1';
+  const TENANT = "tenant-1";
 
   beforeEach(() => {
     prisma = mockPrismaClient();
@@ -40,30 +43,34 @@ describe('PlanProjectorService.projectTenant', () => {
     (prisma.tenantAddOn.findMany as any).mockResolvedValue([]);
     // Default: stale-sources sweep is a no-op. The "switches plan" test
     // overrides this to assert the sweep + invalidate call happen.
-    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({ count: 0 });
+    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({
+      count: 0,
+    });
     // Pass the inner callback through with the prisma mock as the tx
     // client, so projectTenantInner's wrapping $transaction(async tx =>
     // ...) lets the inner findMany / deleteMany / setGrantsForSourceTx
     // calls still land on assertions below.
-    (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
+    (prisma.$transaction as any).mockImplementation(async (fn: any) =>
+      fn(prisma),
+    );
     // v2.8.89 — projectTenantInner now consults Subscription.status
     // before projecting the paid plan. Default: pretend the tenant has
     // an ACTIVE paid subscription so existing cases keep covering the
     // "project current plan" path. The new lifecycle-status case
     // overrides this to assert FREE fallback.
     (prisma.subscription.findFirst as any).mockResolvedValue({
-      id: 'sub-1',
-      status: 'ACTIVE',
+      id: "sub-1",
+      status: "ACTIVE",
     });
   });
 
-  it('projects PRO plan features and limits as grants under plan:PRO', async () => {
+  it("projects PRO plan features and limits as grants under plan:PRO", async () => {
     prisma.tenant.findUnique.mockResolvedValue({
       id: TENANT,
       featureOverrides: null,
       limitOverrides: null,
       currentPlan: {
-        name: 'PRO',
+        name: "PRO",
         advancedReports: true,
         multiLocation: true,
         customBranding: true,
@@ -90,31 +97,32 @@ describe('PlanProjectorService.projectTenant', () => {
     // First call writes plan:PRO grants. Second call writes override:admin (empty).
     expect(entitlements.setGrantsForSourceTx).toHaveBeenCalledTimes(2);
     // setGrantsForSourceTx signature: (tx, tenantId, source, grants)
-    const [, , source, grants] = entitlements.setGrantsForSourceTx.mock.calls[0];
-    expect(source).toBe('plan:PRO');
+    const [, , source, grants] =
+      entitlements.setGrantsForSourceTx.mock.calls[0];
+    expect(source).toBe("plan:PRO");
 
     const featureKeys = grants.map((g) => g.key);
     // Disabled features (apiAccess) are NOT in the grant list — absence
     // means "not enabled" in the engine.
-    expect(featureKeys).toContain('feature.advancedReports');
-    expect(featureKeys).toContain('feature.kdsIntegration');
-    expect(featureKeys).toContain('feature.posAccess');
-    expect(featureKeys).not.toContain('feature.apiAccess');
-    expect(featureKeys).toContain('limit.maxUsers');
-    expect(featureKeys).toContain('limit.maxBranches');
-    expect(featureKeys).toContain('limit.maxMonthlyOrders');
+    expect(featureKeys).toContain("feature.advancedReports");
+    expect(featureKeys).toContain("feature.kdsIntegration");
+    expect(featureKeys).toContain("feature.posAccess");
+    expect(featureKeys).not.toContain("feature.apiAccess");
+    expect(featureKeys).toContain("limit.maxUsers");
+    expect(featureKeys).toContain("limit.maxBranches");
+    expect(featureKeys).toContain("limit.maxMonthlyOrders");
 
-    const limitMax = grants.find((g) => g.key === 'limit.maxUsers');
+    const limitMax = grants.find((g) => g.key === "limit.maxUsers");
     expect(limitMax?.value).toBe(15);
   });
 
-  it('projects BUSINESS unlimited (-1) limits faithfully', async () => {
+  it("projects BUSINESS unlimited (-1) limits faithfully", async () => {
     prisma.tenant.findUnique.mockResolvedValue({
       id: TENANT,
       featureOverrides: null,
       limitOverrides: null,
       currentPlan: {
-        name: 'BUSINESS',
+        name: "BUSINESS",
         advancedReports: true,
         multiLocation: true,
         customBranding: true,
@@ -138,17 +146,17 @@ describe('PlanProjectorService.projectTenant', () => {
 
     // setGrantsForSourceTx args: (tx, tenantId, source, grants) → index 3
     const grants = entitlements.setGrantsForSourceTx.mock.calls[0][3];
-    const max = grants.find((g: any) => g.key === 'limit.maxUsers');
+    const max = grants.find((g: any) => g.key === "limit.maxUsers");
     expect(max?.value).toBe(-1);
   });
 
-  it('projects featureOverrides + limitOverrides as override:admin with REPLACE wrapper', async () => {
+  it("projects featureOverrides + limitOverrides as override:admin with REPLACE wrapper", async () => {
     prisma.tenant.findUnique.mockResolvedValue({
       id: TENANT,
       featureOverrides: { customBranding: true, deliveryIntegration: false },
       limitOverrides: { maxTables: 80 },
       currentPlan: {
-        name: 'BASIC',
+        name: "BASIC",
         advancedReports: false,
         multiLocation: false,
         customBranding: false,
@@ -171,26 +179,31 @@ describe('PlanProjectorService.projectTenant', () => {
     await svc.projectTenant(TENANT);
 
     // setGrantsForSourceTx signature: (tx, tenantId, source, grants)
-    const [, , overrideSource, overrideGrants] = entitlements.setGrantsForSourceTx.mock.calls[1];
-    expect(overrideSource).toBe('override:admin');
+    const [, , overrideSource, overrideGrants] =
+      entitlements.setGrantsForSourceTx.mock.calls[1];
+    expect(overrideSource).toBe("override:admin");
 
-    const branding = overrideGrants.find((g: any) => g.key === 'feature.customBranding');
+    const branding = overrideGrants.find(
+      (g: any) => g.key === "feature.customBranding",
+    );
     expect(branding?.value).toEqual({ __replace: true });
 
-    const delivery = overrideGrants.find((g: any) => g.key === 'feature.deliveryIntegration');
+    const delivery = overrideGrants.find(
+      (g: any) => g.key === "feature.deliveryIntegration",
+    );
     expect(delivery?.value).toEqual({ __replace: false });
 
-    const tables = overrideGrants.find((g: any) => g.key === 'limit.maxTables');
+    const tables = overrideGrants.find((g: any) => g.key === "limit.maxTables");
     expect(tables?.value).toEqual({ __replace: 80 });
   });
 
-  it('revokes stale plan sources after a plan switch', async () => {
+  it("revokes stale plan sources after a plan switch", async () => {
     prisma.tenant.findUnique.mockResolvedValue({
       id: TENANT,
       featureOverrides: null,
       limitOverrides: null,
       currentPlan: {
-        name: 'PRO',
+        name: "PRO",
         advancedReports: true,
         multiLocation: true,
         customBranding: true,
@@ -213,19 +226,24 @@ describe('PlanProjectorService.projectTenant', () => {
     // cache invalidate, not per-source revoke calls. The DELETE filter
     // matches anything `plan:*` except the current planSource, which is
     // exactly the right semantic.
-    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({ count: 1 });
+    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({
+      count: 1,
+    });
 
     await svc.projectTenant(TENANT);
 
-    const deleteCalls = (prisma.featureEntitlement.deleteMany as any).mock.calls;
-    const staleSweep = deleteCalls.find((c: any) =>
-      c[0]?.where?.source?.startsWith === 'plan:' && c[0]?.where?.source?.not === 'plan:PRO',
+    const deleteCalls = (prisma.featureEntitlement.deleteMany as any).mock
+      .calls;
+    const staleSweep = deleteCalls.find(
+      (c: any) =>
+        c[0]?.where?.source?.startsWith === "plan:" &&
+        c[0]?.where?.source?.not === "plan:PRO",
     );
     expect(staleSweep).toBeDefined();
     expect(entitlements.invalidate).toHaveBeenCalledWith(TENANT);
   });
 
-  it('treats a tenant with no current plan as plan:NONE and writes no plan grants', async () => {
+  it("treats a tenant with no current plan as plan:NONE and writes no plan grants", async () => {
     prisma.tenant.findUnique.mockResolvedValue({
       id: TENANT,
       featureOverrides: null,
@@ -237,8 +255,9 @@ describe('PlanProjectorService.projectTenant', () => {
     await svc.projectTenant(TENANT);
 
     // setGrantsForSourceTx signature: (tx, tenantId, source, grants)
-    const [, , source, grants] = entitlements.setGrantsForSourceTx.mock.calls[0];
-    expect(source).toBe('plan:NONE');
+    const [, , source, grants] =
+      entitlements.setGrantsForSourceTx.mock.calls[0];
+    expect(source).toBe("plan:NONE");
     expect(grants).toHaveLength(0);
   });
 
@@ -250,42 +269,46 @@ describe('PlanProjectorService.projectTenant', () => {
   // never lands in the entitlement table. This test pins the expected
   // column set so any schema-side addition is a deliberate, two-file
   // change (schema + this list).
-  it('FEATURE_COLUMNS / LIMIT_COLUMNS match the SubscriptionPlan model snapshot (iter-24)', () => {
+  it("FEATURE_COLUMNS / LIMIT_COLUMNS match the SubscriptionPlan model snapshot (iter-24)", () => {
     // Snapshot of SubscriptionPlan's feature-flag Boolean columns as of
     // 2026-05-28. Update this list AND the projector's FEATURE_COLUMNS
     // whenever a new flag column is added to schema.prisma so the
     // entitlement engine starts surfacing it.
     const EXPECTED_FEATURES = [
-      'advancedReports',
-      'multiLocation',
-      'customBranding',
-      'apiAccess',
-      'prioritySupport',
-      'inventoryTracking',
-      'kdsIntegration',
-      'reservationSystem',
-      'personnelManagement',
-      'deliveryIntegration',
+      "advancedReports",
+      "multiLocation",
+      "customBranding",
+      "apiAccess",
+      "prioritySupport",
+      "inventoryTracking",
+      "kdsIntegration",
+      "reservationSystem",
+      "personnelManagement",
+      "deliveryIntegration",
       // v3.0.0 — POS access tier-gate (BASIC+). FREE plans get
       // posAccess=false, every other tier gets true; projector mirrors
       // the column verbatim so PlanFeatureGuard can read it.
-      'posAccess',
+      "posAccess",
       // Partner Display API gate — feature.externalDisplay.
-      'externalDisplay',
+      "externalDisplay",
     ];
     // Same intent for numeric limit columns.
     const EXPECTED_LIMITS = [
-      'maxUsers',
-      'maxTables',
+      "maxUsers",
+      "maxTables",
       // v3.0.0 — branch cap. FREE/BASIC=1, PRO=3, BUSINESS=-1.
       // extra_branch add-on SUMs onto this via the engine fold.
-      'maxBranches',
-      'maxProducts',
-      'maxCategories',
-      'maxMonthlyOrders',
+      "maxBranches",
+      "maxProducts",
+      "maxCategories",
+      "maxMonthlyOrders",
     ];
     // `as any` to reach the private static — guard is a test-only escape.
-    expect((PlanProjectorService as any).FEATURE_COLUMNS).toEqual(EXPECTED_FEATURES);
-    expect((PlanProjectorService as any).LIMIT_COLUMNS).toEqual(EXPECTED_LIMITS);
+    expect((PlanProjectorService as any).FEATURE_COLUMNS).toEqual(
+      EXPECTED_FEATURES,
+    );
+    expect((PlanProjectorService as any).LIMIT_COLUMNS).toEqual(
+      EXPECTED_LIMITS,
+    );
   });
 });

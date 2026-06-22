@@ -1,7 +1,7 @@
-import axios from 'axios';
-import { useAuthStore } from '../store/authStore';
-import { useBranchScopeStore } from '../store/branchScopeStore';
-import { API_URL } from './env';
+import axios from "axios";
+import { useAuthStore } from "../store/authStore";
+import { useBranchScopeStore } from "../store/branchScopeStore";
+import { API_URL } from "./env";
 
 /**
  * v3.0.0 strict — endpoints that legitimately operate above the
@@ -10,39 +10,39 @@ import { API_URL } from './env';
  * gets fail-fast if branchScopeStore hasn't resolved a branchId.
  */
 export const TENANT_WIDE_PATH_PREFIXES = [
-  '/auth/',
-  '/billing/',
-  '/branches',
-  '/me',
+  "/auth/",
+  "/billing/",
+  "/branches",
+  "/me",
   // Subscriptions, plan usage and invoices are tenant-level (one per tenant,
   // not per branch) — the backend marks both controllers @SkipBranchScope.
   // Bare '/subscriptions' (not '/subscriptions/') so the base create route
   // POST /subscriptions flies too; the bare segment still matches every
   // /subscriptions/{plans,current,effective-features,usage/snapshot,
   // tenant/invoices,:id/*} sub-route. Covers /invoices/:id/download.
-  '/subscriptions',
-  '/invoices/',
-  '/superadmin/',
+  "/subscriptions",
+  "/invoices/",
+  "/superadmin/",
   // POS settings are one row per tenant (class-level @SkipBranchScope on the
   // backend), so they must fly without a branch — a wildcard-owner ADMIN with
   // an unresolved branchId was otherwise fail-fast'd out of the POS settings.
-  '/pos-settings',
+  "/pos-settings",
   // Delivery-platforms DLQ admin is tenant-wide (class-level @SkipBranchScope,
   // tenant-fenced by req.user.tenantId) — dead-letters span all branches, so
   // these routes must fly without a branch header. Bare (no trailing slash)
   // covers /delivery-platforms/dlq, /dlq/summary, /dlq/requeue.
-  '/delivery-platforms/dlq',
+  "/delivery-platforms/dlq",
   // GET /tenants/public is the @Public registration tenant list — fetched
   // UNAUTHENTICATED with no branch resolved. Without this exemption the request
   // interceptor rejects it client-side, so the non-admin "restoran seçin"
   // dropdown gets an empty list and stays disabled. Bare segment so it does NOT
   // widen to the branch-scoped /tenants/settings routes.
-  '/tenants/public',
+  "/tenants/public",
   // Partner Display API key management is tenant-level (class-level
   // @SkipBranchScope, tenant-fenced by req.user.tenantId). Bare segment so it
   // matches /v1/partner/api-keys without a branch header. (The /v1/display/*
   // surface is machine-auth, called by external apps — not the SPA.)
-  '/v1/partner',
+  "/v1/partner",
 ];
 
 /**
@@ -59,13 +59,13 @@ export const TENANT_WIDE_PATH_PREFIXES = [
  */
 export function isTenantWidePath(url: string | undefined): boolean {
   if (!url) return false;
-  const path = url.split('?')[0];
+  const path = url.split("?")[0];
   return TENANT_WIDE_PATH_PREFIXES.some((p) => {
     const idx = path.indexOf(p);
     if (idx === -1) return false;
-    if (p.endsWith('/')) return true;
+    if (p.endsWith("/")) return true;
     const after = path.charAt(idx + p.length);
-    return after === '' || after === '/';
+    return after === "" || after === "/";
   });
 }
 
@@ -77,7 +77,7 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -105,11 +105,11 @@ api.interceptors.request.use(
       if (!branchId) {
         return Promise.reject(
           new Error(
-            'Branch scope not resolved; cannot send branch-scoped request',
+            "Branch scope not resolved; cannot send branch-scoped request",
           ),
         );
       }
-      config.headers['X-Branch-Id'] = branchId;
+      config.headers["X-Branch-Id"] = branchId;
     }
     return config;
   },
@@ -147,10 +147,7 @@ function refreshAccessToken(): Promise<string> {
       return accessToken as string;
     });
   const timeout = new Promise<string>((_, reject) =>
-    setTimeout(
-      () => reject(new Error('refresh timeout')),
-      REFRESH_TIMEOUT_MS,
-    ),
+    setTimeout(() => reject(new Error("refresh timeout")), REFRESH_TIMEOUT_MS),
   );
   refreshInFlight = Promise.race([refresh, timeout]).finally(() => {
     // Clear the slot only after the promise settles so late-arriving 401s
@@ -175,16 +172,16 @@ api.interceptors.response.use(
     // screen. Guard against a redirect loop while already on /subscription/*.
     if (
       error.response?.status === 403 &&
-      error.response?.data?.errorCode === 'PLAN_SELECTION_REQUIRED'
+      error.response?.data?.errorCode === "PLAN_SELECTION_REQUIRED"
     ) {
       try {
         if (
-          typeof window !== 'undefined' &&
+          typeof window !== "undefined" &&
           window.location &&
-          !window.location.pathname.startsWith('/subscription')
+          !window.location.pathname.startsWith("/subscription")
         ) {
           window.location.href =
-            import.meta.env.BASE_URL + 'subscription/plans';
+            import.meta.env.BASE_URL + "subscription/plans";
         }
       } catch {
         // location unavailable (SSR / sandbox) — non-fatal; just reject below.
@@ -200,8 +197,7 @@ api.interceptors.response.use(
     // there on the next action.
     if (error.response?.status === 401 && useAuthStore.getState().demoMode) {
       try {
-        const realUser =
-          useAuthStore.getState().realSession?.user ?? null;
+        const realUser = useAuthStore.getState().realSession?.user ?? null;
         useAuthStore.getState().exitDemo();
         useBranchScopeStore.getState().hydrateFromUser(realUser);
       } catch {
@@ -232,19 +228,22 @@ api.interceptors.response.use(
         // so we hop via sessionStorage — LoginPage reads + clears it
         // on mount. Same internal-path validation runs there.
         try {
-          if (typeof window !== 'undefined' && window.location) {
-            const here = window.location.pathname + window.location.search + window.location.hash;
+          if (typeof window !== "undefined" && window.location) {
+            const here =
+              window.location.pathname +
+              window.location.search +
+              window.location.hash;
             // Skip if we're already on /login (or about to be) — no
             // need to bounce back to ourselves.
-            if (here && !here.startsWith('/login')) {
-              window.sessionStorage.setItem('postLoginReturn', here);
+            if (here && !here.startsWith("/login")) {
+              window.sessionStorage.setItem("postLoginReturn", here);
             }
           }
         } catch {
           // sessionStorage can throw in private-mode / cross-origin
           // sandbox iframes — non-fatal, fall through to /dashboard.
         }
-        window.location.href = import.meta.env.BASE_URL + 'login';
+        window.location.href = import.meta.env.BASE_URL + "login";
         return Promise.reject(refreshError);
       }
     }

@@ -72,7 +72,9 @@ describe("PartnerApiKeyService", () => {
       status: "active",
       tenantId: "t1",
     });
-    await expect(service.authenticate("pk_live_x", secret)).resolves.toMatchObject({
+    await expect(
+      service.authenticate("pk_live_x", secret),
+    ).resolves.toMatchObject({
       id: "key1",
     });
     await expect(
@@ -82,7 +84,9 @@ describe("PartnerApiKeyService", () => {
 
   it("returns null when the key does not exist / is revoked", async () => {
     prisma.partnerApiKey.findFirst.mockResolvedValue(null);
-    await expect(service.authenticate("pk_live_x", "whatever")).resolves.toBeNull();
+    await expect(
+      service.authenticate("pk_live_x", "whatever"),
+    ).resolves.toBeNull();
   });
 
   it("revokes a key and cascades to its active screen sessions", async () => {

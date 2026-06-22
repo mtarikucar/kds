@@ -13,13 +13,16 @@ export class MintScreenSessionDto {
   @IsUUID()
   branchId: string;
 
-  @ApiPropertyOptional({ description: "Table the screen is bound to (optional)" })
+  @ApiPropertyOptional({
+    description: "Table the screen is bound to (optional)",
+  })
   @IsOptional()
   @IsUUID()
   tableId?: string;
 
   @ApiPropertyOptional({
-    description: "Scopes for this screen (subset of the key's; defaults to all key scopes)",
+    description:
+      "Scopes for this screen (subset of the key's; defaults to all key scopes)",
     enum: PARTNER_SCOPES,
     isArray: true,
   })

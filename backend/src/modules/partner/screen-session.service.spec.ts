@@ -42,12 +42,15 @@ describe("ScreenSessionService", () => {
         update: jest.fn().mockResolvedValue({}),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      customerSession: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      customerSession: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     customerSessions = {
-      createForScreen: jest
-        .fn()
-        .mockResolvedValue({ sessionId: "a".repeat(64), expiresAt: new Date() }),
+      createForScreen: jest.fn().mockResolvedValue({
+        sessionId: "a".repeat(64),
+        expiresAt: new Date(),
+      }),
       extendSession: jest.fn().mockResolvedValue(undefined),
     };
     service = new ScreenSessionService(prisma, customerSessions);

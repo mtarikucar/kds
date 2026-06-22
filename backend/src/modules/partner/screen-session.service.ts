@@ -85,9 +85,14 @@ export class ScreenSessionService {
       select: { id: true, status: true },
     });
     if (!branch || branch.status !== "active") {
-      throw new BadRequestException("Invalid or inactive branch for this tenant");
+      throw new BadRequestException(
+        "Invalid or inactive branch for this tenant",
+      );
     }
-    if (key.allowedBranchIds.length > 0 && !key.allowedBranchIds.includes(branchId)) {
+    if (
+      key.allowedBranchIds.length > 0 &&
+      !key.allowedBranchIds.includes(branchId)
+    ) {
       throw new BadRequestException("Branch not permitted for this API key");
     }
     if (tableId) {

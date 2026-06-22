@@ -54,7 +54,11 @@ export class PartnerApiKeyService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** ADMIN-side: create a key. Returns the raw secret EXACTLY ONCE. */
-  async issue(tenantId: string, createdBy: string | null, input: IssueApiKeyInput) {
+  async issue(
+    tenantId: string,
+    createdBy: string | null,
+    input: IssueApiKeyInput,
+  ) {
     const activeCount = await this.prisma.partnerApiKey.count({
       where: { tenantId, status: "active" },
     });

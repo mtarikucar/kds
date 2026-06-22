@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from "socket.io";
 import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { createHash } from "node:crypto";
 import * as Sentry from "@sentry/node";
 import { PrismaService } from "../../prisma/prisma.service";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -88,11 +89,18 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.handshake.headers.authorization?.split(" ")[1];
       const sessionId =
         client.handshake.auth.sessionId || client.handshake.query.sessionId;
+      const screenToken =
+        client.handshake.auth.screenToken || client.handshake.query.screenToken;
 
       if (token) {
         const authed = await this.tryStaffAuth(client, token);
         if (authed) return;
         // fall through — staff auth failed, customer session may still be valid
+      }
+
+      if (screenToken) {
+        const authed = await this.tryScreenAuth(client, String(screenToken));
+        if (authed) return;
       }
 
       if (sessionId) {
@@ -432,6 +440,74 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.logger.log(
       `Customer ${client.id} connected (session=${session.sessionId}, customer=${session.customerId ?? "anonymous"})`,
+    );
+    return true;
+  }
+
+  /**
+   * Partner Display screen principal. Validates the opaque screen token
+   * (sha256-by-hash lookup, same shape as ScreenSessionService.authenticate)
+   * and joins the BACKING customer-session room so the screen receives the
+   * existing customer:order-* events with zero new emit code, plus a
+   * screen-session room for any future screen-only events. Requires the
+   * realtime:subscribe scope. Mirrors tryCustomerAuth's expiry auto-disconnect.
+   */
+  private async tryScreenAuth(
+    client: Socket,
+    screenToken: string,
+  ): Promise<boolean> {
+    const tokenHash = createHash("sha256").update(screenToken).digest("hex");
+    const screen = await this.prisma.screenSession.findFirst({
+      where: { tokenHash, status: "active" },
+      select: {
+        id: true,
+        tenantId: true,
+        branchId: true,
+        orderingSessionId: true,
+        scopes: true,
+        tokenExpiresAt: true,
+      },
+    });
+
+    if (!screen) {
+      this.logger.warn(`Screen session rejected for ${client.id}: not found`);
+      return false;
+    }
+    if (screen.tokenExpiresAt < new Date()) {
+      this.logger.warn(`Screen session rejected for ${client.id}: expired`);
+      return false;
+    }
+    if (!screen.scopes.includes("realtime:subscribe")) {
+      this.logger.warn(
+        `Screen session rejected for ${client.id}: missing realtime:subscribe scope`,
+      );
+      return false;
+    }
+
+    client.data.screenSessionId = screen.id;
+    client.data.tenantId = screen.tenantId;
+    client.data.branchId = screen.branchId;
+    client.data.sessionId = screen.orderingSessionId;
+    client.data.userType = "screen";
+    client.data.sessionExpiresAt = screen.tokenExpiresAt;
+
+    client.join(`customer-session-${screen.orderingSessionId}`);
+    client.join(`screen-session-${screen.id}`);
+
+    const msToExpiry = screen.tokenExpiresAt.getTime() - Date.now();
+    if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+      setTimeout(() => {
+        if (client.connected) {
+          this.logger.log(
+            `Screen client ${client.id} token expired; disconnecting (screen=${screen.id}).`,
+          );
+          client.disconnect(true);
+        }
+      }, msToExpiry).unref?.();
+    }
+
+    this.logger.log(
+      `Screen ${client.id} connected (screen=${screen.id}, branch=${screen.branchId}).`,
     );
     return true;
   }
