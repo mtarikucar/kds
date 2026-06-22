@@ -46,11 +46,17 @@ the prod (un-prefixed) secret.
 | User sessions | `JWT_SECRET`, `JWT_REFRESH_SECRET` | `STAGING_JWT_SECRET`, `STAGING_JWT_REFRESH_SECRET` |
 | Superadmin sessions | `SUPERADMIN_JWT_SECRET`, `SUPERADMIN_JWT_REFRESH_SECRET` | `STAGING_SUPERADMIN_JWT_SECRET`, `STAGING_SUPERADMIN_JWT_REFRESH_SECRET` |
 
-Genuinely shared (no isolation concern): `PAYTR_MERCHANT_*` (staging runs
-`PAYTR_TEST_MODE=1` → no real charges), `GOOGLE_CLIENT_*`, `SSH_*`, `NETGSM_*`
-(never rendered to staging → SMS mock). **Email:** staging does **not** render
-`EMAIL_HOST/USER/PASSWORD`, so `EmailService` runs in mock mode (logs, never
-sends) — staging testing can't deliver real mail.
+Other external integrations:
+- **Email** — staging renders no `EMAIL_HOST/USER/PASSWORD` → `EmailService` mock
+  mode (logs, never sends). Real mail can't leak from staging.
+- **SMS / NETGSM** — never rendered to staging → `SmsService` mock mode.
+- **Google OAuth** — staging uses its OWN client only (`STAGING_GOOGLE_CLIENT_ID`/
+  `_SECRET` + `STAGING_GOOGLE_CLIENT_ID` as the FE build arg). With none set,
+  Google sign-in is **OFF on staging** (the button is hidden; the backend rejects
+  Google tokens) — staging never touches the prod client.
+- **PayTR** — `STAGING_PAYTR_MERCHANT_*` if set, else falls back to the shared
+  merchant. Staging is always `PAYTR_TEST_MODE=1` (no real charges).
+- `SSH_*` are genuinely shared (deploy transport only).
 
 > `STAGING_POSTGRES_PASSWORD` note: a persistent staging volume ignores
 > `POSTGRES_PASSWORD` after first init, so `scripts/deploy.sh` runs a
@@ -66,16 +72,27 @@ sends) — staging testing can't deliver real mail.
 > If you hit that on stale staging data, reset the staging DB for a clean slate:
 > `docker compose -p kds-staging --env-file .env.test -f docker-compose.staging.yml down && docker volume rm kds-staging_postgres_data_staging` then re-deploy (push `test`).
 
-### Deferred isolation items (need external setup; documented, not yet done)
-- **Separate Google OAuth client for staging** — the shared prod client is mid
-  Google verification (don't edit it). Create a dedicated staging client +
-  `STAGING_GOOGLE_CLIENT_*` and render them on staging.
-- **Separate PayTR TEST merchant** — staging shares the prod merchant under
-  `PAYTR_TEST_MODE=1` (no money moves), but a test-mode webhook validates under
-  the shared HMAC salt. A dedicated test merchant (its own panel notify URL)
-  fully isolates settlement.
+### Items that need an external account to ENABLE (wiring is already in place)
+These are **isolated by default** (Google off; PayTR shared in test-mode). The
+wiring consumes `STAGING_*` secrets the moment you create the external resource —
+no further code change, just `gh secret set` + a `test` deploy.
+
+- **Google OAuth — enable an isolated staging login (optional).** Google is OFF on
+  staging today (fully isolated). To turn it on with its OWN client (never prod's):
+  1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client
+     (Web). Authorized JS origin `https://staging.hummytummy.com`; redirect URIs to
+     match. **Do NOT edit the prod client** (it's mid-verification).
+  2. `gh secret set STAGING_GOOGLE_CLIENT_ID --body <id>` and
+     `gh secret set STAGING_GOOGLE_CLIENT_SECRET --body <secret>`.
+  3. Push `test` → staging rebuilds with the staging client.
+- **PayTR — fully isolate the test merchant (optional).** Staging works now via the
+  shared merchant in test mode (no money). To isolate the webhook too:
+  1. PayTR panel → create/obtain a TEST merchant; set its notification URL to
+     `https://staging.hummytummy.com/api/...` (the PayTR webhook route).
+  2. `gh secret set STAGING_PAYTR_MERCHANT_ID|_KEY|_SALT`.
+  3. Push `test`.
 - **Mailtrap/Mailpit sink** — optional upgrade over mock mode if staging needs to
-  inspect rendered emails.
+  inspect rendered emails (email is already isolated via mock).
 - **Sentry staging DSN** — purely additive observability (no DSN set today, so no
   leak); add `SENTRY_ENVIRONMENT=staging` if staging error capture is wanted.
 

@@ -125,7 +125,10 @@ jobs:
             VITE_API_BASE_URL=https://staging.hummytummy.com
             VITE_SOCKET_URL=https://staging.hummytummy.com
             VITE_WS_URL=wss://staging.hummytummy.com
-            VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+            # Google sign-in is OFF on staging until it has its OWN OAuth client
+            # (never the prod client). Empty here → SocialLoginButtons renders
+            # nothing. Set STAGING_GOOGLE_CLIENT_ID to enable an isolated client.
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.STAGING_GOOGLE_CLIENT_ID }}
             VITE_APP_VERSION=${{ steps.commit.outputs.sha }}
             VITE_BUILD_TIME=${{ github.event.head_commit.timestamp }}
             VITE_COMMIT_SHA=${{ github.sha }}
@@ -182,14 +185,21 @@ jobs:
           MARKETING_SERVICE_URL: ${{ vars.MARKETING_SERVICE_URL }}
           INTERNAL_SERVICE_TOKEN: ${{ secrets.STAGING_INTERNAL_SERVICE_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.STAGING_ENCRYPTION_MASTER_KEY }}
-          PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
-          PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
-          PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
+          # PayTR: prefer a dedicated staging TEST merchant when set, else fall
+          # back to the shared merchant. Staging is always PAYTR_TEST_MODE=1 (no
+          # real charges); a separate test merchant additionally isolates the
+          # webhook (its own panel notify URL). Until then the shared merchant is
+          # used (test mode → no money risk).
+          PAYTR_MERCHANT_ID: ${{ secrets.STAGING_PAYTR_MERCHANT_ID || secrets.PAYTR_MERCHANT_ID }}
+          PAYTR_MERCHANT_KEY: ${{ secrets.STAGING_PAYTR_MERCHANT_KEY || secrets.PAYTR_MERCHANT_KEY }}
+          PAYTR_MERCHANT_SALT: ${{ secrets.STAGING_PAYTR_MERCHANT_SALT || secrets.PAYTR_MERCHANT_SALT }}
           # NOTE: EMAIL_HOST/USER/PASSWORD deliberately NOT rendered on staging →
           # EmailService runs in mock mode (logs, never sends) so staging testing
           # can't deliver real mail to real recipients via prod SMTP.
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          # Google: staging uses its OWN client only (never prod's). Empty unless
+          # STAGING_GOOGLE_* is set → backend rejects Google sign-in on staging.
+          GOOGLE_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
         run: |
           set -euo pipefail
