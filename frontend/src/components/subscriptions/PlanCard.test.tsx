@@ -48,6 +48,7 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
       personnelManagement: false,
       deliveryIntegration: false,
       posAccess: true,
+      externalDisplay: false,
     },
     isActive: true,
     createdAt: '2026-01-01T00:00:00.000Z',
