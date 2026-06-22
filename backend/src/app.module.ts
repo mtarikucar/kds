@@ -57,6 +57,7 @@ import { FulfillmentModule } from "./modules/fulfillment/fulfillment.module";
 import { IntegrationGatewayModule } from "./modules/integration-gateway/integration-gateway.module";
 import { HealthDashboardModule } from "./modules/health-dashboard/health-dashboard.module";
 import { WebhooksOutboundModule } from "./modules/webhooks-outbound/webhooks-outbound.module";
+import { PartnerModule } from "./modules/partner/partner.module";
 import { KmsModule } from "./modules/kms/kms.module";
 import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
 import { MetricsModule } from "./common/metrics/metrics.module";
@@ -167,6 +168,8 @@ import { validate } from "./config/env.validation";
     HealthDashboardModule,
     // Outbound webhook delivery to tenant endpoints.
     WebhooksOutboundModule,
+    // Partner Display API — third-party/remote-screen integration.
+    PartnerModule,
     // KMS abstraction (env-derived today; AWS KMS stub for production).
     KmsModule,
   ],

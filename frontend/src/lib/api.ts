@@ -38,6 +38,11 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   // dropdown gets an empty list and stays disabled. Bare segment so it does NOT
   // widen to the branch-scoped /tenants/settings routes.
   '/tenants/public',
+  // Partner Display API key management is tenant-level (class-level
+  // @SkipBranchScope, tenant-fenced by req.user.tenantId). Bare segment so it
+  // matches /v1/partner/api-keys without a branch header. (The /v1/display/*
+  // surface is machine-auth, called by external apps — not the SPA.)
+  '/v1/partner',
 ];
 
 /**
