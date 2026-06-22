@@ -24,6 +24,15 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
 }) => {
   const { t } = useTranslation(['auth']);
 
+  // Only show Google sign-in when a client ID is baked into this build. Staging
+  // builds carry no STAGING_GOOGLE_CLIENT_ID → Google is intentionally OFF on
+  // staging (it must not use the prod OAuth client) until it has its own client.
+  // This also avoids rendering a broken GIS button when clientId is empty.
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as
+    | string
+    | undefined;
+  if (!googleClientId) return null;
+
   const dividerText =
     variant === 'login'
       ? t('auth:login.orContinueWith', 'or continue with')
