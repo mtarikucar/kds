@@ -818,7 +818,12 @@
     "featureApiAccess": "API kirish",
     "featurePrioritySupport": "Ustuvor qo'llab-quvvatlash",
     "featureInventoryTracking": "Inventar nazorati",
-    "featureKdsIntegration": "KDS integratsiyasi"
+    "featureKdsIntegration": "KDS integratsiyasi",
+    "featurePosAccess": "POS / Sotuv ekrani",
+    "featureReservationSystem": "Bronlash tizimi",
+    "featurePersonnelManagement": "Xodimlarni boshqarish",
+    "featureDeliveryIntegration": "Yetkazib berish platformalari",
+    "featureExternalDisplay": "Masofaviy ekran va Partner API"
   },
   "landing": {
     "badge": "Ishga tushirildi",

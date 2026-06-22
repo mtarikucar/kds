@@ -841,7 +841,12 @@
     "featureApiAccess": "API Erişimi",
     "featurePrioritySupport": "Öncelikli Destek",
     "featureInventoryTracking": "Stok Takibi",
-    "featureKdsIntegration": "KDS Entegrasyonu"
+    "featureKdsIntegration": "KDS Entegrasyonu",
+    "featurePosAccess": "POS / Satış Ekranı",
+    "featureReservationSystem": "Rezervasyon Sistemi",
+    "featurePersonnelManagement": "Personel Yönetimi",
+    "featureDeliveryIntegration": "Yemek Platformu Entegrasyonu",
+    "featureExternalDisplay": "Uzak Ekran & Partner API"
   },
   "landing": {
     "badge": "🚀 Şimdi Canlı",

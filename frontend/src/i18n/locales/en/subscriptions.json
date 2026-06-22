@@ -227,6 +227,7 @@
       "limits": {
         "maxUsers": "Users",
         "maxTables": "Tables",
+        "maxBranches": "Branches",
         "maxProducts": "Products",
         "maxCategories": "Categories",
         "maxMonthlyOrders": "Monthly orders"
@@ -235,9 +236,11 @@
         "kdsIntegration": "KDS integration",
         "inventoryTracking": "Inventory tracking",
         "advancedReports": "Advanced reports",
+        "posAccess": "POS / Sales screen",
         "reservationSystem": "Reservation system",
         "personnelManagement": "Personnel management",
         "deliveryIntegration": "Delivery platforms",
+        "externalDisplay": "Remote display & Partner API",
         "multiLocation": "Multi-location",
         "customBranding": "Custom branding",
         "apiAccess": "API access",

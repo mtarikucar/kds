@@ -265,6 +265,7 @@
       "limits": {
         "maxUsers": "Foydalanuvchilar",
         "maxTables": "Stollar",
+        "maxBranches": "Filiallar soni",
         "maxProducts": "Mahsulotlar",
         "maxCategories": "Kategoriyalar",
         "maxMonthlyOrders": "Oylik buyurtmalar"
@@ -273,9 +274,11 @@
         "kdsIntegration": "KDS integratsiyasi",
         "inventoryTracking": "Ombor nazorati",
         "advancedReports": "Kengaytirilgan hisobotlar",
+        "posAccess": "POS / Sotuv ekrani",
         "reservationSystem": "Bronlash tizimi",
         "personnelManagement": "Xodimlarni boshqarish",
         "deliveryIntegration": "Yetkazib berish platformalari",
+        "externalDisplay": "Masofaviy ekran va Partner API",
         "multiLocation": "Bir nechta filial",
         "customBranding": "Maxsus brending",
         "apiAccess": "API ruxsati",

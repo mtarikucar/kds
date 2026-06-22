@@ -828,7 +828,12 @@
     "featureApiAccess": "Доступ к API",
     "featurePrioritySupport": "Приоритетная поддержка",
     "featureInventoryTracking": "Учет инвентаря",
-    "featureKdsIntegration": "Интеграция с KDS"
+    "featureKdsIntegration": "Интеграция с KDS",
+    "featurePosAccess": "POS / Экран продаж",
+    "featureReservationSystem": "Система бронирования",
+    "featurePersonnelManagement": "Управление персоналом",
+    "featureDeliveryIntegration": "Платформы доставки",
+    "featureExternalDisplay": "Удалённый экран и Partner API"
   },
   "landing": {
     "badge": "Уже работает",
