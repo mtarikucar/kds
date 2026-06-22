@@ -485,9 +485,11 @@ verify_and_promote() {
 # We hit the internal maintenance endpoint from INSIDE the backend container so
 # the call is loopback-local and carries the container's INTERNAL_SERVICE_TOKEN
 # env (the prod image has no curl guaranteed, so we use node's global fetch).
-# The backend always listens on :3000 inside the container in BOTH envs (only
-# the host port mapping differs: 3000 prod / 3002 staging), so localhost:3000 is
-# correct here regardless of ENV.
+# The in-container listen port is NOT the same across envs: prod sets PORT=3000,
+# staging sets PORT=3002 (compose `environment:` overrides). main.ts binds to
+# `process.env.PORT || 3000`, so the node one-liner reads the SAME env var the
+# app bound to — never a hardcoded port. (The host-side port mapping is a
+# separate concern and irrelevant here since we exec inside the container.)
 #
 # NON-FATAL by design: a reproject failure must NOT abort/rollback the deploy —
 # the 03:15 UTC nightly reconcile (plan-projector.service.ts#reconcileNightly)
@@ -502,7 +504,7 @@ reproject_entitlements() {
   fi
 
   log "▶ Reproject all tenants' entitlements (post-migration data op)"
-  if docker exec "$BACKEND_CONTAINER" node -e "fetch('http://localhost:3000/api/internal/entitlements/reproject-all',{method:'POST',headers:{'x-internal-token':process.env.INTERNAL_SERVICE_TOKEN}}).then(r=>{console.log('reproject',r.status);process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"; then
+  if docker exec "$BACKEND_CONTAINER" node -e "const p=process.env.PORT||3000;fetch('http://127.0.0.1:'+p+'/api/internal/entitlements/reproject-all',{method:'POST',headers:{'x-internal-token':process.env.INTERNAL_SERVICE_TOKEN}}).then(r=>{console.log('reproject',r.status);process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"; then
     ok "✓ Entitlement reprojection triggered"
   else
     warn "Entitlement reprojection FAILED — a newly-added plan feature may not surface"
