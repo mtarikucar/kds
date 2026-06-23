@@ -1,0 +1,35 @@
+---
+title: Kontrol Paneli (Dashboard)
+description: Giriş sonrası açılan ana ekran — role göre birincil eylem, hızlı kısayollar ve plan kullanım göstergeleri (kullanıcı/şube/ürün/aylık sipariş limitleri).
+---
+
+import { Callout } from 'nextra/components'
+
+# Kontrol Paneli (Dashboard)
+
+**Menü yolu:** İşletme → Kontrol Paneli &nbsp;•&nbsp; **URL:** `/dashboard`
+**Erişim:** Tüm roller (içerik role göre değişir)  •  **Plan:** Tüm planlar
+
+## Amacı
+
+Kontrol Paneli, giriş yaptıktan sonra gördüğünüz **ana ekrandır**. Üç işi tek bakışta toplar: rolünüze uygun **birincil eyleme** hızlı geçiş, en sık kullanılan ekranlara **kısayollar** ve planınızın **kullanım göstergeleri**. Amaç, günlük işe nereden başlayacağınızı netleştirmek ve plan limitlerinize ne kadar yaklaştığınızı görünür kılmaktır.
+
+## Ekranda neler var?
+
+- **Birincil eylem kartı (hero):** Rolünüze göre öne çıkan ana iş. Kasiyer/garson rollerinde bu genellikle **POS**, mutfak rolünde **Mutfak Ekranı (KDS)** olur.
+- **Hızlı kısayollar:** Masalar, Kullanıcılar, Müşteriler, QR Kodları, Raporlar ve Abonelik/Ayarlar gibi sık kullanılan ekranlara tek tıkla geçiş.
+- **Kullanım göstergeleri (kota):** **Kullanıcılar**, **Şubeler**, **Ürünler** ve **Aylık siparişler** için "kullanılan / limit" biçiminde göstergeler. Bu değerler planınızın limitlerinden gelir.
+
+<Callout type="info">
+  Kullanım göstergeleri planınızdaki **sınırlara** karşı okunur. Bir limite
+  yaklaştığınızda (örn. aylık sipariş veya ürün sayısı) yükseltme zamanının geldiğini
+  buradan anlarsınız — ayrıntı için [Planlar](/tr/plans) ve
+  [Plan seçimi & yükseltme](/tr/plans/plan-secimi-ve-yukseltme).
+</Callout>
+
+<Callout type="warning">
+  Panel rolünüze göre **farklı** görünür: KITCHEN/COURIER gibi kısıtlı rollerde yalnızca
+  ilgili kısayollar ve birincil eylem görünür. Bir kartın görünmemesi, o ekranın
+  planınızda veya rolünüzde olmadığı anlamına gelir — bkz.
+  [Kullanıcılar & Roller](/tr/admin-guide/users).
+</Callout>

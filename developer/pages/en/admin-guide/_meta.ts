@@ -1,5 +1,6 @@
 export default {
   "index": "Overview",
+  "dashboard": "Dashboard",
   "pos": "POS (Sales Screen)",
   "kitchen": "Kitchen Display (KDS)",
   "orders": "Orders",

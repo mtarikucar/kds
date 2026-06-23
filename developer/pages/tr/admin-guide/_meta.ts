@@ -1,5 +1,6 @@
 export default {
   "index": "Genel Bakış",
+  "dashboard": "Kontrol Paneli",
   "pos": "POS (Satış Ekranı)",
   "kitchen": "Mutfak Ekranı (KDS)",
   "orders": "Siparişler",
