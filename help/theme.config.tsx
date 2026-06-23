@@ -22,7 +22,7 @@ const Logo = () => {
         H
       </span>
       <span style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, fontSize: 18 }}>
-        HummyTummy <span style={{ color: '#f97316' }}>{locale === 'en' ? 'Developer' : 'Geliştirici'}</span>
+        HummyTummy <span style={{ color: '#f97316' }}>{locale === 'en' ? 'Help' : 'Yardım'}</span>
       </span>
     </span>
   )
@@ -70,7 +70,7 @@ const config = {
   ],
   search: {
     placeholder: () =>
-      useRouter().locale === 'en' ? 'Search docs…' : 'Dokümanlarda ara…',
+      useRouter().locale === 'en' ? 'Search help…' : 'Yardımda ara…',
   },
   feedback: { content: null },
   editLink: { content: null },
@@ -79,13 +79,13 @@ const config = {
   head: () => {
     const { frontMatter, title } = useConfig()
     const { locale } = useRouter()
-    const brand = locale === 'en' ? 'HummyTummy Developer' : 'HummyTummy Geliştirici'
+    const brand = locale === 'en' ? 'HummyTummy Help' : 'HummyTummy Yardım'
     const pageTitle = title ? `${title} — ${brand}` : brand
     const desc =
       frontMatter.description ||
       (locale === 'en'
-        ? 'HummyTummy — developer & integration documentation (API, webhooks, Partner Display).'
-        : 'HummyTummy — geliştirici & entegrasyon dokümantasyonu (API, webhooks, Partner Display).')
+        ? 'HummyTummy — restaurant management help center.'
+        : 'HummyTummy — restoran yönetim sistemi yardım merkezi.')
     return (
       <>
         <title>{pageTitle}</title>

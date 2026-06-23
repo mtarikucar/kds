@@ -63,16 +63,20 @@ BACKEND_CONTAINER=""
 FRONTEND_CONTAINER=""
 LANDING_CONTAINER=""
 DEVELOPER_CONTAINER=""
+HELP_CONTAINER=""
 BACKEND_IMG=""
 FRONTEND_IMG=""
 LANDING_IMG=""
 DEVELOPER_IMG=""
+HELP_IMG=""
 API_LOCAL_URL=""
 API_PUBLIC_URL=""
 FRONTEND_PUBLIC_URL=""
 LANDING_PUBLIC_URL=""
 DEVELOPER_LOCAL_URL=""
 DEVELOPER_PUBLIC_URL=""
+HELP_LOCAL_URL=""
+HELP_PUBLIC_URL=""
 HEALTH_BUDGET_SEC=300
 BACKUP_RETENTION_DAYS=14
 STATE_FILE=""
@@ -120,6 +124,13 @@ configure_env() {
     # the authoritative health gate.
     DEVELOPER_LOCAL_URL="http://localhost:3200/tr"
     DEVELOPER_PUBLIC_URL="https://developer.hummytummy.com/tr"
+    HELP_CONTAINER="kds_help_prod"
+    HELP_IMG="$ghcr_base/help"
+    # Container maps host 3201 → 3000; /tr is the default-locale page. Public
+    # URL depends on a user-side Cloudflare DNS record (help → VPS IP); its
+    # probe is NON-FATAL (warn-only) — the local 3201 probe is authoritative.
+    HELP_LOCAL_URL="http://localhost:3201/tr"
+    HELP_PUBLIC_URL="https://help.hummytummy.com/tr"
     HEALTH_BUDGET_SEC=300
     BACKUP_RETENTION_DAYS=14
     BACKUP_PREFIX="prod"
@@ -147,6 +158,12 @@ configure_env() {
     # authoritative.
     DEVELOPER_LOCAL_URL="http://localhost:3202/tr"
     DEVELOPER_PUBLIC_URL=""
+    HELP_CONTAINER="kds_help_staging"
+    HELP_IMG="$ghcr_base/help-staging"
+    # Staging help maps host 3203 → 3000 (distinct from prod 3201 + staging
+    # developer 3202). No public staging subdomain; local 3203 probe is authoritative.
+    HELP_LOCAL_URL="http://localhost:3203/tr"
+    HELP_PUBLIC_URL=""
     # Bumped from the original 180s → 300s (route-mapping past 180s on
     # cold boots) → 600s. Run 26431353670 showed the HummyTummy-sized
     # image still hadn't responded to /api/health at the 300s mark.
@@ -247,7 +264,7 @@ backup_database() {
 snapshot_image_ids() {
   : > "$STATE_FILE"
   local saved=0
-  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER" "DEVELOPER $DEVELOPER_CONTAINER"; do
+  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER" "DEVELOPER $DEVELOPER_CONTAINER" "HELP $HELP_CONTAINER"; do
     local role="${entry%% *}"
     local container="${entry##* }"
     local sha
@@ -260,7 +277,7 @@ snapshot_image_ids() {
       warn "$container not running — no prior SHA to snapshot"
     fi
   done
-  log "Snapshot complete: $saved/4 containers (file: $STATE_FILE)"
+  log "Snapshot complete: $saved/5 containers (file: $STATE_FILE)"
 }
 
 pull_versioned_images() {
@@ -270,7 +287,7 @@ pull_versioned_images() {
     echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   fi
 
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$DEVELOPER_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$DEVELOPER_IMG" "$HELP_IMG"; do
     log "docker pull $img:$VERSION"
     docker pull "$img:$VERSION"
   done
@@ -448,18 +465,22 @@ swap_app_containers() {
   retag_to_current "$FRONTEND_IMG"
   retag_to_current "$LANDING_IMG"
   retag_to_current "$DEVELOPER_IMG"
+  retag_to_current "$HELP_IMG"
   # --remove-orphans reaps the retired in-repo marketing SPA container —
   # marketing.hummytummy.com is served by the standalone kds-marketing
   # stack (ports 3210/3211) since the v1.0.x cutover.
-  dc up -d --force-recreate --remove-orphans frontend landing developer
+  dc up -d --force-recreate --remove-orphans frontend landing developer help
   sleep 3
   verify_running_image "$FRONTEND_CONTAINER"  "$FRONTEND_IMG"
   verify_running_image "$LANDING_CONTAINER"   "$LANDING_IMG"
   verify_running_image "$DEVELOPER_CONTAINER" "$DEVELOPER_IMG"
-  # Docs portal is loopback-probed (host 3200 → /tr). This is the
-  # authoritative health gate for the container; the public subdomain probe
-  # in verify_and_promote is non-fatal (depends on user-side Cloudflare DNS).
+  verify_running_image "$HELP_CONTAINER"      "$HELP_IMG"
+  # Docs portals are loopback-probed (developer host 3200, help host 3201, both
+  # → /tr). This is the authoritative health gate for each container; the public
+  # subdomain probes in verify_and_promote are non-fatal (depend on user-side
+  # Cloudflare DNS).
   wait_until_healthy "$DEVELOPER_LOCAL_URL" 60
+  wait_until_healthy "$HELP_LOCAL_URL" 60
 }
 
 verify_and_promote() {
@@ -478,6 +499,12 @@ verify_and_promote() {
   if [ -n "$DEVELOPER_PUBLIC_URL" ]; then
     wait_until_healthy "$DEVELOPER_PUBLIC_URL" 30 \
       || warn "Developer docs public probe non-200 (likely Cloudflare DNS for developer.hummytummy.com not yet set — container is healthy locally)"
+  fi
+  # Help Center subdomain probe is NON-FATAL too (same Cloudflare-DNS caveat as
+  # developer; container health already proven via the local 3201 probe).
+  if [ -n "$HELP_PUBLIC_URL" ]; then
+    wait_until_healthy "$HELP_PUBLIC_URL" 30 \
+      || warn "Help Center public probe non-200 (likely Cloudflare DNS for help.hummytummy.com not yet set — container is healthy locally)"
   fi
   # SSL cert expiry — warn at 14d, error at 3d.
   local host="${API_PUBLIC_URL#https://}"; host="${host%%/*}"
@@ -499,7 +526,7 @@ verify_and_promote() {
   fi
 
   # :current already moved by swap_*. Image immutability proof:
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$DEVELOPER_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$DEVELOPER_IMG" "$HELP_IMG"; do
     local cur_sha ver_sha
     cur_sha=$(docker image inspect "$img:current" --format '{{.Id}}' 2>/dev/null || echo "")
     ver_sha=$(docker image inspect "$img:$VERSION" --format '{{.Id}}' 2>/dev/null || echo "")
@@ -579,12 +606,17 @@ restore_image_ids() {
     docker tag "$DEVELOPER_PREV_IMAGE" "$DEVELOPER_IMG:current" || warn "developer retag failed"
     restored=$((restored + 1))
   fi
+  if [ -n "${HELP_PREV_IMAGE:-}" ]; then
+    log "Pinning help :current → ${HELP_PREV_IMAGE}"
+    docker tag "$HELP_PREV_IMAGE" "$HELP_IMG:current" || warn "help retag failed"
+    restored=$((restored + 1))
+  fi
   if [ "$restored" -eq 0 ]; then
     err "Snapshot is empty — manual recovery required"
     return 1
   fi
 
-  dc up -d --force-recreate --remove-orphans backend frontend landing developer
+  dc up -d --force-recreate --remove-orphans backend frontend landing developer help
   sleep 5
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC" || warn "Post-rollback API not healthy"
 

@@ -227,6 +227,32 @@ services:
     networks:
       - kds_network
 
+  # Help Center (Nextra / Next.js) — help.hummytummy.com (customer/operator docs).
+  # Split out of the developer portal; same image shape, distinct host port.
+  help:
+    env_file:
+      - .env.production
+    image: ghcr.io/mtarikucar/kds/help:current
+    build:
+      context: ./help
+      dockerfile: Dockerfile
+    container_name: kds_help_prod
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3201:3000'
+    healthcheck:
+      # No /api/health route; /tr is the default-locale landing page
+      # (nextra/locales middleware redirects / → /tr) and returns 200.
+      test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/tr']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - kds_network
+
 
 volumes:
   postgres_data:

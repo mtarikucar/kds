@@ -1,11 +1,12 @@
 export default {
   "index": "Home",
-  "getting-started": "Getting Started",
-  "admin-guide": "Admin Guide",
-  "plans": "Plans",
-  "marketplace": "Marketplace",
-  "integrations": "Integrations",
   "developer": "Developer / API",
-  "desktop": "Desktop App",
-  "reference": "Reference"
+  "integrations": "Integrations",
+  "reference": "Reference",
+  "help-center": {
+    "title": "Help Center ↗",
+    "href": "https://help.hummytummy.com/en",
+    "newWindow": true,
+    "type": "page"
+  }
 }
