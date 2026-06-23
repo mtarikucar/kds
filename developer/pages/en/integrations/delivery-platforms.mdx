@@ -1,99 +1,235 @@
 ---
 title: Delivery Platforms
-description: Connect your Getir, Yemeksepeti, Trendyol Yemek and Migros Yemek accounts — enter credentials, test the connection, map your menu and stream incoming orders to the kitchen display.
+description: Connect your Yemeksepeti, Getir, Trendyol Yemek and Migros Yemek accounts — credentials, the sandbox test order, the inbound order lifecycle (accept/reject/prep-time/cancel/amend/refund), webhook signatures, menu sync and troubleshooting.
 ---
 
-import { Callout, Steps } from 'nextra/components'
+import { Callout, Steps, Tabs } from 'nextra/components'
 
 # Delivery Platforms
 
-**Menu path:** Settings → Online Ordering Platforms &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
-**Access:** ADMIN, MANAGER  •  **Plan:** plans that include the `deliveryIntegration` feature
+**Operator menu path:** Settings → Online Ordering &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
+**Access:** ADMIN (configuration), MANAGER (view / test / open-close store)  •  **Plan:** plans that include the `deliveryIntegration` feature
 
-## Purpose
-
-This screen connects your restaurant to the **Getir Yemek, Yemeksepeti, Trendyol Yemek and Migros Yemek** platforms. Once a connection is live, orders from those platforms land straight on your kitchen display (KDS); you can map your products to the platform and push your menu, and you can open or close the store on the platform's side. You manage the whole flow from a single page, and if something goes wrong you can trace it in the activity log on that same page.
+This integration connects your restaurant to the **Yemeksepeti, Getir, Trendyol Yemek and Migros Yemek** platforms. Incoming orders become a HummyTummy `Order`, land on the kitchen display (KDS) and auto-print to the kitchen printer. The whole flow lives in one module (`delivery-platforms`); orders, menu sync and open/close all run through the same adapter layer.
 
 <Callout type="info">
-  The page always shows all four platform cards. Until you open a card and enter
-  its credentials, that platform stays in the **"Not configured"** state and
-  receives no orders.
+  This page is the **developer** reference (endpoints, signatures, lifecycle).
+  For operator setup see the
+  **[Online Ordering](https://help.hummytummy.com/en/admin-guide/online-orders)**
+  page in the help portal.
 </Callout>
 
-## Connecting a platform
+## 1. Per-platform connection
 
-Each platform is listed as an expandable card. Tapping a card's header opens its credentials form.
+For each platform there is **one configuration per tenant** (`DeliveryPlatformConfig`). The operator enters credentials on **Settings → Online Ordering**; they are stored encrypted on the server (never returned in responses — only `hasCredentials` / `hasAccessToken` flags come back).
+
+### Configuration fields
+
+| Field | Description |
+| --- | --- |
+| `platform` | `YEMEKSEPETI` · `GETIR` · `TRENDYOL` · `MIGROS` |
+| `remoteRestaurantId` | The store/branch/chain id the platform issued. Inbound webhook and poll calls are matched to your tenant through this id. |
+| `credentials` | Platform-specific keys (below). |
+| `branchId` | The **branch** that receives this platform's orders. Multi-branch routing: one config per platform → one branch. Empty/`null` applies the "first active branch" fallback. |
+| `environment` | `production` (live) or `sandbox` (test endpoints + the test-order simulator). Defaults to `production`. |
+| `autoAccept` | `true` accepts incoming orders automatically; `false` parks them as `PENDING_APPROVAL`. |
+
+### Credentials by platform
+
+Each adapter uses a different authentication scheme:
+
+<Tabs items={['Yemeksepeti', 'Getir', 'Trendyol', 'Migros']}>
+<Tabs.Tab>
+**OAuth client-credentials.** `POST /v2/login` with `clientId` + `clientSecret`; the returned `access_token` is stored (refreshed 5 min before expiry). Menu and store-status calls additionally use `chainCode` and `posVendorId`.
+
+```
+credentials = { clientId, clientSecret, chainCode?, posVendorId? }
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Key-based login.** `POST /auth/login` with `appSecretKey` + `restaurantSecretKey`; the returned `token` is stored (refreshed after ~55 min).
+
+```
+credentials = { appSecretKey, restaurantSecretKey }
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Two versions.** `v2` (recommended): `POST /integration/auth/token` with `integratorId` + `integratorSecret` → Bearer token (~50 min). `v1` (legacy, Basic Auth): `username` + `password` is base64-encoded.
+
+```
+credentials = { apiVersion: "v1" | "v2", username?, password?, integratorId?, integratorSecret? }
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Per-branch API key.** No token refresh; `apiKey` is sent on every request in the `X-API-Key` header, and `remoteRestaurantId` in the `X-Branch-Id` header.
+
+```
+credentials = { apiKey }
+```
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  `remoteRestaurantId` is **unique** per platform + restaurant id
+  (`@@unique([platform, remoteRestaurantId])`). Registering the same store id
+  for a second tenant/branch returns a conflict error.
+</Callout>
+
+## 2. Sandbox / test mode
+
+You can validate the whole ingest → KDS → printer path **without ever connecting** a live platform account. Set the config's `environment` to **`sandbox`** and fire a test order.
 
 <Steps>
-### Step 1 — Enter the restaurant identifier
+### Switch the config to sandbox
 
-In the **Restaurant ID (`remoteRestaurantId`)** field at the top of the form, enter the store/branch number the platform issued to you. Incoming orders and webhook calls are matched to your business through this identifier.
+`PATCH /delivery-platforms/configs/:platform` with `{ "environment": "sandbox" }`. In sandbox the adapter routes to the platform's test endpoints (Trendyol uses `stageapi.trendyol.com`; the others fall back to the production host until their sandbox host is published, overridable via the matching `*_SANDBOX_API_BASE_URL` env var).
 
-### Step 2 — Enter the credential keys
+### Send a test order
 
-Each platform expects different fields (`*` is required):
+```
+POST /delivery-platforms/test-order/:platform   (ADMIN)
+```
 
-- **Getir Yemek:** App Secret Key\*, Restaurant Secret Key\*
-- **Yemeksepeti:** Client ID\*, Client Secret\*, Chain Code, POS Vendor ID
-- **Trendyol Yemek:** API Version (`v1` or `v2`), Username, Password, Integrator ID (v2), Integrator Secret (v2)
-- **Migros Yemek:** API Key\*
+This endpoint pushes a synthetic order through the **same** `processIncomingOrder` pipeline that real webhooks use. Response:
 
-Use the eye icon next to the secret fields to confirm what you typed. The keys are stored on the server and stay hidden when you return to the screen.
+```json
+{ "simulated": true, "orderId": "...", "orderNumber": "YEM-...", "externalOrderId": "TEST-<uuid>", "status": "PENDING_APPROVAL" }
+```
 
-### Step 3 — Save and test the connection
+### Verify the outcome
 
-The **Save** button appears as soon as you make a change. After saving, use **Test Connection** to verify on the platform's side that the keys are valid. The test performs a real sign-in attempt; if it fails, review the keys or the restaurant identifier.
-
-### Step 4 — Turn the integration on
-
-Flip the toggle in the card header. If any required field is empty, the system warns you and keeps the card open. Once enabled, the status badge changes to **"Connected"** and orders begin to flow.
+The order shows on the KDS with `[TEST]`-labelled items, prints to the kitchen printer and arrives with a fixed `TEST-` prefix on its `externalOrderId` — it can't be confused with a real one. If you have mapped products the simulator uses them; otherwise it produces `PENDING_APPROVAL` with clearly `[TEST]`-labelled unmapped items (captured in the notes).
 </Steps>
 
 <Callout type="warning">
-  Creating, updating and deleting a configuration, and pushing the menu, are
-  **ADMIN**-only actions. **MANAGER** users can view the cards and the activity
-  log, run a connection test, and open or close the store — but they cannot
-  change the keys.
+  A test order works **only** on a `sandbox` config. On a `production` config the
+  endpoint refuses — so a synthetic order can never be accepted by, or pushed back
+  to, a live platform.
 </Callout>
 
-## How order sync works
+## 3. Inbound order lifecycle
 
-The platforms operate in different ways, and each card's description notes which:
+### Transport: webhook vs. polling
 
-- **Yemeksepeti** — webhook-based (real time). The platform pushes orders to our server instantly.
-- **Trendyol Yemek** — a mix of webhook and polling.
-- **Getir Yemek** — polling-based (roughly every 15 sec).
-- **Migros Yemek** — polling-based (roughly every 20 sec).
+| Platform | Method | Cadence |
+| --- | --- | --- |
+| **Yemeksepeti** | Webhook (real-time push) | — |
+| **Trendyol** | Webhook + polling | ~15 sec |
+| **Getir** | Polling | ~15 sec |
+| **Migros** | Polling | ~20 sec |
 
-When **Auto Accept** is on, an incoming order is accepted without any manual step and sent to the kitchen; when it's off, you have to confirm each order by hand. The **Last poll** and **Last menu sync** timestamps at the bottom of the card let you confirm the flow is live.
+Both transports land in the same place: the adapter normalizes the raw body into a `NormalizedOrder`, and `processIncomingOrder` turns it into an `Order`. The dedup guarantee is the partial unique index on `orders(tenantId, source, externalOrderId)` (a concurrent duplicate webhook is swallowed via `P2002`).
 
-<Callout type="info">
-  **Open / Close store:** this button, which appears on the card while the
-  integration is on, marks your restaurant as open or closed only on that
-  platform's side. It's handy for pausing new orders during a rush — you can close
-  the store temporarily without turning the integration off.
-</Callout>
+### Routing, auto-accept and the approval gate
 
-## Menu mapping
+- **Branch routing:** if `config.branchId` points to an active branch of this tenant, the order routes there; otherwise it falls back to the oldest active branch.
+- **Auto-accept:** when `autoAccept` is on, the order is created `PENDING` (in the kitchen queue) and also accepted on the platform side.
+- **Forced approval:** if `autoAccept` is off, **or** any item is unmapped, **or** the platform totals drift more than 5% (or 1₺) from the sum of items, the order becomes `PENDING_APPROVAL` — it never enters the kitchen until an operator approves it.
 
-To push your menu to a platform, you must link each of your products to its counterpart on that platform. A mapping is established between a **product** in the system and the platform's **external item ID** (`externalItemId`). The menu sync pushes only **mapped** products and writes each product's name, price (₺) and stock status to the platform. If you mark a product as "out of stock" in HummyTummy, that status can be reflected on the platform too.
+### Operator actions
+
+```
+POST /delivery-platforms/orders/:orderId/accept     { prepTimeMinutes? }
+POST /delivery-platforms/orders/:orderId/reject      { reason }     (required)
+POST /delivery-platforms/orders/:orderId/prep-time   { minutes }    (1–240)
+```
+
+- **Accept:** `PENDING_APPROVAL → PENDING`; sends `acceptOrder` to the platform. May carry an optional prep time. No-op for an already-accepted order (`alreadyAccepted: true`).
+- **Reject:** `reason` is **required** and forwarded to the platform (the customer/courier sees why). Only `PENDING_APPROVAL`/`PENDING` can be rejected; beyond that it's the cancellation flow.
+- **Prep time:** sends `markPreparing` to the platform and advances the order to `PREPARING`.
+
+> Honesty contract: if the adapter call fails, the error propagates, the internal status is **not** advanced, and the failure is recorded (log + circuit breaker).
+
+### Cancellation, amendment and refund (inbound)
+
+These events exist as endpoints only on the two webhook platforms (Yemeksepeti, Trendyol); on Getir + Migros they surface via polling.
+
+- **Status update / cancellation** — `PICKED_UP`/`DELIVERED` → `SERVED`; `CANCELLED`/`REJECTED` → `CANCELLED`. Atomic and idempotent; never bounces a terminal order backwards. It only mutates the internal status — it does **not** push anything back to the platform.
+- **Amendment** — the platform changes an order's items before the kitchen committed. The full cart is re-resolved, totals recomputed with the same drift-safe logic, and re-emitted to the KDS. If the order is `READY`/`SERVED`/`PAID`/`CANCELLED` it is **refused** (mutating items after the food is out would desync the paper ticket); the platform must cancel + re-order.
+- **Refund** — the platform initiates the refund (it owns the money). We only reflect it, never push back:
+  - **Full refund** → the order moves to `CANCELLED` (`cancelledAt` set).
+  - **Partial refund** → the status is preserved.
 
 <Callout type="warning">
-  On a given platform, an external item ID can be mapped only once; the system
-  rejects duplicates. Create your products first on the
-  **[Menu](https://help.hummytummy.com/en/admin-guide/menu)** screen, then map them here.
+  **Partial-refund amount, honest limitation:** the `Order` model has no dedicated
+  refund-amount column and delivery orders never create `Payment` rows. So the
+  partial amount lives only in the order's **`externalData.refunds[]` ledger**, its
+  notes, the delivery log and the emitted `delivery.order.refunded.v1` event.
+  Accounting/reporting must read those.
 </Callout>
-
-## Activity log and error handling
-
-The **Activity Log** at the bottom of the page shows recent order and sync operations. You can filter by all / successful / failed, and expand any row to see its details. Personal data in the raw payload of incoming orders is masked before it is written to the log.
-
-As errors accumulate on a platform, the card badge switches to a **"Error"** warning. If the error count reaches **10**, the circuit breaker trips, the badge becomes **"Circuit Open"**, and the integration is turned off automatically. When this happens, open the card and read the **Last error** message, fix the credentials, verify with **Test Connection**, and then turn the integration back on.
 
 <Callout type="info">
-  The plan restriction is enforced not only in the UI but on the server too: if
-  your plan doesn't include the `deliveryIntegration` feature, this screen's
-  actions are rejected. Since incoming orders enter the kitchen flow, we recommend
-  completing your **[KDS (Kitchen Display)](https://help.hummytummy.com/en/admin-guide/kitchen)** and
-  **[Menu](https://help.hummytummy.com/en/admin-guide/menu)** setup before you start using this screen.
+  **Restaurant-initiated refunds are unsupported.** None of the four platforms
+  documents a refund endpoint from the restaurant POS (`refundOrder` is optional
+  and unimplemented by every adapter). Issue the refund from the platform's own
+  panel; we reflect it via the inbound refund webhook above.
 </Callout>
+
+## 4. Webhook URLs and signatures
+
+Webhook endpoints are `Public` but protected by `WebhookAuthGuard` and rate-limited to 60 requests/minute. `:remoteId` is always the `remoteRestaurantId`.
+
+<Tabs items={['Yemeksepeti', 'Trendyol']}>
+<Tabs.Tab>
+```
+POST /webhooks/delivery/yemeksepeti/order/:remoteId
+PUT  /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/status
+POST /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/refund
+PUT  /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/amend
+```
+
+**Signature:** `Authorization: Bearer <JWT>`. The JWT is `HS512`-signed with `YEMEKSEPETI_WEBHOOK_SECRET` (the `alg` header must be exactly `HS512` — `alg: none` and algorithm-confusion are rejected). `exp` must be valid and `iat` within the last 5 min. If the token carries a restaurant claim (`sub`/`restaurantId`/`chainId`/…) it must match the URL `:remoteId` (defends against cross-tenant replay).
+</Tabs.Tab>
+<Tabs.Tab>
+```
+POST /webhooks/delivery/trendyol/order/:remoteId
+PUT  /webhooks/delivery/trendyol/:remoteId/order/:remoteOrderId/status
+POST /webhooks/delivery/trendyol/:remoteId/order/:remoteOrderId/refund
+PUT  /webhooks/delivery/trendyol/:remoteId/order/:remoteOrderId/amend
+```
+
+**Signature:** `X-Webhook-Signature` = `HMAC-SHA256(TRENDYOL_WEBHOOK_SECRET, "<timestamp>.<rawBody>")` (hex). `X-Webhook-Timestamp` is **required** and must be within a 5-min freshness window. The HMAC is verified against the raw body (re-serialization is rejected). If the body carries a restaurant id it must match the URL `:remoteId`.
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  Getir and Migros use **no inbound webhook** — we poll their orders, so there is no
+  webhook URL or signature secret to configure for these platforms.
+</Callout>
+
+### Menu / availability / store-status sync (outbound)
+
+```
+GET    /delivery-platforms/menu-mappings?platform=
+POST   /delivery-platforms/menu-mappings           { productId, platform, externalItemId, externalData? }
+DELETE /delivery-platforms/menu-mappings/:id
+POST   /delivery-platforms/menu-sync/:platform                      (ADMIN)
+POST   /delivery-platforms/configs/:platform/toggle-restaurant      { open: boolean }
+POST   /delivery-platforms/configs/:platform/test                   (connection test)
+```
+
+- **Menu mapping:** each product is linked to its counterpart on the platform (`externalItemId`). Menu sync pushes only **mapped** products, writing name, price (₺) and availability (`isAvailable && isActive`).
+- **Availability:** a single item can be toggled on/off via `updateItemAvailability`.
+- **Open/close store:** `toggle-restaurant` marks the restaurant open/closed only on that platform's side — for pausing new orders during a rush (without turning the integration off).
+
+### Reconciliation
+
+`DeliveryReconciliationService` is a low-frequency, **read-only** drift scan. Since no adapter exposes a settlement report, platform-side counts aren't compared; instead, from our own state:
+
+- **Staleness:** an enabled polling config whose `lastOrderPollAt` is older than 1 hour is flagged (usually a circuit-breaker trip or a dead token); a menu unsynced for 7 days is flagged informationally.
+- **Count drift:** delivery orders ingested in the last 24 hours, and how many lack an `externalOrderId` (un-syncable back to the platform).
+
+Findings are logged and rolled into a single `delivery.reconciliation.v1` outbox summary.
+
+## Troubleshooting
+
+- **Circuit breaker / auto-disable:** when a config's error count reaches **10** the integration is auto-disabled (to stop spamming the platform and the log table). A `delivery.platform.auto_disabled.v1` event is emitted. The operator must fix the cause (`lastError`) and **re-enable the config manually**. Updating credentials resets the error count.
+- **Dead-letter queue (DLQ):** failed outbound operations are retried with exponential backoff (3 attempts by default, capped at 1 hour). Once attempts are exhausted, the row parks in the DLQ terminal state (`success:false AND nextRetryAt:null AND retryCount>=maxRetries`). DLQ depth is tracked by the `delivery_dlq_depth` metric; rows can be requeued by an operator/superadmin.
+- **`restaurant not configured`:** a webhook arrived with a `remoteId` that doesn't map to an enabled config — verify the `remoteRestaurantId` and that the integration is on.
+- **PII masking:** personal data in inbound raw bodies (phone/email/address/name) is masked from both the log and the order's `externalData` blob before persistence.
+
+## Related pages
+
+- **Operator setup:** [Online Ordering](https://help.hummytummy.com/en/admin-guide/online-orders)
+- **Kitchen flow:** [KDS (Kitchen Display)](https://help.hummytummy.com/en/admin-guide/kitchen)
+- **Menu setup:** [Menu Management](https://help.hummytummy.com/en/admin-guide/menu)

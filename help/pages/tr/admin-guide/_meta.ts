@@ -22,4 +22,5 @@ export default {
   "health": "Sistem Durumu",
   "fiscal-recovery": "Mali Kurtarma",
   "settings": "Ayarlar",
+  "online-orders": "Online Sipariş",
 };
