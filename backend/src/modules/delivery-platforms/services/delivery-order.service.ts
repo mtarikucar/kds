@@ -1,4 +1,10 @@
-import { Injectable, Logger, Inject, forwardRef } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  Inject,
+  forwardRef,
+  Optional,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import * as crypto from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -16,6 +22,51 @@ import { OrderStatus } from "../../../common/constants/order-status.enum";
 import { CommandQueueService } from "../../device-mesh/command-queue.service";
 import { EscPosBuilderService } from "../../device-mesh/printing/escpos-builder.service";
 import { ReceiptSnapshotBuilder } from "../../orders/services/receipt-snapshot.builder";
+import { OutboxService } from "../../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
+
+/**
+ * Versioned domain events for inbound delivery money/cart mutations. Kept
+ * local for the same reason as DELIVERY_AUTO_DISABLED_EVENT /
+ * DELIVERY_RECONCILIATION_EVENT — the central EventTypes registry is owned by
+ * the outbox module, so OutboxService.append only logs a (harmless)
+ * unregistered-type warning until they're added there. The events ride the
+ * SAME durable outbox/in-process bus every other tenant signal uses, so a
+ * notification / accounting consumer can subscribe without coupling to this
+ * module.
+ */
+export const DELIVERY_ORDER_REFUNDED_EVENT = "delivery.order.refunded.v1";
+export const DELIVERY_ORDER_AMENDED_EVENT = "delivery.order.amended.v1";
+
+/**
+ * Order statuses past which an amendment must be REFUSED — the kitchen has
+ * already committed/served the order (or it's a terminal money state), so
+ * mutating its items would desync the paper ticket / KDS hand-off from what
+ * was actually cooked. The platform must instead cancel + re-order.
+ */
+const AMENDMENT_LOCKED_STATUSES: readonly OrderStatus[] = [
+  OrderStatus.READY,
+  OrderStatus.SERVED,
+  OrderStatus.PAID,
+  OrderStatus.CANCELLED,
+];
+
+/**
+ * One recorded refund event on an Order's externalData blob. The internal
+ * Order has NO dedicated refund column (see schema.prisma: Order has only
+ * status/notes/externalData/finalAmount), and delivery orders never create
+ * Payment rows (the platform owns the money), so this append-only ledger on
+ * externalData.refunds[] is where partial-refund amounts are honestly
+ * recorded. A full refund additionally moves the order to CANCELLED.
+ */
+interface RecordedRefund {
+  /** Stable dedup key: platform refundId when supplied, else full|<amount>. */
+  refundKey: string;
+  type: "full" | "partial";
+  amount: number | null;
+  reason?: string;
+  at: string;
+}
 
 @Injectable()
 export class DeliveryOrderService {
@@ -38,6 +89,10 @@ export class DeliveryOrderService {
     private configService: DeliveryConfigService,
     private commandQueue: CommandQueueService,
     private escpos: EscPosBuilderService,
+    // OutboxModule is @Global; @Optional() so the many unit tests that build
+    // this service bare keep working and a missing bus can never break a
+    // refund/amendment write path — the domain-event emit is best-effort.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -115,54 +170,15 @@ export class DeliveryOrderService {
           return null;
         }
 
-        // 2. Map platform items to internal products via MenuItemMapping
-        const itemMappings = await tx.menuItemMapping.findMany({
-          where: {
-            tenantId,
-            platform,
-            externalItemId: {
-              in: normalizedOrder.items.map((i) => i.externalItemId),
-            },
-            isActive: true,
-          },
-          include: { product: true },
-        });
-
-        const mappingByExternalId = new Map(
-          itemMappings.map((m) => [m.externalItemId, m]),
+        // 2-3. Map items + compute/validate totals (shared with the
+        // amendment path so both honour the SAME drift-safe logic).
+        const resolved = await this.resolveItemsAndTotals(
+          tx,
+          tenantId,
+          platform,
+          normalizedOrder,
         );
-
-        // Build order items - map to internal products when possible
-        const orderItems = normalizedOrder.items.map((item) => {
-          const mapping = mappingByExternalId.get(item.externalItemId);
-          const modifierTotal = (item.modifiers || []).reduce(
-            (sum, m) => sum + m.price * m.quantity,
-            0,
-          );
-          return {
-            productId: mapping?.productId || null,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            subtotal: item.quantity * item.unitPrice + modifierTotal,
-            modifierTotal,
-            notes: item.notes
-              ? `${item.name}${mapping ? "" : " (unmapped)"}: ${item.notes}`
-              : !mapping
-                ? `${item.name} (unmapped)`
-                : undefined,
-          };
-        });
-
-        // Filter items - we need valid product mappings for order items
-        const validItems = orderItems.filter((item) => item.productId !== null);
-
-        const unmappedCount = normalizedOrder.items.length - validItems.length;
-        if (validItems.length === 0) {
-          this.logger.warn(
-            `No mapped items (${unmappedCount} unmapped) for ${platform} order ${externalOrderId} in tenant ${tenantId}. ` +
-              `Storing order with notes.`,
-          );
-        }
+        const { validItems, unmappedItems, totalsMismatch } = resolved;
 
         // Config + autoAccept were resolved before the txn (iter-39) so
         // the inside-txn decision and the outside-txn platform-accept
@@ -176,40 +192,7 @@ export class DeliveryOrderService {
         const discount = normalizedOrder.discount;
         const finalAmount = normalizedOrder.finalAmount;
 
-        // Sanity-check the platform-supplied totals against the sum of items.
-        // The platform sends finalAmount straight from its own ledger, so a
-        // platform-side bug or compromise could silently overcharge customers.
-        // Drift > 5% (or > 1₺ absolute on small orders) gates the order into
-        // approval-required so a human reviews before fulfilling.
-        const itemsSum = normalizedOrder.items.reduce(
-          (sum, it) => sum + Number(it.unitPrice) * Number(it.quantity),
-          0,
-        );
-        const claimedSubtotal = Number(totalAmount) - Number(discount ?? 0);
-        const drift = Math.abs(itemsSum - claimedSubtotal);
-        const tolerance = Math.max(1.0, claimedSubtotal * 0.05);
-        const totalsMismatch = drift > tolerance;
-        if (totalsMismatch) {
-          this.logger.warn(
-            `Totals mismatch for ${platform} order ${externalOrderId}: items Σ=${itemsSum.toFixed(2)} vs claimed subtotal ${claimedSubtotal.toFixed(2)} (drift ${drift.toFixed(2)} > tolerance ${tolerance.toFixed(2)}). Forcing approval.`,
-          );
-        }
-
-        // Build notes with platform info and unmapped items
-        const unmappedItems = normalizedOrder.items.filter(
-          (item) => !mappingByExternalId.has(item.externalItemId),
-        );
-        const orderNotes = [
-          normalizedOrder.notes,
-          normalizedOrder.customerAddress
-            ? `Adres: ${normalizedOrder.customerAddress}`
-            : null,
-          unmappedItems.length > 0
-            ? `[UNMAPPED - needs menu mapping]\n${unmappedItems.map((i) => `  - ${i.name} x${i.quantity} @ ${i.unitPrice.toFixed(2)}`).join("\n")}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join("\n");
+        const orderNotes = resolved.orderNotes;
 
         // 4. Create order
         // Also force approval when items are unmapped (a zero-line-item
@@ -377,6 +360,126 @@ export class DeliveryOrderService {
     );
 
     return createdOrder;
+  }
+
+  /**
+   * Shared item-mapping + totals/drift logic used by BOTH processIncomingOrder
+   * and applyPlatformAmendment so the two paths can NEVER diverge on the
+   * money-sensitive bits (item→product mapping, modifier subtotals, the
+   * platform-totals drift guard, the unmapped-items note). Runs inside the
+   * caller's transaction (`tx`) so the mapping read is consistent with the
+   * order write.
+   */
+  private async resolveItemsAndTotals(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    platform: string,
+    normalizedOrder: NormalizedOrder,
+  ): Promise<{
+    validItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      modifierTotal: number;
+      notes?: string;
+    }>;
+    unmappedItems: NormalizedOrder["items"];
+    totalsMismatch: boolean;
+    orderNotes: string;
+  }> {
+    const { externalOrderId } = normalizedOrder;
+
+    // Map platform items to internal products via MenuItemMapping.
+    const itemMappings = await tx.menuItemMapping.findMany({
+      where: {
+        tenantId,
+        platform,
+        externalItemId: {
+          in: normalizedOrder.items.map((i) => i.externalItemId),
+        },
+        isActive: true,
+      },
+      include: { product: true },
+    });
+
+    const mappingByExternalId = new Map(
+      itemMappings.map((m) => [m.externalItemId, m]),
+    );
+
+    // Build order items - map to internal products when possible.
+    const orderItems = normalizedOrder.items.map((item) => {
+      const mapping = mappingByExternalId.get(item.externalItemId);
+      const modifierTotal = (item.modifiers || []).reduce(
+        (sum, m) => sum + m.price * m.quantity,
+        0,
+      );
+      return {
+        productId: mapping?.productId ?? null,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotal: item.quantity * item.unitPrice + modifierTotal,
+        modifierTotal,
+        notes: item.notes
+          ? `${item.name}${mapping ? "" : " (unmapped)"}: ${item.notes}`
+          : !mapping
+            ? `${item.name} (unmapped)`
+            : undefined,
+      };
+    });
+
+    // We need valid product mappings for order items.
+    const validItems = orderItems.filter(
+      (item): item is typeof item & { productId: string } =>
+        item.productId !== null,
+    );
+
+    const unmappedCount = normalizedOrder.items.length - validItems.length;
+    if (validItems.length === 0) {
+      this.logger.warn(
+        `No mapped items (${unmappedCount} unmapped) for ${platform} order ${externalOrderId} in tenant ${tenantId}. ` +
+          `Storing order with notes.`,
+      );
+    }
+
+    // Sanity-check the platform-supplied totals against the sum of items.
+    // The platform sends finalAmount straight from its own ledger, so a
+    // platform-side bug or compromise could silently overcharge customers.
+    // Drift > 5% (or > 1₺ absolute on small orders) gates the order into
+    // approval-required so a human reviews before fulfilling.
+    const itemsSum = normalizedOrder.items.reduce(
+      (sum, it) => sum + Number(it.unitPrice) * Number(it.quantity),
+      0,
+    );
+    const claimedSubtotal =
+      Number(normalizedOrder.totalAmount) -
+      Number(normalizedOrder.discount ?? 0);
+    const drift = Math.abs(itemsSum - claimedSubtotal);
+    const tolerance = Math.max(1.0, claimedSubtotal * 0.05);
+    const totalsMismatch = drift > tolerance;
+    if (totalsMismatch) {
+      this.logger.warn(
+        `Totals mismatch for ${platform} order ${externalOrderId}: items Σ=${itemsSum.toFixed(2)} vs claimed subtotal ${claimedSubtotal.toFixed(2)} (drift ${drift.toFixed(2)} > tolerance ${tolerance.toFixed(2)}). Forcing approval.`,
+      );
+    }
+
+    // Build notes with platform info and unmapped items.
+    const unmappedItems = normalizedOrder.items.filter(
+      (item) => !mappingByExternalId.has(item.externalItemId),
+    );
+    const orderNotes = [
+      normalizedOrder.notes,
+      normalizedOrder.customerAddress
+        ? `Adres: ${normalizedOrder.customerAddress}`
+        : null,
+      unmappedItems.length > 0
+        ? `[UNMAPPED - needs menu mapping]\n${unmappedItems.map((i) => `  - ${i.name} x${i.quantity} @ ${i.unitPrice.toFixed(2)}`).join("\n")}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return { validItems, unmappedItems, totalsMismatch, orderNotes };
   }
 
   /**
@@ -554,5 +657,497 @@ export class DeliveryOrderService {
     });
 
     return { matched: true, mappedTo: target };
+  }
+
+  /**
+   * Apply an INBOUND platform refund to the internal Order honestly.
+   *
+   * Delivery orders are platform-owned money: the platform collected payment
+   * from the customer and is the party that initiates a refund — so we NEVER
+   * push anything back to the platform here (it told us). We only reflect the
+   * refund on our side.
+   *
+   * Schema reality (see schema.prisma): the Order model has NO dedicated
+   * refund column (no refundedAmount / refundedAt), and delivery orders never
+   * create Payment rows (grep-confirmed — the platform owns the money rail),
+   * so there is no Payment to flip to REFUNDED either. Given that, we record
+   * the refund where the schema DOES support it:
+   *   - FULL refund  → move the order to CANCELLED (cancelled-with-refund),
+   *     set cancelledAt, append a refund note, append to externalData.refunds[].
+   *   - PARTIAL refund → keep the status (kitchen may still be fulfilling),
+   *     append a refund note + the refunded amount to externalData.refunds[].
+   *     LIMITATION: with no refundedAmount column the partial amount lives only
+   *     in notes + the externalData ledger + the delivery log + the emitted
+   *     delivery.order.refunded.v1 event. Reporting/accounting must read those.
+   *
+   * Idempotent: a re-delivered refund webhook (same refundId, or same
+   * full|amount shape) is recorded once — the append checks the existing
+   * externalData.refunds[] for the refundKey and no-ops on a repeat.
+   */
+  async applyPlatformRefund(args: {
+    platform: string;
+    remoteOrderId: string;
+    tenantId: string;
+    /** Refunded amount in major units. Omitted/null/>=finalAmount ⇒ full refund. */
+    refundAmount?: number | null;
+    reason?: string | null;
+    /** Platform's refund id — the strongest idempotency key when present. */
+    refundId?: string | null;
+  }): Promise<{
+    matched: boolean;
+    applied: boolean;
+    type?: "full" | "partial";
+    duplicate?: boolean;
+  }> {
+    const { platform, remoteOrderId, tenantId, reason, refundId } = args;
+
+    // Run the read-mutate inside a transaction so a concurrent duplicate
+    // webhook can't both pass the idempotency check and double-append.
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { tenantId, source: platform, externalOrderId: remoteOrderId },
+      });
+      if (!order) {
+        return { matched: false as const, applied: false as const };
+      }
+
+      const finalAmount = Number(order.finalAmount);
+      const rawAmount =
+        args.refundAmount == null ? null : Number(args.refundAmount);
+      // A non-finite / negative amount is treated as "amount unknown" → full.
+      const amount =
+        rawAmount != null && Number.isFinite(rawAmount) && rawAmount > 0
+          ? rawAmount
+          : null;
+      // Full when no usable amount, or it covers (≈) the whole order.
+      const isFull = amount == null || amount >= finalAmount - 0.001;
+      const type: "full" | "partial" = isFull ? "full" : "partial";
+
+      const refundKey = refundId
+        ? `id:${refundId}`
+        : isFull
+          ? "full"
+          : `partial:${amount!.toFixed(2)}`;
+
+      // Read the append-only refund ledger off externalData (may be absent).
+      const externalData =
+        order.externalData && typeof order.externalData === "object"
+          ? (order.externalData as Record<string, any>)
+          : {};
+      const existing: RecordedRefund[] = Array.isArray(externalData.refunds)
+        ? (externalData.refunds as RecordedRefund[])
+        : [];
+
+      // Idempotency: same refundKey already recorded ⇒ no-op.
+      if (existing.some((r) => r.refundKey === refundKey)) {
+        this.logger.debug(
+          `Refund no-op (duplicate ${refundKey}) for ${platform} ${remoteOrderId}`,
+        );
+        return {
+          matched: true as const,
+          applied: false as const,
+          type,
+          duplicate: true as const,
+          orderId: order.id,
+          branchId: order.branchId,
+        };
+      }
+
+      const recorded: RecordedRefund = {
+        refundKey,
+        type,
+        amount,
+        reason: reason ?? undefined,
+        at: new Date().toISOString(),
+      };
+      const refunds = [...existing, recorded];
+
+      const noteLine = isFull
+        ? `[REFUND] Full refund from ${platform}${reason ? ` — ${reason}` : ""}`
+        : `[REFUND] Partial refund ${amount!.toFixed(2)} from ${platform}${reason ? ` — ${reason}` : ""}`;
+      const notes = order.notes ? `${order.notes}\n${noteLine}` : noteLine;
+
+      // A full refund moves the order to a cancelled-with-refund terminal
+      // state UNLESS it's already terminal (PAID/CANCELLED) — never bounce a
+      // settled order back. Partial keeps the current status.
+      const goCancel =
+        isFull &&
+        order.status !== OrderStatus.CANCELLED &&
+        order.status !== OrderStatus.PAID;
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          notes,
+          externalData: { ...externalData, refunds } as any,
+          ...(goCancel
+            ? { status: OrderStatus.CANCELLED, cancelledAt: new Date() }
+            : {}),
+        },
+      });
+
+      return {
+        matched: true as const,
+        applied: true as const,
+        type,
+        amount,
+        reason: reason ?? undefined,
+        refundKey,
+        statusChangedToCancelled: goCancel,
+        orderId: order.id,
+        branchId: order.branchId,
+      };
+    });
+
+    if (!outcome.matched) {
+      this.logger.debug(
+        `Refund: no matching ${platform} order ${remoteOrderId} for tenant ${tenantId}`,
+      );
+      return { matched: false, applied: false };
+    }
+
+    // Re-emit to KDS so a cancelled-with-refund disappears from the line.
+    const refreshed = await this.prisma.order.findUnique({
+      where: { id: (outcome as any).orderId },
+    });
+    if (refreshed) {
+      this.kdsGateway.emitNewOrder(tenantId, refreshed.branchId, refreshed);
+    }
+
+    await this.logService.log({
+      tenantId,
+      platform,
+      direction: PlatformLogDirection.INBOUND,
+      action: PlatformLogAction.ORDER_REFUNDED,
+      orderId: (outcome as any).orderId,
+      externalId: remoteOrderId,
+      request: {
+        type: outcome.type,
+        amount: (outcome as any).amount ?? null,
+        reason: reason ?? null,
+        duplicate: !outcome.applied,
+        statusChangedToCancelled:
+          (outcome as any).statusChangedToCancelled ?? false,
+      },
+      success: true,
+    });
+
+    // Emit the durable domain event only for a NEWLY-applied refund (not a
+    // duplicate) so accounting consumers don't double-count.
+    if (outcome.applied) {
+      await this.outbox
+        ?.append({
+          type: DELIVERY_ORDER_REFUNDED_EVENT,
+          tenantId,
+          payload: {
+            tenantId,
+            branchId: (outcome as any).branchId,
+            orderId: (outcome as any).orderId,
+            platform,
+            externalOrderId: remoteOrderId,
+            type: outcome.type,
+            amount: (outcome as any).amount ?? null,
+            reason: reason ?? null,
+            statusChangedToCancelled:
+              (outcome as any).statusChangedToCancelled ?? false,
+          },
+          // Deterministic dedup key so a re-delivered webhook that somehow
+          // re-applies (shouldn't, idempotency above) still collapses on the
+          // bus. Uses the same refundKey we deduped on.
+          idempotencyKey: `delivery-refund:${tenantId}:${platform}:${remoteOrderId}:${(outcome as any).refundKey}`,
+        })
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "delivery-platforms",
+            op: "order_refunded",
+          }),
+        );
+    }
+
+    return {
+      matched: true,
+      applied: outcome.applied,
+      type: outcome.type,
+      duplicate: !outcome.applied,
+    };
+  }
+
+  /**
+   * Restaurant-INITIATED (outbound) refund. NONE of the four Turkish platform
+   * adapters documents a restaurant-initiated refund endpoint — on Getir /
+   * Yemeksepeti / Trendyol / Migros, refunds are owned by the platform's
+   * customer-service / settlement flow, not the restaurant POS. So
+   * PlatformAdapter.refundOrder is OPTIONAL and unimplemented by all four
+   * adapters today. This method dispatches to it ONLY when an adapter actually
+   * implements it; otherwise it throws an honest "unsupported" error rather
+   * than faking a successful outbound call. To reflect an inbound,
+   * platform-initiated refund use applyPlatformRefund instead.
+   */
+  async refundOrderOnPlatform(
+    tenantId: string,
+    platform: string,
+    externalOrderId: string,
+    amount?: number,
+  ): Promise<void> {
+    const config = await this.prisma.deliveryPlatformConfig.findUnique({
+      where: { tenantId_platform: { tenantId, platform: platform as any } },
+    });
+    if (!config) {
+      throw new Error(
+        `No ${platform} config for tenant ${tenantId} — cannot initiate refund`,
+      );
+    }
+    const adapter = this.adapterFactory.getAdapter(platform);
+    if (typeof adapter.refundOrder !== "function") {
+      // Honest, explicit: do NOT pretend the refund happened.
+      throw new Error(
+        `${platform} adapter does not support a restaurant-initiated refund (inbound-only). ` +
+          `Issue the refund from the platform's own panel; we reflect it via the inbound refund webhook.`,
+      );
+    }
+    const freshConfig =
+      (await this.authService.ensureValidToken(config.id)) ?? config;
+    await adapter.refundOrder(freshConfig as any, externalOrderId, amount);
+
+    await this.logService.log({
+      tenantId,
+      platform,
+      direction: PlatformLogDirection.OUTBOUND,
+      action: PlatformLogAction.ORDER_REFUNDED,
+      externalId: externalOrderId,
+      request: { amount: amount ?? null },
+      success: true,
+    });
+  }
+
+  /**
+   * Apply an INBOUND order AMENDMENT — the platform changed an existing
+   * order's items (added/removed/qty changed) BEFORE the kitchen committed it.
+   *
+   * Re-resolves items via MenuItemMapping and recomputes totals using the
+   * SAME drift-safe logic as processIncomingOrder (shared resolveItemsAndTotals
+   * helper), replaces the existing order's items + amounts in one transaction,
+   * and re-emits to KDS so the line sees the change.
+   *
+   * Guards:
+   *   - Refuse if the order is in a committed/served/terminal state
+   *     (READY/SERVED/PAID/CANCELLED) — mutating items after the food is out
+   *     would desync the ticket from what was cooked. The platform must cancel
+   *     + re-order instead. Returns { matched: true, refused: true }.
+   *   - Idempotent: a stable hash of the amended cart is stored on
+   *     externalData.amendmentHash; a re-delivered identical amendment no-ops.
+   */
+  async applyPlatformAmendment(
+    tenantId: string,
+    normalizedOrder: NormalizedOrder,
+  ): Promise<{
+    matched: boolean;
+    applied: boolean;
+    refused?: boolean;
+    reason?: string;
+    duplicate?: boolean;
+  }> {
+    const { platform, externalOrderId } = normalizedOrder;
+
+    // Stable hash of the incoming cart for idempotency — order-independent so
+    // re-delivery with reordered items still dedups.
+    const amendmentHash = crypto
+      .createHash("sha256")
+      .update(
+        JSON.stringify(
+          [...normalizedOrder.items]
+            .map((i) => ({
+              e: i.externalItemId,
+              q: i.quantity,
+              p: i.unitPrice,
+              m: (i.modifiers || [])
+                .map((x) => `${x.name}:${x.price}:${x.quantity}`)
+                .sort(),
+            }))
+            .sort((a, b) => (a.e > b.e ? 1 : -1)),
+        ) +
+          `|${normalizedOrder.totalAmount}|${normalizedOrder.discount}|${normalizedOrder.finalAmount}`,
+      )
+      .digest("hex");
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { tenantId, source: platform, externalOrderId },
+      });
+      if (!order) {
+        return { matched: false as const, applied: false as const };
+      }
+
+      // Guard: don't amend a committed/served/terminal order.
+      if (AMENDMENT_LOCKED_STATUSES.includes(order.status as OrderStatus)) {
+        return {
+          matched: true as const,
+          applied: false as const,
+          refused: true as const,
+          reason: `order is ${order.status} — too late to amend`,
+          orderId: order.id,
+          branchId: order.branchId,
+        };
+      }
+
+      // Idempotency: identical amendment already applied ⇒ no-op.
+      const externalData =
+        order.externalData && typeof order.externalData === "object"
+          ? (order.externalData as Record<string, any>)
+          : {};
+      if (externalData.amendmentHash === amendmentHash) {
+        return {
+          matched: true as const,
+          applied: false as const,
+          duplicate: true as const,
+          orderId: order.id,
+          branchId: order.branchId,
+        };
+      }
+
+      // Re-resolve items + totals with the shared, drift-safe logic.
+      const resolved = await this.resolveItemsAndTotals(
+        tx,
+        tenantId,
+        platform,
+        normalizedOrder,
+      );
+
+      // Replace the line items wholesale (delete + recreate) — the platform
+      // sends the full amended cart, not a delta.
+      await tx.orderItem.deleteMany({ where: { orderId: order.id } });
+
+      // An amendment that drifts or fully unmaps gates back to approval, same
+      // rationale as ingestion.
+      const requiresApproval =
+        resolved.unmappedItems.length > 0 || resolved.totalsMismatch;
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          totalAmount: normalizedOrder.totalAmount,
+          discount: normalizedOrder.discount,
+          finalAmount: normalizedOrder.finalAmount,
+          notes: resolved.orderNotes || null,
+          requiresApproval,
+          ...(requiresApproval ? { status: OrderStatus.PENDING_APPROVAL } : {}),
+          externalData: {
+            ...externalData,
+            amendmentHash,
+            amendedAt: new Date().toISOString(),
+          } as any,
+          orderItems: {
+            create: resolved.validItems.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              subtotal: item.subtotal,
+              modifierTotal: item.modifierTotal,
+              notes: item.notes,
+            })),
+          },
+        },
+      });
+
+      return {
+        matched: true as const,
+        applied: true as const,
+        orderId: order.id,
+        branchId: order.branchId,
+      };
+    });
+
+    if (!result.matched) {
+      this.logger.debug(
+        `Amendment: no matching ${platform} order ${externalOrderId} for tenant ${tenantId}`,
+      );
+      return { matched: false, applied: false };
+    }
+
+    if ((result as any).refused) {
+      this.logger.warn(
+        `Amendment refused for ${platform} ${externalOrderId}: ${(result as any).reason}`,
+      );
+      await this.logService.log({
+        tenantId,
+        platform,
+        direction: PlatformLogDirection.INBOUND,
+        action: PlatformLogAction.ORDER_AMENDED,
+        orderId: (result as any).orderId,
+        externalId: externalOrderId,
+        request: { refused: true, reason: (result as any).reason },
+        success: false,
+      });
+      return {
+        matched: true,
+        applied: false,
+        refused: true,
+        reason: (result as any).reason,
+      };
+    }
+
+    // Re-emit the (possibly unchanged on duplicate) order to KDS so the
+    // kitchen view reflects the amended items immediately.
+    const refreshed = await this.prisma.order.findUnique({
+      where: { id: (result as any).orderId },
+      include: {
+        orderItems: {
+          include: {
+            product: {
+              select: { id: true, name: true, price: true, image: true },
+            },
+          },
+        },
+        table: { select: { id: true, number: true, section: true } },
+      },
+    });
+    if (refreshed && result.applied) {
+      this.kdsGateway.emitNewOrder(tenantId, refreshed.branchId, refreshed);
+    }
+
+    await this.logService.log({
+      tenantId,
+      platform,
+      direction: PlatformLogDirection.INBOUND,
+      action: PlatformLogAction.ORDER_AMENDED,
+      orderId: (result as any).orderId,
+      externalId: externalOrderId,
+      request: { duplicate: !result.applied, amendmentHash },
+      success: true,
+    });
+
+    if (result.applied) {
+      await this.outbox
+        ?.append({
+          type: DELIVERY_ORDER_AMENDED_EVENT,
+          tenantId,
+          payload: {
+            tenantId,
+            branchId: (result as any).branchId,
+            orderId: (result as any).orderId,
+            platform,
+            externalOrderId,
+            totalAmount: normalizedOrder.totalAmount,
+            finalAmount: normalizedOrder.finalAmount,
+          },
+          idempotencyKey: `delivery-amend:${tenantId}:${platform}:${externalOrderId}:${amendmentHash}`,
+        })
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "delivery-platforms",
+            op: "order_amended",
+          }),
+        );
+    }
+
+    this.logger.log(
+      `Amendment ${result.applied ? "applied" : "no-op (duplicate)"} for ${platform} order ${externalOrderId}`,
+    );
+
+    return {
+      matched: true,
+      applied: result.applied,
+      duplicate: !result.applied,
+    };
   }
 }

@@ -39,15 +39,62 @@ describe("CreatePlatformConfigDto", () => {
     });
     expect((await errs(dto)).some((m) => /credentials/.test(m))).toBe(true);
   });
+
+  it("accepts a sandbox environment and a UUID branchId", async () => {
+    const dto = plainToInstance(CreatePlatformConfigDto, {
+      platform: DeliveryPlatform.GETIR,
+      environment: "sandbox",
+      branchId: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(await errs(dto)).toEqual([]);
+  });
+
+  it("rejects an unknown environment", async () => {
+    const dto = plainToInstance(CreatePlatformConfigDto, {
+      platform: DeliveryPlatform.GETIR,
+      environment: "staging",
+    });
+    expect((await errs(dto)).some((m) => /environment/.test(m))).toBe(true);
+  });
+
+  it("rejects a non-UUID branchId", async () => {
+    const dto = plainToInstance(CreatePlatformConfigDto, {
+      platform: DeliveryPlatform.GETIR,
+      branchId: "not-a-uuid",
+    });
+    expect((await errs(dto)).some((m) => /branchId/.test(m))).toBe(true);
+  });
 });
 
 describe("UpdatePlatformConfigDto", () => {
   it("accepts an empty patch", async () => {
-    expect(await errs(plainToInstance(UpdatePlatformConfigDto, {}))).toEqual([]);
+    expect(await errs(plainToInstance(UpdatePlatformConfigDto, {}))).toEqual(
+      [],
+    );
   });
 
   it("rejects a non-boolean isEnabled", async () => {
     const dto = plainToInstance(UpdatePlatformConfigDto, { isEnabled: "true" });
     expect((await errs(dto)).some((m) => /isEnabled/.test(m))).toBe(true);
+  });
+
+  it("accepts environment + UUID branchId in a patch", async () => {
+    const dto = plainToInstance(UpdatePlatformConfigDto, {
+      environment: "production",
+      branchId: "22222222-2222-4222-8222-222222222222",
+    });
+    expect(await errs(dto)).toEqual([]);
+  });
+
+  it("accepts a null branchId to clear the override", async () => {
+    const dto = plainToInstance(UpdatePlatformConfigDto, { branchId: null });
+    expect(await errs(dto)).toEqual([]);
+  });
+
+  it("rejects a non-UUID branchId", async () => {
+    const dto = plainToInstance(UpdatePlatformConfigDto, {
+      branchId: "nope",
+    });
+    expect((await errs(dto)).some((m) => /branchId/.test(m))).toBe(true);
   });
 });

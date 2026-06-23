@@ -145,6 +145,11 @@ export class DeliveryConfigService {
             : undefined,
           remoteRestaurantId: dto.remoteRestaurantId,
           autoAccept: dto.autoAccept ?? false,
+          environment: dto.environment ?? "production",
+          // Scalar FK (this create uses the unchecked-input shape with a scalar
+          // tenantId, so branchId must be scalar too). null/undefined leaves it
+          // unset so the "first active branch" fallback applies.
+          branchId: dto.branchId ?? undefined,
         },
       });
     } catch (err) {
@@ -182,6 +187,15 @@ export class DeliveryConfigService {
     }
     if (dto.autoAccept !== undefined) data.autoAccept = dto.autoAccept;
     if (dto.notifySound !== undefined) data.notifySound = dto.notifySound;
+    if (dto.environment !== undefined) data.environment = dto.environment;
+    // branchId is a nullable relation FK (onDelete: SetNull) — assigning null
+    // clears the override and restores the "first active branch" fallback.
+    if (dto.branchId !== undefined) {
+      data.branch =
+        dto.branchId === null
+          ? { disconnect: true }
+          : { connect: { id: dto.branchId } };
+    }
 
     // Rotating credentials invalidates any cached access token — keep
     // them in sync or callers will use the stale token for up to the

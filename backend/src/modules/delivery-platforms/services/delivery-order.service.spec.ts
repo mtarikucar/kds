@@ -19,6 +19,7 @@ describe('DeliveryOrderService (iter-39)', () => {
   let configService: any;
   let commandQueue: any;
   let escpos: any;
+  let outbox: any;
   let svc: DeliveryOrderService;
 
   beforeEach(() => {
@@ -36,6 +37,7 @@ describe('DeliveryOrderService (iter-39)', () => {
       buildKitchenTicket: jest.fn().mockReturnValue({ artifact: 'kitchen_ticket' }),
       toPrintCommand: jest.fn().mockReturnValue({ kind: 'print_receipt', payload: { data: 'x' } }),
     };
+    outbox = { append: jest.fn().mockResolvedValue('evt-1') };
     // No kitchen printer by default — the auto-print path is best-effort and
     // most existing tests don't care. Tests that exercise printing override this.
     (prisma.device.findMany as any).mockResolvedValue([]);
@@ -48,6 +50,7 @@ describe('DeliveryOrderService (iter-39)', () => {
       configService,
       commandQueue,
       escpos,
+      outbox,
     );
   });
 
@@ -327,6 +330,346 @@ describe('DeliveryOrderService (iter-39)', () => {
       expect(result).toEqual({ matched: false, mappedTo: 'CANCELLED' });
       expect(kdsGateway.emitNewOrder).not.toHaveBeenCalled();
       expect(adapterFactory.getAdapter).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Inbound refunds (platform-owned money) ──────────────────────────────
+
+  describe('applyPlatformRefund — inbound, platform-initiated', () => {
+    // Helper: wire $transaction to run the callback against a tx whose
+    // order.findFirst returns `order` and capture order.update calls.
+    function wireTxn(order: any) {
+      const update = jest.fn().mockResolvedValue({ ...order });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({
+          order: {
+            findFirst: jest.fn().mockResolvedValue(order),
+            update,
+          },
+        }),
+      );
+      return { update };
+    }
+
+    it('full refund → moves order to CANCELLED-with-refund and emits the domain event, no platform push-back', async () => {
+      const order = {
+        id: 'ord-1',
+        branchId: 'br-1',
+        status: 'PREPARING',
+        finalAmount: 100,
+        notes: null,
+        externalData: {},
+      };
+      const { update } = wireTxn(order);
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: 'ord-1',
+        branchId: 'br-1',
+      });
+
+      const result = await svc.applyPlatformRefund({
+        platform: 'TRENDYOL',
+        remoteOrderId: 'ext-1',
+        tenantId: 't1',
+        refundId: 'rf-1',
+        reason: 'customer cancelled',
+      });
+
+      expect(result).toMatchObject({
+        matched: true,
+        applied: true,
+        type: 'full',
+      });
+      // Order moved to CANCELLED with cancelledAt + refund recorded on
+      // externalData.refunds[] + a note.
+      const data = update.mock.calls[0][0].data;
+      expect(data.status).toBe('CANCELLED');
+      expect(data.cancelledAt).toBeInstanceOf(Date);
+      expect(data.externalData.refunds).toHaveLength(1);
+      expect(data.externalData.refunds[0]).toMatchObject({
+        type: 'full',
+        refundKey: 'id:rf-1',
+      });
+      expect(data.notes).toContain('[REFUND]');
+      // NEVER pushes a refund back to the platform (it initiated).
+      expect(adapterFactory.getAdapter).not.toHaveBeenCalled();
+      // Domain event emitted for accounting consumers.
+      expect(outbox.append).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'delivery.order.refunded.v1' }),
+      );
+      expect(kdsGateway.emitNewOrder).toHaveBeenCalled();
+      expect(logService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'ORDER_REFUNDED', success: true }),
+      );
+    });
+
+    it('partial refund → keeps status, records the amount on externalData + notes (no refund column limitation)', async () => {
+      const order = {
+        id: 'ord-2',
+        branchId: 'br-1',
+        status: 'PREPARING',
+        finalAmount: 100,
+        notes: 'existing note',
+        externalData: {},
+      };
+      const { update } = wireTxn(order);
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: 'ord-2',
+        branchId: 'br-1',
+      });
+
+      const result = await svc.applyPlatformRefund({
+        platform: 'TRENDYOL',
+        remoteOrderId: 'ext-2',
+        tenantId: 't1',
+        refundAmount: 30,
+      });
+
+      expect(result).toMatchObject({
+        matched: true,
+        applied: true,
+        type: 'partial',
+      });
+      const data = update.mock.calls[0][0].data;
+      // Status NOT changed for a partial refund.
+      expect(data.status).toBeUndefined();
+      expect(data.externalData.refunds[0]).toMatchObject({
+        type: 'partial',
+        amount: 30,
+      });
+      expect(data.notes).toContain('existing note');
+      expect(data.notes).toContain('Partial refund 30.00');
+      expect(adapterFactory.getAdapter).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent — a re-delivered refund (same refundId) is a no-op and does NOT re-emit', async () => {
+      const order = {
+        id: 'ord-3',
+        branchId: 'br-1',
+        status: 'CANCELLED',
+        finalAmount: 100,
+        notes: '[REFUND] Full refund from TRENDYOL',
+        externalData: {
+          refunds: [{ refundKey: 'id:rf-9', type: 'full', amount: null, at: 'x' }],
+        },
+      };
+      const { update } = wireTxn(order);
+
+      const result = await svc.applyPlatformRefund({
+        platform: 'TRENDYOL',
+        remoteOrderId: 'ext-3',
+        tenantId: 't1',
+        refundId: 'rf-9',
+      });
+
+      expect(result).toMatchObject({ matched: true, applied: false, duplicate: true });
+      // No second mutation, no duplicate domain event.
+      expect(update).not.toHaveBeenCalled();
+      expect(outbox.append).not.toHaveBeenCalled();
+    });
+
+    it('returns matched:false when no order matches', async () => {
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({ order: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn() } }),
+      );
+
+      const result = await svc.applyPlatformRefund({
+        platform: 'TRENDYOL',
+        remoteOrderId: 'nope',
+        tenantId: 't1',
+      });
+
+      expect(result).toEqual({ matched: false, applied: false });
+      expect(outbox.append).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Restaurant-initiated (outbound) refund support gate ─────────────────
+
+  describe('refundOrderOnPlatform — outbound', () => {
+    it('throws an honest "unsupported" error when the adapter has no refundOrder (no fake call)', async () => {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+      });
+      // Adapter without refundOrder — the common Turkish-platform case.
+      adapterFactory.getAdapter.mockReturnValue({ acceptOrder: jest.fn() });
+
+      await expect(
+        svc.refundOrderOnPlatform('t1', 'TRENDYOL', 'ext-1', 50),
+      ).rejects.toThrow(/does not support a restaurant-initiated refund/);
+      expect(logService.log).not.toHaveBeenCalled();
+    });
+
+    it('dispatches to adapter.refundOrder when implemented', async () => {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+      });
+      authService.ensureValidToken.mockResolvedValue({ id: 'cfg-1' });
+      const refundOrder = jest.fn().mockResolvedValue(undefined);
+      adapterFactory.getAdapter.mockReturnValue({ refundOrder });
+
+      await svc.refundOrderOnPlatform('t1', 'TRENDYOL', 'ext-1', 50);
+
+      expect(refundOrder).toHaveBeenCalledWith(
+        expect.anything(),
+        'ext-1',
+        50,
+      );
+      expect(logService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ORDER_REFUNDED',
+          direction: 'OUTBOUND',
+          success: true,
+        }),
+      );
+    });
+  });
+
+  // ── Inbound order amendments ────────────────────────────────────────────
+
+  describe('applyPlatformAmendment — inbound item/total changes', () => {
+    const amendedOrder = {
+      platform: 'TRENDYOL',
+      externalOrderId: 'ext-amd',
+      items: [
+        { externalItemId: 'x-1', name: 'Burger', quantity: 3, unitPrice: 50, modifiers: [] },
+      ],
+      totalAmount: 150,
+      discount: 0,
+      finalAmount: 150,
+      rawPayload: {},
+    } as any;
+
+    function wireAmendTxn(order: any) {
+      const update = jest.fn().mockResolvedValue({ ...order });
+      const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({
+          order: { findFirst: jest.fn().mockResolvedValue(order), update },
+          orderItem: { deleteMany },
+          menuItemMapping: {
+            findMany: jest
+              .fn()
+              .mockResolvedValue([
+                { externalItemId: 'x-1', productId: 'prod-1', product: {} },
+              ]),
+          },
+        }),
+      );
+      return { update, deleteMany };
+    }
+
+    it('re-resolves items + recomputes totals, replaces line items, and re-emits to KDS', async () => {
+      const order = {
+        id: 'ord-amd',
+        branchId: 'br-1',
+        status: 'PENDING',
+        externalData: {},
+      };
+      const { update, deleteMany } = wireAmendTxn(order);
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: 'ord-amd',
+        branchId: 'br-1',
+        orderItems: [],
+      });
+
+      const result = await svc.applyPlatformAmendment('t1', amendedOrder);
+
+      expect(result).toMatchObject({ matched: true, applied: true });
+      // Old items wiped, new ones recreated with recomputed totals.
+      expect(deleteMany).toHaveBeenCalledWith({ where: { orderId: 'ord-amd' } });
+      const data = update.mock.calls[0][0].data;
+      expect(data.totalAmount).toBe(150);
+      expect(data.finalAmount).toBe(150);
+      expect(data.orderItems.create).toHaveLength(1);
+      expect(data.orderItems.create[0]).toMatchObject({
+        productId: 'prod-1',
+        quantity: 3,
+        unitPrice: 50,
+        subtotal: 150,
+      });
+      // Idempotency stamp recorded.
+      expect(data.externalData.amendmentHash).toEqual(expect.any(String));
+      // KDS re-emitted so the kitchen sees the change.
+      expect(kdsGateway.emitNewOrder).toHaveBeenCalled();
+      expect(outbox.append).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'delivery.order.amended.v1' }),
+      );
+      expect(logService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'ORDER_AMENDED', success: true }),
+      );
+    });
+
+    it('is idempotent — a re-delivered identical amendment is a no-op (no item rewrite, no re-emit)', async () => {
+      // Pre-compute the same hash the service will derive by running it once
+      // against a fresh order, then assert a second delivery with that hash
+      // already stamped no-ops.
+      const firstOrder = {
+        id: 'ord-amd2',
+        branchId: 'br-1',
+        status: 'PENDING',
+        externalData: {},
+      };
+      const w1 = wireAmendTxn(firstOrder);
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: 'ord-amd2',
+        branchId: 'br-1',
+        orderItems: [],
+      });
+      await svc.applyPlatformAmendment('t1', amendedOrder);
+      const stampedHash = w1.update.mock.calls[0][0].data.externalData.amendmentHash;
+
+      // Second delivery: order already carries that hash.
+      jest.clearAllMocks();
+      const w2 = wireAmendTxn({
+        id: 'ord-amd2',
+        branchId: 'br-1',
+        status: 'PENDING',
+        externalData: { amendmentHash: stampedHash },
+      });
+
+      const result = await svc.applyPlatformAmendment('t1', amendedOrder);
+
+      expect(result).toMatchObject({ matched: true, applied: false, duplicate: true });
+      expect(w2.deleteMany).not.toHaveBeenCalled();
+      expect(w2.update).not.toHaveBeenCalled();
+      expect(kdsGateway.emitNewOrder).not.toHaveBeenCalled();
+      expect(outbox.append).not.toHaveBeenCalled();
+    });
+
+    it('REFUSES amending a committed/served/completed order', async () => {
+      const { update, deleteMany } = wireAmendTxn({
+        id: 'ord-served',
+        branchId: 'br-1',
+        status: 'SERVED',
+        externalData: {},
+      });
+
+      const result = await svc.applyPlatformAmendment('t1', amendedOrder);
+
+      expect(result).toMatchObject({ matched: true, applied: false, refused: true });
+      expect(result.reason).toContain('SERVED');
+      // No mutation of a served order.
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      expect(kdsGateway.emitNewOrder).not.toHaveBeenCalled();
+      expect(logService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'ORDER_AMENDED', success: false }),
+      );
+    });
+
+    it('returns matched:false when no order matches the amendment', async () => {
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({
+          order: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn() },
+          orderItem: { deleteMany: jest.fn() },
+          menuItemMapping: { findMany: jest.fn().mockResolvedValue([]) },
+        }),
+      );
+
+      const result = await svc.applyPlatformAmendment('t1', amendedOrder);
+
+      expect(result).toEqual({ matched: false, applied: false });
+      expect(outbox.append).not.toHaveBeenCalled();
     });
   });
 });

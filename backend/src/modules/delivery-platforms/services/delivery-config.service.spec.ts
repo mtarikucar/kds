@@ -1,12 +1,15 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { DeliveryConfigService } from './delivery-config.service';
-import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
+import { ConflictException, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { DeliveryConfigService } from "./delivery-config.service";
+import {
+  mockPrismaClient,
+  MockPrismaClient,
+} from "../../../common/test/prisma-mock.service";
 import {
   decryptJson,
   decryptString,
   isEncryptedPayload,
-} from '../../../common/helpers/encryption.helper';
+} from "../../../common/helpers/encryption.helper";
 
 /**
  * Behaviour locks for config (security-critical credential store):
@@ -25,7 +28,7 @@ import {
  *    the threshold; resetErrorCount / updateToken clear it.
  *  - P2002 uniqueness collisions surface as a friendly ConflictException.
  */
-describe('DeliveryConfigService', () => {
+describe("DeliveryConfigService", () => {
   let prisma: MockPrismaClient;
   let adapterFactory: any;
   let adapter: any;
@@ -34,7 +37,8 @@ describe('DeliveryConfigService', () => {
 
   const originalKey = process.env.ENCRYPTION_MASTER_KEY;
   beforeAll(() => {
-    process.env.ENCRYPTION_MASTER_KEY = 'test-master-key-at-least-32-chars-long-xx';
+    process.env.ENCRYPTION_MASTER_KEY =
+      "test-master-key-at-least-32-chars-long-xx";
   });
   afterAll(() => {
     if (originalKey === undefined) delete process.env.ENCRYPTION_MASTER_KEY;
@@ -49,139 +53,215 @@ describe('DeliveryConfigService', () => {
       closeRestaurant: jest.fn().mockResolvedValue(undefined),
     };
     adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
-    outbox = { append: jest.fn().mockResolvedValue('evt-1') };
-    svc = new DeliveryConfigService(prisma as any, adapterFactory, outbox as any);
+    outbox = { append: jest.fn().mockResolvedValue("evt-1") };
+    svc = new DeliveryConfigService(
+      prisma as any,
+      adapterFactory,
+      outbox as any,
+    );
   });
 
-  describe('encryption at rest', () => {
-    it('create() stores credentials as an AES-GCM envelope, not plaintext, that round-trips', async () => {
+  describe("encryption at rest", () => {
+    it("create() stores credentials as an AES-GCM envelope, not plaintext, that round-trips", async () => {
       (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(null);
       let writtenCredentials: any;
-      (prisma.deliveryPlatformConfig.create as any).mockImplementation(async ({ data }: any) => {
-        writtenCredentials = data.credentials;
-        return { id: 'cfg-1', ...data };
-      });
+      (prisma.deliveryPlatformConfig.create as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenCredentials = data.credentials;
+          return { id: "cfg-1", ...data };
+        },
+      );
 
-      const secret = { apiKey: 'super-secret', vendorId: 'v-1' };
-      await svc.create('t1', { platform: 'GETIR', credentials: secret } as any);
+      const secret = { apiKey: "super-secret", vendorId: "v-1" };
+      await svc.create("t1", { platform: "GETIR", credentials: secret } as any);
 
       // Stored value is an encrypted envelope, NOT the raw object.
       expect(isEncryptedPayload(writtenCredentials)).toBe(true);
       const serialized = JSON.stringify(writtenCredentials);
-      expect(serialized).not.toContain('super-secret');
+      expect(serialized).not.toContain("super-secret");
       // ...and it decrypts back to the original.
       expect(decryptJson(writtenCredentials)).toEqual(secret);
     });
 
-    it('updateToken() encrypts the access token as a v1: blob that decrypts back', async () => {
+    it("updateToken() encrypts the access token as a v1: blob that decrypts back", async () => {
       let written: any;
-      (prisma.deliveryPlatformConfig.update as any).mockImplementation(async ({ data }: any) => {
-        written = data;
-        return { id: 'cfg-1', ...data };
-      });
+      (prisma.deliveryPlatformConfig.update as any).mockImplementation(
+        async ({ data }: any) => {
+          written = data;
+          return { id: "cfg-1", ...data };
+        },
+      );
 
-      await svc.updateToken('cfg-1', 'plaintext-access-token', new Date('2030-01-01'));
+      await svc.updateToken(
+        "cfg-1",
+        "plaintext-access-token",
+        new Date("2030-01-01"),
+      );
 
-      expect(typeof written.accessToken).toBe('string');
-      expect(written.accessToken.startsWith('v1:')).toBe(true);
-      expect(written.accessToken).not.toContain('plaintext-access-token');
-      expect(decryptString(written.accessToken)).toBe('plaintext-access-token');
+      expect(typeof written.accessToken).toBe("string");
+      expect(written.accessToken.startsWith("v1:")).toBe(true);
+      expect(written.accessToken).not.toContain("plaintext-access-token");
+      expect(decryptString(written.accessToken)).toBe("plaintext-access-token");
       // Writing a fresh token clears the circuit-breaker state.
-      expect(written).toMatchObject({ errorCount: 0, lastError: null, lastErrorAt: null });
+      expect(written).toMatchObject({
+        errorCount: 0,
+        lastError: null,
+        lastErrorAt: null,
+      });
     });
 
-    it('findOneInternal() decrypts stored credentials + token for adapter use', async () => {
-      const { encryptJson, encryptString } = require('../../../common/helpers/encryption.helper');
+    it("findOneInternal() decrypts stored credentials + token for adapter use", async () => {
+      const {
+        encryptJson,
+        encryptString,
+      } = require("../../../common/helpers/encryption.helper");
       (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
-        id: 'cfg-1',
-        tenantId: 't1',
-        platform: 'GETIR',
-        credentials: encryptJson({ apiKey: 'k' }),
-        accessToken: encryptString('tok-123'),
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        credentials: encryptJson({ apiKey: "k" }),
+        accessToken: encryptString("tok-123"),
       });
 
-      const cfg: any = await svc.findOneInternal('t1', 'GETIR');
+      const cfg: any = await svc.findOneInternal("t1", "GETIR");
 
-      expect(cfg.credentials).toEqual({ apiKey: 'k' });
-      expect(cfg.accessToken).toBe('tok-123');
+      expect(cfg.credentials).toEqual({ apiKey: "k" });
+      expect(cfg.accessToken).toBe("tok-123");
     });
   });
 
-  describe('client-facing reads never leak secrets', () => {
-    it('findAll() strips credentials + accessToken, exposing only presence flags, scoped to tenant', async () => {
+  describe("client-facing reads never leak secrets", () => {
+    it("findAll() strips credentials + accessToken, exposing only presence flags, scoped to tenant", async () => {
       (prisma.deliveryPlatformConfig.findMany as any).mockResolvedValue([
-        { id: 'c1', tenantId: 't1', platform: 'GETIR', credentials: { apiKey: 'x' }, accessToken: 'v1:zzz' },
+        {
+          id: "c1",
+          tenantId: "t1",
+          platform: "GETIR",
+          credentials: { apiKey: "x" },
+          accessToken: "v1:zzz",
+        },
       ]);
 
-      const out: any = await svc.findAll('t1');
+      const out: any = await svc.findAll("t1");
 
       expect(prisma.deliveryPlatformConfig.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { tenantId: 't1', deletedAt: null } }),
+        expect.objectContaining({ where: { tenantId: "t1", deletedAt: null } }),
       );
-      expect(out[0]).not.toHaveProperty('credentials');
-      expect(out[0]).not.toHaveProperty('accessToken');
-      expect(out[0]).toMatchObject({ hasCredentials: true, hasAccessToken: true });
+      expect(out[0]).not.toHaveProperty("credentials");
+      expect(out[0]).not.toHaveProperty("accessToken");
+      expect(out[0]).toMatchObject({
+        hasCredentials: true,
+        hasAccessToken: true,
+      });
     });
 
-    it('findOne() throws NotFound and never returns raw secrets', async () => {
+    it("findOne() throws NotFound and never returns raw secrets", async () => {
       (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(null);
 
-      await expect(svc.findOne('t1', 'GETIR')).rejects.toThrow(NotFoundException);
+      await expect(svc.findOne("t1", "GETIR")).rejects.toThrow(
+        NotFoundException,
+      );
       expect(prisma.deliveryPlatformConfig.findFirst).toHaveBeenCalledWith({
-        where: { tenantId: 't1', platform: 'GETIR', deletedAt: null },
+        where: { tenantId: "t1", platform: "GETIR", deletedAt: null },
       });
     });
   });
 
-  describe('tenant scoping / defence-in-depth on writes', () => {
-    it('update() claims the row with updateMany {id, tenantId} and throws NotFound on a 0-row claim', async () => {
-      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({ id: 'cfg-1', tenantId: 't1', platform: 'GETIR' });
-      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({ count: 0 });
+  describe("tenant scoping / defence-in-depth on writes", () => {
+    it("update() claims the row with updateMany {id, tenantId} and throws NotFound on a 0-row claim", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({
+        count: 0,
+      });
 
-      await expect(svc.update('t1', 'GETIR', { isEnabled: false } as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        svc.update("t1", "GETIR", { isEnabled: false } as any),
+      ).rejects.toThrow(NotFoundException);
       expect(prisma.deliveryPlatformConfig.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'cfg-1', tenantId: 't1', deletedAt: null } }),
+        expect.objectContaining({
+          where: { id: "cfg-1", tenantId: "t1", deletedAt: null },
+        }),
       );
     });
 
-    it('delete() soft-deletes via a tenant-scoped updateMany (deletedAt set, disabled)', async () => {
-      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({ id: 'cfg-1', tenantId: 't1', platform: 'GETIR' });
-      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({ count: 1 });
-      (prisma.deliveryPlatformConfig.findUniqueOrThrow as any).mockResolvedValue({ id: 'cfg-1' });
+    it("delete() soft-deletes via a tenant-scoped updateMany (deletedAt set, disabled)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
 
-      await svc.delete('t1', 'GETIR');
+      await svc.delete("t1", "GETIR");
 
-      const call = (prisma.deliveryPlatformConfig.updateMany as any).mock.calls[0][0];
-      expect(call.where).toMatchObject({ id: 'cfg-1', tenantId: 't1', deletedAt: null });
+      const call = (prisma.deliveryPlatformConfig.updateMany as any).mock
+        .calls[0][0];
+      expect(call.where).toMatchObject({
+        id: "cfg-1",
+        tenantId: "t1",
+        deletedAt: null,
+      });
       expect(call.data).toMatchObject({ isEnabled: false });
       expect(call.data.deletedAt).toBeInstanceOf(Date);
     });
 
-    it('toggleRestaurant() also writes with a tenant-scoped updateMany', async () => {
-      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({ id: 'cfg-1', tenantId: 't1', platform: 'GETIR', credentials: null, accessToken: null });
-      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({ count: 1 });
-      (prisma.deliveryPlatformConfig.findUniqueOrThrow as any).mockResolvedValue({ id: 'cfg-1' });
+    it("toggleRestaurant() also writes with a tenant-scoped updateMany", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        credentials: null,
+        accessToken: null,
+      });
+      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
 
-      await svc.toggleRestaurant('t1', 'GETIR', true);
+      await svc.toggleRestaurant("t1", "GETIR", true);
 
       expect(adapter.openRestaurant).toHaveBeenCalled();
       expect(prisma.deliveryPlatformConfig.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'cfg-1', tenantId: 't1', deletedAt: null }, data: { restaurantOpen: true } }),
+        expect.objectContaining({
+          where: { id: "cfg-1", tenantId: "t1", deletedAt: null },
+          data: { restaurantOpen: true },
+        }),
       );
     });
   });
 
-  describe('credential rotation', () => {
-    it('rotating credentials nulls the cached token + resets circuit-breaker counters', async () => {
-      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({ id: 'cfg-1', tenantId: 't1', platform: 'GETIR' });
-      let writtenData: any;
-      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(async ({ data }: any) => {
-        writtenData = data;
-        return { count: 1 };
+  describe("credential rotation", () => {
+    it("rotating credentials nulls the cached token + resets circuit-breaker counters", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
       });
-      (prisma.deliveryPlatformConfig.findUniqueOrThrow as any).mockResolvedValue({ id: 'cfg-1' });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
 
-      await svc.update('t1', 'GETIR', { credentials: { apiKey: 'new' } } as any);
+      await svc.update("t1", "GETIR", {
+        credentials: { apiKey: "new" },
+      } as any);
 
       expect(isEncryptedPayload(writtenData.credentials)).toBe(true);
       expect(writtenData).toMatchObject({
@@ -194,124 +274,202 @@ describe('DeliveryConfigService', () => {
     });
   });
 
-  describe('circuit breaker', () => {
-    it('recordError truncates the message to 500 chars and auto-disables once threshold is crossed', async () => {
-      const longErr = 'x'.repeat(900);
+  describe("branch routing + environment", () => {
+    it("update() maps environment and connects a branch when branchId is provided", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.update("t1", "GETIR", {
+        environment: "sandbox",
+        branchId: "br-1",
+      } as any);
+
+      expect(writtenData.environment).toBe("sandbox");
+      expect(writtenData.branch).toEqual({ connect: { id: "br-1" } });
+    });
+
+    it("update() disconnects the branch when branchId is null (restores fallback)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.update("t1", "GETIR", { branchId: null } as any);
+
+      expect(writtenData.branch).toEqual({ disconnect: true });
+    });
+  });
+
+  describe("circuit breaker", () => {
+    it("recordError truncates the message to 500 chars and auto-disables once threshold is crossed", async () => {
+      const longErr = "x".repeat(900);
       let firstUpdateData: any;
       (prisma.deliveryPlatformConfig.update as any)
         .mockImplementationOnce(async ({ data }: any) => {
           firstUpdateData = data;
           return {
-            id: 'cfg-1',
-            tenantId: 't1',
-            platform: 'GETIR',
-            branchId: 'b1',
+            id: "cfg-1",
+            tenantId: "t1",
+            platform: "GETIR",
+            branchId: "b1",
             errorCount: 10,
             isEnabled: true,
-            lastError: 'boom',
-            lastErrorAt: new Date('2030-01-01T00:00:00.000Z'),
+            lastError: "boom",
+            lastErrorAt: new Date("2030-01-01T00:00:00.000Z"),
           };
         })
-        .mockResolvedValueOnce({ id: 'cfg-1', isEnabled: false });
+        .mockResolvedValueOnce({ id: "cfg-1", isEnabled: false });
 
-      await svc.recordError('cfg-1', longErr);
+      await svc.recordError("cfg-1", longErr);
 
       expect(firstUpdateData.lastError).toHaveLength(500);
       expect(firstUpdateData.errorCount).toEqual({ increment: 1 });
       // Second update call is the auto-disable.
-      const secondCall = (prisma.deliveryPlatformConfig.update as any).mock.calls[1][0];
+      const secondCall = (prisma.deliveryPlatformConfig.update as any).mock
+        .calls[1][0];
       expect(secondCall.data).toEqual({ isEnabled: false });
     });
 
-    it('recordError emits a delivery.platform.auto_disabled.v1 tenant alert when the breaker trips', async () => {
+    it("recordError emits a delivery.platform.auto_disabled.v1 tenant alert when the breaker trips", async () => {
       (prisma.deliveryPlatformConfig.update as any)
         .mockResolvedValueOnce({
-          id: 'cfg-1',
-          tenantId: 't1',
-          platform: 'GETIR',
-          branchId: 'b1',
+          id: "cfg-1",
+          tenantId: "t1",
+          platform: "GETIR",
+          branchId: "b1",
           errorCount: 10,
           isEnabled: true,
-          lastError: 'token expired',
-          lastErrorAt: new Date('2030-01-01T00:00:00.000Z'),
+          lastError: "token expired",
+          lastErrorAt: new Date("2030-01-01T00:00:00.000Z"),
         })
-        .mockResolvedValueOnce({ id: 'cfg-1', isEnabled: false });
+        .mockResolvedValueOnce({ id: "cfg-1", isEnabled: false });
 
-      await svc.recordError('cfg-1', 'token expired');
+      await svc.recordError("cfg-1", "token expired");
 
       expect(outbox.append).toHaveBeenCalledTimes(1);
       const arg = outbox.append.mock.calls[0][0];
-      expect(arg.type).toBe('delivery.platform.auto_disabled.v1');
-      expect(arg.tenantId).toBe('t1');
-      expect(arg.idempotencyKey).toBe('delivery-auto-disabled:cfg-1:10');
+      expect(arg.type).toBe("delivery.platform.auto_disabled.v1");
+      expect(arg.tenantId).toBe("t1");
+      expect(arg.idempotencyKey).toBe("delivery-auto-disabled:cfg-1:10");
       expect(arg.payload).toMatchObject({
-        tenantId: 't1',
-        configId: 'cfg-1',
-        platform: 'GETIR',
-        branchId: 'b1',
+        tenantId: "t1",
+        configId: "cfg-1",
+        platform: "GETIR",
+        branchId: "b1",
         errorCount: 10,
-        lastError: 'token expired',
-        lastErrorAt: '2030-01-01T00:00:00.000Z',
+        lastError: "token expired",
+        lastErrorAt: "2030-01-01T00:00:00.000Z",
       });
     });
 
-    it('recordError does NOT auto-disable (or alert) while below threshold', async () => {
+    it("recordError does NOT auto-disable (or alert) while below threshold", async () => {
       (prisma.deliveryPlatformConfig.update as any).mockResolvedValue({
-        id: 'cfg-1', tenantId: 't1', platform: 'GETIR', errorCount: 3, isEnabled: true,
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        errorCount: 3,
+        isEnabled: true,
       });
 
-      await svc.recordError('cfg-1', 'boom');
+      await svc.recordError("cfg-1", "boom");
 
       // Only the single increment update — no second disabling update.
-      expect((prisma.deliveryPlatformConfig.update as any).mock.calls).toHaveLength(1);
+      expect(
+        (prisma.deliveryPlatformConfig.update as any).mock.calls,
+      ).toHaveLength(1);
       expect(outbox.append).not.toHaveBeenCalled();
     });
 
-    it('recordError does not throw when the alert emit fails (best-effort)', async () => {
-      outbox.append.mockRejectedValueOnce(new Error('bus down'));
+    it("recordError does not throw when the alert emit fails (best-effort)", async () => {
+      outbox.append.mockRejectedValueOnce(new Error("bus down"));
       (prisma.deliveryPlatformConfig.update as any)
         .mockResolvedValueOnce({
-          id: 'cfg-1', tenantId: 't1', platform: 'GETIR', branchId: null,
-          errorCount: 10, isEnabled: true, lastError: 'x', lastErrorAt: new Date(),
+          id: "cfg-1",
+          tenantId: "t1",
+          platform: "GETIR",
+          branchId: null,
+          errorCount: 10,
+          isEnabled: true,
+          lastError: "x",
+          lastErrorAt: new Date(),
         })
-        .mockResolvedValueOnce({ id: 'cfg-1', isEnabled: false });
+        .mockResolvedValueOnce({ id: "cfg-1", isEnabled: false });
 
-      await expect(svc.recordError('cfg-1', 'x')).resolves.toBeDefined();
+      await expect(svc.recordError("cfg-1", "x")).resolves.toBeDefined();
       // The disable write still happened.
-      expect((prisma.deliveryPlatformConfig.update as any).mock.calls).toHaveLength(2);
+      expect(
+        (prisma.deliveryPlatformConfig.update as any).mock.calls,
+      ).toHaveLength(2);
     });
 
-    it('recordError does not re-disable (or re-alert) an already-disabled config at threshold', async () => {
+    it("recordError does not re-disable (or re-alert) an already-disabled config at threshold", async () => {
       (prisma.deliveryPlatformConfig.update as any).mockResolvedValue({
-        id: 'cfg-1', tenantId: 't1', platform: 'GETIR', errorCount: 12, isEnabled: false,
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        errorCount: 12,
+        isEnabled: false,
       });
 
-      await svc.recordError('cfg-1', 'boom');
+      await svc.recordError("cfg-1", "boom");
 
-      expect((prisma.deliveryPlatformConfig.update as any).mock.calls).toHaveLength(1);
+      expect(
+        (prisma.deliveryPlatformConfig.update as any).mock.calls,
+      ).toHaveLength(1);
       expect(outbox.append).not.toHaveBeenCalled();
     });
   });
 
-  describe('uniqueness conflicts', () => {
-    it('create() rejects a duplicate platform config for the tenant with ConflictException (pre-check)', async () => {
-      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({ id: 'existing' });
+  describe("uniqueness conflicts", () => {
+    it("create() rejects a duplicate platform config for the tenant with ConflictException (pre-check)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "existing",
+      });
 
-      await expect(svc.create('t1', { platform: 'GETIR' } as any)).rejects.toThrow(ConflictException);
+      await expect(
+        svc.create("t1", { platform: "GETIR" } as any),
+      ).rejects.toThrow(ConflictException);
       expect(prisma.deliveryPlatformConfig.create).not.toHaveBeenCalled();
     });
 
-    it('create() maps a P2002 (remoteRestaurantId collision) to ConflictException', async () => {
+    it("create() maps a P2002 (remoteRestaurantId collision) to ConflictException", async () => {
       (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(null);
       (prisma.deliveryPlatformConfig.create as any).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '6.x',
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "6.x",
         } as any),
       );
 
       await expect(
-        svc.create('t1', { platform: 'GETIR', remoteRestaurantId: 'r-1' } as any),
+        svc.create("t1", {
+          platform: "GETIR",
+          remoteRestaurantId: "r-1",
+        } as any),
       ).rejects.toThrow(ConflictException);
     });
   });
