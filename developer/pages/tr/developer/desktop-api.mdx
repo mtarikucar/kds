@@ -1,0 +1,315 @@
+---
+title: Masaüstü Sürüm API
+description: Public /api/desktop sürüm, güncelleme ve indirme-sayacı uç noktaları, Tauri updater manifesti, minisign imza doğrulaması ve operatör/CI yayınlama rotaları.
+---
+
+import { Callout, Tabs, Steps } from 'nextra/components'
+
+# Masaüstü Sürüm API
+
+HummyTummy Masaüstü uygulamasının kurulum paketleri ve güncellemeleri, sunucu tarafındaki
+bir **sürüm kataloğunda** (`DesktopRelease`) tutulur. Katalog **platform düzeyinde** tek
+bir küresel listedir — her restoran kiracısı (tenant) aynı yayınlanmış sürümleri görür.
+Birkaç uç noktaya kimliksiz (public) erişilebilir (indirme, güncelleme sorgusu, en son
+sürüm); sürüm yayınlama ise yalnızca platform operatörlerine (SuperAdmin) veya CI/CD'ye
+açıktır.
+
+<Callout type="info">
+  Tüm uç noktalar global `/api` ön ekiyle yayınlanır. Aşağıdaki örneklerde sunucu kökü
+  `https://app.hummytummy.com` olarak gösterilmiştir; kendi ortamınızda değiştirin.
+  Kesişen sözleşmeler (hata zarfı, hız sınırı katmanları, durum kodları) için
+  [API Fundamentals](/tr/developer/api-temelleri) sayfasına bakın.
+</Callout>
+
+## Public uç noktalar
+
+Bu uç noktalar kimlik doğrulaması gerektirmez (`@Public`) ve hız sınırlıdır (throttle).
+
+| Metot & yol | Açıklama | Limit |
+| --- | --- | --- |
+| `GET /api/desktop/releases/latest` | En son yayınlanmış sürüm | 30/dk |
+| `GET /api/desktop/releases/published` | Yayınlanmış tüm sürümler (pubDate'e göre azalan) | 30/dk |
+| `GET /api/desktop/updates/:platform/:currentVersion` | Tauri updater sorgusu | 60/dk |
+| `POST /api/desktop/releases/:version/download/:platform` | İndirme sayacını artırır (analitik) | 10/dk |
+
+<Callout type="warning">
+  Yol parametreleri doğrulanır: `:platform` değeri `^[a-z0-9-]{1,32}$` desenine,
+  `:version` / `:currentVersion` değeri `^v?\d+\.\d+\.\d+$` desenine uymalıdır. Uymayan
+  bir değer `400 Bad Request` döner.
+</Callout>
+
+Yalnızca `published: true` olan sürümler public uç noktalardan görünür. Taslak
+(yayınlanmamış) sürümler yalnızca SuperAdmin yönetim uç noktalarından listelenir.
+
+## En son sürümü almak
+
+`GET /api/desktop/releases/latest` en son yayınlanmış tek sürüm kaydını döner. Yayınlanmış
+sürüm yoksa `404` döner.
+
+<Tabs items={['curl', 'JSON yanıt']}>
+  <Tabs.Tab>
+```bash
+curl https://app.hummytummy.com/api/desktop/releases/latest
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{
+  "id": "01J...",
+  "version": "0.2.6",
+  "releaseTag": "v0.2.6",
+  "published": true,
+  "pubDate": "2026-06-20T15:00:00.000Z",
+  "windowsUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.msi",
+  "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "macArmUrl": "https://github.com/.../HummyTummy-POS_0.2.6_aarch64.dmg",
+  "macArmSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "macIntelUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.dmg",
+  "macIntelSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "linuxUrl": "https://github.com/.../hummy-tummy-pos_0.2.6_amd64.AppImage",
+  "linuxSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "releaseNotes": "## Yenilikler\n- Özellik X\n- Düzeltme Y",
+  "changelog": null,
+  "downloadCount": 134,
+  "createdAt": "2026-06-20T14:55:00.000Z",
+  "updatedAt": "2026-06-20T15:00:00.000Z"
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+### Platform başına paket alanları
+
+İstemci, çalıştığı platforma karşılık gelen URL alanını seçer:
+
+| Platform | URL alanı | İmza alanı | Tipik paket |
+| --- | --- | --- | --- |
+| Windows | `windowsUrl` | `windowsSignature` | `.msi` |
+| macOS (Apple Silicon) | `macArmUrl` | `macArmSignature` | `.dmg` |
+| macOS (Intel) | `macIntelUrl` | `macIntelSignature` | `.dmg` |
+| Linux | `linuxUrl` | `linuxSignature` | `.deb` / `.AppImage` |
+
+İlgili platform için URL `null` ise o sürüm o platforma derlenmemiştir.
+
+`GET /api/desktop/releases/published` aynı kayıt biçimini bir dizi olarak, `pubDate`'e göre
+azalan (en yeni önce) sıralı döner.
+
+## Updater uç noktası
+
+```
+GET /api/desktop/updates/:platform/:currentVersion
+```
+
+Masaüstü uygulaması, [Tauri updater](https://tauri.app)'ı kullanarak yeni sürümleri kendisi
+indirir. Akış tamamen sunucu kontrollüdür: uygulama bulunduğu platformu ve mevcut sürümünü
+bildirir, sunucu güncellenebilir bir sürüm varsa **imzalı** bir güncelleme manifesti
+döndürür.
+
+| Parametre | Açıklama | Örnek |
+| --- | --- | --- |
+| `:platform` | Tauri'nin bildirdiği platform anahtarı | `windows-x86_64` |
+| `:currentVersion` | Uygulamanın şu anki sürümü | `0.2.5` veya `v0.2.5` |
+
+Geçerli platform anahtarları: `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64`,
+`linux-x86_64`. Bu uç nokta public'tir ve **60 istek/dk** ile sınırlıdır.
+
+### Yanıtlar
+
+- **Güncelleme var** → `200` ve aşağıdaki manifest.
+- **Güncelleme yok / uygun değil** → gövde `null` döner. Tauri bunu "güncel" olarak
+  yorumlar. Şu durumlarda `null` döner:
+  - mevcut sürüm en son yayınlanmış sürümle aynı ya da daha yeni,
+  - hiç yayınlanmış sürüm yok,
+  - istenen platform en son sürümde mevcut değil (URL yok ya da imzasız).
+
+<Tabs items={['curl', 'Manifest (JSON)']}>
+  <Tabs.Tab>
+```bash
+curl https://app.hummytummy.com/api/desktop/updates/windows-x86_64/0.2.5
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{
+  "version": "0.2.7",
+  "notes": "## Yenilikler\n- Özellik X",
+  "pub_date": "2026-06-20T15:00:00.000Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://github.com/.../HummyTummy-POS_0.2.7_x64.msi",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6..."
+    },
+    "darwin-aarch64": { "url": "...", "signature": "..." },
+    "darwin-x86_64":  { "url": "...", "signature": "..." },
+    "linux-x86_64":   { "url": "...", "signature": "..." }
+  }
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+`platforms` nesnesi yalnızca **hem URL'si hem geçerli imzası olan** platformları içerir
+(aşağıdaki güvenlik notuna bakın). `notes` alanı sürümün `releaseNotes` metnidir,
+`pub_date` ise yayınlama tarihinin ISO biçimidir.
+
+### Sürüm karşılaştırma
+
+Sunucu sürümleri sayısal semver olarak karşılaştırır: `major.minor.patch` parçalarını
+ayırır, baştaki `v` önekini yok sayar ve sayısal olarak kıyaslar. En son yayınlanmış sürüm,
+gönderilen `currentVersion`'dan **kesinlikle büyükse** güncelleme sunulur; eşit ya da
+küçükse `null` döner.
+
+<Callout type="warning">
+  Karşılaştırma yalnızca sayısal parçaları dikkate alır; **ön-sürüm etiketleri**
+  (`1.0.0-beta.1` gibi) desteklenmez. Sürüm kataloğu operatör/CI kontrolünde olduğundan bu
+  kısıt yeterlidir — yayınlanan sürümler daima saf `major.minor.patch` biçiminde tutulur.
+</Callout>
+
+## İmza doğrulama (güvenlik)
+
+Tauri updater, yalnızca **minisign imzası** sabitlenmiş public anahtarla doğrulanan bir
+binary'yi kurar. Sunucu bu sözleşmeyi koruyacak şekilde davranır:
+
+- Bir platformun **URL'si varsa ama imzası yoksa** (boş/eksik), o platform manifeste
+  **eklenmez** — kurulamaz kabul edilir ve sunucuda uyarı loglanır. Yarı dolu, imzasız bir
+  kayıt asla yayımlanmaz.
+- Bir platformun **URL'si yoksa** (o sürüm o platforma derlenmemişse) sessizce atlanır.
+- İstenen platform sonuçta `platforms` içinde yoksa uç nokta `null` döner.
+
+Bu sayede otomatik güncelleyici hiçbir zaman imzasız (dolayısıyla doğrulanamayan) bir
+binary almaz.
+
+<Callout type="info">
+  Updater'ın hangi uç noktayı ve hangi public anahtarı kullanacağı masaüstü uygulamasının
+  Tauri yapılandırmasında (`tauri.conf.json` içindeki updater bölümü) tanımlanır. Yukarıdaki
+  sunucu sözleşmesi (manifest biçimi, imza zorunluluğu, sürüm karşılaştırma) bu istemci
+  yapılandırmasından bağımsız olarak geçerlidir.
+</Callout>
+
+## İndirme sayacı
+
+```
+POST /api/desktop/releases/:version/download/:platform
+```
+
+Analitik için sürüm başına indirme sayacını artırır.
+
+<Tabs items={['curl', 'Yanıt']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://app.hummytummy.com/api/desktop/releases/0.2.6/download/windows-x86_64
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{ "message": "Download tracked" }
+```
+  </Tabs.Tab>
+</Tabs>
+
+Bu çağrı en iyi-çaba (best-effort) çalışır: bilinmeyen bir sürüm gönderilirse hata fırlatmaz,
+yalnızca sunucuda loglanır.
+
+## Sürüm yayınlama (operatör / CI)
+
+Yeni bir sürüm kataloğa iki rotadan biriyle ulaşır.
+
+<Callout type="warning">
+  Sürüm kataloğu **platform düzeyinde** küresel bir listedir ve her restoranın masaüstü
+  güncelleyicisi buradan çeker. Bu nedenle yönetim uç noktaları (oluştur / yayınla / sil)
+  yalnızca **SuperAdmin** veya **CI API anahtarı** ile erişilebilir; kiracı yöneticileri bu
+  kataloğu değiştiremez. Aksi halde tek bir kiracı, tüm restoranların güncelleyicisinin
+  çektiği binary'yi değiştirebilirdi.
+</Callout>
+
+### Kimlik realm'leri
+
+| Realm | Başlık | Kullanan |
+| --- | --- | --- |
+| CI API anahtarı | `x-api-key` (veya `api-key`): `DESKTOP_RELEASE_API_KEY` | GitHub Actions / CI tabanlı yayınlama |
+| SuperAdmin (Bearer) | `Authorization: Bearer <jwt>` | Platform operatörleri |
+
+### Yönetim uç noktaları
+
+| Metot & yol | Realm | Açıklama |
+| --- | --- | --- |
+| `POST /api/desktop/ci/releases` | CI API anahtarı | Sürüm oluştur (CI) |
+| `POST /api/desktop/ci/releases/:id/publish` | CI API anahtarı | Sürüm yayınla (CI) |
+| `POST /api/desktop/releases` | SuperAdmin | Sürüm oluştur |
+| `PATCH /api/desktop/releases/:id` | SuperAdmin | Sürüm güncelle |
+| `POST /api/desktop/releases/:id/publish` | SuperAdmin | Sürüm yayınla |
+| `POST /api/desktop/releases/:id/unpublish` | SuperAdmin | Sürüm yayından kaldır |
+| `DELETE /api/desktop/releases/:id` | SuperAdmin | Sürüm sil |
+
+### Örnek — CI ile sürüm oluşturma
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://app.hummytummy.com/api/desktop/ci/releases \
+  -H "x-api-key: $DESKTOP_RELEASE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "0.2.7",
+    "releaseTag": "v0.2.7",
+    "releaseNotes": "## Yenilikler\n- ...",
+    "windowsUrl": "https://github.com/.../setup.msi",
+    "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+    "published": false
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+await fetch("https://app.hummytummy.com/api/desktop/ci/releases", {
+  method: "POST",
+  headers: {
+    "x-api-key": process.env.DESKTOP_RELEASE_API_KEY!,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    version: "0.2.7",
+    releaseTag: "v0.2.7",
+    releaseNotes: "## Yenilikler\n- ...",
+    windowsUrl: "https://github.com/.../setup.msi",
+    windowsSignature: "dW50cnVzdGVkIGNvbW1lbnQ6...",
+    published: false,
+  }),
+});
+```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  `version` benzersiz olmalı ve `\d+\.\d+\.\d+` (saf semver, `v` öneki olmadan) biçiminde
+  olmalıdır. Var olan bir sürümü tekrar oluşturmaya çalışmak `400` döner. Yayınlama adımı
+  `pubDate` alanını set eder; updater'ın "en son sürüm" sıralaması bu alana göre yapılır.
+</Callout>
+
+## Kaynaktan derleme
+
+Masaüstü uygulamasını kaynaktan derlemek için (Tauri CLI npm ile birlikte gelir):
+
+<Steps>
+### Bağımlılıkları kurun ve derleyin
+```bash
+npm install
+npm run tauri:dev    # geliştirme modunda çalıştır
+npm run tauri:build  # üretim paketi üret
+```
+
+### Paketleri toplayın
+Çıktı paketleri `src-tauri/target/release/bundle/` altında platforma göre (`msi/`, `dmg/`,
+`deb/`, `appimage/`) oluşturulur.
+</Steps>
+
+Geliştirme için **Rust 1.70+** ve **Node.js 18+** gerekir; Linux'ta ayrıca `libdbus-1-dev`
+ve `pkg-config` paketleri gerekir (Bluetooth yazıcı desteği için).
+
+## Operatör ekranları
+
+Son kullanıcılar bu uç noktaları doğrudan çağırmaz — masaüstü uygulaması çağırır.
+Operatörler uygulamayı uygulama içi deneyimle kurar ve günceller:
+
+- Kurulum & indirme (operatör rehberi): [help.hummytummy.com](https://help.hummytummy.com/tr/desktop/kurulum)
+- Otomatik güncelleme (operatör rehberi): [help.hummytummy.com](https://help.hummytummy.com/tr/desktop/otomatik-guncelleme)

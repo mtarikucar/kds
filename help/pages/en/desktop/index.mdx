@@ -49,9 +49,8 @@ each release's download URLs.
 - **Release catalog** — Every published installer lives in the server's `DesktopRelease`
   catalog. The app reports which platform it runs on and the server returns the signed
   binary URL for that platform. See [Install & download](/en/desktop/install).
-- **Auto-update** — On launch, the Tauri updater queries the server's
-  `GET /api/desktop/updates/...` endpoint; if a newer release exists it verifies the
-  minisign signature and downloads it. See [Auto-update](/en/desktop/auto-update).
+- **Auto-update** — On launch, the app checks the server for a newer release; if one
+  exists it verifies the signature and installs it. See [Auto-update](/en/desktop/auto-update).
 - **Hardware (device-mesh)** — Devices such as printers, cash drawers and fiscal
   registers connect to the app from the panel via a **pair code**; commands are dispatched
   to the device through a command queue. See [Hardware pairing](/en/desktop/hardware).

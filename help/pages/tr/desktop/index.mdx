@@ -48,9 +48,8 @@ indirme URL'lerinde birebir kullanılır.
 - **Sürüm kataloğu** — Tüm yayınlanmış kurulum paketleri sunucudaki `DesktopRelease`
   kataloğunda tutulur. Uygulama hangi platformda olduğunu bildirir, sunucu o platforma
   ait imzalı binary URL'sini döndürür. Bkz. [Kurulum & indirme](/tr/desktop/kurulum).
-- **Otomatik güncelleme** — Tauri updater, açılışta sunucudaki `GET /api/desktop/updates/...`
-  uç noktasını sorgular; yeni bir sürüm varsa minisign imzasını doğrulayıp indirir.
-  Bkz. [Otomatik güncelleme](/tr/desktop/otomatik-guncelleme).
+- **Otomatik güncelleme** — Uygulama açılışta sunucuda yeni sürüm olup olmadığını kontrol
+  eder; varsa imzayı doğrulayıp kurar. Bkz. [Otomatik güncelleme](/tr/desktop/otomatik-guncelleme).
 - **Donanım (device-mesh)** — Yazıcı, nakit çekmece ve yazarkasa gibi cihazlar
   panelden bir **eşleştirme kodu** ile uygulamaya bağlanır; komutlar bir komut kuyruğu
   üzerinden cihaza iletilir. Bkz. [Donanım eşleştirme](/tr/desktop/donanim).

@@ -1,181 +1,107 @@
 ---
 title: Satın Alma Akışı
-description: Marketplace → checkout → PayTR → grant. Hak katma kuralları, idempotensi, iptal ve dönem-sonu davranışı.
+description: Add-on'u sepete ekleme, PayTR ile ödeme, hakların etkinleşmesi, iptal ve dönem-sonu davranışı.
 ---
 
-import { Callout, Steps, Tabs } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
 # Satın Alma Akışı
 
-Bir add-on satın almanın **tek** yolu checkout (PayTR) hattıdır. Tenant tarafında "bedava grant"
-veren bir endpoint **yoktur** — kaldırıldı. Ücretli bir add-on, ödeme kanıtı (`paymentRef`)
-olmadan asla provize edilmez.
+**Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Erişim:** ADMIN, MANAGER (ödeme onayı ve iptal yalnızca ADMIN) • **Plan:** Tüm planlar
 
-<Callout type="warning">
-  Eski `POST /v1/marketplace/addons/purchase` endpoint'i **kaldırıldı** (deep-review C2).
-  Sadece `@Roles(ADMIN)` ile korunuyordu ve `paymentRef` olmadan `purchase()` çağırıyordu —
-  yani herhangi bir restoran sahibi curl ile ücretli add-on'u bedavaya açabiliyordu. Artık
-  ödemeli akış zorunludur; operatör bedavaları (comp) yalnızca süperadmin yüzeyinden verilir.
+Bir add-on satın almanın tek yolu Marketplace'ten sepete ekleyip **PayTR ile
+ödeme** yapmaktır. Ödeme tamamlanmadan hiçbir hak (limit veya özellik)
+hesabınıza eklenmez; bedavaya açma yolu yoktur.
+
+<Callout type="info">
+  Operatör bedavaları (comp) yalnızca HummyTummy ekibi/süperadmin tarafından
+  verilebilir. Sizin tarafınızdan satın almanın tek yolu ödemeli akıştır.
 </Callout>
 
 ## Uçtan uca akış
 
 <Steps>
 
-### Kataloğu listele
+### Add-on'u seç
 
-Kullanıcı Marketplace'ten bir add-on seçer. Katalog `GET /v1/marketplace/addons`
-ile gelir (public, yalnızca `published` satırlar).
+Marketplace ekranında satın almak istediğiniz add-on'u bulun. Kart üzerinde
+add-on'un ne işe yaradığını, fiyatını (₺) ve tekrarlayan mı yoksa tek seferlik
+bir hizmet mi olduğunu görürsünüz.
 
-### Checkout intent başlat
+### Sepete ekle
 
-Frontend, seçilen add-on'ları (artı varsa plan/donanım/hizmet) tek bir **karma sepet**
-(mixed cart) olarak `POST /v1/checkout/intent`'e gönderir. Yetki: **ADMIN, MANAGER**.
+Add-on'u sepete ekleyin. Aynı sepete birden çok add-on (ve gerekiyorsa plan veya
+donanım kalemleri) koyabilirsiniz; ekran toplam tutarı **KDV dahil** olarak
+gösterir. Toplam her zaman sunucu tarafında yeniden hesaplanır, böylece
+ödeyeceğiniz tutar güvenilirdir.
 
-Sunucu sepeti **yeniden fiyatlandırır** (istemci toplamına güvenilmez), `CK-<uuid7>`
-biçiminde bir `paymentRef` üretir, sepeti `CheckoutIntent` satırına dondurur ve PayTR
-iframe token'ı + ödeme linki döner.
+### Ödemeye geç
 
-### PayTR'da öde
+**Öde / Devam et** düğmesiyle ödeme adımına geçin. Ekran sizi **PayTR**
+güvenli ödeme sayfasına yönlendirir; sepetinizdeki her kalem burada ayrı bir
+satır olarak görünür (ör. *"Ekstra KDS ekranı (aylık)"*).
 
-Buyer, PayTR hosted iframe'inde ödemesini yapar. Sepetin her satırı buyer'a ayrı kalem
-olarak gösterilir (ör. *"Ekstra KDS ekranı (aylık)"*).
+### Ödemeyi tamamla
 
-### Webhook ile yerleşim (settlement)
+PayTR sayfasında ödemenizi yapın. Ödeme onaylandığında uygulamaya geri
+dönersiniz.
 
-PayTR webhook'u yalnızca `merchant_oid` + `total_amount` taşır. Dispatcher `CK-` önekini
-görüp çağrıyı **CheckoutSettlementService**'e yönlendirir. Burada `CheckoutIntent` bulunur,
-dondurulmuş sepet okunur ve **CheckoutService.confirmAndProvision** çalışır.
+### Hakların etkinleşmesi
 
-### Grant'lar yerleşir
-
-`confirmAndProvision`, her add-on satırı için `TenantMarketplaceService.purchase()`'ı
-**ödemeli `paymentRef` ile** ve checkout'un transaction'ı içinde çağırır. Bu da bir
-`TenantAddOn` satırı oluşturur ve outbox'a `AddOnPurchased` event'i yazar.
-
-### Entitlement projektörü fold eder
-
-Projektör `AddOnPurchased`'ı tüketir, add-on'un `grants` haritasını mevcut hak setinize
-katar. Guard'lar ve UI artık yeni limit/feature/integration'ı görür.
+Ödeme onaylandığı anda add-on'un verdiği hak hesabınıza **otomatik eklenir**.
+Örneğin bir ekstra KDS ekranı aldıysanız, KDS ekranı limitiniz panelde anında
+bir artar; bir entegrasyon aldıysanız ilgili ayar/özellik açılır.
 
 </Steps>
 
-## Hak katma (fold) kuralları
-
-Projektör, plan + tüm aktif add-on'ların `grants` satırlarını **tek** bir hak setine indirger.
-Anahtar önekine göre kombinleme kuralı değişir:
-
-| Önek | Tip | Kombinleme | Örnek |
-| --- | --- | --- | --- |
-| `limit.*` | sayı | **SUM (toplama)** | Plan `limit.kdsScreens: 2` + 1× `kds_extra_screen` (+1) = **3** |
-| `feature.*` | boolean | **OR** | Herhangi bir kaynak `feature.advancedReports: true` veriyorsa → açık |
-| `integration.*` | string[] | **UNION (birleşim)** | `efatura` add-on + `hugin` add-on → `integration.fiscal: ["efatura", "hugin"]` |
-
-<Callout type="info">
-  `limit.*` için `-1` "sınırsız" sentinel'idir: herhangi bir kaynak `-1` verirse, sonuç
-  sınırsız olur ve toplama durur (sınırsız bir cap'e kapasite eklemek no-op'tur).
+<Callout type="warning">
+  Ödeme sayfasına ilerlemenize rağmen ödemeyi yarıda bırakırsanız hiçbir ücret
+  alınmaz ve hiçbir hak eklenmez. İşlem ancak ödeme onaylandığında tamamlanır.
 </Callout>
 
-İki kez aynı kapasite add-on'unu alıp limiti ikiye katlamak engellenir: aynı
-`(tenantId, addOnId, branchId)` için aktif bir satır varsa ikinci satın alma reddedilir.
-Eş zamanlı iki satın alma, **Serializable** transaction ile yakalanır; kaybeden işlem
-yeniden denenebilir bir **409** alır (kart çift çekilmez).
+## Haklar nasıl birikir
 
-## Bağımlılıklar (deps)
+Add-on'lar planınızın üzerine eklenir; aynı türden birden çok kaynak şu şekilde
+birleşir:
 
-Bazı add-on'lar başka bir şeyin önceden mevcut olmasını ister. `deps` dizisindeki her
-giriş, satın alma anında o tenant için **geçerli** olmalıdır:
+- **Limitler** (KDS ekranı, istasyon, tablet, şube) → **toplanır.** Örneğin
+  planınız 2 KDS ekranı veriyorsa ve 1 "Ekstra KDS ekranı" aldıysanız, toplam
+  **3** olur.
+- **Özellikler** (gelişmiş raporlar, öncelikli destek, çoklu-lokasyon vb.) →
+  herhangi bir kaynak açıyorsa **açık** sayılır.
+- **Entegrasyonlar** (e-Fatura, Yemeksepeti, Getir, Trendyol) → hepsi yan yana
+  birikir; aynı anda birden çok teslimat entegrasyonu kullanabilirsiniz.
 
-- `plan:PRO` → tenant'ın aktif planının adı `PRO` olmalı (`Tenant.currentPlan.name`).
-- Bir add-on kodu (ör. `caller_id_integration`) → o add-on'un tenant'ta **aktif** olması.
+Aynı kapasite add-on'unu iki kez alıp limiti çift saymaya çalışmak engellenir:
+bir add-on'a zaten sahipseniz, ikinci kez aynı kalemi satın almaya çalıştığınızda
+işlem reddedilir ve kartınız ikinci kez çekilmez.
 
-Şu an kataloğda tek `deps` taşıyan add-on **`fiscal_hugin`** (`["plan:PRO"]`). PRO planında
-değilseniz satın alma şu hatayla reddedilir:
+## Bağımlılıklar
 
-```
-Add-on requires: plan:PRO. Upgrade your plan or purchase the required add-ons first.
-```
-
-## İdempotensi
-
-PayTR retry'leri agresiftir (200 OK dönse bile gövde "OK"/"FAIL" değilse tekrar dener).
-Çift provizyona karşı çok katmanlı koruma vardır:
-
-1. **`CheckoutIntent.status`** kontrolü — `provisioned`/`failed` ise dokunulmaz.
-2. **`confirmAndProvision`**, `(tenantId, paymentRef)` üzerinde bağımsız idempotent'tir.
-3. **`purchase()`**, aynı `paymentRef`'li mevcut `TenantAddOn` satırını bulursa onu döner
-   (yeniden event yazmadan).
-
-## Mevcut add-on'larım
-
-Tenant'ın elindeki add-on'ları listeler. Yetki: **ADMIN, MANAGER**.
-
-```bash
-curl https://api.hummytummy.com/api/v1/marketplace/addons/mine \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Her satır add-on kataloğunu (`addOn`) ve durum/dönem alanlarını taşır:
-
-```json
-[
-  {
-    "id": "ta_01J...",
-    "tenantId": "t_01J...",
-    "addOnId": "ao_01J...",
-    "branchId": null,
-    "quantity": 1,
-    "status": "active",
-    "activatedAt": "2026-06-22T10:00:00.000Z",
-    "currentPeriodStart": "2026-06-22T10:00:00.000Z",
-    "currentPeriodEnd": "2026-07-22T10:00:00.000Z",
-    "paymentRef": "CK-018f...",
-    "addOn": { "code": "kds_extra_screen", "name": "Extra KDS screen", "...": "..." }
-  }
-]
-```
-
-<Callout type="info">
-  Tekrarlayan add-on'lar 30 günlük bir `currentPeriodEnd` penceresi alır (iptal akışının
-  anlamlı bir dönem sonu olması için). Gerçek faturalama döngüsü, parent Subscription
-  döngüsüyle hizalanır.
-</Callout>
+Bazı add-on'lar başka bir şeyin önceden mevcut olmasını ister. Şu an kataloğda
+bu durumdaki tek add-on **Hugin yazarkasa**'dır: **PRO planı** gerektirir. PRO
+planında değilseniz satın alma engellenir ve önce planınızı yükseltmeniz
+gerektiği bildirilir.
 
 ## İptal ve dönem-sonu davranışı
 
-İptal yalnızca **ADMIN**'e açıktır (faturalandırma kararı):
+Bir add-on'u iptal etme yetkisi yalnızca **ADMIN**'dedir (faturalandırma
+kararıdır). İki seçeneğiniz vardır:
 
-<Tabs items={['Dönem sonunda iptal (varsayılan)', 'Hemen iptal']}>
-<Tabs.Tab>
+- **Dönem sonunda iptal (varsayılan):** add-on **dönem sonuna kadar aktif kalır**
+  ve verdiği haklar o tarihe kadar çalışmaya devam eder. Dönem dolduğunda
+  otomatik olarak kapanır ve ilgili limit/özellik geri alınır.
+- **Hemen iptal:** add-on anında kapanır ve verdiği haklar **derhal geri
+  alınır**.
 
-```bash
-curl -X DELETE \
-  https://api.hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Satır `cancelAtPeriodEnd: true` olur ve **aktif kalır**. Verdiği limit/feature/integration
-hakları, gece taraması (sweeper) / faturalama döngüsü kapanışı satırı `cancelled`'a
-çevirene kadar yaşamaya devam eder.
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-curl -X DELETE \
-  "https://api.hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID?immediate=true" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Satır anında `cancelled` olur (`endedAt` damgalanır), outbox'a `AddOnCancelled` yazılır
-ve **haklar hemen geri alınır**. Emit, iptal transaction'ı içinde çalışır — append
-başarısız olursa iptal geri alınır (yarım kalmış hak bırakılmaz).
-
-</Tabs.Tab>
-</Tabs>
-
-<Callout type="warning">
-  İki eşzamanlı iptal çağrısı tek bir geçişe yakınsar (`status = 'active'` koşullu
-  `updateMany`). Kaybeden çağrı `Cancel raced with another request — refresh and retry`
-  hatası alır; `AddOnCancelled` event'i **iki kez** yazılmaz.
+<Callout type="info">
+  Tekrarlayan add-on'lar 30 günlük bir dönem penceresinde çalışır; gerçek
+  faturalama döngünüz ana aboneliğinizin döngüsüyle hizalanır. Tek seferlik
+  hizmet kalemleri (ör. yerinde kurulum) tekrarlanmaz ve iptal edilecek bir
+  dönemleri yoktur.
 </Callout>
+
+---
+
+Geliştirici/entegrasyon detayları: [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api)

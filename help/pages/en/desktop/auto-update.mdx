@@ -1,139 +1,68 @@
 ---
 title: Auto-update
-description: How the Tauri updater works with the HummyTummy server — the /api/desktop/updates endpoint, manifest format, minisign signature verification and version comparison.
+description: How the HummyTummy Desktop app finds, downloads and safely installs new versions on its own.
 ---
 
 import { Callout, Steps } from 'nextra/components'
 
 # Auto-update
 
-The desktop app uses the [Tauri updater](https://tauri.app) to fetch new versions from
-the server's release catalog on its own. The flow is fully server-controlled: the app
-reports the platform it runs on and its current version, and the server returns a
-**signed** update manifest if an upgradable release exists.
-
-## The updater endpoint
-
-```
-GET /api/desktop/updates/:platform/:currentVersion
-```
-
-| Parameter | Description | Example |
-| --- | --- | --- |
-| `:platform` | The platform key Tauri reports | `windows-x86_64` |
-| `:currentVersion` | The app's current version | `0.2.5` or `v0.2.5` |
-
-Valid platform keys: `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64`,
-`linux-x86_64`. This endpoint is public and rate-limited to **60 requests/min**.
+The HummyTummy Desktop app notices when a new version is published and downloads and
+installs the update for you. You don't have to look for a release or re-download it by
+hand — the app checks whether you're on the latest version every time it launches.
 
 <Callout type="info">
-  `:platform` must match `^[a-z0-9-]{1,32}$`; `:currentVersion` must match
-  `^v?\d+\.\d+\.\d+$` — otherwise the endpoint returns `400 Bad Request`.
+  Updates are published centrally, so every restaurant gets the same, latest version. That
+  way all of your teams have the same features and fixes.
 </Callout>
 
-## Responses
-
-- **Update available** → `200` with the manifest below.
-- **No update / not applicable** → the body is `null`. Tauri treats this as "up to date".
-  `null` is returned when:
-  - the current version equals or is newer than the latest published release,
-  - there is no published release,
-  - the requested platform is not present in the latest release (no URL, or unsigned).
-
-### Manifest format
-
-```json
-{
-  "version": "0.2.7",
-  "notes": "## What's New\n- Feature X",
-  "pub_date": "2026-06-20T15:00:00.000Z",
-  "platforms": {
-    "windows-x86_64": {
-      "url": "https://github.com/.../HummyTummy-POS_0.2.7_x64.msi",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6..."
-    },
-    "darwin-aarch64": { "url": "...", "signature": "..." },
-    "darwin-x86_64":  { "url": "...", "signature": "..." },
-    "linux-x86_64":   { "url": "...", "signature": "..." }
-  }
-}
-```
-
-The `platforms` object only includes platforms that have **both a URL and a valid
-signature** (see the security note below). The `notes` field is the release's
-`releaseNotes` text, and `pub_date` is the publication date in ISO format.
-
-## Version comparison
-
-The server compares versions as numeric semver: it splits the `major.minor.patch` parts,
-strips a leading `v` prefix, and compares numerically. An update is offered only when the
-latest published version is **strictly greater than** the supplied `currentVersion`; if
-equal or lower, it returns `null`.
-
-<Callout type="warning">
-  The comparison considers numeric parts only; **pre-release tags** (such as
-  `1.0.0-beta.1`) are not supported. Since the release catalog is operator/CI-controlled,
-  this is sufficient — published versions are always kept in plain `major.minor.patch`
-  form.
-</Callout>
-
-## Signature verification (security)
-
-The Tauri updater installs a binary only if its **minisign signature** verifies against a
-pinned public key. The server behaves to preserve that contract:
-
-- If a platform **has a URL but no signature** (empty/missing), that platform is **not
-  added** to the manifest — it is treated as not-installable and a warning is logged on
-  the server. A half-populated, unsigned entry is never emitted.
-- If a platform **has no URL** (the release was not built for that platform), it is
-  silently skipped.
-- If the requested platform ends up absent from `platforms`, the endpoint returns `null`.
-
-This guarantees the auto-updater never receives an unsigned (and therefore unverifiable)
-binary.
-
-<Callout type="warning">
-  The release catalog is a **platform-level** global list, and every restaurant's desktop
-  updater pulls from it. For that reason the management endpoints (create / publish /
-  delete) are accessible only with **SuperAdmin** or the **CI API key**; tenant admins
-  cannot modify the catalog. Otherwise a single tenant could swap the binary that every
-  restaurant's updater fetches.
-</Callout>
-
-## End-to-end flow
+## How it works
 
 <Steps>
-### The app queries on launch
+### The app checks on launch
 
-The Tauri updater hits the configured update endpoint with its platform and current
-version:
+Every time you start HummyTummy Desktop, the app quietly checks whether a newer version
+than yours exists. This happens in the background and doesn't interrupt your work.
 
-```bash
-curl https://app.hummytummy.com/api/desktop/updates/windows-x86_64/0.2.5
-```
+### You're told when a newer version exists
 
-### The server returns a manifest
+If a new version is found, the app downloads it and, once it's ready, asks whether you'd
+like to install it. The release notes summarize what changed in that update.
 
-If a newer, signed release exists the manifest above is returned; otherwise `null`.
+### The update installs safely
 
-### Tauri verifies the signature and installs
-
-The updater verifies the manifest's `signature` against the pinned public key, downloads
-the binary from `url`, and installs it if verification succeeds. If verification fails,
-no installation occurs.
-
-### (Optional) Report the download
-
-The client may increment the download counter for analytics:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/desktop/releases/0.2.7/download/windows-x86_64
-```
+The app verifies that the file it downloaded really is a genuine, unmodified, trusted
+package published by HummyTummy. If the check passes, the update installs; if anything
+looks wrong, nothing is installed and your current version stays exactly as it is.
 </Steps>
 
-<Callout type="info">
-  Which endpoint and which public key the updater uses are defined in the desktop app's
-  Tauri configuration (the updater block in `tauri.conf.json`). The server contract above
-  (manifest format, mandatory signature, version comparison) holds regardless of that
-  client configuration.
+<Callout type="warning">
+  An update only installs when the published package passes the security check. This way
+  your app is never updated with an unverified file — the integrity of the software running
+  your register and sales screen is protected.
 </Callout>
+
+## When you're already up to date
+
+If you're on the latest version, the app does nothing and opens normally. Even if you don't
+see an "up to date" message, the check has still run quietly.
+
+## If no update arrives
+
+If you know a new version was published but don't see an update prompt:
+
+- Fully close and reopen the app; the check runs on launch.
+- Make sure you have an internet connection.
+- If the problem persists, you can reinstall the app by hand with the latest package:
+  **[Install & download](/en/desktop/install)**.
+
+## Related pages
+
+- **[Install & download](/en/desktop/install)** — downloading and installing the app for
+  the first time.
+- **[Hardware](/en/desktop/hardware)** — pairing guide for the receipt printer, cash
+  drawer and cash register.
+
+---
+
+Developer/integration details: [Desktop Release API](https://developer.hummytummy.com/en/developer/desktop-api)

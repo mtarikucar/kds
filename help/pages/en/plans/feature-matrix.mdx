@@ -7,57 +7,57 @@ import { Callout } from 'nextra/components'
 
 # Feature matrix
 
-The tables below show every feature flag and usage limit for the three sellable plans (**Basic / Pro / Business**). Source: `subscription-plans.const.ts`.
+The tables below compare what each of the three sellable plans (**Basic / Pro / Business**) includes and their usage limits. Use this page to decide which plan fits you best.
 
 ## Features
 
-| Feature | Flag | Basic | Pro | Business |
-| --- | --- | :---: | :---: | :---: |
-| POS access | `posAccess` | ✓ | ✓ | ✓ |
-| KDS (kitchen display) integration | `kdsIntegration` | ✓ | ✓ | ✓ |
-| Inventory tracking | `inventoryTracking` | ✓ | ✓ | ✓ |
-| Advanced reports | `advancedReports` | ✗ | ✓ | ✓ |
-| Multi-location | `multiLocation` | ✗ | ✓ | ✓ |
-| Custom branding | `customBranding` | ✗ | ✓ | ✓ |
-| Priority support | `prioritySupport` | ✗ | ✓ | ✓ |
-| Reservation system | `reservationSystem` | ✗ | ✓ | ✓ |
-| Personnel management | `personnelManagement` | ✗ | ✓ | ✓ |
-| Delivery integration | `deliveryIntegration` | ✗ | ✓ | ✓ |
-| API access | `apiAccess` | ✗ | ✗ | ✓ |
-| External display (Partner Display) | `externalDisplay` | ✗ | ✗ | ✓ |
+| Feature | Basic | Pro | Business |
+| --- | :---: | :---: | :---: |
+| POS (sales screen) access | ✓ | ✓ | ✓ |
+| KDS (kitchen display) integration | ✓ | ✓ | ✓ |
+| Inventory tracking | ✓ | ✓ | ✓ |
+| Advanced reports | ✗ | ✓ | ✓ |
+| Multi-location | ✗ | ✓ | ✓ |
+| Custom branding | ✗ | ✓ | ✓ |
+| Priority support | ✗ | ✓ | ✓ |
+| Reservation system | ✗ | ✓ | ✓ |
+| Personnel management | ✗ | ✓ | ✓ |
+| Delivery integration | ✗ | ✓ | ✓ |
+| API access | ✗ | ✗ | ✓ |
+| External display (Partner Display) | ✗ | ✗ | ✓ |
 
 <Callout type="info">
-  **API access** and **external display (Partner Display API)** are exclusive to the Business plan. These two capabilities cover third-party integrations and remote/desktop screen sessions.
+  **API access** and **external display (Partner Display)** are exclusive to the Business plan. These two capabilities cover third-party integrations and remote/desktop screen sessions.
 </Callout>
 
 ## Limits
 
-A value of `-1` means **unlimited** (the `isUnlimited` helper compares against `-1`).
+The infinity sign (**∞**) means that limit is **unlimited**.
 
-| Limit | Field | Basic | Pro | Business |
-| --- | --- | :---: | :---: | :---: |
-| Max users | `maxUsers` | 5 | 15 | ∞ |
-| Max tables | `maxTables` | 20 | 50 | ∞ |
-| Max branches | `maxBranches` | 1 | 3 | ∞ |
-| Max products | `maxProducts` | 100 | 500 | ∞ |
-| Max categories | `maxCategories` | 20 | 50 | ∞ |
-| Max monthly orders | `maxMonthlyOrders` | 500 | 2,000 | ∞ |
+| Limit | Basic | Pro | Business |
+| --- | :---: | :---: | :---: |
+| Max users | 5 | 15 | ∞ |
+| Max tables | 20 | 50 | ∞ |
+| Max branches | 1 | 3 | ∞ |
+| Max products | 100 | 500 | ∞ |
+| Max categories | 20 | 50 | ∞ |
+| Max monthly orders | 500 | 2,000 | ∞ |
 
-## The Trial (TRIAL) plan
+## The Trial plan
 
-The **Trial** plan that every new business starts on has **all of Business's features and unlimited limits** for 7 days. It is not sellable (`isPublic=false`), so it is not listed on the plan-selection screen and is excluded from the pricing comparison. For details, see [Trial & billing](/en/plans/trial-and-billing).
+The **Trial** plan that every new business starts on has **all of Business's features and unlimited limits** for 7 days. Because it isn't a plan you buy, it isn't listed on the plan-selection screen and is excluded from the pricing comparison. For details, see [Trial & billing](/en/plans/trial-and-billing).
 
-<Callout type="warning">
-  When a feature flag changes, **all three places** must stay in sync: the Prisma schema, the projector columns (`FEATURE_COLUMNS`), and the `getEffectiveFeatures` fallback. The table on this page mirrors `subscription-plans.const.ts`, from which those sources are derived.
+## Which features do I have right now?
+
+You can see your business's currently active features in the panel. The access you see is your **actual access**, combined from your plan's features, any add-ons you've added from the Marketplace, and any capabilities granted specifically to you — it reflects what you can actually use, not just the plan's default list.
+
+<Callout type="info">
+  If you see a feature is off on your plan, you can unlock it by **upgrading your plan** or with a **Marketplace add-on**. See [Choosing & upgrading](/en/plans/choosing-and-upgrading) and [Marketplace](/en/marketplace).
 </Callout>
 
-## Querying entitled features
+## Related pages
 
-You can read a business's currently effective features via the API. This endpoint merges plan features, any marketplace add-on upgrades, and superadmin overrides.
+- Choosing a plan, upgrading, and payment flows: **[Choosing & upgrading](/en/plans/choosing-and-upgrading)**
+- The trial and billing details: **[Trial & billing](/en/plans/trial-and-billing)**
 
-```bash
-curl https://app.hummytummy.com/api/subscriptions/effective-features \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
-```
-
-> The response returns the business's actual access based on the `feature.*` and `limit.*` projections — not just the plan default.
+Developer/integration details (including querying entitled features via the API): [Subscription & Billing API](https://developer.hummytummy.com/en/developer/billing-api)

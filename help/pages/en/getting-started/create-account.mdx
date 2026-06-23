@@ -1,9 +1,9 @@
 ---
 title: Create an Account
-description: Opening a new restaurant account in HummyTummy — the sign-up form, required fields, and registering via the API.
+description: Opening a new restaurant account in HummyTummy — the sign-up form and required fields.
 ---
 
-import { Callout, Steps, Tabs } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
 # Create an Account
 
@@ -17,19 +17,19 @@ The following fields are **required** to register:
 |---|---|---|
 | **Email** | Used to sign in | Valid email, up to 254 characters |
 | **Password** | Account password | At least 8 characters; must contain **at least one lowercase letter, one uppercase letter, and one digit** (up to 128 characters) |
-| **First name** (`firstName`) | Your first name | Up to 100 characters |
-| **Last name** (`lastName`) | Your last name | Up to 100 characters |
-| **Phone** | For contact and payment | Enter in any natural format; the system converts it to **E.164** |
-| **Restaurant name** (`restaurantName`) | When creating a new business | Becomes your tenant's name, up to 120 characters |
+| **First name** | Your first name | Up to 100 characters |
+| **Last name** | Your last name | Up to 100 characters |
+| **Phone** | For contact and payment | Enter in any natural format; the system converts it to a standard format |
+| **Restaurant name** | When creating a new business | Becomes your tenant's name, up to 120 characters |
 
 <Callout type="info">
   **Why is phone required?** The payment provider (PayTR) requires a phone number at
   checkout, so it is collected at registration. It accepts natural inputs like
   `"0555 123 45 67"` or `"+90 555 123 45 67"` and normalizes them to the standard
-  `+905551234567` (E.164) format.
+  `+905551234567` format.
 </Callout>
 
-## Sign up step by step (UI)
+## Sign up step by step
 
 <Steps>
 
@@ -39,7 +39,7 @@ Click the **"Sign up"** link on the login screen.
 
 ### Enter your details
 
-Fill in email, password, first name, last name, phone, and restaurant name. The password must contain uppercase, lowercase, and a digit.
+Fill in email, password, first name, last name, phone, and restaurant name. The password must contain uppercase, lowercase, and a digit. You can type the phone in any natural format.
 
 ### Create the account
 
@@ -51,87 +51,24 @@ On first login you are taken to a welcome screen and the dashboard. From there, 
 
 </Steps>
 
-## Register via the API
-
-You can also register programmatically. The global API prefix is `/api`.
-
-**Endpoint:** `POST /api/auth/register`
-
-<Tabs items={['curl', 'Request body (JSON)']}>
-  <Tabs.Tab>
-
-```bash
-curl -X POST https://<server>/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "owner@myrestaurant.com",
-    "password": "Passw0rd!",
-    "firstName": "Ayse",
-    "lastName": "Yilmaz",
-    "phone": "0555 123 45 67",
-    "restaurantName": "Sultanahmet Cafe"
-  }'
-```
-
-  </Tabs.Tab>
-  <Tabs.Tab>
-
-```json
-{
-  "email": "owner@myrestaurant.com",
-  "password": "Passw0rd!",
-  "firstName": "Ayse",
-  "lastName": "Yilmaz",
-  "phone": "0555 123 45 67",
-  "restaurantName": "Sultanahmet Cafe"
-}
-```
-
-  </Tabs.Tab>
-</Tabs>
-
-**Successful response (`201 Created`):** returns an `accessToken` plus the user object. The phone is stored normalized as `+905551234567`.
-
-```json
-{
-  "accessToken": "<jwt>",
-  "user": {
-    "id": "…",
-    "email": "owner@myrestaurant.com",
-    "firstName": "Ayse",
-    "lastName": "Yilmaz",
-    "phone": "+905551234567",
-    "role": "ADMIN",
-    "tenantId": "…",
-    "primaryBranchId": "…",
-    "allowedBranchIds": []
-  }
-}
-```
-
 <Callout type="info">
-  The refresh token is **not** returned in the response body; for security it is sent
-  only as an `httpOnly` cookie. Use the `accessToken` on subsequent requests via the
-  `Authorization: Bearer <accessToken>` header.
-</Callout>
-
-**Error cases:**
-
-- `409 Conflict` — this email is already in use.
-- `400 Bad Request` — a field fails validation (e.g. weak password, invalid phone).
-
-<Callout type="warning">
-  **Rate limit:** the register endpoint is limited to **3 requests per hour per IP**.
-  Exceeding it returns `429 Too Many Requests`.
+  If the email is already in use, the sign-up form lets you know — try a different email
+  or sign in with your existing account. If you make many sign-up attempts in a short
+  span, you may be asked to wait a while for security reasons.
 </Callout>
 
 ## What gets provisioned after registration
 
-When registration succeeds, the following are created inside a single database transaction:
+When registration succeeds, the following are created for you:
 
 1. **Tenant** — named after your restaurant, with the 7-day trial window set.
-2. **Subscription** — in **TRIALING** status, on the 7-day TRIAL plan.
+2. **Subscription** — in trial (TRIAL) status, on the 7-day plan.
 3. **"Main" branch** — your default branch.
 4. **ADMIN user** — you (the business owner).
 
 From here, you can prepare your menu, tables, and settings via **[First-Time Setup](/getting-started/first-setup)**.
+
+## Related pages
+
+- **[First-Time Setup](/getting-started/first-setup)** — preparing your menu, tables, and settings after registration.
+- For programmatic sign-up (API): **[API Fundamentals](https://developer.hummytummy.com/en/developer/api-fundamentals)**

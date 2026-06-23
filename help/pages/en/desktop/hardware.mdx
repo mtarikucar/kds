@@ -1,257 +1,120 @@
 ---
 title: Hardware pairing
-description: Pair receipt printers, cash drawers and fiscal registers via device-mesh — the pair-code flow, device token, command queue and security rules.
+description: Pair receipt printers, cash drawers and fiscal registers from the panel — create a device slot, the pairing code, status monitoring and sending commands.
 ---
 
-import { Callout, Steps, Tabs } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
 # Hardware: printer, cash drawer, fiscal register
 
-Local hardware is managed through the **device-mesh** module. An admin creates a **device
-slot** from the panel; that slot shows a 6-character **pair code** on screen. The device
-(or the local bridge that drives the devices — `local_bridge`) enters that code to pair
-and receives a long-lived **device token** in return. From then on the server dispatches
-commands to the device — print a receipt, open the drawer, issue a fiscal receipt —
-through a **command queue**.
+You manage your local hardware (receipt printer, cash drawer, fiscal register, card terminal)
+from the panel. The flow is three steps: you create a **device slot** in the panel, you enter
+the **pairing code** that appears on screen on the device itself (or on the local bridge that
+drives that hardware), and then you monitor the device's status live from the panel and send
+it commands — print a receipt, open the drawer, issue a fiscal receipt.
 
-All endpoints live under `/api/v1/devices/...`.
+<Callout type="info">
+  Device slots are managed from the **Devices** screen, where all your registered terminals
+  live in one list (Multi-Location → Devices). You connect a piece of hardware to a single
+  screen or local bridge; pairing always completes on the device itself.
+</Callout>
 
-## Device kinds
+## What hardware you can add
 
-The `kind` field is one value from a closed set:
+When creating a new slot you pick the device **type** from the dropdown in the top right:
 
-| `kind` | Description |
+| Type | What it's for |
 | --- | --- |
-| `receipt_printer` | Receipt printer |
-| `kitchen_printer` | Kitchen printer |
-| `yazarkasa` | Fiscal register (mali / fiscal device) |
-| `pos_terminal` | Card payment terminal |
-| `kds_screen` / `bar_screen` | Kitchen / bar display |
-| `tablet_waiter` / `tablet_customer` | Waiter / customer tablet |
-| `caller_id` | Caller-ID device |
-| `scanner` | Barcode scanner |
-| `local_bridge` | Local bridge agent that drives multiple devices |
+| Receipt printer | Prints customer receipts |
+| Kitchen printer | Prints order tickets to the kitchen |
+| Fiscal register (yazarkasa) | Issues fiscal receipts (GİB-approved device) |
+| Card terminal (POS) | Collects card payments |
+| Kitchen / bar display | Shows orders on a screen |
+| Waiter / customer tablet | Order taking / customer side |
+| Caller-ID, barcode scanner | Auxiliary hardware |
+| Local bridge | Drives several pieces of local hardware on your network at once |
 
-The `capabilities` field is an array of free-form tags (max 32 items, each ≤ 64 chars) —
-e.g. a bridge that carries fiscal + printer + cash-drawer capabilities.
-
-## Two authorization surfaces
-
-device-mesh hosts two distinct surfaces in one controller:
-
-- **Admin (user session / Bearer JWT)** — tenant admins manage devices. The `ADMIN` or
-  `MANAGER` role is required. These routes are **branch-scoped** (`X-Branch-Id`).
-- **Device side (device token)** — the device itself talks here. It uses the
-  `Authorization: Device <token>` header (deliberately not `Bearer`, so HTTP
-  intermediaries that strip `Bearer` for user sessions do not clobber device auth).
+<Callout type="info">
+  A **local bridge** is a device that drives several pieces of local hardware on your network
+  at once — receipt printer, cash drawer and fiscal register. Rather than adding each printer
+  and drawer individually, setting up one bridge and connecting all the local hardware through
+  it is the most practical approach for most installs.
+</Callout>
 
 ## Pairing flow
 
 <Steps>
-### An admin creates a device slot
+### Create a device slot
 
-```bash
-curl -X POST https://app.hummytummy.com/api/v1/devices \
-  -H "Authorization: Bearer $JWT" \
-  -H "X-Branch-Id: $BRANCH_ID" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "kind": "receipt_printer",
-    "capabilities": ["escpos", "80mm"],
-    "model": "Epson TM-T20III",
-    "ownership": "byo"
-  }'
-```
+On the Devices screen, choose the hardware type from the dropdown in the top right (e.g.
+Receipt printer, Fiscal register, Local bridge) and press **Create Device Slot**. The slot is
+created within the scope of the currently selected **branch**.
 
-The response includes the **pair code** to show on screen:
+### Enter the pairing code on the device
 
-```json
-{
-  "id": "01J...",
-  "tenantId": "01J...",
-  "branchId": "01J...",
-  "kind": "receipt_printer",
-  "status": "unprovisioned",
-  "pairCode": "A4F9K2",
-  "pairCodeExpiresAt": "2026-06-22T10:10:00.000Z"
-}
-```
+In the new row's **Pairing Code** column, a short alphanumeric code and a **QR** that encodes
+it appear. Click the QR to enlarge it (handy for scanning a screen across the dining room from
+a distance). Enter this code on the device — or on the local bridge that drives the hardware.
 
-<Callout type="info">
-  `branchId` is required. Because the route is branch-scoped, the server resolves it from
-  the `X-Branch-Id` header; you may also pass `branchId` in the body to set it explicitly.
-  The `ownership` field is one of `sold` / `rented` / `byo` (default `byo`).
-</Callout>
+### Confirm the connection
 
-### The device pairs with the pair code
-
-The device (or the `local_bridge` agent) reads the on-screen code and pairs:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/v1/devices/pair \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pairCode": "A4F9K2",
-    "model": "Epson TM-T20III",
-    "capabilities": ["escpos", "80mm"]
-  }'
-```
-
-The response contains the raw token, returned **exactly once**:
-
-```json
-{
-  "deviceId": "01J...",
-  "tenantId": "01J...",
-  "branchId": "01J...",
-  "kind": "receipt_printer",
-  "token": "018f....base64url",
-  "tokenExpiresAt": "2026-06-23T10:05:00.000Z",
-  "capabilities": ["escpos", "80mm"]
-}
-```
-
-### The device stores the token and sends heartbeats
-
-From now on the token is sent on every request in the `Authorization: Device <token>`
-header. The device sends regular **heartbeats** to stay online:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/v1/devices/heartbeat \
-  -H "Authorization: Device $DEVICE_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{ "batteryPct": 100, "agentVersion": "1.0.0", "queueDepth": 0 }'
-```
+Once pairing completes, the row's **Status** label flips to `online` and **Last Seen**
+updates. From this point you can send the device commands.
 </Steps>
 
-### Notes on the pairing rules
-
 <Callout type="warning">
-  - **Pair code TTL** defaults to **10 minutes** (`DEVICE_PAIR_CODE_TTL_MS`). An expired
-    code is atomically cleared on first use and returns "Pair code expired — request a new
-    one".
-  - **Device token TTL** defaults to **24 hours** (`DEVICE_TOKEN_TTL_MS`). Tokens are
-    stored as a sha256 hash on the server; the raw token is never persisted and is
-    returned only once, at pair time.
-  - The `/pair` endpoint is rate-limited to **5 requests/min/IP** — making brute force of
-    the 6-character code (`[A-Z0-9]`, ~2.2 billion combinations) meaningless within the
-    TTL window.
-  - The pair code is **single-use**: if two devices enter the same code milliseconds
-    apart, the atomic claim (updateMany) only succeeds for the first; the second gets
-    "Pair code already claimed by another device or expired".
+  The pairing code has an **expiry** time (visible when you hover over the QR). If it expires,
+  the code becomes invalid; retire the slot and create a new one to generate a fresh code.
 </Callout>
 
-## Device statuses
+## Statuses
 
-```
-unprovisioned → (slot created, awaiting code)
-paired        → (first pair, no heartbeat yet)
-online        → (within the heartbeat window)
-offline       → (no heartbeat for ~45s)
-retired       → (admin retired it; token revoked)
-```
+The **Status** label on a row shows the device's current state:
 
-The heartbeat window is **45s**; a background sweeper (cron) flips online devices that
-exceed it to `offline`.
+- **online** (green) — the device is connected and can receive commands.
+- **offline** (gray) — nothing has been heard from the device for a while (it drops to
+  `offline` if the connection lapses for about 45 seconds).
+- **error** (red) — the device reported a problem.
+- **busy** (amber) — the device is currently running a job.
+- **maintenance** (blue) — in maintenance mode.
 
-## Command queue
+Three summary cards at the top of the screen summarize your fleet: **Total devices**,
+**Online** and the count needing attention (`error` or `offline`). The list refreshes itself
+at regular intervals; status changes appear without a manual reload.
 
-An admin drives hardware by sending commands to a device. Commands are held in a
-per-device FIFO + priority queue; the device pulls the next command via `next-command`,
-executes it, and reports the outcome via `ack`.
+## Sending commands
 
-### Command kinds (`kind`)
+You drive hardware by sending commands to a device. Commands wait in a per-device queue; the
+device pulls the next one, runs it, and reports the outcome back to the panel. Click the device
+name in the table to open the **Device Commands** drawer from the right, where you can review
+the command queue (with the Queued / In progress / Completed / Failed filters), read the error
+reason on a failed row, and — if the device looks unhealthy — send a one-off **capability
+probe**.
 
-| `kind` | Hardware action |
-| --- | --- |
-| `print_receipt` | Print a customer receipt |
-| `open_drawer` | Open the cash drawer |
-| `fiscal_receipt` | Issue a fiscal receipt on the register |
-| `fiscal_cancel` | Cancel a fiscal receipt (fiscal void) |
-| `charge_card` | Start a charge on the card terminal |
-| `show_order` / `clear_order` | Show / clear an order on screen |
-| `reboot` / `firmware_update` | Reboot the device / update firmware |
-| `capability_probe` / `noop` | Probe capabilities / no-op |
-
-### Sending a command (admin)
-
-```bash
-curl -X POST https://app.hummytummy.com/api/v1/devices/$DEVICE_ID/commands \
-  -H "Authorization: Bearer $JWT" \
-  -H "X-Branch-Id: $BRANCH_ID" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "kind": "print_receipt",
-    "payload": { "orderId": "01J...", "copies": 1 },
-    "priority": 0,
-    "idempotencyKey": "order-01J-receipt"
-  }'
-```
-
-- `kind` must be one of the closed set above; free-form aliases (such as `charge.card`)
-  are rejected with `400`.
-- `payload` must be an object (JSONB); `priority` is 0–1000 (0 default, higher = first).
-- If `idempotencyKey` is supplied, the command is deduplicated on `(deviceId,
-  idempotencyKey)`; resending returns the same command (no duplicate is created). **Always**
-  send a stable key when retrying.
-
-### Device side: claiming and acking
-
-```bash
-# Atomically claim the next command (returns null if none)
-curl https://app.hummytummy.com/api/v1/devices/next-command \
-  -H "Authorization: Device $DEVICE_TOKEN"
-
-# Report the outcome
-curl -X POST https://app.hummytummy.com/api/v1/devices/commands/$COMMAND_ID/ack \
-  -H "Authorization: Device $DEVICE_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{ "status": "done", "result": { "bytesPrinted": 412 } }'
-```
-
-`next-command` is atomic via `FOR UPDATE SKIP LOCKED` — even if a single device opens two
-connections, a command is never delivered twice. The `ack` status is `done` or `failed`;
-the `error` field (≤ 1000 chars) carries the failure reason.
+Typical commands: print a customer receipt, open the cash drawer, issue a fiscal receipt on the
+register, charge a card terminal, and show an order on a screen.
 
 <Callout type="warning">
-  **Money-moving / artefact-producing commands are never auto-retried.** `charge_card`,
-  `fiscal_receipt`, `fiscal_cancel`, `open_drawer` and `print_receipt` are side-effecting:
-  if a command's ack is lost (the terminal charged → the app crashed → the result never
-  reached the server) and it were requeued, the customer would be **double-charged** or
-  the receipt **double-printed**. Such commands therefore terminate directly in `failed`
-  on failure; an operator reconciles with an explicit **compensating command** (e.g.
-  `fiscal_cancel`). Safe/idempotent commands (`show_order`, `clear_order`,
-  `capability_probe`, `reboot`, `noop`) follow the normal retry path (up to 5 attempts).
+  **Money-moving or artefact-producing commands (charging, fiscal receipts, printing, opening
+  the drawer) are deliberately never auto-retried.** If a command is interrupted and its result
+  doesn't reach the panel, the system will not resend it on its own — otherwise a customer could
+  be double-charged or a receipt double-printed. In such cases the command is marked **failed**;
+  you reconcile with an explicit compensating step (for example a fiscal cancel). Safe operations
+  such as screen commands are retried on their own if needed.
 </Callout>
 
 ## Branch scope and security
 
-- Sending commands and inspecting the queue are **branch-scoped**: a `MANAGER` restricted
-  to one branch can only drive devices in that branch; they cannot send `charge_card` /
-  `open_drawer` / `fiscal_receipt` to another branch's terminal (an out-of-scope device
-  returns `404`). An `ADMIN` operates tenant-wide.
-- **Retiring** a device (`DELETE /api/v1/devices/:id`) is restricted to the `ADMIN` role;
-  it revokes the token.
-- Device-token endpoints (`heartbeat`, `next-command`, `ack`) are additionally
-  rate-limited (heartbeat 60/min; next-command and ack 120/min) — so a compromised token
-  cannot hammer the database.
+- Commands are **branch-scoped**: a manager authorized for a single branch can only drive
+  devices in that branch; they cannot send a charge or receipt command to another branch's
+  terminal. An admin (ADMIN) operates across all branches.
+- To take a device out of service, use the **Retire** button on the right of the row; after you
+  confirm, the device is hidden from the list and its connection is invalidated. Retiring a
+  device is restricted to the **Admin** role.
 
-## Listing devices
+## Related pages
 
-```bash
-curl "https://app.hummytummy.com/api/v1/devices?branchId=$BRANCH_ID&kind=receipt_printer&status=online" \
-  -H "Authorization: Bearer $JWT" \
-  -H "X-Branch-Id: $BRANCH_ID"
-```
+- **[Devices](/en/admin-guide/devices)** — the single list of all your registered terminals.
+- **[Hardware Store](/en/marketplace/hardware-store)** — buy printers, tablets and displays.
 
-Filterable by `branchId`, `kind` and `status`. The list response returns identity +
-status information; sensitive fields such as `pairCode` and `tokenHash` are deliberately
-excluded from the list.
-
-<Callout type="info">
-  The Bluetooth/ESC/POS commands in the README (Tauri commands like `scan_devices`,
-  `connect_device`, `print_receipt`) are the desktop app's **local** BLE printer support
-  and run inside the client. The device-mesh here is the **server-side** device registry,
-  pairing and command queue. The two complement each other: a bridge can translate a
-  `print_receipt` command it received from the mesh into a local ESC/POS print job.
-</Callout>
+Developer/integration details: [Device API (Device Mesh)](https://developer.hummytummy.com/en/developer/devices-api)

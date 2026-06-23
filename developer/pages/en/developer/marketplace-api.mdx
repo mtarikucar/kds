@@ -1,0 +1,370 @@
+---
+title: Marketplace API
+description: List the add-on catalogue, buy add-ons through the checkout rail, read the add-ons a tenant holds, and cancel them — with the fold rules, idempotency, and concurrency guarantees behind each call.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Marketplace API
+
+The Marketplace is the catalogue of add-ons a tenant can buy **individually** on
+top of its plan. A plan gives a feature/limit baseline; add-ons **raise** that
+baseline (an extra KDS screen, an extra branch, an e-Fatura integration,
+advanced reports, and so on).
+
+Buying an add-on writes a **`TenantAddOn`** row, and the entitlement projector
+folds that row's `grants` map into the tenant's existing entitlement set. The
+combine rule depends on the key prefix:
+
+| Prefix | Type | Combine | Example |
+| --- | --- | --- | --- |
+| `limit.*` | number | **SUM** | Plan `limit.kdsScreens: 2` + 1× `kds_extra_screen` (+1) = **3** |
+| `feature.*` | boolean | **OR** | If any source sets `feature.advancedReports: true` → enabled |
+| `integration.*` | string[] | **UNION** | `efatura` add-on + `hugin` add-on → `integration.fiscal: ["efatura", "hugin"]` |
+
+<Callout type="info">
+  For `limit.*`, `-1` is the "unlimited" sentinel: if any source grants `-1`, the
+  result is unlimited and summing stops (adding capacity to an already-unlimited
+  cap is a no-op).
+</Callout>
+
+All paths are under the `/api` global prefix. Prices are in **TRY** and stored
+in the catalogue as **cents** (`priceCents`): `9900` = ₺99.00. Amounts are shown
+KDV-inclusive (gross). For base URL, auth realms, the error envelope, and
+rate-limit tiers, see [API Fundamentals](/en/developer/api-fundamentals).
+
+<Callout type="warning">
+  There is **no** tenant-facing "free grant" endpoint. The legacy
+  `POST /v1/marketplace/addons/purchase` was **removed** (deep-review C2): it was
+  guarded only by `@Roles(ADMIN)` and called `purchase()` with no `paymentRef`,
+  so any owner could activate a paid add-on for free via curl. The paid checkout
+  flow is now mandatory; operator comps are issued only from the superadmin
+  surface.
+</Callout>
+
+## Endpoints
+
+| Method | Path | Auth | Roles | Notes |
+| --- | --- | --- | --- | --- |
+| `GET` | `/v1/marketplace/addons` | Public | — | Catalogue; `published` rows only |
+| `GET` | `/v1/marketplace/addons/mine` | Staff JWT | ADMIN, MANAGER | Add-ons the tenant currently holds |
+| `POST` | `/v1/checkout/intent` | Staff JWT | ADMIN, MANAGER | Mixed-cart checkout intent (the only buy path) |
+| `DELETE` | `/v1/marketplace/addons/:id` | Staff JWT | ADMIN | Cancel a `TenantAddOn` (period-end or immediate) |
+
+These are tenant-level endpoints: they do **not** expect `X-Branch-Id`. The
+checkout intent and the cancel endpoint move/settle money or entitlements and
+are protected accordingly.
+
+## List the catalogue
+
+The catalogue is public (it also shows on the landing site); no authentication
+is required. Only `published` add-ons are returned, and each row is trimmed for
+the UI.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+# All published add-ons
+curl https://hummytummy.com/api/v1/marketplace/addons
+
+# Filter by kind: capacity | integration | software | support
+curl "https://hummytummy.com/api/v1/marketplace/addons?kind=integration"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/marketplace/addons?kind=integration",
+);
+const addons = await res.json();
+```
+  </Tabs.Tab>
+</Tabs>
+
+Response:
+
+```json
+[
+  {
+    "code": "kds_extra_screen",
+    "name": "Extra KDS screen",
+    "description": "Adds one additional kitchen display screen slot to your branch.",
+    "kind": "capacity",
+    "billing": "recurring",
+    "priceCents": 9900,
+    "currency": "TRY",
+    "deps": []
+  }
+]
+```
+
+<Callout type="info">
+  The `grants` field is **not** returned in the public catalogue — only the
+  superadmin surface and the seed file carry the grant map. The catalogue is
+  trimmed for the UI; `priceCents`/`currency` are the source of truth for price.
+</Callout>
+
+### Catalogue summary
+
+Every sellable add-on at a glance. The `Grants` column is shown here for
+reference only; it is not part of the public catalogue payload.
+
+| Code | Kind | Billing | Price | Grants | Dependency |
+| --- | --- | --- | --- | --- | --- |
+| `kds_extra_screen` | capacity | recurring | ₺99.00 (`9900`) | `limit.kdsScreens` +1 | — |
+| `kds_extra_station` | capacity | recurring | ₺149.00 (`14900`) | `limit.kdsStations` +1 | — |
+| `extra_tablet` | capacity | recurring | ₺79.00 (`7900`) | `limit.tablets` +1 | — |
+| `extra_branch` | capacity | recurring | ₺399.00 (`39900`) | `limit.branches` +1, `feature.multiLocation` | — |
+| `fiscal_efatura` | integration | recurring | ₺199.00 (`19900`) | `integration.fiscal` += `efatura` | — |
+| `fiscal_hugin` | integration | recurring | ₺299.00 (`29900`) | `integration.fiscal` += `hugin` | **`plan:PRO`** |
+| `delivery_yemeksepeti` | integration | recurring | ₺249.00 (`24900`) | `integration.delivery` += `yemeksepeti` | — |
+| `delivery_getir` | integration | recurring | ₺249.00 (`24900`) | `integration.delivery` += `getir` | — |
+| `delivery_trendyol_yemek` | integration | recurring | ₺249.00 (`24900`) | `integration.delivery` += `trendyol_yemek` | — |
+| `caller_id_integration` | integration | recurring | ₺149.00 (`14900`) | `feature.callerIntegration` | — |
+| `advanced_reports` | software | recurring | ₺129.00 (`12900`) | `feature.advancedReports` | — |
+| `api_access` | software | recurring | ₺249.00 (`24900`) | `feature.apiAccess` | — |
+| `priority_support` | support | recurring | ₺199.00 (`19900`) | `feature.prioritySupport` | — |
+| `onsite_install_full` | support | **one-time** | ₺7,500.00 (`750000`) | — (`grants: {}`, service line) | — |
+
+<Callout type="warning">
+  `onsite_install_full` is a **service** line: it is paid and invoiced but grants
+  no entitlement (`grants: {}`). It is one-time, not recurring, and gets no
+  period-end window (`currentPeriodEnd` is `null`).
+</Callout>
+
+<Callout type="info">
+  `extra_branch` carries both a **limit** (SUM) and a **feature** (OR) grant in a
+  single purchase: `{ "limit.branches": 1, "feature.multiLocation": true }`.
+  `caller_id_integration` has `kind: "integration"` but its grant is a **feature**
+  flag (`feature.callerIntegration`), not an `integration.*` list. All three
+  `delivery_*` add-ons write to `integration.delivery` and are union-ed.
+</Callout>
+
+## Buy an add-on (checkout intent)
+
+The only way to buy an add-on is the checkout (PayTR) rail. A paid add-on is
+never provisioned without proof of payment (`paymentRef`).
+
+<Steps>
+
+### Start a checkout intent
+
+Submit the selected add-ons (plus any plan / hardware / service lines) as a
+single **mixed cart** to `POST /v1/checkout/intent`. The server **re-prices** the
+cart (it never trusts client totals), mints a `paymentRef` of the form
+`CK-<uuid7>`, freezes the cart onto a `CheckoutIntent` row, and returns a PayTR
+iframe token + payment link.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/checkout/intent \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cart": {
+      "items": [
+        { "type": "addon", "code": "kds_extra_screen", "qty": 1 },
+        { "type": "addon", "code": "fiscal_efatura", "qty": 1 }
+      ]
+    },
+    "buyer": {
+      "email": "owner@restaurant.com",
+      "name": "Ali Veli",
+      "phone": "+905551112233",
+      "address": "..."
+    },
+    "returnUrl": "https://app.hummytummy.com/checkout/done"
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch("https://hummytummy.com/api/v1/checkout/intent", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${jwt}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    cart: {
+      items: [
+        { type: "addon", code: "kds_extra_screen", qty: 1 },
+        { type: "addon", code: "fiscal_efatura", qty: 1 },
+      ],
+    },
+    buyer: {
+      email: "owner@restaurant.com",
+      name: "Ali Veli",
+      phone: "+905551112233",
+      address: "...",
+    },
+    returnUrl: "https://app.hummytummy.com/checkout/done",
+  }),
+});
+const { paymentRef, iframeToken, paymentUrl } = await res.json();
+```
+  </Tabs.Tab>
+</Tabs>
+
+### Pay via PayTR
+
+The buyer pays on the PayTR hosted iframe. Each cart line is shown to the buyer
+as a separate basket entry (e.g. *"Extra KDS screen (monthly)"*).
+
+### Settlement via webhook
+
+The PayTR webhook carries only `merchant_oid` + `total_amount`. The dispatcher
+sees the `CK-` prefix and routes the callback to **`CheckoutSettlementService`**.
+There the `CheckoutIntent` is found, the frozen cart is read, and
+**`CheckoutService.confirmAndProvision`** runs.
+
+### Grants are provisioned
+
+For each add-on line, `confirmAndProvision` calls
+`TenantMarketplaceService.purchase()` **with the settled `paymentRef`** inside
+the checkout transaction. That creates a `TenantAddOn` row and appends an
+`AddOnPurchased` event to the outbox. The entitlement projector consumes
+`AddOnPurchased` and folds the add-on's `grants` map into the tenant's
+entitlement set; guards and the UI then see the new limit/feature/integration.
+
+</Steps>
+
+### Dependencies (`deps`)
+
+Some add-ons require something else to already be in place. Every entry in the
+`deps` array must currently **apply** to the tenant at purchase time:
+
+- `plan:PRO` → the tenant's active plan name must be `PRO`
+  (`Tenant.currentPlan.name`).
+- An add-on code (e.g. `caller_id_integration`) → that add-on must be **active**
+  on the tenant.
+
+Today the only add-on in the catalogue with `deps` is **`fiscal_hugin`**
+(`["plan:PRO"]`). If the tenant is not on PRO, the purchase is rejected with:
+
+```
+Add-on requires: plan:PRO. Upgrade your plan or purchase the required add-ons first.
+```
+
+### Duplicate-purchase guard
+
+Buying the same capacity add-on twice to double a limit is blocked: if an active
+row already exists for the same `(tenantId, addOnId, branchId)`, the second
+purchase is rejected. Two concurrent purchases are caught by a **Serializable**
+transaction; the loser gets a retryable **`409`** (the card is not charged
+twice).
+
+### Idempotency
+
+PayTR retries aggressively (it retries even after a `200 OK` if the body isn't
+`"OK"`/`"FAIL"`). There are multiple layers of protection against double
+provisioning:
+
+<Steps>
+### `CheckoutIntent.status` check
+If the intent is already `provisioned`/`failed`, nothing is touched.
+
+### `confirmAndProvision` is independently idempotent
+It is idempotent on `(tenantId, paymentRef)`.
+
+### `purchase()` returns the existing row
+For the same `paymentRef` it returns the existing `TenantAddOn` row without
+re-emitting an `AddOnPurchased` event.
+</Steps>
+
+## My current add-ons
+
+Lists the add-ons the tenant currently holds.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl https://hummytummy.com/api/v1/marketplace/addons/mine \
+  -H "Authorization: Bearer $JWT"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/marketplace/addons/mine",
+  { headers: { Authorization: `Bearer ${jwt}` } },
+);
+const mine = await res.json();
+```
+  </Tabs.Tab>
+</Tabs>
+
+Each row carries the add-on catalogue (`addOn`) plus its status/period fields:
+
+```json
+[
+  {
+    "id": "ta_01J...",
+    "tenantId": "t_01J...",
+    "addOnId": "ao_01J...",
+    "branchId": null,
+    "quantity": 1,
+    "status": "active",
+    "activatedAt": "2026-06-22T10:00:00.000Z",
+    "currentPeriodStart": "2026-06-22T10:00:00.000Z",
+    "currentPeriodEnd": "2026-07-22T10:00:00.000Z",
+    "paymentRef": "CK-018f...",
+    "addOn": { "code": "kds_extra_screen", "name": "Extra KDS screen", "...": "..." }
+  }
+]
+```
+
+<Callout type="info">
+  Recurring add-ons get a 30-day `currentPeriodEnd` window (so the cancellation
+  flow has a meaningful period end). The real billing cycle aligns to the parent
+  Subscription cycle. One-time items (`onsite_install_full`) carry
+  `currentPeriodEnd: null`.
+</Callout>
+
+## Cancel an add-on
+
+Cancellation is **ADMIN-only** (it is a billing decision). By default the row is
+cancelled **at period end**; pass `?immediate=true` to revoke right away.
+
+<Tabs items={['Cancel at period end (default)', 'Cancel immediately']}>
+  <Tabs.Tab>
+```bash
+curl -X DELETE \
+  https://hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID \
+  -H "Authorization: Bearer $JWT"
+```
+
+The row is set to `cancelAtPeriodEnd: true` and **stays active**. The
+limit/feature/integration entitlements it grants keep living until the nightly
+sweeper / billing-cycle close transitions the row to `cancelled`.
+  </Tabs.Tab>
+  <Tabs.Tab>
+```bash
+curl -X DELETE \
+  "https://hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID?immediate=true" \
+  -H "Authorization: Bearer $JWT"
+```
+
+The row becomes `cancelled` immediately (`endedAt` is stamped), an
+`AddOnCancelled` event is appended to the outbox, and **entitlements are revoked
+right away**. The emit runs inside the cancel transaction — if the append fails,
+the cancellation rolls back (no half-revoked entitlement is left behind).
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  Two concurrent cancel calls converge on a single transition (a
+  `status = 'active'`-scoped `updateMany`). The loser gets
+  `Cancel raced with another request — refresh and retry`; the `AddOnCancelled`
+  event is **not** emitted twice.
+</Callout>
+
+## Related
+
+- [API Fundamentals](/en/developer/api-fundamentals) — base URL, auth realms,
+  error envelope, rate-limit tiers.
+- [Webhooks](/en/developer/webhooks) — receive `subscription.*` /
+  `payment.*` events (the `api_access` add-on grants `feature.apiAccess`).
+- Operator experience (browsing, buying, and tracking add-ons in the panel):
+  [Marketplace help](https://help.hummytummy.com/en/marketplace).

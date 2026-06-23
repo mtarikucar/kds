@@ -1,0 +1,442 @@
+---
+title: Subscription & Billing API
+description: Plan catalog, change-plan (proration upgrade / scheduled downgrade), payment intents (PayTR & bank transfer), invoices, cancellation/reactivation, entitlements, and the TRIAL_ENDED lock envelope.
+---
+
+import { Callout, Tabs, Steps } from 'nextra/components'
+
+# Subscription & Billing API
+
+This page is the integrator reference for everything around subscriptions and
+money: reading the plan catalog, upgrading with proration, scheduling a
+downgrade, creating a PayTR or bank-transfer payment, reading invoices,
+cancelling/reactivating, and querying the tenant's effective features. It builds
+on the conventions in [API Fundamentals](/en/developer/api-fundamentals) (base
+URL, auth realms, branch scope, the error envelope, idempotency, rate limits).
+
+<Callout type="info">
+  All amounts are **TRY** and **VAT-inclusive**. Self-service card payment runs
+  through PayTR, which only supports TR/TRY. There is no cross-currency plan
+  change — the system is TRY-only.
+</Callout>
+
+## Auth & roles
+
+These endpoints use the **Staff JWT** realm (`Authorization: Bearer <jwt>` — see
+[API Fundamentals](/en/developer/api-fundamentals)). Role requirements differ by
+endpoint:
+
+| Capability | Required role |
+| --- | --- |
+| Read plan catalog | Public (`@Public`, no auth) |
+| Create payment intent / checkout | ADMIN, MANAGER |
+| Read invoices / scheduled downgrade | ADMIN, MANAGER |
+| Change plan (write), cancel, reactivate, cancel scheduled downgrade | **ADMIN only** |
+
+<Callout type="warning">
+  The plan-change *quote* call (`POST /subscriptions/:id/change-plan`) is itself
+  ADMIN-only. It does not mutate state — it only computes the amount — but the
+  apply step that follows a successful payment does write, so the whole route is
+  ADMIN-gated.
+</Callout>
+
+## Endpoint summary
+
+| Method | Path | Realm / role | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/subscriptions/plans` | Public | List sellable plans |
+| `POST` | `/api/subscriptions/:id/change-plan` | ADMIN | Quote an upgrade / schedule a downgrade |
+| `GET` | `/api/subscriptions/:id/scheduled-downgrade` | ADMIN, MANAGER | Read a scheduled downgrade |
+| `DELETE` | `/api/subscriptions/:id/scheduled-downgrade` | ADMIN | Cancel a scheduled downgrade |
+| `POST` | `/api/payments/create-intent` | ADMIN, MANAGER | Start a PayTR (card) subscription payment |
+| `GET` | `/api/payments/bank-transfer/details` | ADMIN, MANAGER | Read platform bank (IBAN) details |
+| `POST` | `/api/payments/bank-transfer/intent` | ADMIN, MANAGER | Reserve a bank-transfer payment |
+| `GET` | `/api/subscriptions/tenant/invoices` | ADMIN, MANAGER | List all tenant invoices (paginated) |
+| `GET` | `/api/subscriptions/:id/invoices` | ADMIN, MANAGER | List a subscription's invoices (paginated) |
+| `POST` | `/api/subscriptions/:id/cancel` | ADMIN | Cancel a subscription |
+| `POST` | `/api/subscriptions/:id/reactivate` | ADMIN | Reactivate a cancelled subscription |
+| `GET` | `/api/subscriptions/effective-features` | ADMIN, MANAGER | Read the tenant's effective features/limits |
+
+## Listing sellable plans
+
+The plan catalog is public (`@Public`) and returns only **active + public**
+plans — that is, Basic / Pro / Business. The Trial (`isPublic=false`) and the
+retired Free (`isActive=false`) plans never appear in the list.
+
+<Tabs items={['curl', 'Response (fields)']}>
+<Tabs.Tab>
+
+```bash
+curl https://app.hummytummy.com/api/subscriptions/plans
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+For each plan the response includes:
+
+| Field | Description |
+| --- | --- |
+| `id` | Plan id |
+| `name` / `displayName` | Internal name / display label |
+| `monthlyPrice` / `yearlyPrice` | TRY, VAT-inclusive |
+| `currency` | Always `TRY` |
+| `trialDays` | Trial length (informational) |
+| `limits` | `maxUsers`, `maxTables`, `maxBranches`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
+| `features` | Feature-flag map (`posAccess`, `multiLocation`, …) |
+| `discount` | Active discount, if any |
+
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  Any advertised discounted price is computed with the **same**
+  `resolvePlanAmount` the charge rails use, so the price shown equals the price
+  charged.
+</Callout>
+
+## Choosing the right flow
+
+A client decides between the change-plan rail and a fresh checkout based on the
+business's current subscription status. The operator-facing screens
+([Choosing & upgrading](https://help.hummytummy.com/en/plans/choosing-and-upgrading))
+branch as follows:
+
+<Steps>
+
+### Live subscription (ACTIVE / TRIALING), different plan
+Route to the **change-plan** rail. Upgrade/downgrade proration only makes sense
+within a live billing period.
+
+```text
+/subscription/change-plan?newPlanId=<PLAN_ID>&billingCycle=MONTHLY
+```
+
+### Live subscription, same plan
+No-op.
+
+### PAST_DUE / EXPIRED / CANCELLED / no subscription
+Use the fresh **checkout** rail. Because proration over a finished period would
+produce a negative amount, these cases start a new full-period subscription
+instead.
+
+```text
+/subscription/checkout?planId=<PLAN_ID>&billingCycle=MONTHLY
+```
+
+### Trial-eligible business
+The backend short-circuits to the TRIAL response inside
+`POST /payments/create-intent`; the checkout screen handles this case specially.
+
+</Steps>
+
+## Upgrade (with proration)
+
+Switching to a more expensive plan on a live subscription counts as an
+**upgrade**. `POST /subscriptions/:id/change-plan` returns a **prorated quote**
+based on the days remaining in the period — this call does not write a mutation;
+it only computes the amount to charge. After the quote, payment is collected via
+the PayTR (or bank-transfer) rail, and the upgrade is applied on confirmation.
+
+<Tabs items={['curl', 'Request body', 'Response']}>
+<Tabs.Tab>
+
+```bash
+curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/change-plan \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newPlanId": "<NEW_PLAN_ID>",
+    "billingCycle": "MONTHLY"
+  }'
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `newPlanId` | string | Target plan id |
+| `billingCycle` | `"MONTHLY"` \| `"YEARLY"` | Target billing cycle |
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```json
+{
+  "type": "upgrade",
+  "requiresPayment": true,
+  "paymentInfo": {
+    "subscriptionId": "sub_...",
+    "newPlanId": "plan_...",
+    "billingCycle": "MONTHLY",
+    "prorationAmount": 533.42,
+    "newAmount": 1299,
+    "currency": "TRY"
+  }
+}
+```
+
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  Proration is computed from the ratio of days remaining until
+  `currentPeriodEnd` to the total days in the period. If `prorationAmount` is
+  greater than 0, `requiresPayment: true` is returned and the upgrade is applied
+  only after payment is collected.
+</Callout>
+
+## Downgrade (scheduled at period end)
+
+Switching to a cheaper plan counts as a **downgrade** and is **not applied
+immediately** — `POST /subscriptions/:id/change-plan` schedules it for the end of
+the current billing period. The same call behaves as follows:
+
+- Current usage is first validated against the target plan's limits
+  (`assertDowngradeAllowed`). For example, if you have 4 branches you cannot
+  downgrade to Basic's 1-branch limit.
+- The change is recorded as `scheduledDowngradePlanId`, written atomically with a
+  compound `WHERE ... scheduledDowngradePlanId IS NULL` to guard against races.
+- The response includes `type: "downgrade"`, `requiresPayment: false`, and
+  `scheduledFor` (the period-end date).
+
+### Reading and cancelling a scheduled downgrade
+
+<Tabs items={['Query (GET)', 'Cancel (DELETE)']}>
+<Tabs.Tab>
+
+```bash
+curl https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```bash
+# ADMIN only
+curl -X DELETE https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  If you try to make a new change while one is already scheduled, the request is
+  rejected ("cancel the existing change first"). Cross-currency plan changes are
+  also unsupported (the system is TRY-only).
+</Callout>
+
+## Payment rails
+
+Payment for a new subscription or an upgrade can be collected via two rails:
+**PayTR (card)** or **bank transfer (havale/EFT, manual)**.
+
+### PayTR (card) — default
+
+`POST /payments/create-intent` creates a PENDING payment; once confirmed by the
+PayTR webhook, the subscription activates.
+
+<Tabs items={['curl', 'Request body']}>
+<Tabs.Tab>
+
+```bash
+curl -X POST https://app.hummytummy.com/api/payments/create-intent \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `planId` | string | Target plan id |
+| `billingCycle` | `"MONTHLY"` \| `"YEARLY"` | Billing cycle |
+
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  This endpoint is rate-limited to **5 attempts per minute** (`@Throttle`) — on
+  top of the global tiers in
+  [API Fundamentals](/en/developer/api-fundamentals#rate-limit-tiers). Exceeding
+  it returns `429` with `errorCode: TOO_MANY_REQUESTS`; honor `Retry-After`.
+</Callout>
+
+<Callout type="info">
+  For a trial-eligible business, `create-intent` short-circuits to the TRIAL
+  response instead of creating a charge.
+</Callout>
+
+### Bank transfer (havale/EFT, manual) — alternative
+
+A bank-transfer payment is **activated by superadmin confirmation** (not a
+webhook). If a superadmin has not set an IBAN, the bank-transfer option is
+disabled.
+
+<Tabs items={['Details (GET)', 'Intent (POST)']}>
+<Tabs.Tab>
+
+```bash
+# Returns the platform bank (IBAN) details
+curl https://app.hummytummy.com/api/payments/bank-transfer/details \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```bash
+# Reserves a bank-transfer payment; activated later by superadmin confirmation
+curl -X POST https://app.hummytummy.com/api/payments/bank-transfer/intent \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
+```
+
+</Tabs.Tab>
+</Tabs>
+
+### Marketplace add-ons share the checkout rail
+
+Marketplace add-on purchases use the **same PayTR checkout rail**:
+`POST /api/v1/checkout/intent` → a `CK-`-prefixed webhook → `confirmAndProvision`.
+Add-ons activate only after payment is confirmed.
+
+## Invoices
+
+Read invoices via the API. Both endpoints are paginated (`page`, `pageSize`).
+
+<Tabs items={['All tenant invoices', 'One subscription']}>
+<Tabs.Tab>
+
+```bash
+curl "https://app.hummytummy.com/api/subscriptions/tenant/invoices?page=1&pageSize=20" \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```bash
+curl "https://app.hummytummy.com/api/subscriptions/<SUB_ID>/invoices?page=1&pageSize=20" \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+```
+
+</Tabs.Tab>
+</Tabs>
+
+### VAT-inclusive pricing internals
+
+All advertised plan prices are **gross** (VAT-inclusive) amounts, and the
+customer is charged exactly that amount. When an invoice is issued,
+`BillingService` reverse-engineers the VAT (KDV) out of the gross amount:
+
+- The default VAT rate is **20%** (`DEFAULT_KDV_RATE = 0.2`). It can be
+  overridden with the `KDV_RATE` environment variable (e.g. `0.10`).
+- The split is performed only for TRY invoices; net and tax are derived as:
+
+```text
+subtotal = total / (1 + rate)
+tax      = total - subtotal
+```
+
+Subtracting guarantees `subtotal + tax == total` **to the cent**, regardless of
+rounding choices.
+
+**Example — Pro monthly ₺1,299 (VAT 20%):**
+
+| Line | Amount |
+| --- | --- |
+| Subtotal (net) | ₺1,082.50 |
+| VAT (20%) | ₺216.50 |
+| **Total (charged)** | **₺1,299.00** |
+
+<Callout type="info">
+  The business's tax ID (`taxId`) is snapshotted on the invoice **as it was at
+  issuance time**. Even if it is changed later, past invoices are unaffected.
+</Callout>
+
+## Cancellation and reactivation
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `POST` | `/api/subscriptions/:id/cancel` | ADMIN only. Body: `immediate` (now vs. at period end) and a `reason` of up to 500 chars. |
+| `POST` | `/api/subscriptions/:id/reactivate` | ADMIN only. Reactivates a cancelled subscription. |
+
+```bash
+curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/cancel \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "immediate": false, "reason": "End-of-season closure" }'
+```
+
+## Querying effective features
+
+Read a business's currently effective features and limits. This endpoint merges
+plan features, any marketplace add-on upgrades, and superadmin overrides — it
+returns the business's *actual* access based on the `feature.*` and `limit.*`
+projections, not just the plan default.
+
+```bash
+curl https://app.hummytummy.com/api/subscriptions/effective-features \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+```
+
+## The TRIAL_ENDED lock
+
+Every new business starts on a dedicated **Trial** onboarding plan (7 days, all
+of Business's features, every limit `-1`). If the trial elapses without a paid
+plan being chosen, the business moves to `TRIAL_ENDED` and is **locked** —
+behavior an integrator must handle.
+
+<Steps>
+
+### Backend (default-deny)
+The global `SubscriptionStatusGuard` rejects **every tenant-scoped route** with a
+`403` for any business that lacks a live subscription (`ACTIVE` / `TRIALING` /
+`PAST_DUE`). The envelope:
+
+```json
+{
+  "statusCode": 403,
+  "error": "Plan Selection Required",
+  "errorCode": "PLAN_SELECTION_REQUIRED",
+  "message": "Deneme süreniz sona erdi. Devam etmek için bir plan seçin."
+}
+```
+
+Branch on `errorCode: PLAN_SELECTION_REQUIRED`, not on the localized `message`.
+
+### Allowlisted recovery paths
+A locked business can still call these prefixes: `/auth`, `/me`, `/users/me`,
+`/profile`, `/subscriptions`, `/payments`, `/checkout`, `/legal`,
+`/entitlements`, `/webhooks`, `/health`. In other words it can read the plan
+catalog and make a payment — nothing else.
+
+### Frontend redirect
+On the SPA side, `SubscriptionGate` redirects the user to the plan-selection
+screen (`/choose-plan`) in response to the `PLAN_SELECTION_REQUIRED` code.
+
+</Steps>
+
+<Callout type="warning">
+  The lock is not only for `TRIAL_ENDED`: `EXPIRED` and `CANCELLED` businesses
+  are also considered "not live" and are locked the same way. A subscription in
+  `PAST_DUE` is treated as live during its 7-day grace period.
+</Callout>
+
+## Related
+
+- [API Fundamentals](/en/developer/api-fundamentals) — base URL, auth realms,
+  branch scope, error envelope, rate-limit tiers.
+- [Webhooks](/en/developer/webhooks) — the `subscription.activated.v1` and
+  payment events that fire when these rails confirm.
+- Operator guides on help:
+  [Choosing & upgrading](https://help.hummytummy.com/en/plans/choosing-and-upgrading),
+  [Trial & billing](https://help.hummytummy.com/en/plans/trial-and-billing),
+  [Feature matrix](https://help.hummytummy.com/en/plans/feature-matrix).

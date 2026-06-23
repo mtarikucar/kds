@@ -1,6 +1,6 @@
 ---
 title: KDS / kiosk mode
-description: Run HummyTummy Desktop as a kitchen display (KDS) and full-screen kiosk — window configuration, the KDS screen device and screen commands.
+description: Run HummyTummy Desktop as a kitchen display (KDS) and full-screen kiosk — window configuration, registering the screen as a device and practical tips.
 ---
 
 import { Callout } from 'nextra/components'
@@ -13,15 +13,15 @@ at kitchen/bar stations.
 
 ## Window configuration
 
-The app opens with a single main window defined in the Tauri configuration:
+The app opens with a single main window:
 
 | Setting | Value |
 | --- | --- |
 | Title | `HummyTummy POS` |
 | Initial size | 1280 × 720 |
 | Minimum size | 800 × 600 |
-| `resizable` | `true` |
-| `fullscreen` | `false` (default) |
+| Resizable | Yes |
+| Full screen | No (default) |
 
 At KDS stations, putting the window into full screen (the kitchen display is usually a
 dedicated monitor) is the typical usage. The app is single-window; the same install can
@@ -36,56 +36,41 @@ role and the selected branch.
 
 ## Registering the KDS screen as a device
 
-Optionally, you can also register a KDS/bar screen as a device in device-mesh. This lets
-you monitor the screen's **online/offline** status from the panel and send it screen
+Optionally, you can also register a KDS/bar screen as a device from the **Devices** screen.
+This lets you monitor the screen's **online/offline** status from the panel and send it screen
 commands.
 
-Create the slot with `kind: "kds_screen"` (or `bar_screen`) and pair the device — the
-steps are identical to the [Hardware pairing](/en/desktop/hardware) page:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/v1/devices \
-  -H "Authorization: Bearer $JWT" \
-  -H "X-Branch-Id: $BRANCH_ID" \
-  -H "Content-Type: application/json" \
-  -d '{ "kind": "kds_screen", "model": "Kitchen Display 1" }'
-```
+Create the slot with the **Kitchen display** (or bar display) type and pair the screen — the
+steps are identical to the [Hardware pairing](/en/desktop/hardware) page: create the slot,
+enter the on-screen pairing code on the device, confirm the connection.
 
 ### Screen commands
 
-The following commands can be sent to a registered screen device:
+The following commands can be sent to a registered screen device from the panel:
 
-| `kind` | Action |
-| --- | --- |
-| `show_order` | Show an order on the screen |
-| `clear_order` | Clear the displayed order |
-| `reboot` | Reboot the screen device |
-| `capability_probe` | Probe capabilities |
-| `noop` | No-op (connectivity test) |
-
-Example — show an order on the kitchen display:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/v1/devices/$SCREEN_ID/commands \
-  -H "Authorization: Bearer $JWT" \
-  -H "X-Branch-Id: $BRANCH_ID" \
-  -H "Content-Type: application/json" \
-  -d '{ "kind": "show_order", "payload": { "orderId": "01J..." } }'
-```
+- **Show order** — shows a specific order on the screen.
+- **Clear screen** — clears the displayed order.
+- **Reboot** — reboots the screen device.
+- **Capability probe / connectivity test** — checks the device's health and capabilities.
 
 <Callout type="info">
-  `show_order`, `clear_order`, `reboot`, `capability_probe` and `noop` are
-  **idempotent / safe** commands; on failure they follow the normal retry path (up to 5
-  attempts). Unlike the side-effecting commands (`charge_card`, `fiscal_receipt`,
-  `open_drawer`, `print_receipt`), updating a screen twice causes no harm.
+  Screen commands are **safe** commands; updating a screen twice causes no harm. Unlike
+  side-effecting hardware commands such as charging, fiscal receipts, printing and opening the
+  drawer, a screen command can be retried on its own if needed.
 </Callout>
 
 ## Practical tips
 
 - **Dedicated monitor + full screen:** Move the kitchen/bar display to a separate monitor
   and put the window into full screen.
-- **Keep auto-update on:** KDS stations are rarely managed by hand; letting the Tauri
-  updater fetch new versions on its own keeps stations current. See
-  [Auto-update](/en/desktop/auto-update).
-- **Register it as a device:** Register the screen in device-mesh to monitor its online
-  status from the panel; when heartbeats stop the screen appears `offline` within ~45s.
+- **Keep auto-update on:** KDS stations are rarely managed by hand; letting the app fetch new
+  versions on its own keeps stations current. See [Auto-update](/en/desktop/auto-update).
+- **Register it as a device:** Register the screen to monitor its online status from the panel;
+  when the connection stops the screen appears `offline` shortly after.
+
+## Related pages
+
+- **[Hardware pairing](/en/desktop/hardware)** — pair receipt printers, cash drawers and fiscal registers.
+- **[Devices](/en/admin-guide/devices)** — the single list of all your registered terminals.
+
+Developer/integration details: [Device API (Device Mesh)](https://developer.hummytummy.com/en/developer/devices-api)

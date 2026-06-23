@@ -7,57 +7,57 @@ import { Callout } from 'nextra/components'
 
 # Özellik matrisi
 
-Aşağıdaki tablolar üç satılabilir paketin (**Başlangıç / Profesyonel / Kurumsal**) tüm özellik bayraklarını ve kullanım limitlerini gösterir. Kaynak: `subscription-plans.const.ts`.
+Aşağıdaki tablolar üç satılabilir paketin (**Başlangıç / Profesyonel / Kurumsal**) hangi özellikleri içerdiğini ve kullanım limitlerini karşılaştırır. Hangi paketin size uygun olduğuna karar verirken bu sayfayı kullanabilirsiniz.
 
 ## Özellikler
 
-| Özellik | Bayrak | Başlangıç | Profesyonel | Kurumsal |
-| --- | --- | :---: | :---: | :---: |
-| POS erişimi | `posAccess` | ✓ | ✓ | ✓ |
-| KDS (mutfak ekranı) entegrasyonu | `kdsIntegration` | ✓ | ✓ | ✓ |
-| Stok takibi | `inventoryTracking` | ✓ | ✓ | ✓ |
-| Gelişmiş raporlar | `advancedReports` | ✗ | ✓ | ✓ |
-| Çok şube | `multiLocation` | ✗ | ✓ | ✓ |
-| Özel marka (branding) | `customBranding` | ✗ | ✓ | ✓ |
-| Öncelikli destek | `prioritySupport` | ✗ | ✓ | ✓ |
-| Rezervasyon sistemi | `reservationSystem` | ✗ | ✓ | ✓ |
-| Personel yönetimi | `personnelManagement` | ✗ | ✓ | ✓ |
-| Delivery entegrasyonu | `deliveryIntegration` | ✗ | ✓ | ✓ |
-| API erişimi | `apiAccess` | ✗ | ✗ | ✓ |
-| Harici ekran (Partner Display) | `externalDisplay` | ✗ | ✗ | ✓ |
+| Özellik | Başlangıç | Profesyonel | Kurumsal |
+| --- | :---: | :---: | :---: |
+| POS (satış ekranı) erişimi | ✓ | ✓ | ✓ |
+| KDS (mutfak ekranı) entegrasyonu | ✓ | ✓ | ✓ |
+| Stok takibi | ✓ | ✓ | ✓ |
+| Gelişmiş raporlar | ✗ | ✓ | ✓ |
+| Çok şube | ✗ | ✓ | ✓ |
+| Özel marka (branding) | ✗ | ✓ | ✓ |
+| Öncelikli destek | ✗ | ✓ | ✓ |
+| Rezervasyon sistemi | ✗ | ✓ | ✓ |
+| Personel yönetimi | ✗ | ✓ | ✓ |
+| Delivery entegrasyonu | ✗ | ✓ | ✓ |
+| API erişimi | ✗ | ✗ | ✓ |
+| Harici ekran (Partner Display) | ✗ | ✗ | ✓ |
 
 <Callout type="info">
-  **API erişimi** ve **harici ekran (Partner Display API)** yalnızca Kurumsal pakette açıktır. Bu iki yetenek, üçüncü taraf entegrasyonlarını ve uzak/masaüstü ekran oturumlarını kapsar.
+  **API erişimi** ve **harici ekran (Partner Display)** yalnızca Kurumsal pakette açıktır. Bu iki yetenek, üçüncü taraf entegrasyonlarını ve uzak/masaüstü ekran oturumlarını kapsar.
 </Callout>
 
 ## Limitler
 
-`-1` değeri **sınırsız** anlamına gelir (`isUnlimited` yardımcısı `-1` ile karşılaştırır).
+Sonsuzluk işareti (**∞**) o limitin **sınırsız** olduğunu gösterir.
 
-| Limit | Alan | Başlangıç | Profesyonel | Kurumsal |
-| --- | --- | :---: | :---: | :---: |
-| Maksimum kullanıcı | `maxUsers` | 5 | 15 | ∞ |
-| Maksimum masa | `maxTables` | 20 | 50 | ∞ |
-| Maksimum şube | `maxBranches` | 1 | 3 | ∞ |
-| Maksimum ürün | `maxProducts` | 100 | 500 | ∞ |
-| Maksimum kategori | `maxCategories` | 20 | 50 | ∞ |
-| Aylık maksimum sipariş | `maxMonthlyOrders` | 500 | 2.000 | ∞ |
+| Limit | Başlangıç | Profesyonel | Kurumsal |
+| --- | :---: | :---: | :---: |
+| Maksimum kullanıcı | 5 | 15 | ∞ |
+| Maksimum masa | 20 | 50 | ∞ |
+| Maksimum şube | 1 | 3 | ∞ |
+| Maksimum ürün | 100 | 500 | ∞ |
+| Maksimum kategori | 20 | 50 | ∞ |
+| Aylık maksimum sipariş | 500 | 2.000 | ∞ |
 
-## Deneme (TRIAL) paketi
+## Deneme paketi
 
-Her yeni işletmenin başladığı **Deneme** paketi 7 gün boyunca **Kurumsal'ın tüm özelliklerine ve sınırsız limitlerine** sahiptir. Satılamaz (`isPublic=false`), bu yüzden plan seçim ekranında listelenmez ve fiyatlandırma karşılaştırmasının dışındadır. Ayrıntılar için bkz. [Deneme ve faturalama](/tr/plans/deneme-ve-faturalama).
+Her yeni işletmenin başladığı **Deneme** paketi, 7 gün boyunca **Kurumsal'ın tüm özelliklerine ve sınırsız limitlerine** sahiptir. Satılan bir paket olmadığı için plan seçim ekranında listelenmez ve fiyatlandırma karşılaştırmasının dışındadır. Ayrıntılar için bkz. [Deneme ve faturalama](/tr/plans/deneme-ve-faturalama).
 
-<Callout type="warning">
-  Bir özellik bayrağı değiştiğinde **üç yerin de** senkron olması gerekir: Prisma şeması, projeksiyon kolonları (`FEATURE_COLUMNS`) ve `getEffectiveFeatures` fallback'i. Bu sayfadaki tablo bu kaynakların türetildiği `subscription-plans.const.ts` ile birebir eşleşir.
+## O an hangi özelliklere sahibim?
+
+İşletmenizin o an aktif olan özelliklerini panelden görebilirsiniz. Panelde gördüğünüz erişim; paketinizin özelliklerine, varsa Marketplace’ten eklediğiniz eklentilere ve size özel açılmış yetkilere göre birleştirilmiş **gerçek erişiminizdir** — yalnızca paketin varsayılan listesini değil, fiilen kullanabildiklerinizi yansıtır.
+
+<Callout type="info">
+  Bir özelliğin paketinizde kapalı olduğunu görüyorsanız, o özelliği **plan yükselterek** veya **Marketplace eklentisiyle** açabilirsiniz. Bkz. [Plan seçimi ve yükseltme](/tr/plans/plan-secimi-ve-yukseltme) ve [Marketplace](/tr/marketplace).
 </Callout>
 
-## Yetkili özelliklerin sorgulanması
+## İlgili sayfalar
 
-Bir işletmenin o an aktif (etkin) özelliklerini API üzerinden okuyabilirsiniz. Bu uç nokta paket özelliklerini, varsa marketplace eklenti yükseltmelerini ve superadmin override'larını birleştirir.
+- Plan seçme, yükseltme ve ödeme akışları: **[Plan seçimi ve yükseltme](/tr/plans/plan-secimi-ve-yukseltme)**
+- Deneme süreci ve faturalama: **[Deneme ve faturalama](/tr/plans/deneme-ve-faturalama)**
 
-```bash
-curl https://app.hummytummy.com/api/subscriptions/effective-features \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
-```
-
-> Yanıt, `feature.*` ve `limit.*` projeksiyonlarına göre işletmenin gerçek erişimini döndürür — sadece paket varsayılanını değil.
+Geliştirici/entegrasyon detayları (yetkili özelliklerin API’den sorgulanması dahil): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

@@ -1,181 +1,107 @@
 ---
 title: Purchase Flow
-description: Marketplace → checkout → PayTR → grant. Fold rules, idempotency, cancellation, and period-end behaviour.
+description: Add an add-on to the cart, pay via PayTR, watch the entitlements activate, plus cancellation and period-end behaviour.
 ---
 
-import { Callout, Steps, Tabs } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
 # Purchase Flow
 
-The **only** way to buy an add-on is the checkout (PayTR) rail. There is **no** tenant-facing
-"free grant" endpoint — it was removed. A paid add-on is never provisioned without proof of
-payment (`paymentRef`).
+**Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Access:** ADMIN, MANAGER (payment confirmation and cancellation are ADMIN-only) • **Plan:** All plans
 
-<Callout type="warning">
-  The legacy `POST /v1/marketplace/addons/purchase` endpoint was **removed** (deep-review C2).
-  It was guarded only by `@Roles(ADMIN)` and called `purchase()` with no `paymentRef` — so any
-  restaurant owner could activate a paid add-on for free via curl. The paid flow is now
-  mandatory; operator comps are issued only from the superadmin surface.
+The only way to buy an add-on is to add it to the cart in the Marketplace and
+**pay via PayTR**. No entitlement (limit or feature) is added to your account
+until the payment completes; there is no way to activate an add-on for free.
+
+<Callout type="info">
+  Operator comps can only be issued by the HummyTummy team / superadmin. On your
+  side, the only way to buy is the paid flow.
 </Callout>
 
 ## End-to-end flow
 
 <Steps>
 
-### List the catalogue
+### Pick an add-on
 
-The user picks an add-on in the Marketplace. The catalogue comes from
-`GET /v1/marketplace/addons` (public, `published` rows only).
+Find the add-on you want to buy on the Marketplace screen. Each card shows what
+the add-on does, its price (₺), and whether it's recurring or a one-time service.
 
-### Start a checkout intent
+### Add to cart
 
-The frontend submits the selected add-ons (plus any plan/hardware/service lines) as a single
-**mixed cart** to `POST /v1/checkout/intent`. Roles: **ADMIN, MANAGER**.
+Add the add-on to the cart. You can put several add-ons (and, if needed, plan or
+hardware lines) in the same cart; the screen shows the total **KDV-inclusive**.
+The total is always recalculated on the server, so the amount you pay is
+trustworthy.
 
-The server **re-prices** the cart (it never trusts client totals), mints a `paymentRef` of the
-form `CK-<uuid7>`, freezes the cart onto a `CheckoutIntent` row, and returns a PayTR iframe
-token + payment link.
+### Continue to payment
 
-### Pay via PayTR
+Use the **Pay / Continue** button to move to the payment step. The screen
+redirects you to the **PayTR** secure payment page, where each item in your cart
+appears as its own line (e.g. *"Extra KDS screen (monthly)"*).
 
-The buyer pays on the PayTR hosted iframe. Each cart line is shown to the buyer as a separate
-basket entry (e.g. *"Extra KDS screen (monthly)"*).
+### Complete the payment
 
-### Settlement via webhook
+Pay on the PayTR page. Once the payment is confirmed, you are returned to the app.
 
-The PayTR webhook carries only `merchant_oid` + `total_amount`. The dispatcher sees the `CK-`
-prefix and routes the callback to **CheckoutSettlementService**. There the `CheckoutIntent` is
-found, the frozen cart is read, and **CheckoutService.confirmAndProvision** runs.
+### Entitlements activate
 
-### Grants are provisioned
-
-For each add-on line `confirmAndProvision` calls `TenantMarketplaceService.purchase()` **with
-the settled `paymentRef`** inside the checkout transaction. That creates a `TenantAddOn` row
-and appends an `AddOnPurchased` event to the outbox.
-
-### The entitlement projector folds
-
-The projector consumes `AddOnPurchased` and folds the add-on's `grants` map into your current
-entitlement set. Guards and the UI now see the new limit/feature/integration.
+The moment the payment is confirmed, the entitlement the add-on grants is **added
+to your account automatically**. For example, if you bought one extra KDS screen,
+your KDS-screen limit goes up by one in the panel right away; if you bought an
+integration, the related setting/feature is enabled.
 
 </Steps>
 
-## Fold rules
-
-The projector reduces the plan + all active add-on `grants` rows into **one** entitlement set.
-The combine rule depends on the key prefix:
-
-| Prefix | Type | Combine | Example |
-| --- | --- | --- | --- |
-| `limit.*` | number | **SUM** | Plan `limit.kdsScreens: 2` + 1× `kds_extra_screen` (+1) = **3** |
-| `feature.*` | boolean | **OR** | If any source sets `feature.advancedReports: true` → enabled |
-| `integration.*` | string[] | **UNION** | `efatura` add-on + `hugin` add-on → `integration.fiscal: ["efatura", "hugin"]` |
-
-<Callout type="info">
-  For `limit.*`, `-1` is the "unlimited" sentinel: if any source grants `-1`, the result is
-  unlimited and summing stops (adding capacity to an already-unlimited cap is a no-op).
+<Callout type="warning">
+  If you reach the payment page but abandon the payment, you are not charged and
+  no entitlement is added. The purchase only completes once the payment is
+  confirmed.
 </Callout>
 
-Buying the same capacity add-on twice to double a limit is blocked: if an active row already
-exists for the same `(tenantId, addOnId, branchId)`, the second purchase is rejected. Two
-concurrent purchases are caught by a **Serializable** transaction; the loser gets a retryable
-**409** (the card is not charged twice).
+## How entitlements stack
 
-## Dependencies (deps)
+Add-ons stack on top of your plan; multiple sources of the same kind combine like
+this:
 
-Some add-ons require something else to already be in place. Every entry in the `deps` array
-must currently **apply** to the tenant at purchase time:
+- **Limits** (KDS screens, stations, tablets, branches) → **summed.** For
+  example, if your plan gives 2 KDS screens and you buy 1 "Extra KDS screen",
+  the total becomes **3**.
+- **Features** (advanced reports, priority support, multi-location, etc.) →
+  **enabled** if any source enables it.
+- **Integrations** (e-Fatura, Yemeksepeti, Getir, Trendyol) → all accumulate
+  side by side; you can use several delivery integrations at once.
 
-- `plan:PRO` → the tenant's active plan name must be `PRO` (`Tenant.currentPlan.name`).
-- An add-on code (e.g. `caller_id_integration`) → that add-on must be **active** on the tenant.
+Buying the same capacity add-on twice to double a limit is blocked: if you
+already own an add-on, trying to buy the same item a second time is rejected and
+your card is not charged again.
 
-Today the only add-on in the catalogue with `deps` is **`fiscal_hugin`** (`["plan:PRO"]`). If
-you are not on PRO, the purchase is rejected with:
+## Dependencies
 
-```
-Add-on requires: plan:PRO. Upgrade your plan or purchase the required add-ons first.
-```
-
-## Idempotency
-
-PayTR retries aggressively (it retries even after a 200 OK if the body isn't "OK"/"FAIL").
-There are multiple layers of protection against double provisioning:
-
-1. The **`CheckoutIntent.status`** check — if `provisioned`/`failed`, nothing is touched.
-2. **`confirmAndProvision`** is independently idempotent on `(tenantId, paymentRef)`.
-3. **`purchase()`** returns the existing `TenantAddOn` row for the same `paymentRef` (without
-   re-emitting an event).
-
-## My current add-ons
-
-Lists the add-ons the tenant currently holds. Roles: **ADMIN, MANAGER**.
-
-```bash
-curl https://api.hummytummy.com/api/v1/marketplace/addons/mine \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Each row carries the add-on catalogue (`addOn`) plus its status/period fields:
-
-```json
-[
-  {
-    "id": "ta_01J...",
-    "tenantId": "t_01J...",
-    "addOnId": "ao_01J...",
-    "branchId": null,
-    "quantity": 1,
-    "status": "active",
-    "activatedAt": "2026-06-22T10:00:00.000Z",
-    "currentPeriodStart": "2026-06-22T10:00:00.000Z",
-    "currentPeriodEnd": "2026-07-22T10:00:00.000Z",
-    "paymentRef": "CK-018f...",
-    "addOn": { "code": "kds_extra_screen", "name": "Extra KDS screen", "...": "..." }
-  }
-]
-```
-
-<Callout type="info">
-  Recurring add-ons get a 30-day `currentPeriodEnd` window (so the cancellation flow has a
-  meaningful period end). The real billing cycle aligns to the parent Subscription cycle.
-</Callout>
+Some add-ons require something else to already be in place. Today the only add-on
+like this in the catalogue is **Hugin yazarkasa**: it requires the **PRO plan**.
+If you are not on PRO, the purchase is blocked and you're told to upgrade your
+plan first.
 
 ## Cancellation and period-end behaviour
 
-Cancellation is **ADMIN-only** (it's a billing decision):
+Only an **ADMIN** can cancel an add-on (it's a billing decision). You have two
+options:
 
-<Tabs items={['Cancel at period end (default)', 'Cancel immediately']}>
-<Tabs.Tab>
+- **Cancel at period end (default):** the add-on **stays active until the end of
+  the period**, and the entitlements it grants keep working until that date. When
+  the period ends it closes automatically and the related limit/feature is
+  revoked.
+- **Cancel immediately:** the add-on closes at once and the entitlements it
+  grants are **revoked right away**.
 
-```bash
-curl -X DELETE \
-  https://api.hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-The row is set to `cancelAtPeriodEnd: true` and **stays active**. The limit/feature/integration
-entitlements it grants keep living until the nightly sweeper / billing-cycle close transitions
-the row to `cancelled`.
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-curl -X DELETE \
-  "https://api.hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID?immediate=true" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-The row becomes `cancelled` immediately (`endedAt` is stamped), an `AddOnCancelled` event is
-appended to the outbox, and **entitlements are revoked right away**. The emit runs inside the
-cancel transaction — if the append fails, the cancellation rolls back (no half-revoked
-entitlement is left behind).
-
-</Tabs.Tab>
-</Tabs>
-
-<Callout type="warning">
-  Two concurrent cancel calls converge on a single transition (a `status = 'active'`-scoped
-  `updateMany`). The loser gets `Cancel raced with another request — refresh and retry`; the
-  `AddOnCancelled` event is **not** emitted twice.
+<Callout type="info">
+  Recurring add-ons run on a 30-day period window; your real billing cycle aligns
+  with your main subscription's cycle. One-time service lines (e.g. on-site setup)
+  don't recur and have no period to cancel.
 </Callout>
+
+---
+
+Developer/integration details: [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api)

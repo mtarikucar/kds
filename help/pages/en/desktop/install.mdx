@@ -1,157 +1,87 @@
 ---
 title: Install & download
-description: Download and install HummyTummy Desktop from the release catalog — public /api/desktop endpoints, platform packages and download tracking.
+description: Download and install the HummyTummy Desktop app on your computer — pick the package for your platform and install it step by step.
 ---
 
-import { Callout, Steps, Tabs } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
 # Install & download
 
-The desktop app's installers are kept in a server-side **release catalog**
-(`DesktopRelease`). The catalog is a single **platform-level** global list — every
-restaurant tenant sees the same published releases. A few endpoints are publicly
-accessible; publishing a release, however, is restricted to platform operators
-(SuperAdmin) or CI/CD.
+The HummyTummy Desktop app is an installable program that runs your sales screen (POS) and
+your local hardware (receipt printer, cash drawer, cash register) on your own computer.
+Every version of the app is published centrally; all you do is download the package that
+matches your operating system and install it. The same package is shared by all
+restaurants — the version your team sees is always the latest published release.
 
 <Callout type="info">
-  All endpoints are served under the global `/api` prefix. The examples below use
-  `https://app.hummytummy.com` as the server root; substitute your own.
+  If you're not sure which operating system you're on, the download page lists separate
+  packages for Windows, macOS (Apple Silicon and Intel) and Linux. Once you pick the right
+  one, installation takes only a couple of minutes.
 </Callout>
 
-## Public endpoints
+## Pick the package for your platform
 
-These endpoints require no authentication (`@Public`) and are rate-limited (throttled).
+The download page shows a separate download link for each operating system:
 
-| Method & path | Description | Limit |
-| --- | --- | --- |
-| `GET /api/desktop/releases/latest` | Latest published release | 30/min |
-| `GET /api/desktop/releases/published` | All published releases (newest `pubDate` first) | 30/min |
-| `GET /api/desktop/updates/:platform/:currentVersion` | Tauri updater query | 60/min |
-| `POST /api/desktop/releases/:version/download/:platform` | Increment the download counter (analytics) | 10/min |
+- **Windows** → `.msi` installer
+- **macOS (Apple Silicon — M1/M2/M3)** → `.dmg`
+- **macOS (Intel)** → `.dmg`
+- **Linux** → `.deb` package or `.AppImage`
 
-`:platform` must match `^[a-z0-9-]{1,32}$` and `:version` / `:currentVersion` must match
-`^v?\d+\.\d+\.\d+$`; otherwise the endpoint returns `400 Bad Request`.
+<Callout type="warning">
+  On a Mac, check your chip first: open the Apple menu → "About This Mac". If it says
+  "Apple M…" choose the Apple Silicon package; if it says "Intel" choose the Intel one.
+  Installing the wrong package may stop the app from opening.
+</Callout>
 
-## Get the latest release
-
-<Tabs items={['curl', 'JSON response']}>
-  <Tabs.Tab>
-```bash
-curl https://app.hummytummy.com/api/desktop/releases/latest
-```
-  </Tabs.Tab>
-  <Tabs.Tab>
-```json
-{
-  "id": "01J...",
-  "version": "0.2.6",
-  "releaseTag": "v0.2.6",
-  "published": true,
-  "pubDate": "2026-06-20T15:00:00.000Z",
-  "windowsUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.msi",
-  "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "macArmUrl": "https://github.com/.../HummyTummy-POS_0.2.6_aarch64.dmg",
-  "macArmSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "macIntelUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.dmg",
-  "macIntelSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "linuxUrl": "https://github.com/.../hummy-tummy-pos_0.2.6_amd64.AppImage",
-  "linuxSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "releaseNotes": "## What's New\n- Feature X\n- Bug fix Y",
-  "changelog": null,
-  "downloadCount": 134,
-  "createdAt": "2026-06-20T14:55:00.000Z",
-  "updatedAt": "2026-06-20T15:00:00.000Z"
-}
-```
-  </Tabs.Tab>
-</Tabs>
-
-If there is no published release, `releases/latest` returns `404`.
+If there's no download link for a given operating system, that release simply hasn't been
+built for that platform yet; wait for the next published package or contact support.
 
 ## Installation steps
 
 <Steps>
-### Find the package for your platform
+### Download the package
 
-From the `GET /api/desktop/releases/latest` response, pick the URL field that matches
-your platform:
+On the download page, press the button that matches your operating system. Your browser
+saves the package to your "Downloads" folder. When the download finishes, double-click the
+file.
 
-- **Windows** → `windowsUrl` (`.msi`)
-- **macOS (Apple Silicon)** → `macArmUrl` (`.dmg`)
-- **macOS (Intel)** → `macIntelUrl` (`.dmg`)
-- **Linux** → `linuxUrl` (`.deb` / `.AppImage`)
+### Complete the installation
 
-If the URL for a given platform is `null`, that release was not built for that platform.
+Follow your operating system's normal install flow:
 
-### Download and install
+- **Windows** — the MSI wizard opens; click "Next" through the steps and finish with
+  "Install".
+- **macOS** — in the DMG window that opens, drag the app icon into your **Applications**
+  folder.
+- **Linux** — install the `.deb` package with your software installer, or make the
+  `.AppImage` executable and double-click it.
 
-Open the URL in a browser or download it with `curl -L`, then follow your platform's
-normal install flow (Windows: the MSI wizard; macOS: open the DMG and drag the app into
-Applications; Linux: install the `.deb` package or make the `.AppImage` executable).
+### Open the app and sign in
 
-### (Optional) Report the download
-
-You can increment the download counter for analytics:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/desktop/releases/0.2.6/download/windows-x86_64
-# { "message": "Download tracked" }
-```
-
-This call is best-effort: if an unknown version is supplied it does not throw, it is just
-logged on the server.
+After the install finishes, launch HummyTummy Desktop and sign in with your panel account.
+On first launch the app runs an update check to make sure you're on the latest version.
 </Steps>
 
-<Callout type="warning">
-  Only releases with `published: true` are visible through the public endpoints. Draft
-  (unpublished) releases are listed only via the SuperAdmin management endpoints.
+<Callout type="info">
+  If this is a fresh install and you'll be connecting local hardware such as a receipt
+  printer or cash drawer, follow the hardware pairing guide afterwards:
+  **[Hardware](/en/desktop/hardware)**.
 </Callout>
 
-## Building from source
+## Staying on the latest version
 
-To build from source (the Tauri CLI ships with npm):
+Once you've installed the app you never have to re-download it by hand. When a new version
+is published, the app notices it on launch and updates itself safely. You can read how
+this works on the **[Auto-update](/en/desktop/auto-update)** page.
 
-```bash
-npm install
-npm run tauri:dev    # run in development mode
-npm run tauri:build  # produce a production bundle
-```
+## Related pages
 
-Output bundles are created under `src-tauri/target/release/bundle/` per platform
-(`msi/`, `dmg/`, `deb/`, `appimage/`). Development requires **Rust 1.70+** and
-**Node.js 18+**; on Linux you also need `libdbus-1-dev` and `pkg-config` (for Bluetooth
-printer support).
+- **[Auto-update](/en/desktop/auto-update)** — how the app downloads and installs new
+  versions on its own.
+- **[Hardware](/en/desktop/hardware)** — pairing guide for the receipt printer, cash
+  drawer and cash register.
 
-## Publishing a release (operator / CI)
+---
 
-A new release reaches the catalog through one of two routes:
-
-- **CI/CD (API key)** — `POST /api/desktop/ci/releases` and
-  `POST /api/desktop/ci/releases/:id/publish`. These endpoints expect the
-  `DESKTOP_RELEASE_API_KEY` value in the `x-api-key` (or `api-key`) header; GitHub Actions
-  uses them for automated publishing.
-- **SuperAdmin (Bearer)** — `POST /api/desktop/releases`, `PATCH /api/desktop/releases/:id`,
-  `POST /api/desktop/releases/:id/publish` / `.../unpublish`, `DELETE /api/desktop/releases/:id`.
-  Restricted to platform operators.
-
-Example — create a release via CI:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/desktop/ci/releases \
-  -H "x-api-key: $DESKTOP_RELEASE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "version": "0.2.7",
-    "releaseTag": "v0.2.7",
-    "releaseNotes": "## What'\''s New\n- ...",
-    "windowsUrl": "https://github.com/.../setup.msi",
-    "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-    "published": false
-  }'
-```
-
-<Callout type="warning">
-  `version` must be unique and in `\d+\.\d+\.\d+` form (plain semver, no `v` prefix).
-  Re-creating an existing version returns `400`. The publish step sets `pubDate`; the
-  updater's "latest release" ordering is based on that field.
-</Callout>
+Developer/integration details: [Desktop Release API](https://developer.hummytummy.com/en/developer/desktop-api)

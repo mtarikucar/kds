@@ -1,264 +1,236 @@
 ---
 title: Products (Add-ons)
-description: A detailed card per sellable add-on — what it does, what it grants, recurring vs one-time, dependency, how to buy.
+description: A short card per add-on — what it does, price, recurring vs one-time, dependency.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Products (Add-ons)
 
-Every sellable item in the catalogue is documented below, one by one. Each card lists: **what
-it does**, **what it grants** (feature / limit / integration), **recurring vs one-time**,
-**dependency**, and **how to buy**.
+**Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Access:** ADMIN, MANAGER • **Plan:** All plans
+
+Every item you can buy in the Marketplace is documented below, one by one. Each
+card lists: **what it does**, **price**, **recurring vs one-time**, and any
+**dependency**.
 
 <Callout type="info">
-  The purchase path is the same for every add-on: add it to a mixed cart and call
-  `POST /v1/checkout/intent` → PayTR → webhook → grant. See
-  [Purchase Flow](/en/marketplace/purchase-flow). Prices are TRY, KDV-inclusive.
+  The purchase path is the same for every add-on: add it to the cart in the
+  Marketplace → pay via PayTR → the entitlement activates automatically. For the
+  step-by-step walkthrough see [Purchase Flow](/en/marketplace/purchase-flow).
+  Prices are TRY, KDV-inclusive.
 </Callout>
 
 ---
 
 ## Capacity packs
 
-### `kds_extra_screen` — Extra KDS screen
+### Extra KDS screen
 
 Adds **one** additional kitchen display (KDS) screen slot to your branch.
 
 | Field | Value |
 | --- | --- |
-| Kind (`kind`) | `capacity` |
-| Billing (`billing`) | `recurring` |
-| Price | ₺99.00 (`priceCents: 9900`) |
-| Grants (`grants`) | `limit.kdsScreens` **+1** |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺99.00 |
+| What it does | Raises your KDS-screen limit by **one** |
 | Dependency | — |
 
-### `kds_extra_station` — Extra KDS station
+### Extra KDS station
 
-Adds **one** routing station (bar / grill / dessert) on top of the default kitchen.
+Adds **one** routing station (bar / grill / dessert) on top of the default
+kitchen.
 
 | Field | Value |
 | --- | --- |
-| Kind | `capacity` |
-| Billing | `recurring` |
-| Price | ₺149.00 (`priceCents: 14900`) |
-| Grants | `limit.kdsStations` **+1** |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺149.00 |
+| What it does | Raises your KDS-station limit by **one** |
 | Dependency | — |
 
-### `extra_tablet` — Extra waiter tablet
+### Extra waiter tablet
 
-Increases your waiter-tablet seat limit by **one**.
+Increases your waiter-tablet limit by **one**.
 
 | Field | Value |
 | --- | --- |
-| Kind | `capacity` |
-| Billing | `recurring` |
-| Price | ₺79.00 (`priceCents: 7900`) |
-| Grants | `limit.tablets` **+1** |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺79.00 |
+| What it does | Raises your tablet limit by **one** |
 | Dependency | — |
 
-### `extra_branch` — Extra branch
+### Extra branch
 
-Adds **one** branch beyond your plan limit. Required for chains. A single purchase unlocks two
-things: it raises the branch limit **and** enables the multi-location feature.
+Adds **one** branch beyond your plan limit. Required for chains. A single
+purchase does two things: it raises your branch limit **and** enables the
+multi-location feature.
 
 | Field | Value |
 | --- | --- |
-| Kind | `capacity` |
-| Billing | `recurring` |
-| Price | ₺399.00 (`priceCents: 39900`) |
-| Grants | `limit.branches` **+1** **and** `feature.multiLocation: true` |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺399.00 |
+| What it does | **One** extra branch **and** the multi-location feature |
 | Dependency | — |
-
-<Callout type="info">
-  `extra_branch` carries both a **limit** (SUM) and a **feature** (OR) grant in a single
-  purchase: `{ "limit.branches": 1, "feature.multiLocation": true }`.
-</Callout>
 
 ---
 
 ## Integrations
 
-### `fiscal_efatura` — e-Fatura / e-Arşiv
+### e-Fatura / e-Arşiv
 
 Issue tax-compliant electronic invoices (cloud-side, no hardware required).
 
 | Field | Value |
 | --- | --- |
-| Kind | `integration` |
-| Billing | `recurring` |
-| Price | ₺199.00 (`priceCents: 19900`) |
-| Grants | `efatura` added to the `integration.fiscal` list |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺199.00 |
+| What it does | Enables e-Fatura / e-Arşiv invoicing |
 | Dependency | — |
 
-### `fiscal_hugin` — Hugin yazarkasa integration
+### Hugin yazarkasa integration
 
-Drive a Hugin fiscal device via the Local Bridge Agent.
+Drive a Hugin fiscal device via the Local Bridge.
 
 | Field | Value |
 | --- | --- |
-| Kind | `integration` |
-| Billing | `recurring` |
-| Price | ₺299.00 (`priceCents: 29900`) |
-| Grants | `hugin` added to the `integration.fiscal` list |
-| Dependency | **`plan:PRO`** — requires the PRO plan |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺299.00 |
+| What it does | Enables the Hugin fiscal-device integration |
+| Dependency | **Requires the PRO plan** |
 
 <Callout type="warning">
-  `fiscal_hugin` is the **only** add-on in the catalogue with a dependency. If you are not on
-  PRO, the purchase is rejected with `Add-on requires: plan:PRO`.
+  Hugin yazarkasa is the **only** add-on in the catalogue with a dependency. If
+  you are not on PRO, the purchase is blocked and you're asked to upgrade your
+  plan first.
 </Callout>
 
-### `delivery_yemeksepeti` — Yemeksepeti integration
+### Yemeksepeti integration
 
 Receive Yemeksepeti orders directly into your KDS.
 
 | Field | Value |
 | --- | --- |
-| Kind | `integration` |
-| Billing | `recurring` |
-| Price | ₺249.00 (`priceCents: 24900`) |
-| Grants | `yemeksepeti` added to the `integration.delivery` list |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Brings Yemeksepeti orders into the KDS |
 | Dependency | — |
 
-### `delivery_getir` — Getir Yemek integration
+### Getir Yemek integration
 
 Receive Getir Yemek orders directly into your KDS.
 
 | Field | Value |
 | --- | --- |
-| Kind | `integration` |
-| Billing | `recurring` |
-| Price | ₺249.00 (`priceCents: 24900`) |
-| Grants | `getir` added to the `integration.delivery` list |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Brings Getir Yemek orders into the KDS |
 | Dependency | — |
 
-### `delivery_trendyol_yemek` — Trendyol Yemek integration
+### Trendyol Yemek integration
 
 Receive Trendyol Yemek orders directly into your KDS.
 
 | Field | Value |
 | --- | --- |
-| Kind | `integration` |
-| Billing | `recurring` |
-| Price | ₺249.00 (`priceCents: 24900`) |
-| Grants | `trendyol_yemek` added to the `integration.delivery` list |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Brings Trendyol Yemek orders into the KDS |
 | Dependency | — |
 
 <Callout type="info">
-  All three delivery integrations write to the `integration.delivery` key and are **union**-ed.
-  Buying all of them gives you `integration.delivery: ["getir", "trendyol_yemek", "yemeksepeti"]`.
+  You can use all three delivery integrations at the same time; the orders are
+  collected side by side into a single KDS flow.
 </Callout>
 
-### `caller_id_integration` — Caller ID / phone-order integration
+### Caller ID / phone-order integration
 
 Open a customer card automatically on every inbound call.
 
 | Field | Value |
 | --- | --- |
-| Kind | `integration` |
-| Billing | `recurring` |
-| Price | ₺149.00 (`priceCents: 14900`) |
-| Grants | `feature.callerIntegration: true` |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺149.00 |
+| What it does | Auto-opens a customer card on inbound calls |
 | Dependency | — |
-
-<Callout type="info">
-  Although its `kind` is "integration", its grant is a **feature** flag
-  (`feature.callerIntegration`), not an `integration.*` list.
-</Callout>
 
 ---
 
 ## Software / features
 
-### `advanced_reports` — Advanced reports
+### Advanced reports
 
-Cohort analysis, custom reports, scheduled email delivery.
+Cohort analysis, custom reports, and scheduled email delivery.
 
 | Field | Value |
 | --- | --- |
-| Kind | `software` |
-| Billing | `recurring` |
-| Price | ₺129.00 (`priceCents: 12900`) |
-| Grants | `feature.advancedReports: true` |
+| Kind | Software |
+| Billing | Recurring |
+| Price | ₺129.00 |
+| What it does | Enables the advanced report set |
 | Dependency | — |
 
-### `api_access` — API access
+### API access
 
 A public API key + outbound webhooks for your integrations.
 
 | Field | Value |
 | --- | --- |
-| Kind | `software` |
-| Billing | `recurring` |
-| Price | ₺249.00 (`priceCents: 24900`) |
-| Grants | `feature.apiAccess: true` |
+| Kind | Software |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Enables the API key + outbound webhooks |
 | Dependency | — |
+
+<Callout type="info">
+  For the technical use of API access and webhooks, see the developer docs:
+  [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api).
+</Callout>
 
 ---
 
 ## Support
 
-### `priority_support` — Priority support
+### Priority support
 
 A 24-hour SLA on critical tickets. Direct line during business hours.
 
 | Field | Value |
 | --- | --- |
-| Kind | `support` |
-| Billing | `recurring` |
-| Price | ₺199.00 (`priceCents: 19900`) |
-| Grants | `feature.prioritySupport: true` |
+| Kind | Support |
+| Billing | Recurring |
+| Price | ₺199.00 |
+| What it does | Priority support / 24-hour SLA |
 | Dependency | — |
 
-### `onsite_install_full` — On-site setup (one-time)
+### On-site setup (one-time)
 
-A HummyTummy technician comes to your venue, installs the bridge + devices, and trains your
-staff.
+A HummyTummy technician comes to your venue, installs the bridge + devices, and
+trains your staff.
 
 | Field | Value |
 | --- | --- |
-| Kind | `support` |
-| Billing | **`oneTime`** |
-| Price | ₺7,500.00 (`priceCents: 750000`) |
-| Grants | **Nothing** — `grants: {}` (just a service / invoice line) |
+| Kind | Support |
+| Billing | **One-time** |
+| Price | ₺7,500.00 |
+| What it does | **Grants nothing** — it's an installation/training service |
 | Dependency | — |
 
 <Callout type="warning">
-  This item grants no entitlement delta; it is paid and invoiced but does not change your
-  entitlement set. It is one-time, **not** recurring, and gets no period-end window
-  (`currentPeriodEnd` is `null`).
+  This item does not add a limit or feature to your account; it is paid and
+  invoiced but does not change your entitlement set. It is one-time, **not**
+  recurring.
 </Callout>
 
 ---
 
-## How to buy (example)
-
-Every add-on goes through the same mixed-cart checkout rail. A sample intent body:
-
-```json
-{
-  "cart": {
-    "items": [
-      { "type": "addon", "code": "kds_extra_screen", "qty": 1 },
-      { "type": "addon", "code": "fiscal_efatura", "qty": 1 }
-    ]
-  },
-  "buyer": {
-    "email": "owner@restaurant.com",
-    "name": "Ali Veli",
-    "phone": "+905551112233",
-    "address": "..."
-  },
-  "returnUrl": "https://app.hummytummy.com/checkout/done"
-}
-```
-
-```bash
-curl -X POST https://api.hummytummy.com/api/v1/checkout/intent \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d @intent.json
-```
-
-The response returns a PayTR iframe token + payment link; once payment is confirmed the webhook
-provisions the grants. Step-by-step: [Purchase Flow](/en/marketplace/purchase-flow).
+Developer/integration details: [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api)

@@ -70,7 +70,7 @@ const config = {
   ],
   search: {
     placeholder: () =>
-      useRouter().locale === 'en' ? 'Search docs…' : 'Dokümanlarda ara…',
+      useRouter().locale === 'en' ? 'Search developer docs…' : 'Geliştirici dokümanlarında ara…',
   },
   feedback: { content: null },
   editLink: { content: null },

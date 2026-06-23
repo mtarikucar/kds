@@ -1,0 +1,316 @@
+---
+title: Desktop Release API
+description: Public /api/desktop release, update and download-counter endpoints, the Tauri updater manifest, minisign signature verification and the operator/CI publishing routes.
+---
+
+import { Callout, Tabs, Steps } from 'nextra/components'
+
+# Desktop Release API
+
+The HummyTummy Desktop app's installers and updates are served from a server-side
+**release catalog** (`DesktopRelease`). The catalog is a single **platform-level** global
+list — every restaurant tenant sees the same published releases. A few endpoints are
+publicly accessible (download, update query, latest release); publishing a release is
+restricted to platform operators (SuperAdmin) or CI/CD.
+
+<Callout type="info">
+  All endpoints are served under the global `/api` prefix. The examples below use
+  `https://app.hummytummy.com` as the server root; substitute your own. See
+  [API Fundamentals](/en/developer/api-fundamentals) for the cross-cutting conventions
+  (error envelope, rate-limit tiers, status codes).
+</Callout>
+
+## Public endpoints
+
+These endpoints require no authentication (`@Public`) and are rate-limited (throttled).
+
+| Method & path | Description | Limit |
+| --- | --- | --- |
+| `GET /api/desktop/releases/latest` | Latest published release | 30/min |
+| `GET /api/desktop/releases/published` | All published releases (newest `pubDate` first) | 30/min |
+| `GET /api/desktop/updates/:platform/:currentVersion` | Tauri updater query | 60/min |
+| `POST /api/desktop/releases/:version/download/:platform` | Increment the download counter (analytics) | 10/min |
+
+<Callout type="warning">
+  Path parameters are validated: `:platform` must match `^[a-z0-9-]{1,32}$`, and
+  `:version` / `:currentVersion` must match `^v?\d+\.\d+\.\d+$`. A non-matching value
+  returns `400 Bad Request`.
+</Callout>
+
+Only releases with `published: true` are visible through the public endpoints. Draft
+(unpublished) releases are listed only via the SuperAdmin management endpoints.
+
+## Get the latest release
+
+`GET /api/desktop/releases/latest` returns the single newest published release record.
+If there is no published release it returns `404`.
+
+<Tabs items={['curl', 'JSON response']}>
+  <Tabs.Tab>
+```bash
+curl https://app.hummytummy.com/api/desktop/releases/latest
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{
+  "id": "01J...",
+  "version": "0.2.6",
+  "releaseTag": "v0.2.6",
+  "published": true,
+  "pubDate": "2026-06-20T15:00:00.000Z",
+  "windowsUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.msi",
+  "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "macArmUrl": "https://github.com/.../HummyTummy-POS_0.2.6_aarch64.dmg",
+  "macArmSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "macIntelUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.dmg",
+  "macIntelSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "linuxUrl": "https://github.com/.../hummy-tummy-pos_0.2.6_amd64.AppImage",
+  "linuxSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "releaseNotes": "## What's New\n- Feature X\n- Bug fix Y",
+  "changelog": null,
+  "downloadCount": 134,
+  "createdAt": "2026-06-20T14:55:00.000Z",
+  "updatedAt": "2026-06-20T15:00:00.000Z"
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+### Per-platform package fields
+
+A client picks the URL field that matches the platform it runs on:
+
+| Platform | URL field | Signature field | Typical artifact |
+| --- | --- | --- | --- |
+| Windows | `windowsUrl` | `windowsSignature` | `.msi` |
+| macOS (Apple Silicon) | `macArmUrl` | `macArmSignature` | `.dmg` |
+| macOS (Intel) | `macIntelUrl` | `macIntelSignature` | `.dmg` |
+| Linux | `linuxUrl` | `linuxSignature` | `.deb` / `.AppImage` |
+
+If the URL for a given platform is `null`, that release was not built for that platform.
+
+`GET /api/desktop/releases/published` returns the same record shape as an array, sorted by
+`pubDate` descending (newest first).
+
+## The updater endpoint
+
+```
+GET /api/desktop/updates/:platform/:currentVersion
+```
+
+The desktop app uses the [Tauri updater](https://tauri.app) to fetch new versions on its
+own. The flow is fully server-controlled: the app reports the platform it runs on and its
+current version, and the server returns a **signed** update manifest if an upgradable
+release exists.
+
+| Parameter | Description | Example |
+| --- | --- | --- |
+| `:platform` | The platform key Tauri reports | `windows-x86_64` |
+| `:currentVersion` | The app's current version | `0.2.5` or `v0.2.5` |
+
+Valid platform keys: `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64`,
+`linux-x86_64`. This endpoint is public and rate-limited to **60 requests/min**.
+
+### Responses
+
+- **Update available** → `200` with the manifest below.
+- **No update / not applicable** → the body is `null`. Tauri treats this as "up to date".
+  `null` is returned when:
+  - the current version equals or is newer than the latest published release,
+  - there is no published release,
+  - the requested platform is not present in the latest release (no URL, or unsigned).
+
+<Tabs items={['curl', 'Manifest (JSON)']}>
+  <Tabs.Tab>
+```bash
+curl https://app.hummytummy.com/api/desktop/updates/windows-x86_64/0.2.5
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{
+  "version": "0.2.7",
+  "notes": "## What's New\n- Feature X",
+  "pub_date": "2026-06-20T15:00:00.000Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://github.com/.../HummyTummy-POS_0.2.7_x64.msi",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6..."
+    },
+    "darwin-aarch64": { "url": "...", "signature": "..." },
+    "darwin-x86_64":  { "url": "...", "signature": "..." },
+    "linux-x86_64":   { "url": "...", "signature": "..." }
+  }
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+The `platforms` object only includes platforms that have **both a URL and a valid
+signature** (see the security note below). The `notes` field is the release's
+`releaseNotes` text, and `pub_date` is the publication date in ISO format.
+
+### Version comparison
+
+The server compares versions as numeric semver: it splits the `major.minor.patch` parts,
+strips a leading `v` prefix, and compares numerically. An update is offered only when the
+latest published version is **strictly greater than** the supplied `currentVersion`; if
+equal or lower, it returns `null`.
+
+<Callout type="warning">
+  The comparison considers numeric parts only; **pre-release tags** (such as
+  `1.0.0-beta.1`) are not supported. Since the release catalog is operator/CI-controlled,
+  this is sufficient — published versions are always kept in plain `major.minor.patch`
+  form.
+</Callout>
+
+## Signature verification (security)
+
+The Tauri updater installs a binary only if its **minisign signature** verifies against a
+pinned public key. The server behaves to preserve that contract:
+
+- If a platform **has a URL but no signature** (empty/missing), that platform is **not
+  added** to the manifest — it is treated as not-installable and a warning is logged on
+  the server. A half-populated, unsigned entry is never emitted.
+- If a platform **has no URL** (the release was not built for that platform), it is
+  silently skipped.
+- If the requested platform ends up absent from `platforms`, the endpoint returns `null`.
+
+This guarantees the auto-updater never receives an unsigned (and therefore unverifiable)
+binary.
+
+<Callout type="info">
+  Which endpoint and which public key the updater uses are defined in the desktop app's
+  Tauri configuration (the updater block in `tauri.conf.json`). The server contract above
+  (manifest format, mandatory signature, version comparison) holds regardless of that
+  client configuration.
+</Callout>
+
+## Download counter
+
+```
+POST /api/desktop/releases/:version/download/:platform
+```
+
+Increments the per-release download counter for analytics.
+
+<Tabs items={['curl', 'Response']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://app.hummytummy.com/api/desktop/releases/0.2.6/download/windows-x86_64
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{ "message": "Download tracked" }
+```
+  </Tabs.Tab>
+</Tabs>
+
+This call is best-effort: if an unknown version is supplied it does not throw, it is just
+logged on the server.
+
+## Publishing a release (operator / CI)
+
+A new release reaches the catalog through one of two routes.
+
+<Callout type="warning">
+  The release catalog is a **platform-level** global list, and every restaurant's desktop
+  updater pulls from it. For that reason the management endpoints (create / publish /
+  delete) are accessible only with **SuperAdmin** or the **CI API key**; tenant admins
+  cannot modify the catalog. Otherwise a single tenant could swap the binary that every
+  restaurant's updater fetches.
+</Callout>
+
+### Auth realms
+
+| Realm | Header | Used by |
+| --- | --- | --- |
+| CI API key | `x-api-key` (or `api-key`): `DESKTOP_RELEASE_API_KEY` | GitHub Actions / CI-driven publishing |
+| SuperAdmin (Bearer) | `Authorization: Bearer <jwt>` | Platform operators |
+
+### Management endpoints
+
+| Method & path | Realm | Description |
+| --- | --- | --- |
+| `POST /api/desktop/ci/releases` | CI API key | Create a release (CI) |
+| `POST /api/desktop/ci/releases/:id/publish` | CI API key | Publish a release (CI) |
+| `POST /api/desktop/releases` | SuperAdmin | Create a release |
+| `PATCH /api/desktop/releases/:id` | SuperAdmin | Update a release |
+| `POST /api/desktop/releases/:id/publish` | SuperAdmin | Publish a release |
+| `POST /api/desktop/releases/:id/unpublish` | SuperAdmin | Unpublish a release |
+| `DELETE /api/desktop/releases/:id` | SuperAdmin | Delete a release |
+
+### Example — create a release via CI
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://app.hummytummy.com/api/desktop/ci/releases \
+  -H "x-api-key: $DESKTOP_RELEASE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "0.2.7",
+    "releaseTag": "v0.2.7",
+    "releaseNotes": "## What'\''s New\n- ...",
+    "windowsUrl": "https://github.com/.../setup.msi",
+    "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+    "published": false
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+await fetch("https://app.hummytummy.com/api/desktop/ci/releases", {
+  method: "POST",
+  headers: {
+    "x-api-key": process.env.DESKTOP_RELEASE_API_KEY!,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    version: "0.2.7",
+    releaseTag: "v0.2.7",
+    releaseNotes: "## What's New\n- ...",
+    windowsUrl: "https://github.com/.../setup.msi",
+    windowsSignature: "dW50cnVzdGVkIGNvbW1lbnQ6...",
+    published: false,
+  }),
+});
+```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  `version` must be unique and in `\d+\.\d+\.\d+` form (plain semver, no `v` prefix).
+  Re-creating an existing version returns `400`. The publish step sets `pubDate`; the
+  updater's "latest release" ordering is based on that field.
+</Callout>
+
+## Building from source
+
+To build the desktop app from source (the Tauri CLI ships with npm):
+
+<Steps>
+### Install dependencies and build
+```bash
+npm install
+npm run tauri:dev    # run in development mode
+npm run tauri:build  # produce a production bundle
+```
+
+### Collect the bundles
+Output bundles are created under `src-tauri/target/release/bundle/` per platform
+(`msi/`, `dmg/`, `deb/`, `appimage/`).
+</Steps>
+
+Development requires **Rust 1.70+** and **Node.js 18+**; on Linux you also need
+`libdbus-1-dev` and `pkg-config` (for Bluetooth printer support).
+
+## Operator screens
+
+End users do not call these endpoints directly — the desktop app does. Operators install
+and update the app through the in-app experience:
+
+- Install & download (operator guide): [help.hummytummy.com](https://help.hummytummy.com/en/desktop/install)
+- Auto-update (operator guide): [help.hummytummy.com](https://help.hummytummy.com/en/desktop/auto-update)

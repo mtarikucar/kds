@@ -12,7 +12,7 @@
 #   deploy.sh prod-rollback
 #
 # Notes:
-#   * Images come from GHCR (ghcr.io/mtarikucar/kds/{backend,frontend,landing,developer}).
+#   * Images come from GHCR (ghcr.io/mtarikucar/kds/{backend,frontend,landing,developer,help}).
 #     The :vX.Y.Z (or :<sha>) tag is the immutable identity; :current is
 #     the production pointer that docker-compose reads. We only move
 #     :current once verify_and_promote passes.

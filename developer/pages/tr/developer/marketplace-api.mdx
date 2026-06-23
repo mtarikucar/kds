@@ -1,0 +1,370 @@
+---
+title: Marketplace API
+description: Add-on kataloğunu listele, checkout rayından add-on satın al, tenant'ın elindeki add-on'ları oku ve iptal et — her çağrının ardındaki fold kuralları, idempotency ve eşzamanlılık garantileriyle.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Marketplace API
+
+Marketplace, bir tenant'ın planının üzerine **tek tek satın alabileceği**
+eklentilerin (add-on) kataloğudur. Plan size bir özellik/limit tabanı verir;
+add-on'lar bu tabanı **artırır** (ekstra KDS ekranı, ekstra şube, e-Fatura
+entegrasyonu, gelişmiş raporlar gibi).
+
+Bir add-on satın alındığında bir **`TenantAddOn`** satırı oluşur ve entitlement
+projektörü o satırın `grants` haritasını tenant'ın mevcut hak setine katar
+(fold). Kombinleme kuralı anahtar önekine göre değişir:
+
+| Önek | Tip | Kombinleme | Örnek |
+| --- | --- | --- | --- |
+| `limit.*` | sayı | **SUM (toplama)** | Plan `limit.kdsScreens: 2` + 1× `kds_extra_screen` (+1) = **3** |
+| `feature.*` | boolean | **OR** | Herhangi bir kaynak `feature.advancedReports: true` veriyorsa → açık |
+| `integration.*` | string[] | **UNION (birleşim)** | `efatura` add-on + `hugin` add-on → `integration.fiscal: ["efatura", "hugin"]` |
+
+<Callout type="info">
+  `limit.*` için `-1` "sınırsız" sentinel'idir: herhangi bir kaynak `-1` verirse,
+  sonuç sınırsız olur ve toplama durur (sınırsız bir cap'e kapasite eklemek
+  no-op'tur).
+</Callout>
+
+Tüm uçlar `/api` global ön eki altındadır. Fiyatlar **TRY** cinsindendir ve
+kataloğda **kuruş** (`priceCents`) olarak tutulur: `9900` = ₺99,00. Tutarlar
+KDV dahil (gross) gösterilir. Taban URL, kimlik realm'leri, hata zarfı ve
+rate-limit katmanları için [API Temelleri](/tr/developer/api-temelleri)
+sayfasına bakın.
+
+<Callout type="warning">
+  Tenant tarafında "bedava grant" veren bir uç **yoktur**. Eski
+  `POST /v1/marketplace/addons/purchase` ucu **kaldırıldı** (deep-review C2):
+  yalnızca `@Roles(ADMIN)` ile korunuyordu ve `purchase()`'ı `paymentRef` olmadan
+  çağırıyordu — yani herhangi bir restoran sahibi curl ile ücretli add-on'u
+  bedavaya açabiliyordu. Artık ücretli checkout akışı zorunludur; operatör
+  bedavaları (comp) yalnızca süperadmin yüzeyinden verilir.
+</Callout>
+
+## Uçlar
+
+| Metot | Yol | Kimlik | Roller | Notlar |
+| --- | --- | --- | --- | --- |
+| `GET` | `/v1/marketplace/addons` | Public | — | Katalog; yalnızca `published` satırlar |
+| `GET` | `/v1/marketplace/addons/mine` | Personel JWT | ADMIN, MANAGER | Tenant'ın elindeki add-on'lar |
+| `POST` | `/v1/checkout/intent` | Personel JWT | ADMIN, MANAGER | Karma-sepet checkout intent (tek satın alma yolu) |
+| `DELETE` | `/v1/marketplace/addons/:id` | Personel JWT | ADMIN | `TenantAddOn` iptali (dönem-sonu veya hemen) |
+
+Bunlar tenant-seviyesi uçlardır: `X-Branch-Id` **beklemezler**. Checkout intent
+ve iptal ucu para/hak hareketi yaptığı için buna göre korunur.
+
+## Kataloğu listele
+
+Katalog herkese açıktır (landing sitesinde de görünür); kimlik doğrulama
+gerektirmez. Yalnızca `published` durumundaki add-on'lar döner ve her satır UI
+için kırpılmıştır.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+# Tüm published add-on'lar
+curl https://hummytummy.com/api/v1/marketplace/addons
+
+# kind ile filtrele: capacity | integration | software | support
+curl "https://hummytummy.com/api/v1/marketplace/addons?kind=integration"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/marketplace/addons?kind=integration",
+);
+const addons = await res.json();
+```
+  </Tabs.Tab>
+</Tabs>
+
+Yanıt:
+
+```json
+[
+  {
+    "code": "kds_extra_screen",
+    "name": "Extra KDS screen",
+    "description": "Adds one additional kitchen display screen slot to your branch.",
+    "kind": "capacity",
+    "billing": "recurring",
+    "priceCents": 9900,
+    "currency": "TRY",
+    "deps": []
+  }
+]
+```
+
+<Callout type="info">
+  `grants` alanı **public katalogda döndürülmez** — yalnızca süperadmin yüzeyi ve
+  seed dosyası hak haritasını taşır. Katalog UI için kırpılmıştır;
+  `priceCents`/`currency` fiyat için kaynak gerçektir.
+</Callout>
+
+### Katalog özeti
+
+Tüm sellable add-on'lar tek bakışta. `Açtığı` sütunu burada yalnızca referans
+için gösterilir; public katalog payload'ının parçası değildir.
+
+| Kod | Tür | Fatura | Fiyat | Açtığı (grant) | Bağımlılık |
+| --- | --- | --- | --- | --- | --- |
+| `kds_extra_screen` | capacity | recurring | ₺99,00 (`9900`) | `limit.kdsScreens` +1 | — |
+| `kds_extra_station` | capacity | recurring | ₺149,00 (`14900`) | `limit.kdsStations` +1 | — |
+| `extra_tablet` | capacity | recurring | ₺79,00 (`7900`) | `limit.tablets` +1 | — |
+| `extra_branch` | capacity | recurring | ₺399,00 (`39900`) | `limit.branches` +1, `feature.multiLocation` | — |
+| `fiscal_efatura` | integration | recurring | ₺199,00 (`19900`) | `integration.fiscal` += `efatura` | — |
+| `fiscal_hugin` | integration | recurring | ₺299,00 (`29900`) | `integration.fiscal` += `hugin` | **`plan:PRO`** |
+| `delivery_yemeksepeti` | integration | recurring | ₺249,00 (`24900`) | `integration.delivery` += `yemeksepeti` | — |
+| `delivery_getir` | integration | recurring | ₺249,00 (`24900`) | `integration.delivery` += `getir` | — |
+| `delivery_trendyol_yemek` | integration | recurring | ₺249,00 (`24900`) | `integration.delivery` += `trendyol_yemek` | — |
+| `caller_id_integration` | integration | recurring | ₺149,00 (`14900`) | `feature.callerIntegration` | — |
+| `advanced_reports` | software | recurring | ₺129,00 (`12900`) | `feature.advancedReports` | — |
+| `api_access` | software | recurring | ₺249,00 (`24900`) | `feature.apiAccess` | — |
+| `priority_support` | support | recurring | ₺199,00 (`19900`) | `feature.prioritySupport` | — |
+| `onsite_install_full` | support | **tek seferlik** | ₺7.500,00 (`750000`) | — (`grants: {}`, hizmet satırı) | — |
+
+<Callout type="warning">
+  `onsite_install_full` bir **hizmet** kalemidir: ödenir ve faturalanır ama hiçbir
+  entitlement vermez (`grants: {}`). Tekrarlayan değil tek seferliktir ve dönem
+  sonu penceresi de almaz (`currentPeriodEnd` `null`).
+</Callout>
+
+<Callout type="info">
+  `extra_branch` tek satın almada hem **limit** (SUM) hem **feature** (OR) grant'i
+  taşır: `{ "limit.branches": 1, "feature.multiLocation": true }`.
+  `caller_id_integration`'ın `kind`'i "integration" olsa da grant'i bir
+  **feature** flag'idir (`feature.callerIntegration`), `integration.*` listesi
+  değildir. Üç `delivery_*` add-on'u da `integration.delivery` anahtarına yazar
+  ve union edilir.
+</Callout>
+
+## Add-on satın al (checkout intent)
+
+Bir add-on satın almanın tek yolu checkout (PayTR) rayıdır. Ücretli bir add-on,
+ödeme kanıtı (`paymentRef`) olmadan asla provize edilmez.
+
+<Steps>
+
+### Checkout intent başlat
+
+Seçilen add-on'ları (artı varsa plan / donanım / hizmet satırları) tek bir
+**karma sepet** olarak `POST /v1/checkout/intent`'e gönderin. Sunucu sepeti
+**yeniden fiyatlandırır** (istemci toplamına asla güvenmez), `CK-<uuid7>`
+biçiminde bir `paymentRef` üretir, sepeti bir `CheckoutIntent` satırına dondurur
+ve PayTR iframe token'ı + ödeme linki döner.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/checkout/intent \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cart": {
+      "items": [
+        { "type": "addon", "code": "kds_extra_screen", "qty": 1 },
+        { "type": "addon", "code": "fiscal_efatura", "qty": 1 }
+      ]
+    },
+    "buyer": {
+      "email": "owner@restoran.com",
+      "name": "Ali Veli",
+      "phone": "+905551112233",
+      "address": "..."
+    },
+    "returnUrl": "https://app.hummytummy.com/checkout/done"
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch("https://hummytummy.com/api/v1/checkout/intent", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${jwt}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    cart: {
+      items: [
+        { type: "addon", code: "kds_extra_screen", qty: 1 },
+        { type: "addon", code: "fiscal_efatura", qty: 1 },
+      ],
+    },
+    buyer: {
+      email: "owner@restoran.com",
+      name: "Ali Veli",
+      phone: "+905551112233",
+      address: "...",
+    },
+    returnUrl: "https://app.hummytummy.com/checkout/done",
+  }),
+});
+const { paymentRef, iframeToken, paymentUrl } = await res.json();
+```
+  </Tabs.Tab>
+</Tabs>
+
+### PayTR'da öde
+
+Buyer, PayTR hosted iframe'inde ödemesini yapar. Sepetin her satırı buyer'a ayrı
+bir kalem olarak gösterilir (ör. *"Ekstra KDS ekranı (aylık)"*).
+
+### Webhook ile yerleşim (settlement)
+
+PayTR webhook'u yalnızca `merchant_oid` + `total_amount` taşır. Dispatcher `CK-`
+önekini görüp çağrıyı **`CheckoutSettlementService`**'e yönlendirir. Burada
+`CheckoutIntent` bulunur, dondurulmuş sepet okunur ve
+**`CheckoutService.confirmAndProvision`** çalışır.
+
+### Grant'lar yerleşir
+
+`confirmAndProvision`, her add-on satırı için
+`TenantMarketplaceService.purchase()`'ı **ödemeli `paymentRef` ile** ve
+checkout'un transaction'ı içinde çağırır. Bu da bir `TenantAddOn` satırı oluşturur
+ve outbox'a `AddOnPurchased` event'i yazar. Entitlement projektörü
+`AddOnPurchased`'ı tüketir ve add-on'un `grants` haritasını tenant'ın hak setine
+katar; guard'lar ve UI artık yeni limit/feature/integration'ı görür.
+
+</Steps>
+
+### Bağımlılıklar (`deps`)
+
+Bazı add-on'lar başka bir şeyin önceden mevcut olmasını ister. `deps` dizisindeki
+her giriş, satın alma anında o tenant için **geçerli** olmalıdır:
+
+- `plan:PRO` → tenant'ın aktif planının adı `PRO` olmalı
+  (`Tenant.currentPlan.name`).
+- Bir add-on kodu (ör. `caller_id_integration`) → o add-on'un tenant'ta **aktif**
+  olması.
+
+Şu an kataloğda tek `deps` taşıyan add-on **`fiscal_hugin`**'dir (`["plan:PRO"]`).
+PRO planında değilseniz satın alma şu hatayla reddedilir:
+
+```
+Add-on requires: plan:PRO. Upgrade your plan or purchase the required add-ons first.
+```
+
+### Çift-satın-alma koruması
+
+Aynı kapasite add-on'unu iki kez alıp limiti ikiye katlamak engellenir: aynı
+`(tenantId, addOnId, branchId)` için aktif bir satır varsa ikinci satın alma
+reddedilir. Eş zamanlı iki satın alma, **Serializable** transaction ile
+yakalanır; kaybeden işlem yeniden denenebilir bir **`409`** alır (kart çift
+çekilmez).
+
+### İdempotensi
+
+PayTR retry'leri agresiftir (200 OK dönse bile gövde "OK"/"FAIL" değilse tekrar
+dener). Çift provizyona karşı çok katmanlı koruma vardır:
+
+<Steps>
+### `CheckoutIntent.status` kontrolü
+Intent zaten `provisioned`/`failed` ise hiçbir şeye dokunulmaz.
+
+### `confirmAndProvision` bağımsız idempotenttir
+`(tenantId, paymentRef)` üzerinde idempotenttir.
+
+### `purchase()` mevcut satırı döner
+Aynı `paymentRef` için mevcut `TenantAddOn` satırını, `AddOnPurchased` event'ini
+yeniden yazmadan döner.
+</Steps>
+
+## Mevcut add-on'larım
+
+Tenant'ın elindeki add-on'ları listeler.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl https://hummytummy.com/api/v1/marketplace/addons/mine \
+  -H "Authorization: Bearer $JWT"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/marketplace/addons/mine",
+  { headers: { Authorization: `Bearer ${jwt}` } },
+);
+const mine = await res.json();
+```
+  </Tabs.Tab>
+</Tabs>
+
+Her satır add-on kataloğunu (`addOn`) ve durum/dönem alanlarını taşır:
+
+```json
+[
+  {
+    "id": "ta_01J...",
+    "tenantId": "t_01J...",
+    "addOnId": "ao_01J...",
+    "branchId": null,
+    "quantity": 1,
+    "status": "active",
+    "activatedAt": "2026-06-22T10:00:00.000Z",
+    "currentPeriodStart": "2026-06-22T10:00:00.000Z",
+    "currentPeriodEnd": "2026-07-22T10:00:00.000Z",
+    "paymentRef": "CK-018f...",
+    "addOn": { "code": "kds_extra_screen", "name": "Extra KDS screen", "...": "..." }
+  }
+]
+```
+
+<Callout type="info">
+  Tekrarlayan add-on'lar 30 günlük bir `currentPeriodEnd` penceresi alır (iptal
+  akışının anlamlı bir dönem sonu olması için). Gerçek faturalama döngüsü, parent
+  Subscription döngüsüyle hizalanır. Tek seferlik kalemler
+  (`onsite_install_full`) `currentPeriodEnd: null` taşır.
+</Callout>
+
+## Add-on iptali
+
+İptal yalnızca **ADMIN**'e açıktır (faturalandırma kararı). Varsayılan olarak
+satır **dönem sonunda** iptal edilir; hemen geri almak için `?immediate=true`
+geçin.
+
+<Tabs items={['Dönem sonunda iptal (varsayılan)', 'Hemen iptal']}>
+  <Tabs.Tab>
+```bash
+curl -X DELETE \
+  https://hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID \
+  -H "Authorization: Bearer $JWT"
+```
+
+Satır `cancelAtPeriodEnd: true` olur ve **aktif kalır**. Verdiği
+limit/feature/integration hakları, gece taraması (sweeper) / faturalama döngüsü
+kapanışı satırı `cancelled`'a çevirene kadar yaşamaya devam eder.
+  </Tabs.Tab>
+  <Tabs.Tab>
+```bash
+curl -X DELETE \
+  "https://hummytummy.com/api/v1/marketplace/addons/$TENANT_ADDON_ID?immediate=true" \
+  -H "Authorization: Bearer $JWT"
+```
+
+Satır anında `cancelled` olur (`endedAt` damgalanır), outbox'a `AddOnCancelled`
+yazılır ve **haklar hemen geri alınır**. Emit, iptal transaction'ı içinde çalışır
+— append başarısız olursa iptal geri alınır (yarım kalmış hak bırakılmaz).
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  İki eşzamanlı iptal çağrısı tek bir geçişe yakınsar (`status = 'active'`
+  koşullu `updateMany`). Kaybeden çağrı
+  `Cancel raced with another request — refresh and retry` hatası alır;
+  `AddOnCancelled` event'i **iki kez** yazılmaz.
+</Callout>
+
+## İlgili
+
+- [API Temelleri](/tr/developer/api-temelleri) — taban URL, kimlik realm'leri,
+  hata zarfı, rate-limit katmanları.
+- [Webhook'lar](/tr/developer/webhooks) — `subscription.*` / `payment.*`
+  olaylarını alın (`api_access` add-on'u `feature.apiAccess`'i açar).
+- Operatör deneyimi (panelde add-on'lara göz atma, satın alma ve takip):
+  [Marketplace yardımı](https://help.hummytummy.com/tr/marketplace).

@@ -1,159 +1,88 @@
 ---
 title: Kurulum & indirme
-description: HummyTummy Desktop'u sürüm kataloğundan indirme ve kurma — public /api/desktop uç noktaları, platform paketleri ve indirme takibi.
+description: HummyTummy Masaüstü uygulamasını bilgisayarınıza indirme ve kurma — platform paketini seçme ve adım adım kurulum.
 ---
 
-import { Callout, Steps, Tabs } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
 # Kurulum & indirme
 
-Masaüstü uygulamasının kurulum paketleri, sunucu tarafındaki **sürüm kataloğunda**
-(`DesktopRelease`) tutulur. Katalog **platform düzeyinde** tek bir küresel listedir —
-her restoran kiracısı (tenant) aynı yayınlanmış sürümleri görür. Kataloğa kimliksiz
-(public) erişilebilen birkaç uç nokta vardır; sürüm yayınlama ise yalnızca platform
-operatörlerine (SuperAdmin) veya CI/CD'ye açıktır.
+HummyTummy Masaüstü uygulaması, satış ekranınızı (POS) ve yerel donanımınızı (fiş yazıcısı,
+para çekmecesi, yazarkasa) bilgisayarınızda çalıştırmanızı sağlayan kurulabilir bir
+programdır. Uygulamanın tüm sürümleri merkezi olarak yayınlanır; siz yalnızca işletim
+sisteminize uygun paketi indirip kurarsınız. Aynı paket tüm restoranlar için ortaktır —
+ekibinizin gördüğü sürüm her zaman en güncel yayınlanmış sürümdür.
 
 <Callout type="info">
-  Tüm uç noktalar global `/api` ön ekiyle yayınlanır. Aşağıdaki örneklerde sunucu kökü
-  `https://app.hummytummy.com` olarak gösterilmiştir; kendi ortamınızda değiştirin.
+  Hangi işletim sistemini kullandığınızdan emin değilseniz, indirme sayfasındaki paketler
+  Windows, macOS (Apple Silicon ve Intel) ve Linux için ayrı ayrı listelenir. Doğru paketi
+  seçtiğinizde kurulum birkaç dakikada tamamlanır.
 </Callout>
 
-## Public uç noktalar
+## Platformunuza uygun paketi seçme
 
-Bu uç noktalar kimlik doğrulaması gerektirmez (`@Public`) ve hız sınırlıdır (throttle).
+İndirme sayfası, her işletim sistemi için ayrı bir indirme bağlantısı gösterir:
 
-| Metot & yol | Açıklama | Limit |
-| --- | --- | --- |
-| `GET /api/desktop/releases/latest` | En son yayınlanmış sürüm | 30/dk |
-| `GET /api/desktop/releases/published` | Yayınlanmış tüm sürümler (pubDate'e göre azalan) | 30/dk |
-| `GET /api/desktop/updates/:platform/:currentVersion` | Tauri updater sorgusu | 60/dk |
-| `POST /api/desktop/releases/:version/download/:platform` | İndirme sayacını artırır (analitik) | 10/dk |
+- **Windows** → `.msi` kurulum dosyası
+- **macOS (Apple Silicon — M1/M2/M3)** → `.dmg`
+- **macOS (Intel)** → `.dmg`
+- **Linux** → `.deb` paketi ya da `.AppImage`
 
-`:platform` değeri `^[a-z0-9-]{1,32}$` desenine, `:version`/`:currentVersion`
-değeri `^v?\d+\.\d+\.\d+$` desenine uymalıdır; aksi halde `400 Bad Request` döner.
+<Callout type="warning">
+  Mac kullanıcısıysanız işlemci tipinizi kontrol edin: Apple menüsü → "Bu Mac Hakkında"
+  ekranında "Apple M…" yazıyorsa Apple Silicon, "Intel" yazıyorsa Intel paketini seçin.
+  Yanlış paketi kurarsanız uygulama açılmayabilir.
+</Callout>
 
-## En son sürümü almak
-
-<Tabs items={['curl', 'JSON yanıt']}>
-  <Tabs.Tab>
-```bash
-curl https://app.hummytummy.com/api/desktop/releases/latest
-```
-  </Tabs.Tab>
-  <Tabs.Tab>
-```json
-{
-  "id": "01J...",
-  "version": "0.2.6",
-  "releaseTag": "v0.2.6",
-  "published": true,
-  "pubDate": "2026-06-20T15:00:00.000Z",
-  "windowsUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.msi",
-  "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "macArmUrl": "https://github.com/.../HummyTummy-POS_0.2.6_aarch64.dmg",
-  "macArmSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "macIntelUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.dmg",
-  "macIntelSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "linuxUrl": "https://github.com/.../hummy-tummy-pos_0.2.6_amd64.AppImage",
-  "linuxSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-  "releaseNotes": "## Yenilikler\n- Özellik X\n- Düzeltme Y",
-  "changelog": null,
-  "downloadCount": 134,
-  "createdAt": "2026-06-20T14:55:00.000Z",
-  "updatedAt": "2026-06-20T15:00:00.000Z"
-}
-```
-  </Tabs.Tab>
-</Tabs>
-
-Yayınlanmış sürüm yoksa `releases/latest` uç noktası `404` döner.
+Bir işletim sistemi için indirme bağlantısı görünmüyorsa, o sürüm henüz o platform için
+hazırlanmamış demektir; bu durumda en son yayınlanan paketi bekleyin ya da destek ekibiyle
+iletişime geçin.
 
 ## Kurulum adımları
 
 <Steps>
-### Platformunuza uygun paketi bulun
+### Paketi indirin
 
-`GET /api/desktop/releases/latest` yanıtından platformunuza karşılık gelen URL alanını
-seçin:
+İndirme sayfasında işletim sisteminize karşılık gelen butona basın. Tarayıcınız paketi
+"İndirilenler" klasörüne kaydeder. İndirme bittiğinde dosyaya çift tıklayın.
 
-- **Windows** → `windowsUrl` (`.msi`)
-- **macOS (Apple Silicon)** → `macArmUrl` (`.dmg`)
-- **macOS (Intel)** → `macIntelUrl` (`.dmg`)
-- **Linux** → `linuxUrl` (`.deb` / `.AppImage`)
+### Kurulumu tamamlayın
 
-İlgili platform için URL `null` ise o sürüm o platforma derlenmemiştir.
+İşletim sisteminizin normal kurulum akışını izleyin:
 
-### Paketi indirin ve kurun
+- **Windows** — MSI sihirbazı açılır; "İleri" diyerek ilerleyin ve "Kur" ile bitirin.
+- **macOS** — Açılan DMG penceresinde uygulama simgesini **Applications** (Uygulamalar)
+  klasörüne sürükleyin.
+- **Linux** — `.deb` paketini yazılım yükleyicinizle kurun ya da `.AppImage` dosyasını
+  çalıştırılabilir yapıp çift tıklayın.
 
-URL'yi tarayıcıda açın veya `curl -L` ile indirin, ardından platformunuzun normal
-kurulum akışını izleyin (Windows: MSI sihirbazı; macOS: DMG'yi açıp uygulamayı
-Applications'a sürükleyin; Linux: `.deb` paketini kurun veya `.AppImage`'i
-çalıştırılabilir yapın).
+### Uygulamayı açın ve giriş yapın
 
-### (İsteğe bağlı) İndirmeyi raporlayın
-
-Analitik için indirme sayacını artırabilirsiniz:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/desktop/releases/0.2.6/download/windows-x86_64
-# { "message": "Download tracked" }
-```
-
-Bu çağrı en iyi-çaba (best-effort) çalışır: bilinmeyen bir sürüm gönderilirse hata
-fırlatmaz, yalnızca sunucuda loglanır.
+Kurulum bittikten sonra HummyTummy Masaüstü'nü başlatın ve panel hesabınızla giriş yapın.
+İlk açılışta uygulama, en güncel sürümde olduğunuzdan emin olmak için bir güncelleme
+kontrolü yapar.
 </Steps>
 
-<Callout type="warning">
-  Yalnızca `published: true` olan sürümler public uç noktalardan görünür. Taslak
-  (yayınlanmamış) sürümler yalnızca SuperAdmin yönetim uç noktalarından listelenir.
+<Callout type="info">
+  İlk kez kuruyorsanız ve fiş yazıcısı, para çekmecesi gibi yerel donanımları
+  bağlayacaksanız, kurulumun ardından donanım eşleştirme rehberini izleyin:
+  **[Donanım](/tr/desktop/donanim)**.
 </Callout>
 
-## Geliştirme ortamından derleme
+## Her zaman en güncel sürümde kalma
 
-Kaynaktan derlemek için (Tauri CLI npm ile birlikte gelir):
+Uygulamayı bir kez kurduktan sonra elle yeniden indirmeniz gerekmez. Yeni bir sürüm
+yayınlandığında uygulama bunu açılışta kendisi fark eder ve güvenli biçimde günceller.
+Bunun nasıl çalıştığını **[Otomatik güncelleme](/tr/desktop/otomatik-guncelleme)** sayfasında
+bulabilirsiniz.
 
-```bash
-npm install
-npm run tauri:dev    # geliştirme modunda çalıştır
-npm run tauri:build  # üretim paketi üret
-```
+## İlgili sayfalar
 
-Çıktı paketleri `src-tauri/target/release/bundle/` altında platforma göre
-(`msi/`, `dmg/`, `deb/`, `appimage/`) oluşturulur. Geliştirme için **Rust 1.70+** ve
-**Node.js 18+** gerekir; Linux'ta ayrıca `libdbus-1-dev` ve `pkg-config` paketleri
-kuruludur (Bluetooth yazıcı desteği için).
+- **[Otomatik güncelleme](/tr/desktop/otomatik-guncelleme)** — uygulamanın yeni sürümleri
+  kendiliğinden nasıl indirip kurduğu.
+- **[Donanım](/tr/desktop/donanim)** — fiş yazıcısı, para çekmecesi ve yazarkasa
+  eşleştirme rehberi.
 
-## Sürüm yayınlama (operatör / CI)
+---
 
-Yeni bir sürümü kataloğa eklemek iki rotadan yapılır:
-
-- **CI/CD (API anahtarı)** — `POST /api/desktop/ci/releases` ve
-  `POST /api/desktop/ci/releases/:id/publish`. Bu uç noktalar `x-api-key` (veya `api-key`)
-  başlığında `DESKTOP_RELEASE_API_KEY` değerini bekler; GitHub Actions otomatik
-  yayınlama için kullanır.
-- **SuperAdmin (Bearer)** — `POST /api/desktop/releases`, `PATCH /api/desktop/releases/:id`,
-  `POST /api/desktop/releases/:id/publish` / `.../unpublish`, `DELETE /api/desktop/releases/:id`.
-  Yalnızca platform operatörleri erişebilir.
-
-Bir CI sürümü oluşturma örneği:
-
-```bash
-curl -X POST https://app.hummytummy.com/api/desktop/ci/releases \
-  -H "x-api-key: $DESKTOP_RELEASE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "version": "0.2.7",
-    "releaseTag": "v0.2.7",
-    "releaseNotes": "## Yenilikler\n- ...",
-    "windowsUrl": "https://github.com/.../setup.msi",
-    "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-    "published": false
-  }'
-```
-
-<Callout type="warning">
-  `version` benzersiz olmalı ve `\d+\.\d+\.\d+` (saf semver, `v` öneki olmadan) biçiminde
-  olmalıdır. Var olan bir sürümü tekrar oluşturmaya çalışmak `400` döner. Yayınlama
-  adımı `pubDate` alanını set eder; updater'ın "en son sürüm" sıralaması bu alana göre
-  yapılır.
-</Callout>
+Geliştirici/entegrasyon detayları: [Masaüstü Sürüm API](https://developer.hummytummy.com/tr/developer/desktop-api)

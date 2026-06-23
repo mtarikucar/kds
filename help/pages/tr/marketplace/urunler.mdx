@@ -1,19 +1,22 @@
 ---
 title: Ürünler (Add-on'lar)
-description: Her sellable add-on için detaylı kart — ne işe yarar, neyi açar, tekrarlayan mı, bağımlılık, nasıl satın alınır.
+description: Her add-on için kısa kart — ne işe yarar, fiyat, tekrarlayan mı tek seferlik mi, bağımlılık.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Ürünler (Add-on'lar)
 
-Kataloğun her sellable kalemi aşağıda tek tek belgelenmiştir. Her kartta: **ne işe yarar**,
-**neyi açar** (grant: feature / limit / integration), **tekrarlayan mı tek seferlik mi**,
-**bağımlılık** ve **nasıl satın alınır**.
+**Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Erişim:** ADMIN, MANAGER • **Plan:** Tüm planlar
+
+Marketplace'te satın alabileceğiniz her kalem aşağıda tek tek anlatılmıştır. Her
+kartta: **ne işe yarar**, **fiyat**, **tekrarlayan mı tek seferlik mi** ve varsa
+**bağımlılık**.
 
 <Callout type="info">
-  Satın alma yolu her add-on için aynıdır: karma sepete ekleyip
-  `POST /v1/checkout/intent` → PayTR → webhook → grant. Ayrıntı için
+  Satın alma yolu her add-on için aynıdır: Marketplace'te sepete ekleyin →
+  PayTR ile ödeyin → hak otomatik etkinleşir. Adım adım anlatım için
   [Satın Alma Akışı](/tr/marketplace/satin-alma-akisi). Fiyatlar TRY, KDV dahil.
 </Callout>
 
@@ -21,244 +24,211 @@ Kataloğun her sellable kalemi aşağıda tek tek belgelenmiştir. Her kartta: *
 
 ## Kapasite paketleri
 
-### `kds_extra_screen` — Ekstra KDS ekranı
+### Ekstra KDS ekranı
 
 Şubenize **bir adet** ek mutfak ekranı (KDS) slotu ekler.
 
 | Alan | Değer |
 | --- | --- |
-| Tür (`kind`) | `capacity` |
-| Fatura (`billing`) | `recurring` (tekrarlayan) |
-| Fiyat | ₺99,00 (`priceCents: 9900`) |
-| Açtığı (`grants`) | `limit.kdsScreens` **+1** |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺99,00 |
+| Ne işe yarar | KDS ekranı limitinizi **bir** artırır |
 | Bağımlılık | — |
 
-### `kds_extra_station` — Ekstra KDS istasyonu
+### Ekstra KDS istasyonu
 
-Varsayılan mutfağın üstüne **bir adet** yönlendirme istasyonu (bar / ızgara / tatlı) ekler.
+Varsayılan mutfağın üstüne **bir adet** yönlendirme istasyonu (bar / ızgara /
+tatlı) ekler.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `capacity` |
-| Fatura | `recurring` |
-| Fiyat | ₺149,00 (`priceCents: 14900`) |
-| Açtığı | `limit.kdsStations` **+1** |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺149,00 |
+| Ne işe yarar | KDS istasyonu limitinizi **bir** artırır |
 | Bağımlılık | — |
 
-### `extra_tablet` — Ekstra garson tableti
+### Ekstra garson tableti
 
-Garson-tablet koltuk (seat) limitinizi **bir** artırır.
+Garson-tablet limitinizi **bir** artırır.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `capacity` |
-| Fatura | `recurring` |
-| Fiyat | ₺79,00 (`priceCents: 7900`) |
-| Açtığı | `limit.tablets` **+1** |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺79,00 |
+| Ne işe yarar | Tablet limitinizi **bir** artırır |
 | Bağımlılık | — |
 
-### `extra_branch` — Ekstra şube
+### Ekstra şube
 
-Plan limitinizin ötesine **bir** şube ekler. Zincirler için gereklidir. Tek başına iki şey
-açar: hem şube limitini artırır hem de çoklu-lokasyon özelliğini etkinleştirir.
+Plan limitinizin ötesine **bir** şube ekler. Zincirler için gereklidir. Tek
+satın almada iki şey yapar: hem şube limitinizi artırır hem de çoklu-lokasyon
+özelliğini açar.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `capacity` |
-| Fatura | `recurring` |
-| Fiyat | ₺399,00 (`priceCents: 39900`) |
-| Açtığı | `limit.branches` **+1** **ve** `feature.multiLocation: true` |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺399,00 |
+| Ne işe yarar | **Bir** ek şube **ve** çoklu-lokasyon özelliği |
 | Bağımlılık | — |
-
-<Callout type="info">
-  `extra_branch` tek satın almada hem **limit** (SUM) hem **feature** (OR) grant'i taşır:
-  `{ "limit.branches": 1, "feature.multiLocation": true }`.
-</Callout>
 
 ---
 
 ## Entegrasyonlar
 
-### `fiscal_efatura` — e-Fatura / e-Arşiv
+### e-Fatura / e-Arşiv
 
-Vergi-uyumlu elektronik fatura kesmenizi sağlar (bulut tabanlı, donanım gerekmez).
+Vergi-uyumlu elektronik fatura kesmenizi sağlar (bulut tabanlı, donanım
+gerekmez).
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `integration` |
-| Fatura | `recurring` |
-| Fiyat | ₺199,00 (`priceCents: 19900`) |
-| Açtığı | `integration.fiscal` listesine `efatura` eklenir |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺199,00 |
+| Ne işe yarar | e-Fatura / e-Arşiv kesimini açar |
 | Bağımlılık | — |
 
-### `fiscal_hugin` — Hugin yazarkasa entegrasyonu
+### Hugin yazarkasa entegrasyonu
 
-Local Bridge Agent üzerinden bir Hugin yazarkasa cihazını sürer.
+Local Bridge üzerinden bir Hugin yazarkasa cihazını sürer.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `integration` |
-| Fatura | `recurring` |
-| Fiyat | ₺299,00 (`priceCents: 29900`) |
-| Açtığı | `integration.fiscal` listesine `hugin` eklenir |
-| Bağımlılık | **`plan:PRO`** — PRO planı gerekir |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺299,00 |
+| Ne işe yarar | Hugin yazarkasa entegrasyonunu açar |
+| Bağımlılık | **PRO planı gerekir** |
 
 <Callout type="warning">
-  `fiscal_hugin`, kataloğdaki **tek** bağımlılığı olan add-on'dur. PRO planında değilseniz
-  satın alma `Add-on requires: plan:PRO` hatasıyla reddedilir.
+  Hugin yazarkasa, kataloğdaki **tek** bağımlılığı olan add-on'dur. PRO planında
+  değilseniz satın alma engellenir ve önce planınızı yükseltmeniz istenir.
 </Callout>
 
-### `delivery_yemeksepeti` — Yemeksepeti entegrasyonu
+### Yemeksepeti entegrasyonu
 
 Yemeksepeti siparişlerini doğrudan KDS'inize alır.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `integration` |
-| Fatura | `recurring` |
-| Fiyat | ₺249,00 (`priceCents: 24900`) |
-| Açtığı | `integration.delivery` listesine `yemeksepeti` eklenir |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | Yemeksepeti siparişlerini KDS'e taşır |
 | Bağımlılık | — |
 
-### `delivery_getir` — Getir Yemek entegrasyonu
+### Getir Yemek entegrasyonu
 
 Getir Yemek siparişlerini doğrudan KDS'inize alır.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `integration` |
-| Fatura | `recurring` |
-| Fiyat | ₺249,00 (`priceCents: 24900`) |
-| Açtığı | `integration.delivery` listesine `getir` eklenir |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | Getir Yemek siparişlerini KDS'e taşır |
 | Bağımlılık | — |
 
-### `delivery_trendyol_yemek` — Trendyol Yemek entegrasyonu
+### Trendyol Yemek entegrasyonu
 
 Trendyol Yemek siparişlerini doğrudan KDS'inize alır.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `integration` |
-| Fatura | `recurring` |
-| Fiyat | ₺249,00 (`priceCents: 24900`) |
-| Açtığı | `integration.delivery` listesine `trendyol_yemek` eklenir |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | Trendyol Yemek siparişlerini KDS'e taşır |
 | Bağımlılık | — |
 
 <Callout type="info">
-  Üç teslimat entegrasyonu da `integration.delivery` anahtarına yazar ve **union** edilir.
-  Hepsini alırsanız hak setiniz `integration.delivery: ["getir", "trendyol_yemek", "yemeksepeti"]`
-  olur.
+  Üç teslimat entegrasyonunu da aynı anda kullanabilirsiniz; siparişler yan yana
+  tek bir KDS akışında toplanır.
 </Callout>
 
-### `caller_id_integration` — Caller ID / telefon-sipariş entegrasyonu
+### Caller ID / telefon-sipariş entegrasyonu
 
 Her gelen çağrıda otomatik olarak bir müşteri kartı açar.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `integration` |
-| Fatura | `recurring` |
-| Fiyat | ₺149,00 (`priceCents: 14900`) |
-| Açtığı | `feature.callerIntegration: true` |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺149,00 |
+| Ne işe yarar | Gelen çağrıda otomatik müşteri kartı açar |
 | Bağımlılık | — |
-
-<Callout type="info">
-  Adı "integration" `kind`'inde olsa da grant'i bir **feature** flag'idir
-  (`feature.callerIntegration`), `integration.*` listesi değil.
-</Callout>
 
 ---
 
 ## Yazılım / özellikler
 
-### `advanced_reports` — Gelişmiş raporlar
+### Gelişmiş raporlar
 
-Kohort analizi, özel raporlar, zamanlanmış e-posta teslimi.
+Kohort analizi, özel raporlar ve zamanlanmış e-posta teslimi.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `software` |
-| Fatura | `recurring` |
-| Fiyat | ₺129,00 (`priceCents: 12900`) |
-| Açtığı | `feature.advancedReports: true` |
+| Tür | Yazılım |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺129,00 |
+| Ne işe yarar | Gelişmiş rapor setini açar |
 | Bağımlılık | — |
 
-### `api_access` — API erişimi
+### API erişimi
 
 Entegrasyonlarınız için public API anahtarı + giden (outbound) webhook'lar.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `software` |
-| Fatura | `recurring` |
-| Fiyat | ₺249,00 (`priceCents: 24900`) |
-| Açtığı | `feature.apiAccess: true` |
+| Tür | Yazılım |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | API anahtarı + giden webhook'ları açar |
 | Bağımlılık | — |
+
+<Callout type="info">
+  API erişimi ve webhook'ların teknik kullanımı için geliştirici dokümanına bakın:
+  [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api).
+</Callout>
 
 ---
 
 ## Destek
 
-### `priority_support` — Öncelikli destek
+### Öncelikli destek
 
 Kritik destek talepleri için 24 saatlik SLA. Mesai saatlerinde doğrudan hat.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `support` |
-| Fatura | `recurring` |
-| Fiyat | ₺199,00 (`priceCents: 19900`) |
-| Açtığı | `feature.prioritySupport: true` |
+| Tür | Destek |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺199,00 |
+| Ne işe yarar | Öncelikli destek / 24 saatlik SLA |
 | Bağımlılık | — |
 
-### `onsite_install_full` — Yerinde kurulum (tek seferlik)
+### Yerinde kurulum (tek seferlik)
 
-Bir HummyTummy teknisyeni mekânınıza gelir, bridge + cihazları kurar ve personelinizi eğitir.
+Bir HummyTummy teknisyeni mekânınıza gelir, bridge + cihazları kurar ve
+personelinizi eğitir.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | `support` |
-| Fatura | **`oneTime` (tek seferlik)** |
-| Fiyat | ₺7.500,00 (`priceCents: 750000`) |
-| Açtığı | **Hiçbir şey** — `grants: {}` (sadece bir hizmet/fatura satırı) |
+| Tür | Destek |
+| Fatura | **Tek seferlik** |
+| Fiyat | ₺7.500,00 |
+| Ne işe yarar | **Hak vermez** — bir kurulum/eğitim hizmetidir |
 | Bağımlılık | — |
 
 <Callout type="warning">
-  Bu kalem bir entitlement deltası vermez; ödenir ve faturalanır ama hak setinizi değiştirmez.
-  Tekrarlayan değil, **tek seferliktir** ve dönem sonu (`currentPeriodEnd`) penceresi de
-  almaz (`null`).
+  Bu kalem hesabınıza bir limit veya özellik eklemez; ödenir ve faturalanır ama
+  hak setinizi değiştirmez. Tekrarlayan değil, **tek seferliktir**.
 </Callout>
 
 ---
 
-## Nasıl satın alınır (örnek)
-
-Tüm add-on'lar aynı karma-sepet checkout hattından geçer. Örnek bir intent gövdesi:
-
-```json
-{
-  "cart": {
-    "items": [
-      { "type": "addon", "code": "kds_extra_screen", "qty": 1 },
-      { "type": "addon", "code": "fiscal_efatura", "qty": 1 }
-    ]
-  },
-  "buyer": {
-    "email": "owner@restoran.com",
-    "name": "Ali Veli",
-    "phone": "+905551112233",
-    "address": "..."
-  },
-  "returnUrl": "https://app.hummytummy.com/checkout/done"
-}
-```
-
-```bash
-curl -X POST https://api.hummytummy.com/api/v1/checkout/intent \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d @intent.json
-```
-
-Yanıt PayTR iframe token'ı + ödeme linki döner; ödeme onaylandığında webhook grant'ları
-yerleştirir. Adım adım anlatım: [Satın Alma Akışı](/tr/marketplace/satin-alma-akisi).
+Geliştirici/entegrasyon detayları: [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api)
