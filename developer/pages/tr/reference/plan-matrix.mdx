@@ -27,9 +27,11 @@ Faturalandırmada KDV ayrıştırması geriye dönük hesaplanır.
 | Plan | `name` | Aylık | Yıllık | Deneme |
 | --- | --- | --- | --- | --- |
 | Deneme | `TRIAL` | ₺0 | ₺0 | 7 gün |
-| Başlangıç | `BASIC` | ₺499 | ₺4.490 | 14 gün |
-| Profesyonel | `PRO` | ₺1.299 | ₺12.990 | 14 gün |
-| Kurumsal | `BUSINESS` | ₺2.999 | ₺29.990 | 14 gün |
+| Başlangıç | `BASIC` | ₺499 | ₺4.490 | — |
+| Profesyonel | `PRO` | ₺1.299 | ₺12.990 | — |
+| Kurumsal | `BUSINESS` | ₺2.999 | ₺29.990 | — |
+
+_Ücretli tier'larda **ayrı deneme yoktur** (`trialDays = 0`); tek deneme, yukarıdaki özel **TRIAL** planıdır (7 gün) ve her yeni tenant orada başlar._
 
 ## Limitler
 

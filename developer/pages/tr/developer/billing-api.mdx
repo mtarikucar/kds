@@ -83,7 +83,7 @@ Her paket için yanıt şunları içerir:
 | `monthlyPrice` / `yearlyPrice` | TRY, KDV dahil |
 | `currency` | Her zaman `TRY` |
 | `trialDays` | Deneme süresi (bilgi amaçlı) |
-| `limits` | `maxUsers`, `maxTables`, `maxBranches`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
+| `limits` | `maxUsers`, `maxTables`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
 | `features` | Özellik-bayrağı haritası (`posAccess`, `multiLocation`, …) |
 | `discount` | Varsa aktif indirim |
 
@@ -262,8 +262,8 @@ curl -X POST https://app.hummytummy.com/api/payments/create-intent \
 <Callout type="warning">
   Bu uç dakikada en fazla **5 deneme** ile sınırlıdır (`@Throttle`) —
   [API Temelleri](/tr/developer/api-fundamentals#rate-limit-katmanlar%C4%B1)
-  içindeki global katmanların üstüne. Aşıldığında `429` ve
-  `errorCode: TOO_MANY_REQUESTS` döner; `Retry-After` başlığına saygı gösterin.
+  içindeki global katmanların üstüne. Aşıldığında standart bir `429` döner
+  (`errorCode` eklenmez); `Retry-After` başlığına saygı gösterin.
 </Callout>
 
 <Callout type="info">

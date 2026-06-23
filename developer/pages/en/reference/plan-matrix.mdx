@@ -27,9 +27,11 @@ KDV split is reverse-engineered at invoicing time.
 | Plan | `name` | Monthly | Yearly | Trial |
 | --- | --- | --- | --- | --- |
 | Trial | `TRIAL` | ₺0 | ₺0 | 7 days |
-| Starter | `BASIC` | ₺499 | ₺4,490 | 14 days |
-| Professional | `PRO` | ₺1,299 | ₺12,990 | 14 days |
-| Enterprise | `BUSINESS` | ₺2,999 | ₺29,990 | 14 days |
+| Starter | `BASIC` | ₺499 | ₺4,490 | — |
+| Professional | `PRO` | ₺1,299 | ₺12,990 | — |
+| Enterprise | `BUSINESS` | ₺2,999 | ₺29,990 | — |
+
+_Paid tiers have **no separate trial** (`trialDays = 0`); the dedicated **TRIAL** plan is the only trial (7 days), and every new tenant starts there._
 
 ## Limits
 

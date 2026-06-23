@@ -8,16 +8,17 @@ import { Callout, Steps } from 'nextra/components'
 # Sistem Durumu (Şube Sağlığı)
 
 **Menü yolu:** Çoklu Şube → Şube Sağlığı &nbsp;•&nbsp; **URL:** `/admin/health`
-**Erişim:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** `multiLocation` — **Profesyonel (PRO)** ve üzeri
+**Erişim:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** Tüm planlar (plana bağlı değil)
 
 ## Amacı
 
 Sistem Durumu, işletmenizin tüm aktif şubelerini **tek bir pano**da yan yana gösterir. Her şube için cihazların çevrimiçi olup olmadığını, en son fişin ve en son siparişin ne kadar önce geçtiğini birleştirip **0–100 arası tek bir sağlık puanına** indirger. Bir şubede yazıcı/terminal koptuğunda ya da satış akışı durduğunda, kasaya gitmeden buradan fark edersiniz.
 
 <Callout type="info">
-  Bu pano **Profesyonel (PRO)** ve üzeri planlarda (çoklu şube özelliği) anlamlıdır;
-  alt planlarda Çoklu Şube menü grubu görünmez. Plan kapısı yalnızca arayüz
-  içindir — yetkiyi her zaman sunucu doğrular.
+  Sistem Durumu panosu **plana bağlı değildir** — her planda **ADMIN** ve **MANAGER**
+  için **Çoklu Şube** altında görünür. Birden fazla şube işlettiğinizde (`multiLocation`
+  özelliği) en faydalısıdır, ancak tek şubeli planlarda da erişilebilir. Yetki her zaman
+  sunucuda doğrulanır.
 </Callout>
 
 ## Pano nasıl okunur?

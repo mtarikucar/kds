@@ -82,7 +82,7 @@ For each plan the response includes:
 | `monthlyPrice` / `yearlyPrice` | TRY, VAT-inclusive |
 | `currency` | Always `TRY` |
 | `trialDays` | Trial length (informational) |
-| `limits` | `maxUsers`, `maxTables`, `maxBranches`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
+| `limits` | `maxUsers`, `maxTables`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
 | `features` | Feature-flag map (`posAccess`, `multiLocation`, …) |
 | `discount` | Active discount, if any |
 
@@ -264,7 +264,7 @@ curl -X POST https://app.hummytummy.com/api/payments/create-intent \
   This endpoint is rate-limited to **5 attempts per minute** (`@Throttle`) — on
   top of the global tiers in
   [API Fundamentals](/en/developer/api-fundamentals#rate-limit-tiers). Exceeding
-  it returns `429` with `errorCode: TOO_MANY_REQUESTS`; honor `Retry-After`.
+  it returns a standard `429` (no `errorCode` attached); honor `Retry-After`.
 </Callout>
 
 <Callout type="info">

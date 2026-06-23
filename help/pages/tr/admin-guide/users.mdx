@@ -7,16 +7,17 @@ import { Callout, Steps } from 'nextra/components'
 
 # Kullanıcılar & Roller
 
-**Menü yolu:** Yönetim → Kullanıcılar &nbsp;•&nbsp; **URL:** `/admin/users`
-**Erişim:** ADMIN  •  **Plan:** Tüm planlar
+**Menü yolu:** Operasyon → Kullanıcılar &nbsp;•&nbsp; **URL:** `/admin/users`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar
 
 ## Amacı
 
 Bu ekran, restoranınızda çalışan **personelin sistem hesaplarını** yönetir: yeni hesap açma, rol atama, şifre belirleme ve hesabı pasife alma/silme. Her kullanıcının **rolü**, uygulamada hangi ekranları görebileceğini belirler (örneğin garson POS'a, mutfak personeli KDS'e erişir). Vardiya, izin ve İK kayıtları burada **değil**, **[Personel](/tr/admin-guide/personnel)** ekranında tutulur — burası yalnızca giriş yapan hesaplarla ilgilenir.
 
 <Callout type="info">
-  Bu ekran yalnızca **ADMIN** rolündeki kullanıcılara açıktır. Plan kısıtı yoktur;
-  ancak planınızın **kullanıcı limiti** doluysa yeni hesap ekleyemezsiniz (aşağıya bakın).
+  Bu ekran **ADMIN** ve **MANAGER** rollerine açıktır (bir kullanıcının **rolünü**
+  değiştirmek yalnızca **ADMIN** yetkisindedir). Plan kısıtı yoktur; ancak planınızın
+  **kullanıcı limiti** doluysa yeni hesap ekleyemezsiniz (aşağıya bakın).
 </Callout>
 
 ## Ekranın düzeni

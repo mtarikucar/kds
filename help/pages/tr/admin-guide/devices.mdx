@@ -8,16 +8,16 @@ import { Callout, Steps } from 'nextra/components'
 # Cihazlar
 
 **Menü yolu:** Çoklu Şube → Cihazlar &nbsp;•&nbsp; **URL:** `/admin/devices`
-**Erişim:** ADMIN, MANAGER  •  **Plan:** `multiLocation` — **Profesyonel (PRO)** ve üzeri
+**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar (plana bağlı değil)
 
 ## Amacı
 
 Cihazlar ekranı, işletmenizdeki tüm **kayıtlı terminallerin** envanteridir: mutfak ekranları (KDS), garson ve müşteri tabletleri, fiş/mutfak yazıcıları, POS terminalleri, yazarkasa, arayan ID, barkod okuyucu ve yerel köprü (`local_bridge`) cihazları. Her cihaz için bir **yuva (slot)** oluşturup ekranda çıkan eşleştirme kodu ile cihazı bağlar, sonrasında durumunu canlı izlersiniz. Cihaz işlemleri (fiş bas, çekmece aç, fiş kes) bu kayıtlar üzerinden yürür.
 
 <Callout type="info">
-  Bu ekran **Profesyonel (PRO)** ve üzeri planlarda görünür. Planınızda yoksa sol
-  menüde **Cihazlar** çıkmaz. Plan kısıtı yalnızca arayüz kolaylığıdır; asıl yetki
-  her zaman sunucudadır.
+  Cihazlar ekranı **plana bağlı değildir** — her planda **ADMIN** ve **MANAGER**
+  rolleri için sol menüde (**Çoklu Şube** altında) görünür. Yetki her zaman
+  sunucuda doğrulanır.
 </Callout>
 
 ## Özet kartları ve liste

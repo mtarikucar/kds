@@ -103,12 +103,12 @@ All errors come back in a standard envelope:
 
 ```json
 {
-  "statusCode": 403,
-  "message": "The externalDisplay feature is not enabled for this tenant",
-  "error": "Forbidden",
-  "errorCode": "FEATURE_NOT_AVAILABLE",
+  "statusCode": 401,
+  "message": "Invalid email or password",
+  "error": "INVALID_CREDENTIALS",
+  "errorCode": "INVALID_CREDENTIALS",
   "timestamp": "2026-06-23T08:30:00.000Z",
-  "path": "/api/v1/partner/screen-sessions",
+  "path": "/api/v1/auth/login",
   "requestId": "1718500000000-ab12cd34e"
 }
 ```
@@ -128,10 +128,14 @@ environment; they never appear in production.
 
 <Callout type="info">
   Branch on **`errorCode`** client-side, not on `message` — `message` may be
-  localized, `errorCode` is stable. Example codes: `INVALID_CREDENTIALS`,
-  `TOKEN_EXPIRED`, `FORBIDDEN`, `INSUFFICIENT_PERMISSIONS`,
-  `FEATURE_NOT_AVAILABLE`, `SUBSCRIPTION_REQUIRED`, `QUOTA_EXCEEDED`,
-  `VALIDATION_ERROR`, `TOO_MANY_REQUESTS`.
+  localized, `errorCode` is stable. `errorCode` is present **only** on responses
+  whose thrown exception attaches one; many ordinary errors (request-validation
+  `400`s, plain `403`/`404`s, `429` rate-limits) come back with just a standard
+  `error` label and **no** `errorCode`. Codes you may see today:
+  `INVALID_CREDENTIALS` (401), `RESOURCE_NOT_FOUND` (404),
+  `RESOURCE_ALREADY_EXISTS` (409). For a business-rule error `error` mirrors the
+  `errorCode`; for a framework error `error` is the category label (e.g.
+  `Forbidden`, `Bad Request`).
 </Callout>
 
 ### Common status codes
@@ -199,8 +203,8 @@ self-pay intent (`/v1/display/pay-intent`) at 5 per 60 s.
   forging fresh principals.
 </Callout>
 
-When the limit is exceeded you get `429` with `errorCode: TOO_MANY_REQUESTS`;
-honor the `Retry-After` header.
+When the limit is exceeded you get a standard `429` (a plain rate-limit
+response — no `errorCode` is attached); honor the `Retry-After` header.
 
 ## Quick example
 

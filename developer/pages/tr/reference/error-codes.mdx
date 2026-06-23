@@ -18,8 +18,8 @@ Her hata yanıtı aşağıdaki yapıyı izler:
 ```json
 {
   "statusCode": 409,
-  "message": "A record with this email already exists",
-  "error": "UniqueConstraintViolation",
+  "message": "User with email 'owner@restaurant.com' already exists",
+  "error": "RESOURCE_ALREADY_EXISTS",
   "errorCode": "RESOURCE_ALREADY_EXISTS",
   "timestamp": "2026-06-23T08:14:05.123Z",
   "path": "/api/v1/auth/register",
@@ -181,7 +181,7 @@ if (!res.ok) {
   </Tabs.Tab>
   <Tabs.Tab>
 ```bash
-curl -i -X POST https://api.hummytummy.com/api/v1/display/orders \
+curl -i -X POST https://hummytummy.com/api/v1/display/orders \
   -H "Authorization: Bearer <SCREEN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{ "items": [], "type": "DINE_IN" }'
