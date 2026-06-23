@@ -1,0 +1,77 @@
+---
+title: Rezervasyonlar
+description: HummyTummy rezervasyon yönetimi — gelen rezervasyonları onaylama/reddetme, masa atama, oturtma, no-show ve ayarlar. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Rezervasyonlar
+
+**Menü yolu:** Menü & Masa → Rezervasyonlar &nbsp;•&nbsp; **URL:** `/admin/reservations`
+**Erişim:** ADMIN, MANAGER
+**Plan:** `reservationSystem` — **Profesyonel (PRO)** ve üzeri
+
+## Amacı
+
+Rezervasyon ekranı, müşterilerin online (genel rezervasyon sayfası üzerinden) veya elle alınan masa rezervasyonlarını yönetir: onaylar, masa atar, misafiri oturtur ve gelmeyenleri (no-show) işaretlersiniz.
+
+<Callout type="info">
+  Rezervasyon sistemi **Profesyonel (PRO)** ve üzeri planlarda açıktır. Planınızda yoksa
+  menüde Rezervasyonlar görünmez ve doğrudan URL yükseltme kartı gösterir.
+
+  **Genel (müşteriye açık) rezervasyon sayfaları:** `/reserve/:tenantId` (yeni rezervasyon)
+  ve `/reserve/:tenantId/lookup` (rezervasyon sorgulama). Müşteri giriş yapmadan kullanır.
+</Callout>
+
+## Ekranda neler var?
+
+- **Tarih seçici** — belirli bir günün rezervasyonlarını görürsünüz (varsayılan: bugün).
+- **Durum sekmeleri** — Tümü / Bekliyor / Onaylı / Oturdu / Tamamlandı / İptal.
+- **Arama** — müşteri adı/telefon ile filtreleme.
+- **İstatistikler** — seçili güne ait özet sayılar.
+- **Liste + sayfalama** — her satır müşteri, saat, kişi sayısı, masa ve durumu gösterir; satıra tıklayınca detay modalı açılır.
+
+## Rezervasyon durumları ve akış
+
+| Durum | Anlamı |
+| --- | --- |
+| `PENDING` | Bekliyor — onay gerekiyor |
+| `CONFIRMED` | Onaylandı |
+| `SEATED` | Misafir oturtuldu |
+| `COMPLETED` | Tamamlandı |
+| `REJECTED` | Reddedildi |
+| `CANCELLED` | İptal edildi |
+| `NO_SHOW` | Gelmedi |
+
+Tipik akış: **Bekliyor → Onayla → (gün gelince) Oturt → Tamamla.** Gelmeyenleri **No-show**, iptal edilenleri **İptal** olarak işaretlersiniz. Onay/red/iptal/no-show işlemleri bir **onay diyaloğuyla** korunur.
+
+## Detay modalı
+
+Bir rezervasyona tıklayınca:
+
+- **Masa ataması** — rezervasyona bir masa bağlarsınız (tabloda gösterilir).
+- **Yönetici notu** — iç not (müşteri görmez) ekleyebilirsiniz.
+
+## Masa tutma (auto-hold) ile entegrasyon
+
+Onaylı bir rezervasyon, başlangıç saatine yaklaştıkça ilgili masayı otomatik **Rezerve** olarak tutabilir (ayarlardaki "tutma süresi" ile). POS'ta o masaya dokunan garson, rezervasyon detayını gösteren bir diyalogla karşılaşır ve **tek dokunuşla misafiri oturtur** (masa Dolu'ya, rezervasyon SEATED'a geçer).
+
+## Ayarlar
+
+**Ayarlar → Rezervasyonlar** (`/admin/settings/reservations`) altından:
+
+- **Etkin/pasif** — rezervasyon alımını aç/kapat.
+- **Onay zorunluluğu** — gelen rezervasyonlar otomatik onaylansın mı, yoksa elle mi?
+- **Zaman ayarları** — slot aralığı (15/30/60 dk), minimum/maksimum ön rezervasyon, varsayılan süre, masa tutma offset'i (dk).
+- **Kapasite** — eşzamanlı rezervasyon kapasitesi.
+
+## İpuçları
+
+- **"Onay zorunlu" ile spam'i engelleyin:** Online rezervasyonların hepsini otomatik onaylamak yerine elle onaylarsanız sahte/çift kayıtları yakalarsınız.
+- **Masayı erken atayın:** Onayda masayı bağlarsanız, auto-hold doğru masayı tutar ve garson POS'ta tek dokunuşla oturtur.
+- **No-show'u işaretleyin:** Gelmeyenleri No-show yapın; bu hem masa tutmayı serbest bırakır hem de ileride müşteri davranış analizine veri sağlar.
+
+## İlgili ekranlar
+
+- **[Masalar](/tr/admin-guide/tables)** — masa tutma ve durumlar.
+- **[POS](/tr/admin-guide/pos)** — rezerve masaya dokununca oturtma diyaloğu.

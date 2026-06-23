@@ -1,0 +1,299 @@
+---
+title: Webhook'lar
+description: Sipariş, ödeme ve abonelik olaylarını HMAC-SHA256 imzalı POST'larla uç noktanıza alın.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Webhook'lar (Giden)
+
+HummyTummy, tenant'ınızda bir olay olduğunda kayıtlı uç noktanıza HMAC-SHA256
+imzalı bir HTTP POST atar. Böylece sipariş, ödeme ve abonelik olaylarına anlık
+tepki verebilir; yoklamaya (polling) ihtiyaç duymazsınız.
+
+Tüm yollar `/api` global ön eki altındadır.
+
+<Callout type="warning">
+  Webhook abonelikleri **API erişimi** özelliği gerektirir: BUSINESS planı ya da
+  `api_access` (apiAccess) eklentisi. Abonelik uçları **ADMIN rolü** ile
+  personel JWT'si bekler; özellik kapalıysa `403` döner.
+</Callout>
+
+## Abone olun
+
+Bir abonelik oluşturun. **`secret` yalnızca bir kez** döner — onu güvenli biçimde
+saklayın; bir daha gösterilmez ve geri türetilemez.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/webhooks/subscriptions \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://hooks.ornek.com/hummytummy",
+    "events": ["order.created.v1", "payment.succeeded.v1"]
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/webhooks/subscriptions",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${adminJwt}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url: "https://hooks.ornek.com/hummytummy",
+      events: ["order.created.v1", "payment.succeeded.v1"],
+    }),
+  },
+);
+const { secret } = await res.json(); // SADECE bir kez döner — güvenli sakla
+```
+  </Tabs.Tab>
+</Tabs>
+
+İstek gövdesi:
+
+| Alan | Zorunlu | Açıklama |
+| --- | --- | --- |
+| `url` | Evet | Olayların POST edileceği `https` (ya da `http`) URL. SSRF allowlist'inden geçer; host küçük harfe normalize edilerek saklanır |
+| `events` | Hayır | Abone olunacak olay tipleri. Verilmezse `["*"]` (tüm yayınlanabilir olaylar) |
+
+Yanıt (özet):
+
+```json
+{
+  "id": "0190a1b2-...",
+  "tenantId": "...",
+  "url": "https://hooks.ornek.com/hummytummy",
+  "events": ["order.created.v1", "payment.succeeded.v1"],
+  "status": "active",
+  "secret": "whs_AbCdEf..."
+}
+```
+
+Abonelikleri listeleyin / iptal edin:
+
+```bash
+GET    /api/v1/webhooks/subscriptions
+DELETE /api/v1/webhooks/subscriptions/:id
+```
+
+<Callout type="info">
+  Tenant başına varsayılan aktif abonelik limiti 20'dir (sadece `active` satırlar
+  sayılır); aşılırsa `400` döner. Kullanılmayan abonelikleri iptal edin.
+</Callout>
+
+## Teslim edilen yük (payload)
+
+Her teslim, JSON gövdesiyle bir POST'tur:
+
+```json
+{
+  "id": "0190a1b2-c3d4-...",
+  "type": "order.created.v1",
+  "tenantId": "...",
+  "payload": { "...olaya-özgü alanlar..." }
+}
+```
+
+Ayrıca şu başlıklar gelir:
+
+| Başlık | Açıklama |
+| --- | --- |
+| `Content-Type` | `application/json` |
+| `User-Agent` | `HummyTummy-Webhook/1` |
+| `X-HummyTummy-Event-Id` | Olayın `id`'si (idempotency için) |
+| `X-HummyTummy-Event-Type` | Olay tipi (örn. `order.created.v1`) |
+| `X-HummyTummy-Signature` | İmza: `t=<unix-ms>,v1=<hmac-sha256>` |
+
+<Callout type="info">
+  Aynı olay aynı `id` ile birden çok kez ulaşabilir (en-az-bir-kez teslim).
+  Alıcı tarafta **`id` (veya `X-HummyTummy-Event-Id`) üzerinden dedup** yapın.
+</Callout>
+
+## İmza doğrulama
+
+İmza, gövde üzerinden hesaplanan zaman damgalı bir HMAC-SHA256'dır:
+
+```
+X-HummyTummy-Signature: t=<unix-ms>,v1=<hmac-sha256-hex>
+```
+
+İmza şu şekilde üretilir — **imzalanan metin** `"<timestamp>.<rawBody>"`'dir,
+anahtar ise sizin `secret`'ınız:
+
+```
+v1 = HMAC_SHA256(secret, `${t}.${rawBody}`)  // hex
+```
+
+Doğrulama adımları (HummyTummy'nin `verify` mantığıyla birebir aynı):
+
+<Steps>
+
+### Başlığı ayrıştırın
+`t` ve `v1` değerlerini virgülle ayırıp çıkarın.
+
+### Zaman damgasını kontrol edin
+`t` sayısal olmalı ve şu ana göre **±5 dakika** içinde olmalı (replay
+koruması).
+
+### HMAC'i yeniden hesaplayın
+`secret` ile `"${t}.${rawBody}"` üzerinde HMAC-SHA256 hesaplayın.
+
+### Sabit-zamanlı karşılaştırın
+Hesapladığınız hex'i `v1` ile uzunluk + sabit-zamanlı (timing-safe)
+karşılaştırın. Eşitse olay gerçektir.
+
+</Steps>
+
+<Callout type="warning">
+  **Ham gövdeyi** kullanın — JSON'u parse edip yeniden serialize ETMEYİN; aksi
+  halde byte'lar değişir ve imza tutmaz. Web framework'ünüzde ham body
+  buffer'ını saklayın.
+</Callout>
+
+### Node.js (Express) doğrulama örneği
+
+```ts
+import express from "express";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const app = express();
+
+// Ham gövdeyi sakla — imza ham byte'lar üzerinden hesaplanır.
+app.use(express.json({ verify: (req, _res, buf) => { (req as any).rawBody = buf; } }));
+
+function verify(
+  secret: string,
+  header: string,
+  rawBody: string,
+  toleranceMs = 5 * 60_000,
+): boolean {
+  const parts = Object.fromEntries(header.split(",").map((p) => p.split("=")));
+  const ts = Number(parts.t);
+  const v1 = String(parts.v1 ?? "");
+  if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > toleranceMs) return false;
+  const expected = createHmac("sha256", secret)
+    .update(`${ts}.${rawBody}`)
+    .digest("hex");
+  if (expected.length !== v1.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(v1));
+}
+
+app.post("/hummytummy", (req, res) => {
+  const sig = req.header("X-HummyTummy-Signature") ?? "";
+  const raw = (req as any).rawBody.toString("utf8");
+  if (!verify(process.env.WEBHOOK_SECRET!, sig, raw)) {
+    return res.sendStatus(401); // imza geçersiz/eski
+  }
+  // İdempotency: aynı X-HummyTummy-Event-Id'yi iki kez işleme.
+  const eventId = req.header("X-HummyTummy-Event-Id");
+  // ... olayı işle ...
+  res.sendStatus(200); // 2xx = başarılı teslim
+});
+```
+
+<Callout type="info">
+  Başarılı teslim için **2xx** (200–299) dönün. 2xx dışı her durum başarısızlık
+  sayılır ve yeniden denenir.
+</Callout>
+
+## Olay tipleri
+
+`events` alanında belirli tipleri listeleyin ya da `"*"` ile tüm yayınlanabilir
+olayları yakalayın. Tipler `<alan>.<eylem>.v<sürüm>` biçimindedir.
+
+Örnek yayınlanabilir tipler:
+
+| Olay tipi | Ne zaman |
+| --- | --- |
+| `order.created.v1` | Yeni sipariş oluştu |
+| `order.updated.v1` | Sipariş güncellendi |
+| `order.completed.v1` | Sipariş tamamlandı |
+| `order.cancelled.v1` | Sipariş iptal edildi |
+| `payment.succeeded.v1` | Ödeme başarılı |
+| `payment.intent_created.v1` | Ödeme niyeti oluştu |
+| `payment.refund_completed.v1` | İade tamamlandı |
+| `checkout.completed.v1` | Checkout tamamlandı |
+| `subscription.activated.v1` | Abonelik aktifleşti |
+| `subscription.upgraded.v1` | Abonelik yükseltildi |
+| `subscription.cancelled.v1` | Abonelik iptal edildi |
+| `feature.entitlement.changed.v1` | Özellik hakkı değişti |
+
+### Engelli (BLOCKED) olaylar
+
+Bazı hassas olaylar dahili tutulur ve **hiçbir koşulda** dışarı verilmez —
+`"*"` aboneliği bile bunları almaz. Engelleme **ön ek** bazlıdır; aşağıdaki ön
+ekle başlayan hiçbir olay teslim edilmez:
+
+```
+user.password
+user.email_verification
+auth.
+subscription.upgrade.requested
+subscription.renewal.failed
+subscription.payment.
+kms.
+audit.
+```
+
+<Callout type="info">
+  Yeni iş olayları varsayılan olarak yayınlanabilir; yalnızca hassas olanlar bu
+  listeye eklenir. Bu filtre, abonelik eşlemesinden **önce** çalışır — açıkça
+  isimle abone olsanız bile engellenen bir olayı alamazsınız.
+</Callout>
+
+## Yeniden deneme ve otomatik duraklatma
+
+Teslim, her 30 saniyede bir çalışan bir worker tarafından yapılır.
+
+- **Zaman aşımı:** tek teslim 15 saniyeyle sınırlıdır.
+- **Yeniden deneme:** 2xx dışı yanıt veya ağ hatasında artan beklemelerle (30
+  sn, 2 dk, 10 dk, 1 saat, 6 saat) en fazla **5 deneme**; ardından teslim
+  `failed` işaretlenir.
+- **Otomatik duraklatma:** bir abonelik **20 ardışık başarısızlıktan** sonra
+  otomatik `paused`'a alınır. Ölü bir uç noktanın worker'ı tüketmesini engeller;
+  yeniden çalışır hale getirip yeni bir abonelik oluşturmanız gerekir.
+- **Başarı sayacı sıfırlama:** başarılı bir teslim ardışık-başarısızlık
+  sayacını 0'a çeker.
+
+<Callout type="warning">
+  Yük taşınamazsa (ör. kaynak olay retention tarafından temizlenmişse) teslim
+  `failed` ile sessizce-veri-kaybı yerine açıklayıcı bir not (`source event
+  purged before delivery`) ile işaretlenir.
+</Callout>
+
+## SSRF koruması (allowlist)
+
+Webhook URL'leri hem **abone olurken** hem de **her teslimden hemen önce** bir
+güvenlik kapısından geçer. Bu, tenant'ın iç servislere ya da bulut metadata uç
+noktalarına (örn. `169.254.169.254`) self-fetch yapmasını engeller.
+
+Engellenenler:
+
+- Genel (public) olmayan IP'ler: loopback, özel/dahili aralıklar, link-local,
+  cloud metadata adresleri ve bunların IPv4-mapped IPv6 karşılıkları.
+- Tehlikeli portlar (Redis, Postgres, vb.).
+- URL içinde userinfo (`user:pass@host`).
+- `http`/`https` dışı protokoller.
+
+<Callout type="info">
+  Teslim öncesi tekrar doğrulama, **DNS-rebind** saldırılarını da kapatır
+  (abone olurken "public IP", teslimde "private IP" döndüren bir DNS sunucusu).
+  Böyle bir durumda teslim yeniden denenmeden `failed` işaretlenir.
+</Callout>
+
+## En iyi pratikler
+
+- İmzayı **her zaman** doğrulayın ve `id` üzerinden dedup yapın.
+- Hızlıca **2xx** dönün; ağır işi kuyruğa alın (15 sn timeout'u aşmayın).
+- `secret`'ı sunucu tarafında, ortam değişkeninde/kasada saklayın.
+- Bir aboneliği duraklatıldı bulursanız uç noktanızı onarın ve **yeniden** abone
+  olun.
+- Mümkünse HTTPS uç noktası kullanın.

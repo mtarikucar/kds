@@ -1,0 +1,69 @@
+---
+title: Temel Kavramlar
+description: Tenant, Şube, Roller ve 7 günlük deneme — HummyTummy'de işinizi anlamadan önce bilmeniz gereken kavramlar.
+---
+
+import { Callout } from 'nextra/components'
+
+# Temel Kavramlar
+
+HummyTummy'yi kullanmadan önce dört temel kavramı anlamak işinizi kolaylaştırır: **Tenant**, **Şube (Branch)**, **Roller** ve **Deneme (TRIAL)**.
+
+## Tenant (Restoran / İşletme)
+
+**Tenant**, sisteme kaydolan işletmenizin tamamıdır — yani restoranınız. Kayıt olduğunuzda sizin için bir tenant oluşturulur ve tüm verileriniz (menü, masalar, siparişler, personel, raporlar) bu tenant altında saklanır.
+
+- Her tenant **tamamen izoledir**: başka bir işletmenin verisini göremezsiniz, onlar da sizinkini göremez.
+- Bir tenant'ın bir **abonelik durumu** (deneme / aktif / vb.) ve bir **planı** vardır.
+- Tenant'ı kuran ilk kullanıcı her zaman **ADMIN** rolündedir.
+
+## Şube (Branch)
+
+**Şube**, tenant'ınız altındaki fiziksel bir lokasyondur. Kayıt sırasında otomatik olarak **"Main"** adında bir ana şube oluşturulur — yani hiçbir şey yapmadan zaten bir şubeniz olur.
+
+- Tek lokasyonlu işletmeler tek şube ile çalışır.
+- Çok şubeli zincirler birden fazla şube ekleyebilir (plan limitlerine bağlı).
+- Menü, masa, sipariş ve stok gibi pek çok veri **şube bazlıdır** — yani her şubenin kendi masaları, kendi siparişleri olur.
+
+<Callout type="info">
+  Sistem, şube bazlı isteklerde arka planda bir **şube bağlamı** (`X-Branch-Id`)
+  kullanır. Arayüzde aktif şubenizi seçtiğinizde bu otomatik yönetilir — günlük
+  kullanımda elle bir şey yapmanız gerekmez.
+</Callout>
+
+## Roller
+
+Her kullanıcının bir **rolü** vardır. Rol, kullanıcının nelere erişebileceğini belirler. Beş rol vardır:
+
+| Rol | Kim? | Tipik yetkiler |
+|---|---|---|
+| **ADMIN** | İşletme sahibi / üst yönetici | Her şey: ayarlar, plan/abonelik, kullanıcı yönetimi, tüm şubeler, raporlar |
+| **MANAGER** | Şube/operasyon müdürü | Operasyon yönetimi, menü/masa/personel, raporlar (atandığı şubelerde) |
+| **WAITER** | Garson | POS'tan sipariş alma, masa işlemleri (kendi şubesinde) |
+| **KITCHEN** | Mutfak personeli | Mutfak ekranı (KDS): sipariş durumu güncelleme |
+| **COURIER** | Kurye | Teslimat / kurye akışı |
+
+**Şube kısıtı:** `WAITER`, `KITCHEN` ve `COURIER` rolleri **tek bir şubeye sabitlenir** (kendi ana şubeleri). Yalnızca o şubede çalışabilirler. `ADMIN` ve `MANAGER` ise birden fazla şube arasında geçiş yapabilir (`ADMIN` tüm şubelere, `MANAGER` kendisine atanan şubelere).
+
+<Callout type="info">
+  İlk kaydolan kullanıcı (işletme sahibi) **ADMIN**'dir ve tüm şubelere erişebilir.
+  Diğer personeli daha sonra Yönetici panelinden ekleyip rol atarsınız.
+</Callout>
+
+## Deneme (TRIAL — 7 gün)
+
+Yeni kaydolan her tenant, **özel 7 günlük deneme planı (TRIAL)** ile başlar:
+
+- **Tüm premium özellikler açık**, ücret alınmaz, kart bilgisi istenmez.
+- Abonelik durumu deneme boyunca **TRIALING**'dir.
+- Deneme **tenant başına tek seferliktir** (kötüye kullanım engellenir).
+
+**7 gün dolunca ne olur?** Deneme biter ve hesap **kilitlenir** (`TRIAL_ENDED`): devam etmek için bir **ücretli plan** seçmeniz gerekir. Otomatik olarak ücretsiz bir plana düşmez — bilinçli bir tasarım kararıdır.
+
+<Callout type="warning">
+  Deneme bittiğinde, ücretli bir plan seçilene kadar arayüz sizi plan seçim
+  sayfasına yönlendirir ve şube-bazlı işlemler kilitlenir. Verileriniz silinmez;
+  plan aktive edilir edilmez kaldığınız yerden devam edersiniz.
+</Callout>
+
+Plan seçenekleri ve fiyatlandırma için **[Planlar](/plans)** sayfasına bakın.

@@ -1,0 +1,334 @@
+---
+title: Partner Display API
+description: Run your own screens — menu, ordering, waiter/bill calls, self-pay, and live order status.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Partner Display API
+
+Run your own screens/apps (e.g. a table tablet) that do what the built-in QR
+menu does — against a HummyTummy restaurant: browse the menu, place orders,
+self-pay, call a waiter / request the bill, and watch order status live.
+
+All paths are under the `/api` global prefix. Base URL:
+`https://hummytummy.com/api`.
+
+<Callout type="warning">
+  Partner Display requires the restaurant's plan to include the
+  **`externalDisplay`** feature. Both key issuance and token minting verify this
+  feature and a live subscription (`ACTIVE` / `TRIALING` / `PAST_DUE`);
+  otherwise they return `403`.
+</Callout>
+
+## Concepts
+
+- **Partner API key** — issued by the restaurant ADMIN (Settings → API &
+  Integrations). It consists of a `keyId` (`pk_live_…`, safe to log) plus a
+  `secret` shown **once**. Held only by your **backend**.
+- **Screen session token** — a short-lived, scoped token your backend mints per
+  screen. It is bound to a branch (and optionally a table). The device holds
+  only this token, never the API secret.
+- **Scopes** — `menu:read`, `orders:write`, `orders:read`, `payments:write`,
+  `requests:write`, `realtime:subscribe`. A screen's scopes are a subset of the
+  key's.
+
+## Architecture overview
+
+```
+ADMIN (dashboard)                  Partner backend                Device/Screen
+      │                                  │                              │
+      │ 1. Issue key (keyId+secret)      │                              │
+      ├─────────────────────────────────▶                              │
+      │                                  │ 2. Mint screen token         │
+      │                                  │   X-Partner-Key/Secret       │
+      │                                  ├──────────▶ HummyTummy        │
+      │                                  │   screenToken + refreshToken │
+      │                                  │ 3. Ship screenToken          │
+      │                                  ├──────────────────────────────▶
+      │                                  │            4. /v1/display/*  │
+      │                                  │               Authorization: │
+      │                                  │               Screen <token> │
+      │                                  │◀─────────────────────────────┤
+```
+
+## 1. Issue an API key (restaurant ADMIN, one-time, in-app)
+
+The restaurant owner creates a key in the dashboard. You can also do it as a
+machine: with a staff JWT (ADMIN role required).
+
+```bash
+curl -X POST https://hummytummy.com/api/v1/partner/api-keys \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Table tablets",
+    "scopes": ["menu:read","orders:write","orders:read","payments:write","requests:write","realtime:subscribe"],
+    "allowedReturnOrigins": ["https://tablet.example-restaurant.com"],
+    "allowedBranchIds": ["<branch-uuid>"]
+  }'
+```
+
+Response — the `secret` is returned **once**:
+
+```json
+{
+  "id": "...",
+  "keyId": "pk_live_AbCdEf...",
+  "secret": "pk_live_secret_XyZ...",
+  "name": "Table tablets",
+  "scopes": ["menu:read", "orders:write", "orders:read", "payments:write", "requests:write", "realtime:subscribe"],
+  "allowedReturnOrigins": ["https://tablet.example-restaurant.com"],
+  "allowedBranchIds": ["<branch-uuid>"],
+  "status": "active"
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `name` | Human label (required, 1–80 chars) |
+| `scopes` | Optional; if omitted, the key gets **all** scopes |
+| `allowedReturnOrigins` | PayTR self-pay return origins (`https` URLs only) |
+| `allowedBranchIds` | Restricts the key to specific branches (empty = all branches) |
+
+<Callout type="warning">
+  Store the `secret` securely on your **server** — it is never shown again and
+  cannot be re-derived. The `keyId` is safe to log. The default per-tenant
+  active-key cap is 10; exceeding it returns `400`.
+</Callout>
+
+List / revoke keys (staff JWT, ADMIN):
+
+```bash
+GET    /api/v1/partner/api-keys
+DELETE /api/v1/partner/api-keys/:id   # revoke — cascades to child screen sessions
+```
+
+## 2. Mint a screen token (your backend → us)
+
+Authenticate with your key over TLS:
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/partner/screen-sessions \
+  -H "X-Partner-Key: pk_live_AbCdEf..." \
+  -H "X-Partner-Secret: pk_live_secret_XyZ..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "branchId": "<branch-uuid>",
+    "tableId": "<table-uuid>",
+    "scopes": ["menu:read","orders:write","realtime:subscribe"]
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/partner/screen-sessions",
+  {
+    method: "POST",
+    headers: {
+      "X-Partner-Key": process.env.PARTNER_KEY!,
+      "X-Partner-Secret": process.env.PARTNER_SECRET!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      branchId,
+      tableId, // optional
+      scopes: ["menu:read", "orders:write", "realtime:subscribe"],
+    }),
+  },
+);
+const session = await res.json();
+// session.screenToken → the device; session.refreshToken → stays server-side
+```
+  </Tabs.Tab>
+</Tabs>
+
+Request body fields:
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `branchId` | Yes (UUID) | Branch the screen binds to; must belong to the tenant, be active, and be within the key's `allowedBranchIds` |
+| `tableId` | No (UUID) | Table the screen binds to; if set, the branch/table match is validated |
+| `scopes` | No | Scopes for this screen (a subset of the key's); if omitted, all of the key's scopes |
+
+Response — **tokens are returned once**:
+
+```json
+{
+  "id": "...",
+  "screenToken": "<uuidv7>.<secret>",
+  "refreshToken": "<uuidv7>.<secret>",
+  "expiresAt": "...(≈1 hour)",
+  "refreshExpiresAt": "...(≈30 days)",
+  "scopes": ["menu:read", "orders:write", "realtime:subscribe"],
+  "tenantId": "...",
+  "branchId": "...",
+  "tableId": "...",
+  "orderingSessionId": "..."
+}
+```
+
+Ship `screenToken` to the device; keep `refreshToken` server-side. Before it
+expires (default access ≈1 hour), rotate it:
+
+```bash
+curl -X POST https://hummytummy.com/api/v1/partner/screen-sessions/refresh \
+  -H "X-Partner-Key: pk_live_AbCdEf..." \
+  -H "X-Partner-Secret: pk_live_secret_XyZ..." \
+  -H "Content-Type: application/json" \
+  -d '{ "refreshToken": "<uuidv7>.<secret>" }'
+# → new { screenToken, refreshToken, expiresAt, refreshExpiresAt }
+```
+
+<Callout type="info">
+  Refresh is **single-use**: a second call with the old `refreshToken` returns
+  `401 "Refresh token already used"`. Always store the newly returned
+  `refreshToken`. TTLs are operator-configurable: access ≈1 hour, refresh ≈30
+  days.
+</Callout>
+
+Revoke a single screen (key auth):
+
+```bash
+DELETE /api/v1/partner/screen-sessions/:id
+```
+
+<Callout type="warning">
+  Revoking the **API key** in the dashboard cascades — all its screen tokens die
+  and live socket connections are dropped. Revoking a single screen also closes
+  its backing customer session and immediately disconnects its live socket.
+</Callout>
+
+The per-branch active screen-session cap defaults to 50; exceeding it returns
+`400`.
+
+## 3. Drive the screen (device → us)
+
+Every `/display` call presents the screen token:
+
+```bash
+Authorization: Screen <screenToken>
+```
+
+| Method | Path | Scope | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/display/menu` | `menu:read` | Branding + categories/products/modifiers + feature flags |
+| POST | `/api/v1/display/orders` | `orders:write` | Place an order `{ items:[{ productId, quantity, modifiers?, notes? }], type?, notes? }` |
+| GET | `/api/v1/display/orders` | `orders:read` | This screen's session's orders + statuses |
+| POST | `/api/v1/display/waiter-requests` | `requests:write` | Call a waiter `{ message? }` (requires a table-bound screen) |
+| POST | `/api/v1/display/bill-requests` | `requests:write` | Request the bill `{ message? }` |
+| GET | `/api/v1/display/payable-items` | `payments:write` | Unpaid items for the table |
+| POST | `/api/v1/display/pay-intent` | `payments:write` | PayTR hosted-payment intent `{ items:[{ orderItemId, quantity }], customerPhone? }` |
+| GET | `/api/v1/display/pay-status?oid=…` | `payments:write` | Poll a payment's status |
+
+<Callout type="info">
+  The screen's tenant/branch/table are taken from the **token** — never sent in
+  the body. A missing scope returns `403`. An expired / invalid token returns
+  `401`.
+</Callout>
+
+### Placing an order
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/display/orders \
+  -H "Authorization: Screen $SCREEN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      { "productId": "<product-uuid>", "quantity": 2, "notes": "rare" }
+    ],
+    "notes": "table 5"
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+await fetch("https://hummytummy.com/api/v1/display/orders", {
+  method: "POST",
+  headers: {
+    Authorization: `Screen ${screenToken}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    items: [{ productId, quantity: 2, notes: "rare" }],
+  }),
+});
+```
+  </Tabs.Tab>
+</Tabs>
+
+### Self-pay
+
+Self-pay is TR/TRY + PayTR. Open the returned `paymentLink` in a WebView; the
+return origin is taken from the key's `allowedReturnOrigins` (never from a
+client-supplied header). Flow: `payable-items` → `pay-intent` → WebView → poll
+`pay-status` (or `customer:payment-settled` over WebSocket).
+
+## 4. Live updates (device → us, WebSocket)
+
+With the `realtime:subscribe` scope, connect Socket.IO to the `/kds` namespace
+with the screen token:
+
+```js
+import { io } from "socket.io-client";
+
+const socket = io("https://hummytummy.com/kds", {
+  auth: { screenToken: "<screenToken>" },
+});
+
+socket.on("customer:order-created", (e) => {/* ... */});
+socket.on("customer:order-approved", (e) => {/* ... */});
+socket.on("customer:order-status-updated", (e) => {/* ... */});
+socket.on("customer:payment-settled", (e) => {/* ... */});
+```
+
+Events: `customer:order-created`, `customer:order-approved`,
+`customer:order-status-updated`, `customer:payment-settled`.
+
+<Callout type="info">
+  If the socket drops, fall back to polling `GET /display/orders` and
+  `GET /display/pay-status`. When a screen is revoked, its live socket is
+  disconnected immediately.
+</Callout>
+
+## End-to-end summary
+
+<Steps>
+
+### Issue a key
+The ADMIN issues a partner key from the dashboard (or as a machine with an ADMIN
+JWT). Store the `secret` on your server.
+
+### Mint a screen token
+Your backend mints a `screenToken` + `refreshToken` per screen with
+`X-Partner-Key`/`X-Partner-Secret`. Ship the `screenToken` to the device.
+
+### Drive the screen
+The device calls `/v1/display/*` with `Authorization: Screen <token>`; each
+endpoint requires its own scope.
+
+### Listen live
+The device connects to the `/kds` WebSocket (`realtime:subscribe`) and receives
+order/payment events live.
+
+### Refresh / revoke
+Rotate with the `refreshToken` before the token expires. When no longer needed,
+revoke a single screen or the whole key (cascade).
+
+</Steps>
+
+## Errors and limits
+
+- **Errors:** the standard
+  [envelope](/en/developer/api-fundamentals#error-envelope). `401` =
+  bad/expired token, `403` = missing scope or the tenant lacks `externalDisplay`
+  / the subscription isn't live, `429` = rate limited.
+- **Rate limits** are counted per key / per screen token (not per IP), so a
+  venue of tablets behind one NAT IP is fine. Screen-token minting is capped at
+  60 per 60 s, and the self-pay intent at 5 per 60 s.
+- **Token TTLs** (operator-configurable): access ≈1 hour, refresh ≈30 days.

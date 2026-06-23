@@ -1,0 +1,76 @@
+---
+title: Siparişler
+description: HummyTummy sipariş yaşam döngüsü — durumlar, sipariş tipleri, QR menü onay kuyruğu, garson ve hesap istekleri. Siparişlerin nerede yönetildiği ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Siparişler
+
+**Nerede yönetilir:** **[POS](/tr/admin-guide/pos)** (`/pos`) ve **[Mutfak Ekranı](/tr/admin-guide/kitchen)** (`/kitchen`)
+**Erişim:** ADMIN, MANAGER, WAITER, KITCHEN (role göre)
+**Plan:** Sipariş alma POS gerektirir (`posAccess`, BASIC+); mutfak akışı tüm planlarda
+
+## Amacı
+
+HummyTummy'de **ayrı bir "Siparişler" sayfası yoktur** — siparişler oluşturuldukları ve işlendikleri yerde, yani **POS** ve **Mutfak Ekranı (KDS)** içinde yönetilir. Bu sayfa, sipariş **yaşam döngüsünü** ve siparişlerin uygulamada nerede göründüğünü tek yerde toplar.
+
+## Sipariş yaşam döngüsü (durumlar)
+
+Bir sipariş şu durumlardan geçer:
+
+| Durum | Anlamı | Nerede görünür |
+| --- | --- | --- |
+| `PENDING_APPROVAL` | QR menüden gelen, **onay bekleyen** sipariş | POS bildirim çubuğu → "Bekleyen siparişler" |
+| `PENDING` | Onaylanmış, mutfakta **bekliyor** | Mutfak ekranı "Bekliyor" sütunu |
+| `PREPARING` | Aşçı **hazırlıyor** | Mutfak ekranı "Hazırlanıyor" sütunu |
+| `READY` | **Hazır**, servise/ödemeye bekliyor | Mutfak "Hazır" + POS "ödeme bekleyen" |
+| `SERVED` | **Servis edildi**, ödeme bekliyor | POS "ödeme bekleyen" |
+| `PAID` | **Ödendi**, kapandı | Raporlar/Z-Rapor |
+| `CANCELLED` | **İptal** (stok geri yazılır) | — |
+
+<Callout type="info">
+  Mutfak ekranı sadece aktif kuyruğu (`PENDING`, `PREPARING`, `READY`) gösterir.
+  `SERVED` ve `PAID` siparişler kasada/raporlarda izlenir. İptal (`CANCELLED`) terminaldir
+  ve sunucuda stoğu geri alır.
+</Callout>
+
+## Sipariş tipleri
+
+| Tip | Anlamı |
+| --- | --- |
+| `DINE_IN` | Masada (içeride) servis |
+| `TAKEAWAY` | Gel-al |
+| `DELIVERY` | Adrese teslim (delivery entegrasyonu) |
+| `COUNTER` | Masasız self-pay / tezgah siparişi (Z-raporda ayrı gruplanır) |
+
+## QR menü onay kuyruğu ve istekler
+
+POS ekranının üstündeki **canlı bildirim çubuğu** üç kuyruğu gerçek zamanlı gösterir:
+
+- **Bekleyen siparişler** — QR menüden gelen, `PENDING_APPROVAL` durumundaki siparişler. Panelden onaylayınca mutfağa düşer.
+- **Garson çağrıları** — masadan gelen "garson çağır" istekleri.
+- **Hesap istekleri** — masadan gelen "hesabı getir" istekleri.
+
+Her biri ayrı bir panel açar; oradan tek tek işlem yaparsınız. Tüm bunlar WebSocket ile anında akar.
+
+## Siparişlerle ilgili POS işlemleri
+
+- **Masa transferi** — açık siparişi başka masaya taşı.
+- **Masa birleştirme** — birden çok masanın siparişini tek hesapta topla.
+- **Hesap bölme (split)** — bir hesabı tutar/kişi bazında parçala.
+- **Aşamalı (Dutch) ödeme** — birleşik gruptaki her masanın siparişini sırayla tahsil et.
+
+Ayrıntılar: **[POS](/tr/admin-guide/pos)**.
+
+## İpuçları
+
+- **QR siparişlerini onaylamayı unutmayın:** "Bekleyen siparişler" panelindeki sayaç, onay bekleyen müşteri siparişlerini gösterir — yoğun saatte gözden kaçmaması için bildirim çubuğunu izleyin.
+- **İptal sadece "Bekliyor"da güvenlidir:** Mutfak hazırlamaya başladıysa siparişi kasadan yönetin; iptal stoğu geri yazdığı için yanlış iptal hem hesabı hem stoğu bozar.
+- **Satış geçmişi raporlarda:** Kapanmış (`PAID`) siparişlerin özetleri, ödeme yöntemi kırılımı ve günlük/saatlik dağılım için **[Raporlar](/tr/admin-guide/reports)** sayfasına bakın.
+
+## İlgili ekranlar
+
+- **[POS](/tr/admin-guide/pos)** — sipariş alma, onay kuyruğu, ödeme, masa işlemleri.
+- **[Mutfak Ekranı (KDS)](/tr/admin-guide/kitchen)** — sipariş durum akışı.
+- **[Raporlar & Analitik](/tr/admin-guide/reports)** — satış ve sipariş raporları.

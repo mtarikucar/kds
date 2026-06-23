@@ -1,0 +1,91 @@
+---
+title: KDS / kiosk modu
+description: HummyTummy Desktop'u mutfak ekranı (KDS) ve tam ekran kiosk olarak kullanma — pencere yapılandırması, KDS ekran cihazı ve ekran komutları.
+---
+
+import { Callout } from 'nextra/components'
+
+# KDS / kiosk modu
+
+Masaüstü uygulaması, web panelindeki POS ve **mutfak ekranı (KDS)** arayüzlerini yerel
+bir pencerede çalıştırır. Bu, özellikle mutfak/bar istasyonlarında uygulamayı tek amaçlı,
+tam ekran bir **kiosk** olarak kullanmak için idealdir.
+
+## Pencere yapılandırması
+
+Uygulama, Tauri yapılandırmasındaki tek bir ana pencereyle açılır:
+
+| Ayar | Değer |
+| --- | --- |
+| Başlık | `HummyTummy POS` |
+| Başlangıç boyutu | 1280 × 720 |
+| En küçük boyut | 800 × 600 |
+| `resizable` | `true` |
+| `fullscreen` | `false` (varsayılan) |
+
+KDS istasyonlarında pencereyi tam ekrana almak (mutfak ekranı genelde adanmış bir
+monitördür) tipik kullanım biçimidir. Uygulama tek pencerelidir; aynı kurulum hem POS
+hem KDS ekranlarını gösterebilir — hangi ekranın açılacağı oturum açan kullanıcının
+rolüne ve seçtiği şubeye bağlıdır.
+
+<Callout type="info">
+  KDS, restoran verileri gibi buluttan beslenir. Masaüstü kiosk, tarayıcı sekmesi
+  kapanması / yanlışlıkla gezinme gibi riskleri ortadan kaldırıp ekranı tek bir
+  uygulamaya kilitlemenin temiz yoludur.
+</Callout>
+
+## KDS ekranını bir cihaz olarak kaydetmek
+
+İsteğe bağlı olarak, bir KDS/bar ekranını device-mesh'te bir cihaz olarak da
+kaydedebilirsiniz. Bu, ekranın **çevrimiçi/çevrimdışı** durumunu panelden izlemenize ve
+ona ekran komutları göndermenize olanak tanır.
+
+Yuvayı `kind: "kds_screen"` (ya da `bar_screen`) ile oluşturun ve cihazı eşleştirin —
+adımlar [Donanım eşleştirme](/tr/desktop/donanim) sayfasıyla birebir aynıdır:
+
+```bash
+curl -X POST https://app.hummytummy.com/api/v1/devices \
+  -H "Authorization: Bearer $JWT" \
+  -H "X-Branch-Id: $BRANCH_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "kind": "kds_screen", "model": "Mutfak Ekranı 1" }'
+```
+
+### Ekran komutları
+
+Kayıtlı bir ekran cihazına şu komutlar gönderilebilir:
+
+| `kind` | Eylem |
+| --- | --- |
+| `show_order` | Ekranda bir siparişi göster |
+| `clear_order` | Gösterilen siparişi temizle |
+| `reboot` | Ekran cihazını yeniden başlat |
+| `capability_probe` | Yetenekleri yokla |
+| `noop` | Boş komut (bağlantı testi) |
+
+Örnek — bir siparişi mutfak ekranında göstermek:
+
+```bash
+curl -X POST https://app.hummytummy.com/api/v1/devices/$SCREEN_ID/commands \
+  -H "Authorization: Bearer $JWT" \
+  -H "X-Branch-Id: $BRANCH_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "kind": "show_order", "payload": { "orderId": "01J..." } }'
+```
+
+<Callout type="info">
+  `show_order`, `clear_order`, `reboot`, `capability_probe` ve `noop` **idempotent /
+  güvenli** komutlardır; başarısızlıkta normal yeniden deneme yolunu izlerler (en çok 5
+  deneme). Yan etkili komutların (`charge_card`, `fiscal_receipt`, `open_drawer`,
+  `print_receipt`) aksine ekranı çift güncellemek zarar vermez.
+</Callout>
+
+## Pratik öneriler
+
+- **Adanmış monitör + tam ekran:** Mutfak/bar ekranını ayrı bir monitöre alın ve
+  pencereyi tam ekrana getirin.
+- **Otomatik güncelleme açık kalsın:** KDS istasyonları nadiren elle yönetilir; Tauri
+  updater'ın yeni sürümleri kendi çekmesi, istasyonların güncel kalmasını sağlar. Bkz.
+  [Otomatik güncelleme](/tr/desktop/otomatik-guncelleme).
+- **Cihaz olarak kaydedin:** Ekranı device-mesh'e kaydederek panelden çevrimiçi durumunu
+  izleyin; heartbeat kesildiğinde ekran ~45 sn içinde `offline` görünür.

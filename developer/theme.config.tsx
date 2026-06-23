@@ -25,12 +25,42 @@ const Logo = () => (
   </span>
 )
 
+// "Go to app" navbar CTA — replaces nextra-theme-docs' default GitHub project
+// icon (we don't expose the private repo on a public portal). Label follows the
+// active locale.
+const AppLink = () => {
+  const { locale } = useRouter()
+  return (
+    <a
+      href="https://hummytummy.com"
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 12px',
+        borderRadius: 8,
+        background: '#f97316',
+        color: '#fff',
+        fontWeight: 600,
+        fontSize: 14,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {locale === 'en' ? 'Go to app' : 'Uygulamaya git'}
+      <span aria-hidden style={{ fontSize: 12 }}>↗</span>
+    </a>
+  )
+}
+
 const config = {
   logo: <Logo />,
-  project: { link: 'https://hummytummy.com' },
-  docsRepositoryBase: 'https://github.com/mtarikucar/kds',
+  // No `project`/`docsRepositoryBase`: the default project icon is the GitHub
+  // logo and the repo is private — we surface a branded "Go to app" CTA instead.
   // Warm brand accent (matches the landing + pricing pages). Orange ≈ hue 24.
   color: { hue: 24, saturation: 95 },
+  navbar: { extraContent: <AppLink /> },
   i18n: [
     { locale: 'tr', name: 'Türkçe' },
     { locale: 'en', name: 'English' },
@@ -41,9 +71,12 @@ const config = {
   },
   feedback: { content: null },
   editLink: { content: null },
+  // Nextra 3 removed `useNextSeoProps`; the document <title> + meta are set here
+  // in `head` instead. `title` from useConfig() is the current page's title.
   head: () => {
     const { frontMatter, title } = useConfig()
     const { locale } = useRouter()
+    const pageTitle = title ? `${title} — HummyTummy Docs` : 'HummyTummy Docs'
     const desc =
       frontMatter.description ||
       (locale === 'en'
@@ -51,10 +84,12 @@ const config = {
         : 'HummyTummy — bulut tabanlı restoran yönetim sistemi dokümantasyonu.')
     return (
       <>
+        <title>{pageTitle}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content={desc} />
-        <meta property="og:title" content={title ? `${title} — HummyTummy Docs` : 'HummyTummy Docs'} />
+        <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={desc} />
+        <meta name="og:type" content="website" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -73,10 +108,6 @@ const config = {
         </a>
       </span>
     ),
-  },
-  // Title template per locale.
-  useNextSeoProps() {
-    return { titleTemplate: '%s — HummyTummy Docs' }
   },
 }
 

@@ -1,7 +1,47 @@
 ---
 title: Plans
+description: HummyTummy subscription plans — pricing, scope, and which plan is right for you.
 ---
+
+import { Callout, Cards } from 'nextra/components'
 
 # Plans
 
-This section is being prepared.
+HummyTummy offers three sellable plans: **Basic (BASIC)**, **Pro (PRO)**, and **Business (BUSINESS)**. Every new business starts on a **7-day full-featured Trial (TRIAL)** at sign-up; when the trial ends you must choose a paid plan to keep going.
+
+All prices are in **Turkish Lira (TRY)** and are **VAT-inclusive**.
+
+## Plans and pricing
+
+| Plan | Monthly | Yearly | Best for |
+| --- | --- | --- | --- |
+| **Basic** (BASIC) | **₺499/mo** | **₺4,490/yr** | Cafés and small restaurants needing core POS + inventory |
+| **Pro** (PRO) | **₺1,299/mo** | **₺12,990/yr** | City-center restaurants needing reservations + delivery + staff management |
+| **Business** (BUSINESS) | **₺2,999/mo** | **₺29,990/yr** | Multi-branch chains — unlimited + API access + priority support |
+
+<Callout type="info">
+  Paying yearly saves you ~17%: you pay the yearly amount instead of 12 monthly charges (e.g. on Basic, ₺4,490 instead of 12 × ₺499 = ₺5,988).
+</Callout>
+
+## What's in every plan?
+
+All three plans include the core modules you need to run a restaurant:
+
+- **POS access** (`posAccess`) — order taking and sales screen
+- **KDS integration** (`kdsIntegration`) — kitchen display
+- **Inventory tracking** (`inventoryTracking`) — product and ingredient stock
+
+As you move up the tiers, capabilities like advanced reports, multi-location, reservations, staff management, delivery integration, custom branding, and API access unlock, and your usage limits (users, tables, branches, products, orders) increase.
+
+<Callout type="warning">
+  **The Free (FREE) plan has been retired.** Its enum value is kept only for backward compatibility with legacy tenants; it is not sellable and no new business ever lands on it. Businesses whose trial ends move to `TRIAL_ENDED` status and the app is locked until a plan is chosen — see [Trial & billing](/en/plans/trial-and-billing).
+</Callout>
+
+## Continue
+
+<Cards>
+  <Cards.Card title="Feature matrix" href="/en/plans/feature-matrix" />
+  <Cards.Card title="Choosing & upgrading" href="/en/plans/choosing-and-upgrading" />
+  <Cards.Card title="Trial & billing" href="/en/plans/trial-and-billing" />
+  <Cards.Card title="Marketplace add-ons" href="/en/marketplace" />
+</Cards>

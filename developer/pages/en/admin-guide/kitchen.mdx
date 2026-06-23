@@ -1,0 +1,70 @@
+---
+title: Kitchen Display (KDS)
+description: The HummyTummy kitchen display — orders arriving in real time, the three-column queue (pending / preparing / ready), kiosk mode and safe cancellation. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Kitchen Display (KDS)
+
+**Menu path:** Business → Kitchen &nbsp;•&nbsp; **URL:** `/kitchen`
+**Access:** ADMIN, MANAGER, KITCHEN
+**Plan:** `kdsIntegration` — available on **all plans**
+
+## Purpose
+
+The KDS (Kitchen Display System) is where orders from the till or the QR menu **land in the kitchen in real time**. It replaces the paper ticket: the cook sees the order, starts preparing it, and marks it "ready" when done. All updates stream instantly over WebSocket — the moment the till writes an order, the kitchen sees it.
+
+<Callout type="info">
+  KDS is available on **all plans** (including the lowest, Starter). Unlike POS, it has
+  no separate plan gate.
+</Callout>
+
+## Screen layout
+
+The kitchen screen splits orders into columns by **three statuses**:
+
+| Column | Status | Meaning |
+| --- | --- | --- |
+| **Pending** | `PENDING` | Just arrived, prep not started |
+| **Preparing** | `PREPARING` | The cook has started |
+| **Ready** | `READY` | Done, waiting to be served/handed off |
+
+- **Desktop (≥1024px):** the three columns appear side by side.
+- **Tablet/phone:** they appear as three tabs, each showing that status's count.
+
+The **stats header** at the top shows the live state (connection status, order counts) and a **refresh** button. Each order card ages by **how long it has been waiting**; urgent (long-waiting) orders are highlighted with a **red alert dot** and surfaced on the tab badge.
+
+## Usage
+
+The cook advances an order to the next status with a single tap on the card:
+
+1. **Pending → Preparing** (start work)
+2. **Preparing → Ready** (ready to serve)
+
+Ready orders appear in the "awaiting payment" list on the till side and close out after they're served/paid.
+
+<Callout type="warning">
+  **Safe cancellation:** only an order in **Pending** can be cancelled, and the cancel
+  commits after a 5-second **undo** window. In that gap another station may have advanced
+  the order — when the system commits the cancel, it re-verifies the order is still
+  "Pending". If it isn't, it won't cancel (you get an "order is no longer pending"
+  warning). A cancellation **restores stock** server-side (line items return to inventory).
+</Callout>
+
+## Kiosk mode
+
+The kiosk toggle at the top turns the screen into a **full-screen, dark-themed** kitchen board — readable from a distance, with distracting UI hidden. If you've mounted a fixed screen/tablet in the kitchen, leave it in kiosk mode.
+
+## Connection drops and resilience
+
+- If the live connection (WebSocket) drops, the screen **auto-polls** roughly every 10 seconds to stay current; polling stops once the connection returns.
+- The last known orders stay on screen (the board **never blanks out** during a transient error).
+- If a fetch fails, a red **warning banner** appears showing the time of the last successful sync; one click refreshes.
+- On first open, before data has arrived, a **skeleton** is shown instead of empty columns — so "still loading" is never confused with "kitchen is empty".
+
+## Tips
+
+- Put a **dedicated screen/tablet** in the kitchen and turn on kiosk mode; define a user with the KITCHEN role (their access is limited to the kitchen screen + board).
+- The "urgent" red dot flags a long-waiting order — use it to prioritize during the rush.
+- If an order came in wrong (the customer changed their mind), cancel it **only while Pending**; once prep has started, manage it from the till.

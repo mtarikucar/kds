@@ -1,0 +1,53 @@
+---
+title: Personnel
+description: HummyTummy personnel management — attendance, shift templates, scheduling and performance. How it differs from user management, its purpose and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Personnel
+
+**Menu path:** Operations → Personnel &nbsp;•&nbsp; **URL:** `/admin/personnel`
+**Access:** ADMIN, MANAGER
+**Plan:** `personnelManagement` — **Professional (PRO)** and above
+
+## Purpose
+
+The personnel module manages your team's **working time**: who clocked in/out and when (attendance), shift templates, the weekly schedule, and performance. It updates in real time (over WebSocket) — when a staff member clocks in, the screen reflects it instantly.
+
+<Callout type="info">
+  The personnel module is unlocked on **Professional (PRO)** and higher plans. If your
+  plan doesn't include it, Personnel is hidden from the menu and the direct URL shows an
+  upgrade card.
+
+  **Personnel ≠ Users:** this module is for **working time/shifts**. To open a system
+  account (role, email, password), use the **Operations → Users** (`/admin/users`)
+  screen.
+</Callout>
+
+## Tabs
+
+| Tab | What it does |
+| --- | --- |
+| **Attendance** | Clock-in/out records — who worked and when |
+| **Shift Templates** | Define recurring shifts (e.g. "Morning 09:00–17:00") |
+| **Schedule** | Assign templates to people/days — the weekly plan |
+| **Performance** | Staff performance metrics |
+
+## Typical usage
+
+1. Define your **shift templates** (morning/evening, etc.).
+2. From the **schedule**, place templates onto people and days.
+3. Track real clock-ins/outs in the **Attendance** tab; compare plan vs. reality.
+4. See team productivity in the **Performance** tab.
+
+## Tips
+
+- **Create users first:** if a staff member has no system account (from the Users screen), tracking their shifts/attendance is pointless — define the user with their role first.
+- **Template = recurring work:** instead of entering the same shift by hand every week, set up a template and assign it with one click in the schedule.
+- **Combine performance with reports:** the **Staff** tab on the Reports screen (shown by the same `personnelManagement` flag) gives sales-based performance; read the two screens together.
+
+## Related screens
+
+- **Users** (`/admin/users`) — system accounts, role and status management (on all plans).
+- **[Reports & Analytics](/en/admin-guide/reports)** — Staff performance report tab.

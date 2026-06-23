@@ -1,0 +1,41 @@
+---
+title: Customers
+description: HummyTummy customer management — add/edit customers, spend/order/loyalty-point summaries and the customer detail page. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Customers
+
+**Menu path:** Business → Customers &nbsp;•&nbsp; **URL:** `/customers`
+**Access:** ADMIN, MANAGER, WAITER
+**Plan:** Available on all plans
+
+## Purpose
+
+The Customers screen holds your restaurant's **customer records** (CRM): name, email, phone, along with each customer's **total spend**, **total orders** and **loyalty points**. You recognize repeat guests and base your loyalty program on this data.
+
+## What's on the screen
+
+- **Summary stats:** total customers, total spend, total orders, total loyalty points.
+- **Search:** filter by name, email or phone.
+- **Customer list:** each row shows basic info + spend/orders/points; clicking a row takes you to the **customer detail page** (`/customers/:id`).
+- **Add / Edit / Delete:** a new-customer form, editing, and delete with a confirmation dialog.
+
+<Callout type="info">
+  Customer management is available on **all plans**. If a customer name/phone is entered
+  while taking an order in POS, it can be linked to the records; customers who self-pay
+  from the QR menu can also be matched by their phone number.
+</Callout>
+
+## Tips
+
+- **Enter the phone correctly:** loyalty points and matching to past orders usually run through the phone number — make entering the customer's phone in POS a habit.
+- **Find your most valuable customers:** sort the list by spend/orders to identify regulars, and target campaigns at them.
+- **Combine with analytics:** the **Customers** tab on the Reports screen gives per-period customer analytics; this screen shows the individual record, that tab shows aggregated behavior.
+
+## Related screens
+
+- **[POS](/en/admin-guide/pos)** — customer name/phone is entered on the order.
+- **[Reports & Analytics](/en/admin-guide/reports)** — Customer analytics tab.
+- **[QR Menu](/en/admin-guide/qr-menu)** — loyalty page (`/qr-menu/:tenantId/loyalty`).

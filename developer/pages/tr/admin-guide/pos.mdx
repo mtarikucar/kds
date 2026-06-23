@@ -1,0 +1,101 @@
+---
+title: POS (Satış Ekranı)
+description: HummyTummy satış ekranı — masa seçimi, sepet, ödeme, masa transferi/birleştirme, hesap bölme ve gel-al modu. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# POS (Satış Ekranı)
+
+**Menü yolu:** İşletme → POS &nbsp;•&nbsp; **URL:** `/pos`
+**Erişim:** ADMIN, MANAGER, WAITER
+**Plan:** `posAccess` — **Başlangıç (BASIC)** ve üzeri
+
+## Amacı
+
+POS, restoranınızın **kasa ekranıdır**: masaya oturan misafire veya gel-al (takeaway) müşterisine sipariş alır, mutfağa gönderir ve ödemeyi tahsil eder. Tüm satış akışı buradan döner — masa seçiminden hesap kapatmaya kadar.
+
+<Callout type="info">
+  POS yalnızca **Başlangıç (BASIC)** ve üzeri planlarda açıktır. Planınızda yoksa
+  hem sol menüde POS görünmez hem de `/pos` adresine gittiğinizde yükseltme kartı
+  çıkar. Mutfak ekranı (KDS) ise tüm planlarda açıktır.
+</Callout>
+
+## Ekran nasıl çalışır?
+
+POS iki adımdan oluşur:
+
+<Steps>
+### Adım 1 — Masa Seçimi
+
+Açılışta masa ızgarası gelir. Her masa kartı **durumunu** renkle gösterir: **boş** (yeşil), **dolu** (sarı/amber), **rezerve** (gri). Bir masada bekleyen sipariş, garson çağrısı veya hesap isteği varsa kartın köşesinde **bildirim rozeti** belirir (sipariş = saat, garson = kişi, hesap = fiş ikonu).
+
+Masaya tıklayınca o masanın sipariş ekranına geçersiniz. Masa boşsa yeni sipariş başlar; doluysa açık siparişi yüklenir.
+
+### Adım 2 — Sipariş Ekranı
+
+Solda **menü** (kategorilere göre ürünler), sağda **sepet** vardır. Ürüne dokununca sepete eklenir. Zorunlu seçenekli ürünlerde (örn. "az pişmiş / orta / iyi pişmiş") önce **seçenek modalı** açılır.
+
+Sepette: adet artır/azalt, satır silme, **indirim**, **müşteri adı** ve **sipariş notu** girilir. Ardından siparişi mutfağa gönderir ve/veya ödemeye geçersiniz.
+</Steps>
+
+<Callout type="info">
+  **Gel-al (Takeaway) modu:** POS ayarlarından "Masasız mod" açılırsa masa seçim
+  adımı atlanır; doğrudan sipariş ekranına düşersiniz. Masa zorunluluğu kalkar.
+</Callout>
+
+## Tek adımlı vs. iki adımlı ödeme
+
+POS ayarlarındaki **"İki adımlı ödeme"** seçeneği akışı belirler:
+
+- **Tek adımlı (varsayılan):** "Öde" der demez sipariş oluşur ve ödeme ekranı açılır — hızlı kafe/gel-al için idealdir.
+- **İki adımlı:** Önce **"Siparişi Oluştur"** ile sipariş mutfağa gönderilir; misafir yedikten sonra **"Ödemeye Geç"** ile tahsil edilir. QR menüden müşteri kendi sipariş veriyorsa iki adımlı mod otomatik gerekir.
+
+<Callout type="warning">
+  İki adımlı modda siparişi oluşturduktan sonra sepete ürün ekler/indirimi
+  değiştirirseniz, sistem ödemeye geçmeden önce siparişi **yeniden kaydeder ve yeniden
+  fiyatlandırır**. Böylece eski (bayat) tutar üzerinden tahsilat yapılmaz; yeni
+  eklenen ürünler hem hesaba hem mutfak fişine yansır.
+</Callout>
+
+## Ödeme
+
+**Öde** butonu **Ödeme Modalı**'nı açar. Ödeme yöntemini (nakit, kart, vb.) seçer, gerekiyorsa işlem numarası ve müşteri telefonu girersiniz. Tahsilat sonrası:
+
+- Masada başka açık sipariş kalmadıysa masa **otomatik boşa** çekilir (sistem, ödeme anında en güncel sipariş listesini kontrol eder — başka misafirin açık hesabın üstüne oturmasını engeller).
+- Masaüstü (Tauri) POS terminalinde varsayılan yazıcı tanımlıysa **fiş otomatik basılır**; basım hatasında tek dokunuşla yeniden bas seçeneği çıkar.
+
+<Callout type="info">
+  Her ödeme isteğine bir **idempotency anahtarı** eklenir: çift tıklama veya ağ
+  kopması sonrası tekrar denemede aynı ödeme iki kez işlenmez.
+</Callout>
+
+## Masa işlemleri
+
+Sipariş ekranındaki sepet araç çubuğundan:
+
+- **Masa Transferi** — açık siparişi başka masaya taşıyın (hedef masada sipariş varsa birleştirme önerilir).
+- **Masa Birleştirme** — yan yana oturan grupları tek hesapta toplayın; istediğinizde tekrar ayırın (tekli veya toplu).
+- **Hesap Bölme (Split)** — bir hesabı tutar/kişi bazında parçalayın.
+- **Aşamalı (Dutch) Ödeme** — birleşik masadaki her masanın açık siparişini ayrı ayrı, sırayla tahsil edin.
+
+## Canlı bildirim çubuğu
+
+Ekranın üstündeki bildirim çubuğu üç kuyruğu canlı (WebSocket) gösterir:
+
+- **Bekleyen siparişler** — QR menüden gelen ve onay bekleyen siparişler.
+- **Garson çağrıları** — masadan "garson çağır" istekleri.
+- **Hesap istekleri** — masadan "hesabı getir" istekleri.
+
+Her birine tıklayınca ilgili panel açılır; oradan tek tek işlem yaparsınız.
+
+## İpuçları
+
+- **Sepet kaybolmaz:** Devam eden sipariş tarayıcıya (12 saat) kaydedilir — sekme yanlışlıkla kapanırsa veriniz durur.
+- **Rezerve masaya dokunmak:** Sistem yaklaşan bir rezervasyon için masayı otomatik tuttuysa, dokununca rezervasyon detayını gösteren bir diyalog açılır ve tek dokunuşla **misafiri oturtursunuz**. Rezervasyon olmadan elle "rezerve" işaretlenmiş masada ise kilidi açma diyaloğu çıkar.
+- **Tablet kullanımı:** Yatay tablet (≥768px) masaüstü gibi yan yana menü+sepet düzenini alır; telefonda sepet alttaki çekmeceye iner.
+- **İndirim güvenliği:** İndirim ara toplamı geçemez; ürün çıkarıp indirimi olduğu gibi bırakırsanız sistem indirimi otomatik kısar (eksi tutar oluşmaz).
+
+## İlgili ayarlar
+
+POS davranışını **Ayarlar → POS** ve **Ayarlar → QR Menü** altından yönetirsiniz: masasız mod, iki adımlı ödeme, ücretsiz self-pay (PayTR), "ödemeden önce servis edilmiş olsun" kuralı, ürün görselleri ve varsayılan harita görünümü. Ayrıntı: **[Ayarlar](/tr/admin-guide/settings)**.

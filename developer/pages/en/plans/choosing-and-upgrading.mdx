@@ -1,0 +1,152 @@
+---
+title: Choosing & upgrading
+description: Choosing a plan, upgrading (proration), downgrading (at period end), and payment flows (PayTR / bank transfer).
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Choosing & upgrading
+
+Plan selection and changes run through two screens:
+
+- **Plan selection screen** (`SubscriptionPlansPage`) — lists the plans, lets you pick monthly/yearly.
+- **Change plan screen** (`ChangePlanPage`) — upgrades/downgrades a live subscription.
+
+All prices are **TRY** and **VAT-inclusive**. Only the **ADMIN** and **MANAGER** roles can call the payment/checkout endpoints; the endpoints that actually write a plan change are restricted to **ADMIN**.
+
+## Listing sellable plans
+
+The plan catalog is public (`@Public`) and returns only **active + public** plans — that is, Basic / Pro / Business. The Trial (`isPublic=false`) and the retired Free (`isActive=false`) plans never appear in the list.
+
+```bash
+curl https://app.hummytummy.com/api/subscriptions/plans
+```
+
+For each plan, the response includes `id`, `name`, `displayName`, `monthlyPrice`, `yearlyPrice`, `currency`, `trialDays`, `limits`, `features`, and (if any) an active `discount`. Any advertised discounted price is computed with the **same** `resolvePlanAmount` the charge rails use, so the price shown equals the price charged.
+
+## Selection flow: which path is taken?
+
+The plan selection screen branches on the business's current subscription status:
+
+<Steps>
+
+### Live subscription (ACTIVE / TRIALING), different plan
+The user is routed to the **Change plan** screen. Upgrade/downgrade proration only makes sense within a live billing period.
+
+```text
+/subscription/change-plan?newPlanId=<PLAN_ID>&billingCycle=MONTHLY
+```
+
+### Live subscription, same plan
+No-op.
+
+### PAST_DUE / EXPIRED / CANCELLED / no subscription
+The fresh **checkout** flow is used. Because proration over a finished period would produce a negative amount, these cases start a new full-period subscription instead.
+
+```text
+/subscription/checkout?planId=<PLAN_ID>&billingCycle=MONTHLY
+```
+
+### Trial-eligible business
+The backend short-circuits to the TRIAL response inside `/payments/create-intent`; the checkout screen handles this case specially.
+
+</Steps>
+
+## Upgrade (with proration)
+
+Switching to a more expensive plan on a live subscription counts as an **upgrade**. `POST /subscriptions/:id/change-plan` returns a **prorated quote** based on the days remaining in the period — this call does not write a mutation; it only computes the amount to charge.
+
+<Tabs items={['Flow', 'curl', 'Response']}>
+<Tabs.Tab>
+
+1. The user selects the new (more expensive) plan.
+2. The backend returns an `upgrade` quote with `requiresPayment` and `prorationAmount`.
+3. Payment is collected via the PayTR (or bank transfer) rail; the upgrade is then applied.
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```bash
+curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/change-plan \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newPlanId": "<NEW_PLAN_ID>",
+    "billingCycle": "MONTHLY"
+  }'
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```json
+{
+  "type": "upgrade",
+  "requiresPayment": true,
+  "paymentInfo": {
+    "subscriptionId": "sub_...",
+    "newPlanId": "plan_...",
+    "billingCycle": "MONTHLY",
+    "prorationAmount": 533.42,
+    "newAmount": 1299,
+    "currency": "TRY"
+  }
+}
+```
+
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  Proration is computed from the ratio of days remaining until `currentPeriodEnd` to the total days in the period. If `prorationAmount` is greater than 0, `requiresPayment: true` is returned and the upgrade is applied only after payment is collected.
+</Callout>
+
+## Downgrade (applied at period end)
+
+Switching to a cheaper plan counts as a **downgrade** and is **not applied immediately** — it is **scheduled** for the end of the current billing period. The same call behaves as follows:
+
+- Current usage is first validated against the target plan's limits (`assertDowngradeAllowed`). For example, if you have 4 branches you cannot downgrade to Basic's 1-branch limit.
+- The change is recorded as `scheduledDowngradePlanId`, written atomically with a compound `WHERE ... scheduledDowngradePlanId IS NULL` to guard against races.
+- The response includes `type: "downgrade"`, `requiresPayment: false`, and `scheduledFor` (the period-end date).
+
+```bash
+# Query a scheduled downgrade
+curl https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+
+# Cancel a scheduled downgrade (ADMIN only)
+curl -X DELETE https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+<Callout type="warning">
+  If you try to make a new change while one is already scheduled, the request is rejected ("cancel the existing change first"). Cross-currency plan changes are also unsupported (the system is TRY-only).
+</Callout>
+
+## Payment rails: PayTR and bank transfer
+
+Payment for a new subscription or an upgrade can be collected via two rails:
+
+- **PayTR (card)** — the default. PayTR collects **TRY** only. `POST /payments/create-intent` creates a PENDING payment; once confirmed by webhook the subscription activates. Limited to 5 attempts per minute (`@Throttle`).
+- **Bank transfer (havale/EFT, manual)** — an alternative method. `GET /payments/bank-transfer/details` returns the platform bank details, and `POST /payments/bank-transfer/intent` reserves a bank-transfer payment. A bank-transfer payment is **activated by superadmin confirmation** (not a webhook). If a superadmin hasn't set an IBAN, the bank-transfer screen is disabled.
+
+```bash
+# Start a card (PayTR) subscription payment
+curl -X POST https://app.hummytummy.com/api/payments/create-intent \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
+```
+
+<Callout type="info">
+  Marketplace add-on purchases use the **same PayTR checkout rail** (`POST /api/v1/checkout/intent` → `CK-`-prefixed webhook → `confirmAndProvision`). Add-ons activate only after payment. See [Marketplace](/en/marketplace).
+</Callout>
+
+## Acquiring features later
+
+When you need a feature later, there are two paths:
+
+1. **Plan upgrade** — move to a higher tier to unlock the full feature set and higher limits (the upgrade flow on this page).
+2. **Marketplace add-on** — add a single capability without changing plans. See [Marketplace](/en/marketplace).
+
+> A superadmin override (manually unlocking a feature) is an internal operation only; it is not a customer-facing flow.

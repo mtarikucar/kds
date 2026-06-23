@@ -1,0 +1,57 @@
+---
+title: Tables & Floor Plan
+description: HummyTummy table management — add/edit/delete tables, capacity, one-tap status changes, occupancy stats and plan limits. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Tables & Floor Plan
+
+**Menu path:** Menu & Tables → Tables &nbsp;•&nbsp; **URL:** `/admin/tables`
+**Access:** ADMIN, MANAGER
+**Plan:** Available on all plans (table count **depends on plan**)
+
+## Purpose
+
+This screen defines your restaurant's **tables** and manages their status. The tables you add are used in the POS table grid as well as in the QR menu and reservation flows.
+
+## What's on the screen
+
+- **Stats strip at the top:** total tables, **free**, **occupied**, **reserved** counts and a live **occupancy percentage** (share of seated tables).
+- **Table card grid:** each card shows the table number, status (colored badge), capacity and action buttons.
+- **Plan-limit banner:** warns you as you approach your plan's table limit; once the limit is reached "Add Table" is locked and an upgrade prompt appears.
+
+## Table statuses
+
+| Status | Color | Meaning |
+| --- | --- | --- |
+| **Free** (`AVAILABLE`) | Green | Available |
+| **Occupied** (`OCCUPIED`) | Red/Amber | Guest seated |
+| **Reserved** (`RESERVED`) | Gray/Amber | Reserved |
+
+## Usage
+
+- **Add / edit a table:** "Add Table" asks for the number, capacity and starting status. Editing an existing table (pencil icon) opens the same form.
+- **One-tap status:** each card has a **Free / Occupied / Reserved** segmented control — flip the table's status instantly without opening a modal.
+- **Delete:** the trash icon opens a confirmation dialog. If the table is **occupied** or has an **upcoming reservation**, the dialog warns you (so you don't orphan a seated guest / a booked slot).
+- **Upcoming-reservation badge:** if a confirmed/pending reservation starts soon (within ~2 hours), the card shows the time + customer name — staff can see at a glance which table has an incoming guest.
+
+<Callout type="info">
+  **The table limit depends on the plan:** Starter (BASIC) **20 tables**, Professional
+  (PRO) **50 tables**, Enterprise (BUSINESS) **unlimited**. Once at the limit you can't
+  add a new table; upgrade the plan or delete unused tables. For exact limits see
+  **[Plans](/en/plans)**.
+</Callout>
+
+## Tips
+
+- **Watch the occupancy percentage:** during peak hours the occupancy rate in the stats strip is a good capacity-planning signal; combine it with the "table utilization" report in Analytics.
+- **You can change status from POS too:** taking an order in POS auto-marks the table "occupied", and collecting payment auto-marks it "free". The one-tap control on this screen is for manual fixes without an order (e.g. cleaning / holding as reserved).
+- **Reserved by hand vs. automatic:** if you mark a table "Reserved" by hand (with no reservation record), a waiter tapping that table in POS gets an unlock dialog. Real reservations are managed from the **Reservations** screen.
+- **Before deleting:** deleting an occupied/reserved table may affect an active session or a booking — read the warning.
+
+## Related screens
+
+- **[POS](/en/admin-guide/pos)** — table selection, transfer, merge and bill splitting happen here.
+- **[Reservations](/en/admin-guide/reservations)** — table-based reservations and auto-hold (PRO).
+- **[Reports & Analytics](/en/admin-guide/reports)** — table utilization/occupancy analysis.

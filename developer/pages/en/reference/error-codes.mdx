@@ -1,0 +1,199 @@
+---
+title: Error Codes
+description: The standard error envelope, machine-readable errorCode values, and how Prisma database errors map to HTTP status codes.
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Error Codes
+
+Every error in the HummyTummy API is returned through a single, standard
+**error envelope**. On the client, branch on the stable `errorCode` field —
+not on the human-readable message.
+
+## Error envelope
+
+Every error response follows this shape:
+
+```json
+{
+  "statusCode": 409,
+  "message": "A record with this email already exists",
+  "error": "UniqueConstraintViolation",
+  "errorCode": "RESOURCE_ALREADY_EXISTS",
+  "timestamp": "2026-06-23T08:14:05.123Z",
+  "path": "/api/v1/auth/register",
+  "requestId": "1750665245123-a1b2c3d4e"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `statusCode` | `number` | HTTP status code. |
+| `message` | `string \| string[]` | User-facing message. May be an array for validation errors. |
+| `error` | `string` | A human/category label (sometimes localized, or class-validator's `"Bad Request"`). **Do not branch on this.** |
+| `errorCode` | `string?` | The stable, machine-readable code. **The client should branch only on this.** Present only when the thrown exception attaches one. |
+| `timestamp` | `string` | Request timestamp (ISO 8601). |
+| `path` | `string` | Request path. |
+| `requestId` | `string?` | Tracking id — include it in support requests. |
+| `details` | `any?` | Present only in the `development` environment. |
+| `stack` | `string?` | Present only in the `development` environment. |
+
+<Callout type="info">
+  `errorCode` carries **no PII**, so it is surfaced in every environment
+  (production included). `details` and `stack`, by contrast, appear only in the
+  `development` environment.
+</Callout>
+
+<Callout type="warning">
+  The `error` field may be localized or fall back to a framework-generated
+  label. **Always** branch behaviour on `errorCode`; when `errorCode` is
+  absent, fall back to `statusCode`.
+</Callout>
+
+## errorCode values
+
+The following codes come from the `ErrorCode` enum and are attached to business
+logic exceptions (`BusinessException`).
+
+### Authentication
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `INVALID_CREDENTIALS` | Email or password is wrong. |
+| `TOKEN_EXPIRED` | The token has expired. |
+| `TOKEN_INVALID` | The token is invalid/malformed. |
+| `UNAUTHORIZED` | Authentication is required. |
+
+### Authorization
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `FORBIDDEN` | Access denied. |
+| `INSUFFICIENT_PERMISSIONS` | The role/permission is insufficient for this action. |
+
+### Resource
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `RESOURCE_NOT_FOUND` | The requested record does not exist. |
+| `RESOURCE_ALREADY_EXISTS` | The same record already exists (e.g. duplicate email). |
+| `RESOURCE_CONFLICT` | Conflicts with the resource's current state. |
+
+### Validation
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `VALIDATION_ERROR` | Generic input validation failed. |
+| `INVALID_INPUT` | An input value is invalid. |
+| `MISSING_REQUIRED_FIELD` | A required field is missing. |
+
+### Business logic
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `INSUFFICIENT_STOCK` | Not enough stock for the product. `details`: `{ productName, available, requested }`. |
+| `ORDER_ALREADY_PAID` | The order is already paid. |
+| `TABLE_OCCUPIED` | The table is occupied. |
+| `INVALID_ORDER_STATUS` | The action isn't allowed in the order's current status. |
+| `SUBSCRIPTION_REQUIRED` | An active subscription is required (HTTP 402). |
+| `FEATURE_NOT_AVAILABLE` | The feature isn't on the current plan; an upgrade is required (HTTP 402). |
+| `QUOTA_EXCEEDED` | A plan limit was exceeded (HTTP 402). |
+
+### Payment
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `PAYMENT_FAILED` | The payment failed. |
+| `PAYMENT_PROCESSING_ERROR` | An error occurred while processing the payment. |
+| `INVALID_PAYMENT_METHOD` | Invalid payment method. |
+
+### System
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `INTERNAL_SERVER_ERROR` | Unexpected server error. |
+| `SERVICE_UNAVAILABLE` | The service is temporarily unavailable. |
+| `DATABASE_ERROR` | A database error. |
+| `EXTERNAL_SERVICE_ERROR` | An external service error (e.g. the payment provider). |
+
+### Rate limiting
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `TOO_MANY_REQUESTS` | Too many requests (HTTP 429). |
+
+### Tenant
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `TENANT_NOT_FOUND` | Tenant not found. |
+| `INVALID_TENANT` | Invalid tenant. |
+
+## Database errors → HTTP
+
+Prisma's known database errors (`PrismaClientKnownRequestError`) are translated
+to meaningful HTTP status codes in the global exception filter. In these
+responses the `error` field carries the category label; `errorCode` is **not**
+present here (these are not `BusinessException`s).
+
+| Prisma code | HTTP | `error` | Meaning |
+| --- | --- | --- | --- |
+| `P2002` | `409 Conflict` | `UniqueConstraintViolation` | Unique constraint violation (duplicate record). |
+| `P2025` | `404 Not Found` | `RecordNotFound` | Record not found. |
+| `P2003` | `400 Bad Request` | `ForeignKeyConstraintViolation` | Related record missing, or can't delete due to dependencies. |
+| `P2014` | `400 Bad Request` | `RequiredRelationViolation` | The change would violate a required relation. |
+| `P2016` | `400 Bad Request` | `InvalidQuery` | Invalid query parameters. |
+| `P2021` | `500 Internal Server Error` | `DatabaseConfigError` | Table does not exist (configuration error). |
+| `P2024` | `503 Service Unavailable` | `DatabaseTimeout` | Database connection timeout. |
+| `P2034` | `409 Conflict` | `ConcurrentUpdate` | Serializable transaction conflict (Postgres `40001`). The transaction **did not commit**; the request is safe to retry. |
+| `P2000`, `P2020` | `400 Bad Request` | `ValueOutOfRange` | A value is out of the allowed range or too long. |
+| (other) | `500 Internal Server Error` | `DatabaseError` | An unmapped database error. |
+
+<Callout type="info">
+  `P2034` (`ConcurrentUpdate`, 409) is the expected "loser" outcome of a
+  Serializable transaction under contention (checkout settlement, marketplace
+  purchase, etc.), and your request did **not** take effect. If you receive it,
+  you can safely resend the request as-is.
+</Callout>
+
+## Handling errors on the client
+
+<Tabs items={['Pseudo-code', 'curl']}>
+  <Tabs.Tab>
+```ts
+const res = await fetch('/api/v1/display/orders', { method: 'POST', /* … */ });
+if (!res.ok) {
+  const err = await res.json(); // ErrorResponse
+  switch (err.errorCode) {
+    case 'QUOTA_EXCEEDED':
+    case 'FEATURE_NOT_AVAILABLE':
+    case 'SUBSCRIPTION_REQUIRED':
+      // Send the user to the upgrade flow (HTTP 402)
+      break;
+    case undefined:
+      // No errorCode → branch on statusCode (e.g. 409 ConcurrentUpdate → retry)
+      break;
+    default:
+      showToast(err.message);
+  }
+}
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```bash
+curl -i -X POST https://api.hummytummy.com/api/v1/display/orders \
+  -H "Authorization: Bearer <SCREEN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "items": [], "type": "DINE_IN" }'
+
+# HTTP/1.1 409 Conflict
+# {
+#   "statusCode": 409,
+#   "error": "ConcurrentUpdate",
+#   "message": "Concurrent update conflict — please retry. Your request did not take effect.",
+#   ...
+# }
+```
+  </Tabs.Tab>
+</Tabs>

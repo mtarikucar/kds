@@ -1,7 +1,72 @@
 ---
 title: Geliştirici / Entegrasyon
+description: HummyTummy REST API, Partner Display API ve giden webhook'lar ile entegrasyon kurun.
 ---
+
+import { Cards, Callout } from 'nextra/components'
 
 # Geliştirici / Entegrasyon
 
-Bu bölüm hazırlanıyor.
+HummyTummy'yi kendi sistemlerinize bağlayın: kendi ekranlarınızı/uygulamalarınızı
+çalıştırın, sipariş ve ödeme olaylarını sunucunuza akıtın, REST API üzerinden
+restoran verisine erişin. Tüm uçlar tek bir API tabanı altında toplanır:
+
+```
+https://hummytummy.com/api
+```
+
+<Callout type="info">
+  Tüm REST yolları `/api` global ön ekiyle servis edilir. Bu dokümandaki her
+  örnekte tam yol gösterilir (örn. `POST /api/v1/webhooks/subscriptions`). Para
+  birimi her zaman **TRY**'dir.
+</Callout>
+
+## Hangi entegrasyon size uygun?
+
+HummyTummy üç ayrı entegrasyon yüzeyi sunar; çoğu entegratör birden fazlasını
+birlikte kullanır.
+
+<Cards>
+  <Cards.Card title="API Temelleri" href="/tr/developer/api-temelleri" arrow>
+    Taban URL, kimlik gerçeklikleri (personel JWT / müşteri oturumu / partner
+    anahtarı / ekran token'ı), `X-Branch-Id` şube kapsamı, sayfalama, hata
+    zarfı, idempotency ve rate-limit katmanları.
+  </Cards.Card>
+  <Cards.Card title="Partner Display API" href="/tr/developer/partner-display" arrow>
+    Masa tableti gibi kendi ekranlarınızı çalıştırın: menü, sipariş, garson/hesap
+    çağrısı, self-servis ödeme ve canlı sipariş durumu. ADMIN anahtarı → ekran
+    token'ı → `/v1/display/*` + WebSocket.
+  </Cards.Card>
+  <Cards.Card title="Webhook'lar" href="/tr/developer/webhooks" arrow>
+    Sipariş, ödeme ve abonelik olaylarını HMAC-SHA256 imzalı POST'larla kendi
+    uç noktanıza alın. Abonelik, imza doğrulama, olay tipleri, yeniden deneme ve
+    SSRF koruması.
+  </Cards.Card>
+</Cards>
+
+## İki yön: çekme (pull) ve itme (push)
+
+- **Çekme** — REST uçlarını siz çağırırsınız (menü okuma, sipariş oluşturma,
+  ödeme başlatma). Kimlik ve şube kapsamı kuralları için
+  [API Temelleri](/tr/developer/api-temelleri).
+- **İtme** — bir olay olduğunda biz sizin uç noktanıza POST atarız (giden
+  webhook'lar). Kurulum ve doğrulama için [Webhook'lar](/tr/developer/webhooks).
+
+## Yetkilendirme katmanları (kısa özet)
+
+| Realm | Nasıl kimlik doğrular | Tipik kullanım |
+| --- | --- | --- |
+| Personel JWT | `Authorization: Bearer <jwt>` | Dashboard / yönetim API'si, anahtar & webhook yönetimi |
+| Müşteri oturumu | QR menü oturum token'ı | Misafir sipariş & self-pay |
+| Partner anahtarı | `X-Partner-Key` + `X-Partner-Secret` | Partner backend'i ekran token'ı üretir |
+| Ekran token'ı | `Authorization: Screen <token>` | Cihaz `/v1/display/*` çağırır |
+
+Her birinin tam ayrıntısı [API Temelleri](/tr/developer/api-temelleri)
+sayfasında.
+
+<Callout type="warning">
+  Partner Display ve giden webhook'lar **plana bağlı** özelliklerdir. Partner
+  Display için tenant planının `externalDisplay`, webhook abonelikleri için
+  `apiAccess` (API erişimi) özelliğini içermesi gerekir. Aksi halde ilgili uçlar
+  `403` döner.
+</Callout>

@@ -201,6 +201,32 @@ services:
     networks:
       - kds_network
 
+  # Developer Docs Portal (Nextra / Next.js)
+  developer:
+    env_file:
+      - .env.production
+    image: ghcr.io/mtarikucar/kds/developer:current
+    build:
+      context: ./developer
+      dockerfile: Dockerfile
+    container_name: kds_developer_prod
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3200:3000'
+    healthcheck:
+      # The docs app has no /api/health route; /tr is the default-locale
+      # landing page (nextra/locales middleware redirects / → /tr) and
+      # returns 200, so it's the durable liveness probe.
+      test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/tr']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - kds_network
+
 
 volumes:
   postgres_data:

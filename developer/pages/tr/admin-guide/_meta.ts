@@ -1,3 +1,15 @@
 export default {
-  "index": "Genel Bakış"
-}
+  "index": "Genel Bakış",
+  "pos": "POS (Satış Ekranı)",
+  "qr-menu": "QR Menü",
+  "kitchen": "Mutfak Ekranı (KDS)",
+  "tables": "Masalar & Kat Planı",
+  "orders": "Siparişler",
+  "stock": "Stok & Envanter",
+  "reports": "Raporlar & Analitik",
+  "reservations": "Rezervasyonlar",
+  "personnel": "Personel",
+  "customers": "Müşteriler",
+  "branches": "Şubeler",
+  "settings": "Ayarlar",
+};

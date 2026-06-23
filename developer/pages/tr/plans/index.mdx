@@ -1,7 +1,47 @@
 ---
 title: Planlar
+description: HummyTummy abonelik paketleri — fiyatlar, kapsam ve hangi paketin sizin için doğru olduğu.
 ---
+
+import { Callout, Cards } from 'nextra/components'
 
 # Planlar
 
-Bu bölüm hazırlanıyor.
+HummyTummy üç satılabilir paket sunar: **Başlangıç (BASIC)**, **Profesyonel (PRO)** ve **Kurumsal (BUSINESS)**. Her yeni işletme, kayıt anında **7 günlük tam özellikli Deneme (TRIAL)** ile başlar; deneme bittiğinde devam etmek için ücretli bir paket seçmek gerekir.
+
+Tüm fiyatlar **Türk Lirası (TRY)** cinsinden ve **KDV dahildir**.
+
+## Paketler ve fiyatlar
+
+| Paket | Aylık | Yıllık | Kime uygun |
+| --- | --- | --- | --- |
+| **Başlangıç** (BASIC) | **₺499/ay** | **₺4.490/yıl** | Kafe ve küçük restoranlar için temel POS + stok takibi |
+| **Profesyonel** (PRO) | **₺1.299/ay** | **₺12.990/yıl** | Rezervasyon + delivery + personel takibi gereken şehir merkezi restoranlar |
+| **Kurumsal** (BUSINESS) | **₺2.999/ay** | **₺29.990/yıl** | Çok şubeli zincirler — sınırsız + API erişimi + öncelikli destek |
+
+<Callout type="info">
+  Yıllık ödemede ~%17 tasarruf edersiniz: 12 aylık tutar yerine yıllık tutarı ödersiniz (ör. Başlangıç'ta 12 × ₺499 = ₺5.988 yerine ₺4.490).
+</Callout>
+
+## Her pakette ne var?
+
+Üç paketin de temel restoran işletmeciliği için ihtiyaç duyduğunuz çekirdek modülleri içerir:
+
+- **POS erişimi** (`posAccess`) — sipariş alma ve satış ekranı
+- **KDS entegrasyonu** (`kdsIntegration`) — mutfak ekranı
+- **Stok takibi** (`inventoryTracking`) — ürün ve malzeme stoğu
+
+Paketler yukarı çıktıkça gelişmiş raporlar, çok şube, rezervasyon, personel yönetimi, delivery entegrasyonu, özel marka, API erişimi gibi yetenekler açılır ve kullanım limitleri (kullanıcı, masa, şube, ürün, sipariş) yükselir.
+
+<Callout type="warning">
+  **Ücretsiz (FREE) paket kaldırılmıştır.** Eski tenant'lar için enum değeri yalnızca uyumluluk amacıyla durur; satışa açık değildir ve hiçbir yeni işletme bu pakete düşmez. Deneme süresi biten işletmeler `TRIAL_ENDED` durumuna geçer ve uygulama bir paket seçilene kadar kilitlenir — bkz. [Deneme ve faturalama](/tr/plans/deneme-ve-faturalama).
+</Callout>
+
+## Devam edin
+
+<Cards>
+  <Cards.Card title="Özellik matrisi" href="/tr/plans/ozellik-matrisi" />
+  <Cards.Card title="Plan seçimi ve yükseltme" href="/tr/plans/plan-secimi-ve-yukseltme" />
+  <Cards.Card title="Deneme ve faturalama" href="/tr/plans/deneme-ve-faturalama" />
+  <Cards.Card title="Marketplace eklentileri" href="/tr/marketplace" />
+</Cards>

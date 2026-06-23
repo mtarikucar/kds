@@ -1,0 +1,74 @@
+---
+title: Glossary
+description: Definitions of the core terms used across HummyTummy — Tenant, Branch, Role, KDS, POS, QR menu, Self-pay, Scope, Screen token, Webhook, Outbox, Entitlement, Add-on.
+---
+
+# Glossary
+
+Short definitions of terms that appear frequently in the HummyTummy API and
+docs.
+
+### Tenant
+The top-level account that represents a restaurant business (customer account).
+It owns the subscription, the plan, and all data. Tenant resolution is done via
+the `tenantId` in the JWT, not by host name.
+
+### Branch
+A physical location/branch belonging to a tenant. Tables, orders, stock, and
+most operational data are tied to a branch. Branch-scoped endpoints require the
+`X-Branch-Id` header.
+
+### Role
+A user's permission level. Roles: `ADMIN`, `MANAGER`, `WAITER`, `KITCHEN`,
+`COURIER`. `WAITER`, `KITCHEN`, and `COURIER` are "hard-restricted" roles —
+they are pinned to a single branch (a `primaryBranchId` is mandatory) and
+cannot target any other branch.
+
+### KDS (Kitchen Display System)
+The screen that mirrors incoming orders to kitchen/prep stations in real time.
+Depends on the `kdsIntegration` feature.
+
+### POS (Point of Sale)
+The till interface for taking orders, payments, and managing tables. Depends on
+the `posAccess` feature.
+
+### QR menu
+The public menu and ordering interface a guest reaches by scanning the QR code
+at the table. It drives the ordering and self-pay flows through an ordering
+session.
+
+### Self-pay
+A guest paying their own bill from their own device (or the table screen),
+without a waiter. It runs by creating a PayTR hosted-iframe pay intent and
+requires the `payments:write` scope.
+
+### Scope
+A unit of permission carried by a partner API key and a screen token
+(e.g. `menu:read`, `orders:write`). Each `/display` endpoint requires a
+specific scope. See [Partner Scopes](/en/reference/partner-scopes).
+
+### Screen token
+An access token minted from a partner API key and bound to a specific
+screen/device session. It is bound to a tenant, an optional table, and a branch;
+its effective scopes are a subset of the parent key's.
+
+### Webhook
+An event notification sent outward from the server. For example, the PayTR
+payment provider's callback reporting a payment result; a payment is only
+provisioned after the webhook confirms it (`confirmAndProvision`).
+
+### Outbox
+A pattern where an event record is written in the same transaction as the
+database change and then reliably published afterwards. It keeps side effects
+(event publication) atomic with the primary data and provides at-least-once
+delivery.
+
+### Entitlement
+The effective set of features and limits derived from a tenant's active plan
+(and its add-ons). It is recomputed (re-projected) when the plan changes, and
+feature gates (`PlanFeatureGuard`) consult it.
+
+### Add-on
+An extra feature or capacity added to a plan and purchased separately. It is
+bought through the marketplace via the PayTR payment rail and added to the
+entitlement once the payment is confirmed.

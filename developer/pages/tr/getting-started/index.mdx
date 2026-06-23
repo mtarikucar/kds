@@ -1,7 +1,54 @@
 ---
-title: Başlangıç
+title: Başlangıç — Genel Bakış
+description: HummyTummy nedir, kimler için, nasıl başlanır — yeni restoran sahipleri ve yöneticiler için giriş.
 ---
+
+import { Callout, Cards } from 'nextra/components'
 
 # Başlangıç
 
-Bu bölüm hazırlanıyor.
+**HummyTummy**, kafe ve restoranlar için tasarlanmış **bulut tabanlı bir restoran yönetim sistemidir**. Tek bir hesapta QR menü, POS (kasa), mutfak ekranı (KDS), sipariş ve masa yönetimi, stok, raporlar ve çoklu şube yönetimini birleştirir. Tarayıcı tabanlıdır — herhangi bir donanım kurulumu veya yerel yazılım gerektirmez.
+
+Bu bölüm, sıfırdan başlayan bir restoran sahibi veya yönetici için hazırlanmıştır: kavramları öğrenin, hesabınızı oluşturun ve ilk şubenizi, menünüzü, masalarınızı dakikalar içinde ayağa kaldırın.
+
+## Kimler için?
+
+- **Kafe, restoran, pastane, bar, fast-food** işletmeleri (1 masadan 100+ masaya)
+- İşletmesini **tek panelden** yönetmek isteyen sahipler ve yöneticiler
+- Bulut tabanlı, **kurulumsuz** bir çözüm arayanlar
+
+## Neler sunar?
+
+- **POS / Kasa** — masadan veya gel-al (takeaway) sipariş alma, ödeme, indirim
+- **Mutfak Ekranı (KDS)** — siparişlerin mutfağa gerçek zamanlı düşmesi
+- **QR Menü** — müşterinin masadaki QR'ı okuyup menüyü görmesi ve sipariş vermesi
+- **Masa & Sipariş yönetimi** — masa durumu, transfer, parça parça ödeme
+- **Stok & Reçete**, **Rezervasyon**, **Personel**, **Raporlar** ve **çoklu şube**
+- **5 dilde arayüz**: Türkçe, İngilizce, Rusça, Özbekçe, Arapça
+- **Gerçek zamanlı (WebSocket) güncelleme**: bir kasa sipariş yazınca aynı anda mutfak görür
+
+<Callout type="info">
+  HummyTummy **çok kiracılı (multi-tenant)** bir sistemdir: her işletmenin verisi
+  birbirinden tamamen izoledir. Sadece kendi restoranınızın verisini görürsünüz.
+  Para birimi **Türk Lirası (TRY)** olarak çalışır.
+</Callout>
+
+## Nasıl başlanır?
+
+Yeni kaydolan her işletme **7 günlük ücretsiz deneme (TRIAL)** ile başlar — kart bilgisi istenmez, tüm özellikler açıktır. Deneme bitince devam etmek için bir ücretli plan seçersiniz.
+
+Aşağıdaki sayfaları sırayla izleyin:
+
+<Cards>
+  <Cards.Card title="Temel Kavramlar" href="/getting-started/kavramlar" arrow />
+  <Cards.Card title="Hesap Oluşturma" href="/getting-started/hesap-olusturma" arrow />
+  <Cards.Card title="İlk Kurulum" href="/getting-started/ilk-kurulum" arrow />
+</Cards>
+
+## Sırada ne var?
+
+Hesabınızı kurduktan sonra:
+
+- Tüm yönetim ekranlarının detayı için **[Yönetici Rehberi](/admin-guide)**
+- Plan limitleri ve fiyatlandırma için **[Planlar](/plans)**
+- API ve entegrasyonlar için **[Geliştirici / Entegrasyon](/developer)**

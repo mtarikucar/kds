@@ -16,6 +16,7 @@ silently diverge again.
 |------|----------|-------|
 | `staging.hummytummy.com.conf` | staging | Verified live (2026-06-22). Canonical. |
 | `hummytummy.com.conf` | prod | **Reconstructed** — capture the live prod vhost and reconcile before treating as authoritative (see the header in the file). |
+| `developer.hummytummy.com.conf` | prod (docs) | Developer docs portal (Nextra) → `127.0.0.1:3200`. **Needs a user-side Cloudflare DNS record (`developer` → VPS IP) + a certbot cert before it resolves** (see the header in the file). |
 | `apply.sh` | — | Safe apply: backup → copy → `nginx -t` → reload only on pass. |
 
 ## Routing model (both envs identical, only ports differ)

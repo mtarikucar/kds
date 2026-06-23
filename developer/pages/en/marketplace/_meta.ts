@@ -1,3 +1,5 @@
 export default {
-  "index": "Overview"
-}
+  "index": "Overview",
+  "purchase-flow": "Purchase Flow",
+  "products": "Products (Add-ons)",
+};

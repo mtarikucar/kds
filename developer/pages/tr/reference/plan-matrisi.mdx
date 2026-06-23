@@ -1,0 +1,76 @@
+---
+title: Plan Matrisi
+description: Özellik × plan tablosu, plan limitleri ve fiyatlar (TRY). Onboarding TRIAL planı ve Başlangıç / Profesyonel / Kurumsal tierleri.
+---
+
+import { Callout } from 'nextra/components'
+
+# Plan Matrisi
+
+Bu sayfa, planların hangi özellikleri ve limitleri taşıdığının kompakt bir
+özetidir. Plan ayrıntıları, fiyat değişiklikleri ve satın alma akışı için
+[Planlar](/tr/plans) bölümüne bakın.
+
+<Callout type="info">
+  Yeni tenant'lar 7 günlük tam özellikli **TRIAL** (Deneme) planında başlar.
+  Deneme bittiğinde tenant **TRIAL_ENDED** durumuna geçer ve uygulama plan
+  seçim + ödeme akışına kilitlenir — devam etmek için bir ücretli plan
+  seçilmelidir. Eski **FREE** planı kullanımdan kaldırıldı (yalnızca enum
+  tombstone'u olarak duruyor; hiçbir tenant FREE'ye düşmez).
+</Callout>
+
+## Fiyatlar
+
+Tüm fiyatlar **TRY** ve **KDV dahil** (ilan edilen brüt) tutarlardır.
+Faturalandırmada KDV ayrıştırması geriye dönük hesaplanır.
+
+| Plan | `name` | Aylık | Yıllık | Deneme |
+| --- | --- | --- | --- | --- |
+| Deneme | `TRIAL` | ₺0 | ₺0 | 7 gün |
+| Başlangıç | `BASIC` | ₺499 | ₺4.490 | 14 gün |
+| Profesyonel | `PRO` | ₺1.299 | ₺12.990 | 14 gün |
+| Kurumsal | `BUSINESS` | ₺2.999 | ₺29.990 | 14 gün |
+
+## Limitler
+
+`-1` = sınırsız.
+
+| Limit | TRIAL | BASIC | PRO | BUSINESS |
+| --- | --- | --- | --- | --- |
+| `maxUsers` | ∞ | 5 | 15 | ∞ |
+| `maxBranches` | ∞ | 1 | 3 | ∞ |
+| `maxTables` | ∞ | 20 | 50 | ∞ |
+| `maxProducts` | ∞ | 100 | 500 | ∞ |
+| `maxCategories` | ∞ | 20 | 50 | ∞ |
+| `maxMonthlyOrders` | ∞ | 500 | 2.000 | ∞ |
+
+## Özellik × plan
+
+| Özellik (`flag`) | TRIAL | BASIC | PRO | BUSINESS |
+| --- | --- | --- | --- | --- |
+| POS erişimi (`posAccess`) | ✅ | ✅ | ✅ | ✅ |
+| KDS entegrasyonu (`kdsIntegration`) | ✅ | ✅ | ✅ | ✅ |
+| Stok takibi (`inventoryTracking`) | ✅ | ✅ | ✅ | ✅ |
+| Gelişmiş raporlar (`advancedReports`) | ✅ | ❌ | ✅ | ✅ |
+| Çoklu lokasyon (`multiLocation`) | ✅ | ❌ | ✅ | ✅ |
+| Özel marka (`customBranding`) | ✅ | ❌ | ✅ | ✅ |
+| Rezervasyon sistemi (`reservationSystem`) | ✅ | ❌ | ✅ | ✅ |
+| Personel yönetimi (`personnelManagement`) | ✅ | ❌ | ✅ | ✅ |
+| Delivery entegrasyonu (`deliveryIntegration`) | ✅ | ❌ | ✅ | ✅ |
+| Öncelikli destek (`prioritySupport`) | ✅ | ❌ | ✅ | ✅ |
+| API erişimi (`apiAccess`) | ✅ | ❌ | ❌ | ✅ |
+| Harici ekran / Partner Display (`externalDisplay`) | ✅ | ❌ | ❌ | ✅ |
+
+<Callout type="warning">
+  **Partner Display API** (harici ekran, üçüncü taraf tabletler) `externalDisplay`
+  özelliğine bağlıdır ve yalnızca **BUSINESS** planda (ve onboarding TRIAL'ında)
+  açıktır. Bu özellik partner API anahtarı verilmesini ve ekran token'ı
+  üretimini kapısında tutar. Aynı şekilde `apiAccess` da yalnızca BUSINESS'ta
+  vardır.
+</Callout>
+
+<Callout type="info">
+  TRIAL planı 7 gün boyunca **tüm** premium özellikleri ve sınırsız limitleri
+  açar; amacı tenant'ın ürünü tam olarak değerlendirebilmesidir. Bu, kalıcı bir
+  tier değildir — süresi dolunca ücretli bir plan seçilmelidir.
+</Callout>

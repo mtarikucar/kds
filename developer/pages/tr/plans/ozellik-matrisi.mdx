@@ -1,0 +1,63 @@
+---
+title: Özellik matrisi
+description: Başlangıç, Profesyonel ve Kurumsal paketlerinin tam özellik ve limit karşılaştırması.
+---
+
+import { Callout } from 'nextra/components'
+
+# Özellik matrisi
+
+Aşağıdaki tablolar üç satılabilir paketin (**Başlangıç / Profesyonel / Kurumsal**) tüm özellik bayraklarını ve kullanım limitlerini gösterir. Kaynak: `subscription-plans.const.ts`.
+
+## Özellikler
+
+| Özellik | Bayrak | Başlangıç | Profesyonel | Kurumsal |
+| --- | --- | :---: | :---: | :---: |
+| POS erişimi | `posAccess` | ✓ | ✓ | ✓ |
+| KDS (mutfak ekranı) entegrasyonu | `kdsIntegration` | ✓ | ✓ | ✓ |
+| Stok takibi | `inventoryTracking` | ✓ | ✓ | ✓ |
+| Gelişmiş raporlar | `advancedReports` | ✗ | ✓ | ✓ |
+| Çok şube | `multiLocation` | ✗ | ✓ | ✓ |
+| Özel marka (branding) | `customBranding` | ✗ | ✓ | ✓ |
+| Öncelikli destek | `prioritySupport` | ✗ | ✓ | ✓ |
+| Rezervasyon sistemi | `reservationSystem` | ✗ | ✓ | ✓ |
+| Personel yönetimi | `personnelManagement` | ✗ | ✓ | ✓ |
+| Delivery entegrasyonu | `deliveryIntegration` | ✗ | ✓ | ✓ |
+| API erişimi | `apiAccess` | ✗ | ✗ | ✓ |
+| Harici ekran (Partner Display) | `externalDisplay` | ✗ | ✗ | ✓ |
+
+<Callout type="info">
+  **API erişimi** ve **harici ekran (Partner Display API)** yalnızca Kurumsal pakette açıktır. Bu iki yetenek, üçüncü taraf entegrasyonlarını ve uzak/masaüstü ekran oturumlarını kapsar.
+</Callout>
+
+## Limitler
+
+`-1` değeri **sınırsız** anlamına gelir (`isUnlimited` yardımcısı `-1` ile karşılaştırır).
+
+| Limit | Alan | Başlangıç | Profesyonel | Kurumsal |
+| --- | --- | :---: | :---: | :---: |
+| Maksimum kullanıcı | `maxUsers` | 5 | 15 | ∞ |
+| Maksimum masa | `maxTables` | 20 | 50 | ∞ |
+| Maksimum şube | `maxBranches` | 1 | 3 | ∞ |
+| Maksimum ürün | `maxProducts` | 100 | 500 | ∞ |
+| Maksimum kategori | `maxCategories` | 20 | 50 | ∞ |
+| Aylık maksimum sipariş | `maxMonthlyOrders` | 500 | 2.000 | ∞ |
+
+## Deneme (TRIAL) paketi
+
+Her yeni işletmenin başladığı **Deneme** paketi 7 gün boyunca **Kurumsal'ın tüm özelliklerine ve sınırsız limitlerine** sahiptir. Satılamaz (`isPublic=false`), bu yüzden plan seçim ekranında listelenmez ve fiyatlandırma karşılaştırmasının dışındadır. Ayrıntılar için bkz. [Deneme ve faturalama](/tr/plans/deneme-ve-faturalama).
+
+<Callout type="warning">
+  Bir özellik bayrağı değiştiğinde **üç yerin de** senkron olması gerekir: Prisma şeması, projeksiyon kolonları (`FEATURE_COLUMNS`) ve `getEffectiveFeatures` fallback'i. Bu sayfadaki tablo bu kaynakların türetildiği `subscription-plans.const.ts` ile birebir eşleşir.
+</Callout>
+
+## Yetkili özelliklerin sorgulanması
+
+Bir işletmenin o an aktif (etkin) özelliklerini API üzerinden okuyabilirsiniz. Bu uç nokta paket özelliklerini, varsa marketplace eklenti yükseltmelerini ve superadmin override'larını birleştirir.
+
+```bash
+curl https://app.hummytummy.com/api/subscriptions/effective-features \
+  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
+```
+
+> Yanıt, `feature.*` ve `limit.*` projeksiyonlarına göre işletmenin gerçek erişimini döndürür — sadece paket varsayılanını değil.

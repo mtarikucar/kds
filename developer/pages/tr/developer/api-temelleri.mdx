@@ -1,0 +1,230 @@
+---
+title: API Temelleri
+description: Taban URL, kimlik gerçeklikleri, şube kapsamı, sayfalama, hata zarfı, idempotency ve rate-limit katmanları.
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# API Temelleri
+
+Bu sayfa, HummyTummy'nin tüm REST yüzeyinde geçerli olan ortak kuralları
+açıklar: taban URL, kimlik doğrulama realm'leri, şube kapsamı, hata biçimi ve
+rate-limit'ler. Partner Display ve Webhook sayfaları bu kuralların üzerine
+kurulur.
+
+## Taban URL ve global ön ek
+
+Tüm uçlar `/api` global ön eki altındadır.
+
+```
+https://hummytummy.com/api
+```
+
+Yani bir uç `v1/webhooks/subscriptions` olarak tanımlandığında tam yol
+`https://hummytummy.com/api/v1/webhooks/subscriptions` olur. Bu dokümandaki her
+örnek tam yolu gösterir.
+
+<Callout type="info">
+  Para birimi tüm tutarlar için **TRY**'dir. Self-servis ödeme PayTR üzerinden
+  yürür ve yalnızca TR/TRY desteklenir.
+</Callout>
+
+## Kimlik gerçeklikleri (auth realms)
+
+HummyTummy dört ayrı kimlik realm'i tanır. Her uç bunlardan tam olarak birini
+bekler; yanlış realm `401` döner.
+
+### 1. Personel JWT — `Authorization: Bearer <jwt>`
+
+Dashboard / yönetim API'sinin ana kimliği. Giriş yapan personel kullanıcısının
+JWT'sidir. Partner API anahtarlarını ve webhook aboneliklerini **bu realm**
+yönetir (ADMIN rolü gerekir).
+
+```bash
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+<Callout type="warning">
+  Erişim/yenileme token'ları kasıtlı olarak `localStorage`'da tutulmaz; yenileme
+  token'ı httpOnly çerezdedir. Sunucu-sunucu entegrasyonlarında JWT yerine
+  **Partner API anahtarı** kullanın (aşağıda).
+</Callout>
+
+### 2. Müşteri oturumu — QR menü oturum token'ı
+
+QR menüden gelen misafirin oturum token'ı. Misafir sipariş ve self-pay
+akışlarını yetkilendirir. Partner ekranları bu kimliği doğrudan kullanmaz; bunun
+yerine ekran token'ı arka planda bir müşteri oturumuna (`orderingSessionId`)
+bağlanır.
+
+### 3. Partner anahtarı — `X-Partner-Key` + `X-Partner-Secret`
+
+Bir **partner backend'in** ekran token'ı üretmek/yenilemek/iptal etmek için
+kullandığı makine kimliği. Anahtar restoran ADMIN'i tarafından üretilir; `keyId`
+(`pk_live_…`, loglanması güvenli) + bir kez gösterilen `secret`'tan oluşur.
+
+```bash
+X-Partner-Key:    pk_live_xxxxx
+X-Partner-Secret: pk_live_secret_xxxxx
+```
+
+Ayrıntı: [Partner Display API](/tr/developer/partner-display).
+
+### 4. Ekran token'ı — `Authorization: Screen <token>`
+
+Bir cihazın (tablet/ekran) `/v1/display/*` uçlarını çağırırken sunduğu kısa
+ömürlü, kapsamlı token. Token `<uuidv7>.<secret>` biçimindedir; cihaz API
+secret'ını asla taşımaz.
+
+```bash
+Authorization: Screen 0190a1b2-c3d4-... .Hk9...
+```
+
+## Şube kapsamı — `X-Branch-Id`
+
+HummyTummi çok şubeli bir sistemdir. Şubeye-bağlı (branch-scoped) her uç,
+hangi şube bağlamında çalıştığını belirten bir `X-Branch-Id` başlığı bekler.
+
+```bash
+X-Branch-Id: <branch-uuid>
+```
+
+<Callout type="warning">
+  Şubeye-bağlı bir uca `X-Branch-Id` olmadan istek atarsanız `400` alırsınız.
+  Buna karşılık **tenant-seviyesi** uçlar (örn. webhook abonelikleri
+  `/v1/webhooks/subscriptions`, partner anahtarları `/v1/partner/api-keys`) bu
+  başlığı beklemez — şube kapsamını atlarlar. Partner ekranları için şube/tenant
+  bilgisi token'ın içinden gelir; gövdede veya başlıkta gönderilmez.
+</Callout>
+
+## Hata zarfı
+
+Tüm hatalar standart bir zarf içinde döner:
+
+```json
+{
+  "statusCode": 403,
+  "message": "The externalDisplay feature is not enabled for this tenant",
+  "error": "Forbidden",
+  "errorCode": "FEATURE_NOT_AVAILABLE",
+  "timestamp": "2026-06-23T08:30:00.000Z",
+  "path": "/api/v1/partner/screen-sessions",
+  "requestId": "1718500000000-ab12cd34e"
+}
+```
+
+| Alan | Tip | Açıklama |
+| --- | --- | --- |
+| `statusCode` | number | HTTP durum kodu |
+| `message` | string \| string[] | Kullanıcıya dönük mesaj; doğrulama hatalarında dizi olabilir |
+| `error` | string | İnsan/kategori etiketi (örn. `Bad Request`, `Forbidden`); bazen yerelleştirilir |
+| `errorCode` | string? | **Makine-okunur, kararlı** kod. Yalnızca fırlatan istisna eklediğinde bulunur; PII içermez ve her ortamda döner |
+| `timestamp` | string | ISO-8601 istek zamanı |
+| `path` | string | İstek yolu |
+| `requestId` | string | İzleme için istek kimliği |
+
+`details` ve `stack` alanları yalnızca development ortamında doldurulur;
+production'da görünmezler.
+
+<Callout type="info">
+  İstemci tarafında **`errorCode`** üzerinden dallanın, `message` üzerinden
+  değil — `message` yerelleştirilebilir, `errorCode` kararlıdır. Örnek kodlar:
+  `INVALID_CREDENTIALS`, `TOKEN_EXPIRED`, `FORBIDDEN`,
+  `INSUFFICIENT_PERMISSIONS`, `FEATURE_NOT_AVAILABLE`, `SUBSCRIPTION_REQUIRED`,
+  `QUOTA_EXCEEDED`, `VALIDATION_ERROR`, `TOO_MANY_REQUESTS`.
+</Callout>
+
+### Sık karşılaşılan durum kodları
+
+| Kod | Anlamı |
+| --- | --- |
+| `400` | Geçersiz girdi / eksik `X-Branch-Id` / doğrulama hatası |
+| `401` | Kimlik yok, geçersiz ya da süresi dolmuş token |
+| `403` | Yetki yok, eksik scope ya da plan özelliği kapalı |
+| `404` | Kaynak bulunamadı |
+| `409` | Çakışma (örn. eşzamanlı güncelleme çatışması — yeniden denenebilir) |
+| `429` | Rate limit aşıldı |
+
+Veritabanı kaynaklı bazı durumlar otomatik eşlenir: eşzamanlı güncelleme
+çatışması (`409 ConcurrentUpdate`, yeniden denenebilir), benzersizlik ihlali
+(`409`), aralık/uzunluk taşması (`400 ValueOutOfRange`).
+
+## Sayfalama
+
+Listeleme uçları, ofset tabanlı sayfalamada `page` ve `limit` sorgu
+parametrelerini kullanır; toplam kayıt sayısı `X-Total-Count` yanıt başlığında
+döner (CORS'ta açıkça expose edilir).
+
+```bash
+GET /api/...?page=2&limit=50
+```
+
+```
+X-Total-Count: 137
+```
+
+<Callout type="info">
+  Tüm liste uçları sayfalamayı zorlamaz; bazıları (örn. partner anahtar listesi,
+  webhook abonelik listesi) tüm satırları döner. İlgili uç sayfası, davranışı
+  belirtir.
+</Callout>
+
+## Idempotency
+
+Para hareketi içeren uçlar (checkout/ödeme rayı) tekrar-güvenlidir: aynı isteğin
+iki kez ulaşması ikinci bir tahsilat yaratmaz. Webhook **alımı** tarafında da
+aynı olay aynı `id` ile iki kez gelebilir (en-az-bir-kez teslim) — alıcı tarafta
+`id` üzerinden dedup yapın. Ayrıntı [Webhook'lar](/tr/developer/webhooks)
+sayfasında.
+
+## Rate-limit katmanları
+
+Rate limit, global throttler ile üç katmanda uygulanır:
+
+| Katman | Pencere | Limit |
+| --- | --- | --- |
+| `short` | 1 sn | 10 istek |
+| `medium` | 10 sn | 50 istek |
+| `long` | 60 sn | 100 istek |
+
+Bazı makine uçları kendi sıkı limitlerini ekler — örneğin ekran token'ı üretimi
+(`POST /v1/partner/screen-sessions`) 60 sn'de 60, self-pay intent
+(`/v1/display/pay-intent`) 60 sn'de 5 ile sınırlıdır.
+
+<Callout type="info">
+  **Anahtara/ekran token'ına göre** sayım: rate limit bucket'ı yalnızca IP'ye
+  değil, prensibe (partner anahtarı veya ekran token'ı) göre de bölünür. Böylece
+  tek bir NAT IP'sinin arkasındaki çok sayıda tablet birbirini boğmaz. Yine de
+  her prensip kendi kaynak IP'si altında sayılır, böylece sahte prensip üreterek
+  IP limitinden kaçılamaz.
+</Callout>
+
+Limit aşıldığında `429` ve `errorCode: TOO_MANY_REQUESTS` döner; `Retry-After`
+başlığına saygı gösterin.
+
+## Hızlı örnek
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+# Şubeye-bağlı bir uç (personel JWT + şube kapsamı)
+curl https://hummytummy.com/api/v1/orders \
+  -H "Authorization: Bearer $JWT" \
+  -H "X-Branch-Id: $BRANCH_ID"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch("https://hummytummy.com/api/v1/orders", {
+  headers: {
+    Authorization: `Bearer ${jwt}`,
+    "X-Branch-Id": branchId,
+  },
+});
+if (res.status === 429) {
+  // Retry-After'a saygı göster, sonra yeniden dene
+}
+const total = res.headers.get("X-Total-Count");
+```
+  </Tabs.Tab>
+</Tabs>

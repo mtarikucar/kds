@@ -1,3 +1,15 @@
 export default {
-  "index": "Overview"
-}
+  "index": "Overview",
+  "pos": "POS (Sales Screen)",
+  "qr-menu": "QR Menu",
+  "kitchen": "Kitchen Display (KDS)",
+  "tables": "Tables & Floor Plan",
+  "orders": "Orders",
+  "stock": "Stock & Inventory",
+  "reports": "Reports & Analytics",
+  "reservations": "Reservations",
+  "personnel": "Personnel",
+  "customers": "Customers",
+  "branches": "Branches",
+  "settings": "Settings",
+};

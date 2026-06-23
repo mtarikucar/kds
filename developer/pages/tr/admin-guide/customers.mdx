@@ -1,0 +1,41 @@
+---
+title: Müşteriler
+description: HummyTummy müşteri yönetimi — müşteri ekleme/düzenleme, harcama/sipariş/sadakat puanı özetleri ve müşteri detay sayfası. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Müşteriler
+
+**Menü yolu:** İşletme → Müşteriler &nbsp;•&nbsp; **URL:** `/customers`
+**Erişim:** ADMIN, MANAGER, WAITER
+**Plan:** Tüm planlarda açık
+
+## Amacı
+
+Müşteriler ekranı, restoranınızın **müşteri kayıtlarını** (CRM) tutar: ad, e-posta, telefon ile birlikte her müşterinin **toplam harcaması**, **toplam siparişi** ve **sadakat puanı**. Tekrar eden misafirleri tanır, sadakat programınızı bu veriye dayandırırsınız.
+
+## Ekranda neler var?
+
+- **Özet istatistikler:** Toplam müşteri, toplam harcama, toplam sipariş, toplam sadakat puanı.
+- **Arama:** Ad, e-posta veya telefonla filtreleme.
+- **Müşteri listesi:** Her satır temel bilgiler + harcama/sipariş/puan; satıra tıklayınca **müşteri detay sayfasına** (`/customers/:id`) gidersiniz.
+- **Ekle / Düzenle / Sil:** Yeni müşteri formu, düzenleme ve onay diyaloglu silme.
+
+<Callout type="info">
+  Müşteri yönetimi **tüm planlarda** açıktır. POS'ta sipariş alırken müşteri adı/telefonu
+  girilirse kayıtlarla ilişkilendirilebilir; QR menüden self-pay yapan müşteriler de
+  telefonlarıyla eşleşebilir.
+</Callout>
+
+## İpuçları
+
+- **Telefonu doğru girin:** Sadakat puanı ve geçmiş sipariş eşleşmesi genelde telefon üzerinden yürür — POS'ta müşteri telefonunu girmeyi alışkanlık hâline getirin.
+- **En değerli müşteriyi bulun:** Listeyi harcama/sipariş ile karşılaştırıp düzenli misafirleri belirleyin; kampanyaları onlara hedefleyin.
+- **Analitikle birleştirin:** Raporlar ekranındaki **Müşteriler** sekmesi dönem bazlı müşteri analitiği verir; bu ekran tekil müşteri kaydını, o sekme toplulaştırılmış davranışı gösterir.
+
+## İlgili ekranlar
+
+- **[POS](/tr/admin-guide/pos)** — siparişte müşteri adı/telefonu girilir.
+- **[Raporlar & Analitik](/tr/admin-guide/reports)** — Müşteri analitiği sekmesi.
+- **[QR Menü](/tr/admin-guide/qr-menu)** — sadakat sayfası (`/qr-menu/:tenantId/loyalty`).

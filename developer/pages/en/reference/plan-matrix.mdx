@@ -1,0 +1,75 @@
+---
+title: Plan Matrix
+description: The feature × plan table, plan limits, and prices (TRY). The onboarding TRIAL plan and the Starter / Professional / Enterprise tiers.
+---
+
+import { Callout } from 'nextra/components'
+
+# Plan Matrix
+
+This page is a compact recap of which features and limits each plan carries.
+For plan details, pricing changes, and the purchase flow, see
+[Plans](/en/plans).
+
+<Callout type="info">
+  New tenants start on a 7-day, fully-featured **TRIAL** plan. When the trial
+  ends, the tenant moves to **TRIAL_ENDED** and the app is locked to the
+  plan-selection + checkout flow — a paid plan must be chosen to continue. The
+  old **FREE** plan is retired (kept only as an enum tombstone; no tenant lands
+  on FREE).
+</Callout>
+
+## Prices
+
+All prices are in **TRY** and are **KDV-inclusive** (the advertised gross). The
+KDV split is reverse-engineered at invoicing time.
+
+| Plan | `name` | Monthly | Yearly | Trial |
+| --- | --- | --- | --- | --- |
+| Trial | `TRIAL` | ₺0 | ₺0 | 7 days |
+| Starter | `BASIC` | ₺499 | ₺4,490 | 14 days |
+| Professional | `PRO` | ₺1,299 | ₺12,990 | 14 days |
+| Enterprise | `BUSINESS` | ₺2,999 | ₺29,990 | 14 days |
+
+## Limits
+
+`-1` = unlimited.
+
+| Limit | TRIAL | BASIC | PRO | BUSINESS |
+| --- | --- | --- | --- | --- |
+| `maxUsers` | ∞ | 5 | 15 | ∞ |
+| `maxBranches` | ∞ | 1 | 3 | ∞ |
+| `maxTables` | ∞ | 20 | 50 | ∞ |
+| `maxProducts` | ∞ | 100 | 500 | ∞ |
+| `maxCategories` | ∞ | 20 | 50 | ∞ |
+| `maxMonthlyOrders` | ∞ | 500 | 2,000 | ∞ |
+
+## Feature × plan
+
+| Feature (`flag`) | TRIAL | BASIC | PRO | BUSINESS |
+| --- | --- | --- | --- | --- |
+| POS access (`posAccess`) | ✅ | ✅ | ✅ | ✅ |
+| KDS integration (`kdsIntegration`) | ✅ | ✅ | ✅ | ✅ |
+| Inventory tracking (`inventoryTracking`) | ✅ | ✅ | ✅ | ✅ |
+| Advanced reports (`advancedReports`) | ✅ | ❌ | ✅ | ✅ |
+| Multi-location (`multiLocation`) | ✅ | ❌ | ✅ | ✅ |
+| Custom branding (`customBranding`) | ✅ | ❌ | ✅ | ✅ |
+| Reservation system (`reservationSystem`) | ✅ | ❌ | ✅ | ✅ |
+| Personnel management (`personnelManagement`) | ✅ | ❌ | ✅ | ✅ |
+| Delivery integration (`deliveryIntegration`) | ✅ | ❌ | ✅ | ✅ |
+| Priority support (`prioritySupport`) | ✅ | ❌ | ✅ | ✅ |
+| API access (`apiAccess`) | ✅ | ❌ | ❌ | ✅ |
+| External display / Partner Display (`externalDisplay`) | ✅ | ❌ | ❌ | ✅ |
+
+<Callout type="warning">
+  The **Partner Display API** (external display, third-party tablets) depends on
+  the `externalDisplay` feature and is available only on **BUSINESS** (and on the
+  onboarding TRIAL). It gates partner API-key issuance and screen-token minting.
+  Likewise, `apiAccess` exists only on BUSINESS.
+</Callout>
+
+<Callout type="info">
+  The TRIAL plan unlocks **all** premium features and unlimited limits for 7
+  days so a tenant can fully evaluate the product. It is not a permanent tier —
+  a paid plan must be chosen when it expires.
+</Callout>

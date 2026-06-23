@@ -1,0 +1,52 @@
+---
+title: Personel
+description: HummyTummy personel yönetimi — devamlılık (yoklama), vardiya şablonları, çizelge ve performans. Kullanıcı yönetiminden farkı, amacı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Personel
+
+**Menü yolu:** Operasyon → Personel &nbsp;•&nbsp; **URL:** `/admin/personnel`
+**Erişim:** ADMIN, MANAGER
+**Plan:** `personnelManagement` — **Profesyonel (PRO)** ve üzeri
+
+## Amacı
+
+Personel modülü, ekibinizin **çalışma zamanını** yönetir: kim ne zaman geldi/çıktı (yoklama), vardiya şablonları, haftalık çizelge ve performans. Gerçek zamanlı (WebSocket) güncellenir — bir personel giriş yaptığında ekran anında yansıtır.
+
+<Callout type="info">
+  Personel modülü **Profesyonel (PRO)** ve üzeri planlarda açıktır. Planınızda yoksa
+  menüde Personel görünmez ve doğrudan URL yükseltme kartı gösterir.
+
+  **Personel ≠ Kullanıcılar:** Bu modül **çalışma vakti/vardiya** içindir. Sistem
+  hesabı açmak (rol, e-posta, şifre) için **Operasyon → Kullanıcılar** (`/admin/users`)
+  ekranını kullanın.
+</Callout>
+
+## Sekmeler
+
+| Sekme | Ne yapar? |
+| --- | --- |
+| **Devamlılık (Attendance)** | Giriş/çıkış (yoklama) kayıtları — kim ne zaman çalıştı |
+| **Vardiya Şablonları (Shift Templates)** | Tekrar eden vardiyaları tanımlayın (örn. "Sabah 09:00–17:00") |
+| **Çizelge (Schedule)** | Şablonları kişilere/günlere atayın — haftalık plan |
+| **Performans (Performance)** | Personel performans göstergeleri |
+
+## Tipik kullanım
+
+1. **Vardiya şablonlarını** tanımlayın (sabah/akşam vb.).
+2. **Çizelgeden** şablonları kişilere ve günlere yerleştirin.
+3. **Devamlılık** sekmesinde gerçek giriş/çıkışları izleyin; planla gerçeği karşılaştırın.
+4. **Performans** sekmesinden ekibin verimini görün.
+
+## İpuçları
+
+- **Önce kullanıcıları açın:** Personelin sistemde hesabı (Kullanıcılar ekranından) yoksa vardiya/yoklama izlemek anlamsız kalır — önce rolüyle birlikte kullanıcıyı tanımlayın.
+- **Şablon = tekrar eden iş:** Aynı vardiyayı her hafta elle girmek yerine şablon kurun, çizelgede tek tıkla atayın.
+- **Performansı raporlarla birleştirin:** Raporlar ekranındaki **Personel** sekmesi (aynı `personnelManagement` ile görünür) satışa dayalı performansı gösterir; iki ekranı birlikte okuyun.
+
+## İlgili ekranlar
+
+- **Kullanıcılar** (`/admin/users`) — sistem hesabı, rol ve durum yönetimi (tüm planlarda).
+- **[Raporlar & Analitik](/tr/admin-guide/reports)** — Personel performans rapor sekmesi.

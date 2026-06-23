@@ -1,0 +1,58 @@
+---
+title: Branches
+description: HummyTummy multi-branch management — adding branches, usage/limit tracking, branch scope and the bridge/device/health screens. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Branches
+
+**Menu path:** Multi-Branch → Branches &nbsp;•&nbsp; **URL:** `/admin/branches`
+**Access:** ADMIN, MANAGER
+**Plan:** `multiLocation` — **Professional (PRO)** and above (or the `extra_branch` add-on)
+
+## Purpose
+
+The Branches screen manages **all the branches in your restaurant chain** from one panel. Each branch has its own tables, menu, orders and reports; the manager switches between branches and sees the consolidated picture.
+
+<Callout type="info">
+  Multi-branch is unlocked on **Professional (PRO)** and higher plans. PRO gives **3
+  branches**, Enterprise (BUSINESS) gives **unlimited**. To add an extra branch without
+  moving up to PRO, you can buy the **`extra_branch`** marketplace add-on (each one raises
+  the branch limit). Full limits: **[Plans](/en/plans)**.
+</Callout>
+
+## What's on the screen
+
+- **Usage badge:** "X / Y branches" — how many branches you use and your limit. Unlimited shows as **∞**.
+- **Branch list:** each branch's name, code, timezone and **status** (active / suspended / archived).
+- **Add branch:** create a new branch with a name, code and timezone (default `Europe/Istanbul`). At the limit, adding is **locked** and an add-on prompt appears.
+
+## Branch scope
+
+HummyTummy filters every branch-scoped request by the active branch. Use the **branch picker (BranchPicker)** in the top bar to change the branch you're working on; screens like POS, tables, orders and stock then show that branch's data. Switching branches clears the cache — the previous branch's data can't bleed through.
+
+<Callout type="warning">
+  Some screens are **tenant-wide** (not tied to a branch): profile, subscription/plan,
+  billing, and so on. These screens are unaffected by the branch selection.
+</Callout>
+
+## Related screens in the same section
+
+The "Multi-Branch" menu also contains:
+
+- **Devices** (`/admin/devices`) — branch-bound POS/printer/screen devices. (Accessible on all plans.)
+- **Bridges** (`/admin/bridges`) — local hardware bridges. (Shown/hidden by `multiLocation`.)
+- **Health** (`/admin/health`) — system/branch health status. (On all plans.)
+
+## Tips
+
+- **Pick the timezone correctly:** reports and end-of-day (Z-report) closings are computed in the branch timezone — a wrong timezone shifts the end of day.
+- **Archive unused branches:** instead of deleting a closed/paused branch, change its status; historical data is preserved.
+- **Branch-level reporting:** use the branch filter on the Reports screen to compare branches; see which branch is strong on which product.
+
+## Related screens
+
+- **[Reports & Analytics](/en/admin-guide/reports)** — comparison via the branch filter.
+- **[Plans](/en/plans)** — branch limits and the `extra_branch` add-on.
+- **[Marketplace](/en/marketplace)** — extra branches and other add-ons.

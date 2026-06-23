@@ -1,0 +1,70 @@
+---
+title: Raporlar & Analitik
+description: HummyTummy raporlama — satış, saatlik, müşteri, envanter, personel ve Z-raporlar; ayrıca masa kullanımı ve AI öngörüleri içeren analitik. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Raporlar & Analitik
+
+**Menü yolu:** Operasyon → Raporlar / Analitik
+**URL:** `/admin/reports` ve `/admin/analytics`
+**Erişim:** ADMIN, MANAGER
+**Plan:** `advancedReports` — **Profesyonel (PRO)** ve üzeri (veya `advanced_reports` eklentisi)
+
+## Amacı
+
+İki ekran da işletme verinizi okunabilir hâle getirir:
+
+- **Raporlar** — satış, ödeme yöntemi kırılımı, en çok satan ürünler, müşteri, envanter, personel ve **Z-raporları**.
+- **Analitik** — masa kullanımı, trafik/yoğunluk analizi, müşteri davranışı ve **AI destekli öngörüler**.
+
+<Callout type="info">
+  İki ekran da `advancedReports` özelliğine bağlıdır (**PRO ve üzeri**). PRO'ya
+  çıkmadan açmak isterseniz **`advanced_reports`** marketplace eklentisini alabilirsiniz.
+  Planınızda yoksa her iki menü öğesi gizlenir ve doğrudan URL yükseltme kartı gösterir.
+</Callout>
+
+## Raporlar ekranı
+
+Üstte sekmeler, üstte de bir **tarih aralığı filtresi** (başlangıç–bitiş) ve çok şubeli tenant'larda bir **şube filtresi** vardır (tek şubede şube filtresi görünmez, rapor tenant geneli kalır).
+
+| Sekme | İçerik | Görünürlük |
+| --- | --- | --- |
+| **Satış (Sales)** | Toplam ciro, sipariş sayısı, ortalama sepet, toplam indirim; ödeme yöntemi kırılımı; günlük satış; en çok satan ürünler | Her zaman |
+| **Saatlik (Hourly)** | Günün saatlerine göre sipariş dağılımı | Her zaman |
+| **Müşteriler** | Müşteri analitiği (dönem bazlı) | Her zaman |
+| **Envanter (Inventory)** | Stok raporu | Yalnızca `inventoryTracking` varsa |
+| **Personel (Staff)** | Personel performansı | Yalnızca `personnelManagement` varsa |
+| **Z-Raporları** | Gün sonu mali özetler (Z-raporlar) | Her zaman |
+
+<Callout type="info">
+  Envanter ve Personel sekmeleri ek özelliklere bağlıdır — yoksa **sekme görünmez**
+  (eskiden tıklayınca 403 düşüyordu). Satış/Saatlik/Müşteri/Z-Rapor, sayfayı açan
+  `advancedReports` ile birlikte gelir.
+</Callout>
+
+## Analitik ekranı
+
+| Sekme | İçerik |
+| --- | --- |
+| **Overview** | Ortalama masa kullanımı, dönem cirosu, yoğunluk skoru, aktif öngörü sayısı + aksiyon alınabilir öngörüler |
+| **Table Analytics** | Masa bazında kullanım, ciro, oturum sayısı, ortalama sepet; yetersiz kullanılan masalar |
+| **Traffic Flow** | Yoğunluk skoru, sıcak noktalar ve akışı iyileştirme önerileri |
+| **Customer Behavior** | Ortalama yemek süresi, masada atıl kalma, parti büyüklüğü; pik varış/ayrılış saatleri |
+| **AI Insights** | Üretilen tüm öngörüler; her birini "uygulandı / devam ediyor / yoksay" olarak işaretleyebilirsiniz |
+
+## İpuçları
+
+- **Tarih aralığını dar tutun:** Varsayılan son 7 gündür; karşılaştırma için aralığı değiştirip "Uygula" deyin.
+- **Şube filtresini kullanın:** Çok şubeliyseniz şube bazında karşılaştırma yapın; filtre boşsa rapor tüm şubeleri kapsar.
+- **Z-raporları gün sonu için:** Vergi/muhasebe uyumu açısından gün sonu kapanışlarını Z-Raporları sekmesinden izleyin.
+- **AI öngörülerini işleyin:** Analitikteki öngörüleri "uygulandı/yoksay" diye işaretlemek listeyi temiz tutar ve hangi önerinin gerçekten denendiğini gösterir.
+- **Atıl masa = devir kaybı:** "Customer Behavior" yüksek atıl süre uyarısı verirse, hesabı proaktif sunmak masa devrini artırır.
+
+## İlgili ekranlar
+
+- **[Masalar](/tr/admin-guide/tables)** — masa kullanım analizinin kaynağı.
+- **[Stok](/tr/admin-guide/stock)** — Envanter rapor sekmesi.
+- **[Personel](/tr/admin-guide/personnel)** — Personel performans sekmesi.
+- Faturalar için: **Operasyon → Faturalar** (`/admin/invoices`).

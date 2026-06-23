@@ -1,0 +1,71 @@
+---
+title: QR Menü (Yönetim + Ayarlar)
+description: HummyTummy QR menü yönetimi — QR kod üretme/indirme/yazdırma, tasarım editörü ve müşteri sipariş ayarları. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# QR Menü
+
+**Menü yolu:** Menü & Masa → QR Kodlar &nbsp;•&nbsp; **URL:** `/admin/qr-codes`
+**Erişim:** ADMIN, MANAGER
+**Plan:** Tüm planlarda açık
+
+## Amacı
+
+QR Menü, müşterinin masadaki **QR kodu okutup** menünüzü telefonunda görmesini — ve ayara bağlı olarak **sipariş verip ödemesini** — sağlar. Yönetici tarafında bu ekran iki işi yapar: QR kodlarını **üretip indirmek/yazdırmak** ve QR menünün **görünümünü** ayarlamak.
+
+<Callout type="info">
+  Müşteri tarafındaki QR menü adresleri:
+  - **Masa/Tenant QR:** `/qr-menu/:tenantId` (sepet, sipariş takibi, sadakat sayfaları dahil)
+  - **Alan adı (subdomain) erişimi:** kendi subdomain'iniz üzerinden de aynı menü açılır.
+  Bu sayfalar herkese açıktır; müşteri giriş yapmadan kullanır.
+</Callout>
+
+## İki sekme
+
+### 1. Kodlar (Codes)
+
+QR kodlarınız burada listelenir. Her kodun bir **türü** (örn. `TABLE` — masa) ve etiketi vardır.
+
+- **Tümünü İndir** — tüm kodları tek tek PNG olarak indirir (restoran adı + masa etiketiyle dosyalanır).
+- **Masa QR'larını Yazdır** — `TABLE` türündeki kodları toplu yazdırılabilir bir sayfada açar.
+
+### 2. Tasarım (Design)
+
+**Tasarım editörü** ile QR menünün görünümünü özelleştirirsiniz: renkler, logo ve görsel düzen. Önizleme ile sonucu anında görürsünüz.
+
+## Müşteri sipariş ayarları
+
+QR menünün **davranışı** ayrı bir yerden, **Ayarlar → QR Menü** (`/admin/settings/qr-menu`) altından yönetilir:
+
+<Steps>
+### Müşteri siparişini aç
+
+**"Müşteri siparişi"** açıkken müşteri menüden sipariş gönderebilir; kapalıyken QR menü yalnızca **görüntüleme** içindir (sipariş kasadan alınır).
+
+### İki adımlı ödeme otomatik gelir
+
+Müşteri siparişini açtığınızda **iki adımlı ödeme** de otomatik etkinleşir — çünkü müşteri siparişi önce mutfağa düşmeli, ödeme sonra alınmalıdır.
+
+### Konum ve sosyal/WiFi bilgileri
+
+QR menü sayfasında gösterilecek **konum**, **WiFi** ve **sosyal medya** bilgilerini de buradan girersiniz.
+</Steps>
+
+<Callout type="warning">
+  Müşteri self-pay (PayTR ile masadan ödeme) ayrı bir POS ayarıdır. Açtığınızda müşteri
+  QR menüden kendi hesabını ödeyebilir. Bu özellik **TRY** ile çalışır.
+</Callout>
+
+## İpuçları
+
+- **Her masaya ayrı QR:** Masa türündeki QR'lar masaya bağlı sipariş üretir — sipariş otomatik o masaya yazılır, garson masa seçmek zorunda kalmaz.
+- **Yazdırırken:** "Masa QR'larını Yazdır" ile hepsini tek seferde basıp masalara yapıştırın; menü güncellense bile QR aynı kalır (menü dinamik yüklenir, QR'ı yeniden basmanız gerekmez).
+- **Sadece görüntüleme menüsü mü istiyorsunuz?** Müşteri siparişini kapatın; QR menü dijital bir menü kartı gibi davranır.
+- **Sipariş takibi:** Müşteri sipariş verdikten sonra `/qr-menu/:tenantId/orders` üzerinden siparişinin durumunu (hazırlanıyor/hazır) canlı izleyebilir.
+
+## İlgili ekranlar
+
+- Menü içeriği (kategoriler, ürünler, görseller, modifier'lar) **Menü & Masa → Menü** (`/admin/menu`) altından yönetilir — QR menüde görünen ürünler oradan gelir.
+- Markalama (logo/renk) için: **[Ayarlar](/tr/admin-guide/settings)** (Branding sekmesi, `customBranding` — PRO ve üzeri).

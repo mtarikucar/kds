@@ -271,6 +271,21 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache,mode=max
 
+      # Developer docs portal (Nextra). Standalone Next build; takes no
+      # NEXT_PUBLIC_* / Sentry build-args (the Dockerfile declares none),
+      # so this mirrors the landing step minus the args block. Served at
+      # developer.hummytummy.com (host 3200 → container 3000).
+      - name: Build & push developer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./developer
+          file: ./developer/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_BASE }}/developer:${{ steps.version.outputs.VERSION }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/developer:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/developer:buildcache,mode=max
+
 
   # -------------------------------------------------------------------
   # Render .env.production from secrets, ship it + the repo HEAD to the

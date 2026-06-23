@@ -1,7 +1,101 @@
 ---
 title: Marketplace
+description: HummyTummy Marketplace add-on kataloğu — kapasite paketleri, entegrasyonlar, yazılım özellikleri ve hizmetler.
 ---
+
+import { Callout, Cards } from 'nextra/components'
 
 # Marketplace
 
-Bu bölüm hazırlanıyor.
+Marketplace, planınızın üzerine **tek tek satın alınabilen** eklentilerin (add-on) kataloğudur.
+Bir plan size bir özellik/limit tabanı verir; add-on'lar bu tabanı **artırır**: ekstra KDS ekranı,
+ekstra şube, e-Fatura entegrasyonu, gelişmiş raporlar gibi.
+
+Her add-on'un satın alınmasıyla tenant'ınıza bir **TenantAddOn** kaydı düşer ve entitlement
+projektörü bu kaydın `grants` alanını mevcut hak setinize katar (fold). Katma kuralları nettir:
+
+- **`limit.*`** (sayısal) → **toplanır** (örn. plan 2 KDS + 1 add-on = 3 KDS)
+- **`feature.*`** (boolean) → **OR** (herhangi bir kaynak açıyorsa açık)
+- **`integration.*`** (liste) → **birleşim / union** (sağlayıcılar listeye eklenir)
+
+<Callout type="info">
+  Tüm fiyatlar **TRY** cinsindendir ve kataloğda **kuruş** (`priceCents`) olarak tutulur:
+  `9900` = ₺99,00. Add-on fiyatları KDV dahil (gross) görüntülenir.
+</Callout>
+
+## Add-on'lara göz at
+
+<Cards>
+  <Cards.Card title="Satın Alma Akışı" href="/tr/marketplace/satin-alma-akisi" arrow>
+    Marketplace → checkout → PayTR → grant. Hak katma kuralları, iptal ve dönem-sonu davranışı.
+  </Cards.Card>
+  <Cards.Card title="Ürünler (Add-on Detayları)" href="/tr/marketplace/urunler" arrow>
+    Her sellable add-on için kod, fiyat, ne açtığı (grant), tekrarlayan/tek seferlik, bağımlılık.
+  </Cards.Card>
+  <Cards.Card title="Planlar" href="/tr/plans" arrow>
+    Add-on'ların üzerine bindiği taban planlar (BASIC / PRO / BUSINESS).
+  </Cards.Card>
+</Cards>
+
+## Katalog özeti
+
+Tüm sellable add-on'lar tek bakışta. Detaylar ve örnek payload'lar için
+[Ürünler](/tr/marketplace/urunler) sayfasına bakın.
+
+| Kod | Ad | Tür | Fatura | Fiyat | Açtığı (grant) | Bağımlılık |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kds_extra_screen` | Ekstra KDS ekranı | capacity | Tekrarlayan | ₺99,00 | `limit.kdsScreens` +1 | — |
+| `kds_extra_station` | Ekstra KDS istasyonu | capacity | Tekrarlayan | ₺149,00 | `limit.kdsStations` +1 | — |
+| `extra_tablet` | Ekstra garson tableti | capacity | Tekrarlayan | ₺79,00 | `limit.tablets` +1 | — |
+| `extra_branch` | Ekstra şube | capacity | Tekrarlayan | ₺399,00 | `limit.branches` +1, `feature.multiLocation` | — |
+| `fiscal_efatura` | e-Fatura / e-Arşiv | integration | Tekrarlayan | ₺199,00 | `integration.fiscal` += `efatura` | — |
+| `fiscal_hugin` | Hugin yazarkasa | integration | Tekrarlayan | ₺299,00 | `integration.fiscal` += `hugin` | **`plan:PRO`** |
+| `delivery_yemeksepeti` | Yemeksepeti | integration | Tekrarlayan | ₺249,00 | `integration.delivery` += `yemeksepeti` | — |
+| `delivery_getir` | Getir Yemek | integration | Tekrarlayan | ₺249,00 | `integration.delivery` += `getir` | — |
+| `delivery_trendyol_yemek` | Trendyol Yemek | integration | Tekrarlayan | ₺249,00 | `integration.delivery` += `trendyol_yemek` | — |
+| `caller_id_integration` | Caller ID / telefon-sipariş | integration | Tekrarlayan | ₺149,00 | `feature.callerIntegration` | — |
+| `advanced_reports` | Gelişmiş raporlar | software | Tekrarlayan | ₺129,00 | `feature.advancedReports` | — |
+| `api_access` | API erişimi | software | Tekrarlayan | ₺249,00 | `feature.apiAccess` | — |
+| `priority_support` | Öncelikli destek | support | Tekrarlayan | ₺199,00 | `feature.prioritySupport` | — |
+| `onsite_install_full` | Yerinde kurulum (tek seferlik) | support | **Tek seferlik** | ₺7.500,00 | — (hak vermez, hizmet satırı) | — |
+
+<Callout type="warning">
+  `onsite_install_full` bir **hizmet** kalemidir: ödenir, faturalanır ama hiçbir
+  entitlement vermez (`grants: {}`). Tekrarlayan değil, tek seferliktir.
+</Callout>
+
+## Kataloğu API'den çekmek
+
+Katalog herkese açıktır (landing sitesinde de görünür); kimlik doğrulama gerektirmez.
+
+```bash
+curl https://api.hummytummy.com/api/v1/marketplace/addons
+```
+
+`kind` ile filtreleyebilirsiniz (`capacity` | `integration` | `software` | `support`):
+
+```bash
+curl "https://api.hummytummy.com/api/v1/marketplace/addons?kind=integration"
+```
+
+Yalnızca `published` durumundaki add-on'lar döner; her satır UI için kırpılmıştır:
+
+```json
+[
+  {
+    "code": "kds_extra_screen",
+    "name": "Extra KDS screen",
+    "description": "Adds one additional kitchen display screen slot to your branch.",
+    "kind": "capacity",
+    "billing": "recurring",
+    "priceCents": 9900,
+    "currency": "TRY",
+    "deps": []
+  }
+]
+```
+
+<Callout type="info">
+  Tüm endpoint'ler global `/api` öneki altındadır. `grants` alanı **public katalogda
+  döndürülmez** — yalnızca süperadmin yüzeyi ve seed dosyası hak haritasını taşır.
+</Callout>

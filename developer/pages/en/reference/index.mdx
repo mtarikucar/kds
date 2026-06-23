@@ -1,7 +1,38 @@
 ---
 title: Reference
+description: The error codes, partner scopes, plan matrix, and glossary you'll keep returning to while integrating the HummyTummy API.
 ---
+
+import { Cards, Callout } from 'nextra/components'
 
 # Reference
 
-This section is being prepared.
+This section gathers the stable lookup tables you'll keep returning to while
+integrating the HummyTummy API: the standard error envelope and machine-readable
+error codes, the scopes carried by partner screen tokens, the feature × plan
+matrix, and a glossary of system terms.
+
+<Callout type="info">
+  All REST endpoints are served under the global `/api` prefix
+  (e.g. `POST /api/v1/display/orders`). The currency is always **TRY**.
+</Callout>
+
+## Pages
+
+<Cards>
+  <Cards.Card title="Error Codes" href="/en/reference/error-codes" arrow>
+    The standard error envelope, the `errorCode` field, and the Prisma → HTTP
+    mappings (P2002 → 409, P2025 → 404 …).
+  </Cards.Card>
+  <Cards.Card title="Partner Scopes" href="/en/reference/partner-scopes" arrow>
+    The 6 scopes a partner API key and its screen tokens may carry, and which
+    `/display` endpoint each one unlocks.
+  </Cards.Card>
+  <Cards.Card title="Plan Matrix" href="/en/reference/plan-matrix" arrow>
+    The feature × plan table and the plan limits (users, branches, products …).
+  </Cards.Card>
+  <Cards.Card title="Glossary" href="/en/reference/glossary" arrow>
+    Definitions of terms like Tenant, Branch, KDS, Self-pay, Scope, Outbox,
+    Entitlement.
+  </Cards.Card>
+</Cards>

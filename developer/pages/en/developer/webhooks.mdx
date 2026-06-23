@@ -1,0 +1,297 @@
+---
+title: Webhooks
+description: Receive order, payment, and subscription events as HMAC-SHA256–signed POSTs to your endpoint.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Webhooks (Outbound)
+
+When an event happens in your tenant, HummyTummy POSTs an HMAC-SHA256–signed
+HTTP request to your registered endpoint. This lets you react instantly to
+order, payment, and subscription events without polling.
+
+All paths are under the `/api` global prefix.
+
+<Callout type="warning">
+  Webhook subscriptions require the **API access** feature: the BUSINESS plan or
+  the `api_access` (apiAccess) add-on. Subscription endpoints expect a staff JWT
+  with the **ADMIN role**; if the feature is disabled they return `403`.
+</Callout>
+
+## Subscribe
+
+Create a subscription. The **`secret` is returned once** — store it securely; it
+is never shown again and cannot be re-derived.
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/webhooks/subscriptions \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://hooks.example.com/hummytummy",
+    "events": ["order.created.v1", "payment.succeeded.v1"]
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/webhooks/subscriptions",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${adminJwt}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url: "https://hooks.example.com/hummytummy",
+      events: ["order.created.v1", "payment.succeeded.v1"],
+    }),
+  },
+);
+const { secret } = await res.json(); // returned ONCE — store securely
+```
+  </Tabs.Tab>
+</Tabs>
+
+Request body:
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `url` | Yes | The `https` (or `http`) URL events are POSTed to. It passes the SSRF allowlist; the host is normalized to lowercase before storing |
+| `events` | No | Event types to subscribe to. If omitted, `["*"]` (all publishable events) |
+
+Response (excerpt):
+
+```json
+{
+  "id": "0190a1b2-...",
+  "tenantId": "...",
+  "url": "https://hooks.example.com/hummytummy",
+  "events": ["order.created.v1", "payment.succeeded.v1"],
+  "status": "active",
+  "secret": "whs_AbCdEf..."
+}
+```
+
+List / revoke subscriptions:
+
+```bash
+GET    /api/v1/webhooks/subscriptions
+DELETE /api/v1/webhooks/subscriptions/:id
+```
+
+<Callout type="info">
+  The default per-tenant active-subscription cap is 20 (only `active` rows are
+  counted); exceeding it returns `400`. Revoke unused subscriptions.
+</Callout>
+
+## Delivered payload
+
+Each delivery is a POST with a JSON body:
+
+```json
+{
+  "id": "0190a1b2-c3d4-...",
+  "type": "order.created.v1",
+  "tenantId": "...",
+  "payload": { "...event-specific fields..." }
+}
+```
+
+Plus these headers:
+
+| Header | Description |
+| --- | --- |
+| `Content-Type` | `application/json` |
+| `User-Agent` | `HummyTummy-Webhook/1` |
+| `X-HummyTummy-Event-Id` | The event `id` (for idempotency) |
+| `X-HummyTummy-Event-Type` | The event type (e.g. `order.created.v1`) |
+| `X-HummyTummy-Signature` | The signature: `t=<unix-ms>,v1=<hmac-sha256>` |
+
+<Callout type="info">
+  The same event may arrive more than once with the same `id` (at-least-once
+  delivery). **Dedup on `id`** (or `X-HummyTummy-Event-Id`) in your receiver.
+</Callout>
+
+## Verifying the signature
+
+The signature is a timestamped HMAC-SHA256 computed over the body:
+
+```
+X-HummyTummy-Signature: t=<unix-ms>,v1=<hmac-sha256-hex>
+```
+
+It is produced like this — the **signed string** is `"<timestamp>.<rawBody>"`,
+and the key is your `secret`:
+
+```
+v1 = HMAC_SHA256(secret, `${t}.${rawBody}`)  // hex
+```
+
+Verification steps (identical to HummyTummy's own `verify` logic):
+
+<Steps>
+
+### Parse the header
+Split on commas and extract the `t` and `v1` values.
+
+### Check the timestamp
+`t` must be numeric and within **±5 minutes** of now (replay protection).
+
+### Recompute the HMAC
+Compute HMAC-SHA256 over `"${t}.${rawBody}"` with your `secret`.
+
+### Compare in constant time
+Compare your computed hex against `v1` with a length + constant-time
+(timing-safe) comparison. If they match, the event is authentic.
+
+</Steps>
+
+<Callout type="warning">
+  Use the **raw body** — do NOT parse and re-serialize the JSON; that changes
+  the bytes and the signature won't match. Capture the raw body buffer in your
+  web framework.
+</Callout>
+
+### Node.js (Express) verification example
+
+```ts
+import express from "express";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const app = express();
+
+// Capture the raw body — the signature is computed over the raw bytes.
+app.use(express.json({ verify: (req, _res, buf) => { (req as any).rawBody = buf; } }));
+
+function verify(
+  secret: string,
+  header: string,
+  rawBody: string,
+  toleranceMs = 5 * 60_000,
+): boolean {
+  const parts = Object.fromEntries(header.split(",").map((p) => p.split("=")));
+  const ts = Number(parts.t);
+  const v1 = String(parts.v1 ?? "");
+  if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > toleranceMs) return false;
+  const expected = createHmac("sha256", secret)
+    .update(`${ts}.${rawBody}`)
+    .digest("hex");
+  if (expected.length !== v1.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(v1));
+}
+
+app.post("/hummytummy", (req, res) => {
+  const sig = req.header("X-HummyTummy-Signature") ?? "";
+  const raw = (req as any).rawBody.toString("utf8");
+  if (!verify(process.env.WEBHOOK_SECRET!, sig, raw)) {
+    return res.sendStatus(401); // invalid/stale signature
+  }
+  // Idempotency: don't process the same X-HummyTummy-Event-Id twice.
+  const eventId = req.header("X-HummyTummy-Event-Id");
+  // ... handle the event ...
+  res.sendStatus(200); // 2xx = successful delivery
+});
+```
+
+<Callout type="info">
+  Return **2xx** (200–299) for a successful delivery. Any non-2xx is treated as
+  a failure and retried.
+</Callout>
+
+## Event types
+
+List specific types in the `events` field, or use `"*"` to catch all publishable
+events. Types follow the `<area>.<action>.v<version>` shape.
+
+Example publishable types:
+
+| Event type | When |
+| --- | --- |
+| `order.created.v1` | A new order was created |
+| `order.updated.v1` | An order was updated |
+| `order.completed.v1` | An order completed |
+| `order.cancelled.v1` | An order was cancelled |
+| `payment.succeeded.v1` | A payment succeeded |
+| `payment.intent_created.v1` | A payment intent was created |
+| `payment.refund_completed.v1` | A refund completed |
+| `checkout.completed.v1` | A checkout completed |
+| `subscription.activated.v1` | A subscription activated |
+| `subscription.upgraded.v1` | A subscription was upgraded |
+| `subscription.cancelled.v1` | A subscription was cancelled |
+| `feature.entitlement.changed.v1` | A feature entitlement changed |
+
+### Blocked events
+
+Some sensitive events are kept internal and are **never** sent out — not even a
+`"*"` subscription receives them. Blocking is by **prefix**; no event whose type
+starts with the following prefixes is delivered:
+
+```
+user.password
+user.email_verification
+auth.
+subscription.upgrade.requested
+subscription.renewal.failed
+subscription.payment.
+kms.
+audit.
+```
+
+<Callout type="info">
+  New business events are publishable by default; only sensitive ones are added
+  to this list. The filter runs **before** subscription matching — even an
+  explicit, named subscription cannot opt into a blocked event.
+</Callout>
+
+## Retries and auto-pause
+
+Delivery is performed by a worker that runs every 30 seconds.
+
+- **Timeout:** a single delivery is capped at 15 seconds.
+- **Retry:** on a non-2xx response or network error, up to **5 attempts** with
+  increasing backoff (30 s, 2 m, 10 m, 1 h, 6 h); after that the delivery is
+  marked `failed`.
+- **Auto-pause:** a subscription is automatically set to `paused` after **20
+  consecutive failures**. This stops a dead endpoint from draining the worker;
+  you must fix it and create a new subscription.
+- **Success resets the counter:** a successful delivery resets the
+  consecutive-failure counter to 0.
+
+<Callout type="warning">
+  If the payload can't be loaded (e.g. the source event was purged by
+  retention), the delivery is marked `failed` with an actionable note (`source
+  event purged before delivery`) rather than silently losing data.
+</Callout>
+
+## SSRF protection (allowlist)
+
+Webhook URLs pass a safety gate both **at subscribe time** and **immediately
+before each delivery**. This prevents a tenant from self-fetching internal
+services or cloud metadata endpoints (e.g. `169.254.169.254`).
+
+What's blocked:
+
+- Non-public IPs: loopback, private/internal ranges, link-local, cloud-metadata
+  addresses, and their IPv4-mapped IPv6 equivalents.
+- Dangerous ports (Redis, Postgres, etc.).
+- Userinfo in the URL (`user:pass@host`).
+- Protocols other than `http`/`https`.
+
+<Callout type="info">
+  The re-check before delivery also closes **DNS-rebind** attacks (a DNS server
+  that answers "public IP" at subscribe and "private IP" at delivery). In that
+  case the delivery is marked `failed` without being retried.
+</Callout>
+
+## Best practices
+
+- **Always** verify the signature and dedup on `id`.
+- Return **2xx** quickly; queue heavy work (stay under the 15 s timeout).
+- Store the `secret` server-side, in an environment variable / secret vault.
+- If you find a subscription paused, fix your endpoint and **re-subscribe**.
+- Use an HTTPS endpoint where possible.

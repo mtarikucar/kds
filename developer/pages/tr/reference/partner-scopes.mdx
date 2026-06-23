@@ -1,0 +1,53 @@
+---
+title: Partner Scope'ları
+description: Partner API anahtarının ve ekran token'larının taşıyabileceği 6 scope ve her birinin açtığı /display uç noktası.
+---
+
+import { Callout } from 'nextra/components'
+
+# Partner Scope'ları
+
+Bir **Partner API anahtarı** ve onun ürettiği **ekran token'ları**
+(screen session), neyi yapabileceklerini belirleyen scope'lar taşır.
+Toplam 6 scope vardır. Her `/display` uç noktası `@RequireScope` ile tek bir
+scope ister ve `ScreenScopeGuard` bunu token'ın taşıdığı scope'lara karşı
+doğrular.
+
+<Callout type="info">
+  Bir ekran token'ının efektif scope'ları **her zaman** üst API anahtarının
+  scope'larının bir alt kümesidir. Anahtarın taşımadığı bir scope token'a
+  verilemez.
+</Callout>
+
+## Scope listesi
+
+| Scope | Ne sağlar | Uç nokta(lar) |
+| --- | --- | --- |
+| `menu:read` | Ekranın tenant'ına (ve varsa masasına) ait genel menüyü okuma. | `GET /api/v1/display/menu` |
+| `orders:read` | Ekranın sipariş oturumunun verdiği siparişleri okuma. | `GET /api/v1/display/orders` |
+| `orders:write` | Ekrandan sipariş oluşturma. | `POST /api/v1/display/orders` |
+| `requests:write` | Garson çağırma ve hesap isteme. | `POST /api/v1/display/waiter-requests`, `POST /api/v1/display/bill-requests` |
+| `payments:write` | Self-pay: ödenebilir kalemler, PayTR hosted-iframe ödeme niyeti ve durum sorgulama. | `GET /api/v1/display/payable-items`, `POST /api/v1/display/pay-intent`, `GET /api/v1/display/pay-status` |
+| `realtime:subscribe` | Gerçek zamanlı WebSocket akışına abone olma (sipariş/durum güncellemeleri). | KDS gerçek zamanlı gateway (WebSocket) |
+
+<Callout type="warning">
+  Bir uç noktayı gerekli scope olmadan çağırırsanız `ScreenScopeGuard`
+  isteği **403 Forbidden** ile reddeder. WebSocket bağlantısı için
+  `realtime:subscribe` yoksa oturum bağlanma anında reddedilir.
+</Callout>
+
+## En az ayrıcalık ilkesi
+
+Her ekran/cihaz için yalnızca ihtiyaç duyduğu scope'ları verin:
+
+- **Yalnızca menü gösteren tablet** → `menu:read`
+- **Sipariş + garson çağrısı** → `menu:read`, `orders:write`, `orders:read`, `requests:write`
+- **Masada self-pay** → yukarıdakiler + `payments:write`
+- **Canlı durum güncellemeleri** → ek olarak `realtime:subscribe`
+
+<Callout type="info">
+  `payments:write` üç uç noktayı birden açar: ödenebilir kalemlerin
+  listelenmesi, ödeme niyeti oluşturma ve niyet durumunu sorgulama. Ödeme
+  niyetinin geri dönüş origin'i istemciden değil, anahtarın
+  `allowedReturnOrigins` allowlist'inden alınır.
+</Callout>
