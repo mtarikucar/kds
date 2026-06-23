@@ -1,0 +1,75 @@
+---
+title: Kullanıcılar & Roller
+description: Personel hesaplarını oluşturma, rol atama (ADMIN/MANAGER/WAITER/KITCHEN/COURIER), şifre belirleme ve kayıt başvurularını onaylama/reddetme ekranı.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Kullanıcılar & Roller
+
+**Menü yolu:** Yönetim → Kullanıcılar &nbsp;•&nbsp; **URL:** `/admin/users`
+**Erişim:** ADMIN  •  **Plan:** Tüm planlar
+
+## Amacı
+
+Bu ekran, restoranınızda çalışan **personelin sistem hesaplarını** yönetir: yeni hesap açma, rol atama, şifre belirleme ve hesabı pasife alma/silme. Her kullanıcının **rolü**, uygulamada hangi ekranları görebileceğini belirler (örneğin garson POS'a, mutfak personeli KDS'e erişir). Vardiya, izin ve İK kayıtları burada **değil**, **[Personel](/tr/admin-guide/personnel)** ekranında tutulur — burası yalnızca giriş yapan hesaplarla ilgilenir.
+
+<Callout type="info">
+  Bu ekran yalnızca **ADMIN** rolündeki kullanıcılara açıktır. Plan kısıtı yoktur;
+  ancak planınızın **kullanıcı limiti** doluysa yeni hesap ekleyemezsiniz (aşağıya bakın).
+</Callout>
+
+## Ekranın düzeni
+
+Üstte rollere ve durumlara göre özet kartları (Toplam, Aktif, Onay Bekleyen, Pasif, Yönetici, Müdür) yer alır. Altında **arama kutusu**, **rol filtresi** ve **durum sekmeleri** (Tümü / Aktif / Onay Bekleyen / Pasif) bulunur; bunlarla listeyi hızla daraltırsınız. Onay bekleyen veya pasif kullanıcı yoksa ilgili sekme/kart gizlenir. Liste tablosunda her satırda ad-soyad, e-posta, **rol rozeti**, **durum rozeti**, oluşturulma tarihi ve işlem butonları görünür.
+
+## Kullanıcı ekleme ve düzenleme
+
+<Steps>
+### Yeni kullanıcı oluşturma
+
+Sağ üstteki **"Kullanıcı Ekle"** ile formu açın. E-posta, şifre (en az 6 karakter), ad, soyad ve **rol** girin. Kaydettiğinizde hesap doğrudan oluşturulur.
+
+### Rol seçimi
+
+Roller: **ADMIN** (tam yönetim), **MANAGER** (müdür), **WAITER** (garson), **KITCHEN** (mutfak personeli) ve **COURIER** (kurye). Varsayılan rol garsondur. Rol, kullanıcının görebileceği ekranları belirler.
+
+### Bilgileri düzenleme
+
+Bir satırdaki **kalem** ikonuyla e-posta, ad, soyad ve rol güncellenir. Şifre alanını **boş bırakırsanız mevcut şifre korunur**; yalnızca yeni bir değer yazarsanız şifre değişir.
+</Steps>
+
+<Callout type="warning">
+  Kendi hesabınızı **silemezsiniz** — listede kendinize ait satırda silme butonu pasiftir
+  ve adınızın yanında "(siz)" etiketi görünür. Bu, son yöneticinin yanlışlıkla erişimi
+  kilitlemesini önler.
+</Callout>
+
+## Durumlar: onay, red, pasife alma
+
+Kullanıcı **durumu** dört değerden birini alır ve satırdaki işlemler duruma göre değişir:
+
+- **Onay Bekleyen (PENDING_APPROVAL):** kendi kaydolan bir kişi onay bekliyordur. Satırda **onayla** (✓) ve **reddet** (✗) butonları çıkar.
+- **Aktif (ACTIVE):** normal çalışan hesap. Düzenle ve sil butonları görünür.
+- **Pasif (INACTIVE):** erişimi kapatılmış hesap. **Yeniden aktifleştir** butonuyla geri açabilirsiniz.
+
+<Callout type="info">
+  Durum geçişleri (onay / red / yeniden aktifleştirme / silme) ayrı işlemlerdir;
+  düzenleme formundaki "durum" alanı yalnızca mevcut hesabı düzenlerken görünür ve
+  asıl yetki sunucudadır. Silme işlemi **geri alınamaz** ve hesabı kalıcı olarak kaldırır.
+</Callout>
+
+## Kullanıcı limiti
+
+Planınızın bir **azami kullanıcı sayısı** olabilir. Üstteki bilgi şeridi `mevcut / limit` oranını gösterir. Limite ulaşıldığında **"Kullanıcı Ekle"** butonu kilitlenir, pasif bir kullanıcıyı **yeniden aktifleştirmek de** engellenir ve bir yükseltme kartı çıkar.
+
+<Callout type="warning">
+  Limit kontrolü arayüzde gösterilir, fakat asıl sınırı **sunucu** uygular. Limiti
+  artırmak için planınızı yükseltmeniz gerekir — ayrıntı: **[Abonelik](/tr/plans)**.
+</Callout>
+
+## İlgili sayfalar
+
+- **[Personel](/tr/admin-guide/personnel)** — vardiya, izin ve İK kayıtları (bu ekrandan ayrıdır).
+- **[Şubeler](/tr/admin-guide/branches)** — kullanıcıların çalıştığı şubeler.
+- **[Abonelik](/tr/plans)** — plan ve kullanıcı limiti.

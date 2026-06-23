@@ -4,7 +4,8 @@ export default {
   "admin-guide": "Yönetici Rehberi",
   "plans": "Planlar",
   "marketplace": "Marketplace",
-  "developer": "Geliştirici / Entegrasyon",
+  "integrations": "Entegrasyonlar",
+  "developer": "Geliştirici / API",
   "desktop": "Desktop Uygulaması",
   "reference": "Referans"
 }

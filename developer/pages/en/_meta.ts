@@ -4,7 +4,8 @@ export default {
   "admin-guide": "Admin Guide",
   "plans": "Plans",
   "marketplace": "Marketplace",
-  "developer": "Developer / Integration",
+  "integrations": "Integrations",
+  "developer": "Developer / API",
   "desktop": "Desktop App",
   "reference": "Reference"
 }

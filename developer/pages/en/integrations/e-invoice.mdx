@@ -1,0 +1,103 @@
+---
+title: e-Invoice / e-Archive (Accounting Integration)
+description: The accounting settings screen where you define your company tax details, your accounting provider (Paraşüt, Logo, Foriba) and invoice-issuing settings, then test the connection.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# e-Invoice / e-Archive (Accounting Integration)
+
+**Menu path:** Settings → Accounting &nbsp;•&nbsp; **URL:** `/admin/settings/accounting`
+**Access:** ADMIN, MANAGER  •  **Plan:** All plans
+
+## Purpose
+
+This screen gathers, in one place, the three things you need to **issue invoices** from your sales: your business's **tax details**, the **accounting provider** you'll use (Paraşüt, Logo or Foriba) and your **invoice behavior settings**. The values here make up the seller (company) side of the e-Invoice / e-Archive documents you issue. Every field is **saved automatically** — there's no separate "Save" button; each change is written to the server after a short delay, and the save status is shown in the section header.
+
+## How the screen works
+
+The screen has three sections:
+
+- **Company Details** — the seller identity that appears on the invoice.
+- **Invoice Settings** — automatic invoicing, the invoice prefix and the default due term.
+- **Integration** — accounting provider selection, provider credentials and a connection test.
+
+## Step 1 — Company tax details
+
+<Steps>
+### Fill in the Company Details section
+
+Enter the following fields: **Company name**, **Tax number / National ID**, **Tax office**, **Address**, **Phone** and **Email**. These details are written to the seller side of every invoice you issue; missing or incorrect tax information can cause the provider to reject the invoice.
+
+### Wait for the auto-save
+
+The change is saved automatically when you leave the field. If the save indicator in the section header fails, you can resend it with **Retry**.
+</Steps>
+
+<Callout type="info">
+  These tax details belong only to **your business** (the seller). The invoicing
+  details of individual customers are not stored here; those are handled in the sales/invoice flow.
+</Callout>
+
+## Step 2 — Invoice settings
+
+The Invoice Settings section has three settings:
+
+- **Generate invoices automatically** — when on, the invoice-issuing flow is triggered on its own for eligible sales.
+- **Invoice prefix** — the label prepended to invoice numbers (default `INV`).
+- **Default payment term (days)** — sets the invoice due date; leave it at `0` for immediate payment.
+
+<Callout type="warning">
+  When **Generate invoices automatically** is on but no valid provider is selected or
+  the credentials are missing, invoices can't be issued and the failed records wait on the
+  **Fiscal Recovery** screen. Before turning on automatic invoicing, make sure the
+  integration passes the connection test.
+</Callout>
+
+## Step 3 — Provider integration
+
+In the Integration section you first pick a **Provider**. The options are **None** (default), **Paraşüt**, **Logo** and **Foriba**. When you select a provider, that provider's credential fields appear on the screen.
+
+<Steps>
+### Select the provider
+
+Pick your accounting provider from the dropdown. While "None" is selected, automatic synchronization and the connection test are disabled.
+
+### Enter the provider credentials
+
+The fields change depending on the provider you choose:
+
+- **Paraşüt:** Company ID, Client ID, Client Secret, Username, Password.
+- **Logo:** API address, Username, Password, Company number.
+- **Foriba:** API address, Username, Password, Service type.
+
+The password and secret fields are masked. If you leave these fields blank, the existing stored value is **kept** (an empty submission does not erase the stored secret); to change it, you must type it again.
+
+### Set up automatic synchronization (optional)
+
+When **Automatic synchronization** is on, issued documents are forwarded to the provider automatically. This option is only active while a provider is selected.
+
+### Test the connection
+
+Use the **Test connection** button — shown while a provider is selected — to verify your credentials. On success you get a confirmation; on failure, the error message returned by the provider is shown. Repeat the test whenever you change the credentials.
+</Steps>
+
+<Callout type="info">
+  The plan badge is only an indicator in the interface; the integration's actual
+  authorization and the right to issue invoices are verified on the **server** side. Even if
+  the settings here are correct, no document is issued without server authorization.
+</Callout>
+
+## How the invoice-issuing flow works
+
+When an invoice/receipt request is created, the system first **queues** the record and then forwards it to the selected provider. The result is marked as **issued** or **failed**; failed records are stored together with their error message. Every request carries an **idempotency key**, so the same document is never issued twice on a retry.
+
+- To view issued documents: **[Invoices](/en/admin-guide/invoices)**.
+- To manually resend / cancel records still in the queue or that have failed: **[Fiscal Recovery](/en/admin-guide/fiscal-recovery)**.
+
+<Callout type="warning">
+  If a document is in the "failed" state, fix the problem (missing credential, provider
+  outage) and then resend it from the **Fiscal Recovery** screen. The resend uses the
+  original idempotency key, so a successful retry won't create a duplicate document at
+  the provider.
+</Callout>

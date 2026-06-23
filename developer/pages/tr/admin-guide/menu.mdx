@@ -1,0 +1,90 @@
+---
+title: Menü Yönetimi
+description: HummyTummy menü kataloğu — kategori, ürün, fiyat, görsel, stok bağlantısı, sıralama, görünürlük ve zorunlu/opsiyonel seçenek (modifier) yönetimi.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Menü Yönetimi
+
+**Menü yolu:** İşletme → Menü &nbsp;•&nbsp; **URL:** `/admin/menu`
+**Erişim:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** Tüm planlar
+
+## Amacı
+
+Menü Yönetimi, restoranınızın **merkezi kataloğudur**: kategoriler, ürünler ve seçenekler buradan tanımlanır. Burada girdiğiniz her şey — fiyat, görsel, stok bağlantısı, sıralama ve görünürlük — hem **POS satış ekranını** hem de **QR menüyü** doğrudan besler. Ekran üç sekmeden oluşur: **Menü**, **Görsel Kütüphanesi** ve **Seçenekler (Modifier)**.
+
+<Callout type="info">
+  Plan limitleri yalnızca arayüzde bir uyarı/yükseltme kartı gösterir; asıl
+  sınırı sunucu uygular. Kategori ve ürün sayınız plan kotasına ulaşırsa
+  "Kategori Ekle" / "Ürün Ekle" butonu **kilit simgesiyle** pasifleşir ve sayaç
+  (örn. `Ürünler: 48 / 50`) ekranın üstünde görünür.
+</Callout>
+
+## Menü sekmesi — kategori ve ürün
+
+Menü sekmesi kategorileri ve altlarındaki ürünleri tek bir hiyerarşik liste olarak gösterir. Sağ üstteki butonla kategori, her kategori kartının içinden de o kategoriye ürün eklersiniz.
+
+<Steps>
+### Kategori ekleyin
+
+**Kategori Ekle** ile bir ad (zorunlu) ve isteğe bağlı açıklama girin. Kategoriler menüde bölüm başlıklarıdır (örn. "Başlangıçlar", "Ana Yemekler", "İçecekler").
+
+### Ürün ekleyin
+
+Bir kategorinin içinden **ürün ekleyerek** ad, açıklama, **fiyat (₺)** ve kategori belirleyin. Fiyat sıfır veya pozitif olmalıdır; kategori seçimi zorunludur. Ürünü daha sonra düzenleyerek tüm alanları değiştirebilirsiniz.
+
+### Stok bağlantısı kurun (isteğe bağlı)
+
+Ürün formundaki **mevcut stok** alanına başlangıç miktarını girersiniz. Boş bırakılırsa 0 kabul edilir. Bu alan ürünü envantere bağlar; stok hareketlerini ayrıntılı yönetmek için **[Stok & Envanter](/tr/admin-guide/stock)** ekranını kullanın.
+
+### Görsel ve seçenek atayın
+
+Aynı formdan **görsel kütüphanesinden** ürüne resim seçer (ilk resim **birincil/kapak** olur) ve varsa **seçenek gruplarını** işaretlersiniz. **"Menüde göster"** kutusuyla ürünün POS ve QR menüde görünürlüğünü açıp kapatırsınız.
+</Steps>
+
+<Callout type="info">
+  **Sıralama sürükle-bırak ile yapılır:** Hem kategorileri hem de bir
+  kategori içindeki ürünleri sürükleyerek yeniden sıralayabilirsiniz. Bu sıra,
+  müşterinin QR menüde ve garsonun POS'ta gördüğü sıradır. Üstteki "Tümünü
+  genişlet / daralt" düğmesi tüm kategori kartlarını birlikte açıp kapatır.
+</Callout>
+
+<Callout type="warning">
+  Bir ürünün kategorisi silinir veya geçersiz kalırsa ürün listenin altında
+  **"Kategorisiz"** başlığı altında toplanır. Bu ürünleri düzenleyip geçerli
+  bir kategoriye taşımadan menüde düzgün görünmezler.
+</Callout>
+
+## Görsel Kütüphanesi sekmesi
+
+Görseller bir kez yüklenip birden çok üründe yeniden kullanılır. Yükleme alanına dosya sürükleyip bırakabilir veya tıklayıp seçebilirsiniz; **görsel başına en fazla 5 MB** kabul edilir. Yüklenenler arasında ada göre arama yapabilir, ızgara/liste görünümü arasında geçebilir ve seçtiklerinizi toplu silebilirsiniz.
+
+<Callout type="info">
+  Tarayıcınız destekliyorsa **AI ile arka plan kaldırma** anahtarını açarak
+  yüklediğiniz görsellerin arka planını otomatik temizleyebilirsiniz; işlenen
+  dosyalar **AI** rozetiyle işaretlenir. Bu özellik tamamen tarayıcıda çalışır.
+</Callout>
+
+## Seçenekler (Modifier) sekmesi
+
+Seçenekler, bir ürüne eklenen tercihlerdir: porsiyon boyu, sos seçimi, ekstra malzeme gibi. Önce **seçenek grubu** tanımlar, içine **seçenek öğeleri** eklersiniz; sonra grubu ürün formundan ilgili ürünlere atarsınız.
+
+- **Seçim tipi:** **Tekli** (yalnızca bir öğe — örn. boyut) veya **Çoklu** (birden fazla — örn. ekstra malzemeler).
+- **Zorunlu mu:** İşaretlenirse müşteri sipariş vermeden önce bu gruptan seçim yapmak **zorundadır**; aksi halde opsiyoneldir.
+- **Min/Maks seçim:** Çoklu tipte en az ve en çok kaç öğe seçilebileceğini belirler; maksimum boş bırakılırsa sınırsızdır.
+- **Fiyat farkı (₺):** Her seçenek öğesinin ürün fiyatına eklediği tutardır (negatif olamaz; 0 ise ücretsiz seçenek).
+- **Sıra ve görünürlük:** Grup ve öğeler `displayOrder` ile sıralanır; öğenin "uygun" kutusu kapatılırsa müşteriye gösterilmez.
+
+<Callout type="warning">
+  Bir ürünü düzenlerken seçenek grubu işaretlerini **tamamen kaldırırsanız**,
+  kaydettiğinizde o ürünün tüm grup bağlantıları silinir. Seçim listesi
+  bütünüyle yeniden yazıldığından, yanlışlıkla boş bıraktığınız bir ürün
+  seçeneksiz kalır.
+</Callout>
+
+## İlgili sayfalar
+
+- **[POS (Satış Ekranı)](/tr/admin-guide/pos)** — kategori, ürün ve seçenekler bu ekranda satışa sunulur.
+- **[QR Menü](/tr/admin-guide/qr-menu)** — müşteri menüsü doğrudan bu katalogdan beslenir.
+- **[Stok & Envanter](/tr/admin-guide/stock)** — ürün stok miktarlarının ayrıntılı yönetimi.

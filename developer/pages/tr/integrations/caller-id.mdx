@@ -1,0 +1,96 @@
+---
+title: Çağrı Kimliği (Caller ID)
+description: Telefon santralinizden gelen aramaları HummyTummy'ye bağlayın — gelen numara müşteri kaydıyla eşleşir, ekranda anında müşteri bilgisi belirir. Kurulumu adım adım.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Çağrı Kimliği (Caller ID)
+
+**Menü yolu:** Ayarlar → Entegrasyonlar &nbsp;•&nbsp; **URL:** `/admin/settings/integrations`
+**Erişim:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** `caller_id_integration` marketplace eklentisi
+
+## Amacı
+
+Çağrı Kimliği entegrasyonu, telefon santralinizi (veya bulut telefon servisinizi) HummyTummy'ye bağlar. Bir müşteri aradığında gelen numara, kayıtlı müşteri profilleriyle telefon üzerinden eşleştirilir; eşleşme bulunursa operatör arayan müşteriyi anında tanır. Böylece gel-al ve telefon siparişlerinde "kim arıyor?" sorusu ekranda otomatik yanıtlanır.
+
+<Callout type="info">
+  Bu entegrasyon bir **marketplace eklentisidir** (`caller_id_integration`). Eklenti
+  aktif değilse hem sol menüde **Gelen Aramalar** girişi görünmez hem de arka uç
+  isteği reddeder (savunma derinliği). Eklentiyi [Marketplace](/tr/marketplace)
+  üzerinden ekleyebilirsiniz.
+</Callout>
+
+## Nasıl çalışır?
+
+Akış tek yönlüdür: santralınız her arama olayında HummyTummy'ye bir **webhook** gönderir, sistem olayı kaydeder ve numarayı müşteriyle eşleştirir.
+
+<Steps>
+### Sağlayıcı aramayı bildirir
+
+Telefon sağlayıcınız (Twilio, Verimor, Netgsm, 3CX veya genel HMAC uyumlu bir sistem) her arama için HummyTummy'nin webhook adresine imzalı bir istek atar.
+
+### Olay kaydedilir ve eşleştirilir
+
+Sistem her olayı türüyle birlikte saklar: **gelen (incoming)**, **yanıtlandı (answered)**, **bitti (ended)** ve **cevapsız (missed)**. Aynı anda gelen numara (E.164 biçiminde, örn. `+905xxxxxxxxx`) mevcut müşteri kayıtlarınızda aranır.
+
+### Operatör müşteriyi görür
+
+Eşleşme bulunursa olay, ilgili müşteri profiline bağlanır. **Gelen Aramalar** ekranında numara, müşteri bağlantısı ve süre listelenir; eşleşmeyen aramalarda numara düz metin olarak görünür, oradan tek tıkla yeni müşteri kaydı oluşturabilirsiniz.
+</Steps>
+
+<Callout type="info">
+  Müşteri eşleştirmesi **en iyi çaba** ilkesiyle çalışır: numara hiçbir kayda
+  uymasa bile arama yine de kaydedilir ve listede görünür — eşleşme yokluğu çağrıyı
+  asla gizlemez.
+</Callout>
+
+## Kurulum
+
+Entegrasyon, **Ayarlar → Entegrasyonlar** ekranından bir entegrasyon girişi olarak tanımlanır; webhook gizli anahtarı ise sistem yöneticiniz tarafından sunucu tarafında ayarlanır.
+
+<Steps>
+### Eklentiyi etkinleştirin
+
+Önce [Marketplace](/tr/marketplace) üzerinden `caller_id_integration` eklentisini ekleyin. Eklenti aktif olduğunda **Gelen Aramalar** menüsü açılır.
+
+### Sağlayıcınızı seçin
+
+Desteklenen sağlayıcılar: **twilio**, **verimor**, **netgsm**, **3cx** ve genel HMAC imzalı sistemler için **generic**. Sağlayıcının panelinde webhook (callback) URL'si tanımlama özelliği bulunmalıdır.
+
+### Webhook adresini sağlayıcıya girin
+
+Sağlayıcıya verilecek webhook adresi şu biçimdedir:
+
+`https://<alan-adınız>/v1/caller/webhooks/<sağlayıcı>/<tenant-id>`
+
+Örnek: `.../v1/caller/webhooks/verimor/<tenant-id>`. Her işletmenin (tenant) kendine ait bir webhook adresi vardır.
+
+### Gizli anahtarı ayarlayın
+
+Webhook'lar **HMAC-SHA256** ile imzalanır. Sağlayıcı her isteğe `x-signature` ve `x-timestamp` başlıklarını ekler. Sistem yöneticiniz, sunucuda eşleşen gizli anahtarı tanımlar; anahtar tanımsızsa hiçbir çağrı kabul edilmez (güvenli varsayılan: kapalı).
+</Steps>
+
+<Callout type="warning">
+  Webhook adresi ve gizli anahtar **PII (telefon numarası + müşteri profili)** içeren
+  bir akışı açar. Bu yüzden **Gelen Aramalar** ekranı yalnızca **ADMIN** ve **MANAGER**
+  rollerine açıktır; WAITER/KITCHEN göremez. Gizli anahtarı sağlayıcı paneli ile
+  sunucu yapılandırması dışında hiçbir yerde paylaşmayın.
+</Callout>
+
+<Callout type="info">
+  **Yineleme koruması:** Sağlayıcılar aynı bildirimi birden çok kez gönderebilir
+  ("en az bir kez" teslimat). Sistem, aynı çağrı olayını tekrar aldığında onu sessizce
+  yok sayar — ekranda mükerrer kayıt veya çift uyarı oluşmaz. Ayrıca 5 dakikadan eski
+  zaman damgalı (stale) istekler reddedilir.
+</Callout>
+
+## Gelen Aramalar ekranı
+
+Aktif eklentiyle birlikte **`/admin/caller-feed`** adresindeki **Gelen Aramalar** ekranı açılır. Bu liste son aramaları 10 saniyede bir otomatik yenileyerek gösterir: zaman, sağlayıcı, çağrı türü, numara, eşleşen müşteri ve süre. Eşleşen müşteri satırından doğrudan müşteri detayına, ilişkili sipariş varsa **[POS](/tr/admin-guide/pos)** ekranına geçebilirsiniz.
+
+## İlgili sayfalar
+
+- Entegrasyonlara genel bakış: **[Entegrasyonlar](/tr/integrations)**
+- Eklenti ekleme: **[Marketplace](/tr/marketplace)** ve **[Planlar](/tr/plans)**
+- Sipariş alma ekranı: **[POS (Satış Ekranı)](/tr/admin-guide/pos)**

@@ -1,0 +1,64 @@
+---
+title: Analytics
+description: The HummyTummy visual analytics screen — trend dashboards for table occupancy, traffic flow, customer behavior and AI-powered insights. Purpose, usage and plan requirement.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Analytics
+
+**Menu path:** Business → Analytics &nbsp;•&nbsp; **URL:** `/admin/analytics`
+**Access:** ADMIN, MANAGER  •  **Plan:** `advancedReports` — **Professional (PRO)** and above (or the *advanced_reports* add-on)
+
+## Purpose
+
+The Analytics screen presents how your space is used and how customers move through it as **visual dashboards**: table occupancy, peak hours, traffic bottlenecks and customer behavior — all readable at a glance. Beyond tables, it includes summary cards, occupancy bars and **AI-powered insights**. For raw, table-based sales records, use the [Reports](/en/admin-guide/reports) screen; Analytics is the **interpreted, actionable** view of that same data.
+
+<Callout type="info">
+  Analytics is only unlocked on **Professional (PRO)** and higher plans (or when the
+  *advanced_reports* add-on is purchased). If your plan doesn't include it, it's hidden
+  from the sidebar and visiting `/admin/analytics` shows an upgrade card. This gate is
+  on the UI side only; the real authorization lives on the server.
+</Callout>
+
+## Analytics vs. Reports
+
+Both screens draw on the same data, but they serve different purposes:
+
+- **Reports** — a **table** breakdown of sales records; meant for filtering and exporting.
+- **Analytics** — the same data turned into **trends and dashboards**: occupancy percentages, intensity score, a bottleneck map and recommendations. It focuses on "what can I improve" rather than "what happened".
+
+## Date range and tabs
+
+<Steps>
+### Pick a date range
+
+Set the period from the **Start / End** fields at the top of the screen and run it with **Apply**. On open, the last **7 days** is selected. The date filter affects every tab; only the **Insights** tab works independently of the period.
+
+### Switch to the tab you need
+
+Use the tabs at the top to switch views: **Overview**, **Table Analytics**, **Traffic Flow**, **Customer Behavior** and **Insights**. Each tab loads its own summary cards and detail table.
+</Steps>
+
+## Overview
+
+Shows the period's four summary cards: **average table occupancy**, **total revenue** (₺) and table turnover count, **intensity score** (out of 100 — higher is better) and the number of **active insights**. Below them are the most recent **actionable insights** (up to 5) and, if any, a table of **under-utilized tables**.
+
+## Table Analytics
+
+Lists each table's section, capacity, **occupancy score** (with a colored progress bar), revenue, session count and average order value in a table. The summary cards show total tables, average occupancy, **peak hour** and total sessions.
+
+## Traffic Flow and Customer Behavior
+
+- **Traffic Flow** — shows the venue's intensity score, its **bottlenecks** (location, severity, average wait time, peak hour) and **recommendations** for improving flow.
+- **Customer Behavior** — average dining time, **idle time spent at the table after the meal**, average party size and average order value; plus peak arrival/departure hours and the idle-to-dining time ratio. If the idle ratio comes out high, the screen shows a prompt to improve table turnover.
+
+## Insights (AI Insights)
+
+The system generates **insights** from the data it collects; each one includes a title, a description, a **recommendation**, the likely impact and a confidence score. You can mark insights with a single tap as **applied**, **in progress** or **dismissed**; the status breakdown appears in the summary cards at the top.
+
+<Callout type="warning">
+  If there isn't enough business data yet, the dashboards may come back empty or with
+  low values. This is normal — as real occupancy and session data accumulates, the
+  insights and scores become meaningful.
+</Callout>

@@ -1,0 +1,99 @@
+---
+title: Delivery Platforms
+description: Connect your Getir, Yemeksepeti, Trendyol Yemek and Migros Yemek accounts — enter credentials, test the connection, map your menu and stream incoming orders to the kitchen display.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Delivery Platforms
+
+**Menu path:** Settings → Online Ordering Platforms &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
+**Access:** ADMIN, MANAGER  •  **Plan:** plans that include the `deliveryIntegration` feature
+
+## Purpose
+
+This screen connects your restaurant to the **Getir Yemek, Yemeksepeti, Trendyol Yemek and Migros Yemek** platforms. Once a connection is live, orders from those platforms land straight on your kitchen display (KDS); you can map your products to the platform and push your menu, and you can open or close the store on the platform's side. You manage the whole flow from a single page, and if something goes wrong you can trace it in the activity log on that same page.
+
+<Callout type="info">
+  The page always shows all four platform cards. Until you open a card and enter
+  its credentials, that platform stays in the **"Not configured"** state and
+  receives no orders.
+</Callout>
+
+## Connecting a platform
+
+Each platform is listed as an expandable card. Tapping a card's header opens its credentials form.
+
+<Steps>
+### Step 1 — Enter the restaurant identifier
+
+In the **Restaurant ID (`remoteRestaurantId`)** field at the top of the form, enter the store/branch number the platform issued to you. Incoming orders and webhook calls are matched to your business through this identifier.
+
+### Step 2 — Enter the credential keys
+
+Each platform expects different fields (`*` is required):
+
+- **Getir Yemek:** App Secret Key\*, Restaurant Secret Key\*
+- **Yemeksepeti:** Client ID\*, Client Secret\*, Chain Code, POS Vendor ID
+- **Trendyol Yemek:** API Version (`v1` or `v2`), Username, Password, Integrator ID (v2), Integrator Secret (v2)
+- **Migros Yemek:** API Key\*
+
+Use the eye icon next to the secret fields to confirm what you typed. The keys are stored on the server and stay hidden when you return to the screen.
+
+### Step 3 — Save and test the connection
+
+The **Save** button appears as soon as you make a change. After saving, use **Test Connection** to verify on the platform's side that the keys are valid. The test performs a real sign-in attempt; if it fails, review the keys or the restaurant identifier.
+
+### Step 4 — Turn the integration on
+
+Flip the toggle in the card header. If any required field is empty, the system warns you and keeps the card open. Once enabled, the status badge changes to **"Connected"** and orders begin to flow.
+</Steps>
+
+<Callout type="warning">
+  Creating, updating and deleting a configuration, and pushing the menu, are
+  **ADMIN**-only actions. **MANAGER** users can view the cards and the activity
+  log, run a connection test, and open or close the store — but they cannot
+  change the keys.
+</Callout>
+
+## How order sync works
+
+The platforms operate in different ways, and each card's description notes which:
+
+- **Yemeksepeti** — webhook-based (real time). The platform pushes orders to our server instantly.
+- **Trendyol Yemek** — a mix of webhook and polling.
+- **Getir Yemek** — polling-based (roughly every 15 sec).
+- **Migros Yemek** — polling-based (roughly every 20 sec).
+
+When **Auto Accept** is on, an incoming order is accepted without any manual step and sent to the kitchen; when it's off, you have to confirm each order by hand. The **Last poll** and **Last menu sync** timestamps at the bottom of the card let you confirm the flow is live.
+
+<Callout type="info">
+  **Open / Close store:** this button, which appears on the card while the
+  integration is on, marks your restaurant as open or closed only on that
+  platform's side. It's handy for pausing new orders during a rush — you can close
+  the store temporarily without turning the integration off.
+</Callout>
+
+## Menu mapping
+
+To push your menu to a platform, you must link each of your products to its counterpart on that platform. A mapping is established between a **product** in the system and the platform's **external item ID** (`externalItemId`). The menu sync pushes only **mapped** products and writes each product's name, price (₺) and stock status to the platform. If you mark a product as "out of stock" in HummyTummy, that status can be reflected on the platform too.
+
+<Callout type="warning">
+  On a given platform, an external item ID can be mapped only once; the system
+  rejects duplicates. Create your products first on the
+  **[Menu](/en/admin-guide/menu)** screen, then map them here.
+</Callout>
+
+## Activity log and error handling
+
+The **Activity Log** at the bottom of the page shows recent order and sync operations. You can filter by all / successful / failed, and expand any row to see its details. Personal data in the raw payload of incoming orders is masked before it is written to the log.
+
+As errors accumulate on a platform, the card badge switches to a **"Error"** warning. If the error count reaches **10**, the circuit breaker trips, the badge becomes **"Circuit Open"**, and the integration is turned off automatically. When this happens, open the card and read the **Last error** message, fix the credentials, verify with **Test Connection**, and then turn the integration back on.
+
+<Callout type="info">
+  The plan restriction is enforced not only in the UI but on the server too: if
+  your plan doesn't include the `deliveryIntegration` feature, this screen's
+  actions are rejected. Since incoming orders enter the kitchen flow, we recommend
+  completing your **[KDS (Kitchen Display)](/en/admin-guide/kitchen)** and
+  **[Menu](/en/admin-guide/menu)** setup before you start using this screen.
+</Callout>

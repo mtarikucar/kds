@@ -1,0 +1,83 @@
+---
+title: Hardware Store
+description: A marketplace screen where you browse and order physical hardware for your restaurant — printers, tablets, KDS displays and more — along with installation services.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Hardware Store
+
+**Menu path:** Marketplace → Hardware Store &nbsp;•&nbsp; **URL:** `/admin/store`
+**Access:** ADMIN, MANAGER  •  **Plan:** All plans
+
+## Purpose
+
+The Hardware Store lets you browse and order the **physical devices** your restaurant runs on (receipt/label printers, order tablets, KDS displays and so on) and their **installation and integration services** — all from a single screen. You filter products by category, add them to the cart, get a live price quote and pay through PayTR. You then track the orders you've placed from the **[My Hardware Orders](#order-tracking)** screen.
+
+<Callout type="info">
+  The store is open on every plan. The cart lives **only in your browser's memory**:
+  it survives while you navigate within the SPA, but a full page reload clears it. This
+  is deliberate — it keeps abandoned, half-finished carts from piling up.
+</Callout>
+
+## How the screen is laid out
+
+The screen has two parts: the **product catalog** on the left and a sticky **cart** panel on the right.
+
+- **Category filter** — the dropdown in the header filters products by category; "All categories" shows everything. The category list comes from the server.
+- **Product cards** — show the brand, category, key features, warranty period (in months) and price (₺). When stock runs low a "last units" label appears, and where applicable a **GİB-approved** badge is shown.
+- **Services section** — service line items such as installation and integration are listed in a separate section from the hardware. Because services require a branch and a date, they can't be added straight to the cart; you order them **from the detail page**.
+
+<Callout type="warning">
+  Each product has a sales type, and that determines whether it can be added to the cart:
+  only **direct-sale** products can go into the cart. **Quote** products
+  ("not for direct sale"; quote plus installation via an authorized dealer/service),
+  **partner referral** items (POS service provided by a partnered bank/payment institution)
+  and **recommended equipment** items each route you to their own button — and for these,
+  the price shown is not a sale price but a **reference list price**.
+</Callout>
+
+## Placing an order
+
+<Steps>
+### Add to cart
+
+Press **Add to cart** on a direct-sale product card. The product drops into the cart on the right, with the quantity and line total (₺) shown instantly. If it's out of stock, the button is disabled.
+
+### Get a price quote
+
+In the cart, the **Get quote** button calls a live endpoint to calculate the subtotal, VAT, shipping and **grand total**. Amounts are always shown in the quote's own currency.
+
+### Delivery details
+
+The **Checkout** button opens the delivery dialog. You either enter an address or pick one of the branches defined for your tenant and choose **"ship to my branch."** The selected branch is recorded on the order as a reference.
+
+### Pay with PayTR
+
+Once you confirm the details, the system creates a payment request and redirects you to the **PayTR** payment page. When the payment completes, you're returned to the **My Hardware Orders** page.
+</Steps>
+
+<Callout type="info">
+  Besides reaching the full catalog from the **Marketplace**, an "Order now" link on the
+  landing page can take you into the store with a specific product preselected; if that
+  product is directly purchasable, it's added to the cart automatically.
+</Callout>
+
+## Order tracking
+
+The **"Past orders"** link in the cart, or **My Hardware Orders** (`/admin/hardware-orders`) in the menu, takes you to your order history. Orders are specific to your tenant.
+
+- For each order, the table shows the **order number, date, item count, amount (₺), status** and **installation** info.
+- The **status filter** narrows the list: awaiting payment, paid, preparing, shipped, delivered, installed, completed, canceled, refunded. With the filter empty, all orders are listed.
+- The **Installation** column shows the requested / scheduled / completed state for orders that include an installation service.
+- The **Details** link on a row (`/admin/hardware-orders/:id`) opens the order's full details.
+
+<Callout type="info">
+  Order status and payment collection are managed server-side; the screen only reflects the
+  current state. An order moves to "paid" only after the payment has been confirmed.
+</Callout>
+
+## Related pages
+
+- Device pairing and receipt-printer settings: **[Settings](/en/admin-guide/settings)**
+- Taking orders and collecting payment: **[POS (Sales Screen)](/en/admin-guide/pos)**

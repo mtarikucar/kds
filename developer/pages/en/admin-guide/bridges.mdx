@@ -1,0 +1,84 @@
+---
+title: Bridges (Local Connector)
+description: HummyTummy local bridges (HummyBox) — set up printer, fiscal device and offline-sync bridges, capture the pairing token and manage live connection status.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Bridges (Local Connector)
+
+**Menu path:** Business → Bridges &nbsp;•&nbsp; **URL:** `/admin/bridges`
+**Access:** ADMIN  •  **Plan:** `multiLocation` — **Professional (PRO)** and above
+
+## Purpose
+
+The Bridges screen manages the **local connector devices (HummyBox)** in your branches. A bridge sits between the cloud and the branch's printer, fiscal device and local network: it keeps the branch running locally when the connection drops, and handles **offline sync** once the internet comes back. From this screen you provision a new bridge, monitor the **live connection status** of installed bridges, and retire a bridge when needed.
+
+<Callout type="info">
+  This screen only appears on **Professional (PRO)** and higher plans, where the
+  `multiLocation` feature is enabled. The plan gate is in the UI only; the real
+  authorization check is on the server — if your plan doesn't qualify, the server
+  rejects provision/retire requests.
+</Callout>
+
+## Provisioning a new bridge
+
+Setting up a bridge happens on both ends: first you register the bridge from the panel, then the hardware (HummyBox) pairs itself on first boot using the token you were given.
+
+<Steps>
+### Step 1 — Create the bridge record
+
+In the **New Bridge** section:
+
+- **Branch** — pick the branch the bridge will connect to (required; the button stays disabled until one is selected).
+- **Product (SKU)** — choose the hardware type: **HummyBox Lite**, **HummyBox Pro**, or **BYO (bring your own)** if you're using your own device.
+- **Hostname** — optional; the network name you want to assign to the device.
+
+The **Create** button creates the bridge record.
+
+### Step 2 — Capture the pairing token
+
+Once creation succeeds, a **yellow alert box** opens at the top showing the **single-use pairing token**. Copy the token and enter it on HummyBox's first-boot screen; the device pairs itself using this token.
+
+After you've copied the token, dismiss the box with **"Copied"**.
+</Steps>
+
+<Callout type="warning">
+  The pairing token is shown **only once**. After you dismiss the box or refresh the
+  page, the token **will not reappear** — not even when you return to the list row. If
+  you lose the token, you'll have to retire the bridge and provision it again.
+</Callout>
+
+## Bridge list and connection status
+
+The table below lists every bridge across your branches. Each row shows the **branch**, **product (SKU)**, **hostname**, **status** and the **last seen** time.
+
+The **status** badge shows the bridge's connection to the cloud:
+
+- **Online** — the bridge is active and its signal is coming in regularly (green).
+- **Claiming** — the bridge is set up and pairing/first connection is in progress (purple).
+- **Offline** — the signal has stopped; the device is off or has no internet (gray).
+- **Retired** — the bridge has been decommissioned (faded gray).
+
+The **last seen** column shows when the most recent signal (heartbeat) arrived from the bridge; if it hasn't updated for a long time, check the device's power and network connection.
+
+<Callout type="info">
+  Status and last-seen are based on the **heartbeat** the bridge sends regularly. A
+  newly provisioned bridge stays in **claiming** for a short while; once the device
+  finishes pairing, it switches to **online**.
+</Callout>
+
+## Retiring a bridge
+
+To take a bridge out of service, tap the **Retire** link on its row; the system asks for confirmation. Once you confirm, the bridge moves to the **retired** state and no longer pairs with the cloud.
+
+<Callout type="warning">
+  Retiring ends the bridge's pairing. If you want to use the same device again, you'll
+  need to **create a new bridge record** and pair the hardware from scratch with a new
+  token.
+</Callout>
+
+## Related pages
+
+- To define and manage branches: **[Branches](/en/admin-guide/branches)**.
+- For printer and receipt settings: **[Settings](/en/admin-guide/settings)**.

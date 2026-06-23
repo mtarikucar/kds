@@ -1,0 +1,84 @@
+---
+title: Donanım Mağazası
+description: Restoranınız için yazıcı, tablet, KDS ekranı gibi fiziksel donanımı ve kurulum hizmetlerini görüntüleyip sipariş etmenizi sağlayan pazaryeri ekranı.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Donanım Mağazası
+
+**Menü yolu:** Pazaryeri → Donanım Mağazası &nbsp;•&nbsp; **URL:** `/admin/store`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar
+
+## Amacı
+
+Donanım Mağazası, restoranınızda kullanacağınız **fiziksel cihazları** (fiş/etiket yazıcısı, sipariş tableti, KDS ekranı vb.) ve bunların **kurulum/entegrasyon hizmetlerini** tek ekrandan görüntüleyip sipariş etmenizi sağlar. Ürünleri kategoriye göre süzer, sepete ekler, canlı fiyat teklifi alır ve PayTR üzerinden ödersiniz. Verdiğiniz siparişleri **[Donanım Siparişlerim](#siparis-takibi)** ekranından takip edersiniz.
+
+<Callout type="info">
+  Mağaza tüm planlarda açıktır. Sepet **yalnızca tarayıcı belleğinde** tutulur:
+  SPA içinde gezinirken korunur, ancak sayfayı tam yenilerseniz boşalır. Bu,
+  yarım kalmış sepetlerin birikmesini engelleyen kasıtlı bir davranıştır.
+</Callout>
+
+## Ekran düzeni
+
+Ekran iki bölümden oluşur: solda **ürün kataloğu**, sağda sabit duran **sepet** paneli.
+
+- **Kategori filtresi** — başlıktaki açılır menüden kategoriye göre süzersiniz; "Tüm kategoriler" hepsini gösterir. Kategori listesi sunucudan gelir.
+- **Ürün kartları** — marka, kategori, öne çıkan özellikler, garanti süresi (ay) ve fiyat (₺) gösterir. Stok azaldığında "son adetler", uygunsa **GİB onaylı** rozeti çıkar.
+- **Hizmetler bölümü** — kurulum/entegrasyon gibi hizmet kalemleri, donanımdan ayrı bir bölümde listelenir. Hizmetler şube ve tarih seçimi gerektirdiği için sepete doğrudan eklenmez; **detay sayfasından** sipariş edilir.
+
+<Callout type="warning">
+  Her ürünün satış tipi farklıdır ve sepete eklenebilirliği bununla belirlenir:
+  yalnızca **doğrudan satış** ürünleri sepete eklenebilir. **Teklif** ürünleri
+  ("satışa kapalı"; yetkili bayi/servis üzerinden teklif + kurulum), **partner
+  yönlendirmesi** (POS hizmeti anlaşmalı banka/ödeme kuruluşunca sağlanır) ve
+  **önerilen ekipman** kalemleri kendi butonlarına yönlendirir; bunlarda gösterilen
+  fiyat satış değil **referans liste fiyatıdır**.
+</Callout>
+
+## Sipariş verme
+
+<Steps>
+### Sepete ekleme
+
+Doğrudan satış ürün kartındaki **Sepete ekle** butonuna basın. Ürün sağdaki sepete düşer; adet ve satır tutarı (₺) anında görünür. Stokta yoksa buton pasif olur.
+
+### Fiyat teklifi alma
+
+Sepette **Fiyat al** butonu, canlı uç noktadan ara toplam, KDV, kargo ve **genel toplamı** hesaplar. Tutarlar her zaman teklifin kendi para biriminde gösterilir.
+
+### Teslimat bilgisi
+
+**Ödeme** butonu teslimat penceresini açar. Adres girer veya tenant'ınıza tanımlı şubelerden birini seçerek **"şubeme gönder"** dersiniz. Seçilen şube siparişe referans olarak işlenir.
+
+### PayTR ile ödeme
+
+Bilgileri onaylayınca sistem ödeme talebi oluşturur ve sizi **PayTR** ödeme sayfasına yönlendirir. Ödeme tamamlanınca **Donanım Siparişlerim** sayfasına dönersiniz.
+</Steps>
+
+<Callout type="info">
+  Genel kataloğa **Pazaryeri**'nden gelmenizin yanı sıra, açılış sayfasındaki
+  "Sipariş ver" bağlantısı sizi belirli bir ürünle mağazaya getirebilir; doğrudan
+  satılabilir ürün bu durumda otomatik olarak sepete eklenir.
+</Callout>
+
+## Sipariş takibi
+
+Sepetteki **"Geçmiş siparişler"** bağlantısı veya menüden **Donanım Siparişlerim** (`/admin/hardware-orders`) sizi sipariş geçmişine götürür. Siparişler tenant'ınıza özeldir.
+
+- Tablo her sipariş için **sipariş no, tarih, kalem sayısı, tutar (₺), durum** ve **kurulum** bilgisini gösterir.
+- **Durum filtresi** ile listeyi süzersiniz: ödeme bekliyor, ödendi, hazırlanıyor, kargolandı, teslim edildi, kuruldu, tamamlandı, iptal, iade. Filtre boşken tüm siparişler gelir.
+- **Kurulum** sütunu, kurulum hizmeti içeren siparişlerde talep edildi / planlandı / tamamlandı durumunu gösterir.
+- Bir satırdaki **Detay** bağlantısı (`/admin/hardware-orders/:id`) siparişin tüm ayrıntısını açar.
+
+<Callout type="info">
+  Sipariş durumu ve ödeme tahsilatı sunucu tarafında yönetilir; ekran yalnızca
+  güncel durumu gösterir. Bir sipariş ancak ödeme onaylandıktan sonra "ödendi"
+  durumuna geçer.
+</Callout>
+
+## İlgili sayfalar
+
+- Cihaz eşleştirme ve fiş yazıcısı ayarları: **[Ayarlar](/tr/admin-guide/settings)**
+- Sipariş alma ve tahsilat: **[POS (Satış Ekranı)](/tr/admin-guide/pos)**

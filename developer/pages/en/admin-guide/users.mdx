@@ -1,0 +1,78 @@
+---
+title: Users & Roles
+description: The screen for creating staff accounts, assigning roles (ADMIN/MANAGER/WAITER/KITCHEN/COURIER), setting passwords, and approving or rejecting sign-up requests.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Users & Roles
+
+**Menu path:** Management → Users &nbsp;•&nbsp; **URL:** `/admin/users`
+**Access:** ADMIN  •  **Plan:** All plans
+
+## Purpose
+
+This screen manages the **system accounts of the staff** who work in your restaurant: creating new accounts, assigning roles, setting passwords, and deactivating or deleting accounts. Each user's **role** determines which screens they can see in the app (for example, waiters reach the POS while kitchen staff reach the KDS). Shifts, leave, and HR records are **not** kept here — they live on the **[Personnel](/en/admin-guide/personnel)** screen. This screen deals only with login accounts.
+
+<Callout type="info">
+  This screen is available only to users with the **ADMIN** role. There's no plan
+  restriction; however, if your plan's **user limit** is full, you can't add new
+  accounts (see below).
+</Callout>
+
+## How the screen is laid out
+
+At the top you'll find summary cards by role and status (Total, Active, Pending Approval, Inactive, Admins, Managers). Below them are a **search box**, a **role filter**, and **status tabs** (All / Active / Pending Approval / Inactive) that let you narrow the list quickly. If there are no pending or inactive users, the matching tab/card is hidden. Each row in the list table shows the full name, email, **role badge**, **status badge**, creation date, and action buttons.
+
+## Adding and editing users
+
+<Steps>
+### Create a new user
+
+Open the form with **"Add User"** at the top right. Enter the email, a password (at least 6 characters), first name, last name, and **role**. When you save, the account is created right away.
+
+### Choosing a role
+
+The roles are: **ADMIN** (full management), **MANAGER**, **WAITER**, **KITCHEN** (kitchen staff), and **COURIER**. The default role is waiter. The role determines which screens the user can see.
+
+### Editing details
+
+Use the **pencil** icon on a row to update the email, first name, last name, and role. If you **leave the password field blank, the current password is kept**; the password only changes if you type a new value.
+</Steps>
+
+<Callout type="warning">
+  You **can't delete your own account** — the delete button is disabled on your own
+  row, and a "(you)" label appears next to your name. This prevents the last
+  administrator from accidentally locking everyone out.
+</Callout>
+
+## Statuses: approve, reject, deactivate
+
+A user's **status** takes one of four values, and the actions on a row change with the status:
+
+- **Pending Approval (PENDING_APPROVAL):** someone who signed up themselves is awaiting approval. The row shows **approve** (✓) and **reject** (✗) buttons.
+- **Active (ACTIVE):** a normal working account. The edit and delete buttons appear.
+- **Inactive (INACTIVE):** an account whose access has been turned off. You can re-enable it with the **Reactivate** button.
+
+<Callout type="info">
+  Status transitions (approve / reject / reactivate / delete) are separate actions;
+  the "status" field in the edit form only appears when editing an existing account,
+  and the real authority lives on the server. Deletion is **irreversible** and removes
+  the account permanently.
+</Callout>
+
+## User limit
+
+Your plan may have a **maximum number of users**. The info banner at the top shows the `current / limit` ratio. When the limit is reached, the **"Add User"** button is locked, **reactivating** an inactive user is also blocked, and an upgrade card appears.
+
+<Callout type="warning">
+  The limit check is shown in the interface, but the actual limit is enforced by the
+  **server**. To raise the limit you need to upgrade your plan — details:
+  **[Subscription](/en/plans)**.
+</Callout>
+
+## Related pages
+
+- **[Personnel](/en/admin-guide/personnel)** — shifts, leave, and HR records (separate from this screen).
+- **[Branches](/en/admin-guide/branches)** — the branches users work at.
+- **[Subscription](/en/plans)** — plan and user limit.

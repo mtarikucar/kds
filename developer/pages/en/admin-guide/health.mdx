@@ -1,0 +1,73 @@
+---
+title: System Health
+description: The HummyTummy branch-health dashboard — monitor each branch's device/bridge connectivity, last-receipt and last-order liveness as a single 0–100 score with a color badge.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# System Health
+
+**Menu path:** Multi-Branch → Branch Health &nbsp;•&nbsp; **URL:** `/admin/health`
+**Access:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** `multiLocation` — **Professional (PRO)** and above
+
+## Purpose
+
+System Health puts every active branch of your business **side by side on a single dashboard**. For each branch it combines whether its devices are online, how long ago the last receipt was issued and how long ago the last order came in, then distills that into **a single health score from 0 to 100**. When a printer or terminal drops at one branch, or the sales flow stalls, you spot it from here — without walking up to the till.
+
+<Callout type="info">
+  This dashboard is meaningful on **Professional (PRO)** and higher plans (the multi-branch
+  feature); on lower plans the Multi-Branch menu group is hidden. The plan gate is only a
+  UI convenience — authorization is always verified on the server.
+</Callout>
+
+## How to read the dashboard
+
+You get **one card per active branch**. If there are no active branches, the message "No active branches." is shown.
+
+<Steps>
+### Color badge
+
+The badge in the top-right corner of the card sums up the branch's overall state in three colors:
+
+- **Green** — healthy, no action needed.
+- **Amber** — attention; one of the signals has weakened (e.g. a device dropped or there have been no orders for a while).
+- **Red** — critical; the branch needs to be checked urgently.
+
+### Health score
+
+The large number under the badge is the branch's composite score out of **100**. It is computed from the three sub-signals below, letting you compare branches at a glance.
+
+### The three sub-signals
+
+The bottom row of the card lists the three metrics that make up the score, broken out individually:
+
+- **Devices Online** — what percentage of the branch's connected devices are online (e.g. `80%`). A drop here points to a printer/terminal or the local **bridge** connection going down.
+- **Last Receipt** — how long since the most recent fiscal receipt.
+- **Last Order** — how long since the most recent order.
+</Steps>
+
+<Callout type="info">
+  Durations are shown in short form: `<1m` (less than a minute), `12m` (minutes),
+  `3h` (hours), `2d` (days). When there is no data at all, **`—`** appears — for example
+  at a branch that hasn't had a single order or receipt yet that day.
+</Callout>
+
+## Liveness and refresh
+
+The dashboard data refreshes automatically **every 30 seconds**; just leave the page open — no manual refresh needed. That way a device dropping or a sales flow stalling at a branch shows up on its card within a short time.
+
+<Callout type="warning">
+  An unexpectedly long "Last Order" or "Last Receipt" duration can mean **a quiet hour**
+  just as easily as a real fault. Weigh the branch's traffic and device connectivity first;
+  a high duration on its own doesn't always indicate a problem.
+</Callout>
+
+## When you spot a problem
+
+When a branch turns amber or red, look at which sub-signal has weakened and jump to the matching screen from there:
+
+- **If Devices Online is low** — check the branch's printer/terminal connections on the **[Devices](/en/admin-guide/devices)** screen, and the local network bridges on the **[Local Bridges](/en/admin-guide/bridges)** screen.
+- **If Last Order is very old** — confirm whether sales have actually stopped from the **[POS](/en/admin-guide/pos)** and kitchen screens.
+- **If Last Receipt is very old** — review the receipt/fiscal integration flow and the printer.
+
+This dashboard is read-only: it summarizes the state but doesn't let you act on it. You make changes from the relevant branch and device screens.

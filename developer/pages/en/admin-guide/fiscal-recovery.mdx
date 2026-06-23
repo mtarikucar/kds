@@ -1,0 +1,73 @@
+---
+title: Fiscal Recovery
+description: A recovery panel that lists failed or queued fiscal receipts and recovers them by retrying with the same idempotency key.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Fiscal Recovery
+
+**Menu path:** Business → Fiscal Recovery &nbsp;•&nbsp; **URL:** `/admin/fiscal-recovery`
+**Access:** ADMIN &nbsp;•&nbsp; **Plan:** Fiscal integration (`fiscal`) must be active
+
+## Purpose
+
+Fiscal Recovery gathers, in a single table, every receipt that **could not be issued successfully** to the fiscal device (the cash register / fiscal receipt provider). Receipts left queued or failed due to a network drop, a device error, or a provider outage all show up here, and you **retry them with a single tap**. Use it to clear up any fiscal hiccups that come up during service.
+
+<Callout type="info">
+  This screen only appears for businesses with **fiscal integration active**. If it
+  isn't in the menu, no integration is defined yet. This gate is for the interface
+  only; the real authorization check always lives on the server.
+</Callout>
+
+## What the table shows
+
+The screen lists up to the **100 most recent** receipts that could not be issued, and it refreshes automatically **every 20 seconds**. Use the **Refresh** button at the top to update instantly. When the list is empty, a "no pending receipts" message is shown.
+
+Each row has the following columns:
+
+- **Created** — the date/time the receipt landed in the system.
+- **Provider** — the id of the fiscal provider meant to issue the receipt (`providerId`).
+- **Order** — the related order id (`—` if there is no linked order).
+- **Status** — a `queued` or `failed` badge; the `×N` next to it shows the **number of attempts** so far.
+- **Amount** — the receipt total, formatted in the record's own currency (₺).
+- **Last error** — the most recent error message returned by the provider on a failed attempt (in red).
+
+<Callout type="info">
+  The table only holds receipts that **could not be issued**. Once a receipt is issued
+  successfully (`issued`), it drops off the list automatically — you don't need to take
+  any extra action to clear it.
+</Callout>
+
+## Retrying a receipt
+
+<Steps>
+### Find the problem receipt
+
+Read the **Last error** column on the row whose status is `failed`. If the error points to a fixable cause — such as the device being off, out of paper, or a provider connection issue — resolve that cause first.
+
+### Press Retry
+
+Click the **Retry** button at the end of the row. The button is briefly disabled while the request is in flight; don't trigger several rows at the same time.
+
+### Watch the result
+
+A notification appears as soon as the operation finishes: on success it confirms with the **receipt number** ("receipt issued") and the row drops off the list. If it still fails, it warns you with the error message, and the **Last error** and attempt count are updated.
+</Steps>
+
+<Callout type="warning">
+  A retry resends the receipt with its **original idempotency key**. This ensures the
+  fiscal device **never issues the same receipt twice** — tapping the same row repeatedly
+  won't create a duplicate receipt. Even so, fixing the root cause (device, connection,
+  provider) before each attempt reduces unnecessary failed retries.
+</Callout>
+
+<Callout type="info">
+  The table is branch-scoped: you only see the pending receipts for the branch selected
+  in the top bar. To see another branch's receipts, switch to that branch.
+</Callout>
+
+## Related pages
+
+- For the sales and receipt-printing flow: **[POS (Sales Screen)](/en/admin-guide/pos)**
+- For general integration and behavior settings: **[Settings](/en/admin-guide/settings)**

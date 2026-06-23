@@ -1,0 +1,93 @@
+---
+title: Menu Management
+description: The HummyTummy menu catalog — managing categories, products, prices, images, stock links, ordering, visibility and required/optional options (modifiers).
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Menu Management
+
+**Menu path:** Business → Menu &nbsp;•&nbsp; **URL:** `/admin/menu`
+**Access:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** All plans
+
+## Purpose
+
+Menu Management is your restaurant's **central catalog**: categories, products and options are all defined here. Everything you enter — price, image, stock link, ordering and visibility — feeds both the **POS sales screen** and the **QR menu** directly. The screen is split into three tabs: **Menu**, **Image Library** and **Options (Modifiers)**.
+
+<Callout type="info">
+  Plan limits only show a warning/upgrade card in the interface; the real limit
+  is enforced by the server. When your category or product count reaches the
+  plan quota, the "Add Category" / "Add Product" button is disabled with a
+  **lock icon**, and a counter (e.g. `Products: 48 / 50`) appears at the top of
+  the screen.
+</Callout>
+
+## Menu tab — categories and products
+
+The Menu tab shows categories and the products beneath them as a single hierarchical list. You add categories with the button at the top right, and you add products to a category from within that category's card.
+
+<Steps>
+### Add a category
+
+Use **Add Category** to enter a name (required) and an optional description. Categories are the section headings of your menu (e.g. "Starters", "Mains", "Drinks").
+
+### Add a product
+
+From within a category, **add a product** by setting a name, description, **price (₺)** and category. The price must be zero or positive, and a category is required. You can edit the product later to change any of these fields.
+
+### Link to stock (optional)
+
+Enter the starting quantity in the **current stock** field on the product form. If left blank, it's treated as 0. This field links the product to inventory; to manage stock movements in detail, use the **[Stock & Inventory](/en/admin-guide/stock)** screen.
+
+### Assign images and options
+
+From the same form you select an image for the product from the **image library** (the first image becomes the **primary/cover** image) and tick any **option groups** that apply. The **"Show on menu"** checkbox toggles whether the product is visible on the POS and QR menu.
+</Steps>
+
+<Callout type="info">
+  **Ordering is done by drag and drop:** you can reorder both categories and
+  the products within a category by dragging them. This order is exactly what
+  the customer sees on the QR menu and the waiter sees on the POS. The "Expand /
+  collapse all" button at the top opens and closes every category card together.
+</Callout>
+
+<Callout type="warning">
+  If a product's category is deleted or becomes invalid, the product is grouped
+  at the bottom of the list under an **"Uncategorized"** heading. These products
+  won't display properly on the menu until you edit them and move them into a
+  valid category.
+</Callout>
+
+## Image Library tab
+
+Images are uploaded once and reused across multiple products. You can drag and drop a file onto the upload area or click to select one; **up to 5 MB per image** is accepted. You can search uploaded images by name, switch between grid and list views, and bulk-delete the ones you select.
+
+<Callout type="info">
+  If your browser supports it, turn on the **AI background removal** toggle to
+  automatically clean up the background of the images you upload; processed
+  files are marked with an **AI** badge. This feature runs entirely in the
+  browser.
+</Callout>
+
+## Options (Modifiers) tab
+
+Options are the choices added to a product: portion size, sauce selection, extra toppings, and so on. You first define an **option group**, add **option items** to it, and then assign the group to the relevant products from the product form.
+
+- **Selection type:** **Single** (only one item — e.g. size) or **Multiple** (more than one — e.g. extra toppings).
+- **Required:** if ticked, the customer **must** make a selection from this group before ordering; otherwise it's optional.
+- **Min/Max selection:** for the Multiple type, sets the fewest and most items that can be selected; if the maximum is left blank, it's unlimited.
+- **Price difference (₺):** the amount each option item adds to the product price (can't be negative; 0 means a free option).
+- **Order and visibility:** groups and items are sorted by `displayOrder`; if an item's "available" checkbox is unticked, it's hidden from the customer.
+
+<Callout type="warning">
+  If you **clear all** the option group ticks while editing a product, all of
+  that product's group links are removed when you save. Because the selection
+  list is rewritten in full, a product you accidentally leave blank ends up with
+  no options.
+</Callout>
+
+## Related pages
+
+- **[POS (Sales Screen)](/en/admin-guide/pos)** — categories, products and options are offered for sale on this screen.
+- **[QR Menu](/en/admin-guide/qr-menu)** — the customer menu is fed directly from this catalog.
+- **[Stock & Inventory](/en/admin-guide/stock)** — detailed management of product stock quantities.

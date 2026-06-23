@@ -1,0 +1,64 @@
+---
+title: Analitik
+description: HummyTummy görsel analitik ekranı — masa doluluğu, trafik akışı, müşteri davranışı ve yapay zekâ destekli öneriler için trend panoları. Amacı, kullanımı ve plan koşulu.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Analitik
+
+**Menü yolu:** İşletme → Analitik &nbsp;•&nbsp; **URL:** `/admin/analytics`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** `advancedReports` — **Profesyonel (PRO)** ve üzeri (veya *advanced_reports* eklentisi)
+
+## Amacı
+
+Analitik ekranı, işletmenizin alan kullanımını ve müşteri akışını **görsel panolar** hâlinde sunar: masa doluluğu, yoğun saatler, trafik sıkışma noktaları ve müşteri davranışı tek bakışta okunur. Tablolara ek olarak özet kartları, doluluk çubukları ve **yapay zekâ destekli öneriler (insights)** içerir. Tablo tabanlı, ham satış kayıtları için [Raporlar](/tr/admin-guide/reports) ekranını kullanın; Analitik ise bu verilerin **yorumlanmış, eyleme dönük** halidir.
+
+<Callout type="info">
+  Analitik yalnızca **Profesyonel (PRO)** ve üzeri planlarda (ya da *advanced_reports*
+  eklentisi alındığında) açıktır. Planınızda yoksa sol menüde görünmez ve `/admin/analytics`
+  adresine gittiğinizde yükseltme kartı çıkar. Bu kapı yalnızca arayüz tarafındadır;
+  asıl yetki sunucudadır.
+</Callout>
+
+## Analitik ile Raporlar farkı
+
+İki ekran aynı veriye dayanır ama amaçları ayrıdır:
+
+- **Raporlar** — satış kayıtlarının **tablo** halinde dökümü; filtreleyip dışa aktarmak içindir.
+- **Analitik** — aynı verinin **trend ve panolara** dönüşmüş hali: doluluk yüzdeleri, yoğunluk skoru, sıkışma haritası ve öneriler. "Ne oldu" yerine "neyi iyileştirebilirim" sorusuna odaklanır.
+
+## Tarih aralığı ve sekmeler
+
+<Steps>
+### Tarih aralığını seçin
+
+Ekranın üstündeki **Başlangıç / Bitiş** alanlarından dönemi belirler, **Uygula** ile çalıştırırsınız. Açılışta son **7 gün** seçilidir. Tarih filtresi tüm sekmeleri etkiler; yalnızca **Öneriler** sekmesi dönemden bağımsız çalışır.
+
+### İlgili sekmeye geçin
+
+Üstteki sekmelerden istediğiniz görünüme geçersiniz: **Genel Bakış**, **Masa Analitiği**, **Trafik Akışı**, **Müşteri Davranışı** ve **Öneriler**. Her sekme kendi özet kartlarını ve detay tablosunu yükler.
+</Steps>
+
+## Genel Bakış
+
+Dönemin dört özet kartını gösterir: **ortalama masa doluluğu**, **toplam ciro** (₺) ve masa devri sayısı, **yoğunluk skoru** (100 üzerinden — yüksek olması iyidir) ve **aktif öneri** sayısı. Altında en güncel **eyleme dönük öneriler** (en fazla 5 tanesi) ve varsa **düşük kullanımlı masalar** tablosu listelenir.
+
+## Masa Analitiği
+
+Her masanın bölüm, kapasite, **doluluk skoru** (renkli ilerleme çubuğuyla), ciro, oturum sayısı ve ortalama sipariş tutarını tablo halinde verir. Özet kartlarında toplam masa, ortalama doluluk, **yoğun saat** (peak hour) ve toplam oturum yer alır.
+
+## Trafik Akışı ve Müşteri Davranışı
+
+- **Trafik Akışı** — mekânın yoğunluk skorunu, **sıkışma noktalarını** (konum, şiddet, ortalama bekleme süresi, yoğun saat) ve akışı iyileştirmeye yönelik **önerileri** gösterir.
+- **Müşteri Davranışı** — ortalama yemek süresi, masada **yemekten sonra geçirilen boş süre**, ortalama grup boyu ve ortalama sipariş tutarı; ayrıca yoğun varış/ayrılış saatleri ve boş/yemek süresi oranı. Boş süre oranı yüksek çıkarsa ekran masa devrini artırmaya yönelik bir uyarı gösterir.
+
+## Öneriler (AI Insights)
+
+Sistem topladığı veriden **öneriler** üretir; her biri başlık, açıklama, **tavsiye**, olası etki ve güven skoru içerir. Önerileri tek dokunuşla **uygulandı**, **devam ediyor** ya da **yok say** olarak işaretleyebilirsiniz; durum dağılımı üstteki özet kartlarında görünür.
+
+<Callout type="warning">
+  Henüz yeterli işletme verisi yoksa panolar boş veya düşük değerlerle gelebilir.
+  Bu normaldir — gerçek doluluk ve oturum verisi biriktikçe öneriler ve skorlar
+  anlamlı hale gelir.
+</Callout>

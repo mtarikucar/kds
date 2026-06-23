@@ -1,0 +1,77 @@
+---
+title: Devices
+description: Provision, pair and monitor your registered terminals (KDS screens, tablets, printers, POS/cash registers, partner display devices) from a single list.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Devices
+
+**Menu path:** Multi-Location → Devices &nbsp;•&nbsp; **URL:** `/admin/devices`
+**Access:** ADMIN, MANAGER  •  **Plan:** `multiLocation` — **Professional (PRO)** and above
+
+## Purpose
+
+The Devices screen is the inventory of every **registered terminal** in your business: kitchen display screens (KDS), waiter and customer tablets, receipt/kitchen printers, POS terminals, cash registers, caller ID, barcode scanners and local bridge (`local_bridge`) devices. For each device you create a **slot**, connect the device using the pairing code it displays, and then monitor its status live. Device operations (print receipt, open drawer, cut paper) all run through these records.
+
+<Callout type="info">
+  This screen is visible on **Professional (PRO)** and higher plans. If your plan
+  doesn't include it, **Devices** won't appear in the sidebar. The plan restriction
+  is only a UI convenience; the real authority always lives on the server.
+</Callout>
+
+## Summary cards and the list
+
+Three summary cards at the top of the page summarize your active (non-retired) device fleet:
+
+- **Total devices** — the count of all active (non-retired) devices.
+- **Online** — the number of devices currently in the `online` state.
+- **Needs attention** — the number of devices in the `error` or `offline` state (turns red when it isn't zero).
+
+Below them, a table lists each device with **Type, Status, Pairing Code, Capabilities** and **Last Seen** columns. The list refreshes itself at regular intervals; status changes appear without a manual reload. By default, **retired** devices are hidden; tick the "Show retired devices" box to include them in the list.
+
+## Adding a new device (slot + pairing)
+
+Pairing happens on the device itself, not on a separate screen: the panel opens a **slot** and generates a **pairing code**, which you then enter on the device.
+
+<Steps>
+### Pick a type and create a slot
+
+From the dropdown in the top right, choose the device **type** (e.g. KDS screen, Waiter tablet, Receipt printer, Cash register, Local Bridge) and press **Create Device Slot**. The slot is created within the scope of the current branch.
+
+### Enter the code on the device
+
+In the new row's **Pairing Code** column, a short alphanumeric code and a **QR** that encodes it appear. Click the QR to enlarge it (192px) — use this to scan a screen across the dining room from a distance; the small QR is hard to read from more than about 30 cm away. Enter the code on the device, or on the local bridge that drives it.
+
+### Confirm the connection
+
+Once pairing completes, the device receives its token; the row's **Status** label flips to `online` and **Last Seen** updates.
+</Steps>
+
+<Callout type="warning">
+  The pairing code has an **expiry** time (visible when you hover over the QR). If it
+  expires, the code becomes invalid; retire the slot and create a new one to generate
+  a fresh code.
+</Callout>
+
+## Statuses and device commands
+
+The **Status** label reflects the device's mesh state machine: `online` (green), `offline` (gray), `error` (red), `busy` (amber), `maintenance` (blue) and the hidden `retired`. For devices such as pending orders or printers, the **Capabilities** column lists which jobs they can perform.
+
+Clicking the **type name** in the table opens the **Device Commands** drawer from the right. There you can review the device's command queue with the **Queued / In progress / Completed / Failed** filters, read the error reason on a failed row, and — if the device looks unhealthy — send a one-off **capability probe**.
+
+To take a device out of service, use the **Retire** button on the right of the row; after you confirm, the device is hidden from the list (and its token is invalidated).
+
+<Callout type="info">
+  A **Local Bridge (`local_bridge`)** device drives local hardware on your network,
+  such as the receipt printer, cash drawer and cash register. For details on bridge
+  setup and the hardware command flow, see **[Bridges](/en/admin-guide/bridges)** and the
+  hardware pairing guide **[Hardware](/en/desktop/hardware)**.
+</Callout>
+
+## Related pages
+
+- **[Bridges](/en/admin-guide/bridges)** — local bridge setup and local hardware management.
+- **[Hardware pairing](/en/desktop/hardware)** — the pair-code flow for receipt printer, cash drawer and cash register.
+- **[Partner Display API](/en/developer/partner-display)** — the tenant API key–based integration that lets third-party table tablets / external screens (partner display) mirror the QR menu.
+- **[Kitchen Display (KDS)](/en/admin-guide/kitchen)** — the kitchen flow shown on KDS screen devices.

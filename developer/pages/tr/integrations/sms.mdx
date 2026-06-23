@@ -1,0 +1,99 @@
+---
+title: SMS Bildirimleri
+description: Rezervasyon ve sipariş olaylarında müşteriye otomatik SMS (ve e-posta) gönderimini olay bazında açıp kapatma ekranı; SMS sağlayıcısı sunucu tarafında tanımlanır.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# SMS Bildirimleri
+
+**Menü yolu:** Ayarlar → SMS &nbsp;•&nbsp; **URL:** `/admin/settings/sms`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** `integration_sms` eklentisi (SMS entegrasyonu)
+
+## Amacı
+
+Bu ekran, müşterilerinize **hangi olaylarda otomatik SMS gönderileceğini** olay bazında yönetir. Rezervasyon durumları (alındı, onaylandı, reddedildi, iptal) ve sipariş durumları (alındı, onaylandı, hazırlanıyor, hazır, iptal) için bağımsız anahtarlar vardır. Mesaj metinleri sistem tarafından hazır gelir; bu ekranda yalnızca bildirimleri açar/kapatırsınız.
+
+<Callout type="info">
+  Ekran, **SMS entegrasyonu** eklentisine (`integration_sms`) bağlıdır. Eklenti
+  yoksa sol menüde **SMS** görünmez ve `/admin/settings/sms` adresine gittiğinizde
+  yükseltme kartı çıkar. Yetkiyi sunucu doğrular; arayüz yalnızca görünürlüğü yönetir.
+</Callout>
+
+## Sağlayıcı kurulumu (sunucu tarafı)
+
+SMS gönderiminin gerçekleşmesi için sistemde bir **SMS sağlayıcısı** tanımlı olmalıdır. Bu kimlik bilgileri bu ekranda **girilmez**; PII ve faturalandırma içerdiği için sunucu ortam değişkenleriyle yönetilir. Desteklenen sağlayıcılar **NetGSM** (Türkiye için varsayılan/öncelikli) ve **Twilio**'dur.
+
+<Steps>
+### Sağlayıcıyı seçin
+
+Sunucuda `SMS_PROVIDER` değerini `netgsm` veya `twilio` olarak ayarlayın. Boş bırakılırsa sistem önce NetGSM, sonra Twilio kimlik bilgilerini otomatik dener.
+
+### Kimlik bilgilerini girin
+
+- **NetGSM:** `NETGSM_USERCODE`, `NETGSM_PASSWORD` ve gönderici başlığı (sender) için `NETGSM_MSGHEADER`.
+- **Twilio:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` ve gönderici numarası için `TWILIO_PHONE_NUMBER`.
+
+### Doğrulayın
+
+Kimlik bilgileri eksikse sağlayıcı devre dışı kalır ve sistem **mock (gönderimsiz) moda** düşer.
+</Steps>
+
+<Callout type="warning">
+  Üretim ortamında sağlayıcı yapılandırılmamışsa sistem **açılışta hata vererek durur**
+  (sessizce sahte gönderim yapmaz). Gönderimi bilerek susturmak gerekiyorsa
+  `ALLOW_MOCK_SMS_IN_PROD=true` açık bir kaçış kapısıdır. Bu ayarlar geliştirici/operatör
+  ekibindedir; kimlik bilgileri için hosting sorumlunuzla iletişime geçin.
+</Callout>
+
+## Bildirimleri açma
+
+Ekran tek bir üst anahtar ve altında olay gruplarından oluşur. Her değişiklik **otomatik kaydedilir** (ayrı bir "Kaydet" butonu yoktur); kayıt başarılıysa bir bilgi bildirimi, hata olursa yeniden deneme seçeneği görünür.
+
+<Steps>
+### Ana anahtarı açın
+
+En üstteki **SMS Bildirimleri** anahtarı ana şalterdir. Kapalıyken sipariş ve rezervasyon SMS anahtarları **pasif (gri)** görünür ve hiçbir SMS gönderilmez.
+
+### Rezervasyon SMS'lerini seçin
+
+Hangi rezervasyon olaylarında SMS gideceğini işaretleyin: **oluşturuldu, onaylandı, reddedildi, iptal edildi**. Reddedildi mesajına, varsa girilen **sebep** otomatik eklenir.
+
+### Sipariş SMS'lerini seçin
+
+Sipariş yaşam döngüsü için: **alındı, onaylandı, hazırlanıyor, hazır, iptal edildi**. Müşterinin telefonu olan siparişlere gönderilir.
+</Steps>
+
+<Callout type="info">
+  SMS, yalnızca müşterinin **telefon numarası** kayıtlıysa ve ilgili olay anahtarı
+  açıksa gönderilir. Numara yoksa gönderim sessizce atlanır; bu durum siparişi veya
+  rezervasyonu engellemez.
+</Callout>
+
+## Rezervasyon e-posta kanalı
+
+Rezervasyon bölümünün yanında ayrı bir **E-posta** grubu vardır (oluşturuldu, onaylandı, reddedildi, iptal edildi). Bu anahtarlar ana SMS şalterinden **bağımsızdır** ve onunla birlikte pasifleşmez. Bildirim servisi kanal-duyarlıdır: müşteri bir **e-posta adresi** verdiyse ve buradaki ilgili anahtar açıksa bildirimi e-posta ile gönderir; e-posta yoksa SMS yolu (yalnızca telefon) yedek olarak devreye girer.
+
+## Test etme
+
+Ekranda ayrı bir "test SMS gönder" butonu yoktur. Doğrulamak için:
+
+<Steps>
+### Tek bir olayı açın
+
+Ana anahtarı ve test etmek istediğiniz tek olayı (örn. **Sipariş Hazır**) açın.
+
+### Olayı tetikleyin
+
+Telefon numarası kayıtlı bir test siparişi/rezervasyonu oluşturup ilgili duruma getirin (örn. siparişi "hazır" yapın).
+
+### Sonucu kontrol edin
+
+Mesajın ulaştığını telefondan doğrulayın. Ulaşmazsa sağlayıcı kimlik bilgilerini ve müşteri numarasının kayıtlı olduğunu kontrol edin; gönderim hataları sunucu günlüklerine (telefon maskelenerek) yazılır.
+</Steps>
+
+## İlgili sayfalar
+
+- Rezervasyon akışı ve durumları: **[Rezervasyonlar](/tr/admin-guide/reservations)**
+- Sipariş durumları: **[Siparişler](/tr/admin-guide/orders)**
+- Diğer entegrasyonlar: **[Entegrasyonlar](/tr/integrations)**

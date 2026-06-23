@@ -1,0 +1,95 @@
+---
+title: Caller ID
+description: Connect your phone system's incoming calls to HummyTummy — the calling number is matched to a customer record and the customer's details appear on screen instantly. Step-by-step setup.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Caller ID
+
+**Menu path:** Settings → Integrations &nbsp;•&nbsp; **URL:** `/admin/settings/integrations`
+**Access:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** `caller_id_integration` marketplace add-on
+
+## Purpose
+
+The Caller ID integration connects your phone system (or cloud telephony service) to HummyTummy. When a customer calls, the incoming number is matched against your saved customer profiles by phone; if a match is found, the operator recognizes the caller instantly. This way, the "who's calling?" question is answered automatically on screen for takeaway and phone orders.
+
+<Callout type="info">
+  This integration is a **marketplace add-on** (`caller_id_integration`). When the
+  add-on is inactive, the **Incoming Calls** entry is hidden from the sidebar *and* the
+  backend rejects the request (defense in depth). You can add the add-on from the
+  [Marketplace](/en/marketplace).
+</Callout>
+
+## How it works
+
+The flow is one-directional: on every call event your phone system sends a **webhook** to HummyTummy, the system records the event and matches the number to a customer.
+
+<Steps>
+### The provider reports the call
+
+Your telephony provider (Twilio, Verimor, Netgsm, 3CX, or any generic HMAC-compatible system) sends a signed request to HummyTummy's webhook address for each call.
+
+### The event is recorded and matched
+
+The system stores every event with its type: **incoming**, **answered**, **ended**, and **missed**. At the same time the calling number (in E.164 format, e.g. `+905xxxxxxxxx`) is looked up against your existing customer records.
+
+### The operator sees the customer
+
+When a match is found, the event is linked to the corresponding customer profile. The **Incoming Calls** screen lists the number, the customer link, and the duration; for unmatched calls the number appears as plain text, from where you can create a new customer record in one tap.
+</Steps>
+
+<Callout type="info">
+  Customer matching is **best-effort**: even if the number matches no record, the call
+  is still recorded and shown in the list — a missing match never hides the call.
+</Callout>
+
+## Setup
+
+The integration is defined as an integration entry under **Settings → Integrations**; the webhook secret, meanwhile, is configured server-side by your system administrator.
+
+<Steps>
+### Enable the add-on
+
+First add the `caller_id_integration` add-on from the [Marketplace](/en/marketplace). Once the add-on is active, the **Incoming Calls** menu becomes available.
+
+### Choose your provider
+
+Supported providers: **twilio**, **verimor**, **netgsm**, **3cx**, and **generic** for any HMAC-signed system. The provider's panel must support defining a webhook (callback) URL.
+
+### Enter the webhook address at the provider
+
+The webhook address you give the provider has this shape:
+
+`https://<your-domain>/v1/caller/webhooks/<provider>/<tenant-id>`
+
+Example: `.../v1/caller/webhooks/verimor/<tenant-id>`. Each business (tenant) has its own webhook address.
+
+### Set the secret
+
+Webhooks are signed with **HMAC-SHA256**. The provider adds `x-signature` and `x-timestamp` headers to every request. Your system administrator defines the matching secret on the server; if no secret is set, no call is accepted (secure default: closed).
+</Steps>
+
+<Callout type="warning">
+  The webhook address and secret open a flow that carries **PII (phone number + customer
+  profile)**. For that reason the **Incoming Calls** screen is open only to the **ADMIN**
+  and **MANAGER** roles; WAITER/KITCHEN cannot see it. Never share the secret anywhere
+  other than the provider panel and the server configuration.
+</Callout>
+
+<Callout type="info">
+  **Duplicate protection:** providers may send the same notification more than once
+  ("at-least-once" delivery). When the system receives the same call event again, it
+  silently ignores it — no duplicate row or double alert appears on screen. Requests with
+  a stale timestamp (older than 5 minutes) are also rejected.
+</Callout>
+
+## The Incoming Calls screen
+
+With the add-on active, the **Incoming Calls** screen at **`/admin/caller-feed`** becomes available. This list shows recent calls, auto-refreshing every 10 seconds: time, provider, call type, number, matched customer, and duration. From a matched-customer row you can jump straight to the customer detail, or to the **[POS](/en/admin-guide/pos)** screen when there's a related order.
+
+## Related pages
+
+- Integrations overview: **[Integrations](/en/integrations)**
+- Adding add-ons: **[Marketplace](/en/marketplace)** and **[Plans](/en/plans)**
+- Order-taking screen: **[POS (Sales Screen)](/en/admin-guide/pos)**
