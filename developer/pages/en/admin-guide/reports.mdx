@@ -1,0 +1,71 @@
+---
+title: Reports & Analytics
+description: HummyTummy reporting — sales, hourly, customers, inventory, staff and Z-reports; plus analytics with table utilization and AI insights. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Reports & Analytics
+
+**Menu path:** Operations → Reports / Analytics
+**URL:** `/admin/reports` and `/admin/analytics`
+**Access:** ADMIN, MANAGER
+**Plan:** `advancedReports` — **Professional (PRO)** and above (or the `advanced_reports` add-on)
+
+## Purpose
+
+Both screens turn your business data into something readable:
+
+- **Reports** — sales, payment-method breakdown, top-selling products, customers, inventory, staff and **Z-reports**.
+- **Analytics** — table utilization, traffic/congestion analysis, customer behavior and **AI-powered insights**.
+
+<Callout type="info">
+  Both screens are tied to the `advancedReports` feature (**PRO and above**). To unlock
+  them without moving up to PRO, you can buy the **`advanced_reports`** marketplace
+  add-on. If your plan doesn't include it, both menu items are hidden and the direct URL
+  shows an upgrade card.
+</Callout>
+
+## Reports screen
+
+There are tabs at the top, plus a **date-range filter** (start–end) and, for multi-branch tenants, a **branch filter** (single-branch tenants don't see the branch filter; the report stays tenant-wide).
+
+| Tab | Contents | Visibility |
+| --- | --- | --- |
+| **Sales** | Total revenue, order count, average ticket, total discount; payment-method breakdown; daily sales; top-selling products | Always |
+| **Hourly** | Order distribution by hour of day | Always |
+| **Customers** | Customer analytics (per period) | Always |
+| **Inventory** | Stock report | Only if `inventoryTracking` is granted |
+| **Staff** | Staff performance | Only if `personnelManagement` is granted |
+| **Z-Reports** | End-of-day fiscal summaries (Z-reports) | Always |
+
+<Callout type="info">
+  The Inventory and Staff tabs depend on extra features — without them the **tab is
+  hidden** (it used to 403 on click). Sales/Hourly/Customers/Z-Report come with the
+  `advancedReports` that unlocks the page itself.
+</Callout>
+
+## Analytics screen
+
+| Tab | Contents |
+| --- | --- |
+| **Overview** | Average table utilization, period revenue, congestion score, active-insight count + actionable insights |
+| **Table Analytics** | Per-table utilization, revenue, session count, average ticket; underutilized tables |
+| **Traffic Flow** | Congestion score, hotspots and recommendations to improve flow |
+| **Customer Behavior** | Average dining time, idle time at the table, party size; peak arrival/departure hours |
+| **AI Insights** | All generated insights; you can mark each as "implemented / in progress / dismissed" |
+
+## Tips
+
+- **Keep the date range tight:** the default is the last 7 days; change the range and hit "Apply" to compare periods.
+- **Use the branch filter:** if you run multiple branches, compare per branch; leaving the filter empty covers all branches.
+- **Z-reports for end of day:** for tax/accounting compliance, track end-of-day closings from the Z-Reports tab.
+- **Work the AI insights:** marking analytics insights as "implemented/dismissed" keeps the list clean and shows which suggestion was actually tried.
+- **Idle table = lost turnover:** if "Customer Behavior" flags high idle time, presenting the bill proactively improves table turnover.
+
+## Related screens
+
+- **[Tables](/en/admin-guide/tables)** — the source of table-utilization analysis.
+- **[Stock](/en/admin-guide/stock)** — Inventory report tab.
+- **[Personnel](/en/admin-guide/personnel)** — Staff performance tab.
+- For invoices: **Operations → Invoices** (`/admin/invoices`).

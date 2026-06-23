@@ -1,0 +1,230 @@
+---
+title: API Fundamentals
+description: Base URL, auth realms, branch scope, pagination, the error envelope, idempotency, and rate-limit tiers.
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# API Fundamentals
+
+This page covers the conventions that apply across HummyTummy's entire REST
+surface: base URL, auth realms, branch scope, error shape, and rate limits. The
+Partner Display and Webhooks pages build on these rules.
+
+## Base URL and global prefix
+
+Every endpoint lives under the `/api` global prefix.
+
+```
+https://hummytummy.com/api
+```
+
+So when an endpoint is defined as `v1/webhooks/subscriptions`, the full path is
+`https://hummytummy.com/api/v1/webhooks/subscriptions`. Every example in these
+docs shows the full path.
+
+<Callout type="info">
+  Currency is **TRY** for all amounts. Self-service payment runs through PayTR
+  and only TR/TRY is supported.
+</Callout>
+
+## Auth realms
+
+HummyTummy recognizes four distinct auth realms. Each endpoint expects exactly
+one of them; the wrong realm returns `401`.
+
+### 1. Staff JWT — `Authorization: Bearer <jwt>`
+
+The main identity for the dashboard / management API. It is the JWT of the
+signed-in staff user. Partner API keys and webhook subscriptions are managed
+through **this realm** (ADMIN role required).
+
+```bash
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+<Callout type="warning">
+  Access/refresh tokens are deliberately not kept in `localStorage`; the refresh
+  token lives in an httpOnly cookie. For server-to-server integrations, use a
+  **Partner API key** instead of a JWT (below).
+</Callout>
+
+### 2. Customer session — QR-menu session token
+
+The session token of a guest arriving from the QR menu. It authorizes guest
+ordering and self-pay flows. Partner screens don't use this identity directly;
+instead a screen token is bound behind the scenes to a customer session
+(`orderingSessionId`).
+
+### 3. Partner key — `X-Partner-Key` + `X-Partner-Secret`
+
+The machine identity a **partner backend** uses to mint/refresh/revoke screen
+tokens. The key is issued by the restaurant ADMIN; it consists of a `keyId`
+(`pk_live_…`, safe to log) plus a `secret` shown **once**.
+
+```bash
+X-Partner-Key:    pk_live_xxxxx
+X-Partner-Secret: pk_live_secret_xxxxx
+```
+
+Detail: [Partner Display API](/en/developer/partner-display).
+
+### 4. Screen token — `Authorization: Screen <token>`
+
+The short-lived, scoped token a device (tablet/screen) presents when calling
+`/v1/display/*`. The token is formatted `<uuidv7>.<secret>`; the device never
+carries the API secret.
+
+```bash
+Authorization: Screen 0190a1b2-c3d4-... .Hk9...
+```
+
+## Branch scope — `X-Branch-Id`
+
+HummyTummy is multi-branch. Every branch-scoped endpoint expects an
+`X-Branch-Id` header indicating which branch context it operates in.
+
+```bash
+X-Branch-Id: <branch-uuid>
+```
+
+<Callout type="warning">
+  Calling a branch-scoped endpoint without `X-Branch-Id` returns `400`. By
+  contrast, **tenant-level** endpoints (e.g. webhook subscriptions at
+  `/v1/webhooks/subscriptions`, partner keys at `/v1/partner/api-keys`) don't
+  expect this header — they skip branch scope. For partner screens, the
+  branch/tenant context comes from inside the token; it's never sent in the body
+  or a header.
+</Callout>
+
+## Error envelope
+
+All errors come back in a standard envelope:
+
+```json
+{
+  "statusCode": 403,
+  "message": "The externalDisplay feature is not enabled for this tenant",
+  "error": "Forbidden",
+  "errorCode": "FEATURE_NOT_AVAILABLE",
+  "timestamp": "2026-06-23T08:30:00.000Z",
+  "path": "/api/v1/partner/screen-sessions",
+  "requestId": "1718500000000-ab12cd34e"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `statusCode` | number | HTTP status code |
+| `message` | string \| string[] | User-facing message; may be an array on validation errors |
+| `error` | string | Human/category label (e.g. `Bad Request`, `Forbidden`); sometimes localized |
+| `errorCode` | string? | **Machine-readable, stable** code. Present only when the thrown exception attaches one; carries no PII and is returned in every environment |
+| `timestamp` | string | ISO-8601 request time |
+| `path` | string | Request path |
+| `requestId` | string | Request id for tracing |
+
+The `details` and `stack` fields are only populated in the development
+environment; they never appear in production.
+
+<Callout type="info">
+  Branch on **`errorCode`** client-side, not on `message` — `message` may be
+  localized, `errorCode` is stable. Example codes: `INVALID_CREDENTIALS`,
+  `TOKEN_EXPIRED`, `FORBIDDEN`, `INSUFFICIENT_PERMISSIONS`,
+  `FEATURE_NOT_AVAILABLE`, `SUBSCRIPTION_REQUIRED`, `QUOTA_EXCEEDED`,
+  `VALIDATION_ERROR`, `TOO_MANY_REQUESTS`.
+</Callout>
+
+### Common status codes
+
+| Code | Meaning |
+| --- | --- |
+| `400` | Invalid input / missing `X-Branch-Id` / validation error |
+| `401` | No identity, invalid, or expired token |
+| `403` | Not authorized, missing scope, or plan feature disabled |
+| `404` | Resource not found |
+| `409` | Conflict (e.g. concurrent-update conflict — retryable) |
+| `429` | Rate limit exceeded |
+
+Some database-driven outcomes are mapped automatically: a concurrent-update
+conflict (`409 ConcurrentUpdate`, retryable), a uniqueness violation (`409`),
+and a range/length overflow (`400 ValueOutOfRange`).
+
+## Pagination
+
+Listing endpoints use `page` and `limit` query parameters for offset-based
+pagination; the total record count is returned in the `X-Total-Count` response
+header (explicitly exposed via CORS).
+
+```bash
+GET /api/...?page=2&limit=50
+```
+
+```
+X-Total-Count: 137
+```
+
+<Callout type="info">
+  Not all list endpoints enforce pagination; some (e.g. the partner-key list,
+  the webhook-subscription list) return all rows. The relevant endpoint page
+  states the behavior.
+</Callout>
+
+## Idempotency
+
+Money-moving endpoints (the checkout/payment rail) are replay-safe: the same
+request arriving twice does not create a second charge. On the webhook
+**receiving** side, the same event may also arrive twice with the same `id`
+(at-least-once delivery) — dedup on `id` in your receiver. Detail on the
+[Webhooks](/en/developer/webhooks) page.
+
+## Rate-limit tiers
+
+Rate limiting is applied by a global throttler across three tiers:
+
+| Tier | Window | Limit |
+| --- | --- | --- |
+| `short` | 1 s | 10 requests |
+| `medium` | 10 s | 50 requests |
+| `long` | 60 s | 100 requests |
+
+Some machine endpoints add their own tighter limits — for example screen-token
+minting (`POST /v1/partner/screen-sessions`) is capped at 60 per 60 s, and the
+self-pay intent (`/v1/display/pay-intent`) at 5 per 60 s.
+
+<Callout type="info">
+  **Counted by key/screen-token:** the rate-limit bucket is keyed not just on
+  IP but also on the principal (partner key or screen token). That way the many
+  tablets behind a single NAT IP don't throttle each other. Each principal is
+  still counted under its own source IP, so you can't escape the IP limit by
+  forging fresh principals.
+</Callout>
+
+When the limit is exceeded you get `429` with `errorCode: TOO_MANY_REQUESTS`;
+honor the `Retry-After` header.
+
+## Quick example
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+# A branch-scoped endpoint (staff JWT + branch scope)
+curl https://hummytummy.com/api/v1/orders \
+  -H "Authorization: Bearer $JWT" \
+  -H "X-Branch-Id: $BRANCH_ID"
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch("https://hummytummy.com/api/v1/orders", {
+  headers: {
+    Authorization: `Bearer ${jwt}`,
+    "X-Branch-Id": branchId,
+  },
+});
+if (res.status === 429) {
+  // honor Retry-After, then retry
+}
+const total = res.headers.get("X-Total-Count");
+```
+  </Tabs.Tab>
+</Tabs>

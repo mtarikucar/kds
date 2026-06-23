@@ -146,6 +146,19 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing-staging:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing-staging:buildcache,mode=max
 
+      # Developer docs portal (Nextra) — staging image. Standalone Next build
+      # with no NEXT_PUBLIC_* / Sentry build-args (the Dockerfile declares
+      # none), so this mirrors the landing-staging step minus the args block.
+      - name: Build & push developer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./developer
+          file: ./developer/Dockerfile
+          push: true
+          tags: ${{ env.GHCR_BASE }}/developer-staging:${{ steps.commit.outputs.sha }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/developer-staging:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/developer-staging:buildcache,mode=max
+
 
   deploy:
     name: Deploy staging

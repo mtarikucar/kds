@@ -12,7 +12,7 @@
 #   deploy.sh prod-rollback
 #
 # Notes:
-#   * Images come from GHCR (ghcr.io/mtarikucar/kds/{backend,frontend,landing}).
+#   * Images come from GHCR (ghcr.io/mtarikucar/kds/{backend,frontend,landing,developer}).
 #     The :vX.Y.Z (or :<sha>) tag is the immutable identity; :current is
 #     the production pointer that docker-compose reads. We only move
 #     :current once verify_and_promote passes.
@@ -62,13 +62,17 @@ REDIS_CONTAINER=""
 BACKEND_CONTAINER=""
 FRONTEND_CONTAINER=""
 LANDING_CONTAINER=""
+DEVELOPER_CONTAINER=""
 BACKEND_IMG=""
 FRONTEND_IMG=""
 LANDING_IMG=""
+DEVELOPER_IMG=""
 API_LOCAL_URL=""
 API_PUBLIC_URL=""
 FRONTEND_PUBLIC_URL=""
 LANDING_PUBLIC_URL=""
+DEVELOPER_LOCAL_URL=""
+DEVELOPER_PUBLIC_URL=""
 HEALTH_BUDGET_SEC=300
 BACKUP_RETENTION_DAYS=14
 STATE_FILE=""
@@ -100,13 +104,22 @@ configure_env() {
     BACKEND_CONTAINER="kds_backend_prod"
     FRONTEND_CONTAINER="kds_frontend_prod"
     LANDING_CONTAINER="kds_landing_prod"
+    DEVELOPER_CONTAINER="kds_developer_prod"
     BACKEND_IMG="$ghcr_base/backend"
     FRONTEND_IMG="$ghcr_base/frontend"
     LANDING_IMG="$ghcr_base/landing"
+    DEVELOPER_IMG="$ghcr_base/developer"
     API_LOCAL_URL="http://localhost:3000/api/health"
     API_PUBLIC_URL="https://hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://hummytummy.com"
     LANDING_PUBLIC_URL="https://hummytummy.com/landing"
+    # Container maps host 3200 → 3000; /tr is the docs app's default-locale
+    # page (no /api/health). The PUBLIC URL depends on a user-side Cloudflare
+    # DNS record (developer → VPS IP) that may not exist yet, so its probe is
+    # NON-FATAL (warn-only) in verify_and_promote — the local 3200 probe is
+    # the authoritative health gate.
+    DEVELOPER_LOCAL_URL="http://localhost:3200/tr"
+    DEVELOPER_PUBLIC_URL="https://developer.hummytummy.com/tr"
     HEALTH_BUDGET_SEC=300
     BACKUP_RETENTION_DAYS=14
     BACKUP_PREFIX="prod"
@@ -118,13 +131,22 @@ configure_env() {
     BACKEND_CONTAINER="kds_backend_staging"
     FRONTEND_CONTAINER="kds_frontend_staging"
     LANDING_CONTAINER="kds_landing_staging"
+    DEVELOPER_CONTAINER="kds_developer_staging"
     BACKEND_IMG="$ghcr_base/backend-staging"
     FRONTEND_IMG="$ghcr_base/frontend-staging"
     LANDING_IMG="$ghcr_base/landing-staging"
+    DEVELOPER_IMG="$ghcr_base/developer-staging"
     API_LOCAL_URL="http://localhost:3002/api/health"
     API_PUBLIC_URL="https://staging.hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://staging.hummytummy.com"
     LANDING_PUBLIC_URL="https://staging.hummytummy.com/landing"
+    # Staging docs container maps host 3202 → 3000 (per the compose file) — a
+    # distinct host port from prod's 3200 so both stacks can run the developer
+    # container side-by-side on the shared VPS. No public staging subdomain is
+    # wired, so DEVELOPER_PUBLIC_URL is empty and the local 3202 probe is
+    # authoritative.
+    DEVELOPER_LOCAL_URL="http://localhost:3202/tr"
+    DEVELOPER_PUBLIC_URL=""
     # Bumped from the original 180s → 300s (route-mapping past 180s on
     # cold boots) → 600s. Run 26431353670 showed the HummyTummy-sized
     # image still hadn't responded to /api/health at the 300s mark.
@@ -225,7 +247,7 @@ backup_database() {
 snapshot_image_ids() {
   : > "$STATE_FILE"
   local saved=0
-  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER"; do
+  for entry in "BACKEND $BACKEND_CONTAINER" "FRONTEND $FRONTEND_CONTAINER" "LANDING $LANDING_CONTAINER" "DEVELOPER $DEVELOPER_CONTAINER"; do
     local role="${entry%% *}"
     local container="${entry##* }"
     local sha
@@ -238,7 +260,7 @@ snapshot_image_ids() {
       warn "$container not running — no prior SHA to snapshot"
     fi
   done
-  log "Snapshot complete: $saved/3 containers (file: $STATE_FILE)"
+  log "Snapshot complete: $saved/4 containers (file: $STATE_FILE)"
 }
 
 pull_versioned_images() {
@@ -248,7 +270,7 @@ pull_versioned_images() {
     echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   fi
 
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$DEVELOPER_IMG"; do
     log "docker pull $img:$VERSION"
     docker pull "$img:$VERSION"
   done
@@ -425,13 +447,19 @@ swap_backend() {
 swap_app_containers() {
   retag_to_current "$FRONTEND_IMG"
   retag_to_current "$LANDING_IMG"
+  retag_to_current "$DEVELOPER_IMG"
   # --remove-orphans reaps the retired in-repo marketing SPA container —
   # marketing.hummytummy.com is served by the standalone kds-marketing
   # stack (ports 3210/3211) since the v1.0.x cutover.
-  dc up -d --force-recreate --remove-orphans frontend landing
+  dc up -d --force-recreate --remove-orphans frontend landing developer
   sleep 3
-  verify_running_image "$FRONTEND_CONTAINER" "$FRONTEND_IMG"
-  verify_running_image "$LANDING_CONTAINER"  "$LANDING_IMG"
+  verify_running_image "$FRONTEND_CONTAINER"  "$FRONTEND_IMG"
+  verify_running_image "$LANDING_CONTAINER"   "$LANDING_IMG"
+  verify_running_image "$DEVELOPER_CONTAINER" "$DEVELOPER_IMG"
+  # Docs portal is loopback-probed (host 3200 → /tr). This is the
+  # authoritative health gate for the container; the public subdomain probe
+  # in verify_and_promote is non-fatal (depends on user-side Cloudflare DNS).
+  wait_until_healthy "$DEVELOPER_LOCAL_URL" 60
 }
 
 verify_and_promote() {
@@ -442,6 +470,15 @@ verify_and_promote() {
   # Landing probe is best-effort — its URL layout has changed in the
   # past and we don't want a 301 to fail the deploy.
   wait_until_healthy "$LANDING_PUBLIC_URL"  30 || warn "Landing probe non-200 (likely a redirect)"
+  # Developer docs subdomain probe is NON-FATAL: developer.hummytummy.com
+  # resolves only once a user-side Cloudflare DNS record (developer → VPS IP)
+  # exists, which may not be in place yet. The container's own health was
+  # already proven via the local 3200 probe in swap_app_containers, so a
+  # failed public probe here must NOT roll back the deploy — warn only.
+  if [ -n "$DEVELOPER_PUBLIC_URL" ]; then
+    wait_until_healthy "$DEVELOPER_PUBLIC_URL" 30 \
+      || warn "Developer docs public probe non-200 (likely Cloudflare DNS for developer.hummytummy.com not yet set — container is healthy locally)"
+  fi
   # SSL cert expiry — warn at 14d, error at 3d.
   local host="${API_PUBLIC_URL#https://}"; host="${host%%/*}"
   local exp_str exp_ts now_ts days
@@ -462,7 +499,7 @@ verify_and_promote() {
   fi
 
   # :current already moved by swap_*. Image immutability proof:
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$DEVELOPER_IMG"; do
     local cur_sha ver_sha
     cur_sha=$(docker image inspect "$img:current" --format '{{.Id}}' 2>/dev/null || echo "")
     ver_sha=$(docker image inspect "$img:$VERSION" --format '{{.Id}}' 2>/dev/null || echo "")
@@ -537,12 +574,17 @@ restore_image_ids() {
     docker tag "$LANDING_PREV_IMAGE"  "$LANDING_IMG:current"  || warn "landing retag failed"
     restored=$((restored + 1))
   fi
+  if [ -n "${DEVELOPER_PREV_IMAGE:-}" ]; then
+    log "Pinning developer :current → ${DEVELOPER_PREV_IMAGE}"
+    docker tag "$DEVELOPER_PREV_IMAGE" "$DEVELOPER_IMG:current" || warn "developer retag failed"
+    restored=$((restored + 1))
+  fi
   if [ "$restored" -eq 0 ]; then
     err "Snapshot is empty — manual recovery required"
     return 1
   fi
 
-  dc up -d --force-recreate --remove-orphans backend frontend landing
+  dc up -d --force-recreate --remove-orphans backend frontend landing developer
   sleep 5
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC" || warn "Post-rollback API not healthy"
 

@@ -1,0 +1,334 @@
+---
+title: Partner Display API
+description: Kendi ekranlarınızı çalıştırın — menü, sipariş, garson/hesap çağrısı, self-pay ve canlı sipariş durumu.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Partner Display API
+
+QR menünün yaptığı her şeyi yapan kendi ekranlarınızı/uygulamalarınızı (örneğin
+bir masa tableti) bir HummyTummy restoranına karşı çalıştırın: menüyü
+gözatın, sipariş verin, self-servis ödeyin, garson çağırın / hesap isteyin ve
+sipariş durumunu canlı izleyin.
+
+Tüm yollar `/api` global ön eki altındadır. Taban URL:
+`https://hummytummy.com/api`.
+
+<Callout type="warning">
+  Partner Display, restoran planının **`externalDisplay`** özelliğini içermesini
+  gerektirir. Hem anahtar üretimi hem token üretimi bu özelliği ve canlı bir
+  aboneliği (`ACTIVE` / `TRIALING` / `PAST_DUE`) doğrular; aksi halde `403`
+  döner.
+</Callout>
+
+## Kavramlar
+
+- **Partner API anahtarı** — restoran ADMIN'i tarafından üretilir (Ayarlar → API
+  & Entegrasyonlar). Bir `keyId` (`pk_live_…`, loglanması güvenli) + **bir kez**
+  gösterilen bir `secret`'tan oluşur. Yalnızca **backend'inizde** tutulur.
+- **Ekran oturum token'ı** — backend'inizin her ekran için ürettiği kısa ömürlü,
+  kapsamlı bir token. Bir şubeye (ve isteğe bağlı bir masaya) bağlıdır. Cihaz
+  yalnızca bu token'ı tutar, API secret'ını asla.
+- **Scope'lar** — `menu:read`, `orders:write`, `orders:read`, `payments:write`,
+  `requests:write`, `realtime:subscribe`. Bir ekranın scope'ları, anahtarın
+  scope'larının alt kümesidir.
+
+## Mimari özeti
+
+```
+ADMIN (dashboard)                  Partner backend                Cihaz/Ekran
+      │                                  │                              │
+      │ 1. Anahtar üret (keyId+secret)   │                              │
+      ├─────────────────────────────────▶                              │
+      │                                  │ 2. Ekran token'ı üret        │
+      │                                  │   X-Partner-Key/Secret       │
+      │                                  ├──────────▶ HummyTummy        │
+      │                                  │   screenToken + refreshToken │
+      │                                  │ 3. screenToken'ı cihaza ver  │
+      │                                  ├──────────────────────────────▶
+      │                                  │            4. /v1/display/*  │
+      │                                  │               Authorization: │
+      │                                  │               Screen <token> │
+      │                                  │◀─────────────────────────────┤
+```
+
+## 1. API anahtarı üretin (restoran ADMIN, bir kez, uygulama içinde)
+
+Restoran sahibi dashboard'da bir anahtar oluşturur. Bunu makine olarak da
+yapabilirsiniz: personel JWT'si ile (ADMIN rolü gerekir).
+
+```bash
+curl -X POST https://hummytummy.com/api/v1/partner/api-keys \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Masa tabletleri",
+    "scopes": ["menu:read","orders:write","orders:read","payments:write","requests:write","realtime:subscribe"],
+    "allowedReturnOrigins": ["https://tablet.ornek-restoran.com"],
+    "allowedBranchIds": ["<branch-uuid>"]
+  }'
+```
+
+Yanıt — `secret` **yalnızca bir kez** döner:
+
+```json
+{
+  "id": "...",
+  "keyId": "pk_live_AbCdEf...",
+  "secret": "pk_live_secret_XyZ...",
+  "name": "Masa tabletleri",
+  "scopes": ["menu:read", "orders:write", "orders:read", "payments:write", "requests:write", "realtime:subscribe"],
+  "allowedReturnOrigins": ["https://tablet.ornek-restoran.com"],
+  "allowedBranchIds": ["<branch-uuid>"],
+  "status": "active"
+}
+```
+
+| Alan | Açıklama |
+| --- | --- |
+| `name` | İnsan etiketi (zorunlu, 1–80 karakter) |
+| `scopes` | İsteğe bağlı; verilmezse anahtar **tüm** scope'ları alır |
+| `allowedReturnOrigins` | Self-pay sonrası PayTR dönüş origin'leri (yalnızca `https` URL) |
+| `allowedBranchIds` | Anahtarı belirli şubelerle sınırlar (boş = tüm şubeler) |
+
+<Callout type="warning">
+  `secret`'ı güvenli biçimde **sunucunuzda** saklayın — bir daha asla
+  gösterilmez ve geri türetilemez. `keyId` loglanması güvenlidir. Tenant başına
+  varsayılan aktif anahtar limiti 10'dur; aşılırsa `400` döner.
+</Callout>
+
+Anahtarları listeleyin / iptal edin (personel JWT, ADMIN):
+
+```bash
+GET    /api/v1/partner/api-keys
+DELETE /api/v1/partner/api-keys/:id   # iptal — child ekran oturumlarına cascade eder
+```
+
+## 2. Ekran token'ı üretin (backend'iniz → biz)
+
+Anahtarınızla TLS üzerinden kimlik doğrulayın:
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/partner/screen-sessions \
+  -H "X-Partner-Key: pk_live_AbCdEf..." \
+  -H "X-Partner-Secret: pk_live_secret_XyZ..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "branchId": "<branch-uuid>",
+    "tableId": "<table-uuid>",
+    "scopes": ["menu:read","orders:write","realtime:subscribe"]
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+const res = await fetch(
+  "https://hummytummy.com/api/v1/partner/screen-sessions",
+  {
+    method: "POST",
+    headers: {
+      "X-Partner-Key": process.env.PARTNER_KEY!,
+      "X-Partner-Secret": process.env.PARTNER_SECRET!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      branchId,
+      tableId, // isteğe bağlı
+      scopes: ["menu:read", "orders:write", "realtime:subscribe"],
+    }),
+  },
+);
+const session = await res.json();
+// session.screenToken → cihaza; session.refreshToken → sunucuda kalır
+```
+  </Tabs.Tab>
+</Tabs>
+
+İstek gövdesi alanları:
+
+| Alan | Zorunlu | Açıklama |
+| --- | --- | --- |
+| `branchId` | Evet (UUID) | Ekranın bağlanacağı şube; tenant'a ait ve aktif olmalı, anahtarın `allowedBranchIds`'i içinde olmalı |
+| `tableId` | Hayır (UUID) | Ekranın bağlanacağı masa; verilirse şube/masa eşleşmesi doğrulanır |
+| `scopes` | Hayır | Bu ekranın scope'ları (anahtarın alt kümesi); verilmezse anahtarın tüm scope'ları |
+
+Yanıt — **token'lar yalnızca bir kez** döner:
+
+```json
+{
+  "id": "...",
+  "screenToken": "<uuidv7>.<secret>",
+  "refreshToken": "<uuidv7>.<secret>",
+  "expiresAt": "...(≈1 saat)",
+  "refreshExpiresAt": "...(≈30 gün)",
+  "scopes": ["menu:read", "orders:write", "realtime:subscribe"],
+  "tenantId": "...",
+  "branchId": "...",
+  "tableId": "...",
+  "orderingSessionId": "..."
+}
+```
+
+`screenToken`'ı cihaza gönderin; `refreshToken`'ı sunucu tarafında saklayın.
+Süresi (varsayılan erişim ≈1 saat) dolmadan önce döndürün:
+
+```bash
+curl -X POST https://hummytummy.com/api/v1/partner/screen-sessions/refresh \
+  -H "X-Partner-Key: pk_live_AbCdEf..." \
+  -H "X-Partner-Secret: pk_live_secret_XyZ..." \
+  -H "Content-Type: application/json" \
+  -d '{ "refreshToken": "<uuidv7>.<secret>" }'
+# → yeni { screenToken, refreshToken, expiresAt, refreshExpiresAt }
+```
+
+<Callout type="info">
+  Yenileme **tek kullanımlıktır**: eski `refreshToken` ile ikinci bir çağrı
+  `401 "Refresh token already used"` döner. Daima yeni dönen `refreshToken`'ı
+  saklayın. TTL'ler operatörce ayarlanabilir: erişim ≈1 saat, yenileme ≈30 gün.
+</Callout>
+
+Tek bir ekranı iptal edin (anahtar kimliğiyle):
+
+```bash
+DELETE /api/v1/partner/screen-sessions/:id
+```
+
+<Callout type="warning">
+  Dashboard'da **API anahtarını** iptal etmek cascade eder — o anahtarın tüm
+  ekran token'ları geçersizleşir, canlı socket bağlantıları da düşürülür. Tek
+  bir ekranı iptal etmek arkadaki müşteri oturumunu da kapatır ve canlı socket'i
+  hemen koparır.
+</Callout>
+
+Şube başına aktif ekran oturumu limiti varsayılan 50'dir; aşılırsa `400` döner.
+
+## 3. Ekranı yönetin (cihaz → biz)
+
+Her `/display` çağrısı ekran token'ını sunar:
+
+```bash
+Authorization: Screen <screenToken>
+```
+
+| Metot | Yol | Scope | Amaç |
+| --- | --- | --- | --- |
+| GET | `/api/v1/display/menu` | `menu:read` | Marka + kategori/ürün/modifier + özellik bayrakları |
+| POST | `/api/v1/display/orders` | `orders:write` | Sipariş ver `{ items:[{ productId, quantity, modifiers?, notes? }], type?, notes? }` |
+| GET | `/api/v1/display/orders` | `orders:read` | Bu ekranın oturumunun siparişleri + durumları |
+| POST | `/api/v1/display/waiter-requests` | `requests:write` | Garson çağır `{ message? }` (masaya bağlı ekran gerekir) |
+| POST | `/api/v1/display/bill-requests` | `requests:write` | Hesap iste `{ message? }` |
+| GET | `/api/v1/display/payable-items` | `payments:write` | Masanın ödenmemiş kalemleri |
+| POST | `/api/v1/display/pay-intent` | `payments:write` | PayTR hosted-payment intent `{ items:[{ orderItemId, quantity }], customerPhone? }` |
+| GET | `/api/v1/display/pay-status?oid=…` | `payments:write` | Bir ödemenin durumunu sorgula |
+
+<Callout type="info">
+  Ekranın tenant/şube/masa bilgisi **token'dan** alınır — gövdede asla
+  gönderilmez. Eksik scope `403` döner. Süresi dolmuş / geçersiz token `401`
+  döner.
+</Callout>
+
+### Sipariş verme örneği
+
+<Tabs items={['curl', 'TypeScript (fetch)']}>
+  <Tabs.Tab>
+```bash
+curl -X POST https://hummytummy.com/api/v1/display/orders \
+  -H "Authorization: Screen $SCREEN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      { "productId": "<product-uuid>", "quantity": 2, "notes": "az pişmiş" }
+    ],
+    "notes": "masa 5"
+  }'
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```ts
+await fetch("https://hummytummy.com/api/v1/display/orders", {
+  method: "POST",
+  headers: {
+    Authorization: `Screen ${screenToken}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    items: [{ productId, quantity: 2, notes: "az pişmiş" }],
+  }),
+});
+```
+  </Tabs.Tab>
+</Tabs>
+
+### Self-pay (self-servis ödeme)
+
+Self-pay TR/TRY + PayTR'dir. Dönen `paymentLink`'i bir WebView'da açın; dönüş
+origin'i anahtarın `allowedReturnOrigins`'inden alınır (istemcinin gönderdiği
+bir başlıktan değil). Akış: `payable-items` → `pay-intent` → WebView →
+`pay-status` ile sorgula (ya da WebSocket'ten `customer:payment-settled`).
+
+## 4. Canlı güncellemeler (cihaz → biz, WebSocket)
+
+`realtime:subscribe` scope'u ile Socket.IO'yu `/kds` namespace'ine ekran
+token'ıyla bağlayın:
+
+```js
+import { io } from "socket.io-client";
+
+const socket = io("https://hummytummy.com/kds", {
+  auth: { screenToken: "<screenToken>" },
+});
+
+socket.on("customer:order-created", (e) => {/* ... */});
+socket.on("customer:order-approved", (e) => {/* ... */});
+socket.on("customer:order-status-updated", (e) => {/* ... */});
+socket.on("customer:payment-settled", (e) => {/* ... */});
+```
+
+Olaylar: `customer:order-created`, `customer:order-approved`,
+`customer:order-status-updated`, `customer:payment-settled`.
+
+<Callout type="info">
+  Socket düşerse `GET /display/orders` ve `GET /display/pay-status`'ı
+  yoklayarak (polling) geri düşün. Bir ekran iptal edildiğinde canlı socket'i
+  derhal koparılır.
+</Callout>
+
+## Uçtan uca özet
+
+<Steps>
+
+### Anahtar üretin
+ADMIN dashboard'dan (veya ADMIN JWT ile makine olarak) bir partner anahtarı
+üretir. `secret`'ı sunucunuzda saklayın.
+
+### Ekran token'ı üretin
+Backend'iniz `X-Partner-Key`/`X-Partner-Secret` ile her ekran için bir
+`screenToken` + `refreshToken` üretir. `screenToken`'ı cihaza verin.
+
+### Ekranı yönetin
+Cihaz `Authorization: Screen <token>` ile `/v1/display/*` uçlarını çağırır;
+her uç kendi scope'unu gerektirir.
+
+### Canlı dinleyin
+Cihaz `/kds` WebSocket'ine bağlanır (`realtime:subscribe`) ve sipariş/ödeme
+olaylarını canlı alır.
+
+### Yenileyin / iptal edin
+Token süresi dolmadan `refreshToken` ile döndürün. İhtiyaç bittiğinde tek ekranı
+veya tüm anahtarı (cascade) iptal edin.
+
+</Steps>
+
+## Hatalar ve limitler
+
+- **Hatalar:** standart [zarf](/tr/developer/api-temelleri#hata-zarfı). `401` =
+  hatalı/süresi dolmuş token, `403` = eksik scope ya da tenant'ta
+  `externalDisplay` kapalı / abonelik canlı değil, `429` = rate limit.
+- **Rate limit** anahtar/ekran token'ı başına sayılır (yalnızca IP başına
+  değil), böylece tek NAT IP'sinin arkasındaki bir tablet filosu sorun çıkarmaz.
+  Ekran token'ı üretimi 60 sn'de 60, self-pay intent 60 sn'de 5 ile sınırlıdır.
+- **Token TTL'leri** (operatörce ayarlanabilir): erişim ≈1 saat, yenileme ≈30
+  gün.

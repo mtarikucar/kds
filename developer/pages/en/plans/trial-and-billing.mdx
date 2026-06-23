@@ -1,0 +1,102 @@
+---
+title: Trial & billing
+description: The 7-day trial, the TRIAL_ENDED lock, the billing cycle, and VAT-inclusive pricing.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Trial & billing
+
+## 7-day trial (TRIAL)
+
+Every new business is automatically placed on the **Trial (TRIAL)** plan at sign-up:
+
+- **Duration:** 7 days (`trialDays: 7`).
+- **Scope:** all of Business's features and **unlimited** limits (every limit is `-1`).
+- **Not sellable:** because `isPublic=false`, it never appears on the plan-selection screen. The trial is not tied to any paid plan — it is assigned at sign-up.
+
+The trial runs as a **dedicated onboarding plan**, not on top of the Business plan as in the old design. This keeps the trial from depending on a plan's `trialDays` value and prevents silent transitions.
+
+## The TRIAL_ENDED lock
+
+If the trial period elapses **without a paid plan being chosen**, the business moves to `TRIAL_ENDED` status and is **locked**. This is an explicit lock rather than a silent downgrade to FREE.
+
+<Steps>
+
+### Backend (default-deny)
+The global `SubscriptionStatusGuard` rejects **every tenant-scoped route** with a 403 for any business that lacks a live subscription (`ACTIVE` / `TRIALING` / `PAST_DUE`). The response:
+
+```json
+{
+  "statusCode": 403,
+  "error": "Plan Selection Required",
+  "errorCode": "PLAN_SELECTION_REQUIRED",
+  "message": "Deneme süreniz sona erdi. Devam etmek için bir plan seçin."
+}
+```
+
+### Allowlisted recovery paths
+A locked business can still call these prefixes: `/auth`, `/me`, `/users/me`, `/profile`, `/subscriptions`, `/payments`, `/checkout`, `/legal`, `/entitlements`, `/webhooks`, `/health`. In other words it can read the plan catalog and make a payment — nothing else.
+
+### Frontend redirect
+On the SPA side, `SubscriptionGate` redirects the user to the plan-selection screen (`/choose-plan`) in response to the `PLAN_SELECTION_REQUIRED` code.
+
+</Steps>
+
+<Callout type="warning">
+  The lock is not only for `TRIAL_ENDED`: `EXPIRED` and `CANCELLED` businesses are also considered "not live" and are locked the same way. A subscription in `PAST_DUE` is treated as live during its 7-day grace period.
+</Callout>
+
+## Billing cycle
+
+The billing cycle has two options (`BillingCycle`): **MONTHLY** and **YEARLY**. The chosen cycle determines the period length and the amount charged on subscription creation, upgrade, and downgrade. Paying yearly is cheaper than 12× the monthly amount (~17% savings).
+
+You can read your invoices via the API:
+
+```bash
+# All of a tenant's invoices (paginated)
+curl "https://app.hummytummy.com/api/subscriptions/tenant/invoices?page=1&pageSize=20" \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+
+# Invoices for a specific subscription
+curl "https://app.hummytummy.com/api/subscriptions/<SUB_ID>/invoices?page=1&pageSize=20" \
+  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
+```
+
+## VAT-inclusive pricing
+
+All advertised plan prices are **gross** (VAT-inclusive) amounts, and the customer is charged exactly that amount. When an invoice is issued, `BillingService` reverse-engineers the VAT (KDV) out of the gross amount:
+
+- The default VAT rate is **20%** (`DEFAULT_KDV_RATE = 0.2`). It can be overridden with the `KDV_RATE` environment variable (e.g. `0.10`).
+- The split is performed only for TRY invoices; net and tax are derived as:
+
+```text
+subtotal = total / (1 + rate)
+tax      = total - subtotal
+```
+
+Subtracting guarantees `subtotal + tax == total` **to the cent**, regardless of rounding choices.
+
+**Example — Pro monthly ₺1,299 (VAT 20%):**
+
+| Line | Amount |
+| --- | --- |
+| Subtotal (net) | ₺1,082.50 |
+| VAT (20%) | ₺216.50 |
+| **Total (charged)** | **₺1,299.00** |
+
+<Callout type="info">
+  The business's tax ID (`taxId`) is snapshotted on the invoice **as it was at issuance time**. Even if it is changed later, past invoices are unaffected.
+</Callout>
+
+## Cancellation and reactivation
+
+- `POST /subscriptions/:id/cancel` — cancels the subscription (ADMIN only). The body may include `immediate` (now vs. at period end) and a `reason` of up to 500 characters.
+- `POST /subscriptions/:id/reactivate` — reactivates a cancelled subscription (ADMIN only).
+
+```bash
+curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/cancel \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "immediate": false, "reason": "End-of-season closure" }'
+```

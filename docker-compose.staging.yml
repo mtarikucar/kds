@@ -182,6 +182,38 @@ services:
           cpus: '0.25'
           memory: 256M
 
+  # Developer Docs Portal (Nextra / Next.js) - Staging
+  developer:
+    env_file:
+      - .env.test
+    image: ghcr.io/mtarikucar/kds/developer-staging:current
+    container_name: kds_developer_staging
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      # Host 3202 (distinct from prod's 3200) so staging + prod developer
+      # containers coexist on the shared VPS without a host-port collision.
+      - '3202:3000'
+    healthcheck:
+      # No /api/health route; /tr is the default-locale page (nextra/locales
+      # middleware redirects / → /tr) and returns 200 — durable liveness probe.
+      test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/tr']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kds_staging_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
 
 volumes:
   postgres_data_staging:

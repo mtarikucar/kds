@@ -1,0 +1,198 @@
+---
+title: Hata Kodları
+description: Standart hata zarfı, makine-okunur errorCode değerleri ve Prisma veritabanı hatalarının HTTP durum kodlarına eşlenmesi.
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Hata Kodları
+
+HummyTummy API'sindeki tüm hatalar tek bir standart **hata zarfı** ile döner.
+İstemci tarafında metin mesajına göre değil, kararlı `errorCode` alanına göre
+dallanmanız önerilir.
+
+## Hata zarfı
+
+Her hata yanıtı aşağıdaki yapıyı izler:
+
+```json
+{
+  "statusCode": 409,
+  "message": "A record with this email already exists",
+  "error": "UniqueConstraintViolation",
+  "errorCode": "RESOURCE_ALREADY_EXISTS",
+  "timestamp": "2026-06-23T08:14:05.123Z",
+  "path": "/api/v1/auth/register",
+  "requestId": "1750665245123-a1b2c3d4e"
+}
+```
+
+| Alan | Tip | Açıklama |
+| --- | --- | --- |
+| `statusCode` | `number` | HTTP durum kodu. |
+| `message` | `string \| string[]` | Kullanıcıya gösterilebilir mesaj. Doğrulama hatalarında bir dizi olabilir. |
+| `error` | `string` | İnsan/kategori etiketi (bazen yerelleştirilmiş ya da class-validator'ın `"Bad Request"` değeri). **Buna göre dallanmayın.** |
+| `errorCode` | `string?` | Kararlı, makine-okunur kod. **İstemci yalnızca buna göre dallanmalıdır.** Yalnızca fırlatılan istisna bir kod iliştirdiğinde bulunur. |
+| `timestamp` | `string` | İstek zaman damgası (ISO 8601). |
+| `path` | `string` | İstek yolu. |
+| `requestId` | `string?` | İzleme için istek kimliği — destek talebinde paylaşın. |
+| `details` | `any?` | Yalnızca `development` ortamında bulunur. |
+| `stack` | `string?` | Yalnızca `development` ortamında bulunur. |
+
+<Callout type="info">
+  `errorCode` **PII içermez** ve bu nedenle her ortamda (production dahil)
+  döner. `details` ve `stack` ise yalnızca `development` ortamında yer alır.
+</Callout>
+
+<Callout type="warning">
+  `error` alanı yerelleştirilebilir veya çerçevenin ürettiği bir etikete
+  düşebilir. Davranışsal dallanmayı **her zaman** `errorCode` üzerinden yapın;
+  `errorCode` yoksa `statusCode`'a düşün.
+</Callout>
+
+## errorCode değerleri
+
+Aşağıdaki kodlar `ErrorCode` enum'ından gelir ve iş mantığı istisnalarıyla
+(`BusinessException`) iliştirilir.
+
+### Kimlik doğrulama
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `INVALID_CREDENTIALS` | E-posta veya parola hatalı. |
+| `TOKEN_EXPIRED` | Token'ın süresi doldu. |
+| `TOKEN_INVALID` | Token geçersiz/bozuk. |
+| `UNAUTHORIZED` | Kimlik doğrulama gerekli. |
+
+### Yetkilendirme
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `FORBIDDEN` | Erişim reddedildi. |
+| `INSUFFICIENT_PERMISSIONS` | Rol/izin bu işlem için yetersiz. |
+
+### Kaynak
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `RESOURCE_NOT_FOUND` | İstenen kayıt yok. |
+| `RESOURCE_ALREADY_EXISTS` | Aynı kayıt zaten var (ör. yinelenen e-posta). |
+| `RESOURCE_CONFLICT` | Kaynağın mevcut durumuyla çakışma. |
+
+### Doğrulama
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `VALIDATION_ERROR` | Genel girdi doğrulaması başarısız. |
+| `INVALID_INPUT` | Girdi değeri geçersiz. |
+| `MISSING_REQUIRED_FIELD` | Zorunlu alan eksik. |
+
+### İş mantığı
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `INSUFFICIENT_STOCK` | Ürün için yeterli stok yok. `details`: `{ productName, available, requested }`. |
+| `ORDER_ALREADY_PAID` | Sipariş zaten ödenmiş. |
+| `TABLE_OCCUPIED` | Masa dolu. |
+| `INVALID_ORDER_STATUS` | İşlem siparişin mevcut durumunda yapılamaz. |
+| `SUBSCRIPTION_REQUIRED` | Etkin abonelik gerekir (HTTP 402). |
+| `FEATURE_NOT_AVAILABLE` | Özellik mevcut planda yok; üst plan gerekir (HTTP 402). |
+| `QUOTA_EXCEEDED` | Plan limiti aşıldı (HTTP 402). |
+
+### Ödeme
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `PAYMENT_FAILED` | Ödeme başarısız oldu. |
+| `PAYMENT_PROCESSING_ERROR` | Ödeme işlenirken hata. |
+| `INVALID_PAYMENT_METHOD` | Geçersiz ödeme yöntemi. |
+
+### Sistem
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `INTERNAL_SERVER_ERROR` | Beklenmeyen sunucu hatası. |
+| `SERVICE_UNAVAILABLE` | Servis geçici olarak kullanılamıyor. |
+| `DATABASE_ERROR` | Veritabanı hatası. |
+| `EXTERNAL_SERVICE_ERROR` | Dış servis hatası (ör. ödeme sağlayıcı). |
+
+### Hız sınırı
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `TOO_MANY_REQUESTS` | Çok fazla istek (HTTP 429). |
+
+### Tenant
+
+| `errorCode` | Anlamı |
+| --- | --- |
+| `TENANT_NOT_FOUND` | Tenant bulunamadı. |
+| `INVALID_TENANT` | Geçersiz tenant. |
+
+## Veritabanı hatalarının HTTP eşlemesi
+
+Prisma'nın bilinen veritabanı hataları (`PrismaClientKnownRequestError`) global
+istisna filtresinde anlamlı HTTP durum kodlarına çevrilir. Bu yanıtlarda
+`error` alanı kategori etiketini taşır; `errorCode` bu durumlarda **bulunmaz**
+(bunlar `BusinessException` değildir).
+
+| Prisma kodu | HTTP | `error` | Anlamı |
+| --- | --- | --- | --- |
+| `P2002` | `409 Conflict` | `UniqueConstraintViolation` | Tekil kısıt ihlali (yinelenen kayıt). |
+| `P2025` | `404 Not Found` | `RecordNotFound` | Kayıt bulunamadı. |
+| `P2003` | `400 Bad Request` | `ForeignKeyConstraintViolation` | İlişkili kayıt yok veya bağımlılık nedeniyle silinemiyor. |
+| `P2014` | `400 Bad Request` | `RequiredRelationViolation` | Değişiklik zorunlu bir ilişkiyi ihlal ederdi. |
+| `P2016` | `400 Bad Request` | `InvalidQuery` | Geçersiz sorgu parametreleri. |
+| `P2021` | `500 Internal Server Error` | `DatabaseConfigError` | Tablo yok (yapılandırma hatası). |
+| `P2024` | `503 Service Unavailable` | `DatabaseTimeout` | Veritabanı bağlantı zaman aşımı. |
+| `P2034` | `409 Conflict` | `ConcurrentUpdate` | Serileştirilebilir işlem çakışması (Postgres `40001`). İşlem **commit olmadı**, güvenle yeniden denenebilir. |
+| `P2000`, `P2020` | `400 Bad Request` | `ValueOutOfRange` | Değer izin verilen aralık dışı veya çok uzun. |
+| (diğer) | `500 Internal Server Error` | `DatabaseError` | Eşlenmemiş veritabanı hatası. |
+
+<Callout type="info">
+  `P2034` (`ConcurrentUpdate`, 409) ödeme uzlaştırma, marketplace satın alma
+  gibi yarış durumu altındaki Serializable işlemlerin beklenen "kaybeden"
+  sonucudur ve isteğiniz hiç işlenmemiştir. Bu yanıtı alırsanız isteği aynen
+  yeniden gönderebilirsiniz.
+</Callout>
+
+## İstemci tarafında işleme
+
+<Tabs items={['Pseudo-kod', 'curl']}>
+  <Tabs.Tab>
+```ts
+const res = await fetch('/api/v1/display/orders', { method: 'POST', /* … */ });
+if (!res.ok) {
+  const err = await res.json(); // ErrorResponse
+  switch (err.errorCode) {
+    case 'QUOTA_EXCEEDED':
+    case 'FEATURE_NOT_AVAILABLE':
+    case 'SUBSCRIPTION_REQUIRED':
+      // Kullanıcıyı plan yükseltmeye yönlendir (HTTP 402)
+      break;
+    case undefined:
+      // errorCode yok → statusCode'a göre dallan (ör. 409 ConcurrentUpdate → retry)
+      break;
+    default:
+      showToast(err.message);
+  }
+}
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```bash
+curl -i -X POST https://api.hummytummy.com/api/v1/display/orders \
+  -H "Authorization: Bearer <SCREEN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{ "items": [], "type": "DINE_IN" }'
+
+# HTTP/1.1 409 Conflict
+# {
+#   "statusCode": 409,
+#   "error": "ConcurrentUpdate",
+#   "message": "Concurrent update conflict — please retry. Your request did not take effect.",
+#   ...
+# }
+```
+  </Tabs.Tab>
+</Tabs>

@@ -1,0 +1,159 @@
+---
+title: Kurulum & indirme
+description: HummyTummy Desktop'u sürüm kataloğundan indirme ve kurma — public /api/desktop uç noktaları, platform paketleri ve indirme takibi.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Kurulum & indirme
+
+Masaüstü uygulamasının kurulum paketleri, sunucu tarafındaki **sürüm kataloğunda**
+(`DesktopRelease`) tutulur. Katalog **platform düzeyinde** tek bir küresel listedir —
+her restoran kiracısı (tenant) aynı yayınlanmış sürümleri görür. Kataloğa kimliksiz
+(public) erişilebilen birkaç uç nokta vardır; sürüm yayınlama ise yalnızca platform
+operatörlerine (SuperAdmin) veya CI/CD'ye açıktır.
+
+<Callout type="info">
+  Tüm uç noktalar global `/api` ön ekiyle yayınlanır. Aşağıdaki örneklerde sunucu kökü
+  `https://app.hummytummy.com` olarak gösterilmiştir; kendi ortamınızda değiştirin.
+</Callout>
+
+## Public uç noktalar
+
+Bu uç noktalar kimlik doğrulaması gerektirmez (`@Public`) ve hız sınırlıdır (throttle).
+
+| Metot & yol | Açıklama | Limit |
+| --- | --- | --- |
+| `GET /api/desktop/releases/latest` | En son yayınlanmış sürüm | 30/dk |
+| `GET /api/desktop/releases/published` | Yayınlanmış tüm sürümler (pubDate'e göre azalan) | 30/dk |
+| `GET /api/desktop/updates/:platform/:currentVersion` | Tauri updater sorgusu | 60/dk |
+| `POST /api/desktop/releases/:version/download/:platform` | İndirme sayacını artırır (analitik) | 10/dk |
+
+`:platform` değeri `^[a-z0-9-]{1,32}$` desenine, `:version`/`:currentVersion`
+değeri `^v?\d+\.\d+\.\d+$` desenine uymalıdır; aksi halde `400 Bad Request` döner.
+
+## En son sürümü almak
+
+<Tabs items={['curl', 'JSON yanıt']}>
+  <Tabs.Tab>
+```bash
+curl https://app.hummytummy.com/api/desktop/releases/latest
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```json
+{
+  "id": "01J...",
+  "version": "0.2.6",
+  "releaseTag": "v0.2.6",
+  "published": true,
+  "pubDate": "2026-06-20T15:00:00.000Z",
+  "windowsUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.msi",
+  "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "macArmUrl": "https://github.com/.../HummyTummy-POS_0.2.6_aarch64.dmg",
+  "macArmSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "macIntelUrl": "https://github.com/.../HummyTummy-POS_0.2.6_x64.dmg",
+  "macIntelSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "linuxUrl": "https://github.com/.../hummy-tummy-pos_0.2.6_amd64.AppImage",
+  "linuxSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+  "releaseNotes": "## Yenilikler\n- Özellik X\n- Düzeltme Y",
+  "changelog": null,
+  "downloadCount": 134,
+  "createdAt": "2026-06-20T14:55:00.000Z",
+  "updatedAt": "2026-06-20T15:00:00.000Z"
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+Yayınlanmış sürüm yoksa `releases/latest` uç noktası `404` döner.
+
+## Kurulum adımları
+
+<Steps>
+### Platformunuza uygun paketi bulun
+
+`GET /api/desktop/releases/latest` yanıtından platformunuza karşılık gelen URL alanını
+seçin:
+
+- **Windows** → `windowsUrl` (`.msi`)
+- **macOS (Apple Silicon)** → `macArmUrl` (`.dmg`)
+- **macOS (Intel)** → `macIntelUrl` (`.dmg`)
+- **Linux** → `linuxUrl` (`.deb` / `.AppImage`)
+
+İlgili platform için URL `null` ise o sürüm o platforma derlenmemiştir.
+
+### Paketi indirin ve kurun
+
+URL'yi tarayıcıda açın veya `curl -L` ile indirin, ardından platformunuzun normal
+kurulum akışını izleyin (Windows: MSI sihirbazı; macOS: DMG'yi açıp uygulamayı
+Applications'a sürükleyin; Linux: `.deb` paketini kurun veya `.AppImage`'i
+çalıştırılabilir yapın).
+
+### (İsteğe bağlı) İndirmeyi raporlayın
+
+Analitik için indirme sayacını artırabilirsiniz:
+
+```bash
+curl -X POST https://app.hummytummy.com/api/desktop/releases/0.2.6/download/windows-x86_64
+# { "message": "Download tracked" }
+```
+
+Bu çağrı en iyi-çaba (best-effort) çalışır: bilinmeyen bir sürüm gönderilirse hata
+fırlatmaz, yalnızca sunucuda loglanır.
+</Steps>
+
+<Callout type="warning">
+  Yalnızca `published: true` olan sürümler public uç noktalardan görünür. Taslak
+  (yayınlanmamış) sürümler yalnızca SuperAdmin yönetim uç noktalarından listelenir.
+</Callout>
+
+## Geliştirme ortamından derleme
+
+Kaynaktan derlemek için (Tauri CLI npm ile birlikte gelir):
+
+```bash
+npm install
+npm run tauri:dev    # geliştirme modunda çalıştır
+npm run tauri:build  # üretim paketi üret
+```
+
+Çıktı paketleri `src-tauri/target/release/bundle/` altında platforma göre
+(`msi/`, `dmg/`, `deb/`, `appimage/`) oluşturulur. Geliştirme için **Rust 1.70+** ve
+**Node.js 18+** gerekir; Linux'ta ayrıca `libdbus-1-dev` ve `pkg-config` paketleri
+kuruludur (Bluetooth yazıcı desteği için).
+
+## Sürüm yayınlama (operatör / CI)
+
+Yeni bir sürümü kataloğa eklemek iki rotadan yapılır:
+
+- **CI/CD (API anahtarı)** — `POST /api/desktop/ci/releases` ve
+  `POST /api/desktop/ci/releases/:id/publish`. Bu uç noktalar `x-api-key` (veya `api-key`)
+  başlığında `DESKTOP_RELEASE_API_KEY` değerini bekler; GitHub Actions otomatik
+  yayınlama için kullanır.
+- **SuperAdmin (Bearer)** — `POST /api/desktop/releases`, `PATCH /api/desktop/releases/:id`,
+  `POST /api/desktop/releases/:id/publish` / `.../unpublish`, `DELETE /api/desktop/releases/:id`.
+  Yalnızca platform operatörleri erişebilir.
+
+Bir CI sürümü oluşturma örneği:
+
+```bash
+curl -X POST https://app.hummytummy.com/api/desktop/ci/releases \
+  -H "x-api-key: $DESKTOP_RELEASE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "0.2.7",
+    "releaseTag": "v0.2.7",
+    "releaseNotes": "## Yenilikler\n- ...",
+    "windowsUrl": "https://github.com/.../setup.msi",
+    "windowsSignature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
+    "published": false
+  }'
+```
+
+<Callout type="warning">
+  `version` benzersiz olmalı ve `\d+\.\d+\.\d+` (saf semver, `v` öneki olmadan) biçiminde
+  olmalıdır. Var olan bir sürümü tekrar oluşturmaya çalışmak `400` döner. Yayınlama
+  adımı `pubDate` alanını set eder; updater'ın "en son sürüm" sıralaması bu alana göre
+  yapılır.
+</Callout>

@@ -1,0 +1,56 @@
+---
+title: Masalar & Kat Planı
+description: HummyTummy masa yönetimi — masa ekleme/düzenleme/silme, kapasite, tek dokunuşla durum değişimi, doluluk istatistikleri ve plan limitleri. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Masalar & Kat Planı
+
+**Menü yolu:** Menü & Masa → Masalar &nbsp;•&nbsp; **URL:** `/admin/tables`
+**Erişim:** ADMIN, MANAGER
+**Plan:** Tüm planlarda açık (masa sayısı **plana bağlı**)
+
+## Amacı
+
+Bu ekran restoranınızın **masalarını** tanımlar ve durumlarını yönetir. Eklediğiniz masalar hem POS satış ekranındaki masa ızgarasında hem de QR menü ve rezervasyon akışında kullanılır.
+
+## Ekranda neler var?
+
+- **Üst istatistik şeridi:** Toplam masa, **boş**, **dolu**, **rezerve** sayıları ve canlı bir **doluluk yüzdesi** (dolu masaların oranı).
+- **Masa kartları ızgarası:** Her kart masa numarasını, durumunu (renkli rozet), kapasitesini ve eylem butonlarını gösterir.
+- **Plan limiti bilgi bandı:** Planınızın masa limitine yaklaşıyorsanız bilgilendirir; limit dolduğunda "Masa Ekle" kilitlenir ve yükseltme önerisi çıkar.
+
+## Masa durumları
+
+| Durum | Renk | Anlamı |
+| --- | --- | --- |
+| **Boş** (`AVAILABLE`) | Yeşil | Müsait |
+| **Dolu** (`OCCUPIED`) | Kırmızı/Amber | Misafir oturuyor |
+| **Rezerve** (`RESERVED`) | Gri/Amber | Rezerve edilmiş |
+
+## Kullanım
+
+- **Masa ekle / düzenle:** "Masa Ekle" ile numara, kapasite ve başlangıç durumunu girersiniz. Var olan masada düzenleme (kalem ikonu) aynı formu açar.
+- **Tek dokunuşla durum:** Her kartta **Boş / Dolu / Rezerve** segment düğmesi vardır — modal açmadan masanın durumunu anında çevirirsiniz.
+- **Silme:** Çöp ikonu onay diyaloğu açar. Masa **dolu**ysa veya **yaklaşan bir rezervasyonu** varsa diyalog uyarır (oturan misafiri/rezerve slotu sahipsiz bırakmamak için).
+- **Yaklaşan rezervasyon rozeti:** Masada yakında (~2 saat içinde) başlayacak onaylı/bekleyen bir rezervasyon varsa kartta saat + müşteri adı gösterilir — staff bir bakışta hangi masaya misafir geleceğini görür.
+
+<Callout type="info">
+  **Masa limiti plana bağlıdır:** Başlangıç (BASIC) **20 masa**, Profesyonel (PRO)
+  **50 masa**, Kurumsal (BUSINESS) **sınırsız**. Limite ulaşınca yeni masa ekleyemezsiniz;
+  planı yükseltin veya kullanılmayan masaları silin. Tam limitler için **[Planlar](/tr/plans)**.
+</Callout>
+
+## İpuçları
+
+- **Doluluk yüzdesini takip edin:** Yoğun saatlerde üst şeritteki doluluk oranı kapasite planlaması için iyi bir göstergedir; analitikteki "masa kullanımı" raporuyla birleştirin.
+- **Durumu POS'tan da çevirebilirsiniz:** POS'ta sipariş alınınca masa otomatik "dolu", ödeme alınınca otomatik "boş" olur. Bu ekrandaki tek dokunuşlu kontrol, sipariş olmadan elle düzeltme içindir (örn. temizlik/rezerve tutma).
+- **Rezerve elle vs. otomatik:** Bir masayı elle "Rezerve" yaparsanız (rezervasyon kaydı olmadan), POS'ta o masaya dokunan garson kilidi açma diyaloğuyla karşılaşır. Gerçek rezervasyonlar **Rezervasyonlar** ekranından yönetilir.
+- **Silmeden önce:** Dolu/rezerve masayı silmek aktif oturumu veya booking'i etkileyebilir — uyarıyı okuyun.
+
+## İlgili ekranlar
+
+- **[POS](/tr/admin-guide/pos)** — masa seçimi, transfer, birleştirme ve hesap bölme buradan yapılır.
+- **[Rezervasyonlar](/tr/admin-guide/reservations)** — masa bazlı rezervasyon ve otomatik tutma (PRO).
+- **[Raporlar & Analitik](/tr/admin-guide/reports)** — masa kullanım/doluluk analizi.

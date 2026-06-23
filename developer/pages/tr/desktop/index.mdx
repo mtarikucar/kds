@@ -1,0 +1,56 @@
+---
+title: Desktop Uygulaması
+description: HummyTummy Desktop — Windows, macOS ve Linux için Tauri tabanlı POS/KDS masaüstü uygulaması. Otomatik güncelleme, donanım eşleştirme ve kiosk modu.
+---
+
+import { Cards, Callout } from 'nextra/components'
+
+# HummyTummy Desktop
+
+**HummyTummy Desktop**, restoran kasasını (POS) ve mutfak ekranını (KDS) bir masaüstü
+uygulaması olarak çalıştırmak için tasarlanmış, [Tauri 1.5](https://tauri.app) tabanlı
+çapraz platform bir uygulamadır. Web paneliyle aynı arayüzü yerel bir pencerede sunar;
+ek olarak yerel donanıma (fiş yazıcısı, nakit çekmece, yazarkasa) erişim ve
+sunucu üzerinden **otomatik güncelleme** sağlar.
+
+Uygulama adı (`productName`) **HummyTummy POS**, paket tanımlayıcısı (bundle identifier)
+`com.hummytummy.pos`'tur.
+
+<Callout type="info">
+  Masaüstü uygulaması web paneline ek bir katmandır; restoran verileri yine de bulutta
+  tutulur. Tarayıcıdan da aynı POS/KDS ekranlarına erişebilirsiniz. Masaüstü sürümünün
+  asıl kazandırdığı şey **yerel donanım erişimi** ve **tam ekran kiosk** kullanımıdır.
+</Callout>
+
+## Desteklenen platformlar
+
+| Platform | Tauri anahtarı | Kurulum paketi |
+| --- | --- | --- |
+| Windows (x86_64) | `windows-x86_64` | `.msi` |
+| macOS (Apple Silicon / ARM) | `darwin-aarch64` | `.dmg` |
+| macOS (Intel) | `darwin-x86_64` | `.dmg` |
+| Linux (x86_64) | `linux-x86_64` | `.deb` / `.AppImage` |
+
+Bu dört anahtar, sunucudaki güncelleme manifestinde (`platforms`) ve her sürümdeki
+indirme URL'lerinde birebir kullanılır.
+
+## Bölümler
+
+<Cards>
+  <Cards.Card title="Kurulum & indirme" href="/tr/desktop/kurulum" arrow />
+  <Cards.Card title="Otomatik güncelleme" href="/tr/desktop/otomatik-guncelleme" arrow />
+  <Cards.Card title="Donanım eşleştirme" href="/tr/desktop/donanim" arrow />
+  <Cards.Card title="KDS / kiosk modu" href="/tr/desktop/kds-modu" arrow />
+</Cards>
+
+## Mimari özet
+
+- **Sürüm kataloğu** — Tüm yayınlanmış kurulum paketleri sunucudaki `DesktopRelease`
+  kataloğunda tutulur. Uygulama hangi platformda olduğunu bildirir, sunucu o platforma
+  ait imzalı binary URL'sini döndürür. Bkz. [Kurulum & indirme](/tr/desktop/kurulum).
+- **Otomatik güncelleme** — Tauri updater, açılışta sunucudaki `GET /api/desktop/updates/...`
+  uç noktasını sorgular; yeni bir sürüm varsa minisign imzasını doğrulayıp indirir.
+  Bkz. [Otomatik güncelleme](/tr/desktop/otomatik-guncelleme).
+- **Donanım (device-mesh)** — Yazıcı, nakit çekmece ve yazarkasa gibi cihazlar
+  panelden bir **eşleştirme kodu** ile uygulamaya bağlanır; komutlar bir komut kuyruğu
+  üzerinden cihaza iletilir. Bkz. [Donanım eşleştirme](/tr/desktop/donanim).

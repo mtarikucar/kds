@@ -1,0 +1,72 @@
+---
+title: Sözlük
+description: HummyTummy sisteminde geçen temel terimlerin tanımları — Tenant, Branch, Rol, KDS, POS, QR menü, Self-pay, Scope, Screen token, Webhook, Outbox, Entitlement, Add-on.
+---
+
+# Sözlük
+
+HummyTummy API'sinde ve dokümantasyonda sık geçen terimlerin kısa tanımları.
+
+### Tenant
+Bir restoran işletmesini (müşteri hesabı) temsil eden en üst düzey kiracı.
+Aboneliğin, planın ve tüm verinin sahibidir. Tenant çözümlemesi host adına
+göre değil, JWT içindeki `tenantId` üzerinden yapılır.
+
+### Branch (Şube)
+Bir tenant'a ait fiziksel konum/şube. Masalar, siparişler, stok ve çoğu
+operasyonel veri şubeye bağlıdır. Şubeye-özel uç noktalar `X-Branch-Id`
+başlığını gerektirir.
+
+### Rol
+Bir kullanıcının yetki düzeyi. Roller: `ADMIN`, `MANAGER`, `WAITER`,
+`KITCHEN`, `COURIER`. `WAITER`, `KITCHEN` ve `COURIER` "sert kısıtlı"
+rollerdir — tek bir şubeye sabitlenirler (`primaryBranchId` zorunludur) ve
+başka bir şubeyi hedefleyemezler.
+
+### KDS (Kitchen Display System)
+Mutfak ekran sistemi. Gelen siparişleri mutfak/hazırlık istasyonlarına gerçek
+zamanlı yansıtan ekran. `kdsIntegration` özelliğine bağlıdır.
+
+### POS (Point of Sale)
+Satış noktası — sipariş alma, ödeme ve masa yönetiminin yapıldığı kasa
+arayüzü. `posAccess` özelliğine bağlıdır.
+
+### QR menü
+Müşterinin masadaki QR kodu okutarak eriştiği genel menü ve sipariş arayüzü.
+Bir QR oturumu (ordering session) üzerinden sipariş ve self-pay akışlarını
+besler.
+
+### Self-pay
+Müşterinin garson aracılığı olmadan, kendi cihazından (veya masa ekranından)
+hesabını ödemesi. PayTR hosted-iframe ödeme niyeti oluşturularak yürütülür;
+`payments:write` scope'u gerektirir.
+
+### Scope
+Bir partner API anahtarının ve ekran token'ının taşıdığı izin birimi
+(ör. `menu:read`, `orders:write`). Her `/display` uç noktası belirli bir scope
+ister. Bkz. [Partner Scope'ları](/tr/reference/partner-scopes).
+
+### Screen token (Ekran token'ı)
+Bir partner API anahtarından üretilen, belirli bir ekran/cihaz oturumuna
+(screen session) bağlı erişim token'ı. Bir tenant'a, isteğe bağlı bir masaya
+ve bir şubeye bağlıdır; efektif scope'ları üst anahtarın bir alt kümesidir.
+
+### Webhook
+Sunucudan dışa doğru gönderilen olay bildirimi. Örneğin PayTR ödeme
+sağlayıcısının ödeme sonucunu bildirdiği geri-çağrı; ödeme yalnızca webhook
+onayından sonra provizyonlanır (`confirmAndProvision`).
+
+### Outbox
+Veritabanı işlemiyle aynı transaction içinde yazılan, ardından güvenilir
+biçimde yayımlanan olay kaydı deseni. Yan etkilerin (olay yayını) ana veriyle
+atomik olmasını ve "en az bir kez" teslimi sağlar.
+
+### Entitlement (Hak)
+Bir tenant'ın aktif planından (ve add-on'larından) türetilen efektif özellik
+ve limit kümesi. Plan değiştiğinde yeniden hesaplanır (re-projeksiyon) ve
+özellik kapıları (`PlanFeatureGuard`) bu hesaba bakar.
+
+### Add-on (Eklenti)
+Plana eklenen, ayrı satın alınan ek özellik veya kapasite. Marketplace
+üzerinden PayTR ödeme rayı ile satın alınır ve ödeme onaylandıktan sonra
+entitlement'a eklenir.

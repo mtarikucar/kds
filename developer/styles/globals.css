@@ -1,0 +1,33 @@
+/* HummyTummy docs brand layer — warm/orange, consistent with the landing +
+   pricing pages. Applied on top of nextra-theme-docs defaults. */
+
+:root {
+  --ht-cream: #faf6f0;
+  --ht-ink: #1c1917;
+  --ht-orange: #f97316;
+}
+
+/* Display font for headings (Fraunces loaded via theme.config head link). */
+.nextra-content h1,
+.nextra-content h2,
+.nextra-content h3,
+article h1,
+article h2 {
+  font-family: 'Fraunces', Georgia, serif !important;
+  letter-spacing: -0.01em;
+}
+
+/* Warm page tint in light mode. */
+html:not(.dark) body {
+  background-color: var(--ht-cream);
+}
+
+/* Brand the hero/first heading on the landing page. */
+.nextra-content h1 {
+  color: var(--ht-ink);
+}
+
+/* Slightly warmer cards/callouts. */
+html:not(.dark) .nextra-card {
+  background-color: #fffdfa;
+}

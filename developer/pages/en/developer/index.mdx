@@ -1,0 +1,73 @@
+---
+title: Developer / Integration
+description: Integrate with the HummyTummy REST API, the Partner Display API, and outbound webhooks.
+---
+
+import { Cards, Callout } from 'nextra/components'
+
+# Developer / Integration
+
+Connect HummyTummy to your own systems: run your own screens/apps, stream order
+and payment events to your server, and access restaurant data over the REST API.
+Every endpoint lives under a single API base:
+
+```
+https://hummytummy.com/api
+```
+
+<Callout type="info">
+  All REST paths are served under the `/api` global prefix. Every example in
+  these docs shows the full path (e.g. `POST /api/v1/webhooks/subscriptions`).
+  Currency is always **TRY**.
+</Callout>
+
+## Which integration fits you?
+
+HummyTummy exposes three distinct integration surfaces; most integrators use
+more than one together.
+
+<Cards>
+  <Cards.Card title="API Fundamentals" href="/en/developer/api-fundamentals" arrow>
+    Base URL, auth realms (staff JWT / customer session / partner key / screen
+    token), the `X-Branch-Id` branch scope, pagination, the error envelope,
+    idempotency, and rate-limit tiers.
+  </Cards.Card>
+  <Cards.Card title="Partner Display API" href="/en/developer/partner-display" arrow>
+    Run your own screens, such as a table tablet: menu, ordering, waiter/bill
+    calls, self-service payment, and live order status. ADMIN key → screen token
+    → `/v1/display/*` + WebSocket.
+  </Cards.Card>
+  <Cards.Card title="Webhooks" href="/en/developer/webhooks" arrow>
+    Receive order, payment, and subscription events as HMAC-SHA256–signed POSTs
+    to your endpoint. Subscribe, verify signatures, event types, retries, and
+    SSRF protection.
+  </Cards.Card>
+</Cards>
+
+## Two directions: pull and push
+
+- **Pull** — you call the REST endpoints (read the menu, place an order, start a
+  payment). For auth and branch-scope rules, see
+  [API Fundamentals](/en/developer/api-fundamentals).
+- **Push** — when an event happens, we POST to your endpoint (outbound
+  webhooks). For setup and verification, see
+  [Webhooks](/en/developer/webhooks).
+
+## Authorization realms (at a glance)
+
+| Realm | How it authenticates | Typical use |
+| --- | --- | --- |
+| Staff JWT | `Authorization: Bearer <jwt>` | Dashboard / management API, key & webhook management |
+| Customer session | QR-menu session token | Guest ordering & self-pay |
+| Partner key | `X-Partner-Key` + `X-Partner-Secret` | Partner backend mints screen tokens |
+| Screen token | `Authorization: Screen <token>` | Device calls `/v1/display/*` |
+
+The full detail of each lives in
+[API Fundamentals](/en/developer/api-fundamentals).
+
+<Callout type="warning">
+  Partner Display and outbound webhooks are **plan-gated** features. Partner
+  Display requires the tenant's plan to include `externalDisplay`; webhook
+  subscriptions require `apiAccess` (API access). Otherwise the relevant
+  endpoints return `403`.
+</Callout>

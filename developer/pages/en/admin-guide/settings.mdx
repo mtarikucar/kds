@@ -1,0 +1,72 @@
+---
+title: Settings
+description: The HummyTummy settings screen — POS, QR menu, reports, branding, integrations, webhooks, partner keys, reservation, SMS, online orders and accounting tabs; plus Plan & Access and the Desktop App.
+---
+
+import { Callout } from 'nextra/components'
+
+# Settings
+
+**Menu path:** Settings & Access → Settings &nbsp;•&nbsp; **URL:** `/admin/settings`
+**Access:** ADMIN, MANAGER
+**Plan:** Core tabs on all plans; advanced tabs depend on plan/add-on
+
+## Purpose
+
+Settings is the hub where you configure your restaurant's **behavior** and **integrations**. It has a left sub-menu (tabs); each tab manages one module's settings. If a tab isn't in your plan/add-ons it is **hidden** — visiting its URL directly shows an upgrade card.
+
+<Callout type="info">
+  Most settings are **saved automatically** (the moment you change them); success/failure
+  is shown via a toast. The "Settings & Access" section also has two standalone screens
+  next to Settings: **Plan & Access** and the **Desktop App** (below).
+</Callout>
+
+## Settings tabs
+
+| Tab | URL | What it configures | Requirement |
+| --- | --- | --- | --- |
+| **POS** | `/admin/settings/pos` | Tableless mode, two-step checkout, the "served before payment" rule, customer self-pay (PayTR), product images, default map view (2D/3D) | All plans |
+| **QR Menu** | `/admin/settings/qr-menu` | Customer ordering on/off, two-step checkout, location/WiFi/social info | All plans |
+| **Reports** | `/admin/settings/reports` | Report preferences | All plans |
+| **Branding** | `/admin/settings/branding` | Logo, colors, custom-brand look | `customBranding` — PRO+ |
+| **Integrations** | `/admin/settings/integrations` | API access settings | `apiAccess` — BUSINESS (or `api_access`) |
+| **Webhooks** | `/admin/settings/webhooks` | Event webhooks | `apiAccess` — BUSINESS (or `api_access`) |
+| **Partner Keys** | `/admin/settings/partner-keys` | API key for third-party screens/apps (Partner Display) | `externalDisplay` — BUSINESS |
+| **Reservation** | `/admin/settings/reservations` | Reservation rules (approval, slot, capacity) | `reservationSystem` — PRO+ |
+| **SMS** | `/admin/settings/sms` | SMS integration | `sms` integration add-on |
+| **Online Orders** | `/admin/settings/online-orders` | Delivery platforms (Yemeksepeti/Getir, etc.) | `deliveryIntegration` — PRO+ (or `delivery_*`) |
+| **Accounting** | `/admin/settings/accounting` | e-Invoice/accounting integration | `accounting` integration add-on |
+
+<Callout type="warning">
+  **The Subscription tab was removed.** Billing and plan changes now live on the top-level
+  **Plan & Access** page; the old `/admin/settings/subscription` URL redirects there.
+</Callout>
+
+## Other screens in "Settings & Access"
+
+### Plan & Access
+
+**URL:** `/admin/plan` — your current plan, your usage quotas (users/tables/branches/products/orders) and your active add-ons on one page. Changing plans, billing history, cancellation/reactivation start here. For plan selection and upgrades see **[Plans](/en/plans)**.
+
+### Desktop App
+
+**URL:** `/admin/desktop` — download and setup for the desktop (Tauri) POS terminal. Receipt-printer/hardware integration runs in the desktop app.
+
+### Branch-scoped integration screens
+
+Some integrations have their own full screens (they appear once you've bought the add-on):
+
+- **e-Invoice Recovery** (`/admin/fiscal-recovery`) — `fiscal` integration add-on.
+- **Caller ID Feed** (`/admin/caller-feed`) — `caller` integration add-on.
+
+## Tips
+
+- **POS + QR menu settings are linked:** enabling customer ordering auto-enables two-step checkout; manage it from the QR menu settings (you can't turn off two-step checkout from POS while customer ordering is on).
+- **Buy the integration from the marketplace first:** tabs like SMS/e-Invoice/Delivery/Caller don't appear until the matching add-on is bought — see **[Marketplace](/en/marketplace)**.
+- **Auto-save error:** if a setting didn't save, an error toast appears; most tabs retry with one click.
+
+## Related screens
+
+- **[Plans](/en/plans)** — plan/limit/price and Plan & Access.
+- **[Marketplace](/en/marketplace)** — integration and capacity add-ons.
+- **[Developer / Integration](/en/developer)** — API, webhook and Partner Display details.

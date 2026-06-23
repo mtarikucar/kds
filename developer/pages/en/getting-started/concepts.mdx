@@ -1,0 +1,69 @@
+---
+title: Core Concepts
+description: Tenant, Branch, Roles, and the 7-day trial — the concepts to understand before working in HummyTummy.
+---
+
+import { Callout } from 'nextra/components'
+
+# Core Concepts
+
+Understanding four core concepts will make HummyTummy much easier to use: **Tenant**, **Branch**, **Roles**, and the **trial (TRIAL)**.
+
+## Tenant (Restaurant / Business)
+
+A **tenant** is your entire business as it lives in the system — that is, your restaurant. When you register, a tenant is created for you, and all of your data (menu, tables, orders, staff, reports) is stored under it.
+
+- Each tenant is **fully isolated**: you cannot see another business's data, and they cannot see yours.
+- A tenant has a **subscription status** (trial / active / etc.) and a **plan**.
+- The first user who creates the tenant is always an **ADMIN**.
+
+## Branch
+
+A **branch** is a physical location under your tenant. At registration, a default branch named **"Main"** is created automatically — so you have a branch without doing anything.
+
+- Single-location businesses run on one branch.
+- Multi-branch chains can add more branches (subject to plan limits).
+- A lot of data — menu, tables, orders, stock — is **branch-scoped**, meaning each branch has its own tables and its own orders.
+
+<Callout type="info">
+  Behind the scenes, branch-scoped requests carry a **branch context**
+  (`X-Branch-Id`). This is handled automatically when you select your active branch
+  in the UI — you don't need to do anything manually in day-to-day use.
+</Callout>
+
+## Roles
+
+Every user has a **role** that determines what they can access. There are five roles:
+
+| Role | Who? | Typical permissions |
+|---|---|---|
+| **ADMIN** | Owner / top-level admin | Everything: settings, plan/subscription, user management, all branches, reports |
+| **MANAGER** | Branch / operations manager | Operations, menu/tables/staff, reports (on assigned branches) |
+| **WAITER** | Waiter | Take orders from POS, table actions (in their own branch) |
+| **KITCHEN** | Kitchen staff | Kitchen Display (KDS): update order status |
+| **COURIER** | Courier | Delivery / courier flow |
+
+**Branch restriction:** the `WAITER`, `KITCHEN`, and `COURIER` roles are **pinned to a single branch** (their own home branch). They can only operate in that branch. `ADMIN` and `MANAGER` can switch between branches (`ADMIN` across all, `MANAGER` across branches assigned to them).
+
+<Callout type="info">
+  The first user to register (the business owner) is an **ADMIN** with access to all
+  branches. You add other staff and assign their roles later from the Admin panel.
+</Callout>
+
+## Trial (TRIAL — 7 days)
+
+Every newly registered tenant starts on a **dedicated 7-day trial plan (TRIAL)**:
+
+- **All premium features unlocked**, no charge, no card required.
+- The subscription status during the trial is **TRIALING**.
+- The trial is **one-time per tenant** (abuse is prevented).
+
+**What happens after 7 days?** The trial ends and the account **locks** (`TRIAL_ENDED`): to continue, you must choose a **paid plan**. It does not silently drop to a free tier — this is a deliberate design choice.
+
+<Callout type="warning">
+  When the trial ends, the UI redirects you to the plan-selection page and
+  branch-scoped actions are locked until a paid plan is activated. Your data is not
+  deleted; you pick up right where you left off as soon as a plan is activated.
+</Callout>
+
+For plan options and pricing, see the **[Plans](/plans)** page.

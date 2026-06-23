@@ -1,0 +1,70 @@
+---
+title: Mutfak Ekranı (KDS)
+description: HummyTummy mutfak ekranı — siparişlerin gerçek zamanlı düşmesi, üç sütunlu kuyruk (bekliyor / hazırlanıyor / hazır), kiosk modu ve güvenli iptal. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Mutfak Ekranı (KDS)
+
+**Menü yolu:** İşletme → Mutfak &nbsp;•&nbsp; **URL:** `/kitchen`
+**Erişim:** ADMIN, MANAGER, KITCHEN
+**Plan:** `kdsIntegration` — **tüm planlarda** açık
+
+## Amacı
+
+KDS (Kitchen Display System / Mutfak Ekran Sistemi), kasadan veya QR menüden gelen siparişlerin **mutfağa gerçek zamanlı düştüğü** ekrandır. Kâğıt fişin yerini alır: aşçı siparişi görür, hazırlamaya başlar, hazırladığında "hazır" işaretler. Tüm güncellemeler WebSocket ile anında akar — kasa sipariş yazdığı an mutfak görür.
+
+<Callout type="info">
+  KDS **tüm planlarda** açıktır (en düşük paket olan Başlangıç dahil). POS'tan farklı
+  olarak ayrı bir plan kapısı yoktur.
+</Callout>
+
+## Ekran düzeni
+
+Mutfak ekranı, siparişleri **üç duruma** göre sütunlara böler:
+
+| Sütun | Durum | Anlamı |
+| --- | --- | --- |
+| **Bekliyor** | `PENDING` | Yeni geldi, henüz hazırlanmaya başlanmadı |
+| **Hazırlanıyor** | `PREPARING` | Aşçı işe başladı |
+| **Hazır** | `READY` | Hazır, servise/teslime bekliyor |
+
+- **Masaüstü (≥1024px):** üç sütun yan yana görünür.
+- **Tablet/telefon:** üç sekme olarak görünür; her sekmede o durumun sayacı vardır.
+
+Üstteki **istatistik başlığı** anlık durumu (bağlantı durumu, sipariş sayıları) ve **yenile** butonunu içerir. Her sipariş kartı **bekleme süresine** göre yaşlanır; acil (uzun bekleyen) siparişler **kırmızı bir uyarı noktasıyla** öne çıkar ve sekme rozetinde gösterilir.
+
+## Kullanım
+
+Aşçı bir kartta tek dokunuşla siparişi bir sonraki duruma ilerletir:
+
+1. **Bekliyor → Hazırlanıyor** (işe başla)
+2. **Hazırlanıyor → Hazır** (servise hazır)
+
+Hazır siparişler kasa tarafında "ödeme bekleyen" listesinde görünür ve servis/tahsilat sonrası kapanır.
+
+<Callout type="warning">
+  **Güvenli iptal:** Sadece **Bekliyor** durumundaki bir sipariş iptal edilebilir ve
+  iptal, 5 saniyelik bir **geri-al** penceresinin ardından işlenir. Bu sırada başka bir
+  istasyon siparişi ilerletmiş olabilir — sistem iptali işlerken siparişin hâlâ
+  "Bekliyor" olduğunu yeniden doğrular. Değilse iptal edilmez ("Sipariş artık beklemede
+  değil" uyarısı çıkar). İptal sunucuda **stoğu geri yazar** (kalemler stoğa iade edilir).
+</Callout>
+
+## Kiosk modu
+
+Üstteki kiosk düğmesi ekranı **tam ekran, koyu temalı** bir mutfak panosuna çevirir — uzaktan okunabilir, dikkat dağıtan arayüz öğeleri gizlenir. Mutfağa sabit bir ekran/tablet astıysanız kiosk modunda bırakın.
+
+## Bağlantı kopması ve dayanıklılık
+
+- Canlı bağlantı (WebSocket) düşerse ekran ~10 saniyede bir **otomatik yoklama (polling)** yaparak güncel kalır; bağlantı geri gelince yoklama durur.
+- Son bilinen siparişler ekranda tutulur (geçici hata anında pano **boşalmaz**).
+- Bir veri çekme hatası olursa kırmızı bir **uyarı bandı** çıkar ve son başarılı senkronizasyon saatini gösterir; tek tıkla yenilersiniz.
+- İlk açılışta veri henüz gelmemişse boş sütun yerine **iskelet (skeleton)** gösterilir — "hâlâ yükleniyor" ile "mutfak boş" karışmaz.
+
+## İpuçları
+
+- Mutfağa **adanmış bir ekran/tablet** koyup kiosk modunu açın; KITCHEN rolüyle bir kullanıcı tanımlayın (yetkisi yalnızca mutfak ekranı + panoya yeter).
+- "Acil" kırmızı nokta uzun bekleyen siparişi işaret eder — yoğun saatte önceliklendirme için kullanın.
+- Sipariş yanlış geldiyse (müşteri vazgeçti) **sadece Bekliyor**'dayken iptal edin; hazırlanmaya başlandıysa kasadan yönetin.

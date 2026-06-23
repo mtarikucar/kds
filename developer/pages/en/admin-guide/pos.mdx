@@ -1,0 +1,100 @@
+---
+title: POS (Sales Screen)
+description: The HummyTummy sales screen — table selection, cart, payment, table transfer/merge, bill splitting and takeaway mode. Purpose, usage and tips.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# POS (Sales Screen)
+
+**Menu path:** Business → POS &nbsp;•&nbsp; **URL:** `/pos`
+**Access:** ADMIN, MANAGER, WAITER
+**Plan:** `posAccess` — **Starter (BASIC)** and above
+
+## Purpose
+
+The POS is your restaurant's **point-of-sale screen**: it takes orders from seated guests or takeaway customers, sends them to the kitchen, and collects payment. The entire sales flow runs here — from picking a table to closing the bill.
+
+<Callout type="info">
+  POS is only unlocked on **Starter (BASIC)** and higher plans. If your plan doesn't
+  include it, POS is hidden from the sidebar and visiting `/pos` shows an upgrade card.
+  The Kitchen Display (KDS), by contrast, is available on all plans.
+</Callout>
+
+## How the screen works
+
+POS has two steps:
+
+<Steps>
+### Step 1 — Table Selection
+
+On open you get a grid of tables. Each table card shows its **status** by color: **free** (green), **occupied** (amber), **reserved** (gray). If a table has a pending order, a waiter call, or a bill request, a **notification badge** appears on the corner (order = clock, waiter = person, bill = receipt icon).
+
+Tapping a table opens its order screen. If the table is free, a new order starts; if it's occupied, its open order is loaded.
+
+### Step 2 — Order Screen
+
+The **menu** (products by category) is on the left, the **cart** on the right. Tapping a product adds it to the cart. For products with required options (e.g. "rare / medium / well done") an **options modal** opens first.
+
+In the cart you can: change quantity, remove a line, apply a **discount**, enter a **customer name** and an **order note**. Then you send the order to the kitchen and/or move to payment.
+</Steps>
+
+<Callout type="info">
+  **Takeaway mode:** if "Tableless mode" is enabled in POS settings, the table-selection
+  step is skipped and you land straight on the order screen — no table required.
+</Callout>
+
+## Single-step vs. two-step payment
+
+The **"Two-step checkout"** option in POS settings decides the flow:
+
+- **Single-step (default):** as soon as you hit "Pay", the order is created and the payment screen opens — ideal for a quick café/takeaway counter.
+- **Two-step:** first **"Create Order"** sends the order to the kitchen; after the guest has eaten you **"Proceed to Payment"** to collect. If customers order from the QR menu, two-step mode is required automatically.
+
+<Callout type="warning">
+  In two-step mode, if you add items or change the discount after the order was created,
+  the system **re-saves and re-prices** the order before payment. This prevents charging
+  the stale amount; the newly added items appear on both the bill and the kitchen ticket.
+</Callout>
+
+## Payment
+
+The **Pay** button opens the **Payment Modal**. You pick the payment method (cash, card, etc.) and, where needed, enter a transaction id and customer phone. After collecting:
+
+- If no other open order remains on the table, the table is **freed automatically** (the system re-checks the latest order list at payment time — preventing another guest from sitting on top of an unpaid bill).
+- On the desktop (Tauri) POS terminal with a default printer configured, the **receipt prints automatically**; on a print failure you get a one-tap reprint option.
+
+<Callout type="info">
+  Every payment request carries an **idempotency key**: a double-tap or a retry after a
+  network drop won't charge the same payment twice.
+</Callout>
+
+## Table operations
+
+From the cart toolbar on the order screen:
+
+- **Transfer Table** — move an open order to another table (if the target has an order, a merge is offered).
+- **Merge Tables** — combine adjacent parties onto one bill; un-merge any time (single or all).
+- **Split Bill** — split a bill by amount or by guest.
+- **Progressive (Dutch) Payment** — collect each table's open order in a merged group separately, one at a time.
+
+## Live notification bar
+
+The notification bar at the top shows three queues live (over WebSocket):
+
+- **Pending orders** — orders that came in from the QR menu and are awaiting approval.
+- **Waiter calls** — "call the waiter" requests from tables.
+- **Bill requests** — "bring the bill" requests from tables.
+
+Tapping any of them opens the matching panel, where you act on them one by one.
+
+## Tips
+
+- **The cart isn't lost:** an in-progress order is persisted in the browser (for 12 hours) — if the tab closes by accident, your data survives.
+- **Tapping a reserved table:** if the system auto-held the table for an upcoming reservation, tapping it opens a dialog with the booking details and a one-tap **seat the guest**. If a table was marked reserved by hand with no booking, an unlock dialog appears instead.
+- **Tablet use:** a landscape tablet (≥768px) gets the desktop-style side-by-side menu+cart layout; on a phone the cart drops into a bottom drawer.
+- **Discount safety:** the discount can't exceed the subtotal; if you remove items but leave the discount, the system trims it automatically (no negative totals).
+
+## Related settings
+
+You manage POS behavior under **Settings → POS** and **Settings → QR Menu**: tableless mode, two-step checkout, customer self-pay (PayTR), the "served before payment" rule, product images and the default map view. Details: **[Settings](/en/admin-guide/settings)**.

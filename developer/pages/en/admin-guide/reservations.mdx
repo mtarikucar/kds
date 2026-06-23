@@ -1,0 +1,79 @@
+---
+title: Reservations
+description: HummyTummy reservation management — confirming/rejecting incoming bookings, assigning tables, seating, no-shows and settings. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Reservations
+
+**Menu path:** Menu & Tables → Reservations &nbsp;•&nbsp; **URL:** `/admin/reservations`
+**Access:** ADMIN, MANAGER
+**Plan:** `reservationSystem` — **Professional (PRO)** and above
+
+## Purpose
+
+The reservations screen manages table bookings — taken online (via the public reservation page) or by hand: you confirm them, assign tables, seat guests, and flag no-shows.
+
+<Callout type="info">
+  The reservation system is unlocked on **Professional (PRO)** and higher plans. If your
+  plan doesn't include it, Reservations is hidden from the menu and the direct URL shows
+  an upgrade card.
+
+  **Public (customer-facing) reservation pages:** `/reserve/:tenantId` (new reservation)
+  and `/reserve/:tenantId/lookup` (look up a reservation). Customers use them without
+  signing in.
+</Callout>
+
+## What's on the screen
+
+- **Date picker** — view a specific day's reservations (default: today).
+- **Status tabs** — All / Pending / Confirmed / Seated / Completed / Cancelled.
+- **Search** — filter by customer name/phone.
+- **Stats** — summary counts for the selected day.
+- **List + pagination** — each row shows the customer, time, party size, table and status; clicking a row opens the detail modal.
+
+## Reservation statuses and flow
+
+| Status | Meaning |
+| --- | --- |
+| `PENDING` | Waiting — needs approval |
+| `CONFIRMED` | Confirmed |
+| `SEATED` | Guest seated |
+| `COMPLETED` | Completed |
+| `REJECTED` | Rejected |
+| `CANCELLED` | Cancelled |
+| `NO_SHOW` | Didn't show |
+
+Typical flow: **Pending → Confirm → (on the day) Seat → Complete.** Flag no-shows as **No-show** and cancelled bookings as **Cancelled**. The confirm/reject/cancel/no-show actions are protected by a **confirmation dialog**.
+
+## Detail modal
+
+Clicking a reservation lets you:
+
+- **Assign a table** — bind a table to the reservation (shown in the table).
+- **Admin note** — add an internal note (not visible to the customer).
+
+## Integration with table auto-hold
+
+A confirmed reservation can automatically hold its table as **Reserved** as the start time approaches (governed by the "hold offset" in settings). When a waiter taps that table in POS, they get a dialog with the booking details and can **seat the guest with one tap** (the table moves to Occupied, the reservation to SEATED).
+
+## Settings
+
+Under **Settings → Reservations** (`/admin/settings/reservations`):
+
+- **Enabled/disabled** — turn reservation intake on/off.
+- **Require approval** — should incoming reservations auto-confirm, or be confirmed by hand?
+- **Time settings** — slot interval (15/30/60 min), minimum/maximum advance booking, default duration, table-hold offset (min).
+- **Capacity** — concurrent reservation capacity.
+
+## Tips
+
+- **Stop spam with "require approval":** instead of auto-confirming every online reservation, confirming by hand catches fake/duplicate bookings.
+- **Assign the table early:** binding the table at confirmation means auto-hold reserves the right table and the waiter can seat with one tap in POS.
+- **Flag no-shows:** mark no-shows as No-show; this both releases the held table and feeds future customer-behavior analytics.
+
+## Related screens
+
+- **[Tables](/en/admin-guide/tables)** — table holding and statuses.
+- **[POS](/en/admin-guide/pos)** — the seat dialog when tapping a reserved table.

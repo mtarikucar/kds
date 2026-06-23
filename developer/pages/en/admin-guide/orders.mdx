@@ -1,0 +1,76 @@
+---
+title: Orders
+description: The HummyTummy order lifecycle — statuses, order types, the QR-menu approval queue, waiter and bill requests. Where orders are managed and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Orders
+
+**Where it's managed:** **[POS](/en/admin-guide/pos)** (`/pos`) and the **[Kitchen Display](/en/admin-guide/kitchen)** (`/kitchen`)
+**Access:** ADMIN, MANAGER, WAITER, KITCHEN (by role)
+**Plan:** Taking orders needs POS (`posAccess`, BASIC+); the kitchen flow is on all plans
+
+## Purpose
+
+HummyTummy has **no separate "Orders" page** — orders are managed where they're created and processed: inside **POS** and the **Kitchen Display (KDS)**. This page brings the order **lifecycle** and where orders surface in the app together in one place.
+
+## Order lifecycle (statuses)
+
+An order moves through these statuses:
+
+| Status | Meaning | Where it shows |
+| --- | --- | --- |
+| `PENDING_APPROVAL` | A QR-menu order **awaiting approval** | POS notification bar → "Pending orders" |
+| `PENDING` | Approved, **waiting** in the kitchen | Kitchen "Pending" column |
+| `PREPARING` | The cook is **preparing** it | Kitchen "Preparing" column |
+| `READY` | **Ready**, waiting to be served/paid | Kitchen "Ready" + POS "awaiting payment" |
+| `SERVED` | **Served**, awaiting payment | POS "awaiting payment" |
+| `PAID` | **Paid**, closed | Reports/Z-Report |
+| `CANCELLED` | **Cancelled** (stock is restored) | — |
+
+<Callout type="info">
+  The kitchen screen shows only the active queue (`PENDING`, `PREPARING`, `READY`).
+  `SERVED` and `PAID` orders are tracked at the till/in reports. A cancellation
+  (`CANCELLED`) is terminal and restores stock on the server.
+</Callout>
+
+## Order types
+
+| Type | Meaning |
+| --- | --- |
+| `DINE_IN` | Served at the table (dine-in) |
+| `TAKEAWAY` | Takeaway |
+| `DELIVERY` | Delivery to an address (delivery integration) |
+| `COUNTER` | Tableless self-pay / counter order (bucketed separately in the Z-report) |
+
+## QR-menu approval queue and requests
+
+The **live notification bar** at the top of the POS screen shows three queues in real time:
+
+- **Pending orders** — orders from the QR menu in `PENDING_APPROVAL`. Approving them from the panel sends them to the kitchen.
+- **Waiter calls** — "call the waiter" requests from tables.
+- **Bill requests** — "bring the bill" requests from tables.
+
+Each opens its own panel, where you act on them one by one. All of this streams instantly over WebSocket.
+
+## POS operations on orders
+
+- **Transfer table** — move an open order to another table.
+- **Merge tables** — combine multiple tables' orders onto one bill.
+- **Split bill** — split a bill by amount or by guest.
+- **Progressive (Dutch) payment** — collect each table's order in a merged group in turn.
+
+Details: **[POS](/en/admin-guide/pos)**.
+
+## Tips
+
+- **Don't forget to approve QR orders:** the counter on the "Pending orders" panel shows customer orders awaiting approval — watch the notification bar so none slips through during the rush.
+- **Cancellation is only safe while "Pending":** if the kitchen has started preparing, manage the order from the till; because cancellation restores stock, a wrong cancel corrupts both the bill and inventory.
+- **Sales history lives in reports:** for summaries of closed (`PAID`) orders, payment-method breakdown and daily/hourly distribution, see **[Reports](/en/admin-guide/reports)**.
+
+## Related screens
+
+- **[POS](/en/admin-guide/pos)** — taking orders, the approval queue, payment, table operations.
+- **[Kitchen Display (KDS)](/en/admin-guide/kitchen)** — order status flow.
+- **[Reports & Analytics](/en/admin-guide/reports)** — sales and order reports.

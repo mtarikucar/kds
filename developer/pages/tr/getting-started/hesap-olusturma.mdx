@@ -1,0 +1,137 @@
+---
+title: Hesap Oluşturma
+description: HummyTummy'de yeni bir restoran hesabı açma — kayıt formu, zorunlu alanlar ve API ile kayıt.
+---
+
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Hesap Oluşturma
+
+Yeni bir restoran hesabı açmak, kayıt formunu doldurmaktan ibarettir. Kayıt tamamlandığı anda sizin için bir **tenant**, bir **"Main" şube**, **ADMIN** kullanıcınız ve **7 günlük ücretsiz deneme** otomatik kurulur — başka bir adım gerekmez.
+
+## Zorunlu bilgiler
+
+Kayıt için aşağıdaki alanlar **zorunludur**:
+
+| Alan | Açıklama | Kural |
+|---|---|---|
+| **E-posta** | Giriş için kullanılır | Geçerli e-posta, en fazla 254 karakter |
+| **Şifre** | Hesap şifresi | En az 8 karakter; **en az bir küçük harf, bir büyük harf ve bir rakam** içermeli (en fazla 128 karakter) |
+| **Ad** (`firstName`) | Adınız | En fazla 100 karakter |
+| **Soyad** (`lastName`) | Soyadınız | En fazla 100 karakter |
+| **Telefon** | İletişim ve ödeme için | Herhangi bir doğal formatta girebilirsiniz; sistem **E.164**'e çevirir |
+| **Restoran adı** (`restaurantName`) | Yeni işletme açarken | Tenant'ınızın adı olur, en fazla 120 karakter |
+
+<Callout type="info">
+  **Telefon neden zorunlu?** Ödeme sağlayıcısı (PayTR) checkout sırasında telefon
+  numarası ister. Bu yüzden telefon kayıtta alınır. `"0555 123 45 67"` veya
+  `"+90 555 123 45 67"` gibi doğal yazımları kabul eder ve standart
+  `+905551234567` (E.164) biçimine çevirir.
+</Callout>
+
+## Adım adım kayıt (arayüz)
+
+<Steps>
+
+### Kayıt sayfasını açın
+
+Giriş ekranındaki **"Kayıt ol"** bağlantısına tıklayın.
+
+### Bilgileri girin
+
+E-posta, şifre, ad, soyad, telefon ve restoran adını doldurun. Şifre, büyük/küçük harf ve rakam içermelidir.
+
+### Hesabı oluşturun
+
+Formu gönderin. Hesabınız, ana şubeniz ve 7 günlük deneme aboneliğiniz tek seferde kurulur ve doğrudan sisteme giriş yaparsınız.
+
+### Karşılama akışını tamamlayın
+
+İlk girişte sizi karşılayan ekrana ve kontrol paneline yönlendirilirsiniz. Buradan **[İlk Kurulum](/getting-started/ilk-kurulum)** adımlarına geçin.
+
+</Steps>
+
+## API ile kayıt
+
+Kaydı programatik olarak da yapabilirsiniz. Global API ön eki `/api`'dir.
+
+**Uç nokta:** `POST /api/auth/register`
+
+<Tabs items={['curl', 'İstek gövdesi (JSON)']}>
+  <Tabs.Tab>
+
+```bash
+curl -X POST https://<sunucu>/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "sahip@restoranim.com",
+    "password": "Passw0rd!",
+    "firstName": "Ayşe",
+    "lastName": "Yılmaz",
+    "phone": "0555 123 45 67",
+    "restaurantName": "Sultanahmet Kafe"
+  }'
+```
+
+  </Tabs.Tab>
+  <Tabs.Tab>
+
+```json
+{
+  "email": "sahip@restoranim.com",
+  "password": "Passw0rd!",
+  "firstName": "Ayşe",
+  "lastName": "Yılmaz",
+  "phone": "0555 123 45 67",
+  "restaurantName": "Sultanahmet Kafe"
+}
+```
+
+  </Tabs.Tab>
+</Tabs>
+
+**Başarılı yanıt (`201 Created`):** Bir `accessToken` ile kullanıcı bilgisini döner. Telefon `+905551234567` biçiminde normalize edilmiş olarak saklanır.
+
+```json
+{
+  "accessToken": "<jwt>",
+  "user": {
+    "id": "…",
+    "email": "sahip@restoranim.com",
+    "firstName": "Ayşe",
+    "lastName": "Yılmaz",
+    "phone": "+905551234567",
+    "role": "ADMIN",
+    "tenantId": "…",
+    "primaryBranchId": "…",
+    "allowedBranchIds": []
+  }
+}
+```
+
+<Callout type="info">
+  Yenileme jetonu (refresh token) yanıt gövdesinde **dönmez**; güvenlik için yalnızca
+  `httpOnly` çerez olarak gönderilir. Erişim jetonunu (`accessToken`) sonraki
+  isteklerde `Authorization: Bearer <accessToken>` başlığıyla kullanın.
+</Callout>
+
+**Hata durumları:**
+
+- `409 Conflict` — bu e-posta zaten kullanımda.
+- `400 Bad Request` — alanlardan biri kuralları sağlamıyor (örn. zayıf şifre, geçersiz telefon).
+
+<Callout type="warning">
+  **Hız sınırı:** Kayıt uç noktası IP başına **saatte 3 istek** ile sınırlıdır.
+  Aşıldığında `429 Too Many Requests` döner.
+</Callout>
+
+## Kayıttan sonra otomatik kurulan şeyler
+
+Kayıt başarıyla tamamlandığında, tek bir veritabanı işlemi (transaction) içinde şunlar oluşturulur:
+
+1. **Tenant** — restoran adınızla, 7 günlük deneme süresi ayarlı.
+2. **Abonelik** — **TRIALING** durumunda, 7 günlük TRIAL planında.
+3. **"Main" şube** — varsayılan ana şubeniz.
+4. **ADMIN kullanıcı** — siz (işletme sahibi).
+
+Bu noktadan sonra **[İlk Kurulum](/getting-started/ilk-kurulum)** adımlarıyla menünüzü, masalarınızı ve ayarlarınızı hazırlayabilirsiniz.

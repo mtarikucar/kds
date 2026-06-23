@@ -1,0 +1,51 @@
+---
+title: Partner Scopes
+description: The 6 scopes a partner API key and its screen tokens may carry, and which /display endpoint each one unlocks.
+---
+
+import { Callout } from 'nextra/components'
+
+# Partner Scopes
+
+A **partner API key** — and the **screen tokens** (screen sessions) it mints —
+carry scopes that determine what they can do. There are 6 scopes in total. Each
+`/display` endpoint requires a single scope via `@RequireScope`, and
+`ScreenScopeGuard` validates it against the scopes the token carries.
+
+<Callout type="info">
+  A screen token's effective scopes are **always** a subset of its parent API
+  key's scopes. A scope the key doesn't hold can never be granted to the token.
+</Callout>
+
+## Scope list
+
+| Scope | What it grants | Endpoint(s) |
+| --- | --- | --- |
+| `menu:read` | Read the public menu for the screen's tenant (and table, if any). | `GET /api/v1/display/menu` |
+| `orders:read` | Read the orders placed by the screen's ordering session. | `GET /api/v1/display/orders` |
+| `orders:write` | Place an order from the screen. | `POST /api/v1/display/orders` |
+| `requests:write` | Call a waiter and request the bill. | `POST /api/v1/display/waiter-requests`, `POST /api/v1/display/bill-requests` |
+| `payments:write` | Self-pay: payable items, create a PayTR hosted-iframe pay intent, and poll its status. | `GET /api/v1/display/payable-items`, `POST /api/v1/display/pay-intent`, `GET /api/v1/display/pay-status` |
+| `realtime:subscribe` | Subscribe to the realtime WebSocket stream (order/status updates). | KDS realtime gateway (WebSocket) |
+
+<Callout type="warning">
+  Calling an endpoint without its required scope is rejected by
+  `ScreenScopeGuard` with **403 Forbidden**. For the WebSocket connection, a
+  screen session without `realtime:subscribe` is rejected at connect time.
+</Callout>
+
+## Least-privilege
+
+Grant each screen/device only the scopes it needs:
+
+- **Menu-only tablet** → `menu:read`
+- **Ordering + waiter calls** → `menu:read`, `orders:write`, `orders:read`, `requests:write`
+- **Self-pay at the table** → the above + `payments:write`
+- **Live status updates** → additionally `realtime:subscribe`
+
+<Callout type="info">
+  `payments:write` unlocks three endpoints at once: listing payable items,
+  creating a pay intent, and polling the intent's status. The pay intent's
+  return origin is taken from the key's `allowedReturnOrigins` allowlist, never
+  from a client-supplied value.
+</Callout>

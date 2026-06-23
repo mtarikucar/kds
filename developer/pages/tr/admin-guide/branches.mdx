@@ -1,0 +1,58 @@
+---
+title: Şubeler
+description: HummyTummy çoklu şube yönetimi — şube ekleme, kullanım/limit takibi, şube kapsamı ve bridge/cihaz/sağlık ekranları. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Şubeler
+
+**Menü yolu:** Çoklu Şube → Şubeler &nbsp;•&nbsp; **URL:** `/admin/branches`
+**Erişim:** ADMIN, MANAGER
+**Plan:** `multiLocation` — **Profesyonel (PRO)** ve üzeri (veya `extra_branch` eklentisi)
+
+## Amacı
+
+Şubeler ekranı, **restoran zincirinizin tüm şubelerini** tek panelden yönetir. Her şubenin kendi masaları, menüsü, siparişleri ve raporları vardır; yönetici şubeler arasında geçiş yapar ve toplam tabloyu görür.
+
+<Callout type="info">
+  Çoklu şube **Profesyonel (PRO)** ve üzeri planlarda açıktır. PRO **3 şube**, Kurumsal
+  (BUSINESS) **sınırsız** şube verir. PRO'ya çıkmadan ek şube isterseniz **`extra_branch`**
+  marketplace eklentisini alabilirsiniz (her biri şube limitini artırır). Tam limitler:
+  **[Planlar](/tr/plans)**.
+</Callout>
+
+## Ekranda neler var?
+
+- **Kullanım rozeti:** "X / Y şube" — kaç şube kullandığınız ve limitiniz. Sınırsızda **∞** gösterilir.
+- **Şube listesi:** Her şube adı, kodu, saat dilimi ve **durumu** (aktif / askıda / arşivli).
+- **Şube ekle:** Ad, kod ve saat dilimi (varsayılan `Europe/Istanbul`) ile yeni şube. Limite ulaşıldıysa ekleme **kilitlenir** ve eklenti önerisi çıkar.
+
+## Şube kapsamı (Branch scope)
+
+HummyTummy her şube-bazlı isteği aktif şubeye göre filtreler. Üst çubuktaki **şube seçici (BranchPicker)** ile çalıştığınız şubeyi değiştirirsiniz; POS, masalar, siparişler, stok gibi ekranlar o şubenin verisini gösterir. Şube değiştirince önbellek temizlenir — eski şubenin verisi karışmaz.
+
+<Callout type="warning">
+  Bazı ekranlar **tenant geneli**dir (şubeye bağlı değildir): profil, abonelik/plan,
+  faturalandırma gibi. Bu ekranlar şube seçiminden etkilenmez.
+</Callout>
+
+## Aynı bölümdeki ilgili ekranlar
+
+"Çoklu Şube" menüsü altında ayrıca:
+
+- **Cihazlar** (`/admin/devices`) — şubeye bağlı POS/yazıcı/ekran cihazları. (Tüm planlarda erişilebilir.)
+- **Bridge'ler** (`/admin/bridges`) — yerel donanım köprüleri. (`multiLocation` ile gizlenir/görünür.)
+- **Sağlık** (`/admin/health`) — sistem/şube sağlık durumu. (Tüm planlarda.)
+
+## İpuçları
+
+- **Saat dilimini doğru seçin:** Raporlar ve gün sonu (Z-rapor) kapanışları şube saat dilimine göre hesaplanır — yanlış dilim gün sonunu kaydırır.
+- **Kullanılmayan şubeyi arşivleyin:** Kapanan/duran şubeyi silmek yerine durumunu değiştirin; geçmiş veri korunur.
+- **Şube bazlı raporlama:** Raporlar ekranındaki şube filtresiyle şubeleri kıyaslayın; hangi şube hangi üründe güçlü görün.
+
+## İlgili ekranlar
+
+- **[Raporlar & Analitik](/tr/admin-guide/reports)** — şube filtresi ile karşılaştırma.
+- **[Planlar](/tr/plans)** — şube limitleri ve `extra_branch` eklentisi.
+- **[Marketplace](/tr/marketplace)** — ek şube ve diğer eklentiler.

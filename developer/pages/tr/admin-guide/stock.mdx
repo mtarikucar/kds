@@ -1,0 +1,56 @@
+---
+title: Stok & Envanter
+description: HummyTummy stok yönetimi — malzemeler, reçeteler, tedarikçiler, satın alma siparişleri, hareketler, fire ve stok sayımı. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout } from 'nextra/components'
+
+# Stok & Envanter
+
+**Menü yolu:** Operasyon → Stok &nbsp;•&nbsp; **URL:** `/admin/stock`
+**Erişim:** ADMIN, MANAGER
+**Plan:** `inventoryTracking` — **Başlangıç (BASIC)** ve üzeri
+
+## Amacı
+
+Stok modülü, mutfak malzemelerinizi (envanter) baştan sona izler: ne kadar var, ne tükeniyor, ne fire veriyor ve satışla otomatik düşüşü. Reçeteler sayesinde bir ürün satıldığında içindeki malzemeler stoktan otomatik düşülebilir.
+
+<Callout type="info">
+  Stok takibi **Başlangıç (BASIC)** ve üzeri planlarda açıktır. Planınızda yoksa sol
+  menüde Stok görünmez ve `/admin/stock` adresi yükseltme kartı gösterir.
+</Callout>
+
+## Sekmeler
+
+Ekran sekmelere ayrılır; her biri stok yönetiminin bir parçasıdır:
+
+| Sekme | Ne yapar? |
+| --- | --- |
+| **Genel Bakış (Dashboard)** | Stok durumu özeti — düşük/kritik seviyeler, anlık görünüm |
+| **Malzemeler (Ingredients)** | Stok kalemlerini tanımla — birim, mevcut miktar, kritik eşik |
+| **Reçeteler (Recipes)** | Bir ürünün hangi malzemelerden ne kadar içerdiğini tanımla |
+| **Tedarikçiler (Suppliers)** | Tedarikçi kayıtları |
+| **Satın Alma Siparişleri (Purchase Orders)** | Tedarikçiye sipariş oluştur, gelen malı stoğa al |
+| **Hareketler (Movements)** | Tüm stok giriş/çıkış hareketlerinin kaydı |
+| **Fire (Waste Log)** | Zayi/fire kayıtları |
+| **Stok Sayımı (Stock Count)** | Fiziksel sayım ve sistemle uzlaştırma |
+
+## Tipik kullanım akışı
+
+1. **Malzemeleri tanımla** — un, et, süt vb.; birim ve kritik eşiklerini gir.
+2. **Reçete bağla** — "Cheeseburger = 1 köfte + 1 ekmek + 30g peynir" gibi. Böylece satışta malzeme otomatik düşer.
+3. **Tedarikçi + satın alma** — tedarikçiyi tanımla, satın alma siparişiyle gelen malı stoğa ekle.
+4. **Fire & sayım** — zayi olanı fire kaydına gir; dönemsel fiziksel sayımla sistemi uzlaştır.
+5. **Hareketleri izle** — tüm giriş/çıkışlar Hareketler sekmesinde denetlenebilir.
+
+## İpuçları
+
+- **Kritik eşik belirleyin:** Her malzemeye kritik seviye girin; Genel Bakış düşük stokları öne çıkarır, sipariş zamanını kaçırmazsınız.
+- **Reçeteler otomatik düşüşün anahtarı:** Reçete tanımlamazsanız satış stoğu otomatik düşmez — manuel hareket girmeniz gerekir. Çok satan ürünler için reçeteyi mutlaka tanımlayın.
+- **İptal stok iade eder:** Mutfakta `PENDING` bir sipariş iptal edilirse stok geri yazılır. Bu yüzden sayımda "neden eksik/fazla" sorusunu yanıtlarken iptalleri de göz önünde bulundurun.
+- **Stok raporu:** Raporlar ekranındaki **Envanter** sekmesi (aynı `inventoryTracking` ile gizlenir/görünür) stok analizini sunar.
+
+## İlgili ekranlar
+
+- **[Menü](/tr/admin-guide/qr-menu)** — reçeteler ürünlere bağlanır; ürün tanımı menü yönetiminde.
+- **[Raporlar & Analitik](/tr/admin-guide/reports)** — Envanter raporu sekmesi.

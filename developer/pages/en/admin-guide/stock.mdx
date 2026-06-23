@@ -1,0 +1,57 @@
+---
+title: Stock & Inventory
+description: HummyTummy stock management — ingredients, recipes, suppliers, purchase orders, movements, waste and stock counts. Purpose, usage and tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# Stock & Inventory
+
+**Menu path:** Operations → Stock &nbsp;•&nbsp; **URL:** `/admin/stock`
+**Access:** ADMIN, MANAGER
+**Plan:** `inventoryTracking` — **Starter (BASIC)** and above
+
+## Purpose
+
+The stock module tracks your kitchen ingredients (inventory) end to end: how much you have, what's running out, what's wasted, and the automatic drawdown from sales. Thanks to recipes, when a product is sold its ingredients can be deducted from stock automatically.
+
+<Callout type="info">
+  Inventory tracking is unlocked on **Starter (BASIC)** and higher plans. If your plan
+  doesn't include it, Stock is hidden from the sidebar and `/admin/stock` shows an
+  upgrade card.
+</Callout>
+
+## Tabs
+
+The screen is split into tabs, each a part of stock management:
+
+| Tab | What it does |
+| --- | --- |
+| **Dashboard** | Stock-status summary — low/critical levels, at-a-glance view |
+| **Ingredients** | Define stock items — unit, current quantity, critical threshold |
+| **Recipes** | Define how much of which ingredient a product contains |
+| **Suppliers** | Supplier records |
+| **Purchase Orders** | Create an order to a supplier, receive incoming goods into stock |
+| **Movements** | A log of every stock in/out movement |
+| **Waste Log** | Spoilage/waste records |
+| **Stock Count** | Physical counting and reconciliation with the system |
+
+## A typical workflow
+
+1. **Define ingredients** — flour, beef, milk, etc.; enter their unit and critical thresholds.
+2. **Attach recipes** — e.g. "Cheeseburger = 1 patty + 1 bun + 30g cheese". Now sales deduct ingredients automatically.
+3. **Supplier + purchasing** — define the supplier, add incoming goods to stock via a purchase order.
+4. **Waste & count** — record spoilage in the waste log; reconcile the system with a periodic physical count.
+5. **Track movements** — every in/out is auditable in the Movements tab.
+
+## Tips
+
+- **Set critical thresholds:** give each ingredient a critical level; the Dashboard surfaces low stock so you don't miss reorder time.
+- **Recipes are the key to auto-drawdown:** without a recipe, a sale won't reduce stock automatically — you'd have to enter a manual movement. Always define recipes for your best-sellers.
+- **Cancellation returns stock:** if a `PENDING` order is cancelled in the kitchen, stock is restored. So when answering "why is this short/over" during a count, account for cancellations too.
+- **Stock report:** the **Inventory** tab on the Reports screen (shown/hidden by the same `inventoryTracking` flag) gives you stock analysis.
+
+## Related screens
+
+- **[Menu](/en/admin-guide/qr-menu)** — recipes attach to products; the product definition lives in menu management.
+- **[Reports & Analytics](/en/admin-guide/reports)** — Inventory report tab.

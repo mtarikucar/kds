@@ -1,0 +1,72 @@
+---
+title: QR Menu (Management + Settings)
+description: HummyTummy QR menu management — generating/downloading/printing QR codes, the design editor and customer-ordering settings. Purpose, usage and tips.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# QR Menu
+
+**Menu path:** Menu & Tables → QR Codes &nbsp;•&nbsp; **URL:** `/admin/qr-codes`
+**Access:** ADMIN, MANAGER
+**Plan:** Available on all plans
+
+## Purpose
+
+The QR Menu lets a customer **scan the QR code** at the table and view your menu on their phone — and, depending on settings, **place an order and pay**. On the admin side this screen does two jobs: **generate, download and print** your QR codes, and configure how the QR menu **looks**.
+
+<Callout type="info">
+  Customer-facing QR menu addresses:
+  - **Table/tenant QR:** `/qr-menu/:tenantId` (includes the cart, order-tracking and loyalty pages)
+  - **Subdomain access:** the same menu also opens via your own subdomain.
+  These pages are public; customers use them without signing in.
+</Callout>
+
+## Two tabs
+
+### 1. Codes
+
+Your QR codes are listed here. Each code has a **type** (e.g. `TABLE`) and a label.
+
+- **Download All** — downloads every code as an individual PNG (filed by restaurant name + table label).
+- **Print Table QRs** — opens the `TABLE`-type codes on a single printable sheet.
+
+### 2. Design
+
+The **design editor** lets you customize how the QR menu looks: colors, logo and visual layout. A preview shows the result instantly.
+
+## Customer-ordering settings
+
+The QR menu's **behavior** is managed separately, under **Settings → QR Menu** (`/admin/settings/qr-menu`):
+
+<Steps>
+### Enable customer ordering
+
+When **"Customer ordering"** is on, customers can submit orders from the menu; when off, the QR menu is **view-only** (orders are taken at the till).
+
+### Two-step checkout is enabled automatically
+
+Turning on customer ordering also auto-enables **two-step checkout** — because a customer's order must first reach the kitchen and be paid afterward.
+
+### Location and social/WiFi info
+
+You also enter the **location**, **WiFi** and **social media** details shown on the QR menu page here.
+</Steps>
+
+<Callout type="warning">
+  Customer self-pay (paying from the table via PayTR) is a separate POS setting. When
+  enabled, the customer can pay their own bill from the QR menu. This feature operates in
+  **TRY**.
+</Callout>
+
+## Tips
+
+- **A separate QR per table:** table-type QRs create table-bound orders — the order is written to that table automatically, so the waiter doesn't have to pick a table.
+- **When printing:** use "Print Table QRs" to print them all at once and stick them on the tables; even if the menu changes the QR stays the same (the menu loads dynamically, no need to reprint).
+- **Want a view-only menu?** Turn customer ordering off; the QR menu then behaves like a digital menu card.
+- **Order tracking:** after ordering, the customer can watch their order's status (preparing/ready) live at `/qr-menu/:tenantId/orders`.
+
+## Related screens
+
+- Menu content (categories, products, images, modifiers) is managed under **Menu & Tables → Menu** (`/admin/menu`) — the products shown in the QR menu come from there.
+- For branding (logo/colors): **[Settings](/en/admin-guide/settings)** (Branding tab, `customBranding` — PRO and above).
