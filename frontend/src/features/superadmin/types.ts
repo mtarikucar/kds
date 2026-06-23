@@ -180,6 +180,9 @@ export interface SubscriptionPlan {
   trialDays: number;
   maxUsers: number;
   maxTables: number;
+  // v3.0.0 branch cap. -1 means unlimited (BUSINESS). Optional so older
+  // cached payloads without the field still typecheck.
+  maxBranches?: number;
   maxProducts: number;
   maxCategories: number;
   maxMonthlyOrders: number;

@@ -105,6 +105,10 @@ export class SuperAdminSubscriptionsService {
         trialDays: createDto.trialDays ?? 0,
         maxUsers: createDto.maxUsers ?? 1,
         maxTables: createDto.maxTables ?? 5,
+        // maxBranches (v3.0.0 column) — previously omitted, so a plan created
+        // via the SA form silently took the schema default (1) regardless of
+        // intent. -1 means unlimited (see isUnlimited()).
+        maxBranches: createDto.maxBranches ?? 1,
         maxProducts: createDto.maxProducts ?? 50,
         maxCategories: createDto.maxCategories ?? 10,
         maxMonthlyOrders: createDto.maxMonthlyOrders ?? 100,
@@ -173,6 +177,9 @@ export class SuperAdminSubscriptionsService {
         trialDays: updateDto.trialDays,
         maxUsers: updateDto.maxUsers,
         maxTables: updateDto.maxTables,
+        // PATCH: undefined leaves the column untouched (DTO coerces blank ->
+        // undefined). An explicit -1 sets unlimited; an explicit number caps.
+        maxBranches: updateDto.maxBranches,
         maxProducts: updateDto.maxProducts,
         maxCategories: updateDto.maxCategories,
         maxMonthlyOrders: updateDto.maxMonthlyOrders,

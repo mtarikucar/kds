@@ -186,3 +186,71 @@ describe('PlansPage — PlanModal create', () => {
     expect(createMutate).not.toHaveBeenCalled();
   });
 });
+
+describe('PlansPage — limit fields (unlimited / blank handling)', () => {
+  beforeEach(() => {
+    createMutate.mockReset();
+    updateMutate.mockReset();
+    plansData = [];
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  function openEdit() {
+    renderPage();
+    const card = screen.getByText('Pro Plan').closest('div')!.parentElement!
+      .parentElement as HTMLElement;
+    fireEvent.click(within(card).getAllByRole('button')[0]); // [edit, delete]
+  }
+
+  function limitInput(labelKey: string): HTMLInputElement {
+    const wrap = screen.getByText(labelKey).closest('div') as HTMLElement;
+    return within(wrap).getByRole('spinbutton') as HTMLInputElement;
+  }
+
+  it('exposes a maxBranches input pre-filled from the plan (preserves -1)', () => {
+    plansData = [plan({ id: 'p-biz', displayName: 'Pro Plan', maxBranches: -1 })];
+    openEdit();
+    expect(limitInput('plans.modal.maxBranches').value).toBe('-1');
+  });
+
+  it('shows a stored 0 limit as 0 (not silently 1 via ||)', () => {
+    plansData = [plan({ id: 'p0', displayName: 'Pro Plan', maxUsers: 0 })];
+    openEdit();
+    expect(limitInput('plans.modal.maxUsers').value).toBe('0');
+  });
+
+  it('clearing a limit input OMITS it from the update payload (never sends 0)', () => {
+    plansData = [
+      plan({ id: 'p-biz', displayName: 'Pro Plan', maxUsers: -1, maxBranches: -1 }),
+    ];
+    openEdit();
+    fireEvent.change(limitInput('plans.modal.maxUsers'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'plans.modal.update' }));
+
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    const body = updateMutate.mock.calls[0][0];
+    expect(body.maxUsers).toBeUndefined(); // NOT 0 — would zero the cap and 403 every create
+  });
+
+  it('submitting an unlimited plan untouched preserves -1 on every limit', () => {
+    plansData = [
+      plan({
+        id: 'p-biz',
+        displayName: 'Pro Plan',
+        maxUsers: -1,
+        maxTables: -1,
+        maxBranches: -1,
+        maxProducts: -1,
+        maxCategories: -1,
+        maxMonthlyOrders: -1,
+      }),
+    ];
+    openEdit();
+    fireEvent.click(screen.getByRole('button', { name: 'plans.modal.update' }));
+
+    const body = updateMutate.mock.calls[0][0];
+    expect(body.maxUsers).toBe(-1);
+    expect(body.maxBranches).toBe(-1);
+    expect(body.maxMonthlyOrders).toBe(-1);
+  });
+});

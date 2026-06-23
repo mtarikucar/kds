@@ -15,6 +15,7 @@ import {
 } from "class-validator";
 import { PartialType } from "@nestjs/swagger";
 import { Type, Transform } from "class-transformer";
+import { EmptyStringToNumber } from "../../../common/dto/transforms";
 
 // Optional date fields: HTML <input type="date"> (and forms that resend
 // every field on save) emit "" when cleared. @IsOptional() only skips
@@ -103,37 +104,61 @@ export class CreatePlanDto {
   @IsInt()
   trialDays?: number = 0;
 
+  // Limit fields: @Type(() => String) + @EmptyStringToNumber (NOT a bare
+  // @Type(() => Number)). The superadmin Plans form resends every field on
+  // save; a cleared input arrives as "". Under the global ValidationPipe's
+  // enableImplicitConversion, a Number-typed field coerces "" through
+  // Number("") === 0 BEFORE any @Transform runs — silently rewriting an
+  // unlimited (-1) cap to "zero allowed" and 403-ing every create. Forcing
+  // the implicit conversion to String keeps "" intact so @EmptyStringToNumber
+  // can collapse ""/whitespace to undefined (=> @IsOptional skips it =>
+  // Prisma leaves the column untouched on PATCH) while still parsing "5"->5
+  // and "-1"->-1. -1 is the unlimited sentinel (see isUnlimited()). An
+  // explicit 0 is preserved — that genuinely means "zero allowed".
   @ApiPropertyOptional({ default: 1 })
+  @Type(() => String)
+  @EmptyStringToNumber()
   @IsOptional()
-  @Type(() => Number)
   @IsInt()
   @Min(-1)
   maxUsers?: number = 1;
 
   @ApiPropertyOptional({ default: 5 })
+  @Type(() => String)
+  @EmptyStringToNumber()
   @IsOptional()
-  @Type(() => Number)
   @IsInt()
   @Min(-1)
   maxTables?: number = 5;
 
-  @ApiPropertyOptional({ default: 50 })
+  @ApiPropertyOptional({ default: 1 })
+  @Type(() => String)
+  @EmptyStringToNumber()
   @IsOptional()
-  @Type(() => Number)
+  @IsInt()
+  @Min(-1)
+  maxBranches?: number = 1;
+
+  @ApiPropertyOptional({ default: 50 })
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
   @IsInt()
   @Min(-1)
   maxProducts?: number = 50;
 
   @ApiPropertyOptional({ default: 10 })
+  @Type(() => String)
+  @EmptyStringToNumber()
   @IsOptional()
-  @Type(() => Number)
   @IsInt()
   @Min(-1)
   maxCategories?: number = 10;
 
   @ApiPropertyOptional({ default: 100 })
+  @Type(() => String)
+  @EmptyStringToNumber()
   @IsOptional()
-  @Type(() => Number)
   @IsInt()
   @Min(-1)
   maxMonthlyOrders?: number = 100;
