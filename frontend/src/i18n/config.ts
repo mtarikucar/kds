@@ -28,6 +28,7 @@ import enBridges from './locales/en/bridges.json';
 import enSuperadmin from './locales/en/superadmin.json';
 import enHardware from './locales/en/hardware.json';
 import enAnalytics from './locales/en/analytics.json';
+import enDeliveryOrders from './locales/en/deliveryOrders.json';
 
 import trCommon from './locales/tr/common.json';
 import trAuth from './locales/tr/auth.json';
@@ -53,6 +54,7 @@ import trBridges from './locales/tr/bridges.json';
 import trSuperadmin from './locales/tr/superadmin.json';
 import trHardware from './locales/tr/hardware.json';
 import trAnalytics from './locales/tr/analytics.json';
+import trDeliveryOrders from './locales/tr/deliveryOrders.json';
 
 import ruCommon from './locales/ru/common.json';
 import ruAuth from './locales/ru/auth.json';
@@ -78,6 +80,7 @@ import ruBridges from './locales/ru/bridges.json';
 import ruSuperadmin from './locales/ru/superadmin.json';
 import ruHardware from './locales/ru/hardware.json';
 import ruAnalytics from './locales/ru/analytics.json';
+import ruDeliveryOrders from './locales/ru/deliveryOrders.json';
 
 import uzCommon from './locales/uz/common.json';
 import uzAuth from './locales/uz/auth.json';
@@ -103,6 +106,7 @@ import uzBridges from './locales/uz/bridges.json';
 import uzSuperadmin from './locales/uz/superadmin.json';
 import uzHardware from './locales/uz/hardware.json';
 import uzAnalytics from './locales/uz/analytics.json';
+import uzDeliveryOrders from './locales/uz/deliveryOrders.json';
 
 import arCommon from './locales/ar/common.json';
 import arAuth from './locales/ar/auth.json';
@@ -128,6 +132,7 @@ import arBridges from './locales/ar/bridges.json';
 import arSuperadmin from './locales/ar/superadmin.json';
 import arHardware from './locales/ar/hardware.json';
 import arAnalytics from './locales/ar/analytics.json';
+import arDeliveryOrders from './locales/ar/deliveryOrders.json';
 
 // Define resources
 const resources = {
@@ -156,6 +161,7 @@ const resources = {
     superadmin: enSuperadmin,
     hardware: enHardware,
     analytics: enAnalytics,
+    deliveryOrders: enDeliveryOrders,
   },
   tr: {
     common: trCommon,
@@ -182,6 +188,7 @@ const resources = {
     superadmin: trSuperadmin,
     hardware: trHardware,
     analytics: trAnalytics,
+    deliveryOrders: trDeliveryOrders,
   },
   ru: {
     common: ruCommon,
@@ -208,6 +215,7 @@ const resources = {
     superadmin: ruSuperadmin,
     hardware: ruHardware,
     analytics: ruAnalytics,
+    deliveryOrders: ruDeliveryOrders,
   },
   uz: {
     common: uzCommon,
@@ -234,6 +242,7 @@ const resources = {
     superadmin: uzSuperadmin,
     hardware: uzHardware,
     analytics: uzAnalytics,
+    deliveryOrders: uzDeliveryOrders,
   },
   ar: {
     common: arCommon,
@@ -260,6 +269,7 @@ const resources = {
     superadmin: arSuperadmin,
     hardware: arHardware,
     analytics: arAnalytics,
+    deliveryOrders: arDeliveryOrders,
   },
 };
 
@@ -344,7 +354,7 @@ i18next
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock', 'help', 'webhooks', 'partnerKeys', 'bridges', 'superadmin', 'hardware', 'analytics'],
+    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock', 'help', 'webhooks', 'partnerKeys', 'bridges', 'superadmin', 'hardware', 'analytics', 'deliveryOrders'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

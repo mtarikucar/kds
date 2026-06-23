@@ -1,0 +1,48 @@
+{
+  "title": "Delivery Orders",
+  "description": "Incoming orders from Yemeksepeti, Getir, Trendyol and Migros",
+  "externalIdLabel": "No:",
+  "awaitingApproval": "{{count}} order(s) awaiting your approval",
+  "loadError": "Could not load delivery orders.",
+  "filters": {
+    "all": "All"
+  },
+  "empty": {
+    "title": "No delivery orders",
+    "description": "New platform orders will appear here automatically."
+  },
+  "status": {
+    "PENDING_APPROVAL": "Awaiting approval",
+    "PENDING": "Accepted",
+    "PREPARING": "Preparing",
+    "READY": "Ready",
+    "SERVED": "Served",
+    "PAID": "Paid",
+    "CANCELLED": "Rejected"
+  },
+  "moderation": {
+    "prepTimeOptional": "Prep time (optional):",
+    "minutesShort": "{{minutes}} min",
+    "accept": "Accept",
+    "acceptWithPrep": "Accept · {{minutes}} min",
+    "reject": "Reject",
+    "setPrepTime": "Set prep time",
+    "setPrepTimeButton": "Set",
+    "minutesPlaceholder": "Minutes",
+    "rejectModalTitle": "Reject order",
+    "rejectModalDescription": "The reason is sent to the platform so the customer can see why the order was rejected.",
+    "reasonPlaceholder": "Reason for rejection",
+    "cancel": "Cancel",
+    "confirmReject": "Reject order"
+  },
+  "toast": {
+    "accepted": "Order accepted",
+    "alreadyAccepted": "Order was already accepted",
+    "acceptFailed": "Could not accept the order",
+    "rejected": "Order rejected",
+    "alreadyRejected": "Order was already rejected",
+    "rejectFailed": "Could not reject the order",
+    "prepTimeSet": "Prep time set to {{minutes}} min",
+    "prepTimeFailed": "Could not set the prep time"
+  }
+}

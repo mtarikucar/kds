@@ -4,6 +4,8 @@ import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Order } from '../../types';
 import Spinner from '../ui/Spinner';
 import { useTranslation } from 'react-i18next';
+import DeliveryOrderBadge from '../delivery-platforms/DeliveryOrderBadge';
+import DeliveryOrderModerationPanel from '../delivery-platforms/DeliveryOrderModerationPanel';
 
 interface PendingOrdersPanelProps {
   isOpen: boolean;
@@ -12,6 +14,7 @@ interface PendingOrdersPanelProps {
 
 const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   const { t } = useTranslation('pos');
+  const { t: td } = useTranslation('deliveryOrders');
   const formatPrice = useFormatCurrency();
   const { data: pendingOrders = [], isLoading } = usePendingOrders();
   const approveOrder = useApproveOrder();
@@ -94,6 +97,13 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                         <span className="text-lg font-bold text-slate-900">
                           #{order.orderNumber}
                         </span>
+                        {/* Delivery platform badge — instantly flags an order
+                            as Yemeksepeti/Getir/etc. with its external id. */}
+                        <DeliveryOrderBadge
+                          source={order.source}
+                          externalOrderId={order.externalOrderId}
+                          idLabel={td('externalIdLabel')}
+                        />
                         {order.table && (
                           <div className="flex items-center gap-1 text-sm text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60">
                             <MapPin className="h-3.5 w-3.5" />
@@ -164,30 +174,39 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="bg-slate-50/80 px-5 py-4 border-t border-slate-100 flex gap-3">
-                    <button
-                      onClick={() => handleReject(order.id)}
-                      disabled={cancelOrder.isPending}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <X className="h-5 w-5" />
-                      {t('pendingOrders.reject')}
-                    </button>
-                    <button
-                      onClick={() => handleApprove(order.id)}
-                      disabled={approveOrder.isPending}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold transition-all duration-200 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {approveOrder.isPending ? (
-                        <Spinner size="sm" color="white" />
-                      ) : (
-                        <>
-                          <Check className="h-5 w-5" />
-                          {t('pendingOrders.approve')}
-                        </>
-                      )}
-                    </button>
+                  {/* Action Buttons — delivery-platform orders MUST go through
+                      the platform moderation endpoints (accept/reject relays the
+                      decision back to Yemeksepeti/Getir/…); the internal
+                      approve/cancel flow only applies to QR/in-house orders. */}
+                  <div className="bg-slate-50/80 px-5 py-4 border-t border-slate-100">
+                    {order.source && order.externalOrderId ? (
+                      <DeliveryOrderModerationPanel order={order} />
+                    ) : (
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleReject(order.id)}
+                          disabled={cancelOrder.isPending}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <X className="h-5 w-5" />
+                          {t('pendingOrders.reject')}
+                        </button>
+                        <button
+                          onClick={() => handleApprove(order.id)}
+                          disabled={approveOrder.isPending}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold transition-all duration-200 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {approveOrder.isPending ? (
+                            <Spinner size="sm" color="white" />
+                          ) : (
+                            <>
+                              <Check className="h-5 w-5" />
+                              {t('pendingOrders.approve')}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

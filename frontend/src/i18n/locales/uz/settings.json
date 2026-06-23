@@ -100,7 +100,22 @@
       "restaurantClosed": "Restoran platformada yopildi",
       "toggleFailed": "Restoran holatini almashtirib bo'lmadi",
       "menuSyncStarted": "Menyu sinxronlash boshlandi",
-      "menuSyncFailed": "Menyu sinxronlash muvaffaqiyatsiz"
+      "menuSyncFailed": "Menyu sinxronlash muvaffaqiyatsiz",
+      "testOrderCreated": "Sinov buyurtmasi yaratildi: {{orderNumber}}",
+      "testOrderSent": "Sinov buyurtmasi quvur orqali yuborildi",
+      "testOrderFailed": "Sinov buyurtmasini yuborib bo‘lmadi"
+    },
+    "branch": "Filial",
+    "branchDefault": "Birinchi faol filial (standart)",
+    "branchDescription": "Ushbu platformaning buyurtmalarini qaysi filial qabul qiladi.",
+    "syncMenu": "Menyuni sinxronlash",
+    "sendTestOrder": "Sinov buyurtmasini yuborish",
+    "testOrderSandboxOnly": "Sinov buyurtmasini yuborish uchun ushbu platformani sandbox rejimiga oting.",
+    "environment": {
+      "label": "Muhit",
+      "production": "Ishlab chiqarish",
+      "sandbox": "Sandbox",
+      "sandboxWarning": "Sandbox ushbu platformani sinov endpointlariga yo‘naltiradi va o‘rnatilgan sinov buyurtma simulyatorini yoqadi. Haqiqiy buyurtmalar qayta ishlanmaydi."
     }
   },
   "autoSave": {

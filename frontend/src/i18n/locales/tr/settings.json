@@ -100,7 +100,22 @@
       "restaurantClosed": "Restoran platformda kapatıldı",
       "toggleFailed": "Restoran durumu değiştirilemedi",
       "menuSyncStarted": "Menü senkronizasyonu başlatıldı",
-      "menuSyncFailed": "Menü senkronizasyonu başarısız"
+      "menuSyncFailed": "Menü senkronizasyonu başarısız",
+      "testOrderCreated": "Test siparişi oluşturuldu: {{orderNumber}}",
+      "testOrderSent": "Test siparişi işlem hattına gönderildi",
+      "testOrderFailed": "Test siparişi gönderilemedi"
+    },
+    "branch": "Şube",
+    "branchDefault": "İlk aktif şube (varsayılan)",
+    "branchDescription": "Bu platformun siparişlerini hangi şube alacak.",
+    "syncMenu": "Menüyü Senkronize Et",
+    "sendTestOrder": "Test Siparişi Gönder",
+    "testOrderSandboxOnly": "Test siparişi göndermek için bu platformu sandbox moduna alın.",
+    "environment": {
+      "label": "Ortam",
+      "production": "Canlı",
+      "sandbox": "Sandbox",
+      "sandboxWarning": "Sandbox, bu platformu test uç noktalarına yönlendirir ve yerleşik test sipariş simülatörünü etkinleştirir. Gerçek sipariş işlenmez."
     }
   },
   "autoSave": {

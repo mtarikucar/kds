@@ -1,21 +1,31 @@
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { DeliveryPlatformConfig } from "@prisma/client";
 import { numericEnv } from "../../../common/config/numeric-env.util";
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export abstract class BaseAdapter {
   protected readonly logger: Logger;
   protected readonly httpClient: AxiosInstance;
-  protected readonly baseURL: string;
+  /** Production base URL (the axios instance default). */
+  protected baseURL: string;
+  /**
+   * Sandbox/test base URL. Selected per-request when a config has
+   * environment === "sandbox" (see resolveBaseURL). Defaults to the
+   * production base URL when a platform has no dedicated sandbox host.
+   */
+  protected sandboxBaseURL: string;
 
   constructor(
     name: string,
     defaultBaseURL: string,
     config?: ConfigService,
     timeout?: number,
+    sandboxBaseURL?: string,
   ) {
     this.logger = new Logger(name);
     this.baseURL = defaultBaseURL;
+    this.sandboxBaseURL = sandboxBaseURL ?? defaultBaseURL;
     // Per-request HTTP timeout. Default 10s; override via
     // DELIVERY_PLATFORM_HTTP_TIMEOUT_MS. An explicit `timeout` arg (rare)
     // still wins so a subclass can hard-pin a value if it ever needs to.
@@ -28,11 +38,50 @@ export abstract class BaseAdapter {
     });
   }
 
-  /** Allow overriding baseURL from env (call in subclass constructor if ConfigService is available) */
+  /** Allow overriding the production baseURL from env (call in subclass constructor if ConfigService is available) */
   protected overrideBaseURL(url: string | undefined) {
     if (url) {
+      this.baseURL = url;
       this.httpClient.defaults.baseURL = url;
     }
+  }
+
+  /** Allow overriding the sandbox baseURL from env (call in subclass constructor if ConfigService is available) */
+  protected overrideSandboxBaseURL(url: string | undefined) {
+    if (url) {
+      this.sandboxBaseURL = url;
+    }
+  }
+
+  /**
+   * True only when this adapter has a *real*, distinct sandbox endpoint — i.e.
+   * sandboxBaseURL is set AND differs from the production baseURL.
+   *
+   * SANDBOX-FAIL-CLOSED: several platforms (Getir, Yemeksepeti, Migros) have
+   * no publicly documented test host, so their sandboxBaseURL defaults to the
+   * production host. For those, a config with environment === "sandbox" still
+   * resolves to PRODUCTION, which would make the test-order simulator's
+   * sandbox-only guard a no-op and let a synthetic order auto-accept against
+   * the LIVE platform. Callers (notably DeliveryTestService.simulateOrder)
+   * MUST consult this before treating a "sandbox" config as safe to hit, and
+   * refuse when it returns false. Trendyol returns true once its distinct
+   * stage host is configured.
+   */
+  hasRealSandbox(): boolean {
+    return !!this.sandboxBaseURL && this.sandboxBaseURL !== this.baseURL;
+  }
+
+  /**
+   * Resolve the base URL for a given config: the platform's sandbox host when
+   * config.environment === "sandbox", otherwise the production host. Adapters
+   * pass the result as the per-request `baseURL` (axios merges a per-request
+   * baseURL over the instance default), so a single singleton adapter can
+   * serve both production and sandbox tenant configs simultaneously.
+   */
+  protected resolveBaseURL(config?: DeliveryPlatformConfig): string {
+    return config?.environment === "sandbox"
+      ? this.sandboxBaseURL
+      : this.baseURL;
   }
 
   protected async request<T = any>(

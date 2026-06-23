@@ -10,16 +10,30 @@ import {
 import { NormalizedOrder } from "../interfaces/platform-order.interface";
 import { BaseAdapter } from "./base.adapter";
 
+const YEMEKSEPETI_PROD_BASE_URL = "https://middleware-api.yemeksepeti.com";
+// Yemeksepeti (Delivery Hero) does expose a vendor/integration test
+// environment, but its host is not publicly published. Until the real
+// sandbox host is confirmed, default to the production host so sandbox
+// configs do not silently hit an invalid URL — override via
+// YEMEKSEPETI_SANDBOX_API_BASE_URL once the test host is known.
+// TODO(delivery-sandbox): replace with the real Yemeksepeti sandbox host.
+const YEMEKSEPETI_SANDBOX_BASE_URL = YEMEKSEPETI_PROD_BASE_URL;
+
 @Injectable()
 export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
     super(
       "YemeksepetiAdapter",
-      "https://middleware-api.yemeksepeti.com",
+      YEMEKSEPETI_PROD_BASE_URL,
       configService,
+      undefined,
+      YEMEKSEPETI_SANDBOX_BASE_URL,
     );
     this.overrideBaseURL(
       this.configService.get<string>("YEMEKSEPETI_API_BASE_URL"),
+    );
+    this.overrideSandboxBaseURL(
+      this.configService.get<string>("YEMEKSEPETI_SANDBOX_API_BASE_URL"),
     );
   }
 
@@ -27,6 +41,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     const credentials = config.credentials as any;
     const response = await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: "/v2/login",
       data: {
         grant_type: "client_credentials",
@@ -48,6 +63,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { status: "accepted" },
@@ -61,6 +77,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: {
@@ -76,6 +93,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { status: "preparing" },
@@ -88,6 +106,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/orders/${externalOrderId}/preparation-completed`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -99,6 +118,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { status: "delivered" },
@@ -112,6 +132,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { status: "cancelled", reason: reason || "Restaurant cancelled" },
@@ -161,6 +182,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     const credentials = config.credentials as any;
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/chains/${credentials.chainCode}/catalog`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { items },
@@ -175,6 +197,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     const credentials = config.credentials as any;
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/chains/${credentials.chainCode}/vendors/${credentials.posVendorId}/catalog/items/availability`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: {
@@ -187,6 +210,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     const credentials = config.credentials as any;
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/vendors/${credentials.posVendorId}/status`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: true },
@@ -197,6 +221,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     const credentials = config.credentials as any;
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/v2/vendors/${credentials.posVendorId}/status`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: false },

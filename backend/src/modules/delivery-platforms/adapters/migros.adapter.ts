@@ -4,20 +4,34 @@ import { DeliveryPlatformConfig } from "@prisma/client";
 import { DeliveryPlatform } from "../constants/platform.enum";
 import {
   AuthResult,
+  MenuSyncItem,
   PlatformAdapter,
 } from "../interfaces/platform-adapter.interface";
 import { NormalizedOrder } from "../interfaces/platform-order.interface";
 import { BaseAdapter } from "./base.adapter";
+
+const MIGROS_PROD_BASE_URL = "https://partner-api.migros.com.tr/yemek";
+// Migros Yemek runs a partner test environment, but its host is not publicly
+// documented. Until the real sandbox host is confirmed, default to the
+// production host so sandbox configs do not silently hit an invalid URL —
+// override via MIGROS_SANDBOX_API_BASE_URL once the test host is known.
+// TODO(delivery-sandbox): replace with the real Migros Yemek sandbox host.
+const MIGROS_SANDBOX_BASE_URL = MIGROS_PROD_BASE_URL;
 
 @Injectable()
 export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
     super(
       "MigrosAdapter",
-      "https://partner-api.migros.com.tr/yemek",
+      MIGROS_PROD_BASE_URL,
       configService,
+      undefined,
+      MIGROS_SANDBOX_BASE_URL,
     );
     this.overrideBaseURL(this.configService.get<string>("MIGROS_API_BASE_URL"));
+    this.overrideSandboxBaseURL(
+      this.configService.get<string>("MIGROS_SANDBOX_API_BASE_URL"),
+    );
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
@@ -35,6 +49,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
       data: { status: "ACCEPTED" },
@@ -48,6 +63,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
       data: { status: "REJECTED", reason },
@@ -60,6 +76,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
       data: { status: "PREPARING" },
@@ -72,6 +89,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
       data: { status: "READY" },
@@ -95,6 +113,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
       data: { status: "CANCELLED", reason },
@@ -106,6 +125,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<NormalizedOrder[]> {
     const response = await this.request({
       method: "GET",
+      baseURL: this.resolveBaseURL(config),
       url: `/restaurants/${config.remoteRestaurantId}/orders?status=NEW`,
       headers: this.getMigrosHeaders(config),
     });
@@ -114,10 +134,66 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     return orders.map((order: any) => this.normalizeOrder(order));
   }
 
+  async syncMenu(
+    config: DeliveryPlatformConfig,
+    items: MenuSyncItem[],
+  ): Promise<void> {
+    // Migros Yemek pushes the catalog under the store's menu resource. The
+    // store id is the remoteRestaurantId; payload mirrors the other Turkish
+    // platforms ({ products: [...] }).
+    await this.request({
+      method: "PUT",
+      baseURL: this.resolveBaseURL(config),
+      url: `/restaurants/${config.remoteRestaurantId}/menu`,
+      headers: this.getMigrosHeaders(config),
+      data: { products: items },
+    });
+  }
+
+  async updateItemAvailability(
+    config: DeliveryPlatformConfig,
+    externalItemId: string,
+    available: boolean,
+  ): Promise<void> {
+    // Mirrors the Family-B live adapter:
+    //   PUT /yemek/restaurants/:storeId/products/:productId/status { isAvailable }
+    // (the "/yemek" prefix is already in the base URL here).
+    await this.request({
+      method: "PUT",
+      baseURL: this.resolveBaseURL(config),
+      url: `/restaurants/${config.remoteRestaurantId}/products/${externalItemId}/status`,
+      headers: this.getMigrosHeaders(config),
+      data: { isAvailable: available },
+    });
+  }
+
+  async openRestaurant(config: DeliveryPlatformConfig): Promise<void> {
+    // Mirrors the Family-B live adapter:
+    //   PUT /yemek/restaurants/:storeId/status { isOpen }
+    await this.request({
+      method: "PUT",
+      baseURL: this.resolveBaseURL(config),
+      url: `/restaurants/${config.remoteRestaurantId}/status`,
+      headers: this.getMigrosHeaders(config),
+      data: { isOpen: true },
+    });
+  }
+
+  async closeRestaurant(config: DeliveryPlatformConfig): Promise<void> {
+    await this.request({
+      method: "PUT",
+      baseURL: this.resolveBaseURL(config),
+      url: `/restaurants/${config.remoteRestaurantId}/status`,
+      headers: this.getMigrosHeaders(config),
+      data: { isOpen: false },
+    });
+  }
+
   async testConnection(config: DeliveryPlatformConfig): Promise<boolean> {
     try {
       await this.request({
         method: "GET",
+        baseURL: this.resolveBaseURL(config),
         url: `/restaurants/${config.remoteRestaurantId}`,
         headers: this.getMigrosHeaders(config),
       });

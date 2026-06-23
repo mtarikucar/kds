@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import type { DeliveryPlatformConfig, DeliveryPlatformLog } from '../../types';
 
-const tt = (key: string) => i18n.t(key, { ns: 'settings' });
+const tt = (key: string, options?: Record<string, unknown>) =>
+  i18n.t(key, { ns: 'settings', ...options });
 
 // ========================================
 // Platform Configuration Queries
@@ -44,6 +45,8 @@ export const useCreatePlatformConfig = () => {
       credentials?: Record<string, any>;
       remoteRestaurantId?: string;
       autoAccept?: boolean;
+      branchId?: string | null;
+      environment?: 'production' | 'sandbox';
     }) => {
       const response = await api.post('/delivery-platforms/configs', data);
       return response.data;
@@ -73,6 +76,8 @@ export const useUpdatePlatformConfig = () => {
       remoteRestaurantId?: string;
       autoAccept?: boolean;
       notifySound?: string;
+      branchId?: string | null;
+      environment?: 'production' | 'sandbox';
     }) => {
       const response = await api.patch(
         `/delivery-platforms/configs/${platform}`,
@@ -170,6 +175,47 @@ export const useToggleRestaurant = () => {
   });
 };
 
+// Fire a synthetic TEST order through the real ingest pipeline. Backend
+// refuses unless the platform's environment === "sandbox" — that 400 surfaces
+// via getApiErrorMessage so the operator knows to flip the sandbox toggle.
+export interface TestOrderResult {
+  simulated: boolean;
+  orderId: string | null;
+  orderNumber: string | null;
+  externalOrderId: string | null;
+  status: string | null;
+}
+
+export const useSendTestOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation<TestOrderResult, unknown, string>({
+    mutationFn: async (platform: string) => {
+      const response = await api.post(
+        `/delivery-platforms/test-order/${platform}`,
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // The synthetic order lands in the kitchen; refresh the activity log.
+      queryClient.invalidateQueries({ queryKey: ['deliveryPlatformLogs'] });
+      if (data?.orderNumber) {
+        toast.success(
+          tt('onlineOrders.toast.testOrderCreated', {
+            orderNumber: data.orderNumber,
+          }),
+        );
+      } else {
+        toast.success(tt('onlineOrders.toast.testOrderSent'));
+      }
+    },
+    onError: (error) => {
+      toast.error(
+        getApiErrorMessage(error, tt('onlineOrders.toast.testOrderFailed')),
+      );
+    },
+  });
+};
+
 // ========================================
 // Logs
 // ========================================
@@ -194,6 +240,7 @@ export const useDeliveryPlatformLogs = (params?: {
 // ========================================
 
 export const useSyncMenu = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (platform: string) => {
       const response = await api.post(
@@ -202,6 +249,8 @@ export const useSyncMenu = () => {
       return response.data;
     },
     onSuccess: () => {
+      // Server stamps lastMenuSyncAt; refresh configs so the card shows it.
+      queryClient.invalidateQueries({ queryKey: ['deliveryPlatformConfigs'] });
       toast.success(tt('onlineOrders.toast.menuSyncStarted'));
     },
     onError: (error) => {

@@ -2693,6 +2693,19 @@ model DeliveryPlatformConfig {
   autoAccept  Boolean @default(true) // Auto-accept incoming orders
   notifySound String? // Custom notification sound identifier
 
+  // Runtime environment for this config. "sandbox" routes the adapter to the
+  // platform's test endpoints (and is also what the built-in test-order
+  // simulator stamps), so a tenant can validate the full ingest→KDS→print
+  // pipeline without touching production / a live platform account.
+  environment String @default("production") // "production" | "sandbox"
+
+  // Multi-branch routing: which branch receives this platform's orders. NULL
+  // keeps the legacy "first active branch" fallback. A tenant running the same
+  // platform on multiple branches uses one config row per branch (each with
+  // its own remoteRestaurantId), and incoming orders route to branch here.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   // Soft delete marker so we don't orphan in-flight orders / mappings
   // when an admin hits Delete while orders are still syncing.
   deletedAt DateTime?
@@ -2711,6 +2724,7 @@ model DeliveryPlatformConfig {
   @@index([tenantId])
   @@index([platform])
   @@index([isEnabled])
+  @@index([branchId])
   @@map("delivery_platform_configs")
 }
 
@@ -4172,6 +4186,7 @@ model Branch {
   bridges               LocalBridgeAgent[]
   orders                Order[]
   tables                Table[]
+  deliveryPlatformConfigs DeliveryPlatformConfig[]
   // v3.0.0 — strict branch-scope inverse relations.
   deviceCommands        DeviceCommand[]
   payments              Payment[]

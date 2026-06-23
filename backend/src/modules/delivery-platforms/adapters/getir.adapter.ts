@@ -10,17 +10,35 @@ import {
 import { NormalizedOrder } from "../interfaces/platform-order.interface";
 import { BaseAdapter } from "./base.adapter";
 
+const GETIR_PROD_BASE_URL = "https://food-external-api.getir.com";
+// Getir Food runs a partner test/staging environment, but its host is not
+// publicly documented. Until the real sandbox host is confirmed, default to
+// the production host so sandbox configs do not silently hit an invalid URL —
+// override via GETIR_SANDBOX_API_BASE_URL once the test host is known.
+// TODO(delivery-sandbox): replace with the real Getir Food sandbox host.
+const GETIR_SANDBOX_BASE_URL = GETIR_PROD_BASE_URL;
+
 @Injectable()
 export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super("GetirAdapter", "https://food-external-api.getir.com", configService);
+    super(
+      "GetirAdapter",
+      GETIR_PROD_BASE_URL,
+      configService,
+      undefined,
+      GETIR_SANDBOX_BASE_URL,
+    );
     this.overrideBaseURL(this.configService.get<string>("GETIR_API_BASE_URL"));
+    this.overrideSandboxBaseURL(
+      this.configService.get<string>("GETIR_SANDBOX_API_BASE_URL"),
+    );
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
     const credentials = config.credentials as any;
     const response = await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: "/auth/login",
       data: {
         appSecretKey: credentials.appSecretKey,
@@ -41,6 +59,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/food-orders/${externalOrderId}/verify`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -53,6 +72,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/food-orders/${externalOrderId}/cancel`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { rejectReason: reason || "Restaurant rejected the order" },
@@ -65,6 +85,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/food-orders/${externalOrderId}/prepare`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -76,6 +97,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/food-orders/${externalOrderId}/handover`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -98,6 +120,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: `/food-orders/${externalOrderId}/cancel`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { cancelReason: reason || "Restaurant cancelled the order" },
@@ -109,6 +132,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<NormalizedOrder[]> {
     const response = await this.request({
       method: "POST",
+      baseURL: this.resolveBaseURL(config),
       url: "/food-orders/periodic/unapproved",
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -124,6 +148,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/food-products/${externalItemId}/status`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isActive: available },
@@ -133,6 +158,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   async openRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: "/restaurants/status",
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: true },
@@ -142,6 +168,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   async closeRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: "/restaurants/status",
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: false },

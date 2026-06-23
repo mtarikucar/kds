@@ -3,6 +3,11 @@ import { ConfigModule } from "@nestjs/config";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { KdsModule } from "../kds/kds.module";
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
+// DeviceMeshModule provides CommandQueueService + EscPosBuilderService so
+// DeliveryOrderService can auto-print kitchen tickets for incoming delivery
+// orders via the SAME device-mesh print rail POS orders use. No cycle:
+// DeviceMeshModule imports only Prisma/LocalBridge/Subscriptions.
+import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
 
 // Adapters
 import { GetirAdapter } from "./adapters/getir.adapter";
@@ -18,6 +23,9 @@ import { DeliveryAuthService } from "./services/delivery-auth.service";
 import { DeliveryMenuSyncService } from "./services/delivery-menu-sync.service";
 import { DeliveryConfigService } from "./services/delivery-config.service";
 import { DeliveryLogService } from "./services/delivery-log.service";
+import { DeliveryTestService } from "./services/delivery-test.service";
+import { DeliveryModerationService } from "./services/delivery-moderation.service";
+import { DeliveryReconciliationService } from "./services/delivery-reconciliation.service";
 
 // Controllers
 import { DeliveryPlatformsController } from "./controllers/delivery-platforms.controller";
@@ -28,6 +36,7 @@ import { DeliveryDlqController } from "./controllers/delivery-dlq.controller";
 import { OrderPollingScheduler } from "./schedulers/order-polling.scheduler";
 import { TokenRefreshScheduler } from "./schedulers/token-refresh.scheduler";
 import { RetryScheduler } from "./schedulers/retry.scheduler";
+import { DeliveryReconciliationScheduler } from "./schedulers/delivery-reconciliation.scheduler";
 
 // Guards
 import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
@@ -38,6 +47,7 @@ import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
     ConfigModule,
     forwardRef(() => KdsModule),
     SubscriptionsModule,
+    DeviceMeshModule,
   ],
   controllers: [
     DeliveryPlatformsController,
@@ -59,11 +69,15 @@ import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
     DeliveryMenuSyncService,
     DeliveryConfigService,
     DeliveryLogService,
+    DeliveryTestService,
+    DeliveryModerationService,
+    DeliveryReconciliationService,
 
     // Schedulers
     OrderPollingScheduler,
     TokenRefreshScheduler,
     RetryScheduler,
+    DeliveryReconciliationScheduler,
 
     // Guards
     WebhookAuthGuard,

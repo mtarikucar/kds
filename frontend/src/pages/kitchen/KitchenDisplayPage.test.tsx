@@ -7,6 +7,10 @@ import { OrderStatus } from '../../types';
 // labels are stable selectors (kitchen.actions.startPreparing, etc.).
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+  // The KDS order card now renders the delivery moderation panel, whose
+  // action-hooks file imports i18n/config (the codebase norm), which calls
+  // `.use(initReactI18next)` at module load — so this mock must expose it too.
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
 // --- orders/kds api hooks (the real data + mutation layer) ---

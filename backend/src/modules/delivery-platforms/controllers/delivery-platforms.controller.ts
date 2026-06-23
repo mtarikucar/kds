@@ -10,7 +10,7 @@ import {
   Request,
   UseGuards,
 } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
@@ -22,6 +22,8 @@ import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { DeliveryConfigService } from "../services/delivery-config.service";
 import { DeliveryLogService } from "../services/delivery-log.service";
 import { DeliveryMenuSyncService } from "../services/delivery-menu-sync.service";
+import { DeliveryTestService } from "../services/delivery-test.service";
+import { DeliveryModerationService } from "../services/delivery-moderation.service";
 import { CreatePlatformConfigDto } from "../dto/create-platform-config.dto";
 import { UpdatePlatformConfigDto } from "../dto/update-platform-config.dto";
 
@@ -35,6 +37,8 @@ export class DeliveryPlatformsController {
     private readonly configService: DeliveryConfigService,
     private readonly logService: DeliveryLogService,
     private readonly menuSyncService: DeliveryMenuSyncService,
+    private readonly testService: DeliveryTestService,
+    private readonly moderationService: DeliveryModerationService,
   ) {}
 
   // ========================================
@@ -99,6 +103,29 @@ export class DeliveryPlatformsController {
     return { success };
   }
 
+  @Post("test-order/:platform")
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      "Fire a synthetic TEST order through the real ingest pipeline (sandbox-only)",
+  })
+  async createTestOrder(
+    @Request() req: any,
+    @Param("platform") platform: string,
+  ) {
+    const order = await this.testService.simulateOrder(
+      req.user.tenantId,
+      platform.toUpperCase(),
+    );
+    return {
+      simulated: true,
+      orderId: order?.id ?? null,
+      orderNumber: order?.orderNumber ?? null,
+      externalOrderId: order?.externalOrderId ?? null,
+      status: order?.status ?? null,
+    };
+  }
+
   @Post("configs/:platform/toggle-restaurant")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   toggleRestaurant(
@@ -110,6 +137,64 @@ export class DeliveryPlatformsController {
       req.user.tenantId,
       platform.toUpperCase(),
       open,
+    );
+  }
+
+  // ========================================
+  // Order Moderation (operator ACCEPT / REJECT / set PREP-TIME)
+  // ========================================
+
+  @Post("orders/:orderId/accept")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Accept an incoming delivery-platform order (optionally with a prep time)",
+  })
+  acceptOrder(
+    @Request() req: any,
+    @Param("orderId") orderId: string,
+    @Body("prepTimeMinutes") prepTimeMinutes?: number,
+  ) {
+    return this.moderationService.acceptOrder(
+      req.user.tenantId,
+      orderId,
+      prepTimeMinutes,
+    );
+  }
+
+  @Post("orders/:orderId/reject")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Reject an incoming delivery-platform order; the reason is sent to the platform",
+  })
+  rejectOrder(
+    @Request() req: any,
+    @Param("orderId") orderId: string,
+    @Body("reason") reason: string,
+  ) {
+    return this.moderationService.rejectOrder(
+      req.user.tenantId,
+      orderId,
+      reason,
+    );
+  }
+
+  @Post("orders/:orderId/prep-time")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Set the kitchen prep time for an accepted delivery-platform order (marks it preparing on the platform)",
+  })
+  setPrepTime(
+    @Request() req: any,
+    @Param("orderId") orderId: string,
+    @Body("minutes") minutes: number,
+  ) {
+    return this.moderationService.setPrepTime(
+      req.user.tenantId,
+      orderId,
+      minutes,
     );
   }
 

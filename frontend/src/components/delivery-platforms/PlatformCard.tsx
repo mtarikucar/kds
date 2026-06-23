@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Power,
   TestTube,
   Store,
   ChevronDown,
   ChevronUp,
   Save,
   Loader2,
+  FlaskConical,
+  Send,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PlatformStatusBadge from './PlatformStatusBadge';
@@ -18,7 +21,12 @@ import {
   useCreatePlatformConfig,
   useTestPlatformConnection,
   useToggleRestaurant,
+  useSendTestOrder,
+  useSyncMenu,
 } from '../../features/delivery-platforms/deliveryPlatformsApi';
+import { useListBranches } from '../../features/branches/branchesApi';
+
+type PlatformEnvironment = 'production' | 'sandbox';
 
 // Required credential fields per platform
 const REQUIRED_CREDENTIALS: Record<string, string[]> = {
@@ -93,14 +101,37 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
     config?.remoteRestaurantId || '',
   );
   const [autoAccept, setAutoAccept] = useState(config?.autoAccept ?? true);
+  const [branchId, setBranchId] = useState<string | null>(
+    config?.branchId ?? null,
+  );
+  const [environment, setEnvironment] = useState<PlatformEnvironment>(
+    config?.environment ?? 'production',
+  );
   const [hasChanges, setHasChanges] = useState(false);
+  // The backend strips credentials on read, so we never have the live secrets
+  // in local state for a saved config. Track whether the operator has actually
+  // typed into a credential field this session; only THEN do we send a
+  // credentials payload (otherwise we'd overwrite the stored secrets with the
+  // empty local state). Branch/environment/other edits never set this.
+  const [credentialsDirty, setCredentialsDirty] = useState(false);
 
   const updateConfig = useUpdatePlatformConfig();
   const createConfig = useCreatePlatformConfig();
   const testConnection = useTestPlatformConnection();
   const toggleRestaurant = useToggleRestaurant();
+  const sendTestOrder = useSendTestOrder();
+  const syncMenu = useSyncMenu();
+  const { data: branches } = useListBranches();
 
-  const hasCredentials = checkHasCredentials(platform, credentials);
+  // Credentials are "configured" if the server says so (hasCredentials flag on
+  // a saved config) OR the operator has just filled in a complete, valid set
+  // locally (covers the not-yet-saved / re-rotating case). Never derive this
+  // from local state alone — the server strips secrets, so local state is
+  // empty for an already-configured platform after a reload.
+  const hasCredentials =
+    config?.hasCredentials === true ||
+    checkHasCredentials(platform, credentials);
+  const isSandbox = environment === 'sandbox';
 
   const handleToggleEnabled = async () => {
     if (!config) {
@@ -114,6 +145,8 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
         credentials,
         remoteRestaurantId,
         autoAccept,
+        branchId,
+        environment,
       });
     } else {
       if (!config.isEnabled && !hasCredentials) {
@@ -135,24 +168,44 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
         credentials,
         remoteRestaurantId,
         autoAccept,
+        branchId,
+        environment,
       });
     } else {
+      // Only send credentials when the operator actually edited a credential
+      // field this session. The GET configs endpoint strips secrets, so our
+      // local `credentials` is empty for an already-saved platform — sending
+      // it would wipe the stored encrypted credentials on the backend.
+      // Branch/environment/auto-accept changes save without re-entry.
       await updateConfig.mutateAsync({
         platform,
-        credentials,
+        ...(credentialsDirty ? { credentials } : {}),
         remoteRestaurantId,
         autoAccept,
+        branchId,
+        environment,
       });
     }
     setHasChanges(false);
+    setCredentialsDirty(false);
   };
 
   const handleCredentialsChange = (
     creds: Record<string, any>,
     remoteId: string,
   ) => {
+    // PlatformCredentialsForm bundles credential edits AND the (non-secret)
+    // remote-restaurant-id edit through this one callback. Only flag the
+    // credentials payload dirty when a credential field actually changed —
+    // editing just the remote restaurant id must NOT force credential
+    // re-entry (and must not wipe stored secrets on save).
+    const credentialsChanged =
+      JSON.stringify(creds) !== JSON.stringify(credentials);
     setCredentials(creds);
     setRemoteRestaurantId(remoteId);
+    if (credentialsChanged) {
+      setCredentialsDirty(true);
+    }
     setHasChanges(true);
   };
 
@@ -171,6 +224,30 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
         open: !config.restaurantOpen,
       });
     }
+  };
+
+  const handleBranchChange = (value: string) => {
+    setBranchId(value === '' ? null : value);
+    setHasChanges(true);
+  };
+
+  const handleEnvironmentChange = (next: PlatformEnvironment) => {
+    setEnvironment(next);
+    setHasChanges(true);
+  };
+
+  const handleSendTestOrder = () => {
+    if (!config) return;
+    if (!isSandbox) {
+      toast.error(t('onlineOrders.testOrderSandboxOnly'));
+      return;
+    }
+    sendTestOrder.mutate(platform);
+  };
+
+  const handleSyncMenu = () => {
+    if (!config) return;
+    syncMenu.mutate(platform);
   };
 
   const isSaving =
@@ -273,6 +350,75 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
             </button>
           </div>
 
+          {/* Branch selector — which branch receives this platform's orders */}
+          <div className="py-2">
+            <label
+              htmlFor={`branch-${platform}`}
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              {t('onlineOrders.branch')}
+            </label>
+            <select
+              id={`branch-${platform}`}
+              value={branchId ?? ''}
+              onChange={(e) => handleBranchChange(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">{t('onlineOrders.branchDefault')}</option>
+              {(branches ?? [])
+                .filter((b) => b.status === 'active')
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              {t('onlineOrders.branchDescription')}
+            </p>
+          </div>
+
+          {/* Environment (sandbox) toggle */}
+          <div className="py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <FlaskConical className="h-4 w-4 text-slate-400" />
+                <p className="text-sm font-medium text-slate-700">
+                  {t('onlineOrders.environment.label')}
+                </p>
+              </div>
+              <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+                {(['production', 'sandbox'] as const).map((env) => (
+                  <button
+                    key={env}
+                    type="button"
+                    onClick={() => handleEnvironmentChange(env)}
+                    aria-pressed={environment === env}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      environment === env
+                        ? env === 'sandbox'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-primary-100 text-primary-700'
+                        : 'bg-white text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    {env === 'sandbox'
+                      ? t('onlineOrders.environment.sandbox')
+                      : t('onlineOrders.environment.production')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {isSandbox && (
+              <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700">
+                  {t('onlineOrders.environment.sandboxWarning')}
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Error Info */}
           {config?.lastError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -334,6 +480,37 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
                 {config.restaurantOpen ? t('onlineOrders.closeRestaurant') : t('onlineOrders.openRestaurant')}
               </button>
             )}
+
+            {/* Menu sync */}
+            <button
+              onClick={handleSyncMenu}
+              disabled={syncMenu.isPending || !config}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {syncMenu.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              {t('onlineOrders.syncMenu')}
+            </button>
+
+            {/* Send test order — sandbox-only "we've never tested" affordance */}
+            <button
+              onClick={handleSendTestOrder}
+              disabled={sendTestOrder.isPending || !config || !isSandbox}
+              title={
+                !isSandbox ? t('onlineOrders.testOrderSandboxOnly') : undefined
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendTestOrder.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              {t('onlineOrders.sendTestOrder')}
+            </button>
           </div>
 
           {/* Sync Info */}

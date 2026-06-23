@@ -80,6 +80,7 @@
     "personnel": "Personnel",
     "stock": "Stock",
     "invoices": "Invoices",
+    "deliveryOrders": "Delivery Orders",
     "devices": "Devices",
     "branches": "Branches",
     "health": "Branch Health",

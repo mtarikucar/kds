@@ -192,6 +192,14 @@ const SECTIONS: NavSection[] = [
         gate: { feature: 'advancedReports' },
       },
       {
+        to: '/admin/delivery-orders',
+        icon: Truck,
+        labelKey: 'navigation.deliveryOrders',
+        labelFallback: 'Paket Siparişleri',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'deliveryIntegration' },
+      },
+      {
         to: '/admin/invoices',
         icon: Receipt,
         labelKey: 'navigation.invoices',

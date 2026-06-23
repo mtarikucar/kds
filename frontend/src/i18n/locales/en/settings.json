@@ -100,7 +100,22 @@
       "restaurantClosed": "Restaurant closed on platform",
       "toggleFailed": "Failed to toggle restaurant status",
       "menuSyncStarted": "Menu sync initiated",
-      "menuSyncFailed": "Menu sync failed"
+      "menuSyncFailed": "Menu sync failed",
+      "testOrderCreated": "Test order created: {{orderNumber}}",
+      "testOrderSent": "Test order sent through the pipeline",
+      "testOrderFailed": "Failed to send test order"
+    },
+    "branch": "Branch",
+    "branchDefault": "First active branch (default)",
+    "branchDescription": "Which branch receives this platform’s orders.",
+    "syncMenu": "Sync Menu",
+    "sendTestOrder": "Send Test Order",
+    "testOrderSandboxOnly": "Switch this platform to sandbox to send a test order.",
+    "environment": {
+      "label": "Environment",
+      "production": "Production",
+      "sandbox": "Sandbox",
+      "sandboxWarning": "Sandbox routes this platform to its test endpoints and enables the built-in test-order simulator. No real orders are processed."
     }
   },
   "autoSave": {

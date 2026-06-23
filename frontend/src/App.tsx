@@ -63,6 +63,7 @@ const ReservationsPage = lazy(() => import('./pages/admin/ReservationsPage'));
 const PersonnelManagementPage = lazy(() => import('./pages/admin/PersonnelManagementPage'));
 const StockManagementPage = lazy(() => import('./pages/admin/StockManagementPage'));
 const InvoicesPage = lazy(() => import('./pages/admin/invoices/InvoicesPage'));
+const DeliveryOrdersPage = lazy(() => import('./pages/admin/DeliveryOrdersPage'));
 
 // Onboarding (lazy-loaded)
 const WelcomePage = lazy(() => import('./pages/onboarding/WelcomePage'));
@@ -266,6 +267,10 @@ function App() {
           </FeatureGate>
         } />
         <Route path="/admin/invoices" element={<InvoicesPage />} />
+        {/* Operator-facing delivery-orders moderation queue (accept / reject /
+            set prep-time on incoming Yemeksepeti/Getir/Trendyol/Migros orders).
+            Self-gates behind the deliveryIntegration plan feature. */}
+        <Route path="/admin/delivery-orders" element={<DeliveryOrdersPage />} />
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>

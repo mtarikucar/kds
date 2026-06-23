@@ -1,0 +1,136 @@
+---
+title: Online Ordering (Delivery Platforms)
+description: Connect your Yemeksepeti, Getir, Trendyol Yemek and Migros Yemek accounts — enter credentials, validate the pipeline with a sandbox test order, accept/reject/set prep time on incoming orders, push your menu and handle errors.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Online Ordering (Delivery Platforms)
+
+**Menu path:** Settings → Online Ordering &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
+**Access:** ADMIN (setup), MANAGER (view, test, open/close store)
+**Plan:** `deliveryIntegration` — PRO+ (or the `delivery_*` add-on)
+
+## Purpose
+
+This screen connects your restaurant to the **Yemeksepeti, Getir, Trendyol Yemek and Migros Yemek** platforms. Once a connection is live, orders from those platforms land straight on your kitchen display (KDS) and auto-print to the kitchen printer; you can map your products and push your menu, and open or close the store on the platform's side.
+
+<Callout type="info">
+  Each platform is configured on its own card. Until you open a card, enter
+  credentials and turn the integration on, **no orders are received** from that
+  platform.
+</Callout>
+
+## Connecting a platform
+
+<Steps>
+### Enter the restaurant identifier
+
+In the **Restaurant ID (`remoteRestaurantId`)** field, enter the store/branch number the platform issued to you. Incoming orders are matched to your business through this identifier.
+
+### Enter the credential keys
+
+Each platform expects different fields (`*` is required):
+
+- **Yemeksepeti:** Client ID\*, Client Secret\*, Chain Code, POS Vendor ID
+- **Getir:** App Secret Key\*, Restaurant Secret Key\*
+- **Trendyol Yemek:** API Version (`v1` or `v2`), Username, Password, Integrator ID (v2), Integrator Secret (v2)
+- **Migros Yemek:** API Key\*
+
+The keys are stored encrypted on the server and stay hidden when you return to the screen.
+
+### Choose the branch
+
+If you run multiple branches, pick the **branch** that should receive this platform's orders (one config per platform → one branch). Leave it empty to use the first active branch.
+
+### Save and test the connection
+
+After saving, use **Test Connection** to verify the keys are valid. The test performs a real sign-in attempt on the platform's side; if it fails, review the keys or the restaurant identifier.
+
+### Turn the integration on
+
+Flip the card's toggle. If any required field is empty, the system warns you. Once enabled, orders begin to flow.
+</Steps>
+
+<Callout type="warning">
+  Entering, updating and deleting keys, and pushing the menu, are **ADMIN**-only.
+  **MANAGER** users can view the cards and the activity log, run a connection test,
+  and open or close the store — but cannot change the keys.
+</Callout>
+
+## Test first (without a live account)
+
+You can validate the whole flow (order → KDS → printer) without having any live platform account.
+
+<Steps>
+### Switch the platform to "sandbox" mode
+
+Set the **Environment** field to **`sandbox`** in the configuration.
+
+### Send a test order
+
+Use **Send Test Order** to fire a synthetic order. It runs through the **same** pipeline real orders use.
+
+### Verify the outcome
+
+The order shows on the KDS with `[TEST]`-labelled items and prints to the kitchen printer. Because it arrives with a fixed `TEST-` prefix it can't be confused with a real one; you can cancel it safely.
+</Steps>
+
+<Callout type="warning">
+  A test order works **only** on sandbox configs — so a fake order is never sent
+  to a live platform.
+</Callout>
+
+## How incoming orders flow
+
+The platforms operate differently:
+
+- **Yemeksepeti** — webhook (real time).
+- **Trendyol Yemek** — webhook + polling (~15 sec).
+- **Getir** — polling (~15 sec).
+- **Migros Yemek** — polling (~20 sec).
+
+When **Auto Accept** is on, an incoming order is accepted hands-free and sent to the kitchen. When auto-accept is off — **or** an item isn't mapped to your menu, **or** the platform total drifts noticeably from the sum of items — the order **waits for approval** and won't enter the kitchen until you approve it.
+
+### Accept / reject / set prep time
+
+From the KDS or this screen:
+
+- **Accept** — moves the order into the kitchen queue and tells the platform it's accepted. You can set a prep time at the same time.
+- **Reject** — a **reason is required** and forwarded to the platform (the customer/courier sees why). Only orders the kitchen hasn't started can be rejected.
+- **Prep Time** — tells the platform the order is now being prepared.
+
+### Cancellation, amendment and refund
+
+- **Cancellation:** if the platform cancels an order, it moves to cancelled automatically and drops off the KDS.
+- **Amendment:** the platform may change an order's items before the kitchen starts; the KDS updates automatically. Once the order is ready/served, an amendment is refused.
+- **Refund:** the platform initiates the refund. A **full refund** moves the order to cancelled; a **partial refund** keeps the status and the amount is recorded on the order's note/log.
+
+<Callout type="info">
+  **Refunds cannot be started by the restaurant.** On these four platforms a refund
+  is issued from the platform's own panel / customer service; we only reflect a
+  refund the platform tells us about.
+</Callout>
+
+## Menu mapping and sync
+
+To push your menu to a platform, you must link each of your products to its counterpart on that platform (**external item ID**). Menu sync pushes only **mapped** products and writes each product's name, price (₺) and availability. When you mark a product "out of stock", that status can be reflected on the platform too.
+
+<Callout type="info">
+  **Open / Close store:** marks your restaurant open or closed only on that
+  platform's side. It's handy for temporarily pausing new orders during a rush —
+  you can close the store without turning the integration off.
+</Callout>
+
+## Activity log and error handling
+
+The **Activity Log** at the bottom of the page shows recent order and sync operations; you can filter by all / successful / failed. Personal data in the raw payload of incoming orders is masked before it is logged.
+
+As errors accumulate on a platform, the card switches to a **warning**. If the error count reaches **10**, the circuit breaker trips, the integration is **turned off automatically**, and an alert is emitted. When this happens: open the card, read the **Last error** message, fix the credentials, verify with **Test Connection**, then **re-enable the integration manually**.
+
+## Related pages
+
+- **Kitchen flow:** [Kitchen Display (KDS)](/en/admin-guide/kitchen)
+- **Menu setup:** [Menu Management](/en/admin-guide/menu)
+- **Settings overview:** [Settings](/en/admin-guide/settings)
+- **Developer reference (endpoints, webhook signatures):** [Delivery Platforms](https://developer.hummytummy.com/en/integrations/delivery-platforms)

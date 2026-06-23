@@ -22,4 +22,5 @@ export default {
   "health": "System Health",
   "fiscal-recovery": "Fiscal Recovery",
   "settings": "Settings",
+  "online-orders": "Online Ordering",
 };

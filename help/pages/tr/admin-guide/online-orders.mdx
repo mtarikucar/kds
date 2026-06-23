@@ -1,0 +1,136 @@
+---
+title: Online Sipariş (Teslimat Platformları)
+description: Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek hesaplarınızı bağlayın — kimlik bilgisi girişi, sandbox test siparişiyle hattı doğrulama, gelen siparişleri kabul/ret/hazırlık süresi, menü gönderme ve hata yönetimi.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Online Sipariş (Teslimat Platformları)
+
+**Menü yolu:** Ayarlar → Online Sipariş &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
+**Erişim:** ADMIN (kurulum), MANAGER (görüntüleme, test, dükkân aç/kapat)
+**Plan:** `deliveryIntegration` — PRO+ (veya `delivery_*` eklentisi)
+
+## Amacı
+
+Bu ekran restoranınızı **Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek** platformlarına bağlar. Bağlantı kurulduğunda bu platformlardan gelen siparişler doğrudan mutfak ekranınıza (KDS) düşer ve mutfak yazıcısına otomatik basılır; ürünlerinizi eşleyip menünüzü gönderebilir, dükkânı platform üzerinden açıp kapatabilirsiniz.
+
+<Callout type="info">
+  Her platform ayrı bir kartla yapılandırılır. Bir kartı açıp kimlik bilgisi
+  girmediğiniz ve entegrasyonu açmadığınız sürece o platformdan **hiçbir sipariş
+  alınmaz**.
+</Callout>
+
+## Bir platformu bağlama
+
+<Steps>
+### Restoran kimliğini girin
+
+**Restoran Kimliği (`remoteRestaurantId`)** alanına, platformun size verdiği mağaza/şube numarasını yazın. Gelen siparişler bu kimlik üzerinden işletmenize eşlenir.
+
+### Kimlik anahtarlarını girin
+
+Her platformun beklediği alanlar farklıdır (`*` zorunludur):
+
+- **Yemeksepeti:** Client ID\*, Client Secret\*, Chain Code, POS Vendor ID
+- **Getir:** App Secret Key\*, Restaurant Secret Key\*
+- **Trendyol Yemek:** API Sürümü (`v1` veya `v2`), Username, Password, Integrator ID (v2), Integrator Secret (v2)
+- **Migros Yemek:** API Key\*
+
+Anahtarlar sunucuda şifrelenerek saklanır; ekrana döndüğünüzde gizli kalır.
+
+### Şubeyi seçin
+
+Çok şubeliyseniz bu platformun siparişlerinin düşeceği **şubeyi** seçin (platform başına bir yapılandırma → bir şube). Boş bırakırsanız ilk aktif şube kullanılır.
+
+### Kaydedin ve bağlantıyı test edin
+
+Kaydettikten sonra **Bağlantıyı Test Et** ile anahtarların geçerli olduğunu doğrulayın. Test, platform tarafında gerçek bir oturum açma denemesi yapar; başarısızsa anahtarları veya restoran kimliğini gözden geçirin.
+
+### Entegrasyonu açın
+
+Kartın anahtarını (toggle) açın. Zorunlu alanlar boşsa sistem uyarır. Açıldıktan sonra siparişler akmaya başlar.
+</Steps>
+
+<Callout type="warning">
+  Anahtar girme, güncelleme, silme ve menü gönderme yalnızca **ADMIN** yetkisindedir.
+  **MANAGER** kartları ve etkinlik kaydını görebilir, bağlantı testi yapabilir ve
+  dükkânı açıp kapatabilir; anahtarları değiştiremez.
+</Callout>
+
+## Önce test edin (canlı hesap olmadan)
+
+Hiç canlı platform hesabınız olmadan tüm akışı (sipariş → KDS → yazıcı) doğrulayabilirsiniz.
+
+<Steps>
+### Platformu "sandbox" moduna alın
+
+Yapılandırmada **Ortam (environment)** alanını **`sandbox`** yapın.
+
+### Test siparişi gönderin
+
+**Test Siparişi Gönder** ile sentetik bir sipariş tetikleyin. Bu sipariş gerçek siparişlerin geçtiği **aynı** hattı kullanır.
+
+### Sonucu doğrulayın
+
+Sipariş KDS'te `[TEST]` etiketli kalemlerle görünür ve mutfak yazıcısına basılır. Sabit `TEST-` ön ekiyle geldiği için gerçek bir siparişle karıştırılamaz; güvenle iptal edebilirsiniz.
+</Steps>
+
+<Callout type="warning">
+  Test siparişi **yalnızca sandbox** yapılandırmalarda çalışır — böylece sahte bir
+  sipariş asla canlı platforma iletilmez.
+</Callout>
+
+## Gelen siparişler nasıl akar?
+
+Platformlar farklı yöntemlerle çalışır:
+
+- **Yemeksepeti** — webhook (gerçek zamanlı).
+- **Trendyol Yemek** — webhook + yoklama (~15 sn).
+- **Getir** — yoklama (~15 sn).
+- **Migros Yemek** — yoklama (~20 sn).
+
+**Otomatik Onay** açıkken gelen sipariş el değmeden kabul edilip mutfağa gönderilir. Otomatik onay kapalıysa — **veya** bir kalem menünüze eşlenmemişse **veya** platform toplamı kalem toplamından belirgin saparsa — sipariş **onay bekler** ve siz onaylayana dek mutfağa girmez.
+
+### Siparişi kabul / ret / hazırlık süresi
+
+KDS veya bu ekrandan:
+
+- **Kabul Et** — siparişi mutfak kuyruğuna alır ve platforma kabul bildirir. İsterseniz aynı anda bir hazırlık süresi verebilirsiniz.
+- **Reddet** — bir **neden zorunludur** ve platforma iletilir (müşteri/kurye nedeni görür). Yalnızca henüz başlanmamış siparişler reddedilebilir.
+- **Hazırlık Süresi** — platforma siparişin hazırlandığını bildirir.
+
+### İptal, sipariş değişikliği ve iade
+
+- **İptal:** platform bir siparişi iptal ederse sipariş otomatik olarak iptale geçer ve KDS'ten düşer.
+- **Değişiklik:** platform, mutfak başlamadan önce sipariş kalemlerini değiştirebilir; KDS otomatik güncellenir. Sipariş hazır/servis edilmiş ise değişiklik kabul edilmez.
+- **İade:** iadeyi platform başlatır. **Tam iade** siparişi iptale taşır; **kısmi iade** durumu korur ve tutar siparişin notuna/kaydına işlenir.
+
+<Callout type="info">
+  **Restoran tarafından iade başlatılamaz.** Bu dört platformda iade, platformun
+  kendi panelinden/müşteri hizmetlerinden yapılır; biz yalnızca platformun
+  bildirdiği iadeyi yansıtırız.
+</Callout>
+
+## Menü eşleme ve gönderme
+
+Bir platforma menü gönderebilmek için her ürününüzü o platformdaki karşılığına (**dış ürün kimliği**) bağlamanız gerekir. Menü senkronu yalnızca **eşlenmiş** ürünleri gönderir ve ürünün adını, fiyatını (₺) ve uygunluğunu platforma yazar. Bir ürünü "tükendi" yaptığınızda bu durum platforma da yansıtılabilir.
+
+<Callout type="info">
+  **Dükkânı Aç / Kapat:** restoranınızı yalnızca ilgili platform tarafında açık/kapalı
+  işaretler. Yoğunlukta yeni sipariş almayı geçici durdurmak için kullanışlıdır —
+  entegrasyonu kapatmadan dükkânı kapatabilirsiniz.
+</Callout>
+
+## Etkinlik kaydı ve hata yönetimi
+
+Sayfanın altındaki **Etkinlik Kaydı** son sipariş ve senkron işlemlerini gösterir; tümü / başarılı / başarısız olarak filtrelenebilir. Gelen siparişlerin ham içeriğindeki kişisel veriler kayda yazılmadan maskelenir.
+
+Bir platformda hata biriktikçe kart bir **uyarıya** döner. Hata sayısı **10'a** ulaşırsa devre kesici devreye girer, entegrasyon **otomatik kapatılır** ve bir uyarı yayınlanır. Bu durumda: kartı açın, **Son hata** mesajını okuyun, kimlik bilgilerini düzeltip **Bağlantıyı Test Et** ile doğrulayın, ardından entegrasyonu **elle yeniden açın**.
+
+## İlgili sayfalar
+
+- **Mutfak akışı:** [Mutfak Ekranı (KDS)](/tr/admin-guide/kitchen)
+- **Menü kurulumu:** [Menü Yönetimi](/tr/admin-guide/menu)
+- **Ayarlar genel bakış:** [Ayarlar](/tr/admin-guide/settings)
+- **Geliştirici referansı (uç noktalar, webhook imzaları):** [Teslimat Platformları](https://developer.hummytummy.com/tr/integrations/delivery-platforms)

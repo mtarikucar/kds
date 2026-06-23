@@ -34,6 +34,7 @@ import {
   useToggleRestaurant,
   useDeliveryPlatformLogs,
   useSyncMenu,
+  useSendTestOrder,
 } from './deliveryPlatformsApi';
 
 let client: QueryClient;
@@ -112,6 +113,30 @@ describe('deliveryPlatformsApi mutations', () => {
     });
   });
 
+  it('useUpdatePlatformConfig does NOT send credentials when the caller omits them (branch/environment-only save must not wipe stored secrets)', async () => {
+    h.patch.mockResolvedValue({ data: {} });
+    const { result } = renderHook(() => useUpdatePlatformConfig(), { wrapper });
+    // PlatformCard omits `credentials` from the payload unless a credential
+    // field was actually edited. A branch/environment-only save therefore
+    // reaches the API without a `credentials` key, so the backend keeps the
+    // existing encrypted credentials it stripped on read.
+    await result.current.mutateAsync({
+      platform: 'getir',
+      branchId: 'branch-1',
+      environment: 'sandbox',
+      autoAccept: true,
+      remoteRestaurantId: 'REST-42',
+    });
+    expect(h.patch).toHaveBeenCalledWith('/delivery-platforms/configs/getir', {
+      branchId: 'branch-1',
+      environment: 'sandbox',
+      autoAccept: true,
+      remoteRestaurantId: 'REST-42',
+    });
+    const sentBody = h.patch.mock.calls[0][1] as Record<string, unknown>;
+    expect(sentBody).not.toHaveProperty('credentials');
+  });
+
   it('useDeletePlatformConfig DELETEs a platform', async () => {
     h.del.mockResolvedValue({ data: {} });
     const { result } = renderHook(() => useDeletePlatformConfig(), { wrapper });
@@ -148,10 +173,35 @@ describe('deliveryPlatformsApi mutations', () => {
     );
   });
 
-  it('useSyncMenu POSTs the menu-sync endpoint', async () => {
+  it('useSyncMenu POSTs the menu-sync endpoint and invalidates configs', async () => {
     h.post.mockResolvedValue({ data: {} });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
     const { result } = renderHook(() => useSyncMenu(), { wrapper });
     await result.current.mutateAsync('getir');
     expect(h.post).toHaveBeenCalledWith('/delivery-platforms/menu-sync/getir');
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ['deliveryPlatformConfigs'],
+    });
+  });
+
+  it('useSendTestOrder POSTs the test-order endpoint and toasts the order number', async () => {
+    h.post.mockResolvedValue({
+      data: { simulated: true, orderNumber: 'KDS-TEST-1', status: 'PENDING' },
+    });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useSendTestOrder(), { wrapper });
+    await result.current.mutateAsync('getir');
+    expect(h.post).toHaveBeenCalledWith('/delivery-platforms/test-order/getir');
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ['deliveryPlatformLogs'],
+    });
+    expect(h.toastSuccess).toHaveBeenCalled();
+  });
+
+  it('useSendTestOrder surfaces the API error when the platform is not sandbox', async () => {
+    h.post.mockRejectedValue(new Error('sandbox only'));
+    const { result } = renderHook(() => useSendTestOrder(), { wrapper });
+    await expect(result.current.mutateAsync('getir')).rejects.toThrow();
+    expect(h.toastError).toHaveBeenCalled();
   });
 });

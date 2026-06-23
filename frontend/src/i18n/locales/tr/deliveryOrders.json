@@ -1,0 +1,48 @@
+{
+  "title": "Paket Siparişleri",
+  "description": "Yemeksepeti, Getir, Trendyol ve Migros'tan gelen siparişler",
+  "externalIdLabel": "No:",
+  "awaitingApproval": "Onayınızı bekleyen {{count}} sipariş",
+  "loadError": "Paket siparişleri yüklenemedi.",
+  "filters": {
+    "all": "Tümü"
+  },
+  "empty": {
+    "title": "Paket siparişi yok",
+    "description": "Yeni platform siparişleri burada otomatik olarak görünür."
+  },
+  "status": {
+    "PENDING_APPROVAL": "Onay bekliyor",
+    "PENDING": "Kabul edildi",
+    "PREPARING": "Hazırlanıyor",
+    "READY": "Hazır",
+    "SERVED": "Servis edildi",
+    "PAID": "Ödendi",
+    "CANCELLED": "Reddedildi"
+  },
+  "moderation": {
+    "prepTimeOptional": "Hazırlık süresi (opsiyonel):",
+    "minutesShort": "{{minutes}} dk",
+    "accept": "Kabul et",
+    "acceptWithPrep": "Kabul et · {{minutes}} dk",
+    "reject": "Reddet",
+    "setPrepTime": "Hazırlık süresi belirle",
+    "setPrepTimeButton": "Belirle",
+    "minutesPlaceholder": "Dakika",
+    "rejectModalTitle": "Siparişi reddet",
+    "rejectModalDescription": "Gerekçe platforma iletilir; müşteri siparişin neden reddedildiğini görebilir.",
+    "reasonPlaceholder": "Reddetme gerekçesi",
+    "cancel": "Vazgeç",
+    "confirmReject": "Siparişi reddet"
+  },
+  "toast": {
+    "accepted": "Sipariş kabul edildi",
+    "alreadyAccepted": "Sipariş zaten kabul edilmişti",
+    "acceptFailed": "Sipariş kabul edilemedi",
+    "rejected": "Sipariş reddedildi",
+    "alreadyRejected": "Sipariş zaten reddedilmişti",
+    "rejectFailed": "Sipariş reddedilemedi",
+    "prepTimeSet": "Hazırlık süresi {{minutes}} dk olarak ayarlandı",
+    "prepTimeFailed": "Hazırlık süresi ayarlanamadı"
+  }
+}

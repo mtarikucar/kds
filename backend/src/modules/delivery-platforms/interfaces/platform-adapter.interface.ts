@@ -55,6 +55,29 @@ export interface PlatformAdapter {
     reason?: string,
   ): Promise<void>;
 
+  /**
+   * Restaurant-INITIATED (outbound) refund of an order on the platform.
+   *
+   * OPTIONAL — on the four Turkish platforms we integrate (Getir,
+   * Yemeksepeti, Trendyol, Migros) refunds are owned by the platform's own
+   * customer-service / settlement flow, NOT the restaurant POS, so none of
+   * those adapters implements this method. The common case is the INBOUND
+   * direction: the platform initiates the refund and notifies us — handled by
+   * DeliveryOrderService.applyPlatformRefund, which never calls back out.
+   *
+   * An adapter should implement this ONLY if its platform genuinely exposes a
+   * restaurant-initiated refund endpoint. DeliveryOrderService.refundOrderOnPlatform
+   * dispatches here only when implemented and otherwise throws an honest
+   * "unsupported" error rather than faking an outbound call.
+   *
+   * @param amount Partial refund amount in major units; omit for a full refund.
+   */
+  refundOrder?(
+    config: DeliveryPlatformConfig,
+    externalOrderId: string,
+    amount?: number,
+  ): Promise<void>;
+
   /** Poll platform for new orders (Getir, Migros, Trendyol) */
   pollNewOrders?(config: DeliveryPlatformConfig): Promise<NormalizedOrder[]>;
 

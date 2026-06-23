@@ -1,99 +1,236 @@
 ---
 title: Teslimat Platformları
-description: Getir, Yemeksepeti, Trendyol Yemek ve Migros Yemek hesaplarını bağlayın — kimlik bilgisi girişi, bağlantı testi, menü eşleme ve gelen siparişlerin mutfak ekranına akışı.
+description: Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek hesaplarını bağlayın — kimlik bilgileri, sandbox test siparişi, gelen sipariş yaşam döngüsü (kabul/ret/hazırlık süresi/iptal/değişiklik/iade), webhook imzaları, menü senkronu ve sorun giderme.
 ---
 
-import { Callout, Steps } from 'nextra/components'
+import { Callout, Steps, Tabs } from 'nextra/components'
 
 # Teslimat Platformları
 
-**Menü yolu:** Ayarlar → Online Sipariş Platformları &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
-**Erişim:** ADMIN, MANAGER  •  **Plan:** `deliveryIntegration` özelliği olan planlar
+**Operatör menü yolu:** Ayarlar → Online Sipariş &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
+**Erişim:** ADMIN (yapılandırma), MANAGER (görüntüleme/test/dükkân aç-kapat)  •  **Plan:** `deliveryIntegration` özelliği olan planlar
 
-## Amacı
-
-Bu ekran restoranınızı **Getir Yemek, Yemeksepeti, Trendyol Yemek ve Migros Yemek** platformlarına bağlar. Bağlantı kurulduğunda bu platformlardan gelen siparişler doğrudan mutfak ekranınıza (KDS) düşer; ürünlerinizi platforma eşleyip menünüzü gönderebilir, dükkânı platform üzerinden açıp kapatabilirsiniz. Tüm akışı tek sayfadan yönetir, hata olursa aynı sayfadaki etkinlik kaydından takip edersiniz.
+Bu entegrasyon restoranınızı **Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek** platformlarına bağlar. Gelen siparişler doğrudan bir HummyTummy `Order` kaydına dönüşür, mutfak ekranına (KDS) düşer ve mutfak yazıcısına otomatik basılır. Tüm akış tek bir module (`delivery-platforms`) içinde toplanmıştır; siparişler, menü senkronu ve dükkân aç/kapat aynı adaptör katmanı üzerinden çalışır.
 
 <Callout type="info">
-  Sayfa dört platform kartını her zaman gösterir. Bir kartı açıp kimlik bilgisi
-  girmediğiniz sürece o platform **"Yapılandırılmamış"** durumunda kalır ve hiçbir
-  sipariş alınmaz.
+  Bu sayfa **geliştirici** referansıdır (uç noktalar, imzalar, yaşam döngüsü).
+  Operatör kurulumu için yardım portalındaki
+  **[Online Sipariş](https://help.hummytummy.com/tr/admin-guide/online-orders)**
+  sayfasına bakın.
 </Callout>
 
-## Bir platformu bağlama
+## 1. Platform başına bağlantı
 
-Her platform genişleyen bir kart olarak listelenir. Kartın başlığına dokununca kimlik bilgisi formu açılır.
+Her platform için tenant başına **tek bir yapılandırma** (`DeliveryPlatformConfig`) tutulur. Operatör, kimlik bilgilerini **Ayarlar → Online Sipariş** ekranından girer; sunucuda şifrelenerek saklanır (yanıtlarda asla geri dönmez, yalnızca `hasCredentials` / `hasAccessToken` bayrakları döner).
+
+### Yapılandırma alanları
+
+| Alan | Açıklama |
+| --- | --- |
+| `platform` | `YEMEKSEPETI` · `GETIR` · `TRENDYOL` · `MIGROS` |
+| `remoteRestaurantId` | Platformun verdiği mağaza/şube/zincir kimliği. Gelen webhook ve poll çağrıları bu kimlik üzerinden tenant'a eşlenir. |
+| `credentials` | Platforma özel anahtarlar (aşağıda). |
+| `branchId` | Bu platformun siparişlerini alacak **şube**. Çok şubeli routing: platform başına bir yapılandırma → bir şube. Boş/`null` ise "ilk aktif şube" yedeği uygulanır. |
+| `environment` | `production` (canlı) veya `sandbox` (test uç noktaları + test siparişi simülatörü). Varsayılan `production`. |
+| `autoAccept` | `true` ise gelen sipariş otomatik kabul edilir; `false` ise `PENDING_APPROVAL` olarak bekler. |
+
+### Platforma göre kimlik bilgileri
+
+Her adaptör farklı bir kimlik doğrulama yöntemi kullanır:
+
+<Tabs items={['Yemeksepeti', 'Getir', 'Trendyol', 'Migros']}>
+<Tabs.Tab>
+**OAuth client-credentials.** `POST /v2/login` ile `clientId` + `clientSecret` gönderilir, dönen `access_token` saklanır (süre dolmadan 5 dk önce yenilenir). Menü ve dükkân-durum çağrıları için ek olarak `chainCode` ve `posVendorId` kullanılır.
+
+```
+credentials = { clientId, clientSecret, chainCode?, posVendorId? }
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Anahtar tabanlı login.** `POST /auth/login` ile `appSecretKey` + `restaurantSecretKey` gönderilir, dönen `token` saklanır (~55 dk sonra yenilenir).
+
+```
+credentials = { appSecretKey, restaurantSecretKey }
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**İki sürüm.** `v2` (önerilen): `POST /integration/auth/token` ile `integratorId` + `integratorSecret` → Bearer token (~50 dk). `v1` (eski, Basic Auth): `username` + `password` base64'lenir.
+
+```
+credentials = { apiVersion: "v1" | "v2", username?, password?, integratorId?, integratorSecret? }
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Şube başına API key.** Token yenileme yoktur; `apiKey` her istekte `X-API-Key` başlığında, `remoteRestaurantId` ise `X-Branch-Id` başlığında gönderilir.
+
+```
+credentials = { apiKey }
+```
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  `remoteRestaurantId`, platform + restoran kimliği çiftinde **benzersizdir**
+  (`@@unique([platform, remoteRestaurantId])`). Aynı mağaza kimliğini ikinci bir
+  tenant/şube için kaydetmeye çalışmak çakışma hatası döndürür.
+</Callout>
+
+## 2. Sandbox / test modu
+
+Canlı bir platform hesabı **hiç bağlanmadan** tüm ingest → KDS → yazıcı hattını doğrulayabilirsiniz. Yapılandırmanın `environment` alanını **`sandbox`** yapın ve test siparişi tetikleyin.
 
 <Steps>
-### Adım 1 — Restoran kimliğini girin
+### Yapılandırmayı sandbox'a alın
 
-Formun üstündeki **Restoran Kimliği (`remoteRestaurantId`)** alanına, platformun size verdiği mağaza/şube numarasını yazın. Gelen siparişler ve webhook çağrıları bu kimlik üzerinden sizin işletmenize eşlenir.
+`PATCH /delivery-platforms/configs/:platform` ile `{ "environment": "sandbox" }` gönderin. Sandbox modunda adaptör, platformun test uç noktalarına yönlenir (Trendyol için `stageapi.trendyol.com`; diğerleri için sandbox host'u henüz yayınlanmadığından üretim host'una düşer, ilgili `*_SANDBOX_API_BASE_URL` ortam değişkeniyle ezilebilir).
 
-### Adım 2 — Kimlik anahtarlarını girin
+### Test siparişi gönderin
 
-Her platformun beklediği alanlar farklıdır (`*` zorunludur):
+```
+POST /delivery-platforms/test-order/:platform   (ADMIN)
+```
 
-- **Getir Yemek:** App Secret Key\*, Restaurant Secret Key\*
-- **Yemeksepeti:** Client ID\*, Client Secret\*, Chain Code, POS Vendor ID
-- **Trendyol Yemek:** API Version (`v1` veya `v2`), Username, Password, Integrator ID (v2), Integrator Secret (v2)
-- **Migros Yemek:** API Key\*
+Bu uç nokta, gerçek webhook'ların kullandığı **aynı** `processIncomingOrder` hattından sentetik bir sipariş geçirir. Yanıt:
 
-Şifre alanlarının yanındaki göz simgesiyle girdiğinizi doğrulayabilirsiniz. Anahtarlar sunucuda saklanır; ekrana geri dönüldüğünde gizli kalır.
+```json
+{ "simulated": true, "orderId": "...", "orderNumber": "YEM-...", "externalOrderId": "TEST-<uuid>", "status": "PENDING_APPROVAL" }
+```
 
-### Adım 3 — Kaydedin ve bağlantıyı test edin
+### Sonucu doğrulayın
 
-Bir değişiklik yaptığınızda **Kaydet** butonu belirir. Kaydettikten sonra **Bağlantıyı Test Et** ile anahtarların geçerli olduğunu platform tarafında doğrulayın. Test, gerçek bir oturum açma denemesi yapar; başarısızsa anahtarları veya restoran kimliğini gözden geçirin.
-
-### Adım 4 — Entegrasyonu açın
-
-Kart başlığındaki anahtarı (toggle) açın. Zorunlu alanlar boşsa sistem sizi uyarır ve kartı açık tutar. Açıldıktan sonra durum rozeti **"Bağlandı"** olur ve siparişler akmaya başlar.
+Sipariş; KDS'te `[TEST]` etiketli kalemlerle görünür, mutfak yazıcısına basılır ve `externalOrderId` sabit `TEST-` ön ekiyle gelir — gerçek bir siparişle karıştırılamaz. Eşlenmiş ürününüz varsa simülatör bunları kullanır; yoksa açıkça `[TEST]` etiketli, eşlenmemiş kalemlerle (notlara yazılır) `PENDING_APPROVAL` üretir.
 </Steps>
 
 <Callout type="warning">
-  Yapılandırma oluşturma, güncelleme, silme ve menü gönderme işlemleri yalnızca
-  **ADMIN** yetkisindedir. **MANAGER** kullanıcıları kartları ve etkinlik kaydını
-  görüntüleyebilir, bağlantı testi yapabilir ve dükkânı açıp kapatabilir; ancak
-  anahtarları değiştiremez.
+  Test siparişi **yalnızca `sandbox`** yapılandırmalarda çalışır. `production`
+  bir yapılandırmada uç nokta reddeder — böylece sentetik bir sipariş asla canlı
+  platforma kabul/iletme yapamaz.
 </Callout>
 
-## Sipariş senkronu nasıl çalışır?
+## 3. Gelen sipariş yaşam döngüsü
 
-Platformlar farklı yöntemlerle çalışır ve kart açıklamasında bu belirtilir:
+### Taşıma: webhook vs. yoklama (polling)
 
-- **Yemeksepeti** — webhook tabanlı (gerçek zamanlı). Siparişler platform tarafından sunucumuza anında iletilir.
-- **Trendyol Yemek** — webhook + yoklama (polling) karması.
-- **Getir Yemek** — yoklama tabanlı (yaklaşık her 15 sn).
-- **Migros Yemek** — yoklama tabanlı (yaklaşık her 20 sn).
+| Platform | Yöntem | Cadence |
+| --- | --- | --- |
+| **Yemeksepeti** | Webhook (gerçek zamanlı push) | — |
+| **Trendyol** | Webhook + yoklama | ~15 sn |
+| **Getir** | Yoklama | ~15 sn |
+| **Migros** | Yoklama | ~20 sn |
 
-**Otomatik Onay** açıkken gelen sipariş herhangi bir el işlemi beklemeden kabul edilir ve mutfağa gönderilir; kapalıysa siparişi elle onaylamanız gerekir. Kartın altındaki **Son yoklama** ve **Son menü senkronu** zaman damgaları akışın canlı olduğunu doğrulamanızı sağlar.
+İki taşıma da aynı yere iner: adaptör ham gövdeyi `NormalizedOrder` biçimine çevirir, `processIncomingOrder` bunu bir `Order`'a dönüştürür. Dedup garantisi `orders(tenantId, source, externalOrderId)` üzerindeki kısmi benzersiz index'tir (eşzamanlı çift webhook `P2002` ile sessizce yutulur).
 
-<Callout type="info">
-  **Dükkânı Aç / Kapat:** Entegrasyon açıkken kartta beliren bu buton, restoranınızı
-  yalnızca ilgili platform tarafında açık/kapalı işaretler. Yoğunlukta yeni sipariş
-  almayı durdurmak için kullanışlıdır; entegrasyonu kapatmadan dükkânı geçici olarak
-  kapatabilirsiniz.
-</Callout>
+### Yönlendirme, otomatik kabul ve onay kapısı
 
-## Menü eşleme
+- **Şube routing:** `config.branchId` bu tenant'ın aktif bir şubesini gösteriyorsa sipariş oraya; aksi halde en eski aktif şubeye düşer.
+- **Otomatik kabul:** `autoAccept` açıksa sipariş `PENDING` (mutfak kuyruğunda) oluşturulur ve platform tarafında da kabul edilir.
+- **Onay zorlama:** `autoAccept` kapalıysa **veya** eşlenmemiş kalem varsa **veya** platform toplamları kalem toplamından %5'ten (veya 1₺'den) fazla saparsa sipariş `PENDING_APPROVAL` olur — bir operatör onaylayana dek mutfağa girmez.
 
-Bir platforma menü gönderebilmek için her ürününüzü o platformdaki karşılığına bağlamanız gerekir. Eşleme, sistemdeki bir **ürün** ile platformun **dış ürün kimliği** (`externalItemId`) arasında kurulur. Menü senkronu yalnızca **eşlenmiş** ürünleri gönderir ve ürünün adını, fiyatını (₺) ve stok durumunu platforma yazar. HummyTummy'de ürünü "tükendi" yaparsanız bu durum da platforma yansıtılabilir.
+### Operatör aksiyonları
+
+```
+POST /delivery-platforms/orders/:orderId/accept     { prepTimeMinutes? }
+POST /delivery-platforms/orders/:orderId/reject      { reason }     (zorunlu)
+POST /delivery-platforms/orders/:orderId/prep-time   { minutes }    (1–240)
+```
+
+- **Kabul:** `PENDING_APPROVAL → PENDING`; platforma `acceptOrder` gönderilir. İsteğe bağlı hazırlık süresiyle birlikte yapılabilir. Zaten kabul edilmiş sipariş için no-op (`alreadyAccepted: true`).
+- **Ret:** `reason` **zorunludur** ve platforma iletilir (müşteri/kurye nedeni görür). Yalnızca `PENDING_APPROVAL`/`PENDING` reddedilebilir; sonrası iptal akışıdır.
+- **Hazırlık süresi:** platforma `markPreparing` gönderir ve siparişi `PREPARING`'e ilerletir.
+
+> Dürüstlük sözleşmesi: adaptör çağrısı başarısız olursa hata yukarı taşınır, iç durum **ilerletilmez** ve hata kaydedilir (log + devre kesici).
+
+### İptal, değişiklik ve iade (gelen)
+
+Bu olaylar yalnızca webhook'lu iki platformda (Yemeksepeti, Trendyol) uç nokta olarak vardır; Getir + Migros'ta yoklama üzerinden yüzeye çıkar.
+
+- **Durum güncellemesi / iptal** — `PICKED_UP`/`DELIVERED` → `SERVED`; `CANCELLED`/`REJECTED` → `CANCELLED`. Atomik ve idempotenttir; terminal bir siparişi geri sektirmez. Yalnızca iç durumu değiştirir, platforma geri **bildirim göndermez**.
+- **Değişiklik (amendment)** — platform, mutfak işlemeden önce sipariş kalemlerini değiştirir. Tam sepet yeniden çözümlenir, toplamlar aynı drift-güvenli mantıkla yeniden hesaplanır, KDS'e yeniden yayınlanır. Sipariş `READY`/`SERVED`/`PAID`/`CANCELLED` ise **reddedilir** (kâğıt fiş ile pişen yemeğin senkronu bozulmasın diye); platform iptal + yeniden sipariş etmelidir.
+- **İade (refund)** — platform iadeyi başlatır (parayı platform tutar). Biz yalnızca yansıtırız, geri **bildirim göndermeyiz**:
+  - **Tam iade** → sipariş `CANCELLED` olur (`cancelledAt` işlenir).
+  - **Kısmi iade** → durum korunur.
 
 <Callout type="warning">
-  Aynı platformda aynı dış ürün kimliği bir kez eşlenebilir; tekrarı sistem reddeder.
-  Ürünlerinizi önce **[Menü](https://help.hummytummy.com/tr/admin-guide/menu)** ekranında oluşturun, sonra burada
-  eşleyin.
+  **Kısmi iade tutarı dürüst sınır:** `Order` modelinde özel bir iade tutarı
+  kolonu yoktur ve teslimat siparişleri `Payment` satırı oluşturmaz. Bu yüzden
+  kısmi tutar yalnızca siparişin **`externalData.refunds[]` defterinde**,
+  notlarında, teslimat logunda ve yayınlanan
+  `delivery.order.refunded.v1` olayında durur. Muhasebe/raporlama bu kaynakları
+  okumalıdır.
 </Callout>
-
-## Etkinlik kaydı ve hata yönetimi
-
-Sayfanın alt bölümündeki **Etkinlik Kaydı**, son sipariş ve senkron işlemlerini gösterir. Tümü / başarılı / başarısız olarak filtreleyebilir, her satırı açıp ayrıntısını görebilirsiniz. Gelen siparişlerin ham içeriğindeki kişisel veriler kayda yazılmadan önce maskelenir.
-
-Bir platformda hata biriktikçe kart rozeti **"Hata"** uyarısına döner. Hata sayısı **10**'a ulaşırsa devre kesici (circuit breaker) devreye girer, rozet **"Devre Açık"** olur ve entegrasyon otomatik kapatılır. Bu durumda kartı açıp **Son hata** mesajını okuyun, kimlik bilgilerini düzeltip **Bağlantıyı Test Et** ile doğrulayın, ardından entegrasyonu yeniden açın.
 
 <Callout type="info">
-  Plan kısıtı yalnızca arayüzde değil sunucuda da uygulanır: planınızda
-  `deliveryIntegration` özelliği yoksa bu ekranın işlemleri reddedilir. Gelen
-  siparişler mutfak akışına girdiğinden, ekranı kullanmadan önce **[KDS (Mutfak
-  Ekranı)](https://help.hummytummy.com/tr/admin-guide/kitchen)** ve **[Menü](https://help.hummytummy.com/tr/admin-guide/menu)** kurulumunuzu
-  tamamlamış olmanız önerilir.
+  **Restoran-başlatımlı iade desteklenmez.** Dört platformun hiçbiri restoran
+  POS'undan iade uç noktası belgelemez (`refundOrder` opsiyoneldir ve hiçbir
+  adaptör uygulamaz). İade platformun kendi panelinden yapılır; biz onu yukarıdaki
+  gelen iade webhook'uyla yansıtırız.
 </Callout>
+
+## 4. Webhook URL'leri ve imzalar
+
+Webhook uç noktaları `Public` ama `WebhookAuthGuard` ile korunur ve dakikada 60 istekle hız sınırlıdır. `:remoteId` her zaman `remoteRestaurantId`'dir.
+
+<Tabs items={['Yemeksepeti', 'Trendyol']}>
+<Tabs.Tab>
+```
+POST /webhooks/delivery/yemeksepeti/order/:remoteId
+PUT  /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/status
+POST /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/refund
+PUT  /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/amend
+```
+
+**İmza:** `Authorization: Bearer <JWT>`. JWT, `YEMEKSEPETI_WEBHOOK_SECRET` ile `HS512` imzalanır (`alg` başlığı sıkıca `HS512` olmalı — `alg: none` ve algoritma-karıştırma reddedilir). `exp` geçerli, `iat` son 5 dk içinde olmalıdır. Token bir restoran iddiası taşıyorsa (`sub`/`restaurantId`/`chainId`/…) bu, URL'deki `:remoteId` ile eşleşmelidir (tenant'lar arası tekrar saldırısına karşı).
+</Tabs.Tab>
+<Tabs.Tab>
+```
+POST /webhooks/delivery/trendyol/order/:remoteId
+PUT  /webhooks/delivery/trendyol/:remoteId/order/:remoteOrderId/status
+POST /webhooks/delivery/trendyol/:remoteId/order/:remoteOrderId/refund
+PUT  /webhooks/delivery/trendyol/:remoteId/order/:remoteOrderId/amend
+```
+
+**İmza:** `X-Webhook-Signature` = `HMAC-SHA256(TRENDYOL_WEBHOOK_SECRET, "<timestamp>.<rawBody>")` (hex). `X-Webhook-Timestamp` **zorunludur** ve 5 dk tazelik penceresi içinde olmalıdır. HMAC, ham gövdeye karşı doğrulanır (yeniden serileştirme reddedilir). Gövde restoran kimliği taşıyorsa URL `:remoteId` ile eşleşmelidir.
+</Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  Getir ve Migros **gelen webhook kullanmaz** — siparişleri biz yoklarız, dolayısıyla
+  bu platformlar için yapılandıracağınız bir webhook URL'si veya imza sırrı yoktur.
+</Callout>
+
+### Menü / uygunluk / dükkân-durum senkronu (giden)
+
+```
+GET    /delivery-platforms/menu-mappings?platform=
+POST   /delivery-platforms/menu-mappings           { productId, platform, externalItemId, externalData? }
+DELETE /delivery-platforms/menu-mappings/:id
+POST   /delivery-platforms/menu-sync/:platform                      (ADMIN)
+POST   /delivery-platforms/configs/:platform/toggle-restaurant      { open: boolean }
+POST   /delivery-platforms/configs/:platform/test                   (bağlantı testi)
+```
+
+- **Menü eşleme:** her ürün, platformdaki karşılığına (`externalItemId`) bağlanır. Menü senkronu yalnızca **eşlenmiş** ürünleri gönderir; ad, fiyat (₺) ve uygunluk (`isAvailable && isActive`) yazılır.
+- **Uygunluk:** tek bir kalem `updateItemAvailability` ile açılıp kapatılabilir.
+- **Dükkân aç/kapat:** `toggle-restaurant`, restoranı yalnızca ilgili platform tarafında açık/kapalı işaretler — yoğunlukta yeni sipariş almayı durdurmak için (entegrasyonu kapatmadan).
+
+### Mutabakat (reconciliation)
+
+`DeliveryReconciliationService` düşük frekanslı, **salt-okunur** bir drift taramasıdır. Hiçbir adaptör mutabakat raporu sunmadığından platform-tarafı sayımları karşılaştırılmaz; bunun yerine kendi durumumuzdan:
+
+- **Bayatlık:** etkin bir yoklama yapılandırmasının `lastOrderPollAt`'i 1 saatten eskiyse (genelde devre kesici tripi veya token ölümü) işaretlenir; menü senkronu 7 günden eski ise bilgilendirme amaçlı işaretlenir.
+- **Sayım driftı:** son 24 saatte ingest edilen teslimat siparişleri ve `externalOrderId`'si olmayanlar (platforma geri senkronlanamaz).
+
+Bulgular loglanır ve tek bir `delivery.reconciliation.v1` outbox özetine toplanır.
+
+## Sorun giderme
+
+- **Devre kesici / otomatik kapanma:** bir yapılandırmada hata sayısı **10**'a ulaşırsa entegrasyon otomatik devre dışı bırakılır (platformu ve log tablosunu spam'lemeyi durdurur). `delivery.platform.auto_disabled.v1` olayı yayınlanır. Operatör nedeni (`lastError`) düzeltip yapılandırmayı **elle yeniden etkinleştirmelidir**. Kimlik bilgisini güncellemek hata sayacını sıfırlar.
+- **Ölü-mektup kuyruğu (DLQ):** başarısız giden işlemler üstel geri çekilmeyle yeniden denenir (varsayılan 3 deneme, en fazla 1 saat). Denemeler tükenince satır DLQ terminal durumuna düşer (`success:false AND nextRetryAt:null AND retryCount>=maxRetries`). DLQ derinliği `delivery_dlq_depth` metriğiyle izlenir; satırlar operatör/superadmin tarafından yeniden kuyruğa alınabilir.
+- **`restaurant not configured`:** webhook, etkin bir yapılandırmaya eşlenmeyen bir `remoteId` ile geldi — `remoteRestaurantId`'yi ve entegrasyonun açık olduğunu doğrulayın.
+- **PII maskeleme:** gelen ham gövdelerdeki kişisel veriler (telefon/e-posta/adres/ad) hem logdan hem siparişin `externalData` blob'undan kalıcı saklama öncesi maskelenir.
+
+## İlgili sayfalar
+
+- **Operatör kurulumu:** [Online Sipariş](https://help.hummytummy.com/tr/admin-guide/online-orders)
+- **Mutfak akışı:** [KDS (Mutfak Ekranı)](https://help.hummytummy.com/tr/admin-guide/kitchen)
+- **Menü kurulumu:** [Menü Yönetimi](https://help.hummytummy.com/tr/admin-guide/menu)
