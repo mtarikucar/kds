@@ -1,7 +1,7 @@
 export default {
   "index": "Genel Bakış",
-  "kurulum": "Kurulum & indirme",
-  "otomatik-guncelleme": "Otomatik güncelleme",
-  "donanim": "Donanım eşleştirme",
-  "kds-modu": "KDS / kiosk modu"
+  "install": "Kurulum & indirme",
+  "auto-update": "Otomatik güncelleme",
+  "hardware": "Donanım eşleştirme",
+  "kds-mode": "KDS / kiosk modu"
 }

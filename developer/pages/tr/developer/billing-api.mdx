@@ -10,7 +10,7 @@ import { Callout, Tabs, Steps } from 'nextra/components'
 Bu sayfa, abonelik ve para ile ilgili her şeyin entegratör referansıdır: plan
 kataloğunu okuma, proration ile yükseltme, düşürmeyi planlama, PayTR veya havale
 ödemesi oluşturma, faturaları okuma, iptal/yeniden etkinleştirme ve tenant'ın
-yetkili özelliklerini sorgulama. [API Temelleri](/tr/developer/api-temelleri)
+yetkili özelliklerini sorgulama. [API Temelleri](/tr/developer/api-fundamentals)
 sayfasındaki ortak kuralların (taban URL, auth realm'leri, şube kapsamı, hata
 zarfı, idempotency, rate-limit'ler) üzerine kurulur.
 
@@ -23,7 +23,7 @@ zarfı, idempotency, rate-limit'ler) üzerine kurulur.
 ## Kimlik & roller
 
 Bu uçlar **Personel JWT** realm'ini kullanır (`Authorization: Bearer <jwt>` —
-bkz. [API Temelleri](/tr/developer/api-temelleri)). Rol gereksinimleri uca göre
+bkz. [API Temelleri](/tr/developer/api-fundamentals)). Rol gereksinimleri uca göre
 değişir:
 
 | Yetenek | Gerekli rol |
@@ -100,7 +100,7 @@ Her paket için yanıt şunları içerir:
 
 İstemci, işletmenin mevcut abonelik durumuna göre change-plan rayı ile taze
 checkout arasında karar verir. Operatöre dönük ekranlar
-([Plan seçimi ve yükseltme](https://help.hummytummy.com/tr/plans/plan-secimi-ve-yukseltme))
+([Plan seçimi ve yükseltme](https://help.hummytummy.com/tr/plans/choosing-and-upgrading))
 şöyle dallanır:
 
 <Steps>
@@ -261,7 +261,7 @@ curl -X POST https://app.hummytummy.com/api/payments/create-intent \
 
 <Callout type="warning">
   Bu uç dakikada en fazla **5 deneme** ile sınırlıdır (`@Throttle`) —
-  [API Temelleri](/tr/developer/api-temelleri#rate-limit-katmanlar%C4%B1)
+  [API Temelleri](/tr/developer/api-fundamentals#rate-limit-katmanlar%C4%B1)
   içindeki global katmanların üstüne. Aşıldığında `429` ve
   `errorCode: TOO_MANY_REQUESTS` döner; `Retry-After` başlığına saygı gösterin.
 </Callout>
@@ -433,11 +433,11 @@ kullanıcıyı plan seçim ekranına (`/choose-plan`) yönlendirir.
 
 ## İlgili
 
-- [API Temelleri](/tr/developer/api-temelleri) — taban URL, auth realm'leri,
+- [API Temelleri](/tr/developer/api-fundamentals) — taban URL, auth realm'leri,
   şube kapsamı, hata zarfı, rate-limit katmanları.
 - [Webhook'lar](/tr/developer/webhooks) — bu raylar onaylandığında tetiklenen
   `subscription.activated.v1` ve ödeme olayları.
 - Help'teki operatör kılavuzları:
-  [Plan seçimi ve yükseltme](https://help.hummytummy.com/tr/plans/plan-secimi-ve-yukseltme),
-  [Deneme ve faturalama](https://help.hummytummy.com/tr/plans/deneme-ve-faturalama),
-  [Özellik matrisi](https://help.hummytummy.com/tr/plans/ozellik-matrisi).
+  [Plan seçimi ve yükseltme](https://help.hummytummy.com/tr/plans/choosing-and-upgrading),
+  [Deneme ve faturalama](https://help.hummytummy.com/tr/plans/trial-and-billing),
+  [Özellik matrisi](https://help.hummytummy.com/tr/plans/feature-matrix).
