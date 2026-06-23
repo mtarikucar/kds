@@ -1,0 +1,48 @@
+{
+  "title": "طلبات التوصيل",
+  "description": "الطلبات الواردة من Yemeksepeti وGetir وTrendyol وMigros",
+  "externalIdLabel": "رقم:",
+  "awaitingApproval": "{{count}} طلب بانتظار موافقتك",
+  "loadError": "تعذّر تحميل طلبات التوصيل.",
+  "filters": {
+    "all": "الكل"
+  },
+  "empty": {
+    "title": "لا توجد طلبات توصيل",
+    "description": "ستظهر طلبات المنصات الجديدة هنا تلقائيًا."
+  },
+  "status": {
+    "PENDING_APPROVAL": "بانتظار الموافقة",
+    "PENDING": "مقبول",
+    "PREPARING": "قيد التحضير",
+    "READY": "جاهز",
+    "SERVED": "تم التقديم",
+    "PAID": "مدفوع",
+    "CANCELLED": "مرفوض"
+  },
+  "moderation": {
+    "prepTimeOptional": "وقت التحضير (اختياري):",
+    "minutesShort": "{{minutes}} دقيقة",
+    "accept": "قبول",
+    "acceptWithPrep": "قبول · {{minutes}} دقيقة",
+    "reject": "رفض",
+    "setPrepTime": "تحديد وقت التحضير",
+    "setPrepTimeButton": "تحديد",
+    "minutesPlaceholder": "الدقائق",
+    "rejectModalTitle": "رفض الطلب",
+    "rejectModalDescription": "يُرسَل السبب إلى المنصة حتى يرى العميل سبب رفض الطلب.",
+    "reasonPlaceholder": "سبب الرفض",
+    "cancel": "إلغاء",
+    "confirmReject": "رفض الطلب"
+  },
+  "toast": {
+    "accepted": "تم قبول الطلب",
+    "alreadyAccepted": "تم قبول الطلب مسبقًا",
+    "acceptFailed": "تعذّر قبول الطلب",
+    "rejected": "تم رفض الطلب",
+    "alreadyRejected": "تم رفض الطلب مسبقًا",
+    "rejectFailed": "تعذّر رفض الطلب",
+    "prepTimeSet": "تم ضبط وقت التحضير على {{minutes}} دقيقة",
+    "prepTimeFailed": "تعذّر ضبط وقت التحضير"
+  }
+}

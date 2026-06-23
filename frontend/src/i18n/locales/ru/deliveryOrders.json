@@ -1,0 +1,48 @@
+{
+  "title": "Заказы доставки",
+  "description": "Входящие заказы из Yemeksepeti, Getir, Trendyol и Migros",
+  "externalIdLabel": "№:",
+  "awaitingApproval": "{{count}} заказ(ов) ожидают вашего подтверждения",
+  "loadError": "Не удалось загрузить заказы доставки.",
+  "filters": {
+    "all": "Все"
+  },
+  "empty": {
+    "title": "Нет заказов доставки",
+    "description": "Новые заказы с платформ появятся здесь автоматически."
+  },
+  "status": {
+    "PENDING_APPROVAL": "Ожидает подтверждения",
+    "PENDING": "Принят",
+    "PREPARING": "Готовится",
+    "READY": "Готов",
+    "SERVED": "Подан",
+    "PAID": "Оплачен",
+    "CANCELLED": "Отклонён"
+  },
+  "moderation": {
+    "prepTimeOptional": "Время приготовления (необязательно):",
+    "minutesShort": "{{minutes}} мин",
+    "accept": "Принять",
+    "acceptWithPrep": "Принять · {{minutes}} мин",
+    "reject": "Отклонить",
+    "setPrepTime": "Указать время приготовления",
+    "setPrepTimeButton": "Указать",
+    "minutesPlaceholder": "Минуты",
+    "rejectModalTitle": "Отклонить заказ",
+    "rejectModalDescription": "Причина будет отправлена на платформу, чтобы клиент видел, почему заказ отклонён.",
+    "reasonPlaceholder": "Причина отклонения",
+    "cancel": "Отмена",
+    "confirmReject": "Отклонить заказ"
+  },
+  "toast": {
+    "accepted": "Заказ принят",
+    "alreadyAccepted": "Заказ уже был принят",
+    "acceptFailed": "Не удалось принять заказ",
+    "rejected": "Заказ отклонён",
+    "alreadyRejected": "Заказ уже был отклонён",
+    "rejectFailed": "Не удалось отклонить заказ",
+    "prepTimeSet": "Время приготовления установлено: {{minutes}} мин",
+    "prepTimeFailed": "Не удалось установить время приготовления"
+  }
+}

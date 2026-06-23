@@ -17,6 +17,8 @@ import {
   kioskItemNameText,
   kioskQtyText,
 } from './kioskTheme';
+import DeliveryOrderBadge from '../delivery-platforms/DeliveryOrderBadge';
+import DeliveryOrderModerationPanel from '../delivery-platforms/DeliveryOrderModerationPanel';
 
 interface OrderCardProps {
   order: Order;
@@ -177,21 +179,13 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTou
                 {t('kitchen.table')} {order.table.number}
               </span>
             )}
-            {/* Delivery Platform Badge */}
-            {order.source && (() => {
-              const PLATFORM_DISPLAY: Record<string, { label: string; className: string }> = {
-                GETIR: { label: 'Getir', className: 'bg-purple-100 text-purple-700' },
-                YEMEKSEPETI: { label: 'Yemeksepeti', className: 'bg-pink-100 text-pink-700' },
-                TRENDYOL: { label: 'Trendyol', className: 'bg-orange-100 text-orange-700' },
-                MIGROS: { label: 'Migros', className: 'bg-green-100 text-green-700' },
-              };
-              const display = PLATFORM_DISPLAY[order.source] || { label: order.source, className: 'bg-slate-100 text-slate-700' };
-              return (
-                <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap', display.className)}>
-                  {display.label}
-                </span>
-              );
-            })()}
+            {/* Delivery Platform Badge — shared component so KDS / Orders / POS
+                stay visually consistent and show the platform's externalOrderId. */}
+            <DeliveryOrderBadge
+              source={order.source}
+              externalOrderId={order.externalOrderId}
+              kiosk={kiosk}
+            />
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -273,6 +267,16 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTou
               <span className="font-semibold">{t('kitchen.orderNoteLabel')}:</span>{' '}
               {order.notes}
             </p>
+          </div>
+        )}
+
+        {/* Delivery-platform moderation: for an accepted delivery order
+            (PENDING/PREPARING) the operator can push a prep time back to the
+            platform straight from the KDS card. Renders nothing for internal
+            orders or terminal statuses. */}
+        {order.source && order.externalOrderId && (
+          <div className="mb-3">
+            <DeliveryOrderModerationPanel order={order} kiosk={kiosk} compact />
           </div>
         )}
 

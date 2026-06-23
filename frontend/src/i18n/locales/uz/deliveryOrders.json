@@ -1,0 +1,48 @@
+{
+  "title": "Yetkazib berish buyurtmalari",
+  "description": "Yemeksepeti, Getir, Trendyol va Migros'dan kelgan buyurtmalar",
+  "externalIdLabel": "No:",
+  "awaitingApproval": "Tasdiqlashingizni kutayotgan {{count}} ta buyurtma",
+  "loadError": "Yetkazib berish buyurtmalarini yuklab bo'lmadi.",
+  "filters": {
+    "all": "Hammasi"
+  },
+  "empty": {
+    "title": "Yetkazib berish buyurtmalari yo'q",
+    "description": "Yangi platforma buyurtmalari bu yerda avtomatik paydo bo'ladi."
+  },
+  "status": {
+    "PENDING_APPROVAL": "Tasdiqlash kutilmoqda",
+    "PENDING": "Qabul qilindi",
+    "PREPARING": "Tayyorlanmoqda",
+    "READY": "Tayyor",
+    "SERVED": "Berildi",
+    "PAID": "To'landi",
+    "CANCELLED": "Rad etildi"
+  },
+  "moderation": {
+    "prepTimeOptional": "Tayyorlash vaqti (ixtiyoriy):",
+    "minutesShort": "{{minutes}} daq",
+    "accept": "Qabul qilish",
+    "acceptWithPrep": "Qabul qilish · {{minutes}} daq",
+    "reject": "Rad etish",
+    "setPrepTime": "Tayyorlash vaqtini belgilash",
+    "setPrepTimeButton": "Belgilash",
+    "minutesPlaceholder": "Daqiqa",
+    "rejectModalTitle": "Buyurtmani rad etish",
+    "rejectModalDescription": "Sabab platformaga yuboriladi, shunda mijoz buyurtma nega rad etilganini ko'radi.",
+    "reasonPlaceholder": "Rad etish sababi",
+    "cancel": "Bekor qilish",
+    "confirmReject": "Buyurtmani rad etish"
+  },
+  "toast": {
+    "accepted": "Buyurtma qabul qilindi",
+    "alreadyAccepted": "Buyurtma allaqachon qabul qilingan edi",
+    "acceptFailed": "Buyurtmani qabul qilib bo'lmadi",
+    "rejected": "Buyurtma rad etildi",
+    "alreadyRejected": "Buyurtma allaqachon rad etilgan edi",
+    "rejectFailed": "Buyurtmani rad etib bo'lmadi",
+    "prepTimeSet": "Tayyorlash vaqti {{minutes}} daq qilib belgilandi",
+    "prepTimeFailed": "Tayyorlash vaqtini belgilab bo'lmadi"
+  }
+}

@@ -464,6 +464,11 @@ export interface DeliveryPlatformConfig {
   errorCount: number;
   autoAccept: boolean;
   notifySound?: string;
+  // "production" routes to the live platform; "sandbox" routes to the
+  // platform's test endpoints and enables the built-in test-order simulator.
+  environment?: 'production' | 'sandbox';
+  // Branch that receives this platform's orders. null = "first active branch".
+  branchId?: string | null;
   tenantId: string;
   createdAt: string;
   updatedAt: string;

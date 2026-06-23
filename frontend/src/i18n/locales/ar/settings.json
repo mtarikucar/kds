@@ -100,7 +100,22 @@
       "restaurantClosed": "تم إغلاق المطعم على المنصة",
       "toggleFailed": "فشل تبديل حالة المطعم",
       "menuSyncStarted": "بدأت مزامنة القائمة",
-      "menuSyncFailed": "فشلت مزامنة القائمة"
+      "menuSyncFailed": "فشلت مزامنة القائمة",
+      "testOrderCreated": "تم إنشاء طلب تجريبي: {{orderNumber}}",
+      "testOrderSent": "تم إرسال الطلب التجريبي عبر المسار",
+      "testOrderFailed": "فشل إرسال الطلب التجريبي"
+    },
+    "branch": "الفرع",
+    "branchDefault": "أول فرع نشط (افتراضي)",
+    "branchDescription": "الفرع الذي يستقبل طلبات هذه المنصة.",
+    "syncMenu": "مزامنة القائمة",
+    "sendTestOrder": "إرسال طلب تجريبي",
+    "testOrderSandboxOnly": "حوّل هذه المنصة إلى وضع الاختبار لإرسال طلب تجريبي.",
+    "environment": {
+      "label": "البيئة",
+      "production": "الإنتاج",
+      "sandbox": "الاختبار",
+      "sandboxWarning": "يوجّه وضع الاختبار هذه المنصة إلى نقاط نهاية الاختبار ويفعّل محاكي الطلبات التجريبية المدمج. لا تتم معالجة أي طلبات حقيقية."
     }
   },
   "autoSave": {

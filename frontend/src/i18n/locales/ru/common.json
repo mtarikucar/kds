@@ -80,6 +80,7 @@
     "personnel": "Персонал",
     "stock": "Склад",
     "invoices": "Счета",
+    "deliveryOrders": "Заказы доставки",
     "devices": "Устройства",
     "branches": "Филиалы",
     "health": "Состояние филиалов",
