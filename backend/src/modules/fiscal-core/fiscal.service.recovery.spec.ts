@@ -1,10 +1,10 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { FiscalService } from './fiscal.service';
+import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { FiscalService } from "./fiscal.service";
 import {
   mockPrismaClient,
   MockPrismaClient,
-} from '../../common/test/prisma-mock.service';
-import { FiscalProviderRegistry } from './fiscal-provider.registry';
+} from "../../common/test/prisma-mock.service";
+import { FiscalProviderRegistry } from "./fiscal-provider.registry";
 
 /**
  * Branch-state coverage for the manual recovery paths (cancelReceipt /
@@ -13,134 +13,134 @@ import { FiscalProviderRegistry } from './fiscal-provider.registry';
  * spec drives the GUARD branches that gate those operations — each test
  * fails if the corresponding 404/400/no-op guard regresses.
  */
-describe('FiscalService — recovery guard branches', () => {
+describe("FiscalService — recovery guard branches", () => {
   let prisma: MockPrismaClient;
   let registry: jest.Mocked<FiscalProviderRegistry>;
   let outbox: { append: jest.Mock };
   let svc: FiscalService;
 
   const scope = {
-    tenantId: 't-1',
-    branchId: 'b-1',
-    userId: 'u-1',
-    role: 'ADMIN',
+    tenantId: "t-1",
+    branchId: "b-1",
+    userId: "u-1",
+    role: "ADMIN",
   } as any;
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    outbox = { append: jest.fn().mockResolvedValue('outbox') };
+    outbox = { append: jest.fn().mockResolvedValue("outbox") };
     registry = { get: jest.fn() } as any;
     svc = new FiscalService(prisma as any, registry as any, outbox as any);
   });
 
   // ── cancelReceipt ──────────────────────────────────────────────────
-  describe('cancelReceipt', () => {
-    it('throws NotFound when no row matches the branch scope', async () => {
+  describe("cancelReceipt", () => {
+    it("throws NotFound when no row matches the branch scope", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue(null);
       await expect(
-        svc.cancelReceipt(scope, 'missing', 'x'),
+        svc.cancelReceipt(scope, "missing", "x"),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(registry.get).not.toHaveBeenCalled();
     });
 
-    it('rejects cancelling a receipt that is not in the issued state', async () => {
+    it("rejects cancelling a receipt that is not in the issued state", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue({
-        id: 'fr-1',
-        status: 'queued',
-        providerId: 'mock',
+        id: "fr-1",
+        status: "queued",
+        providerId: "mock",
       });
-      await expect(
-        svc.cancelReceipt(scope, 'fr-1', 'x'),
-      ).rejects.toThrow(/Only issued receipts/);
+      await expect(svc.cancelReceipt(scope, "fr-1", "x")).rejects.toThrow(
+        /Only issued receipts/,
+      );
       expect(registry.get).not.toHaveBeenCalled();
     });
 
-    it('calls the provider then flips the row to cancelled with the reason', async () => {
+    it("calls the provider then flips the row to cancelled with the reason", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue({
-        id: 'fr-1',
-        status: 'issued',
-        providerId: 'mock',
+        id: "fr-1",
+        status: "issued",
+        providerId: "mock",
       });
       const provider = {
         cancelReceipt: jest.fn().mockResolvedValue(undefined),
       };
       registry.get.mockReturnValue(provider as any);
       (prisma.fiscalReceipt.update as any).mockResolvedValue({
-        id: 'fr-1',
-        status: 'cancelled',
+        id: "fr-1",
+        status: "cancelled",
       });
 
-      await svc.cancelReceipt(scope, 'fr-1', 'duplicate fiş');
+      await svc.cancelReceipt(scope, "fr-1", "duplicate fiş");
 
       expect(provider.cancelReceipt).toHaveBeenCalledWith(
-        'fr-1',
-        'duplicate fiş',
+        "fr-1",
+        "duplicate fiş",
       );
       expect(prisma.fiscalReceipt.update).toHaveBeenCalledWith({
-        where: { id: 'fr-1' },
-        data: { status: 'cancelled', lastError: 'cancelled: duplicate fiş' },
+        where: { id: "fr-1" },
+        data: { status: "cancelled", lastError: "cancelled: duplicate fiş" },
       });
     });
   });
 
   // ── retryFailed ────────────────────────────────────────────────────
-  describe('retryFailed', () => {
-    it('throws NotFound when no row matches the branch scope', async () => {
+  describe("retryFailed", () => {
+    it("throws NotFound when no row matches the branch scope", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue(null);
-      await expect(svc.retryFailed(scope, 'missing')).rejects.toBeInstanceOf(
+      await expect(svc.retryFailed(scope, "missing")).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
 
-    it('returns the row unchanged when it is already issued (idempotent no-op)', async () => {
-      const row = { id: 'fr-1', status: 'issued' };
+    it("returns the row unchanged when it is already issued (idempotent no-op)", async () => {
+      const row = { id: "fr-1", status: "issued" };
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue(row);
-      const result = await svc.retryFailed(scope, 'fr-1');
+      const result = await svc.retryFailed(scope, "fr-1");
       expect(result).toBe(row);
       expect(registry.get).not.toHaveBeenCalled();
       expect(prisma.fiscalReceipt.update).not.toHaveBeenCalled();
     });
 
-    it('rejects retrying a cancelled receipt', async () => {
+    it("rejects retrying a cancelled receipt", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue({
-        id: 'fr-1',
-        status: 'cancelled',
+        id: "fr-1",
+        status: "cancelled",
       });
-      await expect(svc.retryFailed(scope, 'fr-1')).rejects.toThrow(
+      await expect(svc.retryFailed(scope, "fr-1")).rejects.toThrow(
         /Cannot retry a cancelled/,
       );
     });
 
-    it('enforces the 30s cooldown when the previous attempt was recent', async () => {
+    it("enforces the 30s cooldown when the previous attempt was recent", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue({
-        id: 'fr-1',
-        status: 'failed',
-        providerId: 'mock',
+        id: "fr-1",
+        status: "failed",
+        providerId: "mock",
         updatedAt: new Date(Date.now() - 5_000), // 5s ago, inside cooldown
         lines: [],
       });
-      await expect(svc.retryFailed(scope, 'fr-1')).rejects.toThrow(
+      await expect(svc.retryFailed(scope, "fr-1")).rejects.toThrow(
         /Cooldown active/,
       );
       // Provider must not be hit while the cooldown is active.
       expect(registry.get).not.toHaveBeenCalled();
     });
 
-    it('re-dispatches with the ORIGINAL idempotency key once the cooldown elapses', async () => {
+    it("re-dispatches with the ORIGINAL idempotency key once the cooldown elapses", async () => {
       (prisma.fiscalReceipt.findFirst as any).mockResolvedValue({
-        id: 'fr-1',
-        status: 'failed',
-        providerId: 'mock',
-        branchId: 'b-1',
-        fiscalDeviceId: 'd-1',
+        id: "fr-1",
+        status: "failed",
+        providerId: "mock",
+        branchId: "b-1",
+        fiscalDeviceId: "d-1",
         orderId: null,
-        idempotencyKey: 'orig-key',
+        idempotencyKey: "orig-key",
         totalCents: 1200,
         updatedAt: new Date(0), // long ago → past cooldown
         lines: [
           {
-            productCode: 'X',
-            name: 'X',
+            productCode: "X",
+            name: "X",
             qty: 1,
             unitPriceCents: 1200,
             vatRate: 20,
@@ -151,50 +151,90 @@ describe('FiscalService — recovery guard branches', () => {
       });
       const provider = {
         issueReceipt: jest.fn().mockResolvedValue({
-          providerId: 'mock',
-          receiptId: 'fr-1',
-          status: 'issued',
-          fiscalNo: '0001',
+          providerId: "mock",
+          receiptId: "fr-1",
+          status: "issued",
+          fiscalNo: "0001",
         }),
       };
       registry.get.mockReturnValue(provider as any);
       (prisma.fiscalReceipt.update as any).mockImplementation(
-        async ({ data }: any) => ({ id: 'fr-1', ...data }),
+        async ({ data }: any) => ({ id: "fr-1", ...data }),
       );
 
-      await svc.retryFailed(scope, 'fr-1');
+      await svc.retryFailed(scope, "fr-1");
 
       const arg = provider.issueReceipt.mock.calls[0][0];
-      expect(arg.idempotencyKey).toBe('orig-key'); // SAME key → provider dedupes
+      expect(arg.idempotencyKey).toBe("orig-key"); // SAME key → provider dedupes
       expect(arg.lines[0]).toEqual(
-        expect.objectContaining({ productCode: 'X', qty: 1, vatRate: 20 }),
+        expect.objectContaining({ productCode: "X", qty: 1, vatRate: 20 }),
       );
       // Success → row flipped to issued + attempts incremented.
       const updateData = (prisma.fiscalReceipt.update as any).mock.calls[0][0]
         .data;
-      expect(updateData.status).toBe('issued');
+      expect(updateData.status).toBe("issued");
       expect(updateData.attempts).toEqual({ increment: 1 });
+    });
+
+    it("FIX 3 — keeps the receipt queued (not re-failed) when the GMP-3 re-dispatch returns status=queued", async () => {
+      // On-prem ÖKC recovery: re-claiming the SAME idempotent command row most
+      // often comes back `queued` again (bridge re-claimed, not yet re-acked).
+      // It must STAY queued — not oscillate back to failed and not emit a
+      // terminal failure event.
+      (prisma.fiscalReceipt.findFirst as any).mockResolvedValue({
+        id: "fr-1",
+        status: "failed",
+        providerId: "fiscal_hugin",
+        branchId: "b-1",
+        fiscalDeviceId: "d-1",
+        orderId: null,
+        idempotencyKey: "orig-key",
+        totalCents: 1200,
+        updatedAt: new Date(0),
+        lines: [],
+      });
+      const provider = {
+        issueReceipt: jest.fn().mockResolvedValue({
+          providerId: "fiscal_hugin",
+          receiptId: "fr-1",
+          status: "queued",
+        }),
+      };
+      registry.get.mockReturnValue(provider as any);
+      (prisma.fiscalReceipt.update as any).mockImplementation(
+        async ({ data }: any) => ({ id: "fr-1", ...data }),
+      );
+
+      const out = await svc.retryFailed(scope, "fr-1");
+
+      const updateData = (prisma.fiscalReceipt.update as any).mock.calls[0][0]
+        .data;
+      expect(updateData.status).toBe("queued");
+      expect(updateData.issuedAt).toBeNull();
+      expect(updateData.lastError).toBeNull();
+      expect(updateData.attempts).toEqual({ increment: 1 });
+      expect(out.status).toBe("queued");
+      // No terminal event for a still-in-flight retry.
+      expect(outbox.append).not.toHaveBeenCalled();
     });
   });
 
   // ── closeDay ───────────────────────────────────────────────────────
-  describe('closeDay', () => {
-    it('throws NotFound when the device is absent / out of branch scope', async () => {
+  describe("closeDay", () => {
+    it("throws NotFound when the device is absent / out of branch scope", async () => {
       (prisma.fiscalDeviceRecord.findFirst as any).mockResolvedValue(null);
-      await expect(svc.closeDay(scope, 'dev-x')).rejects.toBeInstanceOf(
+      await expect(svc.closeDay(scope, "dev-x")).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
 
-    it('rejects closing the day on a retired device', async () => {
+    it("rejects closing the day on a retired device", async () => {
       (prisma.fiscalDeviceRecord.findFirst as any).mockResolvedValue({
-        id: 'dev-1',
-        providerId: 'mock',
-        status: 'retired',
+        id: "dev-1",
+        providerId: "mock",
+        status: "retired",
       });
-      await expect(svc.closeDay(scope, 'dev-1')).rejects.toThrow(
-        /retired/,
-      );
+      await expect(svc.closeDay(scope, "dev-1")).rejects.toThrow(/retired/);
       expect(registry.get).not.toHaveBeenCalled();
     });
   });

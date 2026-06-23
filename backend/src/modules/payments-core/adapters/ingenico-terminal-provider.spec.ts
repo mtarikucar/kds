@@ -67,6 +67,29 @@ describe("IngenicoTerminalProvider", () => {
     };
   }
 
+  // The intentId is opaque: it carries the tenantId + deviceId so status()/
+  // refund() can re-scope the charge lookup. Mirror the provider's encoding so
+  // the tests drive the real id shape (and decode it back to assert the scope).
+  function encodeIntentId(scope: {
+    tenantId: string;
+    deviceId: string;
+    idempotencyKey: string;
+  }): string {
+    const json = JSON.stringify({
+      t: scope.tenantId,
+      d: scope.deviceId,
+      k: scope.idempotencyKey,
+    });
+    return `ING-${Buffer.from(json, "utf8").toString("base64url")}`;
+  }
+
+  // The canonical scoped intentId used across status/refund tests.
+  const SCOPED_INTENT_ID = encodeIntentId({
+    tenantId: "t-1",
+    deviceId: "term-1",
+    idempotencyKey: "idem-abc",
+  });
+
   describe("identity", () => {
     it("is id=ingenico, modes=[cardPresent]", () => {
       expect(provider.id).toBe("ingenico");
@@ -108,13 +131,23 @@ describe("IngenicoTerminalProvider", () => {
       expect(ecr.requestType).toBe("CardPayment");
       expect(ecr.amountMinor).toBe(14990);
       expect(ecr.currency).toBe("TRY");
-      expect(ecr.posReference).toBe("ING-idem-abc");
+      // posReference IS the opaque scoped intentId (carries tenant+device).
+      expect(ecr.posReference).toBe(SCOPED_INTENT_ID);
       expect(ecr.externalRef).toBe("ORD-42");
       expect(ecr.slipText).toBe("pos");
 
       // The charge is queued, not yet authorised.
       expect(intent.providerId).toBe("ingenico");
-      expect(intent.intentId).toBe("ING-idem-abc");
+      // The intentId is the opaque scoped id, NOT the bare idempotencyKey: it
+      // must carry tenantId + deviceId so the later status()/refund() lookup is
+      // re-scoped to this tenant's command (cross-tenant correlation fix).
+      expect(intent.intentId).toBe(SCOPED_INTENT_ID);
+      const decoded = JSON.parse(
+        Buffer.from(intent.intentId.slice("ING-".length), "base64url").toString(
+          "utf8",
+        ),
+      );
+      expect(decoded).toEqual({ t: "t-1", d: "term-1", k: "idem-abc" });
       expect(intent.status).toBe("requires_action");
       expect(intent.amountCents).toBe(14990);
     });
@@ -157,8 +190,32 @@ describe("IngenicoTerminalProvider", () => {
         result: null,
         error: null,
       });
-      const tx = await provider.status("ING-idem-abc");
+      const tx = await provider.status(SCOPED_INTENT_ID);
       expect(tx.status).toBe("pending");
+      // SECURITY: the lookup is scoped to BOTH this tenant and this device
+      // (the unique (deviceId, idempotencyKey) tuple) parsed back out of the
+      // opaque intentId — not a bare idempotencyKey that could match another
+      // tenant's charge_card row.
+      expect(prisma.deviceCommand.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            idempotencyKey: "idem-abc",
+            kind: "charge_card",
+            deviceId: "term-1",
+            tenantId: "t-1",
+          },
+        }),
+      );
+    });
+
+    it("falls back to (idempotencyKey, kind) ONLY for a legacy unscoped intentId", async () => {
+      prisma.deviceCommand.findFirst.mockResolvedValue({
+        status: "inflight",
+        result: null,
+        error: null,
+      });
+      // Pre-fix ids were `ING-<rawIdempotencyKey>` with no embedded scope.
+      await provider.status("ING-idem-abc");
       expect(prisma.deviceCommand.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { idempotencyKey: "idem-abc", kind: "charge_card" },
@@ -178,7 +235,7 @@ describe("IngenicoTerminalProvider", () => {
         }),
         error: null,
       });
-      const tx = await provider.status("ING-idem-abc");
+      const tx = await provider.status(SCOPED_INTENT_ID);
       expect(tx.status).toBe("succeeded");
       expect(tx.acquirerRef).toBe("HOST-9911");
       expect(tx.authCode).toBe("A1B2C3");
@@ -196,7 +253,7 @@ describe("IngenicoTerminalProvider", () => {
         }),
         error: null,
       });
-      const tx = await provider.status("ING-idem-abc");
+      const tx = await provider.status(SCOPED_INTENT_ID);
       expect(tx.status).toBe("failed");
     });
 
@@ -206,7 +263,7 @@ describe("IngenicoTerminalProvider", () => {
         result: {},
         error: null,
       });
-      const tx = await provider.status("ING-idem-abc");
+      const tx = await provider.status(SCOPED_INTENT_ID);
       expect(tx.status).toBe("failed");
     });
 
@@ -216,7 +273,7 @@ describe("IngenicoTerminalProvider", () => {
         result: null,
         error: "No ack received",
       });
-      const tx = await provider.status("ING-idem-abc");
+      const tx = await provider.status(SCOPED_INTENT_ID);
       expect(tx.status).toBe("failed");
     });
 
@@ -235,6 +292,37 @@ describe("IngenicoTerminalProvider", () => {
   });
 
   describe("refund (PaymentReversal to the terminal)", () => {
+    it("scopes the charge lookup to the intent's tenant + device", async () => {
+      prisma.deviceCommand.findFirst.mockResolvedValue({
+        tenantId: "t-1",
+        deviceId: "term-1",
+        branchId: "b-1",
+        result: {
+          ecrResponse: {
+            overallResult: "Success",
+            acquirerTransactionId: "HOST-9911",
+          },
+        },
+      });
+      await provider.refund({
+        intentId: SCOPED_INTENT_ID,
+        idempotencyKey: "idem-rv-1",
+      });
+      // SECURITY: the charge correlated for the reversal MUST be scoped to
+      // this tenant's (and this terminal's) command — never a bare
+      // idempotencyKey that could reverse a different tenant's charge.
+      expect(prisma.deviceCommand.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            idempotencyKey: "idem-abc",
+            kind: "charge_card",
+            deviceId: "term-1",
+            tenantId: "t-1",
+          },
+        }),
+      );
+    });
+
     it("enqueues a PaymentReversal referencing the original acquirer transaction", async () => {
       prisma.deviceCommand.findFirst.mockResolvedValue({
         tenantId: "t-1",
@@ -248,7 +336,7 @@ describe("IngenicoTerminalProvider", () => {
         },
       });
       const out = await provider.refund({
-        intentId: "ING-idem-abc",
+        intentId: SCOPED_INTENT_ID,
         idempotencyKey: "idem-rv-1",
         reason: "customer cancelled",
       });
@@ -258,8 +346,45 @@ describe("IngenicoTerminalProvider", () => {
         .ecrRequest as IngenicoEcrRequest;
       expect(ecr.requestType).toBe("PaymentReversal");
       expect(ecr.originalTransactionId).toBe("HOST-9911");
+      // The reversal command's idempotencyKey is DISTINCT from the charge's
+      // (which == the original idempotencyKey embedded in the intentId) and
+      // deterministic per refund — so charge+reversal don't collide on the
+      // (deviceId, idempotencyKey) unique constraint, and a retried refund is
+      // idempotent.
+      const expectedReversalKey = `reversal:${SCOPED_INTENT_ID}:idem-rv-1`;
       expect(commands.enqueue.mock.calls[0][2].idempotencyKey).toBe(
-        "idem-rv-1",
+        expectedReversalKey,
+      );
+      expect(commands.enqueue.mock.calls[0][2].idempotencyKey).not.toBe(
+        "idem-abc",
+      );
+      expect(ecr.posReference).toBe(expectedReversalKey);
+      expect(out.refundId).toBe(expectedReversalKey);
+    });
+
+    it("derives the same reversal key on a retried refund (idempotent)", async () => {
+      prisma.deviceCommand.findFirst.mockResolvedValue({
+        tenantId: "t-1",
+        deviceId: "term-1",
+        branchId: "b-1",
+        result: {
+          ecrResponse: {
+            overallResult: "Success",
+            acquirerTransactionId: "HOST-9911",
+          },
+        },
+      });
+      const first = await provider.refund({
+        intentId: SCOPED_INTENT_ID,
+        idempotencyKey: "idem-rv-1",
+      });
+      const second = await provider.refund({
+        intentId: SCOPED_INTENT_ID,
+        idempotencyKey: "idem-rv-1",
+      });
+      expect(second.refundId).toBe(first.refundId);
+      expect(commands.enqueue.mock.calls[0][2].idempotencyKey).toBe(
+        commands.enqueue.mock.calls[1][2].idempotencyKey,
       );
     });
 
@@ -271,7 +396,7 @@ describe("IngenicoTerminalProvider", () => {
         result: { ecrResponse: { overallResult: "Failure" } },
       });
       await expect(
-        provider.refund({ intentId: "ING-idem-abc", idempotencyKey: "rv" }),
+        provider.refund({ intentId: SCOPED_INTENT_ID, idempotencyKey: "rv" }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(commands.enqueue).not.toHaveBeenCalled();
     });

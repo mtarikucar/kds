@@ -256,8 +256,8 @@ describe("HuginFiscalProvider (GMP-3 base)", () => {
     expect(input.idempotencyKey).toBe("cancel:rcpt-1");
   });
 
-  it("zReport enqueues a GMP-3 Z report and maps the bridge totals/zNo back", async () => {
-    const { provider, prisma } = makeMocks();
+  it("zReport enqueues a GMP-3 Z report under kind=fiscal_report and maps the bridge totals/zNo back", async () => {
+    const { provider, prisma, commandQueue } = makeMocks();
     (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(
       linkedDevice(),
     );
@@ -276,6 +276,100 @@ describe("HuginFiscalProvider (GMP-3 base)", () => {
     expect(z.providerId).toBe("fiscal_hugin");
     expect(z.zNo).toBe("Z-0042");
     expect(z.totals).toEqual({ cash: 12345, card: 6789 });
+    expect(z.openedAt).toBe("2026-06-23T06:00:00.000Z");
+    expect(z.closedAt).toBe("2026-06-23T23:59:00.000Z");
+
+    // FIX 2 — a Z/X report is NOT a sales receipt; it dispatches under the
+    // dedicated `fiscal_report` kind (not `fiscal_receipt`/`capability_probe`).
+    const input = (commandQueue.enqueue as jest.Mock).mock.calls[0][2];
+    expect(input.kind).toBe("fiscal_report");
+    expect(input.payload.report).toBe("Z");
+  });
+
+  it("X report also dispatches under kind=fiscal_report", async () => {
+    const { provider, prisma, commandQueue } = makeMocks();
+    (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(
+      linkedDevice(),
+    );
+    (prisma.deviceCommand.findUnique as jest.Mock).mockResolvedValue({
+      status: "done",
+      result: { zNo: "X-0001", totals: {} },
+      error: null,
+    });
+
+    await (provider as any).runReport(
+      "fd-1",
+      new Date("2026-06-23T12:00:00Z"),
+      "X",
+    );
+    const input = (commandQueue.enqueue as jest.Mock).mock.calls[0][2];
+    expect(input.kind).toBe("fiscal_report");
+    expect(input.payload.report).toBe("X");
+  });
+
+  it("FIX 1 — an un-acked Z report THROWS (pending) and never returns a fabricated zNo='' day-close", async () => {
+    const { provider, prisma } = makeMocks();
+    (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(
+      linkedDevice(),
+    );
+    // Bridge has NOT acked yet — the command is still inflight with no result.
+    (prisma.deviceCommand.findUnique as jest.Mock).mockResolvedValue({
+      status: "inflight",
+      result: null,
+      error: null,
+    });
+
+    // Must NOT resolve to a ZReport with zNo='' and openedAt/closedAt = now();
+    // a legally-binding day-close must never be fabricated from an un-acked
+    // command. It throws a retryable conflict instead.
+    await expect(
+      provider.zReport("fd-1", new Date("2026-06-23T12:00:00Z")),
+    ).rejects.toThrow(/queued on device/i);
+  });
+
+  it("FIX 1 — a never-claimed Z report (no command row at all) THROWS pending", async () => {
+    const { provider, prisma } = makeMocks();
+    (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(
+      linkedDevice(),
+    );
+    (prisma.deviceCommand.findUnique as jest.Mock).mockResolvedValue(null);
+
+    await expect(provider.closeDay("fd-1")).rejects.toThrow(
+      /queued on device/i,
+    );
+  });
+
+  it("FIX 1 — a `done` ack with NO real zNo still THROWS (does not fabricate zNo='')", async () => {
+    const { provider, prisma } = makeMocks();
+    (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(
+      linkedDevice(),
+    );
+    // Acked done, but the device returned no zNo/fiscalZNo — not a real close.
+    (prisma.deviceCommand.findUnique as jest.Mock).mockResolvedValue({
+      status: "done",
+      result: { totals: {} },
+      error: null,
+    });
+
+    await expect(
+      provider.zReport("fd-1", new Date("2026-06-23T12:00:00Z")),
+    ).rejects.toThrow(/queued on device/i);
+  });
+
+  it("FIX 1 — a `failed` Z report ack THROWS surfacing the device error (no fabricated close)", async () => {
+    const { provider, prisma } = makeMocks();
+    (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(
+      linkedDevice(),
+    );
+    (prisma.deviceCommand.findUnique as jest.Mock).mockResolvedValue({
+      status: "failed",
+      result: null,
+      error: "ÖKC EKÜ dolu",
+    });
+
+    await expect(
+      provider.zReport("fd-1", new Date("2026-06-23T12:00:00Z")),
+    ).rejects.toThrow(/EKÜ dolu/);
   });
 
   it("healthCheck is ok when the DB is reachable", async () => {

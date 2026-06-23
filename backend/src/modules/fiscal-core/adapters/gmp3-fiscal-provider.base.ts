@@ -1,4 +1,4 @@
-import { Logger, NotFoundException } from "@nestjs/common";
+import { ConflictException, Logger, NotFoundException } from "@nestjs/common";
 import {
   FiscalCapability,
   FiscalDeviceStatus,
@@ -568,21 +568,58 @@ export abstract class Gmp3FiscalProviderBase implements FiscalProvider {
       date: dateStr,
     };
     const idempotencyKey = `${report.toLowerCase()}report:${fiscalDeviceId}:${dateStr}`;
+    // Both X and Z reports dispatch under the dedicated `fiscal_report` kind —
+    // a report is NOT a sales receipt (`fiscal_receipt`) nor a read-only probe
+    // (`capability_probe`). A Z run is non-idempotent (it closes the fiscal
+    // day), so the queue treats `fiscal_report` as a non-retryable side effect.
     await this.commandQueue.enqueue(record.tenantId, record.deviceId, {
-      kind: report === "Z" ? "fiscal_receipt" : "capability_probe",
+      kind: "fiscal_report",
       payload: command as unknown as Record<string, unknown>,
       priority: 5,
       idempotencyKey,
     });
+
+    // Correlate the bridge ack. The enqueue is asynchronous: the on-prem
+    // local_bridge drives the ÖKC and writes the real Z/X result back onto the
+    // SAME DeviceCommand row. We must NOT fabricate a report from an un-acked
+    // command — a Z report is a legally-binding Turkish day-close, and
+    // defaulting `zNo` to "" and the timestamps to now() would record a
+    // day-close that never ran on the device. Only return a real ZReport when
+    // the command is `done` AND the device reported a real zNo; otherwise throw
+    // a retryable conflict so the fiscal-core service does NOT persist anything.
     const cmd = await this.readCorrelated(record.deviceId, idempotencyKey);
     const parsed = this.parseResult(cmd?.result);
-    const nowIso = new Date().toISOString();
+
+    if (cmd?.status === "failed" || cmd?.status === "expired") {
+      throw new ConflictException(
+        `${this.id} ${report} report failed on the ÖKC: ${
+          cmd.error ?? parsed.error ?? "device reported a failure"
+        }`,
+      );
+    }
+
+    const zNo = parsed.zNo ?? parsed.fiscalZNo;
+    if (cmd?.status !== "done" || !zNo) {
+      // Still queued / inflight / not-yet-claimed, or acked `done` without a
+      // real report number. Either way the day-close did not (verifiably) run.
+      // Surface a retryable conflict so nothing is persisted; the recovery
+      // panel reconciles once the ÖKC actually acks the report.
+      throw new ConflictException(
+        `${this.id} ${report} report queued on device ${record.serial}; ` +
+          `reconcile after the ÖKC acks (no fiscal day-close is recorded until then)`,
+      );
+    }
+
+    // Acked `done` with a real zNo: carry the device's own timestamps. We do
+    // NOT default openedAt/closedAt to now() — if the device omitted them on a
+    // `done` ack we still fall back to its zNo's report instant, but never to a
+    // fabricated wall-clock for a legally-binding day boundary.
     return {
       providerId: this.id,
       fiscalDeviceId,
-      zNo: parsed.zNo ?? parsed.fiscalZNo ?? "",
-      openedAt: parsed.openedAt ?? nowIso,
-      closedAt: parsed.closedAt ?? nowIso,
+      zNo,
+      openedAt: parsed.openedAt ?? parsed.closedAt ?? dateStr,
+      closedAt: parsed.closedAt ?? parsed.openedAt ?? dateStr,
       totals: parsed.totals ?? {},
     };
   }

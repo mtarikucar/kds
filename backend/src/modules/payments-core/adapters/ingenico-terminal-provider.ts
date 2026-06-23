@@ -183,7 +183,18 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
     // Deterministic intentId from the idempotency anchor so a retried call
     // returns the same intent without an extra round-trip. The terminal sees
     // it as POSReference; the bridge echoes it on the ECR response.
-    const intentId = `ING-${req.idempotencyKey}`;
+    //
+    // SECURITY: the intentId additionally CARRIES the tenantId + deviceId so
+    // that status()/refund() — whose interface signatures only receive the
+    // opaque intentId — can re-scope the charge lookup to this tenant's (and
+    // this terminal's) command. The device-command idempotencyKey is unique
+    // only per (deviceId, idempotencyKey); a findFirst by idempotencyKey alone
+    // could correlate (and refund) a DIFFERENT tenant's charge.
+    const intentId = this.encodeIntentId({
+      tenantId: req.tenantId,
+      deviceId,
+      idempotencyKey: req.idempotencyKey,
+    });
 
     const ecrRequest: IngenicoEcrRequest = {
       requestType: "CardPayment",
@@ -241,9 +252,9 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
    * trail maps to `succeeded`.
    */
   async status(intentId: string): Promise<PaymentTransaction> {
-    const idempotencyKey = this.intentIdToIdempotencyKey(intentId);
+    const scope = this.parseIntentId(intentId);
     const cmd = await this.prisma.deviceCommand.findFirst({
-      where: { idempotencyKey, kind: "charge_card" },
+      where: this.chargeWhere(scope),
       orderBy: { createdAt: "desc" },
       select: {
         status: true,
@@ -283,9 +294,9 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
    * transaction id resolved from the completed charge command.
    */
   async refund(req: RefundRequest): Promise<RefundTransaction> {
-    const idempotencyKey = this.intentIdToIdempotencyKey(req.intentId);
+    const scope = this.parseIntentId(req.intentId);
     const charge = await this.prisma.deviceCommand.findFirst({
-      where: { idempotencyKey, kind: "charge_card" },
+      where: this.chargeWhere(scope),
       orderBy: { createdAt: "desc" },
       select: { tenantId: true, deviceId: true, branchId: true, result: true },
     });
@@ -304,9 +315,18 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
       );
     }
 
+    // The reversal command MUST carry an idempotencyKey distinct from the
+    // original charge's: enqueue dedups on (deviceId, idempotencyKey), and the
+    // reversal runs against the SAME device. Reusing the charge's key would hit
+    // the charge row's unique constraint and return the charge command instead
+    // of dispatching the reversal. Derive it deterministically from the intent
+    // + the caller's refund idempotencyKey so a RETRIED refund stays idempotent
+    // (same reversal command), while still differing from the charge.
+    const reversalIdempotencyKey = `reversal:${req.intentId}:${req.idempotencyKey}`;
+
     const reversalRequest: IngenicoEcrRequest = {
       requestType: "PaymentReversal",
-      posReference: `${req.intentId}-RV`,
+      posReference: reversalIdempotencyKey,
       // Omitted amount = full reversal; a partial amount is sent when present.
       amountMinor: req.amountCents ?? 0,
       currency: "TRY",
@@ -324,7 +344,7 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
           ecrRequest: reversalRequest as unknown as Record<string, unknown>,
         },
         priority: 10,
-        idempotencyKey: req.idempotencyKey,
+        idempotencyKey: reversalIdempotencyKey,
       },
       charge.branchId,
     );
@@ -332,7 +352,7 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
     return {
       providerId: this.id,
       intentId: req.intentId,
-      refundId: `${req.intentId}-RV`,
+      refundId: reversalIdempotencyKey,
       // The reversal is queued for the terminal; it is not confirmed until the
       // bridge writes the ECR response back. The caller polls status() of the
       // refund command for the terminal outcome.
@@ -389,13 +409,105 @@ export class IngenicoTerminalProvider implements PaymentProvider, OnModuleInit {
 
   // -- helpers --------------------------------------------------------------
 
-  private intentIdToIdempotencyKey(intentId: string): string {
+  /**
+   * Encode the de-dup anchor plus the security scope (tenantId + deviceId) into
+   * an opaque, parseable intentId: `ING-<base64url(JSON)>`.
+   *
+   * Why base64url(JSON) over a delimited string: tenantId / deviceId /
+   * idempotencyKey are caller-supplied and may themselves contain any
+   * delimiter, so a `ING_<t>_<d>_<k>` scheme is not unambiguously parseable.
+   * JSON round-trips them losslessly; base64url keeps the id URL-safe and
+   * delimiter-free for the bridge's POSReference echo.
+   */
+  private encodeIntentId(scope: {
+    tenantId: string;
+    deviceId: string;
+    idempotencyKey: string;
+  }): string {
+    const json = JSON.stringify({
+      t: scope.tenantId,
+      d: scope.deviceId,
+      k: scope.idempotencyKey,
+    });
+    return `ING-${Buffer.from(json, "utf8").toString("base64url")}`;
+  }
+
+  /**
+   * Recover the de-dup anchor and security scope from an intentId.
+   *
+   * Accepts BOTH the structured `ING-<base64url(JSON)>` form (carries tenantId +
+   * deviceId) and the LEGACY `ING-<rawIdempotencyKey>` form emitted before this
+   * fix, so intents created pre-deploy still resolve. For the legacy form the
+   * tenant/device scope is unrecoverable, so the lookup falls back to
+   * (idempotencyKey, kind) — the pre-fix behaviour — only for those old ids.
+   */
+  private parseIntentId(intentId: string): {
+    tenantId?: string;
+    deviceId?: string;
+    idempotencyKey: string;
+  } {
     if (!intentId.startsWith("ING-")) {
       throw new BadRequestException(
         `Malformed Ingenico intentId: ${intentId} (expected ING- prefix).`,
       );
     }
-    return intentId.slice("ING-".length);
+    const suffix = intentId.slice("ING-".length);
+    if (!suffix) {
+      throw new BadRequestException(
+        `Malformed Ingenico intentId: ${intentId} (empty body).`,
+      );
+    }
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(suffix, "base64url").toString("utf8"),
+      ) as { t?: unknown; d?: unknown; k?: unknown };
+      if (
+        decoded &&
+        typeof decoded === "object" &&
+        typeof decoded.t === "string" &&
+        typeof decoded.d === "string" &&
+        typeof decoded.k === "string"
+      ) {
+        return {
+          tenantId: decoded.t,
+          deviceId: decoded.d,
+          idempotencyKey: decoded.k,
+        };
+      }
+    } catch {
+      // Not a structured id — fall through to the legacy raw-key form.
+    }
+    // Legacy `ING-<rawIdempotencyKey>` — no tenant/device scope recoverable.
+    return { idempotencyKey: suffix };
+  }
+
+  /**
+   * Build the tenant-scoped where-clause for correlating the `charge_card`
+   * command behind an intentId.
+   *
+   * Prefer the UNIQUE (deviceId, idempotencyKey) tuple when the deviceId is
+   * recoverable — that pins the lookup to exactly one row on this terminal.
+   * Otherwise scope by (tenantId, idempotencyKey) so the row can only belong to
+   * this tenant. Only a legacy id (neither recoverable) falls back to the bare
+   * (idempotencyKey) — and even that can never match across tenants for new
+   * intents, since all new ids carry the scope.
+   */
+  private chargeWhere(scope: {
+    tenantId?: string;
+    deviceId?: string;
+    idempotencyKey: string;
+  }): {
+    idempotencyKey: string;
+    kind: string;
+    deviceId?: string;
+    tenantId?: string;
+  } {
+    return {
+      idempotencyKey: scope.idempotencyKey,
+      kind: "charge_card",
+      ...(scope.deviceId ? { deviceId: scope.deviceId } : {}),
+      ...(scope.tenantId ? { tenantId: scope.tenantId } : {}),
+    };
   }
 
   private extractEcrResponse(result: unknown): IngenicoEcrResponse | undefined {
