@@ -27,7 +27,7 @@ HummyTummy üç ayrı entegrasyon yüzeyi sunar; çoğu entegratör birden fazla
 birlikte kullanır.
 
 <Cards>
-  <Cards.Card title="API Temelleri" href="/tr/developer/api-temelleri" arrow>
+  <Cards.Card title="API Temelleri" href="/tr/developer/api-fundamentals" arrow>
     Taban URL, kimlik gerçeklikleri (personel JWT / müşteri oturumu / partner
     anahtarı / ekran token'ı), `X-Branch-Id` şube kapsamı, sayfalama, hata
     zarfı, idempotency ve rate-limit katmanları.
@@ -48,7 +48,7 @@ birlikte kullanır.
 
 - **Çekme** — REST uçlarını siz çağırırsınız (menü okuma, sipariş oluşturma,
   ödeme başlatma). Kimlik ve şube kapsamı kuralları için
-  [API Temelleri](/tr/developer/api-temelleri).
+  [API Temelleri](/tr/developer/api-fundamentals).
 - **İtme** — bir olay olduğunda biz sizin uç noktanıza POST atarız (giden
   webhook'lar). Kurulum ve doğrulama için [Webhook'lar](/tr/developer/webhooks).
 
@@ -61,7 +61,7 @@ birlikte kullanır.
 | Partner anahtarı | `X-Partner-Key` + `X-Partner-Secret` | Partner backend'i ekran token'ı üretir |
 | Ekran token'ı | `Authorization: Screen <token>` | Cihaz `/v1/display/*` çağırır |
 
-Her birinin tam ayrıntısı [API Temelleri](/tr/developer/api-temelleri)
+Her birinin tam ayrıntısı [API Temelleri](/tr/developer/api-fundamentals)
 sayfasında.
 
 <Callout type="warning">

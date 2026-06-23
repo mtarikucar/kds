@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -124,37 +125,58 @@ export class FiscalService {
     const provider = this.registry.get(device.providerId);
     try {
       const result = await provider.issueReceipt(req);
+      // Honour the provider's THREE-state result. For on-prem ÖKC (GMP-3) the
+      // normal case is `queued`: the receipt was enqueued onto the device-mesh
+      // and the bridge has not acked yet. A `queued` result MUST stay queued —
+      // it is NOT a failure (no fiscal.receipt.failed.v1, no `failed` count)
+      // and NOT an issuance. Only `issued` flips the row to issued; only
+      // `failed` flips it to failed. The e-Fatura adapter returns `issued`
+      // synchronously, so it is unaffected.
+      const nextStatus =
+        result.status === "issued"
+          ? "issued"
+          : result.status === "queued"
+            ? "queued"
+            : "failed";
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
-          status: result.status === "issued" ? "issued" : "failed",
+          status: nextStatus,
           fiscalNo: result.fiscalNo,
           fiscalZNo: result.fiscalZNo,
-          issuedAt: result.status === "issued" ? new Date() : null,
-          lastError: result.status !== "issued" ? result.error : null,
+          issuedAt: nextStatus === "issued" ? new Date() : null,
+          lastError: nextStatus === "failed" ? result.error : null,
         },
       });
-      this.countIssued(updated.status);
-      await this.outbox
-        .append({
-          type:
-            result.status === "issued"
-              ? "fiscal.receipt.printed.v1"
-              : "fiscal.receipt.failed.v1",
-          tenantId: req.tenantId,
-          payload: {
-            fiscalReceiptId: updated.id,
-            fiscalDeviceId: req.fiscalDeviceId,
-            fiscalNo: result.fiscalNo,
-            error: result.error,
-          },
-        })
-        .catch(
-          captureSwallowedEmit(this.logger, {
-            module: "fiscal-core",
-            op: "issueReceipt",
-          }),
-        );
+      // Only terminal outcomes (issued|failed) move the metric; a still-queued
+      // receipt has no terminal status yet.
+      if (nextStatus !== "queued") this.countIssued(updated.status);
+      // Emit a domain event only on a terminal outcome. A `queued` receipt
+      // stays silent until the bridge acks (the recovery/outbox path emits
+      // printed/failed then) — emitting `failed` here would falsely mark an
+      // in-flight fiscal print as failed.
+      if (nextStatus !== "queued") {
+        await this.outbox
+          .append({
+            type:
+              nextStatus === "issued"
+                ? "fiscal.receipt.printed.v1"
+                : "fiscal.receipt.failed.v1",
+            tenantId: req.tenantId,
+            payload: {
+              fiscalReceiptId: updated.id,
+              fiscalDeviceId: req.fiscalDeviceId,
+              fiscalNo: result.fiscalNo,
+              error: result.error,
+            },
+          })
+          .catch(
+            captureSwallowedEmit(this.logger, {
+              module: "fiscal-core",
+              op: "issueReceipt",
+            }),
+          );
+      }
       return updated;
     } catch (e) {
       // Compliance-critical money path — the provider dispatch threw. This was
@@ -242,7 +264,22 @@ export class FiscalService {
       throw new BadRequestException("Fiscal device retired — cannot close day");
     }
     const provider = this.registry.get(device.providerId);
+    // The provider dispatch is asynchronous for on-prem ÖKC adapters (GMP-3):
+    // closeDay() THROWS a retryable conflict while the device has not yet
+    // acked the Z report, so a thrown error here means the day-close did not
+    // run — we must NOT persist a fiscalDayClose row or emit
+    // fiscal.day.closed.v1 (both happen below only on a real, returned report).
     const report = await provider.closeDay(fiscalDeviceId);
+    // Defence in depth: never record a legally-binding day-close without a
+    // real Z number. A provider that returns a report with an empty/missing
+    // zNo (un-acked, or a placeholder) is treated as "not closed yet" — surface
+    // it as a retryable conflict instead of writing a fabricated row.
+    if (!report.zNo) {
+      throw new ConflictException(
+        "Fiscal day-close has no Z number yet — the ÖKC has not acked the Z report. " +
+          "Reconcile from the recovery panel once the device confirms.",
+      );
+    }
     await this.prisma.fiscalDayClose.create({
       data: {
         id: uuidv7(),
@@ -343,39 +380,53 @@ export class FiscalService {
         payments: [{ method: "cash", amountCents: row.totalCents }],
       });
 
+      // Same three-state contract as the initial dispatch. On recovery the ÖKC
+      // re-dispatch most often comes back `queued` again (the bridge re-claims
+      // the SAME idempotent command row and has not re-acked yet) — that must
+      // stay `queued`, NOT be re-marked `failed`. Otherwise a healthy in-flight
+      // print would oscillate failed→queued→failed on every retry click.
+      const nextStatus =
+        result.status === "issued"
+          ? "issued"
+          : result.status === "queued"
+            ? "queued"
+            : "failed";
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
-          status: result.status === "issued" ? "issued" : "failed",
+          status: nextStatus,
           fiscalNo: result.fiscalNo,
           fiscalZNo: result.fiscalZNo,
-          issuedAt: result.status === "issued" ? new Date() : null,
-          lastError: result.status !== "issued" ? result.error : null,
+          issuedAt: nextStatus === "issued" ? new Date() : null,
+          lastError: nextStatus === "failed" ? result.error : null,
           attempts: { increment: 1 },
         },
       });
 
-      await this.outbox
-        .append({
-          type:
-            result.status === "issued"
-              ? "fiscal.receipt.printed.v1"
-              : "fiscal.receipt.failed.v1",
-          tenantId: scope.tenantId,
-          payload: {
-            fiscalReceiptId: updated.id,
-            fiscalDeviceId: row.fiscalDeviceId,
-            fiscalNo: result.fiscalNo,
-            error: result.error,
-            retried: true,
-          },
-        })
-        .catch(
-          captureSwallowedEmit(this.logger, {
-            module: "fiscal-core",
-            op: "retryFailed",
-          }),
-        );
+      // Terminal outcomes only — a still-queued retry stays silent.
+      if (nextStatus !== "queued") {
+        await this.outbox
+          .append({
+            type:
+              nextStatus === "issued"
+                ? "fiscal.receipt.printed.v1"
+                : "fiscal.receipt.failed.v1",
+            tenantId: scope.tenantId,
+            payload: {
+              fiscalReceiptId: updated.id,
+              fiscalDeviceId: row.fiscalDeviceId,
+              fiscalNo: result.fiscalNo,
+              error: result.error,
+              retried: true,
+            },
+          })
+          .catch(
+            captureSwallowedEmit(this.logger, {
+              module: "fiscal-core",
+              op: "retryFailed",
+            }),
+          );
+      }
 
       return updated;
     } catch (e) {

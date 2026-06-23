@@ -1,6 +1,6 @@
 export default {
   "index": "Genel Bakış",
-  "satin-alma-akisi": "Satın Alma Akışı",
-  "urunler": "Ürünler (Add-on'lar)",
+  "purchase-flow": "Satın Alma Akışı",
+  "products": "Ürünler (Add-on'lar)",
   "hardware-store": "Donanım Mağazası",
 };

@@ -117,6 +117,16 @@ export class PaymentsFacadeService {
    * the façade verifies signature via the adapter and emits one normalised
    * event per provider event so downstream consumers don't care which
    * vendor produced the message.
+   *
+   * ⚠️ REPLAY PRECONDITION (do NOT wire an HTTP route to this without it):
+   * this method has NO dedup gate. Signed iyzico/paytr webhooks carry no
+   * nonce/timestamp in the signed payload, so a captured (body, signature)
+   * pair is cryptographically replayable — a replay would re-emit
+   * `payment.succeeded` and double-fire settlement consumers. The sibling
+   * integration-gateway ingest (IntegrationService.ingestWebhook) already
+   * guards this with a Serializable-txn dedup on (tenant, provider, signature)
+   * within a 24h window; mirror that BEFORE exposing this façade over HTTP.
+   * Today this path is internal-only (no controller reaches it).
    */
   async ingestWebhook(
     providerId: string,

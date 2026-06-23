@@ -26,6 +26,7 @@ const COMMAND_KINDS = [
   "open_drawer",
   "fiscal_receipt",
   "fiscal_cancel",
+  "fiscal_report",
   "charge_card",
   "show_order",
   "clear_order",

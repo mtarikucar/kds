@@ -30,6 +30,11 @@ export type CommandKind =
   | "open_drawer"
   | "fiscal_receipt"
   | "fiscal_cancel"
+  // GMP-3 X/Z report or day-close run on the ÖKC. Distinct from
+  // `fiscal_receipt` (a sales fiş) — a Z/X report is not a sale. A Z report
+  // is non-idempotent (it closes the fiscal day), so it is treated as a
+  // non-retryable side-effecting kind in CommandQueueService.
+  | "fiscal_report"
   | "charge_card"
   | "show_order"
   | "clear_order"

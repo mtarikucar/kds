@@ -3,7 +3,12 @@ import { PaymentProviderRegistry } from "./payment-provider.registry";
 import { PaymentsFacadeService } from "./payments-facade.service";
 import { MockPaymentProvider } from "./adapters/mock-payment-provider";
 import { PaytrPaymentProvider } from "./adapters/paytr-payment-provider";
+import { IngenicoTerminalProvider } from "./adapters/ingenico-terminal-provider";
+import { IyzicoPaymentProvider } from "./adapters/iyzico-payment-provider";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
+// Ingenico card-present terminal routes charge_card commands through the
+// on-prem local bridge → CommandQueueService (exported by DeviceMeshModule).
+import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
 
 /**
  * Payments-core module. Exposes the provider-neutral interface that the
@@ -19,12 +24,14 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
  */
 @Global()
 @Module({
-  imports: [PaytrAdapterModule],
+  imports: [PaytrAdapterModule, DeviceMeshModule],
   providers: [
     PaymentProviderRegistry,
     PaymentsFacadeService,
     MockPaymentProvider,
     PaytrPaymentProvider,
+    IngenicoTerminalProvider,
+    IyzicoPaymentProvider,
   ],
   exports: [PaymentProviderRegistry, PaymentsFacadeService],
 })

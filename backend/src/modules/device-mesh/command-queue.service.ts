@@ -34,6 +34,14 @@ export class CommandQueueService {
    *   - fiscal_receipt → prints a yazarkasa fiscal receipt; a duplicate is a
    *                      tax/legal exposure.
    *   - fiscal_cancel  → fiscal void; double-void corrupts the fiscal journal.
+   *   - fiscal_report  → GMP-3 X/Z report. A Z report is non-idempotent: it
+   *                      closes the fiscal day and freezes the counters, so a
+   *                      re-delivery would fabricate a second day-close. (An X
+   *                      report is read-only/retryable, but the queue keys the
+   *                      protection on the command KIND, not the report letter
+   *                      inside the payload, so we keep the whole kind in the
+   *                      non-retryable set — the safe default; an X is simply
+   *                      re-requested by the operator from the recovery panel.)
    *   - open_drawer    → physically re-opens the cash drawer.
    *   - print_receipt  → emits a customer receipt (cosmetic but undesirable
    *                      to duplicate; included so the agent gets a stable
@@ -55,6 +63,7 @@ export class CommandQueueService {
     "charge_card",
     "fiscal_receipt",
     "fiscal_cancel",
+    "fiscal_report",
     "open_drawer",
     "print_receipt",
   ]);

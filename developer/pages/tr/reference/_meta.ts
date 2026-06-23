@@ -1,7 +1,7 @@
 export default {
   "index": "Genel Bakış",
-  "hata-kodlari": "Hata Kodları",
+  "error-codes": "Hata Kodları",
   "partner-scopes": "Partner Scope'ları",
-  "plan-matrisi": "Plan Matrisi",
-  "sozluk": "Sözlük"
+  "plan-matrix": "Plan Matrisi",
+  "glossary": "Sözlük"
 }

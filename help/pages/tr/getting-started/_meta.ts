@@ -1,6 +1,6 @@
 export default {
   "index": "Genel Bakış",
-  "kavramlar": "Temel Kavramlar",
-  "hesap-olusturma": "Hesap Oluşturma",
-  "ilk-kurulum": "İlk Kurulum",
+  "concepts": "Temel Kavramlar",
+  "create-account": "Hesap Oluşturma",
+  "first-setup": "İlk Kurulum",
 }
