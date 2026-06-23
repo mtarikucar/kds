@@ -10,12 +10,28 @@ import {
 import { NormalizedOrder } from "../interfaces/platform-order.interface";
 import { BaseAdapter } from "./base.adapter";
 
+const TRENDYOL_PROD_BASE_URL = "https://api.trendyol.com/yemek";
+// Trendyol exposes a published stage/sandbox host for partner integrations.
+// `stageapi.trendyol.com` is Trendyol's documented staging gateway; the
+// "/yemek" path segment mirrors production. Override via
+// TRENDYOL_SANDBOX_API_BASE_URL if the integrator is issued a different host.
+const TRENDYOL_SANDBOX_BASE_URL = "https://stageapi.trendyol.com/yemek";
+
 @Injectable()
 export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super("TrendyolAdapter", "https://api.trendyol.com/yemek", configService);
+    super(
+      "TrendyolAdapter",
+      TRENDYOL_PROD_BASE_URL,
+      configService,
+      undefined,
+      TRENDYOL_SANDBOX_BASE_URL,
+    );
     this.overrideBaseURL(
       this.configService.get<string>("TRENDYOL_API_BASE_URL"),
+    );
+    this.overrideSandboxBaseURL(
+      this.configService.get<string>("TRENDYOL_SANDBOX_API_BASE_URL"),
     );
   }
 
@@ -26,6 +42,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
       // New webhook-based integration
       const response = await this.request({
         method: "POST",
+        baseURL: this.resolveBaseURL(config),
         url: "/integration/auth/token",
         data: {
           integratorId: credentials.integratorId,
@@ -52,6 +69,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { status: "ACCEPTED" },
@@ -65,6 +83,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { status: "REJECTED", reason },
@@ -77,6 +96,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { status: "PREPARING" },
@@ -89,6 +109,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { status: "READY" },
@@ -101,6 +122,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { status: "PICKED_UP" },
@@ -114,6 +136,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { status: "CANCELLED", reason },
@@ -125,6 +148,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<NormalizedOrder[]> {
     const response = await this.request({
       method: "GET",
+      baseURL: this.resolveBaseURL(config),
       url: `/restaurants/${config.remoteRestaurantId}/orders?status=NEW`,
       headers: this.getTrendyolAuthHeaders(config),
     });
@@ -143,6 +167,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/restaurants/${config.remoteRestaurantId}/menu`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { products: items },
@@ -156,6 +181,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/restaurants/${config.remoteRestaurantId}/products/${externalItemId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { isAvailable: available },
@@ -165,6 +191,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   async openRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/restaurants/${config.remoteRestaurantId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { isOpen: true },
@@ -174,6 +201,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   async closeRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
       method: "PUT",
+      baseURL: this.resolveBaseURL(config),
       url: `/restaurants/${config.remoteRestaurantId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { isOpen: false },
@@ -188,6 +216,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
       } else {
         await this.request({
           method: "GET",
+          baseURL: this.resolveBaseURL(config),
           url: `/restaurants/${config.remoteRestaurantId}`,
           headers: this.getTrendyolAuthHeaders(config),
         });

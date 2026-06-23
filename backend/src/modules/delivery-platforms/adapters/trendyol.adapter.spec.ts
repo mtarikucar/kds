@@ -214,6 +214,31 @@ describe("TrendyolAdapter", () => {
     });
   });
 
+  describe("sandbox vs production base-URL selection (config.environment)", () => {
+    let captured: any;
+    beforeEach(() => {
+      captured = undefined;
+      jest
+        .spyOn(adapter as any, "request")
+        .mockImplementation(async (c: any) => {
+          captured = c;
+          return { data: {} } as any;
+        });
+    });
+
+    it("targets the production host by default", async () => {
+      await adapter.acceptOrder(cfg({ environment: "production" }), "o-1");
+      expect(captured.baseURL).toBe("https://api.trendyol.com/yemek");
+    });
+
+    it("targets the published Trendyol stage host in sandbox", async () => {
+      await adapter.acceptOrder(cfg({ environment: "sandbox" }), "o-1");
+      // Trendyol's distinct, published sandbox host (NOT prod).
+      expect(captured.baseURL).toBe("https://stageapi.trendyol.com/yemek");
+      expect(captured.baseURL).not.toBe("https://api.trendyol.com/yemek");
+    });
+  });
+
   describe("authenticate", () => {
     it("v2: exchanges integrator credentials for a Bearer token with a ~50min TTL", async () => {
       jest

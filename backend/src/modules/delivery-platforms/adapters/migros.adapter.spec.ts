@@ -203,4 +203,112 @@ describe("MigrosAdapter", () => {
       expect(captured.headers["X-Branch-Id"]).toBe("");
     });
   });
+
+  describe("menu + store status (sibling-parity methods)", () => {
+    let captured: any;
+    beforeEach(() => {
+      captured = undefined;
+      jest
+        .spyOn(adapter as any, "request")
+        .mockImplementation(async (c: any) => {
+          captured = c;
+          return { data: {} } as any;
+        });
+    });
+
+    it("syncMenu PUTs the catalog to /restaurants/:id/menu as { products }", async () => {
+      const items = [
+        {
+          externalItemId: "mp-1",
+          name: "Pide",
+          price: 75,
+          isAvailable: true,
+        },
+      ];
+      await adapter.syncMenu(cfg({ remoteRestaurantId: "branch-5" }), items);
+
+      expect(captured.method).toBe("PUT");
+      expect(captured.url).toBe("/restaurants/branch-5/menu");
+      expect(captured.data).toEqual({ products: items });
+      expect(captured.headers).toEqual({
+        "X-API-Key": "mig-key",
+        "X-Branch-Id": "branch-5",
+      });
+    });
+
+    it("updateItemAvailability PUTs { isAvailable } to the product status route", async () => {
+      await adapter.updateItemAvailability(
+        cfg({ remoteRestaurantId: "branch-5" }),
+        "prod-9",
+        false,
+      );
+
+      expect(captured.method).toBe("PUT");
+      expect(captured.url).toBe(
+        "/restaurants/branch-5/products/prod-9/status",
+      );
+      expect(captured.data).toEqual({ isAvailable: false });
+    });
+
+    it("openRestaurant PUTs { isOpen: true } to the store status route", async () => {
+      await adapter.openRestaurant(cfg({ remoteRestaurantId: "branch-5" }));
+
+      expect(captured.method).toBe("PUT");
+      expect(captured.url).toBe("/restaurants/branch-5/status");
+      expect(captured.data).toEqual({ isOpen: true });
+    });
+
+    it("closeRestaurant PUTs { isOpen: false } to the store status route", async () => {
+      await adapter.closeRestaurant(cfg({ remoteRestaurantId: "branch-5" }));
+
+      expect(captured.method).toBe("PUT");
+      expect(captured.url).toBe("/restaurants/branch-5/status");
+      expect(captured.data).toEqual({ isOpen: false });
+    });
+  });
+
+  describe("sandbox vs production base-URL selection (config.environment)", () => {
+    let captured: any;
+    beforeEach(() => {
+      captured = undefined;
+      jest
+        .spyOn(adapter as any, "request")
+        .mockImplementation(async (c: any) => {
+          captured = c;
+          return { data: {} } as any;
+        });
+    });
+
+    it("uses the production base URL when environment is 'production'", async () => {
+      await adapter.acceptOrder(cfg({ environment: "production" }), "o-1");
+      // MIGROS_SANDBOX_BASE_URL currently mirrors prod (no public test host),
+      // but the resolver MUST return the production field for production.
+      expect(captured.baseURL).toBe(
+        "https://partner-api.migros.com.tr/yemek",
+      );
+    });
+
+    it("uses the sandbox base URL when environment is 'sandbox'", async () => {
+      await adapter.acceptOrder(cfg({ environment: "sandbox" }), "o-1");
+      expect(captured.baseURL).toBe((adapter as any).sandboxBaseURL);
+    });
+
+    it("routes new orders to the sandbox host when environment is 'sandbox'", async () => {
+      jest
+        .spyOn(adapter as any, "request")
+        .mockImplementation(async (c: any) => {
+          captured = c;
+          return { data: { orders: [] } } as any;
+        });
+      await adapter.pollNewOrders(cfg({ environment: "sandbox" }));
+      expect(captured.baseURL).toBe((adapter as any).sandboxBaseURL);
+    });
+
+    it("falls back to production when environment is undefined", async () => {
+      await adapter.acceptOrder(cfg({ environment: undefined as any }), "o-1");
+      expect(captured.baseURL).toBe(
+        "https://partner-api.migros.com.tr/yemek",
+      );
+    });
+  });
 });

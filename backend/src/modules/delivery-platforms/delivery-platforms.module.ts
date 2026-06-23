@@ -18,6 +18,7 @@ import { DeliveryAuthService } from "./services/delivery-auth.service";
 import { DeliveryMenuSyncService } from "./services/delivery-menu-sync.service";
 import { DeliveryConfigService } from "./services/delivery-config.service";
 import { DeliveryLogService } from "./services/delivery-log.service";
+import { DeliveryTestService } from "./services/delivery-test.service";
 
 // Controllers
 import { DeliveryPlatformsController } from "./controllers/delivery-platforms.controller";
@@ -59,6 +60,7 @@ import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
     DeliveryMenuSyncService,
     DeliveryConfigService,
     DeliveryLogService,
+    DeliveryTestService,
 
     // Schedulers
     OrderPollingScheduler,
