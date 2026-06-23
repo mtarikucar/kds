@@ -13,10 +13,20 @@ import {
   PlatformLogAction,
 } from "../constants/platform.enum";
 import { OrderStatus } from "../../../common/constants/order-status.enum";
+import { CommandQueueService } from "../../device-mesh/command-queue.service";
+import { EscPosBuilderService } from "../../device-mesh/printing/escpos-builder.service";
+import { ReceiptSnapshotBuilder } from "../../orders/services/receipt-snapshot.builder";
 
 @Injectable()
 export class DeliveryOrderService {
   private readonly logger = new Logger(DeliveryOrderService.name);
+
+  // Stateless, dependency-free snapshot builder (same one OrdersService uses).
+  // Instantiated directly rather than injected so the delivery module doesn't
+  // need to import OrdersModule (which itself forwardRef-imports this module —
+  // adding the reverse edge would make the cycle harder to reason about for a
+  // class that has no DI dependencies anyway).
+  private readonly snapshotBuilder = new ReceiptSnapshotBuilder();
 
   constructor(
     private prisma: PrismaService,
@@ -26,6 +36,8 @@ export class DeliveryOrderService {
     private logService: DeliveryLogService,
     private authService: DeliveryAuthService,
     private configService: DeliveryConfigService,
+    private commandQueue: CommandQueueService,
+    private escpos: EscPosBuilderService,
   ) {}
 
   /**
@@ -335,6 +347,20 @@ export class DeliveryOrderService {
     // 6. Emit via KDS WebSocket
     this.kdsGateway.emitNewOrder(tenantId, createdOrder.branchId, createdOrder);
 
+    // 6b. Auto-print the kitchen ticket. Best-effort: a printer that is
+    // offline / unmapped / mis-encoding must NEVER block order ingestion —
+    // the order is already persisted and on the KDS screen. Mirrors the
+    // auto-accept error handling above (wrap + log, no rethrow).
+    await this.printKitchenTicket(
+      tenantId,
+      createdOrder.branchId,
+      createdOrder,
+    ).catch((err: any) =>
+      this.logger.error(
+        `Kitchen-ticket auto-print failed for ${platform} order ${createdOrder.orderNumber}: ${err?.message}`,
+      ),
+    );
+
     // 7. Log the inbound order
     await this.logService.log({
       tenantId,
@@ -351,6 +377,86 @@ export class DeliveryOrderService {
     );
 
     return createdOrder;
+  }
+
+  /**
+   * Enqueue a kitchen-ticket ESC/POS print for a freshly-created delivery
+   * order to the branch's kitchen printer(s). This is the SAME mechanism POS
+   * orders use: build the canonical kitchen-ticket snapshot
+   * (ReceiptSnapshotBuilder) → render ESC/POS bytes (EscPosBuilderService) →
+   * wrap as a `print_receipt` device-mesh command → CommandQueueService.enqueue
+   * targeting the `kitchen_printer` device(s) in the order's branch.
+   *
+   * Strictly best-effort. Any failure (no mapped printer, builder error, queue
+   * write error) is logged and swallowed — the order is already persisted and
+   * visible on the KDS, and a missing paper ticket must never bounce a webhook
+   * (which would make the platform retry / mark us unavailable).
+   */
+  private async printKitchenTicket(
+    tenantId: string,
+    branchId: string,
+    order: any,
+  ): Promise<void> {
+    // Find the kitchen printer(s) for this branch. A small footprint (1-2 per
+    // kitchen); cap defensively like the KDS routing fan-out does. `retired`
+    // devices are excluded — they can't print. `offline` devices are kept so
+    // the command queues and prints when the bridge reconnects (the TTL
+    // sweeper cleans up anything still stuck).
+    const printers = await this.prisma.device.findMany({
+      where: {
+        tenantId,
+        branchId,
+        kind: "kitchen_printer",
+        status: { in: ["online", "offline", "paired", "busy"] },
+      },
+      select: { id: true, config: true },
+      take: 20,
+    });
+
+    if (printers.length === 0) {
+      this.logger.debug(
+        `No kitchen_printer device in branch ${branchId} for order ${order.orderNumber} — skipping auto-print`,
+      );
+      return;
+    }
+
+    // Build the canonical kitchen-ticket snapshot from the created order graph.
+    // toBuilderOrder tolerates missing modifiers/table (delivery orders have no
+    // table); the include in processIncomingOrder already pulls orderItems.product.
+    const snapshot = this.snapshotBuilder.buildKitchenTicketSnapshot({
+      order: ReceiptSnapshotBuilder.toBuilderOrder(order),
+    });
+
+    for (const printer of printers) {
+      try {
+        // Per-printer paper width from the device's free-form provisioning
+        // config (e.g. { paperWidth: "58mm" }); default 80mm.
+        const paperWidth =
+          (printer.config as { paperWidth?: "58mm" | "80mm" } | null)
+            ?.paperWidth === "58mm"
+            ? "58mm"
+            : "80mm";
+        const job = this.escpos.buildKitchenTicket(snapshot, { paperWidth });
+        const command = this.escpos.toPrintCommand(job);
+
+        await this.commandQueue.enqueue(tenantId, printer.id, {
+          kind: command.kind,
+          payload: command.payload as unknown as Record<string, unknown>,
+          // Kitchen tickets are high-priority — the food can't be made until
+          // the line sees it. Matches POS receipt urgency.
+          priority: 7,
+          // Idempotent on (order, printer): a duplicate webhook that somehow
+          // reaches this path again collapses onto the same command row rather
+          // than printing two identical tickets.
+          idempotencyKey: `delivery-kitchen:${order.id}:${printer.id}`,
+        });
+      } catch (err: any) {
+        // Per-printer guard so one bad device doesn't starve the others.
+        this.logger.error(
+          `Failed to enqueue kitchen ticket for order ${order.orderNumber} to printer ${printer.id}: ${err?.message}`,
+        );
+      }
+    }
   }
 
   /**
@@ -434,7 +540,13 @@ export class DeliveryOrderService {
       tenantId,
       platform: platform as any,
       direction: PlatformLogDirection.INBOUND,
-      action: PlatformLogAction.STATUS_UPDATE,
+      // Use the precise ORDER_CANCELLED action for a platform-originated
+      // cancellation (better observability than a generic STATUS_UPDATE);
+      // everything else stays STATUS_UPDATE.
+      action:
+        target === OrderStatus.CANCELLED
+          ? PlatformLogAction.ORDER_CANCELLED
+          : PlatformLogAction.STATUS_UPDATE,
       orderId: order?.id,
       externalId: remoteOrderId,
       request: { platformStatus, mappedTo: target },

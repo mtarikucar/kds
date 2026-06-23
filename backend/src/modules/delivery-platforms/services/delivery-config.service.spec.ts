@@ -29,6 +29,7 @@ describe('DeliveryConfigService', () => {
   let prisma: MockPrismaClient;
   let adapterFactory: any;
   let adapter: any;
+  let outbox: { append: jest.Mock };
   let svc: DeliveryConfigService;
 
   const originalKey = process.env.ENCRYPTION_MASTER_KEY;
@@ -48,7 +49,8 @@ describe('DeliveryConfigService', () => {
       closeRestaurant: jest.fn().mockResolvedValue(undefined),
     };
     adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
-    svc = new DeliveryConfigService(prisma as any, adapterFactory);
+    outbox = { append: jest.fn().mockResolvedValue('evt-1') };
+    svc = new DeliveryConfigService(prisma as any, adapterFactory, outbox as any);
   });
 
   describe('encryption at rest', () => {
@@ -199,7 +201,16 @@ describe('DeliveryConfigService', () => {
       (prisma.deliveryPlatformConfig.update as any)
         .mockImplementationOnce(async ({ data }: any) => {
           firstUpdateData = data;
-          return { id: 'cfg-1', platform: 'GETIR', errorCount: 10, isEnabled: true };
+          return {
+            id: 'cfg-1',
+            tenantId: 't1',
+            platform: 'GETIR',
+            branchId: 'b1',
+            errorCount: 10,
+            isEnabled: true,
+            lastError: 'boom',
+            lastErrorAt: new Date('2030-01-01T00:00:00.000Z'),
+          };
         })
         .mockResolvedValueOnce({ id: 'cfg-1', isEnabled: false });
 
@@ -212,25 +223,73 @@ describe('DeliveryConfigService', () => {
       expect(secondCall.data).toEqual({ isEnabled: false });
     });
 
-    it('recordError does NOT auto-disable while below threshold', async () => {
+    it('recordError emits a delivery.platform.auto_disabled.v1 tenant alert when the breaker trips', async () => {
+      (prisma.deliveryPlatformConfig.update as any)
+        .mockResolvedValueOnce({
+          id: 'cfg-1',
+          tenantId: 't1',
+          platform: 'GETIR',
+          branchId: 'b1',
+          errorCount: 10,
+          isEnabled: true,
+          lastError: 'token expired',
+          lastErrorAt: new Date('2030-01-01T00:00:00.000Z'),
+        })
+        .mockResolvedValueOnce({ id: 'cfg-1', isEnabled: false });
+
+      await svc.recordError('cfg-1', 'token expired');
+
+      expect(outbox.append).toHaveBeenCalledTimes(1);
+      const arg = outbox.append.mock.calls[0][0];
+      expect(arg.type).toBe('delivery.platform.auto_disabled.v1');
+      expect(arg.tenantId).toBe('t1');
+      expect(arg.idempotencyKey).toBe('delivery-auto-disabled:cfg-1:10');
+      expect(arg.payload).toMatchObject({
+        tenantId: 't1',
+        configId: 'cfg-1',
+        platform: 'GETIR',
+        branchId: 'b1',
+        errorCount: 10,
+        lastError: 'token expired',
+        lastErrorAt: '2030-01-01T00:00:00.000Z',
+      });
+    });
+
+    it('recordError does NOT auto-disable (or alert) while below threshold', async () => {
       (prisma.deliveryPlatformConfig.update as any).mockResolvedValue({
-        id: 'cfg-1', platform: 'GETIR', errorCount: 3, isEnabled: true,
+        id: 'cfg-1', tenantId: 't1', platform: 'GETIR', errorCount: 3, isEnabled: true,
       });
 
       await svc.recordError('cfg-1', 'boom');
 
       // Only the single increment update — no second disabling update.
       expect((prisma.deliveryPlatformConfig.update as any).mock.calls).toHaveLength(1);
+      expect(outbox.append).not.toHaveBeenCalled();
     });
 
-    it('recordError does not re-disable an already-disabled config at threshold', async () => {
+    it('recordError does not throw when the alert emit fails (best-effort)', async () => {
+      outbox.append.mockRejectedValueOnce(new Error('bus down'));
+      (prisma.deliveryPlatformConfig.update as any)
+        .mockResolvedValueOnce({
+          id: 'cfg-1', tenantId: 't1', platform: 'GETIR', branchId: null,
+          errorCount: 10, isEnabled: true, lastError: 'x', lastErrorAt: new Date(),
+        })
+        .mockResolvedValueOnce({ id: 'cfg-1', isEnabled: false });
+
+      await expect(svc.recordError('cfg-1', 'x')).resolves.toBeDefined();
+      // The disable write still happened.
+      expect((prisma.deliveryPlatformConfig.update as any).mock.calls).toHaveLength(2);
+    });
+
+    it('recordError does not re-disable (or re-alert) an already-disabled config at threshold', async () => {
       (prisma.deliveryPlatformConfig.update as any).mockResolvedValue({
-        id: 'cfg-1', platform: 'GETIR', errorCount: 12, isEnabled: false,
+        id: 'cfg-1', tenantId: 't1', platform: 'GETIR', errorCount: 12, isEnabled: false,
       });
 
       await svc.recordError('cfg-1', 'boom');
 
       expect((prisma.deliveryPlatformConfig.update as any).mock.calls).toHaveLength(1);
+      expect(outbox.append).not.toHaveBeenCalled();
     });
   });
 

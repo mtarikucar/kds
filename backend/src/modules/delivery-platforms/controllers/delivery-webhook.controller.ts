@@ -211,4 +211,49 @@ export class DeliveryWebhookController {
       );
     }
   }
+
+  /**
+   * Trendyol order status / cancellation webhook. Mirrors the Yemeksepeti
+   * status route: resolve the tenant by the restaurant id, then hand the
+   * platform-supplied status to applyPlatformStatusUpdate, which maps a
+   * cancellation onto the internal Order idempotently.
+   *
+   * IMPORTANT: this is the INBOUND direction — the platform already knows the
+   * order is cancelled (it told us). applyPlatformStatusUpdate only mutates the
+   * internal Order + notifies the KDS; it deliberately does NOT push any status
+   * back to the platform, so a platform-originated CANCELLED never echoes a
+   * redundant (and potentially error-raising) outbound call.
+   */
+  @Put("trendyol/:remoteId/order/:remoteOrderId/status")
+  @WebhookPlatform("TRENDYOL")
+  @HttpCode(HttpStatus.OK)
+  async trendyolStatusUpdate(
+    @Param("remoteId") remoteId: string,
+    @Param("remoteOrderId") remoteOrderId: string,
+    @Body() body: any,
+  ) {
+    const config = await this.configService.findByRemoteRestaurantId(
+      DeliveryPlatform.TRENDYOL,
+      remoteId,
+    );
+    if (!config) {
+      this.logger.warn(`No config found for Trendyol restaurant ${remoteId}`);
+      return { status: "ignored", reason: "restaurant not configured" };
+    }
+
+    const platformStatus = body?.status ?? body?.event ?? body?.state;
+    const result = await this.orderService.applyPlatformStatusUpdate({
+      platform: DeliveryPlatform.TRENDYOL,
+      remoteOrderId,
+      tenantId: config.tenantId,
+      platformStatus,
+    });
+
+    this.logger.log(
+      `Trendyol status '${platformStatus}' for ${remoteOrderId} -> ${
+        result.mappedTo ?? "unmapped"
+      }${result.matched ? "" : " (no-op)"}`,
+    );
+    return { status: "ok", matched: result.matched, mappedTo: result.mappedTo };
+  }
 }

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -16,10 +17,24 @@ import {
   encryptString,
   isEncryptedPayload,
 } from "../../../common/helpers/encryption.helper";
+import { OutboxService } from "../../outbox/outbox.service";
+import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 
 // Error count at which we auto-disable a config so we stop spamming
 // the platform / log table. The admin has to re-enable explicitly.
 const CIRCUIT_BREAKER_THRESHOLD = 10;
+
+/**
+ * Versioned domain-event emitted when the circuit breaker auto-disables a
+ * delivery-platform config. NOTE: this string is intentionally kept local —
+ * adding it to the central EventTypes registry is owned by the outbox module;
+ * until then OutboxService.append only logs a (harmless) unregistered-type
+ * warning for it. The event rides the SAME durable outbox/in-process bus every
+ * other tenant signal uses, so a notification consumer can subscribe without
+ * coupling to this module.
+ */
+export const DELIVERY_AUTO_DISABLED_EVENT =
+  "delivery.platform.auto_disabled.v1";
 
 type StoredCredentials = Record<string, unknown>;
 
@@ -30,6 +45,10 @@ export class DeliveryConfigService {
   constructor(
     private prisma: PrismaService,
     private adapterFactory: AdapterFactory,
+    // OutboxModule is @Global; @Optional() so the many unit tests that build
+    // this service bare keep working and a missing bus can never break the
+    // circuit-breaker write path — the alert is best-effort.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -261,13 +280,43 @@ export class DeliveryConfigService {
       },
     });
     if (updated.errorCount >= CIRCUIT_BREAKER_THRESHOLD && updated.isEnabled) {
+      // Loud log: before this, the breaker tripped and orders SILENTLY
+      // stopped — the operator had no signal until they noticed missing
+      // orders. WARN here + the durable alert below close that gap.
       this.logger.warn(
-        `Auto-disabling ${updated.platform} config ${configId} after ${updated.errorCount} errors`,
+        `Auto-disabling ${updated.platform} config ${configId} (tenant=${updated.tenantId}) after ${updated.errorCount} errors; last error: ${updated.lastError ?? "n/a"}`,
       );
       await this.prisma.deliveryPlatformConfig.update({
         where: { id: configId },
         data: { isEnabled: false },
       });
+      // Best-effort tenant alert on the shared outbox/in-process bus. A
+      // notification consumer surfaces this to the operator so they know to
+      // fix credentials / re-enable. Idempotency key = config id + the
+      // current error count so a retried recordError that re-enters this
+      // branch can't double-notify (it can't today — isEnabled is already
+      // false — but the key is cheap insurance).
+      await this.outbox
+        ?.append({
+          type: DELIVERY_AUTO_DISABLED_EVENT,
+          tenantId: updated.tenantId,
+          payload: {
+            tenantId: updated.tenantId,
+            configId: updated.id,
+            platform: updated.platform,
+            branchId: updated.branchId,
+            errorCount: updated.errorCount,
+            lastError: updated.lastError,
+            lastErrorAt: updated.lastErrorAt?.toISOString() ?? null,
+          },
+          idempotencyKey: `delivery-auto-disabled:${updated.id}:${updated.errorCount}`,
+        })
+        .catch(
+          captureSwallowedEmit(this.logger, {
+            module: "delivery-platforms",
+            op: "auto-disable",
+          }),
+        );
     }
     return updated;
   }

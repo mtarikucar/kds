@@ -15,7 +15,10 @@ import { DeliveryPlatform } from "../constants/platform.enum";
  */
 describe("DeliveryWebhookController (yemeksepeti)", () => {
   let configService: { findByRemoteRestaurantId: jest.Mock };
-  let orderService: { processIncomingOrder: jest.Mock };
+  let orderService: {
+    processIncomingOrder: jest.Mock;
+    applyPlatformStatusUpdate: jest.Mock;
+  };
   let logService: Record<string, jest.Mock>;
   let adapterFactory: { getAdapter: jest.Mock };
   let parseWebhookOrder: jest.Mock;
@@ -30,6 +33,9 @@ describe("DeliveryWebhookController (yemeksepeti)", () => {
     };
     orderService = {
       processIncomingOrder: jest.fn().mockResolvedValue({ id: "ord-1" }),
+      applyPlatformStatusUpdate: jest
+        .fn()
+        .mockResolvedValue({ matched: true, mappedTo: "CANCELLED" }),
     };
     logService = { log: jest.fn().mockResolvedValue(undefined) };
     adapterFactory = {
@@ -66,5 +72,32 @@ describe("DeliveryWebhookController (yemeksepeti)", () => {
     orderService.processIncomingOrder.mockResolvedValue(null);
     const out = await ctrl.yemeksepetiNewOrder("r-1", {});
     expect(out).toMatchObject({ status: "ok" });
+  });
+
+  describe("trendyol status/cancellation route", () => {
+    it("ignores a status webhook for an unconfigured restaurant (no throw)", async () => {
+      configService.findByRemoteRestaurantId.mockResolvedValue(null);
+      const out = await ctrl.trendyolStatusUpdate("r-unknown", "ext-9", {
+        status: "CANCELLED",
+      });
+      expect(out).toMatchObject({ status: "ignored" });
+      expect(orderService.applyPlatformStatusUpdate).not.toHaveBeenCalled();
+    });
+
+    it("routes a platform cancellation to applyPlatformStatusUpdate (inbound only)", async () => {
+      const out = await ctrl.trendyolStatusUpdate("r-1", "ext-9", {
+        status: "CANCELLED",
+      });
+
+      expect(orderService.applyPlatformStatusUpdate).toHaveBeenCalledWith({
+        platform: DeliveryPlatform.TRENDYOL,
+        remoteOrderId: "ext-9",
+        tenantId: "t1",
+        platformStatus: "CANCELLED",
+      });
+      expect(out).toMatchObject({ status: "ok", matched: true });
+      // Inbound only — the controller must not parse/process a new order.
+      expect(orderService.processIncomingOrder).not.toHaveBeenCalled();
+    });
   });
 });
