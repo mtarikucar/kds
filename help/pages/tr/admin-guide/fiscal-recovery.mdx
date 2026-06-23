@@ -1,0 +1,74 @@
+---
+title: Mali Kurtarma
+description: Başarısız veya kuyrukta bekleyen mali fişleri listeleyen ve aynı idempotency anahtarıyla yeniden deneyerek kurtaran kurtarma paneli.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Mali Kurtarma
+
+**Menü yolu:** İşletme → Mali Kurtarma &nbsp;•&nbsp; **URL:** `/admin/fiscal-recovery`
+**Erişim:** ADMIN &nbsp;•&nbsp; **Plan:** Mali entegrasyon (`fiscal`) aktif olmalı
+
+## Amacı
+
+Mali Kurtarma, mali cihaza (ÖKC / mali fiş sağlayıcısı) **başarıyla kesilememiş** fişleri tek bir tablo altında toplar. Ağ kopması, cihaz hatası veya sağlayıcı arızası nedeniyle kuyrukta kalan ya da başarısız olan fişleri buradan görür ve **tek dokunuşla yeniden denersiniz**. Operasyon sırasında ortaya çıkan mali aksaklıkları kapatmak için kullanılır.
+
+<Callout type="info">
+  Bu ekran yalnızca **mali entegrasyon aktif** olan işletmelerde görünür. Menüde
+  çıkmıyorsa entegrasyon henüz tanımlı değildir. Bu kapı (gate) yalnızca arayüz
+  içindir; gerçek yetki kontrolü her zaman sunucudadır.
+</Callout>
+
+## Tablo neyi gösterir?
+
+Ekran, başarıyla kesilememiş en güncel **100 fişe kadar** olan kaydı listeler ve her **20 saniyede bir** otomatik yenilenir. Üstteki **Yenile** butonuyla anında güncelleyebilirsiniz. Liste boşsa "bekleyen fiş yok" bilgisi gösterilir.
+
+Her satırda şu kolonlar yer alır:
+
+- **Oluşturulma** — fişin sisteme düştüğü tarih/saat.
+- **Sağlayıcı** — fişi kesecek mali sağlayıcının kimliği (`providerId`).
+- **Sipariş** — ilgili sipariş kimliği (bağlı sipariş yoksa `—`).
+- **Durum** — `queued` (kuyrukta) veya `failed` (başarısız) rozeti; yanındaki `×N` o ana kadarki **deneme sayısını** gösterir.
+- **Tutar** — fiş toplamı, kaydın kendi para biriminde (₺) biçimlendirilir.
+- **Son hata** — başarısız denemede sağlayıcıdan dönen son hata mesajı (kırmızı).
+
+<Callout type="info">
+  Tablo yalnızca **kesilememiş** fişleri taşır. Bir fiş başarıyla kesildiğinde
+  (`issued`) listeden otomatik düşer — temizlenmesi için ayrıca bir işlem
+  yapmanıza gerek yoktur.
+</Callout>
+
+## Bir fişi yeniden deneme
+
+<Steps>
+### Sorunlu fişi bulun
+
+Durumu `failed` olan satırın **Son hata** kolonunu okuyun. Hata, cihazın kapalı olması, kâğıt bitmesi veya sağlayıcı bağlantısı gibi giderilebilir bir nedeni gösteriyorsa önce o nedeni çözün.
+
+### Yeniden Dene'ye basın
+
+Satırın sonundaki **Yeniden Dene** butonuna tıklayın. İstek sürerken buton kısa süre pasifleşir; aynı anda birden fazla satırı tetiklemeyin.
+
+### Sonucu izleyin
+
+İşlem biter bitmez bir bildirim çıkar: başarılıysa **fiş numarasıyla** ("fiş kesildi") onaylanır ve satır listeden düşer. Hâlâ başarısızsa hata mesajıyla uyarır; **Son hata** ve deneme sayısı güncellenir.
+</Steps>
+
+<Callout type="warning">
+  Yeniden deneme, fişi **özgün idempotency anahtarıyla** tekrar gönderir. Bu
+  sayede mali cihaz aynı fişi **iki kez kesmez** — aynı satıra art arda
+  basmanız çift fiş oluşturmaz. Yine de her denemeden önce kök nedeni (cihaz,
+  bağlantı, sağlayıcı) gidermek, gereksiz başarısız denemeleri azaltır.
+</Callout>
+
+<Callout type="info">
+  Tablo şubeye göre kapsamlıdır (branch-scope): yalnızca üst çubuktan seçili
+  şubenin bekleyen fişlerini görürsünüz. Başka bir şubenin fişlerini görmek için
+  o şubeye geçin.
+</Callout>
+
+## İlgili sayfalar
+
+- Satış ve fiş basımı akışı için: **[POS (Satış Ekranı)](/tr/admin-guide/pos)**
+- Genel entegrasyon ve davranış ayarları için: **[Ayarlar](/tr/admin-guide/settings)**

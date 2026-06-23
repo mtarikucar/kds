@@ -214,6 +214,36 @@ services:
           cpus: '0.25'
           memory: 256M
 
+  # Help Center (Nextra / Next.js) - Staging
+  help:
+    env_file:
+      - .env.test
+    image: ghcr.io/mtarikucar/kds/help-staging:current
+    container_name: kds_help_staging
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      # Host 3203 (distinct from prod's 3201, and from staging developer's 3202)
+      # so all docs containers coexist on the shared VPS.
+      - '3203:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/tr']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kds_staging_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
 
 volumes:
   postgres_data_staging:

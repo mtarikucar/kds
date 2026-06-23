@@ -1,0 +1,120 @@
+---
+title: Hardware pairing
+description: Pair receipt printers, cash drawers and fiscal registers from the panel — create a device slot, the pairing code, status monitoring and sending commands.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Hardware: printer, cash drawer, fiscal register
+
+You manage your local hardware (receipt printer, cash drawer, fiscal register, card terminal)
+from the panel. The flow is three steps: you create a **device slot** in the panel, you enter
+the **pairing code** that appears on screen on the device itself (or on the local bridge that
+drives that hardware), and then you monitor the device's status live from the panel and send
+it commands — print a receipt, open the drawer, issue a fiscal receipt.
+
+<Callout type="info">
+  Device slots are managed from the **Devices** screen, where all your registered terminals
+  live in one list (Multi-Location → Devices). You connect a piece of hardware to a single
+  screen or local bridge; pairing always completes on the device itself.
+</Callout>
+
+## What hardware you can add
+
+When creating a new slot you pick the device **type** from the dropdown in the top right:
+
+| Type | What it's for |
+| --- | --- |
+| Receipt printer | Prints customer receipts |
+| Kitchen printer | Prints order tickets to the kitchen |
+| Fiscal register (yazarkasa) | Issues fiscal receipts (GİB-approved device) |
+| Card terminal (POS) | Collects card payments |
+| Kitchen / bar display | Shows orders on a screen |
+| Waiter / customer tablet | Order taking / customer side |
+| Caller-ID, barcode scanner | Auxiliary hardware |
+| Local bridge | Drives several pieces of local hardware on your network at once |
+
+<Callout type="info">
+  A **local bridge** is a device that drives several pieces of local hardware on your network
+  at once — receipt printer, cash drawer and fiscal register. Rather than adding each printer
+  and drawer individually, setting up one bridge and connecting all the local hardware through
+  it is the most practical approach for most installs.
+</Callout>
+
+## Pairing flow
+
+<Steps>
+### Create a device slot
+
+On the Devices screen, choose the hardware type from the dropdown in the top right (e.g.
+Receipt printer, Fiscal register, Local bridge) and press **Create Device Slot**. The slot is
+created within the scope of the currently selected **branch**.
+
+### Enter the pairing code on the device
+
+In the new row's **Pairing Code** column, a short alphanumeric code and a **QR** that encodes
+it appear. Click the QR to enlarge it (handy for scanning a screen across the dining room from
+a distance). Enter this code on the device — or on the local bridge that drives the hardware.
+
+### Confirm the connection
+
+Once pairing completes, the row's **Status** label flips to `online` and **Last Seen**
+updates. From this point you can send the device commands.
+</Steps>
+
+<Callout type="warning">
+  The pairing code has an **expiry** time (visible when you hover over the QR). If it expires,
+  the code becomes invalid; retire the slot and create a new one to generate a fresh code.
+</Callout>
+
+## Statuses
+
+The **Status** label on a row shows the device's current state:
+
+- **online** (green) — the device is connected and can receive commands.
+- **offline** (gray) — nothing has been heard from the device for a while (it drops to
+  `offline` if the connection lapses for about 45 seconds).
+- **error** (red) — the device reported a problem.
+- **busy** (amber) — the device is currently running a job.
+- **maintenance** (blue) — in maintenance mode.
+
+Three summary cards at the top of the screen summarize your fleet: **Total devices**,
+**Online** and the count needing attention (`error` or `offline`). The list refreshes itself
+at regular intervals; status changes appear without a manual reload.
+
+## Sending commands
+
+You drive hardware by sending commands to a device. Commands wait in a per-device queue; the
+device pulls the next one, runs it, and reports the outcome back to the panel. Click the device
+name in the table to open the **Device Commands** drawer from the right, where you can review
+the command queue (with the Queued / In progress / Completed / Failed filters), read the error
+reason on a failed row, and — if the device looks unhealthy — send a one-off **capability
+probe**.
+
+Typical commands: print a customer receipt, open the cash drawer, issue a fiscal receipt on the
+register, charge a card terminal, and show an order on a screen.
+
+<Callout type="warning">
+  **Money-moving or artefact-producing commands (charging, fiscal receipts, printing, opening
+  the drawer) are deliberately never auto-retried.** If a command is interrupted and its result
+  doesn't reach the panel, the system will not resend it on its own — otherwise a customer could
+  be double-charged or a receipt double-printed. In such cases the command is marked **failed**;
+  you reconcile with an explicit compensating step (for example a fiscal cancel). Safe operations
+  such as screen commands are retried on their own if needed.
+</Callout>
+
+## Branch scope and security
+
+- Commands are **branch-scoped**: a manager authorized for a single branch can only drive
+  devices in that branch; they cannot send a charge or receipt command to another branch's
+  terminal. An admin (ADMIN) operates across all branches.
+- To take a device out of service, use the **Retire** button on the right of the row; after you
+  confirm, the device is hidden from the list and its connection is invalidated. Retiring a
+  device is restricted to the **Admin** role.
+
+## Related pages
+
+- **[Devices](/en/admin-guide/devices)** — the single list of all your registered terminals.
+- **[Hardware Store](/en/marketplace/hardware-store)** — buy printers, tablets and displays.
+
+Developer/integration details: [Device API (Device Mesh)](https://developer.hummytummy.com/en/developer/devices-api)

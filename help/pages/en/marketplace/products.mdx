@@ -1,0 +1,236 @@
+---
+title: Products (Add-ons)
+description: A short card per add-on — what it does, price, recurring vs one-time, dependency.
+---
+
+import { Callout } from 'nextra/components'
+
+# Products (Add-ons)
+
+**Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Access:** ADMIN, MANAGER • **Plan:** All plans
+
+Every item you can buy in the Marketplace is documented below, one by one. Each
+card lists: **what it does**, **price**, **recurring vs one-time**, and any
+**dependency**.
+
+<Callout type="info">
+  The purchase path is the same for every add-on: add it to the cart in the
+  Marketplace → pay via PayTR → the entitlement activates automatically. For the
+  step-by-step walkthrough see [Purchase Flow](/en/marketplace/purchase-flow).
+  Prices are TRY, KDV-inclusive.
+</Callout>
+
+---
+
+## Capacity packs
+
+### Extra KDS screen
+
+Adds **one** additional kitchen display (KDS) screen slot to your branch.
+
+| Field | Value |
+| --- | --- |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺99.00 |
+| What it does | Raises your KDS-screen limit by **one** |
+| Dependency | — |
+
+### Extra KDS station
+
+Adds **one** routing station (bar / grill / dessert) on top of the default
+kitchen.
+
+| Field | Value |
+| --- | --- |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺149.00 |
+| What it does | Raises your KDS-station limit by **one** |
+| Dependency | — |
+
+### Extra waiter tablet
+
+Increases your waiter-tablet limit by **one**.
+
+| Field | Value |
+| --- | --- |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺79.00 |
+| What it does | Raises your tablet limit by **one** |
+| Dependency | — |
+
+### Extra branch
+
+Adds **one** branch beyond your plan limit. Required for chains. A single
+purchase does two things: it raises your branch limit **and** enables the
+multi-location feature.
+
+| Field | Value |
+| --- | --- |
+| Kind | Capacity |
+| Billing | Recurring |
+| Price | ₺399.00 |
+| What it does | **One** extra branch **and** the multi-location feature |
+| Dependency | — |
+
+---
+
+## Integrations
+
+### e-Fatura / e-Arşiv
+
+Issue tax-compliant electronic invoices (cloud-side, no hardware required).
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺199.00 |
+| What it does | Enables e-Fatura / e-Arşiv invoicing |
+| Dependency | — |
+
+### Hugin yazarkasa integration
+
+Drive a Hugin fiscal device via the Local Bridge.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺299.00 |
+| What it does | Enables the Hugin fiscal-device integration |
+| Dependency | **Requires the PRO plan** |
+
+<Callout type="warning">
+  Hugin yazarkasa is the **only** add-on in the catalogue with a dependency. If
+  you are not on PRO, the purchase is blocked and you're asked to upgrade your
+  plan first.
+</Callout>
+
+### Yemeksepeti integration
+
+Receive Yemeksepeti orders directly into your KDS.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Brings Yemeksepeti orders into the KDS |
+| Dependency | — |
+
+### Getir Yemek integration
+
+Receive Getir Yemek orders directly into your KDS.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Brings Getir Yemek orders into the KDS |
+| Dependency | — |
+
+### Trendyol Yemek integration
+
+Receive Trendyol Yemek orders directly into your KDS.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Brings Trendyol Yemek orders into the KDS |
+| Dependency | — |
+
+<Callout type="info">
+  You can use all three delivery integrations at the same time; the orders are
+  collected side by side into a single KDS flow.
+</Callout>
+
+### Caller ID / phone-order integration
+
+Open a customer card automatically on every inbound call.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Recurring |
+| Price | ₺149.00 |
+| What it does | Auto-opens a customer card on inbound calls |
+| Dependency | — |
+
+---
+
+## Software / features
+
+### Advanced reports
+
+Cohort analysis, custom reports, and scheduled email delivery.
+
+| Field | Value |
+| --- | --- |
+| Kind | Software |
+| Billing | Recurring |
+| Price | ₺129.00 |
+| What it does | Enables the advanced report set |
+| Dependency | — |
+
+### API access
+
+A public API key + outbound webhooks for your integrations.
+
+| Field | Value |
+| --- | --- |
+| Kind | Software |
+| Billing | Recurring |
+| Price | ₺249.00 |
+| What it does | Enables the API key + outbound webhooks |
+| Dependency | — |
+
+<Callout type="info">
+  For the technical use of API access and webhooks, see the developer docs:
+  [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api).
+</Callout>
+
+---
+
+## Support
+
+### Priority support
+
+A 24-hour SLA on critical tickets. Direct line during business hours.
+
+| Field | Value |
+| --- | --- |
+| Kind | Support |
+| Billing | Recurring |
+| Price | ₺199.00 |
+| What it does | Priority support / 24-hour SLA |
+| Dependency | — |
+
+### On-site setup (one-time)
+
+A HummyTummy technician comes to your venue, installs the bridge + devices, and
+trains your staff.
+
+| Field | Value |
+| --- | --- |
+| Kind | Support |
+| Billing | **One-time** |
+| Price | ₺7,500.00 |
+| What it does | **Grants nothing** — it's an installation/training service |
+| Dependency | — |
+
+<Callout type="warning">
+  This item does not add a limit or feature to your account; it is paid and
+  invoiced but does not change your entitlement set. It is one-time, **not**
+  recurring.
+</Callout>
+
+---
+
+Developer/integration details: [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api)

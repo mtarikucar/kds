@@ -1,0 +1,74 @@
+---
+title: Hesap Oluşturma
+description: HummyTummy'de yeni bir restoran hesabı açma — kayıt formu ve zorunlu alanlar.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Hesap Oluşturma
+
+Yeni bir restoran hesabı açmak, kayıt formunu doldurmaktan ibarettir. Kayıt tamamlandığı anda sizin için bir **tenant**, bir **"Main" şube**, **ADMIN** kullanıcınız ve **7 günlük ücretsiz deneme** otomatik kurulur — başka bir adım gerekmez.
+
+## Zorunlu bilgiler
+
+Kayıt için aşağıdaki alanlar **zorunludur**:
+
+| Alan | Açıklama | Kural |
+|---|---|---|
+| **E-posta** | Giriş için kullanılır | Geçerli e-posta, en fazla 254 karakter |
+| **Şifre** | Hesap şifresi | En az 8 karakter; **en az bir küçük harf, bir büyük harf ve bir rakam** içermeli (en fazla 128 karakter) |
+| **Ad** | Adınız | En fazla 100 karakter |
+| **Soyad** | Soyadınız | En fazla 100 karakter |
+| **Telefon** | İletişim ve ödeme için | Herhangi bir doğal formatta girebilirsiniz; sistem standart biçime çevirir |
+| **Restoran adı** | Yeni işletme açarken | Tenant'ınızın adı olur, en fazla 120 karakter |
+
+<Callout type="info">
+  **Telefon neden zorunlu?** Ödeme sağlayıcısı (PayTR) checkout sırasında telefon
+  numarası ister. Bu yüzden telefon kayıtta alınır. `"0555 123 45 67"` veya
+  `"+90 555 123 45 67"` gibi doğal yazımları kabul eder ve standart
+  `+905551234567` biçimine çevirir.
+</Callout>
+
+## Adım adım kayıt
+
+<Steps>
+
+### Kayıt sayfasını açın
+
+Giriş ekranındaki **"Kayıt ol"** bağlantısına tıklayın.
+
+### Bilgileri girin
+
+E-posta, şifre, ad, soyad, telefon ve restoran adını doldurun. Şifre, büyük/küçük harf ve rakam içermelidir. Telefonu istediğiniz doğal yazımla girebilirsiniz.
+
+### Hesabı oluşturun
+
+Formu gönderin. Hesabınız, ana şubeniz ve 7 günlük deneme aboneliğiniz tek seferde kurulur ve doğrudan sisteme giriş yaparsınız.
+
+### Karşılama akışını tamamlayın
+
+İlk girişte sizi karşılayan ekrana ve kontrol paneline yönlendirilirsiniz. Buradan **[İlk Kurulum](/getting-started/ilk-kurulum)** adımlarına geçin.
+
+</Steps>
+
+<Callout type="info">
+  Aynı e-posta zaten kullanımdaysa kayıt formu sizi uyarır; farklı bir e-posta deneyin
+  veya mevcut hesabınızla giriş yapın. Çok kısa sürede çok sayıda kayıt denemesi yaparsanız
+  güvenlik amacıyla bir süre beklemeniz istenebilir.
+</Callout>
+
+## Kayıttan sonra otomatik kurulan şeyler
+
+Kayıt başarıyla tamamlandığında sizin için şunlar hazırlanır:
+
+1. **Tenant** — restoran adınızla, 7 günlük deneme süresi ayarlı.
+2. **Abonelik** — deneme (TRIAL) durumunda, 7 günlük plan.
+3. **"Main" şube** — varsayılan ana şubeniz.
+4. **ADMIN kullanıcı** — siz (işletme sahibi).
+
+Bu noktadan sonra **[İlk Kurulum](/getting-started/ilk-kurulum)** adımlarıyla menünüzü, masalarınızı ve ayarlarınızı hazırlayabilirsiniz.
+
+## İlgili sayfalar
+
+- **[İlk Kurulum](/getting-started/ilk-kurulum)** — kayıttan sonra menü, masa ve ayarların hazırlanması.
+- Programatik kayıt (API) için: **[API Temelleri](https://developer.hummytummy.com/tr/developer/api-temelleri)**

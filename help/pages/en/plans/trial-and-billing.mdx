@@ -1,0 +1,73 @@
+---
+title: Trial & billing
+description: The 7-day trial, the TRIAL_ENDED lock, the billing cycle, and VAT-inclusive pricing.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Trial & billing
+
+## 7-day trial
+
+Every new business is automatically placed on the **Trial** plan at sign-up:
+
+- **Duration:** 7 days.
+- **Scope:** **all of the Business plan's features** and **unlimited** limits. So during the trial you can test the product at full capacity without hitting any feature restriction.
+- **Not sellable:** the Trial plan is not listed on the plan-selection screen; it isn't a plan you buy — it's assigned to you at sign-up.
+
+The trial runs as a separate onboarding plan and isn't tied to any paid plan. You're expected to choose a paid plan before your trial period ends.
+
+## What happens when the trial ends (the lock)
+
+If your trial period elapses **without you choosing a paid plan**, your business is locked. This is not a silent downgrade to a lower plan — it's an **explicit lock**: you have to choose a plan to continue.
+
+<Steps>
+
+### The app locks
+When the trial ends and you try to navigate the panel, you'll see the message "Your trial has ended. Choose a plan to continue." and access to the normal screens stops.
+
+### What you can still do
+Even while locked you can reach the **plan-selection and payment screens**: you can view the plans, pick one, and pay. The other working screens (POS, kitchen, reports, etc.) stay closed until you choose a plan.
+
+### Automatic redirect
+While locked, the app automatically sends you to the plan-selection screen, where choosing a plan unlocks everything.
+
+</Steps>
+
+<Callout type="warning">
+  The same lock applies not only when the trial ends, but also when your subscription **expires** or is **cancelled**. A subscription that is past due (PAST_DUE) is still treated as live during its 7-day grace period and isn't locked.
+</Callout>
+
+## Billing cycle
+
+You choose one of two billing cycles: **Monthly** or **Yearly**. The cycle you pick determines the period length and the amount you pay on subscription creation, upgrade, and downgrade. **Paying yearly is cheaper than 12× the monthly amount** (about 17% savings).
+
+You can view and download your past invoices from the invoices screen in the panel; each invoice lists its date, amount, and period.
+
+## VAT-inclusive pricing
+
+All advertised plan prices are **gross** (VAT-inclusive) amounts, and you are charged exactly that amount — no extra VAT is added on top at invoice time. On the invoice the total is broken down so the VAT it contains is shown as a separate line.
+
+**Example — Pro monthly ₺1,299:**
+
+| Line | Amount |
+| --- | --- |
+| Subtotal (net) | ₺1,082.50 |
+| VAT (20%) | ₺216.50 |
+| **Total (charged)** | **₺1,299.00** |
+
+<Callout type="info">
+  Your business's tax ID is written onto the invoice **as it was at the time the invoice was issued**. Even if you change your tax ID later, your past invoices are unaffected.
+</Callout>
+
+## Cancellation and reactivation
+
+- **Cancel** — you can cancel your subscription from the panel (Admin only). You can choose whether the cancellation takes effect **immediately or at period end**, and optionally enter a short **cancellation reason**.
+- **Reactivate** — you can reactivate a cancelled subscription from the panel (Admin only).
+
+## Related pages
+
+- Choosing a plan, upgrading, and payment flows: **[Choosing & upgrading](/en/plans/choosing-and-upgrading)**
+- Full feature/limit comparison across plans: **[Feature matrix](/en/plans/feature-matrix)**
+
+Developer/integration details (endpoints, JSON, invoice/cancellation APIs, the TRIAL_ENDED lock envelope): [Subscription & Billing API](https://developer.hummytummy.com/en/developer/billing-api)

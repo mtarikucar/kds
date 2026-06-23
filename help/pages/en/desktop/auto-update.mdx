@@ -1,0 +1,68 @@
+---
+title: Auto-update
+description: How the HummyTummy Desktop app finds, downloads and safely installs new versions on its own.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Auto-update
+
+The HummyTummy Desktop app notices when a new version is published and downloads and
+installs the update for you. You don't have to look for a release or re-download it by
+hand — the app checks whether you're on the latest version every time it launches.
+
+<Callout type="info">
+  Updates are published centrally, so every restaurant gets the same, latest version. That
+  way all of your teams have the same features and fixes.
+</Callout>
+
+## How it works
+
+<Steps>
+### The app checks on launch
+
+Every time you start HummyTummy Desktop, the app quietly checks whether a newer version
+than yours exists. This happens in the background and doesn't interrupt your work.
+
+### You're told when a newer version exists
+
+If a new version is found, the app downloads it and, once it's ready, asks whether you'd
+like to install it. The release notes summarize what changed in that update.
+
+### The update installs safely
+
+The app verifies that the file it downloaded really is a genuine, unmodified, trusted
+package published by HummyTummy. If the check passes, the update installs; if anything
+looks wrong, nothing is installed and your current version stays exactly as it is.
+</Steps>
+
+<Callout type="warning">
+  An update only installs when the published package passes the security check. This way
+  your app is never updated with an unverified file — the integrity of the software running
+  your register and sales screen is protected.
+</Callout>
+
+## When you're already up to date
+
+If you're on the latest version, the app does nothing and opens normally. Even if you don't
+see an "up to date" message, the check has still run quietly.
+
+## If no update arrives
+
+If you know a new version was published but don't see an update prompt:
+
+- Fully close and reopen the app; the check runs on launch.
+- Make sure you have an internet connection.
+- If the problem persists, you can reinstall the app by hand with the latest package:
+  **[Install & download](/en/desktop/install)**.
+
+## Related pages
+
+- **[Install & download](/en/desktop/install)** — downloading and installing the app for
+  the first time.
+- **[Hardware](/en/desktop/hardware)** — pairing guide for the receipt printer, cash
+  drawer and cash register.
+
+---
+
+Developer/integration details: [Desktop Release API](https://developer.hummytummy.com/en/developer/desktop-api)

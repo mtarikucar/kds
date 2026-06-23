@@ -1,28 +1,29 @@
 ---
-title: HummyTummy Documentation
-description: HummyTummy — cloud-based restaurant management. Guides from setup to integration, plans to the desktop app.
+title: HummyTummy Developer Portal
+description: HummyTummy integration documentation — REST API, Partner Display API, webhooks, external service integrations (delivery/SMS/e-Invoice/Caller ID) and reference.
 ---
 
-import { Cards } from 'nextra/components'
+import { Cards, Callout } from 'nextra/components'
 
-# HummyTummy Documentation
+# HummyTummy Developer Portal
 
-**HummyTummy** is a cloud-based restaurant management system: QR menu, POS, kitchen display (KDS), order & table management, inventory, reports, multi-branch, and developer integrations — in one panel.
-
-This portal serves both **owners/admins** (pages, plans, desktop) and **developers/integrators** (API, Partner Display, webhooks).
+This portal is for **developers and integrators** connecting HummyTummy to their own software, screens or external services.
 
 <Cards>
-  <Cards.Card title="Getting Started" href="/getting-started" arrow />
-  <Cards.Card title="Admin Guide" href="/admin-guide" arrow />
-  <Cards.Card title="Plans" href="/plans" arrow />
-  <Cards.Card title="Marketplace" href="/marketplace" arrow />
-  <Cards.Card title="Developer / Integration" href="/developer" arrow />
-  <Cards.Card title="Desktop App" href="/desktop" arrow />
+  <Cards.Card title="Developer / API" href="/developer" arrow />
+  <Cards.Card title="Integrations" href="/integrations" arrow />
   <Cards.Card title="Reference" href="/reference" arrow />
 </Cards>
 
 ## Quick start
 
-- **Restaurant owner:** [Getting Started](/en/getting-started) → [Admin Guide](/en/admin-guide) → [Plans](/en/plans)
-- **Integrator/developer:** [Developer / Integration](/en/developer) → [Partner Display API](/en/developer/partner-display) → [Webhooks](/en/developer/webhooks)
-- **Desktop setup:** [Desktop App](/en/desktop)
+- **API basics:** [Developer / API](/developer) → [API Fundamentals](/developer/api-fundamentals)
+- **Partner screen/kiosk integration:** [Partner Display API](/developer/partner-display)
+- **Event notifications:** [Webhooks](/developer/webhooks)
+- **External service setup:** [Integrations](/integrations) → delivery, SMS, e-Invoice, Caller ID
+- **Error codes & scopes:** [Reference](/reference)
+
+<Callout type="info">
+  Guides for **using** the system (admin panel screens, plans, desktop app) live on a
+  separate portal: **[help.hummytummy.com](https://help.hummytummy.com/en)**.
+</Callout>

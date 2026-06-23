@@ -1,0 +1,99 @@
+---
+title: SMS
+description: A screen for turning automatic customer SMS (and email) on or off per event for reservation and order milestones; the SMS provider is configured server-side.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# SMS Notifications
+
+**Menu path:** Settings → SMS &nbsp;•&nbsp; **URL:** `/admin/settings/sms`
+**Access:** ADMIN, MANAGER  •  **Plan:** `integration_sms` add-on (SMS integration)
+
+## Purpose
+
+This screen lets you control **which events trigger an automatic SMS** to your customers, one event at a time. There are independent switches for reservation states (received, confirmed, rejected, cancelled) and order states (received, confirmed, preparing, ready, cancelled). The message text ships ready-made with the system; here you only toggle the notifications on or off.
+
+<Callout type="info">
+  This screen depends on the **SMS integration** add-on (`integration_sms`). Without the
+  add-on, **SMS** doesn't appear in the sidebar and visiting `/admin/settings/sms` shows an
+  upgrade card. The server enforces the entitlement; the interface only controls visibility.
+</Callout>
+
+## Provider setup (server-side)
+
+For SMS to actually be sent, an **SMS provider** must be configured in the system. These credentials are **not** entered on this screen; because they involve PII and billing, they're managed through server environment variables. The supported providers are **NetGSM** (the default/preferred choice for Turkey) and **Twilio**.
+
+<Steps>
+### Pick a provider
+
+On the server, set `SMS_PROVIDER` to `netgsm` or `twilio`. If left empty, the system tries NetGSM credentials first, then Twilio.
+
+### Enter the credentials
+
+- **NetGSM:** `NETGSM_USERCODE`, `NETGSM_PASSWORD`, and `NETGSM_MSGHEADER` for the sender header.
+- **Twilio:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` for the sender number.
+
+### Verify
+
+If credentials are missing, the provider is disabled and the system falls back to **mock (no-send) mode**.
+</Steps>
+
+<Callout type="warning">
+  In a production environment, if no provider is configured the system **fails fast on startup**
+  (it does not silently fake sending). If you genuinely need to mute sending,
+  `ALLOW_MOCK_SMS_IN_PROD=true` is an explicit escape hatch. These settings live with your
+  developer/operations team; contact whoever manages your hosting for the credentials.
+</Callout>
+
+## Turning notifications on
+
+The screen consists of a single master switch with event groups beneath it. Every change is **saved automatically** (there is no separate "Save" button); on a successful save you get an info notification, and on an error a retry option appears.
+
+<Steps>
+### Turn on the master switch
+
+The **SMS Notifications** switch at the top is the master control. While it's off, the order and reservation SMS switches appear **disabled (greyed out)** and no SMS is sent.
+
+### Choose your reservation SMS messages
+
+Tick which reservation events should send an SMS: **created, confirmed, rejected, cancelled**. The rejection message automatically includes the **reason**, if one was entered.
+
+### Choose your order SMS messages
+
+For the order lifecycle: **received, confirmed, preparing, ready, cancelled**. These are sent for orders that have a customer phone number.
+</Steps>
+
+<Callout type="info">
+  An SMS is sent only if the customer has a **phone number** on file and the relevant event
+  switch is on. If there's no number, sending is silently skipped; this does not block the order
+  or reservation.
+</Callout>
+
+## Reservation email channel
+
+Alongside the reservation section there's a separate **Email** group (created, confirmed, rejected, cancelled). These switches are **independent** of the master SMS switch and don't get disabled along with it. The notification service is channel-aware: if the customer provided an **email address** and the relevant switch here is on, it sends the notification by email; if there's no email, the SMS path (phone only) kicks in as a fallback.
+
+## Testing
+
+There's no separate "send test SMS" button on the screen. To verify:
+
+<Steps>
+### Turn on a single event
+
+Turn on the master switch and just the one event you want to test (e.g. **Order Ready**).
+
+### Trigger the event
+
+Create a test order/reservation with a phone number on file and move it to the relevant state (e.g. mark the order "ready").
+
+### Check the result
+
+Confirm on the phone that the message arrived. If it doesn't, check the provider credentials and that the customer's number is on file; send failures are written to the server logs (with the phone number masked).
+</Steps>
+
+## Related pages
+
+- Reservation flow and states: **[Reservations](https://help.hummytummy.com/en/admin-guide/reservations)**
+- Order states: **[Orders](https://help.hummytummy.com/en/admin-guide/orders)**
+- Other integrations: **[Integrations](/en/integrations)**

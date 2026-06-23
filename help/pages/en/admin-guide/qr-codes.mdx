@@ -1,0 +1,85 @@
+---
+title: QR Codes
+description: HummyTummy QR code management — generating restaurant-wide and per-table QR codes, downloading/printing, and designing the QR menu. Where each code points, how to use it, and tips.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# QR Codes
+
+**Menu path:** Menu & Tables → QR Codes &nbsp;•&nbsp; **URL:** `/admin/qr-codes`
+**Access:** ADMIN, MANAGER  •  **Plan:** All plans
+
+## Purpose
+
+The QR Codes screen **generates, downloads, and prints** the QR codes your guests scan with their phones to open your menu. There are two kinds: a single **restaurant-wide QR** for the whole venue, and individual **per-table QR codes**. You also design the look of the QR menu (color, typography, layout, logo) from here.
+
+<Callout type="info">
+  This is the admin screen that **generates** the codes. The menu a guest actually
+  sees after scanning is a separate screen — see **[QR Menu (customer)](/en/admin-guide/qr-menu)**.
+</Callout>
+
+## How QR codes work
+
+The screen is split into two tabs: **QR Codes** and **Design Settings**. The three cards at the top show the current counts: total codes, table QR codes, and the restaurant QR.
+
+<Steps>
+### Restaurant QR Code
+
+A single QR for the whole venue. Whoever scans it lands directly on your menu's home page; it isn't tied to a specific table. It's a good fit for the storefront, the door, a business card, or social media.
+
+### Per-Table QR Codes
+
+When **"Enable table QR codes"** is turned on under Design Settings, a separate QR is generated for every table you've defined. A guest who scans one of these goes **straight to that table's menu**, so ordering and self-pay are bound to the correct table. If you haven't defined any tables yet, this section appears empty — add tables first from the **[Tables](/en/admin-guide/tables)** screen.
+</Steps>
+
+QR codes are **branch-scoped**: the branch you're viewing in the top branch selector determines which table codes are listed.
+
+## Where each code points
+
+Every QR carries your menu's address: `…/qr-menu/<restaurant-no>` (table codes also include the relevant table). Use the **copy** button under a code to put that address on your clipboard, or **share** to send it straight from your phone.
+
+<Callout type="warning">
+  Once you print a code and place it on a table, the restaurant number and the table
+  link stay fixed — as long as the address doesn't change, you never need to regenerate
+  printed codes. Changing the color or design doesn't affect the address; it only changes
+  how the opened menu looks.
+</Callout>
+
+## Downloading and printing
+
+You can download each code individually from its own card, or use the bulk actions.
+
+- **Size selection:** every card offers three preset sizes — **Table card** (150×150), **Standard** (300×300), and **Poster** (600×600).
+- **Format:** for individual downloads you can choose **PNG**, **SVG** (vector, for lossless scaling), or **PDF**.
+- **Download all:** the button on the bulk actions card downloads every code in the list, one after another, as PNG.
+- **Print table QR page:** opens all table QRs — each with its table label — on a single print-ready page (grid layout) and launches the print dialog.
+
+<Callout type="info">
+  Bulk downloads arrive one at a time, in short intervals, so the files don't get mixed up.
+  Because printing opens a new tab, you may need to allow your browser's **pop-up blocker**.
+</Callout>
+
+## Design Settings
+
+The **Design Settings** tab edits how the menu looks when a guest scans the QR, with a live preview. Settings are on the left; the QR and menu preview on the right update instantly. There are five sub-tabs:
+
+- **Templates** — apply ready-made look presets with one tap.
+- **Colors** — primary, secondary, and background color (preset themes included).
+- **Typography** — font and restaurant logo upload (image up to 5 MB).
+- **Layout** — list / grid / compact arrangement, products per row, and price-description-image display.
+- **QR Style** — toggle table QRs on/off and set the message printed under the table code (e.g. "Scan to see the menu"). The QR pattern uses your chosen primary and background colors.
+
+Changes are written with **"Save all changes"**; **"Reset to default"** returns to factory settings. All prices in the menu are shown in **₺ (TRY)**.
+
+<Callout type="info">
+  Plan limits only hide the interface; the real authorization check lives on the server.
+  Since QR code generation is enabled on all plans, you won't see an upgrade barrier on
+  this screen.
+</Callout>
+
+## Related pages
+
+- **[Tables](/en/admin-guide/tables)** — the source of table QRs; you define tables here.
+- **[QR Menu (customer)](/en/admin-guide/qr-menu)** — the ordering/payment screen a scanning guest sees.
+- **[POS (Sales Screen)](/en/admin-guide/pos)** — where orders from the QR menu are handled at the register.

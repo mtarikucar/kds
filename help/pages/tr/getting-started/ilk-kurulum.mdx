@@ -1,0 +1,95 @@
+---
+title: İlk Kurulum
+description: İlk giriş, karşılama akışı, kurulum kontrol listesi ve önerilen sıra — şube, menü, masa.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# İlk Kurulum
+
+Hesabınızı oluşturduktan sonra ilk girişte sizi bir karşılama akışı ve kontrol paneli karşılar. Bu sayfa, restoranınızı çalışır hale getirmek için izlemeniz gereken sırayı anlatır.
+
+## İlk açılış: karşılama ve rehberli tur
+
+İlk girişinizde kontrol panelinde (`/dashboard`) bir **karşılama penceresi** açılır. Burada iki seçeneğiniz vardır:
+
+- **Rehberli turu başlat** — sistemin ana ekranlarını (POS, menü, masalar vb.) adım adım gezdiren interaktif bir tur.
+- **Önce örnek bir restoranı (demo) keşfet** — kendi verinize dokunmadan, hazır kurulmuş bir demo restoranda sistemi deneyebilirsiniz. İstediğiniz an kendi hesabınıza geri dönersiniz.
+
+<Callout type="info">
+  Turu atlayabilirsiniz; bir daha gösterilmez. Daha sonra istediğinizde tekrar
+  başlatabilirsiniz. Demo, gerçek verilerle dolu paylaşımlı bir restorandır —
+  güvenle keşfedebilirsiniz.
+</Callout>
+
+### Profilini tamamla (sosyal giriş kullandıysanız)
+
+Google ile giriş yaptıysanız ve hesabınızda **telefon numarası yoksa**, sistem sizi önce **"Hesabını tamamla"** ekranına yönlendirir. Burada:
+
+- **Telefon** (zorunlu — ödeme adımı için gerekli)
+- İşletme adı, ad-soyad, vergi no / vergi dairesi, adres, şehir
+- Saat dilimi ve dil tercihi
+
+bilgilerini girersiniz. E-posta + şifre ile normal kayıt yaptıysanız bu adım atlanır, çünkü telefon zaten kayıtta alınmıştır.
+
+## Kurulum kontrol listesi
+
+Kontrol panelinizde, restoranınız tam hazır olana kadar bir **kurulum kontrol listesi** banner'ı görünür. Her madde gerçek bir koşulu kontrol eder ve sizi ilgili sayfaya yönlendirir; tüm maddeler tamamlanınca banner kendiliğinden kaybolur. Maddeler:
+
+| Madde | Ne ister? | Nereye gider? |
+|---|---|---|
+| **Şube** | En az bir şube olması | Şubeler |
+| **KDS ekranı** | Bir mutfak ekranı (KDS) cihazının eşleştirilmesi | Cihazlar |
+| **Garson tableti** | Bir garson tableti cihazının eşleştirilmesi | Cihazlar |
+| **Köprü (Bridge)** | Yazıcı/yazarkasa varsa bir bridge'in çevrimiçi olması | Köprüler |
+| **Mali entegrasyon** | Mali (fiscal) entegrasyonun bağlanması | Marketplace |
+
+<Callout type="info">
+  Kontrol listesi **bağlama duyarlıdır**: örneğin KDS özelliği planınızda yoksa o
+  madde gösterilmez; yazıcı/yazarkasa cihazı tanımlamadıysanız "Köprü" maddesi
+  atlanır. Yani yalnızca sizin için anlamlı adımları görürsünüz.
+</Callout>
+
+## Önerilen kurulum sırası
+
+Cihaz eşleştirmeden önce, restoranınızı operasyonel hale getirecek temel veriyi şu sırayla girmenizi öneririz:
+
+<Steps>
+
+### 1. Şube ayarları
+
+Kayıtta otomatik bir **"Main"** şubeniz oluşturulmuştur. Şubenizin adını, adresini ve saat dilimini gözden geçirin. Çok lokasyonlu çalışacaksanız (planınız izin veriyorsa) ek şubelerinizi şimdi ekleyin.
+
+### 2. Menü
+
+Yönetici panelindeki **Menü Yönetimi**'nden:
+
+- Önce **kategorileri** oluşturun (örn. "Sıcak İçecekler", "Tatlılar").
+- Ardından her kategoriye **ürünleri** ekleyin (ad, fiyat, fotoğraf, açıklama).
+- Gerekiyorsa **modifier** (seçenek) tanımlayın — örn. "boyut: küçük/orta/büyük" veya "ekstra peynir".
+
+Menü, POS'ta sipariş alabilmenizin ve QR menünün temelidir; bu yüzden masalardan önce gelir.
+
+### 3. Masalar
+
+**Masa Yönetimi**'nden masalarınızı ekleyin (ad/numara ve kapasite). Masasız (yalnız gel-al) çalışıyorsanız bu adımı atlayıp ayarlardan **takeaway** modunu açabilirsiniz.
+
+### 4. (İsteğe bağlı) QR kodları ve cihazlar
+
+- **QR Yönetimi**'nden masa QR kodlarını oluşturup yazdırın.
+- Mutfak ekranı (KDS) ve garson tabletlerini **Cihazlar**'dan eşleştirin.
+- Yazıcı/yazarkasa kullanıyorsanız bir **Köprü (Bridge)** kurun.
+
+</Steps>
+
+<Callout type="info">
+  **Önerilen mantık:** önce **şube** → sonra **menü** (kategori, ardından ürün) →
+  sonra **masa**. Bu sırayla ilerlediğinizde POS'ta hemen sipariş alabilir, QR
+  menüyü yayına alabilir ve mutfak ekranını bağlayabilirsiniz.
+</Callout>
+
+## Sırada ne var?
+
+- Tüm yönetim ekranlarının detaylı anlatımı için **[Yönetici Rehberi](/admin-guide)**
+- Plan limitleri ve fiyatlar için **[Planlar](/plans)**
+- Cihazlar, köprü ve entegrasyonlar için **[Marketplace](/marketplace)** ve **[Geliştirici / Entegrasyon](https://developer.hummytummy.com/tr/developer)**

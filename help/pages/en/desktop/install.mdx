@@ -1,0 +1,87 @@
+---
+title: Install & download
+description: Download and install the HummyTummy Desktop app on your computer — pick the package for your platform and install it step by step.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Install & download
+
+The HummyTummy Desktop app is an installable program that runs your sales screen (POS) and
+your local hardware (receipt printer, cash drawer, cash register) on your own computer.
+Every version of the app is published centrally; all you do is download the package that
+matches your operating system and install it. The same package is shared by all
+restaurants — the version your team sees is always the latest published release.
+
+<Callout type="info">
+  If you're not sure which operating system you're on, the download page lists separate
+  packages for Windows, macOS (Apple Silicon and Intel) and Linux. Once you pick the right
+  one, installation takes only a couple of minutes.
+</Callout>
+
+## Pick the package for your platform
+
+The download page shows a separate download link for each operating system:
+
+- **Windows** → `.msi` installer
+- **macOS (Apple Silicon — M1/M2/M3)** → `.dmg`
+- **macOS (Intel)** → `.dmg`
+- **Linux** → `.deb` package or `.AppImage`
+
+<Callout type="warning">
+  On a Mac, check your chip first: open the Apple menu → "About This Mac". If it says
+  "Apple M…" choose the Apple Silicon package; if it says "Intel" choose the Intel one.
+  Installing the wrong package may stop the app from opening.
+</Callout>
+
+If there's no download link for a given operating system, that release simply hasn't been
+built for that platform yet; wait for the next published package or contact support.
+
+## Installation steps
+
+<Steps>
+### Download the package
+
+On the download page, press the button that matches your operating system. Your browser
+saves the package to your "Downloads" folder. When the download finishes, double-click the
+file.
+
+### Complete the installation
+
+Follow your operating system's normal install flow:
+
+- **Windows** — the MSI wizard opens; click "Next" through the steps and finish with
+  "Install".
+- **macOS** — in the DMG window that opens, drag the app icon into your **Applications**
+  folder.
+- **Linux** — install the `.deb` package with your software installer, or make the
+  `.AppImage` executable and double-click it.
+
+### Open the app and sign in
+
+After the install finishes, launch HummyTummy Desktop and sign in with your panel account.
+On first launch the app runs an update check to make sure you're on the latest version.
+</Steps>
+
+<Callout type="info">
+  If this is a fresh install and you'll be connecting local hardware such as a receipt
+  printer or cash drawer, follow the hardware pairing guide afterwards:
+  **[Hardware](/en/desktop/hardware)**.
+</Callout>
+
+## Staying on the latest version
+
+Once you've installed the app you never have to re-download it by hand. When a new version
+is published, the app notices it on launch and updates itself safely. You can read how
+this works on the **[Auto-update](/en/desktop/auto-update)** page.
+
+## Related pages
+
+- **[Auto-update](/en/desktop/auto-update)** — how the app downloads and installs new
+  versions on its own.
+- **[Hardware](/en/desktop/hardware)** — pairing guide for the receipt printer, cash
+  drawer and cash register.
+
+---
+
+Developer/integration details: [Desktop Release API](https://developer.hummytummy.com/en/developer/desktop-api)

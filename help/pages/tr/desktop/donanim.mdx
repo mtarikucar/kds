@@ -1,0 +1,121 @@
+---
+title: Donanım eşleştirme
+description: Fiş yazıcısı, nakit çekmece ve yazarkasa'yı panelden eşleştirme — cihaz yuvası oluşturma, eşleştirme kodu, durum izleme ve komut gönderme.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Donanım: yazıcı, nakit çekmece, yazarkasa
+
+Yerel donanımınızı (fiş yazıcısı, nakit çekmece, yazarkasa, kart terminali) panelden
+yönetirsiniz. İşleyiş üç adımda özetlenebilir: panelden bir **cihaz yuvası** oluşturursunuz,
+ekrana gelen **eşleştirme kodunu** cihazın (ya da o donanımı sürücüleyen yerel köprünün)
+üzerinde girersiniz, ardından cihazın durumunu panelden canlı izler ve ona fiş yazdırma,
+çekmece açma, fiş kesme gibi komutlar gönderirsiniz.
+
+<Callout type="info">
+  Cihaz yuvaları, kayıtlı terminallerinizi tek bir listede topladığınız **Cihazlar**
+  ekranından yönetilir (Çoklu Şube → Cihazlar). Bir donanımı tek tek bir ekrana ya da
+  yerel köprüye bağlarsınız; eşleştirme her zaman cihazın üzerinde tamamlanır.
+</Callout>
+
+## Hangi donanımları ekleyebilirsiniz
+
+Yeni yuva oluştururken üst sağdaki açılır menüden cihaz **türünü** seçersiniz:
+
+| Tür | Ne için |
+| --- | --- |
+| Fiş yazıcısı | Müşteri fişi basar |
+| Mutfak yazıcısı | Mutfağa sipariş fişi basar |
+| Yazarkasa | Mali fiş keser (GİB onaylı cihaz) |
+| Kart terminali (POS) | Kart ile tahsilat yapar |
+| Mutfak / bar ekranı | Siparişleri ekranda gösterir |
+| Garson / müşteri tableti | Sipariş alma / müşteri tarafı |
+| Çağrı kimliği, barkod okuyucu | Yan donanımlar |
+| Yerel köprü | Ağınızdaki birden çok donanımı tek seferde sürücüler |
+
+<Callout type="info">
+  **Yerel köprü**, ağınızdaki fiş yazıcısı, nakit çekmece ve yazarkasa gibi birden çok
+  donanımı aynı anda sürücüleyen bir cihazdır. Tek tek yazıcı/çekmece eklemek yerine bir
+  köprü kurup tüm yerel donanımı onun üzerinden bağlamak çoğu kurulumda en pratiğidir.
+</Callout>
+
+## Eşleştirme akışı
+
+<Steps>
+### Bir cihaz yuvası oluşturun
+
+Cihazlar ekranında, üst sağdaki açılır menüden donanım türünü (örn. Fiş yazıcısı, Yazarkasa,
+Yerel köprü) seçin ve **Cihaz Yuvası Oluştur**'a basın. Yuva, o an seçili olan **şube**
+kapsamında oluşturulur.
+
+### Eşleştirme kodunu cihazda girin
+
+Yeni satırın **Eşleştirme Kodu** sütununda kısa, harf-rakam bir kod ve onu kodlayan bir
+**QR** belirir. QR'a tıklayarak büyütebilirsiniz (uzaktan, örneğin salonun karşısındaki bir
+ekranı taratmak için kullanışlıdır). Bu kodu cihazın üzerinde — ya da o donanımı sürücüleyen
+yerel köprüde — girin.
+
+### Bağlantıyı doğrulayın
+
+Eşleştirme tamamlandığında satırın **Durum** etiketi `online`'a döner ve **Son Görülme**
+güncellenir. Bu noktadan sonra cihaza komut gönderebilirsiniz.
+</Steps>
+
+<Callout type="warning">
+  Eşleştirme kodunun bir **son kullanma süresi** vardır (QR'ın üzerine geldiğinizde
+  görünür). Süre dolarsa kod geçersiz olur; yuvayı emekliye ayırıp yeni bir tane oluşturarak
+  taze bir kod üretin.
+</Callout>
+
+## Durumlar
+
+Satırdaki **Durum** etiketi cihazın o anki halini gösterir:
+
+- **online** (yeşil) — cihaz çevrimiçi ve komut alabilir.
+- **offline** (gri) — cihazdan bir süredir haber alınamıyor (yaklaşık 45 sn içinde
+  bağlantı kesilirse `offline`'a düşer).
+- **error** (kırmızı) — cihaz bir sorun bildirdi.
+- **busy** (amber) — cihaz şu an bir işi yürütüyor.
+- **maintenance** (mavi) — bakım modunda.
+
+Ekranın üstündeki üç özet kartı filonuzu özetler: **Toplam cihaz**, **Çevrimiçi** ve
+dikkat gerektiren (`error` veya `offline`) cihaz sayısı. Liste kendini düzenli aralıklarla
+yeniler; durum değişiklikleri elle yenileme yapmadan görünür.
+
+## Komut gönderme
+
+Donanımı, cihaza komut göndererek sürücülersiniz. Komutlar cihaz-başına bir sırada bekler;
+cihaz sıradaki komutu çeker, çalıştırır ve sonucu panele bildirir. Tablodaki cihaz adına
+tıklayarak sağdan açılan **Cihaz Komutları** çekmecesinden komut kuyruğunu
+(Sırada / Yürütülüyor / Tamamlandı / Başarısız filtreleriyle) inceleyebilir, başarısız bir
+satırdaki hata nedenini okuyabilir ve cihaz sağlıksız görünüyorsa tek seferlik bir **yetenek
+yoklaması** gönderebilirsiniz.
+
+Tipik komutlar: müşteri fişi yazdırma, nakit çekmeceyi açma, yazarkasada mali fiş kesme,
+kart terminalinden tahsilat ve ekranda sipariş gösterme.
+
+<Callout type="warning">
+  **Para taşıyan ya da kalıcı çıktı üreten komutlar (tahsilat, mali fiş, fiş basma, çekmece
+  açma) güvenlik gereği otomatik yeniden denenmez.** Bir komut yarıda kalır ve sonucu panele
+  ulaşmazsa, sistem onu kendiliğinden tekrar göndermez — aksi halde müşteri çift çekilebilir
+  ya da fiş çift basılabilir. Böyle durumlarda komut **başarısız** olarak işaretlenir; siz de
+  açık bir telafi adımıyla (örneğin mali fiş iptali) uzlaştırırsınız. Ekran komutları gibi
+  güvenli işlemler ise gerekirse kendiliğinden yeniden denenir.
+</Callout>
+
+## Şube kapsamı ve güvenlik
+
+- Komutlar **şube kapsamına** bağlıdır: tek bir şubeye yetkili bir müdür yalnızca o şubedeki
+  cihazları sürücüleyebilir; başka şubenin terminaline tahsilat ya da fiş komutu gönderemez.
+  Yönetici (ADMIN) tüm şubelerde çalışır.
+- Bir cihazı hizmet dışı bırakmak için satırın sağındaki **Emekliye Ayır** düğmesini
+  kullanın; onayladıktan sonra cihaz listeden gizlenir ve bağlantısı geçersiz kılınır.
+  Cihazı emekliye ayırma yalnızca **Yönetici** rolüne açıktır.
+
+## İlgili sayfalar
+
+- **[Cihazlar](/tr/admin-guide/devices)** — kayıtlı tüm terminallerinizin tek listesi.
+- **[Donanım Mağazası](/tr/marketplace/hardware-store)** — yazıcı, tablet ve ekran satın alma.
+
+Geliştirici/entegrasyon detayları: [Cihaz API (Device Mesh)](https://developer.hummytummy.com/tr/developer/devices-api)

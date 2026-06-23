@@ -1,10 +1,12 @@
 export default {
   "index": "Ana Sayfa",
-  "getting-started": "Başlangıç",
-  "admin-guide": "Yönetici Rehberi",
-  "plans": "Planlar",
-  "marketplace": "Marketplace",
-  "developer": "Geliştirici / Entegrasyon",
-  "desktop": "Desktop Uygulaması",
-  "reference": "Referans"
+  "developer": "Geliştirici / API",
+  "integrations": "Entegrasyonlar",
+  "reference": "Referans",
+  "help-center": {
+    "title": "Yardım Merkezi ↗",
+    "href": "https://help.hummytummy.com/tr",
+    "newWindow": true,
+    "type": "page"
+  }
 }

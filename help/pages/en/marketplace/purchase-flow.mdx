@@ -1,0 +1,107 @@
+---
+title: Purchase Flow
+description: Add an add-on to the cart, pay via PayTR, watch the entitlements activate, plus cancellation and period-end behaviour.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Purchase Flow
+
+**Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Access:** ADMIN, MANAGER (payment confirmation and cancellation are ADMIN-only) • **Plan:** All plans
+
+The only way to buy an add-on is to add it to the cart in the Marketplace and
+**pay via PayTR**. No entitlement (limit or feature) is added to your account
+until the payment completes; there is no way to activate an add-on for free.
+
+<Callout type="info">
+  Operator comps can only be issued by the HummyTummy team / superadmin. On your
+  side, the only way to buy is the paid flow.
+</Callout>
+
+## End-to-end flow
+
+<Steps>
+
+### Pick an add-on
+
+Find the add-on you want to buy on the Marketplace screen. Each card shows what
+the add-on does, its price (₺), and whether it's recurring or a one-time service.
+
+### Add to cart
+
+Add the add-on to the cart. You can put several add-ons (and, if needed, plan or
+hardware lines) in the same cart; the screen shows the total **KDV-inclusive**.
+The total is always recalculated on the server, so the amount you pay is
+trustworthy.
+
+### Continue to payment
+
+Use the **Pay / Continue** button to move to the payment step. The screen
+redirects you to the **PayTR** secure payment page, where each item in your cart
+appears as its own line (e.g. *"Extra KDS screen (monthly)"*).
+
+### Complete the payment
+
+Pay on the PayTR page. Once the payment is confirmed, you are returned to the app.
+
+### Entitlements activate
+
+The moment the payment is confirmed, the entitlement the add-on grants is **added
+to your account automatically**. For example, if you bought one extra KDS screen,
+your KDS-screen limit goes up by one in the panel right away; if you bought an
+integration, the related setting/feature is enabled.
+
+</Steps>
+
+<Callout type="warning">
+  If you reach the payment page but abandon the payment, you are not charged and
+  no entitlement is added. The purchase only completes once the payment is
+  confirmed.
+</Callout>
+
+## How entitlements stack
+
+Add-ons stack on top of your plan; multiple sources of the same kind combine like
+this:
+
+- **Limits** (KDS screens, stations, tablets, branches) → **summed.** For
+  example, if your plan gives 2 KDS screens and you buy 1 "Extra KDS screen",
+  the total becomes **3**.
+- **Features** (advanced reports, priority support, multi-location, etc.) →
+  **enabled** if any source enables it.
+- **Integrations** (e-Fatura, Yemeksepeti, Getir, Trendyol) → all accumulate
+  side by side; you can use several delivery integrations at once.
+
+Buying the same capacity add-on twice to double a limit is blocked: if you
+already own an add-on, trying to buy the same item a second time is rejected and
+your card is not charged again.
+
+## Dependencies
+
+Some add-ons require something else to already be in place. Today the only add-on
+like this in the catalogue is **Hugin yazarkasa**: it requires the **PRO plan**.
+If you are not on PRO, the purchase is blocked and you're told to upgrade your
+plan first.
+
+## Cancellation and period-end behaviour
+
+Only an **ADMIN** can cancel an add-on (it's a billing decision). You have two
+options:
+
+- **Cancel at period end (default):** the add-on **stays active until the end of
+  the period**, and the entitlements it grants keep working until that date. When
+  the period ends it closes automatically and the related limit/feature is
+  revoked.
+- **Cancel immediately:** the add-on closes at once and the entitlements it
+  grants are **revoked right away**.
+
+<Callout type="info">
+  Recurring add-ons run on a 30-day period window; your real billing cycle aligns
+  with your main subscription's cycle. One-time service lines (e.g. on-site setup)
+  don't recur and have no period to cancel.
+</Callout>
+
+---
+
+Developer/integration details: [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api)

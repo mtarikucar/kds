@@ -159,6 +159,16 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/developer-staging:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/developer-staging:buildcache,mode=max
 
+      - name: Build & push help
+        uses: docker/build-push-action@v5
+        with:
+          context: ./help
+          file: ./help/Dockerfile
+          push: true
+          tags: ${{ env.GHCR_BASE }}/help-staging:${{ steps.commit.outputs.sha }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/help-staging:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/help-staging:buildcache,mode=max
+
 
   deploy:
     name: Deploy staging

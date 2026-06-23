@@ -1,0 +1,63 @@
+---
+title: Özellik matrisi
+description: Başlangıç, Profesyonel ve Kurumsal paketlerinin tam özellik ve limit karşılaştırması.
+---
+
+import { Callout } from 'nextra/components'
+
+# Özellik matrisi
+
+Aşağıdaki tablolar üç satılabilir paketin (**Başlangıç / Profesyonel / Kurumsal**) hangi özellikleri içerdiğini ve kullanım limitlerini karşılaştırır. Hangi paketin size uygun olduğuna karar verirken bu sayfayı kullanabilirsiniz.
+
+## Özellikler
+
+| Özellik | Başlangıç | Profesyonel | Kurumsal |
+| --- | :---: | :---: | :---: |
+| POS (satış ekranı) erişimi | ✓ | ✓ | ✓ |
+| KDS (mutfak ekranı) entegrasyonu | ✓ | ✓ | ✓ |
+| Stok takibi | ✓ | ✓ | ✓ |
+| Gelişmiş raporlar | ✗ | ✓ | ✓ |
+| Çok şube | ✗ | ✓ | ✓ |
+| Özel marka (branding) | ✗ | ✓ | ✓ |
+| Öncelikli destek | ✗ | ✓ | ✓ |
+| Rezervasyon sistemi | ✗ | ✓ | ✓ |
+| Personel yönetimi | ✗ | ✓ | ✓ |
+| Delivery entegrasyonu | ✗ | ✓ | ✓ |
+| API erişimi | ✗ | ✗ | ✓ |
+| Harici ekran (Partner Display) | ✗ | ✗ | ✓ |
+
+<Callout type="info">
+  **API erişimi** ve **harici ekran (Partner Display)** yalnızca Kurumsal pakette açıktır. Bu iki yetenek, üçüncü taraf entegrasyonlarını ve uzak/masaüstü ekran oturumlarını kapsar.
+</Callout>
+
+## Limitler
+
+Sonsuzluk işareti (**∞**) o limitin **sınırsız** olduğunu gösterir.
+
+| Limit | Başlangıç | Profesyonel | Kurumsal |
+| --- | :---: | :---: | :---: |
+| Maksimum kullanıcı | 5 | 15 | ∞ |
+| Maksimum masa | 20 | 50 | ∞ |
+| Maksimum şube | 1 | 3 | ∞ |
+| Maksimum ürün | 100 | 500 | ∞ |
+| Maksimum kategori | 20 | 50 | ∞ |
+| Aylık maksimum sipariş | 500 | 2.000 | ∞ |
+
+## Deneme paketi
+
+Her yeni işletmenin başladığı **Deneme** paketi, 7 gün boyunca **Kurumsal'ın tüm özelliklerine ve sınırsız limitlerine** sahiptir. Satılan bir paket olmadığı için plan seçim ekranında listelenmez ve fiyatlandırma karşılaştırmasının dışındadır. Ayrıntılar için bkz. [Deneme ve faturalama](/tr/plans/deneme-ve-faturalama).
+
+## O an hangi özelliklere sahibim?
+
+İşletmenizin o an aktif olan özelliklerini panelden görebilirsiniz. Panelde gördüğünüz erişim; paketinizin özelliklerine, varsa Marketplace’ten eklediğiniz eklentilere ve size özel açılmış yetkilere göre birleştirilmiş **gerçek erişiminizdir** — yalnızca paketin varsayılan listesini değil, fiilen kullanabildiklerinizi yansıtır.
+
+<Callout type="info">
+  Bir özelliğin paketinizde kapalı olduğunu görüyorsanız, o özelliği **plan yükselterek** veya **Marketplace eklentisiyle** açabilirsiniz. Bkz. [Plan seçimi ve yükseltme](/tr/plans/plan-secimi-ve-yukseltme) ve [Marketplace](/tr/marketplace).
+</Callout>
+
+## İlgili sayfalar
+
+- Plan seçme, yükseltme ve ödeme akışları: **[Plan seçimi ve yükseltme](/tr/plans/plan-secimi-ve-yukseltme)**
+- Deneme süreci ve faturalama: **[Deneme ve faturalama](/tr/plans/deneme-ve-faturalama)**
+
+Geliştirici/entegrasyon detayları (yetkili özelliklerin API’den sorgulanması dahil): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

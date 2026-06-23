@@ -1,28 +1,30 @@
 ---
-title: HummyTummy Dokümantasyon
-description: HummyTummy — bulut tabanlı restoran yönetim sistemi. Kurulumdan entegrasyona, planlardan desktop uygulamasına kadar tüm rehberler.
+title: HummyTummy Geliştirici Portalı
+description: HummyTummy entegrasyon dokümantasyonu — REST API, Partner Display API, webhooks, dış servis entegrasyonları (teslimat/SMS/e-Fatura/Caller ID) ve referans.
 ---
 
-import { Cards } from 'nextra/components'
+import { Cards, Callout } from 'nextra/components'
 
-# HummyTummy Dokümantasyon
+# HummyTummy Geliştirici Portalı
 
-**HummyTummy**, restoranlar için bulut tabanlı bir yönetim sistemidir: QR menü, POS, mutfak ekranı (KDS), sipariş & masa yönetimi, stok, raporlar, çoklu şube ve geliştirici entegrasyonları — tek panelde.
-
-Bu portal hem **yöneticiler/kullanıcılar** (sayfalar, planlar, desktop) hem de **geliştiriciler/entegratörler** (API, Partner Display, webhooks) içindir.
+Bu portal, **HummyTummy'yi kendi yazılımınıza, ekranınıza veya dış servislerinize bağlayan geliştiriciler ve entegratörler** içindir.
 
 <Cards>
-  <Cards.Card title="Başlangıç" href="/getting-started" arrow />
-  <Cards.Card title="Yönetici Rehberi" href="/admin-guide" arrow />
-  <Cards.Card title="Planlar" href="/plans" arrow />
-  <Cards.Card title="Marketplace" href="/marketplace" arrow />
-  <Cards.Card title="Geliştirici / Entegrasyon" href="/developer" arrow />
-  <Cards.Card title="Desktop Uygulaması" href="/desktop" arrow />
+  <Cards.Card title="Geliştirici / API" href="/developer" arrow />
+  <Cards.Card title="Entegrasyonlar" href="/integrations" arrow />
   <Cards.Card title="Referans" href="/reference" arrow />
 </Cards>
 
 ## Hızlı başlangıç
 
-- **Restoran sahibiyseniz:** [Başlangıç](/getting-started) → [Yönetici Rehberi](/admin-guide) → [Planlar](/plans)
-- **Entegratör/geliştiriciyseniz:** [Geliştirici / Entegrasyon](/developer) → [Partner Display API](/developer/partner-display) → [Webhooks](/developer/webhooks)
-- **Masaüstü kurulumu:** [Desktop Uygulaması](/desktop)
+- **API temelleri:** [Geliştirici / API](/developer) → [API Temelleri](/developer/api-temelleri)
+- **Partner ekran/kiosk entegrasyonu:** [Partner Display API](/developer/partner-display)
+- **Olay bildirimleri:** [Webhooks](/developer/webhooks)
+- **Dış servis kurulumu:** [Entegrasyonlar](/integrations) → teslimat, SMS, e-Fatura, Çağrı Kimliği
+- **Hata kodları & scope'lar:** [Referans](/reference)
+
+<Callout type="info">
+  Sistemi **kullanmaya** dair rehberler (yönetim paneli ekranları, planlar, masaüstü
+  uygulaması) ayrı bir portaldedir:
+  **[help.hummytummy.com](https://help.hummytummy.com/tr)**.
+</Callout>

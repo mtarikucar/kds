@@ -1,0 +1,74 @@
+---
+title: Faturalar
+description: HummyTummy satış faturaları ekranı — fatura listesi, durumları, arama/filtre, e-Fatura entegrasyonuna senkron gönderim ve iptal. Amacı, kullanımı ve ipuçları.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Faturalar
+
+**Menü yolu:** İşletme → Faturalar &nbsp;•&nbsp; **URL:** `/admin/invoices`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar (e-Fatura kesimi fiscal entegrasyonu gerektirir)
+
+## Amacı
+
+Faturalar ekranı, kesilen **satış faturalarını** tek listede gösterir. Her faturanın numarasını, müşterisini, tarihini, tutarını ve vergisini görür; durumunu ve e-Fatura entegrasyonuna **senkron durumunu** takip edersiniz. Buradan ayrıca henüz gönderilmemiş bir faturayı entegrasyona **yeniden gönderebilir** veya bir faturayı **iptal** edebilirsiniz.
+
+<Callout type="info">
+  Bu ekran faturaları **listeler ve yönetir**. Faturaların gerçek e-Fatura/e-Arşiv
+  olarak resmî kesimi, **Entegrasyonlar → e-Fatura** altında tanımlanan fiscal
+  sağlayıcı bağlantısı üzerinden yapılır. Bağlantı yoksa kayıtlar listede durur ama
+  senkron durumu **gönderilmedi** kalır.
+</Callout>
+
+## Liste nasıl okunur?
+
+Tablo her fatura için şu sütunları gösterir:
+
+- **Fatura No** — fatura numarası.
+- **Müşteri** — fatura kesilen müşteri adı (boşsa `-`).
+- **Tarih** — düzenlenme tarihi (`gg.aa.yyyy`).
+- **Tutar** ve **Vergi** — faturanın para birimiyle biçimlenir (varsayılan ₺/TRY).
+- **Durum** — faturanın yaşam döngüsü: **Taslak (DRAFT)**, **Kesildi (ISSUED)**, **Gönderildi (SENT)** veya **İptal (CANCELLED)**.
+- **Senkron durumu** — entegrasyona gönderim sonucu: **Senkronlandı**, **Başarısız** veya **gönderilmedi**.
+
+<Callout type="info">
+  Senkron başarısız olan faturanın etiketinin üzerine gelirseniz (hover), sağlayıcının
+  döndürdüğü **hata mesajı** ipucu olarak görünür — sorunu çözüp yeniden göndermek
+  için kullanın.
+</Callout>
+
+## Arama ve filtreleme
+
+<Steps>
+### Arama
+
+Üstteki arama kutusuna fatura no veya müşteri yazarak listeyi daraltın. Yazdığınızda liste ilk sayfaya döner.
+
+### Durum filtresi
+
+Yanındaki açılır menüden **Taslak / Kesildi / Gönderildi / İptal** seçerek yalnızca o durumdaki faturaları görün; "Tüm durumlar" hepsini gösterir.
+
+### Sayfalama
+
+Liste 20'şerli sayfalanır. Tablo altındaki **Önceki / Sonraki** ile sayfalar arasında gezinirsiniz; ortada `sayfa / toplam` bilgisi görünür.
+</Steps>
+
+## Senkron ve iptal işlemleri
+
+Her satırın sonundaki simgelerle iki işlem yapabilirsiniz:
+
+- **Yeniden gönder (senkron)** — yenile simgesi. Yalnızca **henüz senkronlanmamış** ve **iptal edilmemiş** faturalarda görünür. Faturayı e-Fatura entegrasyonuna yeniden iletir.
+- **İptal** — kırmızı çarpı simgesi. **İptal edilmemiş** her faturada görünür; faturayı iptal durumuna alır.
+
+<Callout type="warning">
+  İptal ve senkron işlemleri geri dönülmesi güç sonuçlar doğurabilir — özellikle
+  fatura sağlayıcıya **gönderildikten** sonra. İşlemi onaylamadan önce doğru faturada
+  olduğunuzdan emin olun. Plan ve yetki kontrolü arayüzde yapılsa da nihai karar
+  **sunucudadır**: yetkisiz veya kurala aykırı bir işlem sunucu tarafından reddedilir.
+</Callout>
+
+## İlgili sayfalar
+
+- e-Fatura/e-Arşiv sağlayıcı bağlantısı ve fiscal ayarlar: **[Entegrasyonlar](https://developer.hummytummy.com/tr/integrations/e-invoice)**
+- Faturaların kaynağı olan satış akışı: **[POS (Satış Ekranı)](/tr/admin-guide/pos)**

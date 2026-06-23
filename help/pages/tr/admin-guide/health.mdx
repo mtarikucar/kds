@@ -1,0 +1,74 @@
+---
+title: Sistem Durumu (Şube Sağlığı)
+description: HummyTummy şube sağlığı panosu — her şubenin cihaz/bridge bağlanabilirliğini, son fiş ve son sipariş canlılığını tek bir 0–100 puanla ve renk rozetiyle izleme.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Sistem Durumu (Şube Sağlığı)
+
+**Menü yolu:** Çoklu Şube → Şube Sağlığı &nbsp;•&nbsp; **URL:** `/admin/health`
+**Erişim:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** `multiLocation` — **Profesyonel (PRO)** ve üzeri
+
+## Amacı
+
+Sistem Durumu, işletmenizin tüm aktif şubelerini **tek bir pano**da yan yana gösterir. Her şube için cihazların çevrimiçi olup olmadığını, en son fişin ve en son siparişin ne kadar önce geçtiğini birleştirip **0–100 arası tek bir sağlık puanına** indirger. Bir şubede yazıcı/terminal koptuğunda ya da satış akışı durduğunda, kasaya gitmeden buradan fark edersiniz.
+
+<Callout type="info">
+  Bu pano **Profesyonel (PRO)** ve üzeri planlarda (çoklu şube özelliği) anlamlıdır;
+  alt planlarda Çoklu Şube menü grubu görünmez. Plan kapısı yalnızca arayüz
+  içindir — yetkiyi her zaman sunucu doğrular.
+</Callout>
+
+## Pano nasıl okunur?
+
+Her **aktif şube için bir kart** çıkar. Aktif şube yoksa "Aktif şube yok." mesajı görünür.
+
+<Steps>
+### Renk rozeti
+
+Kartın sağ üstündeki rozet, şubenin genel durumunu üç renkle özetler:
+
+- **Yeşil** — sağlıklı, müdahale gerekmez.
+- **Sarı** — dikkat; sinyallerden biri zayıflamış (örn. cihaz kopmuş ya da bir süredir sipariş yok).
+- **Kırmızı** — kritik; şubenin acilen kontrol edilmesi gerekir.
+
+### Sağlık puanı
+
+Rozetin altındaki büyük sayı, şubenin **/ 100** üzerinden bileşik puanıdır. Aşağıdaki üç alt sinyalin birleşiminden hesaplanır; tek bir bakışta şubeleri kıyaslamanızı sağlar.
+
+### Üç alt sinyal
+
+Kartın alt satırında puanı oluşturan üç ölçüt ayrı ayrı listelenir:
+
+- **Cihaz Online** — şubeye bağlı cihazların yüzde kaçının çevrimiçi olduğu (ör. `%80`). Düşmesi, yazıcı/terminal ya da yerel **bridge** bağlantısının koptuğuna işaret eder.
+- **Son Fiş** — en son mali fişin üzerinden geçen süre.
+- **Son Sipariş** — en son siparişin üzerinden geçen süre.
+</Steps>
+
+<Callout type="info">
+  Süreler kısa biçimde gösterilir: `<1m` (bir dakikadan az), `12m` (dakika),
+  `3h` (saat), `2d` (gün). İlgili veri hiç yoksa **`—`** görünür — örneğin o gün
+  henüz hiç sipariş veya fiş geçmemiş bir şubede.
+</Callout>
+
+## Canlılık ve yenileme
+
+Pano verisi **30 saniyede bir** otomatik yenilenir; sayfayı açık bırakmanız yeterlidir, elle yenilemeye gerek yoktur. Bu sayede bir şubedeki cihaz kopması ya da satış akışının durması kısa sürede karta yansır.
+
+<Callout type="warning">
+  "Son Sipariş" veya "Son Fiş" süresinin beklenmedik şekilde uzaması, gerçek bir
+  arıza kadar **sakin bir saat** anlamına da gelebilir. Önce o şubenin yoğunluğunu
+  ve cihaz bağlantısını değerlendirin; tek başına yüksek süre her zaman sorun
+  demek değildir.
+</Callout>
+
+## Sorun gördüğünüzde
+
+Bir şube sarı veya kırmızıya düştüğünde, hangi alt sinyalin zayıfladığına bakın ve oradan ilgili ekrana geçin:
+
+- **Cihaz Online düşükse** — şubedeki yazıcı/terminal bağlantılarını **[Cihazlar](/tr/admin-guide/devices)** ekranından, yerel ağ köprülerini ise **[Yerel Köprüler](/tr/admin-guide/bridges)** ekranından kontrol edin.
+- **Son Sipariş çok eskiyse** — satışın gerçekten durup durmadığını **[POS](/tr/admin-guide/pos)** ve mutfak ekranlarından doğrulayın.
+- **Son Fiş çok eskiyse** — fiş/mali entegrasyon akışını ve yazıcıyı gözden geçirin.
+
+Bu pano salt görüntülemedir: durumu özetler, üzerinde işlem yaptırmaz. Müdahaleyi ilgili şube ve cihaz ekranlarından yaparsınız.

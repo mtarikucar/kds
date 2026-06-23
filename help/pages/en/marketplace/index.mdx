@@ -1,0 +1,77 @@
+---
+title: Marketplace
+description: HummyTummy Marketplace add-on catalogue — capacity packs, integrations, software features, and services.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# Marketplace
+
+**Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Access:** ADMIN, MANAGER (purchase confirmation is ADMIN-only) • **Plan:** All plans
+
+The Marketplace is the catalogue of add-ons you can buy **individually** on top
+of your plan. A plan gives you a feature and limit baseline; add-ons **raise**
+that baseline: an extra KDS screen, an extra branch, an e-Fatura integration,
+advanced reports, and so on.
+
+The Marketplace screen is open on every plan. Each card shows what the add-on
+does, its price (₺), and whether it's recurring or a one-time service. When you
+buy an add-on, the entitlement it grants (for example one extra KDS screen or a
+new integration) is **added to your account automatically** — the related
+limit/feature becomes usable in the panel right away.
+
+<Callout type="info">
+  All prices are in **TRY** and add-on prices are shown **KDV-inclusive**.
+  Payments are collected through PayTR.
+</Callout>
+
+## Browse the add-ons
+
+<Cards>
+  <Cards.Card title="Purchase Flow" href="/en/marketplace/purchase-flow" arrow>
+    Add to cart → pay → entitlements activate. Cancellation and period-end behaviour.
+  </Cards.Card>
+  <Cards.Card title="Products (Add-on Details)" href="/en/marketplace/products" arrow>
+    Per add-on: what it does, price, what it grants, recurring vs one-time, dependency.
+  </Cards.Card>
+  <Cards.Card title="Plans" href="/en/plans" arrow>
+    The base plans add-ons stack on top of (BASIC / PRO / BUSINESS).
+  </Cards.Card>
+</Cards>
+
+## Catalogue summary
+
+Every add-on you can buy at a glance. For each add-on's details, what it grants,
+and how to buy it, see the [Products](/en/marketplace/products) page.
+
+| Name | Kind | Billing | Price | What it does |
+| --- | --- | --- | --- | --- |
+| Extra KDS screen | Capacity | Recurring | ₺99.00 | One extra kitchen display slot for your branch |
+| Extra KDS station | Capacity | Recurring | ₺149.00 | One extra routing station (bar / grill / dessert) |
+| Extra waiter tablet | Capacity | Recurring | ₺79.00 | Raises your waiter-tablet limit by one |
+| Extra branch | Capacity | Recurring | ₺399.00 | One extra branch + the multi-location feature |
+| e-Fatura / e-Arşiv | Integration | Recurring | ₺199.00 | Tax-compliant electronic invoicing |
+| Hugin yazarkasa | Integration | Recurring | ₺299.00 | Hugin fiscal-device integration (requires PRO plan) |
+| Yemeksepeti | Integration | Recurring | ₺249.00 | Yemeksepeti orders straight into your KDS |
+| Getir Yemek | Integration | Recurring | ₺249.00 | Getir Yemek orders straight into your KDS |
+| Trendyol Yemek | Integration | Recurring | ₺249.00 | Trendyol Yemek orders straight into your KDS |
+| Caller ID / phone-order | Integration | Recurring | ₺149.00 | Auto-opens a customer card on inbound calls |
+| Advanced reports | Software | Recurring | ₺129.00 | Cohort analysis, custom & scheduled reports |
+| API access | Software | Recurring | ₺249.00 | Public API key + outbound webhooks |
+| Priority support | Support | Recurring | ₺199.00 | 24-hour SLA on critical tickets |
+| On-site setup | Support | **One-time** | ₺7,500.00 | A technician visits, installs, and trains your staff |
+
+<Callout type="warning">
+  **On-site setup** is a service line: it is paid and invoiced but does not add an
+  entitlement (a limit or feature) to your account. It is one-time, not recurring.
+</Callout>
+
+<Callout type="info">
+  The **Hugin yazarkasa** add-on requires the **PRO** plan. If you are not on PRO,
+  the screen routes you to upgrade your plan first when you try to buy it.
+</Callout>
+
+---
+
+Developer/integration details: [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api)

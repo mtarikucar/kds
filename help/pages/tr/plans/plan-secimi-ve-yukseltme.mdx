@@ -1,0 +1,98 @@
+---
+title: Plan seçimi ve yükseltme
+description: Paket seçme, yükseltme (proration), düşürme (dönem sonunda) ve ödeme akışları (PayTR / havale).
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Plan seçimi ve yükseltme
+
+Paket seçimi ve değişikliği panelde iki ekran üzerinden yürür:
+
+- **Plan seçim ekranı** — satılabilir paketleri listeler, aylık/yıllık seçtirir.
+- **Plan değiştir ekranı** — canlı bir abonelik üzerinde yükseltme veya düşürme yaptırır.
+
+Tüm fiyatlar **TRY** ve **KDV dahildir**; ekranda gördüğünüz tutar tahsil edilecek tutardır. Plan ve ödeme işlemleri için işletmenizde **Yönetici (ADMIN)** veya **Müdür (MANAGER)** rolüne sahip olmanız gerekir; bir planı fiilen değiştirme yetkisi **yalnızca Yönetici (ADMIN)** içindir.
+
+## Satılabilir paketleri görme
+
+Plan seçim ekranı yalnızca **satışta olan** paketleri gösterir: Başlangıç, Profesyonel ve Kurumsal. Kayıt sırasında aldığınız Deneme paketi ve kaldırılmış eski Ücretsiz paket bu listede yer almaz.
+
+Her paket kartında aylık ve yıllık fiyat (₺, KDV dahil), o pakete dahil özellikler ve kullanım limitleri görünür. Aktif bir kampanya varsa indirimli fiyat doğrudan kart üzerinde gösterilir — gösterilen indirimli fiyat, ödeme ekranında karşınıza çıkacak tutarla birebir aynıdır.
+
+## Seçim akışı: hangi ekrana gidersiniz?
+
+Bir paket kartında **Seç** dediğinizde sistem, işletmenizin mevcut abonelik durumuna bakarak sizi doğru ekrana yönlendirir:
+
+<Steps>
+
+### Canlı aboneliğiniz var, farklı bir paket seçtiniz
+**Plan değiştir** ekranına gidersiniz. Yükseltme ya da düşürme yalnızca canlı (aktif veya deneme) bir abonelik döneminde anlamlıdır.
+
+### Canlı aboneliğiniz var, zaten o paketteyim
+Hiçbir işlem yapılmaz; aynı pakete tekrar geçilmez.
+
+### Aboneliğiniz dolmuş, iptal edilmiş veya hiç abonelik yok
+Sıfırdan bir **ödeme (checkout)** ekranına gidersiniz ve yeni, tam dönemli bir abonelik başlatırsınız.
+
+### Deneme hakkınız varsa
+Henüz deneme hakkınız sürüyorsa ödeme adımı atlanır ve deneme akışı devreye girer; ücret alınmadan devam edersiniz.
+
+</Steps>
+
+## Yükseltme (anında, oransal ücretle)
+
+Canlı bir abonelikteyken daha üst bir pakete geçmek **yükseltme** sayılır. Plan değiştir ekranında daha pahalı bir paket seçtiğinizde sistem, dönemin **kalan günlerine göre oransal (proration) bir tutar** hesaplar ve karşınıza çıkarır — yani sadece kalan süre için aradaki farkı ödersiniz, bütün ayı/yılı yeniden ödemezsiniz.
+
+<Steps>
+
+### Yeni (daha üst) paketi seçin
+Plan değiştir ekranında hedef paketi ve aylık/yıllık döngüyü işaretleyin.
+
+### Oransal tutarı onaylayın
+Ekran, ödenecek oransal farkı (₺, KDV dahil) gösterir. Kalan gün ne kadar azsa fark da o kadar düşüktür.
+
+### Ödemeyi tamamlayın
+Ödeme PayTR (kart) ya da havale ile alınır. Ödeme onaylandıktan **sonra** yükseltme uygulanır ve yeni özellikler/limitler hemen açılır.
+
+</Steps>
+
+<Callout type="info">
+  Oransal tutar; faturalama döneminizin bitişine kalan gün sayısına göre belirlenir. Kalan süre için ödenecek bir fark çıkarsa, yükseltme ancak bu ödeme alındıktan sonra devreye girer.
+</Callout>
+
+## Düşürme (dönem sonunda uygulanır)
+
+Daha alt (daha ucuz) bir pakete geçmek **düşürme** sayılır ve **hemen uygulanmaz** — mevcut faturalama döneminizin **sonuna planlanır**. Böylece zaten ödediğiniz dönemi sonuna kadar üst paketle kullanmaya devam edersiniz.
+
+- Düşürmeden önce sistem, mevcut kullanımınızın hedef paketin limitlerine uyup uymadığını kontrol eder. Örneğin **4 şubeniz** varsa, tek şube hakkı veren Başlangıç paketine düşemezsiniz; önce kullanımı limitlerin altına indirmeniz gerekir.
+- Düşürme planlandığında ekran size, değişikliğin uygulanacağı **dönem sonu tarihini** gösterir.
+
+<Callout type="warning">
+  Zaten planlanmış bir plan değişikliğiniz varken yeni bir değişiklik yapmaya çalışırsanız, sistem önce mevcut planlı değişikliği iptal etmenizi ister. Düşürmeyi dönem sonu gelmeden iptal ederseniz mevcut paketinizde kalırsınız.
+</Callout>
+
+## Ödeme yöntemleri: PayTR ve havale
+
+Yeni bir abonelik veya yükseltme ödemesini iki yöntemden biriyle tamamlayabilirsiniz:
+
+- **Kart (PayTR)** — varsayılan yöntem. PayTR yalnızca **TRY** tahsil eder. Ödeme ekranında kart bilgilerinizi girersiniz; ödeme onaylanınca aboneliğiniz otomatik olarak aktifleşir.
+- **Havale / EFT (banka transferi)** — alternatif yöntem. Ekran size platformun banka/IBAN bilgilerini gösterir; transferi yaptıktan sonra ödemeniz **yetkili onayıyla** etkinleştirilir. Bu seçenek yalnızca platform tarafında IBAN tanımlıysa görünür.
+
+<Callout type="info">
+  Marketplace’ten satın aldığınız eklentiler de **aynı kart ödeme akışını** kullanır ve yalnızca ödeme tamamlandıktan sonra etkinleşir. Bkz. [Marketplace](/tr/marketplace).
+</Callout>
+
+## Sonradan özellik edinme
+
+Bir özelliğe sonradan ihtiyaç duyduğunuzda iki yolunuz vardır:
+
+1. **Plan yükseltme** — daha üst pakete geçerek tüm özellik setini ve daha yüksek limitleri açın (bu sayfadaki yükseltme akışı).
+2. **Marketplace eklentisi** — tek bir yeteneği paket değiştirmeden ekleyin. Bkz. [Marketplace](/tr/marketplace).
+
+## İlgili sayfalar
+
+- Deneme süreci ve faturalama: **[Deneme ve faturalama](/tr/plans/deneme-ve-faturalama)**
+- Paketlerin tam özellik/limit karşılaştırması: **[Özellik matrisi](/tr/plans/ozellik-matrisi)**
+
+Geliştirici/entegrasyon detayları (uç noktalar, JSON, proration/iptal API'leri): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

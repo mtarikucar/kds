@@ -1,0 +1,34 @@
+---
+title: Entegrasyonlar
+description: HummyTummy'yi dış servislerle bağlayın — teslimat platformları (Yemeksepeti/Getir/Trendyol), SMS, e-Fatura/e-Arşiv ve Çağrı Kimliği. Her birinin adım adım kurulumu.
+---
+
+import { Cards, Callout } from 'nextra/components'
+
+# Entegrasyonlar
+
+HummyTummy'yi kullandığınız dış servislerle bağlayın. Bu entegrasyonlar **Ayarlar** ekranından kurulur ve sipariş, fatura ve müşteri akışlarınızı dış dünyaya bağlar.
+
+<Callout type="info">
+  Entegrasyon ayarları **ADMIN** rolüyle yapılır. Çoğu entegrasyon bir **plan
+  özelliğine** veya **marketplace eklentisine** bağlıdır — planınızda yoksa ilgili
+  sekme görünmez. Bkz. [Planlar](https://help.hummytummy.com/tr/plans) ve [Marketplace](https://help.hummytummy.com/tr/marketplace).
+</Callout>
+
+## Mevcut entegrasyonlar
+
+<Cards>
+  <Cards.Card title="Teslimat Platformları" href="/tr/integrations/delivery-platforms" arrow />
+  <Cards.Card title="SMS" href="/tr/integrations/sms" arrow />
+  <Cards.Card title="e-Fatura / e-Arşiv" href="/tr/integrations/e-invoice" arrow />
+  <Cards.Card title="Çağrı Kimliği (Caller ID)" href="/tr/integrations/caller-id" arrow />
+</Cards>
+
+## İlgili ekranlar
+
+- **e-Fatura kesimi ve takibi:** [Faturalar](https://help.hummytummy.com/tr/admin-guide/invoices) ve [Mali Kurtarma](https://help.hummytummy.com/tr/admin-guide/fiscal-recovery)
+- **Yerel donanım köprüsü (yazıcı/mali cihaz):** [Bridge'ler](https://help.hummytummy.com/tr/admin-guide/bridges) ve [Cihazlar](https://help.hummytummy.com/tr/admin-guide/devices)
+
+## Kendi yazılımınızı bağlamak
+
+Kendi uygulamanızı, ekranınızı veya otomasyonunuzu bağlamak (REST API, webhooks, partner ekran) için **[Geliştirici / API](/tr/developer)** bölümüne bakın.

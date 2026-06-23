@@ -1,0 +1,234 @@
+---
+title: Ürünler (Add-on'lar)
+description: Her add-on için kısa kart — ne işe yarar, fiyat, tekrarlayan mı tek seferlik mi, bağımlılık.
+---
+
+import { Callout } from 'nextra/components'
+
+# Ürünler (Add-on'lar)
+
+**Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Erişim:** ADMIN, MANAGER • **Plan:** Tüm planlar
+
+Marketplace'te satın alabileceğiniz her kalem aşağıda tek tek anlatılmıştır. Her
+kartta: **ne işe yarar**, **fiyat**, **tekrarlayan mı tek seferlik mi** ve varsa
+**bağımlılık**.
+
+<Callout type="info">
+  Satın alma yolu her add-on için aynıdır: Marketplace'te sepete ekleyin →
+  PayTR ile ödeyin → hak otomatik etkinleşir. Adım adım anlatım için
+  [Satın Alma Akışı](/tr/marketplace/satin-alma-akisi). Fiyatlar TRY, KDV dahil.
+</Callout>
+
+---
+
+## Kapasite paketleri
+
+### Ekstra KDS ekranı
+
+Şubenize **bir adet** ek mutfak ekranı (KDS) slotu ekler.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺99,00 |
+| Ne işe yarar | KDS ekranı limitinizi **bir** artırır |
+| Bağımlılık | — |
+
+### Ekstra KDS istasyonu
+
+Varsayılan mutfağın üstüne **bir adet** yönlendirme istasyonu (bar / ızgara /
+tatlı) ekler.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺149,00 |
+| Ne işe yarar | KDS istasyonu limitinizi **bir** artırır |
+| Bağımlılık | — |
+
+### Ekstra garson tableti
+
+Garson-tablet limitinizi **bir** artırır.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺79,00 |
+| Ne işe yarar | Tablet limitinizi **bir** artırır |
+| Bağımlılık | — |
+
+### Ekstra şube
+
+Plan limitinizin ötesine **bir** şube ekler. Zincirler için gereklidir. Tek
+satın almada iki şey yapar: hem şube limitinizi artırır hem de çoklu-lokasyon
+özelliğini açar.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kapasite |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺399,00 |
+| Ne işe yarar | **Bir** ek şube **ve** çoklu-lokasyon özelliği |
+| Bağımlılık | — |
+
+---
+
+## Entegrasyonlar
+
+### e-Fatura / e-Arşiv
+
+Vergi-uyumlu elektronik fatura kesmenizi sağlar (bulut tabanlı, donanım
+gerekmez).
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺199,00 |
+| Ne işe yarar | e-Fatura / e-Arşiv kesimini açar |
+| Bağımlılık | — |
+
+### Hugin yazarkasa entegrasyonu
+
+Local Bridge üzerinden bir Hugin yazarkasa cihazını sürer.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺299,00 |
+| Ne işe yarar | Hugin yazarkasa entegrasyonunu açar |
+| Bağımlılık | **PRO planı gerekir** |
+
+<Callout type="warning">
+  Hugin yazarkasa, kataloğdaki **tek** bağımlılığı olan add-on'dur. PRO planında
+  değilseniz satın alma engellenir ve önce planınızı yükseltmeniz istenir.
+</Callout>
+
+### Yemeksepeti entegrasyonu
+
+Yemeksepeti siparişlerini doğrudan KDS'inize alır.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | Yemeksepeti siparişlerini KDS'e taşır |
+| Bağımlılık | — |
+
+### Getir Yemek entegrasyonu
+
+Getir Yemek siparişlerini doğrudan KDS'inize alır.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | Getir Yemek siparişlerini KDS'e taşır |
+| Bağımlılık | — |
+
+### Trendyol Yemek entegrasyonu
+
+Trendyol Yemek siparişlerini doğrudan KDS'inize alır.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | Trendyol Yemek siparişlerini KDS'e taşır |
+| Bağımlılık | — |
+
+<Callout type="info">
+  Üç teslimat entegrasyonunu da aynı anda kullanabilirsiniz; siparişler yan yana
+  tek bir KDS akışında toplanır.
+</Callout>
+
+### Caller ID / telefon-sipariş entegrasyonu
+
+Her gelen çağrıda otomatik olarak bir müşteri kartı açar.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺149,00 |
+| Ne işe yarar | Gelen çağrıda otomatik müşteri kartı açar |
+| Bağımlılık | — |
+
+---
+
+## Yazılım / özellikler
+
+### Gelişmiş raporlar
+
+Kohort analizi, özel raporlar ve zamanlanmış e-posta teslimi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Yazılım |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺129,00 |
+| Ne işe yarar | Gelişmiş rapor setini açar |
+| Bağımlılık | — |
+
+### API erişimi
+
+Entegrasyonlarınız için public API anahtarı + giden (outbound) webhook'lar.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Yazılım |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺249,00 |
+| Ne işe yarar | API anahtarı + giden webhook'ları açar |
+| Bağımlılık | — |
+
+<Callout type="info">
+  API erişimi ve webhook'ların teknik kullanımı için geliştirici dokümanına bakın:
+  [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api).
+</Callout>
+
+---
+
+## Destek
+
+### Öncelikli destek
+
+Kritik destek talepleri için 24 saatlik SLA. Mesai saatlerinde doğrudan hat.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Destek |
+| Fatura | Tekrarlayan |
+| Fiyat | ₺199,00 |
+| Ne işe yarar | Öncelikli destek / 24 saatlik SLA |
+| Bağımlılık | — |
+
+### Yerinde kurulum (tek seferlik)
+
+Bir HummyTummy teknisyeni mekânınıza gelir, bridge + cihazları kurar ve
+personelinizi eğitir.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Destek |
+| Fatura | **Tek seferlik** |
+| Fiyat | ₺7.500,00 |
+| Ne işe yarar | **Hak vermez** — bir kurulum/eğitim hizmetidir |
+| Bağımlılık | — |
+
+<Callout type="warning">
+  Bu kalem hesabınıza bir limit veya özellik eklemez; ödenir ve faturalanır ama
+  hak setinizi değiştirmez. Tekrarlayan değil, **tek seferliktir**.
+</Callout>
+
+---
+
+Geliştirici/entegrasyon detayları: [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api)

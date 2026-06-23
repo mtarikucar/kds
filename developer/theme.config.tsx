@@ -2,28 +2,31 @@ import React from 'react'
 import { useConfig } from 'nextra-theme-docs'
 import { useRouter } from 'next/router'
 
-const Logo = () => (
-  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <span
-      style={{
-        display: 'grid',
-        placeItems: 'center',
-        width: 30,
-        height: 30,
-        borderRadius: 9,
-        background: '#f97316',
-        color: '#fff',
-        fontWeight: 800,
-        fontFamily: '"Fraunces", Georgia, serif',
-      }}
-    >
-      H
+const Logo = () => {
+  const { locale } = useRouter()
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span
+        style={{
+          display: 'grid',
+          placeItems: 'center',
+          width: 30,
+          height: 30,
+          borderRadius: 9,
+          background: '#f97316',
+          color: '#fff',
+          fontWeight: 800,
+          fontFamily: '"Fraunces", Georgia, serif',
+        }}
+      >
+        H
+      </span>
+      <span style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, fontSize: 18 }}>
+        HummyTummy <span style={{ color: '#f97316' }}>{locale === 'en' ? 'Developer' : 'Geliştirici'}</span>
+      </span>
     </span>
-    <span style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, fontSize: 18 }}>
-      HummyTummy <span style={{ color: '#f97316' }}>Docs</span>
-    </span>
-  </span>
-)
+  )
+}
 
 // "Go to app" navbar CTA — replaces nextra-theme-docs' default GitHub project
 // icon (we don't expose the private repo on a public portal). Label follows the
@@ -67,7 +70,7 @@ const config = {
   ],
   search: {
     placeholder: () =>
-      useRouter().locale === 'en' ? 'Search docs…' : 'Dokümanlarda ara…',
+      useRouter().locale === 'en' ? 'Search developer docs…' : 'Geliştirici dokümanlarında ara…',
   },
   feedback: { content: null },
   editLink: { content: null },
@@ -76,12 +79,13 @@ const config = {
   head: () => {
     const { frontMatter, title } = useConfig()
     const { locale } = useRouter()
-    const pageTitle = title ? `${title} — HummyTummy Docs` : 'HummyTummy Docs'
+    const brand = locale === 'en' ? 'HummyTummy Developer' : 'HummyTummy Geliştirici'
+    const pageTitle = title ? `${title} — ${brand}` : brand
     const desc =
       frontMatter.description ||
       (locale === 'en'
-        ? 'HummyTummy — cloud restaurant management documentation.'
-        : 'HummyTummy — bulut tabanlı restoran yönetim sistemi dokümantasyonu.')
+        ? 'HummyTummy — developer & integration documentation (API, webhooks, Partner Display).'
+        : 'HummyTummy — geliştirici & entegrasyon dokümantasyonu (API, webhooks, Partner Display).')
     return (
       <>
         <title>{pageTitle}</title>

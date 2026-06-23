@@ -1,0 +1,84 @@
+---
+title: Bridge'ler (Yerel Bağlayıcı)
+description: HummyTummy yerel köprüleri (HummyBox) — yazıcı, mali cihaz ve çevrimdışı senkron köprülerinin kurulumu, eşleştirme jetonu ve canlı bağlantı durumu yönetimi.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Bridge'ler (Yerel Bağlayıcı)
+
+**Menü yolu:** İşletme → Bridge'ler &nbsp;•&nbsp; **URL:** `/admin/bridges`
+**Erişim:** ADMIN  •  **Plan:** `multiLocation` — **Profesyonel (PRO)** ve üzeri
+
+## Amacı
+
+Bridge'ler ekranı, şubelerinizdeki **yerel bağlayıcı cihazları (HummyBox)** yönetir. Köprü, bulut ile şube içindeki yazıcı, mali cihaz ve yerel ağ arasında durur; bağlantı koptuğunda işin yerelde sürmesini ve internet geri geldiğinde **çevrimdışı senkronu** sağlar. Bu ekrandan yeni bir köprü kurar (provision), kurulu köprülerin **canlı bağlantı durumunu** izler ve gerektiğinde köprüyü hizmet dışı bırakırsınız.
+
+<Callout type="info">
+  Bu ekran yalnızca `multiLocation` özelliğinin açık olduğu **Profesyonel (PRO)** ve
+  üzeri planlarda görünür. Plan kapısı yalnızca arayüzdedir; gerçek yetki kontrolü
+  sunucudadır — köprü kurma/iptal istekleri planınız uygun değilse sunucu tarafından
+  reddedilir.
+</Callout>
+
+## Yeni köprü kurma
+
+Bir köprü kurmak iki tarafta birden yürür: önce panelden köprüyü tanımlar, ardından donanım (HummyBox) ilk açılışta size verilen jeton ile kendini eşleştirir.
+
+<Steps>
+### Adım 1 — Köprü kaydını oluştur
+
+**Yeni Köprü** bölümünde:
+
+- **Şube** — köprünün bağlanacağı şubeyi seçin (zorunlu; seçilmeden buton pasiftir).
+- **Ürün (SKU)** — donanım tipini seçin: **HummyBox Lite**, **HummyBox Pro** ya da kendi cihazınızı kullanacaksanız **BYO (Kendi cihazın)**.
+- **Hostname** — isteğe bağlı; cihaza vereceğiniz ağ adı.
+
+**Oluştur** butonu köprü kaydını yaratır.
+
+### Adım 2 — Eşleştirme jetonunu yakala
+
+Oluşturma başarılı olunca üstte **sarı bir uyarı kutusu** açılır ve **tek kullanımlık eşleştirme jetonu** burada gösterilir. Jetonu kopyalayıp HummyBox'ın ilk açılış ekranına girin; cihaz kendini bu jetonla eşleştirir.
+
+Jetonu aldıktan sonra **"Kopyaladım"** ile kutuyu kapatın.
+</Steps>
+
+<Callout type="warning">
+  Eşleştirme jetonu **yalnızca bir kez** gösterilir. Kutuyu kapattıktan veya sayfayı
+  yeniledikten sonra liste satırına dönseniz bile jeton **bir daha görünmez**. Jetonu
+  kaybederseniz köprüyü hizmet dışı bırakıp yeniden kurmanız gerekir.
+</Callout>
+
+## Köprü listesi ve bağlantı durumu
+
+Alttaki tablo şubelerinizdeki tüm köprüleri listeler. Her satırda **şube**, **ürün (SKU)**, **hostname**, **durum** ve **son görülme** zamanı yer alır.
+
+**Durum** rozeti köprünün bulutla bağlantısını gösterir:
+
+- **Çevrimiçi (online)** — köprü aktif, sinyal düzenli geliyor (yeşil).
+- **Eşleşiyor (claiming)** — köprü kuruldu, jetonla eşleştirme/ilk bağlantı sürüyor (mor).
+- **Çevrimdışı (offline)** — sinyal kesildi; cihaz kapalı veya internet yok (gri).
+- **Hizmet dışı (retired)** — köprü iptal edilmiş (soluk gri).
+
+**Son görülme** sütunu, köprüden en son sinyalin (heartbeat) geldiği zamanı gösterir; uzun süredir güncellenmiyorsa cihazın güç/ağ bağlantısını kontrol edin.
+
+<Callout type="info">
+  Durum ve son görülme, köprünün düzenli gönderdiği **sinyale (heartbeat)** dayanır.
+  Yeni kurulan bir köprü kısa süre **eşleşiyor** kalır; cihaz eşleştirmeyi tamamlayınca
+  **çevrimiçi**'ye döner.
+</Callout>
+
+## Köprüyü hizmet dışı bırakma
+
+Bir köprüyü kullanımdan kaldırmak için ilgili satırdaki **İptal Et** bağlantısına dokunun; sistem bir onay sorar. Onaylarsanız köprü **hizmet dışı (retired)** duruma geçer ve artık bulutla eşleşmez.
+
+<Callout type="warning">
+  İptal işlemi köprünün eşleştirmesini sonlandırır. Aynı cihazı tekrar kullanmak
+  isterseniz **yeni bir köprü kaydı** oluşturup donanımı yeni jetonla baştan
+  eşleştirmeniz gerekir.
+</Callout>
+
+## İlgili sayfalar
+
+- Şubeleri tanımlamak ve yönetmek için: **[Şubeler](/tr/admin-guide/branches)**.
+- Yazıcı ve fiş ayarları için: **[Ayarlar](/tr/admin-guide/settings)**.

@@ -1,0 +1,107 @@
+---
+title: Satın Alma Akışı
+description: Add-on'u sepete ekleme, PayTR ile ödeme, hakların etkinleşmesi, iptal ve dönem-sonu davranışı.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Satın Alma Akışı
+
+**Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Erişim:** ADMIN, MANAGER (ödeme onayı ve iptal yalnızca ADMIN) • **Plan:** Tüm planlar
+
+Bir add-on satın almanın tek yolu Marketplace'ten sepete ekleyip **PayTR ile
+ödeme** yapmaktır. Ödeme tamamlanmadan hiçbir hak (limit veya özellik)
+hesabınıza eklenmez; bedavaya açma yolu yoktur.
+
+<Callout type="info">
+  Operatör bedavaları (comp) yalnızca HummyTummy ekibi/süperadmin tarafından
+  verilebilir. Sizin tarafınızdan satın almanın tek yolu ödemeli akıştır.
+</Callout>
+
+## Uçtan uca akış
+
+<Steps>
+
+### Add-on'u seç
+
+Marketplace ekranında satın almak istediğiniz add-on'u bulun. Kart üzerinde
+add-on'un ne işe yaradığını, fiyatını (₺) ve tekrarlayan mı yoksa tek seferlik
+bir hizmet mi olduğunu görürsünüz.
+
+### Sepete ekle
+
+Add-on'u sepete ekleyin. Aynı sepete birden çok add-on (ve gerekiyorsa plan veya
+donanım kalemleri) koyabilirsiniz; ekran toplam tutarı **KDV dahil** olarak
+gösterir. Toplam her zaman sunucu tarafında yeniden hesaplanır, böylece
+ödeyeceğiniz tutar güvenilirdir.
+
+### Ödemeye geç
+
+**Öde / Devam et** düğmesiyle ödeme adımına geçin. Ekran sizi **PayTR**
+güvenli ödeme sayfasına yönlendirir; sepetinizdeki her kalem burada ayrı bir
+satır olarak görünür (ör. *"Ekstra KDS ekranı (aylık)"*).
+
+### Ödemeyi tamamla
+
+PayTR sayfasında ödemenizi yapın. Ödeme onaylandığında uygulamaya geri
+dönersiniz.
+
+### Hakların etkinleşmesi
+
+Ödeme onaylandığı anda add-on'un verdiği hak hesabınıza **otomatik eklenir**.
+Örneğin bir ekstra KDS ekranı aldıysanız, KDS ekranı limitiniz panelde anında
+bir artar; bir entegrasyon aldıysanız ilgili ayar/özellik açılır.
+
+</Steps>
+
+<Callout type="warning">
+  Ödeme sayfasına ilerlemenize rağmen ödemeyi yarıda bırakırsanız hiçbir ücret
+  alınmaz ve hiçbir hak eklenmez. İşlem ancak ödeme onaylandığında tamamlanır.
+</Callout>
+
+## Haklar nasıl birikir
+
+Add-on'lar planınızın üzerine eklenir; aynı türden birden çok kaynak şu şekilde
+birleşir:
+
+- **Limitler** (KDS ekranı, istasyon, tablet, şube) → **toplanır.** Örneğin
+  planınız 2 KDS ekranı veriyorsa ve 1 "Ekstra KDS ekranı" aldıysanız, toplam
+  **3** olur.
+- **Özellikler** (gelişmiş raporlar, öncelikli destek, çoklu-lokasyon vb.) →
+  herhangi bir kaynak açıyorsa **açık** sayılır.
+- **Entegrasyonlar** (e-Fatura, Yemeksepeti, Getir, Trendyol) → hepsi yan yana
+  birikir; aynı anda birden çok teslimat entegrasyonu kullanabilirsiniz.
+
+Aynı kapasite add-on'unu iki kez alıp limiti çift saymaya çalışmak engellenir:
+bir add-on'a zaten sahipseniz, ikinci kez aynı kalemi satın almaya çalıştığınızda
+işlem reddedilir ve kartınız ikinci kez çekilmez.
+
+## Bağımlılıklar
+
+Bazı add-on'lar başka bir şeyin önceden mevcut olmasını ister. Şu an kataloğda
+bu durumdaki tek add-on **Hugin yazarkasa**'dır: **PRO planı** gerektirir. PRO
+planında değilseniz satın alma engellenir ve önce planınızı yükseltmeniz
+gerektiği bildirilir.
+
+## İptal ve dönem-sonu davranışı
+
+Bir add-on'u iptal etme yetkisi yalnızca **ADMIN**'dedir (faturalandırma
+kararıdır). İki seçeneğiniz vardır:
+
+- **Dönem sonunda iptal (varsayılan):** add-on **dönem sonuna kadar aktif kalır**
+  ve verdiği haklar o tarihe kadar çalışmaya devam eder. Dönem dolduğunda
+  otomatik olarak kapanır ve ilgili limit/özellik geri alınır.
+- **Hemen iptal:** add-on anında kapanır ve verdiği haklar **derhal geri
+  alınır**.
+
+<Callout type="info">
+  Tekrarlayan add-on'lar 30 günlük bir dönem penceresinde çalışır; gerçek
+  faturalama döngünüz ana aboneliğinizin döngüsüyle hizalanır. Tek seferlik
+  hizmet kalemleri (ör. yerinde kurulum) tekrarlanmaz ve iptal edilecek bir
+  dönemleri yoktur.
+</Callout>
+
+---
+
+Geliştirici/entegrasyon detayları: [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api)

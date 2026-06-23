@@ -2,7 +2,7 @@
   "name": "hummytummy-developer-docs",
   "private": true,
   "version": "1.0.0",
-  "description": "HummyTummy documentation portal (developer.hummytummy.com)",
+  "description": "HummyTummy Developer Docs (developer.hummytummy.com)",
   "scripts": {
     "dev": "next dev -p 3200",
     "build": "next build",

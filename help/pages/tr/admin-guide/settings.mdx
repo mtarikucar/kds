@@ -1,0 +1,73 @@
+---
+title: Ayarlar
+description: HummyTummy ayarlar ekranı — POS, QR menü, raporlar, marka, entegrasyonlar, webhook'lar, partner anahtarları, rezervasyon, SMS, online sipariş ve muhasebe sekmeleri; ayrıca Plan & Erişim ve Masaüstü Uygulaması.
+---
+
+import { Callout } from 'nextra/components'
+
+# Ayarlar
+
+**Menü yolu:** Ayarlar & Erişim → Ayarlar &nbsp;•&nbsp; **URL:** `/admin/settings`
+**Erişim:** ADMIN, MANAGER
+**Plan:** Çekirdek sekmeler tüm planlarda; gelişmiş sekmeler plana/eklentiye bağlı
+
+## Amacı
+
+Ayarlar, restoranınızın **davranışını** ve **entegrasyonlarını** ayarladığınız merkezdir. Sol bir alt menü (sekmeler) içerir; her sekme bir modülün ayarını yönetir. Bir sekme planınızda/eklentinizde yoksa **görünmez** — doğrudan URL'e giderseniz yükseltme kartı çıkar.
+
+<Callout type="info">
+  Çoğu ayar **otomatik kaydedilir** (değiştirdiğiniz an); başarı/başarısızlık bir
+  bildirimle (toast) gösterilir. Ayrıca "Ayarlar & Erişim" bölümünde, Ayarlar'ın yanında
+  iki bağımsız ekran daha vardır: **Plan & Erişim** ve **Masaüstü Uygulaması** (aşağıda).
+</Callout>
+
+## Ayar sekmeleri
+
+| Sekme | URL | Ne ayarlar? | Gereksinim |
+| --- | --- | --- | --- |
+| **POS** | `/admin/settings/pos` | Masasız mod, iki adımlı ödeme, "ödemeden önce servis edilmiş olsun" kuralı, müşteri self-pay (PayTR), ürün görselleri, varsayılan harita görünümü (2D/3D) | Tüm planlar |
+| **QR Menü** | `/admin/settings/qr-menu` | Müşteri siparişi aç/kapat, iki adımlı ödeme, konum/WiFi/sosyal bilgileri | Tüm planlar |
+| **Raporlar** | `/admin/settings/reports` | Rapor tercihleri | Tüm planlar |
+| **Marka (Branding)** | `/admin/settings/branding` | Logo, renkler, özel marka görünümü | `customBranding` — PRO+ |
+| **Entegrasyonlar** | `/admin/settings/integrations` | API erişim ayarları | `apiAccess` — BUSINESS (veya `api_access`) |
+| **Webhook'lar** | `/admin/settings/webhooks` | Olay webhook'ları | `apiAccess` — BUSINESS (veya `api_access`) |
+| **Partner Anahtarları** | `/admin/settings/partner-keys` | Üçüncü taraf ekran/uygulama için API anahtarı (Partner Display) | `externalDisplay` — BUSINESS |
+| **Rezervasyon** | `/admin/settings/reservations` | Rezervasyon kuralları (onay, slot, kapasite) | `reservationSystem` — PRO+ |
+| **SMS** | `/admin/settings/sms` | SMS entegrasyonu | `sms` entegrasyon eklentisi |
+| **Online Sipariş** | `/admin/settings/online-orders` | Delivery platformları (Yemeksepeti/Getir vb.) | `deliveryIntegration` — PRO+ (veya `delivery_*`) |
+| **Muhasebe** | `/admin/settings/accounting` | e-Fatura/muhasebe entegrasyonu | `accounting` entegrasyon eklentisi |
+
+<Callout type="warning">
+  **Abonelik sekmesi kaldırıldı.** Faturalandırma ve plan değişimi artık üst seviyedeki
+  **Plan & Erişim** sayfasındadır; eski `/admin/settings/subscription` adresi oraya
+  yönlendirir.
+</Callout>
+
+## "Ayarlar & Erişim" bölümündeki diğer ekranlar
+
+### Plan & Erişim
+
+**URL:** `/admin/plan` — Mevcut planınız, kullanım kotalarınız (kullanıcı/masa/şube/ürün/sipariş) ve aktif eklentileriniz tek sayfada. Plan değiştirme, fatura geçmişi, iptal/yeniden etkinleştirme buradan başlar. Plan seçimi ve yükseltme için **[Planlar](/tr/plans)**.
+
+### Masaüstü Uygulaması
+
+**URL:** `/admin/desktop` — Masaüstü (Tauri) POS terminali için indirme ve kurulum. Fiş yazıcısı/donanım entegrasyonu masaüstü uygulamasında çalışır.
+
+### Şube-bazlı entegrasyon ekranları
+
+Bazı entegrasyonların kendi tam ekranları vardır (eklenti aldıysanız görünür):
+
+- **e-Fatura Kurtarma** (`/admin/fiscal-recovery`) — `fiscal` entegrasyon eklentisi.
+- **Çağrı Kimliği Akışı** (`/admin/caller-feed`) — `caller` entegrasyon eklentisi.
+
+## İpuçları
+
+- **POS + QR menü ayarları birbirine bağlıdır:** Müşteri siparişini açınca iki adımlı ödeme otomatik gelir; bunu QR menü ayarından yönetin (POS'tan iki adımlı ödemeyi kapatamazsınız).
+- **Entegrasyonu önce marketplace'ten alın:** SMS/e-Fatura/Delivery/Çağrı gibi sekmeler ilgili eklenti alınmadan görünmez — bkz. **[Marketplace](/tr/marketplace)**.
+- **Otomatik kayıt hatası:** Bir ayar kaydedilmediyse hata bildirimi çıkar; çoğu sekmede tek tıkla yeniden dener.
+
+## İlgili ekranlar
+
+- **[Planlar](/tr/plans)** — plan/limit/fiyat ve Plan & Erişim.
+- **[Marketplace](/tr/marketplace)** — entegrasyon ve kapasite eklentileri.
+- **[Geliştirici / Entegrasyon](https://developer.hummytummy.com/tr/developer)** — API, webhook ve Partner Display detayları.

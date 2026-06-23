@@ -1,0 +1,73 @@
+---
+title: Deneme ve faturalama
+description: 7 günlük deneme, TRIAL_ENDED kilidi, faturalama döngüsü ve KDV dahil fiyatlandırma.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Deneme ve faturalama
+
+## 7 günlük deneme
+
+Her yeni işletme, kayıt anında otomatik olarak **Deneme** paketine alınır:
+
+- **Süre:** 7 gün.
+- **Kapsam:** Kurumsal paketin **tüm özellikleri** ve **sınırsız** limitler. Yani deneme boyunca hiçbir özellik kısıtlamasına takılmadan ürünü tam kapasite test edebilirsiniz.
+- **Satılamaz:** Deneme paketi plan seçim ekranında listelenmez; satın alınan bir paket değildir, kayıt anında size atanır.
+
+Deneme, ayrı bir karşılama (onboarding) paketi olarak çalışır; herhangi bir ücretli pakete bağlı değildir. Deneme süreniz dolmadan bir ücretli paket seçmeniz beklenir.
+
+## Deneme bitince ne olur? (kilit)
+
+Deneme süreniz **bir ücretli paket seçmeden** dolarsa işletmeniz kilitlenir. Bu, sessizce daha düşük bir pakete düşürülme değil; **açık bir kilittir** — devam etmek için bir paket seçmeniz gerekir.
+
+<Steps>
+
+### Uygulama kilitlenir
+Deneme bittiğinde panelde gezinmeye çalıştığınızda, "Deneme süreniz sona erdi. Devam etmek için bir plan seçin." mesajıyla karşılaşırsınız ve normal ekranlara erişiminiz durur.
+
+### Hâlâ yapabilecekleriniz
+Kilitliyken bile **plan seçim ve ödeme ekranlarına** ulaşabilirsiniz: paketleri görebilir, bir paket seçip ödeme yapabilirsiniz. Diğer iş ekranları (POS, mutfak, raporlar vb.) bir paket seçene kadar kapalı kalır.
+
+### Otomatik yönlendirme
+Kilitliyken uygulama sizi otomatik olarak plan seçim ekranına yönlendirir; oradan bir paket seçerek kilidi açarsınız.
+
+</Steps>
+
+<Callout type="warning">
+  Aynı kilit yalnızca deneme bitişinde değil, aboneliğiniz **süresi dolduğunda** veya **iptal edildiğinde** de devreye girer. Ödemesi geciken (PAST_DUE) bir abonelik ise 7 günlük ödemesiz dönem (grace) boyunca canlı sayılır ve kilitlenmez.
+</Callout>
+
+## Faturalama döngüsü
+
+İki faturalama döngüsünden birini seçersiniz: **Aylık** veya **Yıllık**. Seçtiğiniz döngü; abonelik başlatma, yükseltme ve düşürmede dönem uzunluğunu ve ödeyeceğiniz tutarı belirler. **Yıllık ödeme, aylık tutarın 12 katından daha düşüktür** (yaklaşık %17 tasarruf).
+
+Geçmiş faturalarınızı paneldeki faturalar ekranından görüntüleyip indirebilirsiniz; her fatura için tarih, tutar ve dönem bilgisi listelenir.
+
+## KDV dahil fiyatlandırma
+
+İlan edilen tüm paket fiyatları **brüt** (KDV dahil) tutarlardır ve sizden tam olarak bu tutar tahsil edilir — fatura aşamasında üstüne ayrıca KDV eklenmez. Faturada toplam tutar, içindeki KDV ayrı bir kalem olarak gösterilecek şekilde ayrıştırılır.
+
+**Örnek — Profesyonel aylık ₺1.299:**
+
+| Kalem | Tutar |
+| --- | --- |
+| Ara toplam (net) | ₺1.082,50 |
+| KDV (%20) | ₺216,50 |
+| **Toplam (tahsil edilen)** | **₺1.299,00** |
+
+<Callout type="info">
+  Faturaya, işletmenizin **fatura kesim anındaki** vergi numarası yazılır. Vergi numaranızı sonradan değiştirseniz bile geçmiş faturalarınız etkilenmez.
+</Callout>
+
+## İptal ve yeniden etkinleştirme
+
+- **İptal** — Aboneliğinizi panelden iptal edebilirsiniz (yalnızca Yönetici). İptalin **anında mı yoksa dönem sonunda mı** geçerli olacağını seçebilir ve isterseniz kısa bir **iptal nedeni** girebilirsiniz.
+- **Yeniden etkinleştirme** — İptal edilmiş bir aboneliği panelden yeniden etkinleştirebilirsiniz (yalnızca Yönetici).
+
+## İlgili sayfalar
+
+- Plan seçme, yükseltme ve ödeme akışları: **[Plan seçimi ve yükseltme](/tr/plans/plan-secimi-ve-yukseltme)**
+- Paketlerin tam özellik/limit karşılaştırması: **[Özellik matrisi](/tr/plans/ozellik-matrisi)**
+
+Geliştirici/entegrasyon detayları (uç noktalar, JSON, fatura/iptal API'leri, TRIAL_ENDED kilit zarfı): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

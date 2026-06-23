@@ -1,0 +1,84 @@
+---
+title: QR Kodları
+description: HummyTummy QR kod yönetimi — restoran geneli ve masa başına QR üretimi, indirme/yazdırma, QR menü tasarımı. Hangi adrese gittiği, kullanımı ve ipuçları.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# QR Kodları
+
+**Menü yolu:** Menü & Masa → QR Kodları &nbsp;•&nbsp; **URL:** `/admin/qr-codes`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar
+
+## Amacı
+
+QR Kodları ekranı, müşterilerinizin telefonuyla okutup menünüze ulaştığı **QR kodları üretir, indirir ve yazdırır**. İki tür kod vardır: tüm restoran için tek bir **genel QR** ve her masa için ayrı ayrı **masa QR'ları**. Ayrıca QR menünün görünümünü (renk, tipografi, düzen, logo) buradan tasarlarsınız.
+
+<Callout type="info">
+  Bu ekran kodları **üreten** yönetici ekranıdır. Müşterinin kodu okutunca gördüğü
+  asıl menü ekranı ayrıdır — bkz. **[QR Menü (müşteri)](/tr/admin-guide/qr-menu)**.
+</Callout>
+
+## QR kodları nasıl çalışır?
+
+Ekran iki sekmeye ayrılır: **QR Kodları** ve **Tasarım Ayarları**. Üstteki üç kart o anki sayıları gösterir: toplam kod, masa QR'ları ve restoran QR'ı.
+
+<Steps>
+### Restoran QR Kodu
+
+Restoran geneli için tek bir QR'dır. Okutan kişi doğrudan menünüzün ana sayfasına düşer; belirli bir masaya bağlı değildir. Vitrin, kapı, kartvizit veya sosyal medya için uygundur.
+
+### Masaya Özel QR Kodları
+
+Tasarım Ayarları'nda **"Masa QR kodlarını etkinleştir"** açıksa, tanımlı her masa için ayrı bir QR üretilir. Bu kodu okutan müşteri **doğrudan o masanın menüsüne** girer; böylece sipariş ve self-servis ödeme doğru masaya bağlanır. Henüz masa tanımlamadıysanız bu bölüm boş görünür — önce **[Masalar](/tr/admin-guide/tables)** ekranından masa ekleyin.
+</Steps>
+
+QR kodları **şubeye bağlıdır**: üstteki şube seçiciyle hangi şubeye baktığınız, hangi masa kodlarının listeleneceğini belirler.
+
+## Kodun gittiği adres
+
+Her QR, menünüzün adresini taşır: `…/qr-menu/<restoran-no>` (masa kodlarında ilgili masa bilgisi de eklenir). Bir kodun altındaki **kopyala** düğmesiyle bu adresi panoya alabilir, **paylaş** ile telefondan doğrudan gönderebilirsiniz.
+
+<Callout type="warning">
+  Kodu basıp masaya koyduktan sonra restoran numarası ve masa bağlantısı sabit
+  kalır — adres değişmediği sürece basılı kodları yeniden üretmeniz gerekmez.
+  Renk/tasarım değişikliği adresi etkilemez, yalnızca açılan menünün görünümünü değiştirir.
+</Callout>
+
+## İndirme ve yazdırma
+
+Her kodun kendi kartından tekil indirme yapabilir, ya da toplu işlemleri kullanabilirsiniz.
+
+- **Boyut seçimi:** Her kartta üç hazır boyut vardır — **Masa kartı** (150×150), **Standart** (300×300) ve **Poster** (600×600).
+- **Biçim:** Tekil indirmede **PNG**, **SVG** (vektörel, kayıpsız büyütme için) veya **PDF** seçebilirsiniz.
+- **Tümünü indir:** Toplu işlemler kartındaki düğme, listedeki tüm kodları arka arkaya PNG olarak indirir.
+- **Masa QR sayfasını yazdır:** Tüm masa QR'larını her masanın etiketiyle birlikte tek bir baskıya uygun sayfada (ızgara düzeninde) açar ve yazdırma penceresini başlatır.
+
+<Callout type="info">
+  Toplu indirmeler dosyaların karışmaması için tek tek, kısa aralıklarla iner.
+  Yazdırma yeni bir sekme açtığından, tarayıcınızın **açılır pencere engelleyicisine**
+  izin vermeniz gerekebilir.
+</Callout>
+
+## Tasarım Ayarları
+
+**Tasarım Ayarları** sekmesi, müşterinin QR'ı okutunca gördüğü menünün görünümünü canlı önizlemeyle düzenler. Sol tarafta ayarlar, sağ tarafta QR ve menü önizlemesi anlık güncellenir. Beş alt sekme vardır:
+
+- **Şablonlar** — hazır görünüm setlerini tek tıkla uygular.
+- **Renkler** — birincil, ikincil ve arka plan rengi (hazır temalar dahil).
+- **Tipografi** — yazı tipi ve restoran logosu yükleme (en fazla 5 MB görsel).
+- **Düzen** — liste / ızgara / kompakt yerleşim, satır başına ürün sayısı, fiyat-açıklama-görsel gösterimi.
+- **QR Stili** — masa QR'larını aç/kapat ve masa kodunun altına yazılacak mesajı belirleyin (örn. "Menüyü görmek için okutun"). QR deseni, seçtiğiniz birincil ve arka plan rengini kullanır.
+
+Değişiklikler **"Tüm değişiklikleri kaydet"** ile yazılır; **"Varsayılana dön"** fabrika ayarlarına çevirir. Tüm fiyatlar menüde **₺ (TRY)** olarak gösterilir.
+
+<Callout type="info">
+  Plan kısıtları yalnızca arayüzü gizler; gerçek yetki kontrolü sunucudadır. QR
+  kod üretimi tüm planlarda açık olduğundan bu ekranda yükseltme engeli görmezsiniz.
+</Callout>
+
+## İlgili sayfalar
+
+- **[Masalar](/tr/admin-guide/tables)** — masa QR'larının kaynağı; masaları buradan tanımlarsınız.
+- **[QR Menü (müşteri)](/tr/admin-guide/qr-menu)** — kodu okutan müşterinin gördüğü sipariş/ödeme ekranı.
+- **[POS (Satış Ekranı)](/tr/admin-guide/pos)** — QR menüden gelen siparişlerin kasada işlendiği ekran.

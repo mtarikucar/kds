@@ -1,0 +1,78 @@
+---
+title: Marketplace
+description: HummyTummy Marketplace add-on kataloğu — kapasite paketleri, entegrasyonlar, yazılım özellikleri ve hizmetler.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# Marketplace
+
+**Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
+**Erişim:** ADMIN, MANAGER (satın alma onayı yalnızca ADMIN) • **Plan:** Tüm planlar
+
+Marketplace, planınızın üzerine **tek tek satın alabileceğiniz** eklentilerin
+(add-on) kataloğudur. Bir plan size bir özellik ve limit tabanı verir;
+add-on'lar bu tabanı **artırır**: ekstra KDS ekranı, ekstra şube, e-Fatura
+entegrasyonu, gelişmiş raporlar gibi.
+
+Marketplace ekranı her planda açıktır. Kart üzerinde add-on'un ne işe yaradığını,
+fiyatını (₺) ve tekrarlayan mı yoksa tek seferlik bir hizmet mi olduğunu görürsünüz.
+Bir add-on'u satın aldığınızda, verdiği hak (örneğin bir ekstra KDS ekranı veya
+yeni bir entegrasyon) hesabınıza **otomatik eklenir** — panelde ilgili limit/özellik
+anında kullanılabilir hâle gelir.
+
+<Callout type="info">
+  Tüm fiyatlar **TRY** cinsindendir ve add-on fiyatları **KDV dahil** gösterilir.
+  Ödemeler PayTR üzerinden alınır.
+</Callout>
+
+## Add-on'lara göz at
+
+<Cards>
+  <Cards.Card title="Satın Alma Akışı" href="/tr/marketplace/satin-alma-akisi" arrow>
+    Sepete ekleme → ödeme → hakların etkinleşmesi. İptal ve dönem-sonu davranışı.
+  </Cards.Card>
+  <Cards.Card title="Ürünler (Add-on Detayları)" href="/tr/marketplace/urunler" arrow>
+    Her add-on için ne işe yaradığı, fiyatı, neyi açtığı, tekrarlayan/tek seferlik ve bağımlılık.
+  </Cards.Card>
+  <Cards.Card title="Planlar" href="/tr/plans" arrow>
+    Add-on'ların üzerine bindiği taban planlar (BASIC / PRO / BUSINESS).
+  </Cards.Card>
+</Cards>
+
+## Katalog özeti
+
+Satın alabileceğiniz tüm add-on'lar tek bakışta. Her add-on'un ayrıntısı,
+neyi açtığı ve nasıl satın alınacağı için [Ürünler](/tr/marketplace/urunler)
+sayfasına bakın.
+
+| Ad | Tür | Fatura | Fiyat | Ne işe yarar |
+| --- | --- | --- | --- | --- |
+| Ekstra KDS ekranı | Kapasite | Tekrarlayan | ₺99,00 | Şubenize bir ek mutfak ekranı slotu |
+| Ekstra KDS istasyonu | Kapasite | Tekrarlayan | ₺149,00 | Bir ek yönlendirme istasyonu (bar / ızgara / tatlı) |
+| Ekstra garson tableti | Kapasite | Tekrarlayan | ₺79,00 | Garson-tablet limitinizi bir artırır |
+| Ekstra şube | Kapasite | Tekrarlayan | ₺399,00 | Bir ek şube + çoklu-lokasyon özelliği |
+| e-Fatura / e-Arşiv | Entegrasyon | Tekrarlayan | ₺199,00 | Vergi-uyumlu elektronik fatura |
+| Hugin yazarkasa | Entegrasyon | Tekrarlayan | ₺299,00 | Hugin yazarkasa entegrasyonu (PRO planı gerekir) |
+| Yemeksepeti | Entegrasyon | Tekrarlayan | ₺249,00 | Yemeksepeti siparişleri doğrudan KDS'e |
+| Getir Yemek | Entegrasyon | Tekrarlayan | ₺249,00 | Getir Yemek siparişleri doğrudan KDS'e |
+| Trendyol Yemek | Entegrasyon | Tekrarlayan | ₺249,00 | Trendyol Yemek siparişleri doğrudan KDS'e |
+| Caller ID / telefon-sipariş | Entegrasyon | Tekrarlayan | ₺149,00 | Gelen çağrıda otomatik müşteri kartı |
+| Gelişmiş raporlar | Yazılım | Tekrarlayan | ₺129,00 | Kohort analizi, özel ve zamanlanmış raporlar |
+| API erişimi | Yazılım | Tekrarlayan | ₺249,00 | Public API anahtarı + giden webhook'lar |
+| Öncelikli destek | Destek | Tekrarlayan | ₺199,00 | Kritik talepler için 24 saatlik SLA |
+| Yerinde kurulum | Destek | **Tek seferlik** | ₺7.500,00 | Bir teknisyen mekânınıza gelir, kurar ve eğitir |
+
+<Callout type="warning">
+  **Yerinde kurulum** bir hizmet kalemidir: ödenir ve faturalanır ama hesabınıza
+  bir hak (limit veya özellik) eklemez. Tekrarlayan değil, tek seferliktir.
+</Callout>
+
+<Callout type="info">
+  **Hugin yazarkasa** add-on'u **PRO** planı gerektirir. PRO planında değilseniz,
+  satın almaya çalıştığınızda ekran sizi önce planı yükseltmeye yönlendirir.
+</Callout>
+
+---
+
+Geliştirici/entegrasyon detayları: [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api)

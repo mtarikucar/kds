@@ -1,0 +1,77 @@
+---
+title: Cihazlar
+description: Kayıtlı terminalleri (KDS ekranları, tabletler, yazıcılar, POS/yazarkasa, partner display cihazları) tek listeden provizyonlayın, eşleştirin ve durumlarını izleyin.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Cihazlar
+
+**Menü yolu:** Çoklu Şube → Cihazlar &nbsp;•&nbsp; **URL:** `/admin/devices`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** `multiLocation` — **Profesyonel (PRO)** ve üzeri
+
+## Amacı
+
+Cihazlar ekranı, işletmenizdeki tüm **kayıtlı terminallerin** envanteridir: mutfak ekranları (KDS), garson ve müşteri tabletleri, fiş/mutfak yazıcıları, POS terminalleri, yazarkasa, arayan ID, barkod okuyucu ve yerel köprü (`local_bridge`) cihazları. Her cihaz için bir **yuva (slot)** oluşturup ekranda çıkan eşleştirme kodu ile cihazı bağlar, sonrasında durumunu canlı izlersiniz. Cihaz işlemleri (fiş bas, çekmece aç, fiş kes) bu kayıtlar üzerinden yürür.
+
+<Callout type="info">
+  Bu ekran **Profesyonel (PRO)** ve üzeri planlarda görünür. Planınızda yoksa sol
+  menüde **Cihazlar** çıkmaz. Plan kısıtı yalnızca arayüz kolaylığıdır; asıl yetki
+  her zaman sunucudadır.
+</Callout>
+
+## Özet kartları ve liste
+
+Sayfanın üstünde üç özet kartı, emekliye ayrılmamış cihaz filosunu özetler:
+
+- **Toplam cihaz** — aktif (emekli olmayan) tüm cihaz sayısı.
+- **Çevrimiçi** — şu an `online` durumdaki cihaz sayısı.
+- **Dikkat gerekiyor** — `error` veya `offline` durumdaki cihaz sayısı (sıfır değilse kırmızı yanar).
+
+Altta tablo her cihazı **Tür, Durum, Eşleştirme Kodu, Yetenekler** ve **Son Görülme** sütunlarıyla listeler. Liste düzenli aralıkla kendini yeniler; durum değişiklikleri elle yenilemeye gerek kalmadan görünür. Varsayılan olarak **emekli** cihazlar gizlidir; "Emekli cihazları göster" kutusunu işaretleyerek listeye dahil edebilirsiniz.
+
+## Yeni cihaz ekleme (yuva + eşleştirme)
+
+Eşleştirme, ayrı bir ekran değil, cihazın kendi üzerinde olur: panel bir **yuva** açar ve bir **eşleştirme kodu** üretir; kodu cihaza girersiniz.
+
+<Steps>
+### Tür seçip yuva oluşturun
+
+Sağ üstteki açılır listeden cihaz **türünü** seçin (örn. KDS ekranı, Garson tableti, Fiş yazıcısı, Yazarkasa, Yerel Köprü) ve **Cihaz Slotu Oluştur**'a basın. Yuva, geçerli şube kapsamında oluşturulur.
+
+### Kodu cihaza girin
+
+Yeni satırın **Eşleştirme Kodu** sütununda kısa bir alfanümerik kod ve onu kodlayan bir **QR** belirir. QR'a tıklayınca büyür (192px) — bunu salon ortasındaki ekranı uzaktan taratmak için kullanın; küçük QR yaklaşık 30 cm'den uzakta zor okunur. Kodu cihazda ya da cihazı süren yerel köprüde girin.
+
+### Bağlantıyı doğrulayın
+
+Eşleştirme tamamlanınca cihaz token'ını alır; satırın **Durum** etiketi `online`'a döner ve **Son Görülme** güncellenir.
+</Steps>
+
+<Callout type="warning">
+  Eşleştirme kodunun bir **son kullanma** zamanı vardır (QR'ın üzerine gelince
+  görünür). Süre dolarsa kod geçersiz olur; yuvayı emekliye ayırıp yeni bir yuva
+  oluşturarak taze kod üretin.
+</Callout>
+
+## Durumlar ve cihaz komutları
+
+**Durum** etiketi cihazın mesh durum makinesini yansıtır: `online` (yeşil), `offline` (gri), `error` (kırmızı), `busy` (amber), `maintenance` (mavi) ve gizlenen `retired`. Bekleyen sipariş veya yazıcı gibi cihazların **Yetenekler** sütununda hangi işleri yapabildiği listelenir.
+
+Tablodaki **tür adına** tıklayınca sağdan **Cihaz Komutları** çekmecesi açılır. Burada cihazın komut kuyruğunu **Kuyrukta / İşlemde / Tamamlandı / Başarısız** filtreleriyle inceler, başarısız bir satırdaki hata nedenini okur ve cihaz sağlıksız görünüyorsa tek seferlik bir **yetenek yoklaması (probe)** gönderebilirsiniz.
+
+Bir cihazı kullanımdan kaldırmak için satırın sağındaki **Emekliye Ayır** butonunu kullanın; onay sorulduktan sonra cihaz listeden gizlenir (token'ı geçersiz kılınır).
+
+<Callout type="info">
+  **Yerel Köprü (`local_bridge`)** cihazı, ağınızdaki fiş yazıcısı, nakit çekmece
+  ve yazarkasa gibi yerel donanımı sürer. Köprü kurulumu ve donanım komut akışının
+  ayrıntısı için **[Bridges / Köprüler](/tr/admin-guide/bridges)** ve donanım
+  eşleştirme rehberi **[Donanım](/tr/desktop/donanim)** sayfalarına bakın.
+</Callout>
+
+## İlgili sayfalar
+
+- **[Bridges / Köprüler](/tr/admin-guide/bridges)** — yerel köprü kurulumu ve yerel donanım yönetimi.
+- **[Donanım eşleştirme](/tr/desktop/donanim)** — fiş yazıcısı, nakit çekmece ve yazarkasa pair-code akışı.
+- **[Partner Display API](https://developer.hummytummy.com/tr/developer/partner-display)** — üçüncü taraf masa tableti / harici ekranların (partner display) QR menüyü yansıttığı tenant API anahtarı tabanlı entegrasyon.
+- **[Mutfak Ekranı (KDS)](/tr/admin-guide/kitchen)** — KDS ekran cihazlarının gösterdiği mutfak akışı.

@@ -286,6 +286,19 @@ jobs:
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/developer:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/developer:buildcache,mode=max
 
+      # Help Center docs (Nextra). Served at help.hummytummy.com (host 3201 →
+      # container 3000). Same shape as the developer step.
+      - name: Build & push help
+        uses: docker/build-push-action@v5
+        with:
+          context: ./help
+          file: ./help/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_BASE }}/help:${{ steps.version.outputs.VERSION }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/help:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/help:buildcache,mode=max
+
 
   # -------------------------------------------------------------------
   # Render .env.production from secrets, ship it + the repo HEAD to the

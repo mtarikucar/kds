@@ -1,0 +1,99 @@
+---
+title: Teslimat Platformları
+description: Getir, Yemeksepeti, Trendyol Yemek ve Migros Yemek hesaplarını bağlayın — kimlik bilgisi girişi, bağlantı testi, menü eşleme ve gelen siparişlerin mutfak ekranına akışı.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Teslimat Platformları
+
+**Menü yolu:** Ayarlar → Online Sipariş Platformları &nbsp;•&nbsp; **URL:** `/admin/settings/online-orders`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** `deliveryIntegration` özelliği olan planlar
+
+## Amacı
+
+Bu ekran restoranınızı **Getir Yemek, Yemeksepeti, Trendyol Yemek ve Migros Yemek** platformlarına bağlar. Bağlantı kurulduğunda bu platformlardan gelen siparişler doğrudan mutfak ekranınıza (KDS) düşer; ürünlerinizi platforma eşleyip menünüzü gönderebilir, dükkânı platform üzerinden açıp kapatabilirsiniz. Tüm akışı tek sayfadan yönetir, hata olursa aynı sayfadaki etkinlik kaydından takip edersiniz.
+
+<Callout type="info">
+  Sayfa dört platform kartını her zaman gösterir. Bir kartı açıp kimlik bilgisi
+  girmediğiniz sürece o platform **"Yapılandırılmamış"** durumunda kalır ve hiçbir
+  sipariş alınmaz.
+</Callout>
+
+## Bir platformu bağlama
+
+Her platform genişleyen bir kart olarak listelenir. Kartın başlığına dokununca kimlik bilgisi formu açılır.
+
+<Steps>
+### Adım 1 — Restoran kimliğini girin
+
+Formun üstündeki **Restoran Kimliği (`remoteRestaurantId`)** alanına, platformun size verdiği mağaza/şube numarasını yazın. Gelen siparişler ve webhook çağrıları bu kimlik üzerinden sizin işletmenize eşlenir.
+
+### Adım 2 — Kimlik anahtarlarını girin
+
+Her platformun beklediği alanlar farklıdır (`*` zorunludur):
+
+- **Getir Yemek:** App Secret Key\*, Restaurant Secret Key\*
+- **Yemeksepeti:** Client ID\*, Client Secret\*, Chain Code, POS Vendor ID
+- **Trendyol Yemek:** API Version (`v1` veya `v2`), Username, Password, Integrator ID (v2), Integrator Secret (v2)
+- **Migros Yemek:** API Key\*
+
+Şifre alanlarının yanındaki göz simgesiyle girdiğinizi doğrulayabilirsiniz. Anahtarlar sunucuda saklanır; ekrana geri dönüldüğünde gizli kalır.
+
+### Adım 3 — Kaydedin ve bağlantıyı test edin
+
+Bir değişiklik yaptığınızda **Kaydet** butonu belirir. Kaydettikten sonra **Bağlantıyı Test Et** ile anahtarların geçerli olduğunu platform tarafında doğrulayın. Test, gerçek bir oturum açma denemesi yapar; başarısızsa anahtarları veya restoran kimliğini gözden geçirin.
+
+### Adım 4 — Entegrasyonu açın
+
+Kart başlığındaki anahtarı (toggle) açın. Zorunlu alanlar boşsa sistem sizi uyarır ve kartı açık tutar. Açıldıktan sonra durum rozeti **"Bağlandı"** olur ve siparişler akmaya başlar.
+</Steps>
+
+<Callout type="warning">
+  Yapılandırma oluşturma, güncelleme, silme ve menü gönderme işlemleri yalnızca
+  **ADMIN** yetkisindedir. **MANAGER** kullanıcıları kartları ve etkinlik kaydını
+  görüntüleyebilir, bağlantı testi yapabilir ve dükkânı açıp kapatabilir; ancak
+  anahtarları değiştiremez.
+</Callout>
+
+## Sipariş senkronu nasıl çalışır?
+
+Platformlar farklı yöntemlerle çalışır ve kart açıklamasında bu belirtilir:
+
+- **Yemeksepeti** — webhook tabanlı (gerçek zamanlı). Siparişler platform tarafından sunucumuza anında iletilir.
+- **Trendyol Yemek** — webhook + yoklama (polling) karması.
+- **Getir Yemek** — yoklama tabanlı (yaklaşık her 15 sn).
+- **Migros Yemek** — yoklama tabanlı (yaklaşık her 20 sn).
+
+**Otomatik Onay** açıkken gelen sipariş herhangi bir el işlemi beklemeden kabul edilir ve mutfağa gönderilir; kapalıysa siparişi elle onaylamanız gerekir. Kartın altındaki **Son yoklama** ve **Son menü senkronu** zaman damgaları akışın canlı olduğunu doğrulamanızı sağlar.
+
+<Callout type="info">
+  **Dükkânı Aç / Kapat:** Entegrasyon açıkken kartta beliren bu buton, restoranınızı
+  yalnızca ilgili platform tarafında açık/kapalı işaretler. Yoğunlukta yeni sipariş
+  almayı durdurmak için kullanışlıdır; entegrasyonu kapatmadan dükkânı geçici olarak
+  kapatabilirsiniz.
+</Callout>
+
+## Menü eşleme
+
+Bir platforma menü gönderebilmek için her ürününüzü o platformdaki karşılığına bağlamanız gerekir. Eşleme, sistemdeki bir **ürün** ile platformun **dış ürün kimliği** (`externalItemId`) arasında kurulur. Menü senkronu yalnızca **eşlenmiş** ürünleri gönderir ve ürünün adını, fiyatını (₺) ve stok durumunu platforma yazar. HummyTummy'de ürünü "tükendi" yaparsanız bu durum da platforma yansıtılabilir.
+
+<Callout type="warning">
+  Aynı platformda aynı dış ürün kimliği bir kez eşlenebilir; tekrarı sistem reddeder.
+  Ürünlerinizi önce **[Menü](https://help.hummytummy.com/tr/admin-guide/menu)** ekranında oluşturun, sonra burada
+  eşleyin.
+</Callout>
+
+## Etkinlik kaydı ve hata yönetimi
+
+Sayfanın alt bölümündeki **Etkinlik Kaydı**, son sipariş ve senkron işlemlerini gösterir. Tümü / başarılı / başarısız olarak filtreleyebilir, her satırı açıp ayrıntısını görebilirsiniz. Gelen siparişlerin ham içeriğindeki kişisel veriler kayda yazılmadan önce maskelenir.
+
+Bir platformda hata biriktikçe kart rozeti **"Hata"** uyarısına döner. Hata sayısı **10**'a ulaşırsa devre kesici (circuit breaker) devreye girer, rozet **"Devre Açık"** olur ve entegrasyon otomatik kapatılır. Bu durumda kartı açıp **Son hata** mesajını okuyun, kimlik bilgilerini düzeltip **Bağlantıyı Test Et** ile doğrulayın, ardından entegrasyonu yeniden açın.
+
+<Callout type="info">
+  Plan kısıtı yalnızca arayüzde değil sunucuda da uygulanır: planınızda
+  `deliveryIntegration` özelliği yoksa bu ekranın işlemleri reddedilir. Gelen
+  siparişler mutfak akışına girdiğinden, ekranı kullanmadan önce **[KDS (Mutfak
+  Ekranı)](https://help.hummytummy.com/tr/admin-guide/kitchen)** ve **[Menü](https://help.hummytummy.com/tr/admin-guide/menu)** kurulumunuzu
+  tamamlamış olmanız önerilir.
+</Callout>

@@ -1,0 +1,67 @@
+---
+title: Otomatik güncelleme
+description: HummyTummy Masaüstü uygulamasının yeni sürümleri kendiliğinden nasıl bulduğu, indirdiği ve güvenli biçimde kurduğu.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Otomatik güncelleme
+
+HummyTummy Masaüstü uygulaması, yeni bir sürüm yayınlandığında bunu kendisi fark eder ve
+güncellemeyi sizin için indirip kurar. Bir sürümü elle aramanız ya da yeniden indirmeniz
+gerekmez — uygulama her açılışta en güncel sürümde olup olmadığınızı kontrol eder.
+
+<Callout type="info">
+  Güncellemeler merkezi olarak yayınlanır; her restoran aynı, en güncel sürümü alır.
+  Böylece bütün ekipleriniz aynı özelliklere ve düzeltmelere sahip olur.
+</Callout>
+
+## Nasıl çalışır
+
+<Steps>
+### Uygulama açılışta kontrol eder
+
+HummyTummy Masaüstü'nü her başlattığınızda uygulama, sizden daha yeni bir sürüm olup
+olmadığını sessizce kontrol eder. Bu işlem arka planda olur; çalışmanızı kesmez.
+
+### Daha yeni bir sürüm varsa bildirilir
+
+Yeni bir sürüm bulunursa uygulama bunu indirir ve hazır olduğunda size kurmak isteyip
+istemediğinizi sorar. Sürüm notları, o güncellemede neyin değiştiğini özetler.
+
+### Güncelleme güvenli biçimde kurulur
+
+Uygulama, indirdiği dosyanın gerçekten HummyTummy tarafından yayınlanmış, değiştirilmemiş
+ve güvenilir bir paket olduğunu doğrular. Doğrulama başarılı olursa güncelleme kurulur;
+herhangi bir sorun olursa kurulum yapılmaz ve mevcut sürümünüz olduğu gibi kalır.
+</Steps>
+
+<Callout type="warning">
+  Güncelleme yalnızca, yayınlanan paket güvenlik doğrulamasını geçtiğinde kurulur. Bu
+  sayede uygulamanız hiçbir zaman doğrulanmamış bir dosyayla güncellenmez — kasanızda ve
+  satış ekranınızda çalışan yazılımın bütünlüğü korunur.
+</Callout>
+
+## Zaten en güncel sürümdeyseniz
+
+En güncel sürümü kullanıyorsanız uygulama hiçbir şey yapmaz ve normal şekilde açılır.
+"Güncelsiniz" türünde bir bildirim görmeseniz bile kontrol sessizce yapılmıştır.
+
+## Güncelleme gelmiyorsa
+
+Yeni bir sürüm yayınlandığını bildiğiniz halde güncelleme önerisi görmüyorsanız:
+
+- Uygulamayı tamamen kapatıp yeniden açın; kontrol açılışta yapılır.
+- İnternet bağlantınızın olduğundan emin olun.
+- Sorun devam ederse uygulamayı en güncel paketle elle yeniden kurabilirsiniz:
+  **[Kurulum & indirme](/tr/desktop/kurulum)**.
+
+## İlgili sayfalar
+
+- **[Kurulum & indirme](/tr/desktop/kurulum)** — uygulamayı ilk kez indirip kurma.
+- **[Donanım](/tr/desktop/donanim)** — fiş yazıcısı, para çekmecesi ve yazarkasa
+  eşleştirme rehberi.
+
+---
+
+Geliştirici/entegrasyon detayları: [Masaüstü Sürüm API](https://developer.hummytummy.com/tr/developer/desktop-api)

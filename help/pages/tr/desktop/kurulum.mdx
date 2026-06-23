@@ -1,0 +1,88 @@
+---
+title: Kurulum & indirme
+description: HummyTummy Masaüstü uygulamasını bilgisayarınıza indirme ve kurma — platform paketini seçme ve adım adım kurulum.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Kurulum & indirme
+
+HummyTummy Masaüstü uygulaması, satış ekranınızı (POS) ve yerel donanımınızı (fiş yazıcısı,
+para çekmecesi, yazarkasa) bilgisayarınızda çalıştırmanızı sağlayan kurulabilir bir
+programdır. Uygulamanın tüm sürümleri merkezi olarak yayınlanır; siz yalnızca işletim
+sisteminize uygun paketi indirip kurarsınız. Aynı paket tüm restoranlar için ortaktır —
+ekibinizin gördüğü sürüm her zaman en güncel yayınlanmış sürümdür.
+
+<Callout type="info">
+  Hangi işletim sistemini kullandığınızdan emin değilseniz, indirme sayfasındaki paketler
+  Windows, macOS (Apple Silicon ve Intel) ve Linux için ayrı ayrı listelenir. Doğru paketi
+  seçtiğinizde kurulum birkaç dakikada tamamlanır.
+</Callout>
+
+## Platformunuza uygun paketi seçme
+
+İndirme sayfası, her işletim sistemi için ayrı bir indirme bağlantısı gösterir:
+
+- **Windows** → `.msi` kurulum dosyası
+- **macOS (Apple Silicon — M1/M2/M3)** → `.dmg`
+- **macOS (Intel)** → `.dmg`
+- **Linux** → `.deb` paketi ya da `.AppImage`
+
+<Callout type="warning">
+  Mac kullanıcısıysanız işlemci tipinizi kontrol edin: Apple menüsü → "Bu Mac Hakkında"
+  ekranında "Apple M…" yazıyorsa Apple Silicon, "Intel" yazıyorsa Intel paketini seçin.
+  Yanlış paketi kurarsanız uygulama açılmayabilir.
+</Callout>
+
+Bir işletim sistemi için indirme bağlantısı görünmüyorsa, o sürüm henüz o platform için
+hazırlanmamış demektir; bu durumda en son yayınlanan paketi bekleyin ya da destek ekibiyle
+iletişime geçin.
+
+## Kurulum adımları
+
+<Steps>
+### Paketi indirin
+
+İndirme sayfasında işletim sisteminize karşılık gelen butona basın. Tarayıcınız paketi
+"İndirilenler" klasörüne kaydeder. İndirme bittiğinde dosyaya çift tıklayın.
+
+### Kurulumu tamamlayın
+
+İşletim sisteminizin normal kurulum akışını izleyin:
+
+- **Windows** — MSI sihirbazı açılır; "İleri" diyerek ilerleyin ve "Kur" ile bitirin.
+- **macOS** — Açılan DMG penceresinde uygulama simgesini **Applications** (Uygulamalar)
+  klasörüne sürükleyin.
+- **Linux** — `.deb` paketini yazılım yükleyicinizle kurun ya da `.AppImage` dosyasını
+  çalıştırılabilir yapıp çift tıklayın.
+
+### Uygulamayı açın ve giriş yapın
+
+Kurulum bittikten sonra HummyTummy Masaüstü'nü başlatın ve panel hesabınızla giriş yapın.
+İlk açılışta uygulama, en güncel sürümde olduğunuzdan emin olmak için bir güncelleme
+kontrolü yapar.
+</Steps>
+
+<Callout type="info">
+  İlk kez kuruyorsanız ve fiş yazıcısı, para çekmecesi gibi yerel donanımları
+  bağlayacaksanız, kurulumun ardından donanım eşleştirme rehberini izleyin:
+  **[Donanım](/tr/desktop/donanim)**.
+</Callout>
+
+## Her zaman en güncel sürümde kalma
+
+Uygulamayı bir kez kurduktan sonra elle yeniden indirmeniz gerekmez. Yeni bir sürüm
+yayınlandığında uygulama bunu açılışta kendisi fark eder ve güvenli biçimde günceller.
+Bunun nasıl çalıştığını **[Otomatik güncelleme](/tr/desktop/otomatik-guncelleme)** sayfasında
+bulabilirsiniz.
+
+## İlgili sayfalar
+
+- **[Otomatik güncelleme](/tr/desktop/otomatik-guncelleme)** — uygulamanın yeni sürümleri
+  kendiliğinden nasıl indirip kurduğu.
+- **[Donanım](/tr/desktop/donanim)** — fiş yazıcısı, para çekmecesi ve yazarkasa
+  eşleştirme rehberi.
+
+---
+
+Geliştirici/entegrasyon detayları: [Masaüstü Sürüm API](https://developer.hummytummy.com/tr/developer/desktop-api)

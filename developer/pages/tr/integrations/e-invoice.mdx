@@ -1,0 +1,103 @@
+---
+title: e-Fatura / e-Arşiv (Muhasebe Entegrasyonu)
+description: Şirket vergi bilgilerinizi, muhasebe sağlayıcınızı (Paraşüt, Logo, Foriba) ve fatura kesim ayarlarını tanımlayıp bağlantıyı test ettiğiniz muhasebe ayarları ekranı.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# e-Fatura / e-Arşiv (Muhasebe Entegrasyonu)
+
+**Menü yolu:** Ayarlar → Muhasebe &nbsp;•&nbsp; **URL:** `/admin/settings/accounting`
+**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar
+
+## Amacı
+
+Bu ekran, satışlarınızdan **fatura kesimi** için gereken üç şeyi tek yerde toplar: işletmenizin **vergi bilgileri**, kullanacağınız **muhasebe sağlayıcısı** (Paraşüt, Logo veya Foriba) ve **fatura davranış ayarları**. Buradaki bilgiler kesilen e-Fatura / e-Arşiv belgelerinin satıcı (şirket) tarafını oluşturur. Tüm alanlar **otomatik kaydedilir** — ayrı bir "Kaydet" butonu yoktur; her değişiklik kısa bir gecikmeyle sunucuya yazılır ve kaydetme durumu bölüm başlığında gösterilir.
+
+## Ekran yapısı
+
+Ekran üç bölümden oluşur:
+
+- **Şirket Bilgileri** — faturada görünecek satıcı kimliği.
+- **Fatura Ayarları** — otomatik fatura, fatura ön eki ve varsayılan vade.
+- **Entegrasyon** — muhasebe sağlayıcısı seçimi, sağlayıcı kimlik bilgileri ve bağlantı testi.
+
+## Adım 1 — Şirket vergi bilgileri
+
+<Steps>
+### Şirket Bilgileri bölümünü doldurun
+
+Şu alanları girin: **Şirket adı**, **Vergi numarası / TCKN**, **Vergi dairesi**, **Adres**, **Telefon** ve **E-posta**. Bu bilgiler kesilen faturaların satıcı tarafına yazılır; eksik veya yanlış vergi bilgisi sağlayıcı tarafında fatura reddine yol açabilir.
+
+### Otomatik kaydı bekleyin
+
+Alandan çıktığınızda değişiklik otomatik kaydedilir. Bölüm başlığındaki kaydetme göstergesi başarısız olursa **Yeniden dene** ile tekrar gönderebilirsiniz.
+</Steps>
+
+<Callout type="info">
+  Bu vergi bilgileri sadece **işletmenizin** (satıcının) bilgileridir. Tek tek
+  müşterilerin fatura bilgileri burada tutulmaz; onlar satış/fatura akışında ele alınır.
+</Callout>
+
+## Adım 2 — Fatura ayarları
+
+Fatura Ayarları bölümünde üç ayar bulunur:
+
+- **Otomatik fatura oluştur** — açıkken uygun satışlar için fatura kesim akışı kendiliğinden tetiklenir.
+- **Fatura ön eki** — fatura numaralarının başına eklenen etiket (varsayılan `INV`).
+- **Varsayılan ödeme vadesi (gün)** — faturanın vade gününü belirler; peşin için `0` bırakın.
+
+<Callout type="warning">
+  **Otomatik fatura oluştur** açıkken, geçerli bir sağlayıcı seçili değilse ya da
+  kimlik bilgileri eksikse faturalar kesilemez ve kesilemeyen kayıtlar
+  **Mali Kurtarma** ekranında bekler. Otomatik faturayı açmadan önce
+  entegrasyonun bağlantı testini geçtiğinden emin olun.
+</Callout>
+
+## Adım 3 — Sağlayıcı entegrasyonu
+
+Entegrasyon bölümünde önce **Sağlayıcı** seçilir. Seçenekler: **Yok** (varsayılan), **Paraşüt**, **Logo** ve **Foriba**. Sağlayıcı seçtiğinizde o sağlayıcıya ait kimlik alanları ekranda belirir.
+
+<Steps>
+### Sağlayıcıyı seçin
+
+Açılır listeden muhasebe sağlayıcınızı seçin. "Yok" seçiliyken otomatik senkronizasyon ve bağlantı testi kapalıdır.
+
+### Sağlayıcı kimlik bilgilerini girin
+
+Seçtiğiniz sağlayıcıya göre alanlar değişir:
+
+- **Paraşüt:** Şirket ID, Client ID, Client Secret, Kullanıcı adı, Parola.
+- **Logo:** API adresi, Kullanıcı adı, Parola, Firma numarası.
+- **Foriba:** API adresi, Kullanıcı adı, Parola, Servis tipi.
+
+Parola ve gizli anahtar alanları maskelidir. Bu alanları boş bırakırsanız mevcut kayıtlı değer **korunur** (boş gönderim kayıtlı gizli bilgiyi silmez); değiştirmek için yeniden yazmanız gerekir.
+
+### Otomatik senkronizasyonu ayarlayın (isteğe bağlı)
+
+**Otomatik senkronizasyon** açıkken kesilen belgeler sağlayıcıya otomatik iletilir. Bu seçenek yalnızca bir sağlayıcı seçiliyken etkindir.
+
+### Bağlantıyı test edin
+
+Sağlayıcı seçiliyken görünen **Bağlantıyı test et** butonuyla kimlik bilgilerinizi doğrulayın. Başarılıysa onay, başarısızsa sağlayıcıdan dönen hata mesajı gösterilir. Kimlik bilgilerini değiştirdiğinizde testi tekrarlayın.
+</Steps>
+
+<Callout type="info">
+  Plan rozeti yalnızca arayüzde bir göstergedir; entegrasyonun gerçek yetkisi ve
+  fatura kesim hakkı **sunucu** tarafında doğrulanır. Buradaki ayarlar doğru olsa
+  bile sunucu yetkilendirmesi yoksa belge kesilmez.
+</Callout>
+
+## Fatura kesim akışı nasıl işler?
+
+Bir fatura/fiş isteği oluştuğunda sistem kaydı önce **kuyruğa** alır, ardından seçili sağlayıcıya iletir. Sonuç **kesildi** veya **başarısız** olarak işaretlenir; başarısız kayıtlar hata mesajıyla birlikte saklanır. Her istek bir **idempotency (tekillik) anahtarı** taşır, böylece aynı belge tekrar denemede iki kez kesilmez.
+
+- Kesilen belgeleri görüntülemek için: **[Faturalar](https://help.hummytummy.com/tr/admin-guide/invoices)**.
+- Kuyrukta kalan veya başarısız olan kayıtları elle yeniden göndermek / iptal etmek için: **[Mali Kurtarma](https://help.hummytummy.com/tr/admin-guide/fiscal-recovery)**.
+
+<Callout type="warning">
+  Bir belge "başarısız" durumdaysa, sorunu (eksik kimlik bilgisi, sağlayıcı kesintisi)
+  giderdikten sonra **Mali Kurtarma** ekranından yeniden gönderin. Yeniden gönderim
+  orijinal tekillik anahtarını kullanır; bu yüzden başarılı tekrar denemede sağlayıcıda
+  mükerrer belge oluşmaz.
+</Callout>

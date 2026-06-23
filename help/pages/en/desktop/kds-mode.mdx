@@ -1,0 +1,76 @@
+---
+title: KDS / kiosk mode
+description: Run HummyTummy Desktop as a kitchen display (KDS) and full-screen kiosk — window configuration, registering the screen as a device and practical tips.
+---
+
+import { Callout } from 'nextra/components'
+
+# KDS / kiosk mode
+
+The desktop app runs the web panel's POS and **kitchen display (KDS)** interfaces in a
+native window. This is ideal for using the app as a single-purpose, full-screen **kiosk**
+at kitchen/bar stations.
+
+## Window configuration
+
+The app opens with a single main window:
+
+| Setting | Value |
+| --- | --- |
+| Title | `HummyTummy POS` |
+| Initial size | 1280 × 720 |
+| Minimum size | 800 × 600 |
+| Resizable | Yes |
+| Full screen | No (default) |
+
+At KDS stations, putting the window into full screen (the kitchen display is usually a
+dedicated monitor) is the typical usage. The app is single-window; the same install can
+show both the POS and KDS screens — which screen opens depends on the signed-in user's
+role and the selected branch.
+
+<Callout type="info">
+  Like all restaurant data, KDS is fed from the cloud. A desktop kiosk is the clean way to
+  lock the screen to a single app, removing risks like a browser tab closing or accidental
+  navigation.
+</Callout>
+
+## Registering the KDS screen as a device
+
+Optionally, you can also register a KDS/bar screen as a device from the **Devices** screen.
+This lets you monitor the screen's **online/offline** status from the panel and send it screen
+commands.
+
+Create the slot with the **Kitchen display** (or bar display) type and pair the screen — the
+steps are identical to the [Hardware pairing](/en/desktop/hardware) page: create the slot,
+enter the on-screen pairing code on the device, confirm the connection.
+
+### Screen commands
+
+The following commands can be sent to a registered screen device from the panel:
+
+- **Show order** — shows a specific order on the screen.
+- **Clear screen** — clears the displayed order.
+- **Reboot** — reboots the screen device.
+- **Capability probe / connectivity test** — checks the device's health and capabilities.
+
+<Callout type="info">
+  Screen commands are **safe** commands; updating a screen twice causes no harm. Unlike
+  side-effecting hardware commands such as charging, fiscal receipts, printing and opening the
+  drawer, a screen command can be retried on its own if needed.
+</Callout>
+
+## Practical tips
+
+- **Dedicated monitor + full screen:** Move the kitchen/bar display to a separate monitor
+  and put the window into full screen.
+- **Keep auto-update on:** KDS stations are rarely managed by hand; letting the app fetch new
+  versions on its own keeps stations current. See [Auto-update](/en/desktop/auto-update).
+- **Register it as a device:** Register the screen to monitor its online status from the panel;
+  when the connection stops the screen appears `offline` shortly after.
+
+## Related pages
+
+- **[Hardware pairing](/en/desktop/hardware)** — pair receipt printers, cash drawers and fiscal registers.
+- **[Devices](/en/admin-guide/devices)** — the single list of all your registered terminals.
+
+Developer/integration details: [Device API (Device Mesh)](https://developer.hummytummy.com/en/developer/devices-api)

@@ -1,0 +1,74 @@
+---
+title: Invoices
+description: The HummyTummy sales invoices screen — invoice list, statuses, search/filter, syncing to the e-Invoice integration and cancellation. Purpose, usage and tips.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Invoices
+
+**Menu path:** Business → Invoices &nbsp;•&nbsp; **URL:** `/admin/invoices`
+**Access:** ADMIN, MANAGER  •  **Plan:** All plans (issuing an e-Invoice requires a fiscal integration)
+
+## Purpose
+
+The Invoices screen lists every **sales invoice** you've issued in one place. For each invoice you can see its number, customer, date, amount and tax; you also track its status and its **sync status** with the e-Invoice integration. From here you can **resend** an invoice that hasn't been delivered to the integration yet, or **cancel** an invoice.
+
+<Callout type="info">
+  This screen **lists and manages** invoices. The official issuance of an invoice as a
+  real e-Invoice/e-Archive document happens through the fiscal provider connection
+  configured under **Integrations → e-Invoice**. Without a connection, records still
+  appear in the list but their sync status stays **not sent**.
+</Callout>
+
+## How to read the list
+
+The table shows the following columns for each invoice:
+
+- **Invoice No** — the invoice number.
+- **Customer** — the name the invoice was issued to (`-` if empty).
+- **Date** — the issue date (`dd.mm.yyyy`).
+- **Amount** and **Tax** — formatted in the invoice's currency (₺/TRY by default).
+- **Status** — the invoice lifecycle: **Draft (DRAFT)**, **Issued (ISSUED)**, **Sent (SENT)** or **Cancelled (CANCELLED)**.
+- **Sync status** — the result of sending to the integration: **Synced**, **Failed** or **not sent**.
+
+<Callout type="info">
+  If you hover over the label of an invoice whose sync failed, the **error message**
+  returned by the provider appears as a tooltip — use it to fix the problem and resend.
+</Callout>
+
+## Search and filtering
+
+<Steps>
+### Search
+
+Type an invoice number or customer name into the search box at the top to narrow the list. As you type, the list jumps back to the first page.
+
+### Status filter
+
+Use the dropdown next to it to pick **Draft / Issued / Sent / Cancelled** and see only invoices in that status; "All statuses" shows everything.
+
+### Pagination
+
+The list is paginated 20 at a time. Use **Previous / Next** below the table to move between pages; a `page / total` indicator sits in the middle.
+</Steps>
+
+## Sync and cancel actions
+
+The icons at the end of each row let you perform two actions:
+
+- **Resend (sync)** — the refresh icon. It appears only on invoices that **haven't been synced yet** and **aren't cancelled**. It re-delivers the invoice to the e-Invoice integration.
+- **Cancel** — the red cross icon. It appears on every invoice that **isn't already cancelled**; it moves the invoice into the cancelled status.
+
+<Callout type="warning">
+  Cancel and sync actions can have consequences that are hard to undo — especially
+  after an invoice has been **sent** to the provider. Make sure you're on the correct
+  invoice before confirming. Even though the plan and permission checks run in the UI,
+  the final decision is made **on the server**: an unauthorized action or one that
+  breaks the rules is rejected server-side.
+</Callout>
+
+## Related pages
+
+- e-Invoice/e-Archive provider connection and fiscal settings: **[Integrations](https://developer.hummytummy.com/en/integrations/e-invoice)**
+- The sales flow that invoices originate from: **[POS (Sales Screen)](/en/admin-guide/pos)**
