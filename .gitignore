@@ -11,17 +11,21 @@ coverage/
 dist/
 build/
 
-# Environment variables
+# Environment variables — ignore ALL real .env files; only *.example / *.template
+# may be committed. (History once leaked .env.default.backup / .env.development /
+# .env.docker / .env.staging with real secrets — see the security runbook; this
+# broad rule prevents any recurrence.)
 .env
-.env.local
-.env.*.local
-.env.production
-.env.test
+.env.*
+!.env*.example
+!.env*.template
+!.env*.sample
 
-# Environment templates are tracked
+# Environment templates are tracked (templates ONLY — never real env files).
+# NOTE: the previous `!.env.development` / `!.env.staging` negations here were
+# how real secrets got committed & leaked into history. Removed — those are NOT
+# templates. Only *.template / *.example / *.sample may be un-ignored.
 !.env.production.template
-!.env.development
-!.env.staging
 
 # IDE
 .vscode/
