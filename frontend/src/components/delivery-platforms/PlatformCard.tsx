@@ -108,6 +108,12 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
     config?.environment ?? 'production',
   );
   const [hasChanges, setHasChanges] = useState(false);
+  // The backend strips credentials on read, so we never have the live secrets
+  // in local state for a saved config. Track whether the operator has actually
+  // typed into a credential field this session; only THEN do we send a
+  // credentials payload (otherwise we'd overwrite the stored secrets with the
+  // empty local state). Branch/environment/other edits never set this.
+  const [credentialsDirty, setCredentialsDirty] = useState(false);
 
   const updateConfig = useUpdatePlatformConfig();
   const createConfig = useCreatePlatformConfig();
@@ -117,7 +123,14 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
   const syncMenu = useSyncMenu();
   const { data: branches } = useListBranches();
 
-  const hasCredentials = checkHasCredentials(platform, credentials);
+  // Credentials are "configured" if the server says so (hasCredentials flag on
+  // a saved config) OR the operator has just filled in a complete, valid set
+  // locally (covers the not-yet-saved / re-rotating case). Never derive this
+  // from local state alone — the server strips secrets, so local state is
+  // empty for an already-configured platform after a reload.
+  const hasCredentials =
+    config?.hasCredentials === true ||
+    checkHasCredentials(platform, credentials);
   const isSandbox = environment === 'sandbox';
 
   const handleToggleEnabled = async () => {
@@ -159,9 +172,14 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
         environment,
       });
     } else {
+      // Only send credentials when the operator actually edited a credential
+      // field this session. The GET configs endpoint strips secrets, so our
+      // local `credentials` is empty for an already-saved platform — sending
+      // it would wipe the stored encrypted credentials on the backend.
+      // Branch/environment/auto-accept changes save without re-entry.
       await updateConfig.mutateAsync({
         platform,
-        credentials,
+        ...(credentialsDirty ? { credentials } : {}),
         remoteRestaurantId,
         autoAccept,
         branchId,
@@ -169,14 +187,25 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
       });
     }
     setHasChanges(false);
+    setCredentialsDirty(false);
   };
 
   const handleCredentialsChange = (
     creds: Record<string, any>,
     remoteId: string,
   ) => {
+    // PlatformCredentialsForm bundles credential edits AND the (non-secret)
+    // remote-restaurant-id edit through this one callback. Only flag the
+    // credentials payload dirty when a credential field actually changed —
+    // editing just the remote restaurant id must NOT force credential
+    // re-entry (and must not wipe stored secrets on save).
+    const credentialsChanged =
+      JSON.stringify(creds) !== JSON.stringify(credentials);
     setCredentials(creds);
     setRemoteRestaurantId(remoteId);
+    if (credentialsChanged) {
+      setCredentialsDirty(true);
+    }
     setHasChanges(true);
   };
 

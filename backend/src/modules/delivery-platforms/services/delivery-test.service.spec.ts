@@ -7,6 +7,10 @@ import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-
  *   (a) REFUSES unless the platform config's environment === "sandbox" — a
  *       synthetic order must never be injected into a production-configured
  *       platform (auto-accept would push a fake order back to the live one).
+ *   (a2) SANDBOX-FAIL-CLOSED: REFUSES even on a "sandbox" config when the
+ *       platform's adapter has no REAL sandbox host (sandbox base URL still
+ *       points at prod) — otherwise the sandbox-only guard is a no-op and the
+ *       synthetic order would auto-accept against the live API.
  *   (b) the synthetic order it hands to processIncomingOrder is unmistakably
  *       a test: TEST- externalOrderId + a loud note, with totals that match
  *       the line items (so the order-service totals sanity check passes).
@@ -17,6 +21,8 @@ describe('DeliveryTestService', () => {
   let prisma: MockPrismaClient;
   let configService: any;
   let orderService: { processIncomingOrder: jest.Mock };
+  let adapter: { hasRealSandbox: jest.Mock };
+  let adapterFactory: { getAdapter: jest.Mock };
   let svc: DeliveryTestService;
 
   beforeEach(() => {
@@ -27,10 +33,15 @@ describe('DeliveryTestService', () => {
         .fn()
         .mockResolvedValue({ id: 'ord-1', externalOrderId: 'TEST-x' }),
     };
+    // Default: a platform WITH a real, distinct sandbox host. The
+    // fail-closed tests override hasRealSandbox to false.
+    adapter = { hasRealSandbox: jest.fn().mockReturnValue(true) };
+    adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
     svc = new DeliveryTestService(
       prisma as any,
       configService as any,
       orderService as any,
+      adapterFactory as any,
     );
   });
 
@@ -62,6 +73,49 @@ describe('DeliveryTestService', () => {
       BadRequestException,
     );
     expect(orderService.processIncomingOrder).not.toHaveBeenCalled();
+  });
+
+  it('SANDBOX-FAIL-CLOSED: REFUSES a sandbox config when the adapter has no real sandbox host', async () => {
+    configService.findOneInternal.mockResolvedValue({
+      id: 'cfg-1',
+      environment: 'sandbox',
+    });
+    // Migros/Getir/Yemeksepeti: sandbox base URL still points at prod.
+    adapter.hasRealSandbox.mockReturnValue(false);
+
+    await expect(svc.simulateOrder('t1', 'MIGROS')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    // Critical: the synthetic order must NOT reach the ingest/auto-accept
+    // path when it would resolve to a production host.
+    expect(orderService.processIncomingOrder).not.toHaveBeenCalled();
+    expect(adapterFactory.getAdapter).toHaveBeenCalledWith('MIGROS');
+  });
+
+  it('SANDBOX-FAIL-CLOSED: the refusal names the platform-specific env var to set', async () => {
+    configService.findOneInternal.mockResolvedValue({
+      id: 'cfg-1',
+      environment: 'sandbox',
+    });
+    adapter.hasRealSandbox.mockReturnValue(false);
+
+    await expect(svc.simulateOrder('t1', 'GETIR')).rejects.toThrow(
+      /GETIR_SANDBOX_API_BASE_URL/,
+    );
+  });
+
+  it('allows a sandbox config when the adapter DOES have a real sandbox host', async () => {
+    configService.findOneInternal.mockResolvedValue({
+      id: 'cfg-1',
+      environment: 'sandbox',
+    });
+    adapter.hasRealSandbox.mockReturnValue(true);
+    (prisma.menuItemMapping.findMany as any).mockResolvedValue([]);
+
+    await svc.simulateOrder('t1', 'TRENDYOL');
+
+    expect(adapter.hasRealSandbox).toHaveBeenCalled();
+    expect(orderService.processIncomingOrder).toHaveBeenCalledTimes(1);
   });
 
   it('propagates NotFoundException when the platform was never configured', async () => {

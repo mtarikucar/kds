@@ -311,4 +311,26 @@ describe("MigrosAdapter", () => {
       );
     });
   });
+
+  describe("hasRealSandbox (SANDBOX-FAIL-CLOSED)", () => {
+    it("is FALSE with no env override — Migros sandbox host defaults to PROD", () => {
+      // configService.get returns undefined for both overrides here, so the
+      // sandbox base URL stays pinned to the production host. This is the
+      // exact condition that makes the simulator's sandbox-only guard a no-op,
+      // and why DeliveryTestService must refuse to simulate against Migros.
+      expect((adapter as any).hasRealSandbox()).toBe(false);
+    });
+
+    it("flips to TRUE once a distinct MIGROS_SANDBOX_API_BASE_URL is configured", () => {
+      const cfgWithSandbox = {
+        get: jest.fn((key: string) =>
+          key === "MIGROS_SANDBOX_API_BASE_URL"
+            ? "https://sandbox.migros.example/yemek"
+            : undefined,
+        ),
+      } as unknown as ConfigService;
+      const a = new MigrosAdapter(cfgWithSandbox);
+      expect((a as any).hasRealSandbox()).toBe(true);
+    });
+  });
 });

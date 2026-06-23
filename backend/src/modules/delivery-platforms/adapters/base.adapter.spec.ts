@@ -33,6 +33,9 @@ class TestAdapter extends BaseAdapter {
   public callOverrideSandboxBaseURL(url?: string) {
     return this.overrideSandboxBaseURL(url);
   }
+  public callHasRealSandbox() {
+    return this.hasRealSandbox();
+  }
   public get client() {
     return this.httpClient;
   }
@@ -116,6 +119,41 @@ describe("BaseAdapter", () => {
       expect(a.callResolveBaseURL({ environment: "sandbox" })).toBe(
         "https://sandbox.example.test",
       );
+    });
+  });
+
+  describe("hasRealSandbox (SANDBOX-FAIL-CLOSED signal)", () => {
+    it("is FALSE when no sandbox host is given (defaults to prod)", () => {
+      // No sandbox arg -> sandboxBaseURL defaults to the prod base URL, so the
+      // adapter has no distinct sandbox to safely simulate against.
+      expect(new TestAdapter().callHasRealSandbox()).toBe(false);
+    });
+
+    it("is FALSE when the sandbox host equals the prod host", () => {
+      expect(
+        new TestAdapter("https://example.test").callHasRealSandbox(),
+      ).toBe(false);
+    });
+
+    it("is TRUE when a distinct sandbox host is configured", () => {
+      expect(
+        new TestAdapter("https://sandbox.example.test").callHasRealSandbox(),
+      ).toBe(true);
+    });
+
+    it("flips to TRUE once a distinct sandbox host is set via override", () => {
+      const a = new TestAdapter();
+      expect(a.callHasRealSandbox()).toBe(false);
+      a.callOverrideSandboxBaseURL("https://sandbox.example.test");
+      expect(a.callHasRealSandbox()).toBe(true);
+    });
+
+    it("flips back to FALSE if a prod override is moved onto the sandbox host", () => {
+      const a = new TestAdapter("https://sandbox.example.test");
+      expect(a.callHasRealSandbox()).toBe(true);
+      // Pointing prod at the same host as sandbox removes the distinction.
+      a.callOverrideBaseURL("https://sandbox.example.test");
+      expect(a.callHasRealSandbox()).toBe(false);
     });
   });
 

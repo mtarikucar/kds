@@ -281,6 +281,8 @@ describe("DeliveryConfigService", () => {
         tenantId: "t1",
         platform: "GETIR",
       });
+      // The branch belongs to the tenant (security check passes).
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "br-1" });
       let writtenData: any;
       (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
         async ({ data }: any) => {
@@ -297,6 +299,10 @@ describe("DeliveryConfigService", () => {
         branchId: "br-1",
       } as any);
 
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { id: "br-1", tenantId: "t1" },
+        select: { id: true },
+      });
       expect(writtenData.environment).toBe("sandbox");
       expect(writtenData.branch).toEqual({ connect: { id: "br-1" } });
     });
@@ -321,6 +327,114 @@ describe("DeliveryConfigService", () => {
       await svc.update("t1", "GETIR", { branchId: null } as any);
 
       expect(writtenData.branch).toEqual({ disconnect: true });
+    });
+  });
+
+  describe("branchId tenant validation (security)", () => {
+    it("create() rejects a branchId that is NOT a branch of the caller's tenant", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(null);
+      // Cross-tenant / unknown branch: findFirst scoped to {id, tenantId}
+      // returns nothing.
+      (prisma.branch.findFirst as any).mockResolvedValue(null);
+
+      await expect(
+        svc.create("t1", {
+          platform: "GETIR",
+          branchId: "br-other-tenant",
+        } as any),
+      ).rejects.toThrow(/not a branch of this tenant/i);
+      // The write must never happen.
+      expect(prisma.deliveryPlatformConfig.create).not.toHaveBeenCalled();
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { id: "br-other-tenant", tenantId: "t1" },
+        select: { id: true },
+      });
+    });
+
+    it("create() persists when the branchId is a valid branch of the tenant", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(null);
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "br-1" });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.create as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { id: "cfg-1", ...data };
+        },
+      );
+
+      await svc.create("t1", { platform: "GETIR", branchId: "br-1" } as any);
+
+      expect(writtenData.branchId).toBe("br-1");
+    });
+
+    it("create() with no branchId skips the branch lookup (fallback applies)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(null);
+      (prisma.deliveryPlatformConfig.create as any).mockResolvedValue({
+        id: "cfg-1",
+      });
+
+      await svc.create("t1", { platform: "GETIR" } as any);
+
+      expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("update() rejects a branchId that is NOT a branch of the caller's tenant", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      (prisma.branch.findFirst as any).mockResolvedValue(null);
+
+      await expect(
+        svc.update("t1", "GETIR", { branchId: "br-other-tenant" } as any),
+      ).rejects.toThrow(/not a branch of this tenant/i);
+      // The write must never happen.
+      expect(prisma.deliveryPlatformConfig.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("update() with branchId=null clears the override without a branch lookup", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.update("t1", "GETIR", { branchId: null } as any);
+
+      expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+      expect(writtenData.branch).toEqual({ disconnect: true });
+    });
+
+    it("update() maps a P2025 on the branch connect to a 400 (TOCTOU)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+      });
+      // Ownership check passes...
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "br-1" });
+      // ...but the connect then fails (row vanished between check and write).
+      (prisma.deliveryPlatformConfig.updateMany as any).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Record to connect not found", {
+          code: "P2025",
+          clientVersion: "6.x",
+        } as any),
+      );
+
+      await expect(
+        svc.update("t1", "GETIR", { branchId: "br-1" } as any),
+      ).rejects.toThrow(/not a branch of this tenant/i);
     });
   });
 

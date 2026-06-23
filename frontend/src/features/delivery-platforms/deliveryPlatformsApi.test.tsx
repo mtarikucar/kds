@@ -113,6 +113,30 @@ describe('deliveryPlatformsApi mutations', () => {
     });
   });
 
+  it('useUpdatePlatformConfig does NOT send credentials when the caller omits them (branch/environment-only save must not wipe stored secrets)', async () => {
+    h.patch.mockResolvedValue({ data: {} });
+    const { result } = renderHook(() => useUpdatePlatformConfig(), { wrapper });
+    // PlatformCard omits `credentials` from the payload unless a credential
+    // field was actually edited. A branch/environment-only save therefore
+    // reaches the API without a `credentials` key, so the backend keeps the
+    // existing encrypted credentials it stripped on read.
+    await result.current.mutateAsync({
+      platform: 'getir',
+      branchId: 'branch-1',
+      environment: 'sandbox',
+      autoAccept: true,
+      remoteRestaurantId: 'REST-42',
+    });
+    expect(h.patch).toHaveBeenCalledWith('/delivery-platforms/configs/getir', {
+      branchId: 'branch-1',
+      environment: 'sandbox',
+      autoAccept: true,
+      remoteRestaurantId: 'REST-42',
+    });
+    const sentBody = h.patch.mock.calls[0][1] as Record<string, unknown>;
+    expect(sentBody).not.toHaveProperty('credentials');
+  });
+
   it('useDeletePlatformConfig DELETEs a platform', async () => {
     h.del.mockResolvedValue({ data: {} });
     const { result } = renderHook(() => useDeletePlatformConfig(), { wrapper });

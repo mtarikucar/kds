@@ -330,19 +330,29 @@ export class DeliveryOrderService {
     // 6. Emit via KDS WebSocket
     this.kdsGateway.emitNewOrder(tenantId, createdOrder.branchId, createdOrder);
 
-    // 6b. Auto-print the kitchen ticket. Best-effort: a printer that is
-    // offline / unmapped / mis-encoding must NEVER block order ingestion —
-    // the order is already persisted and on the KDS screen. Mirrors the
-    // auto-accept error handling above (wrap + log, no rethrow).
-    await this.printKitchenTicket(
-      tenantId,
-      createdOrder.branchId,
-      createdOrder,
-    ).catch((err: any) =>
-      this.logger.error(
-        `Kitchen-ticket auto-print failed for ${platform} order ${createdOrder.orderNumber}: ${err?.message}`,
-      ),
-    );
+    // 6b. Auto-print the kitchen ticket — ONLY for an auto-accepted order that
+    // is NOT gated into approval. An order that drifted on totals or had
+    // unmapped items lands in PENDING_APPROVAL (requiresApproval=true): the
+    // kitchen must not start cooking off a paper ticket before a human has
+    // reviewed/approved it, or we'd print (and cook) an order whose money/items
+    // we don't trust. Printing on the approve path (PENDING_APPROVAL→PENDING)
+    // is out of scope for this ingest method.
+    //
+    // Best-effort otherwise: a printer that is offline / unmapped /
+    // mis-encoding must NEVER block order ingestion — the order is already
+    // persisted and on the KDS screen. Mirrors the auto-accept error handling
+    // above (wrap + log, no rethrow).
+    if (!createdOrder.requiresApproval) {
+      await this.printKitchenTicket(
+        tenantId,
+        createdOrder.branchId,
+        createdOrder,
+      ).catch((err: any) =>
+        this.logger.error(
+          `Kitchen-ticket auto-print failed for ${platform} order ${createdOrder.orderNumber}: ${err?.message}`,
+        ),
+      );
+    }
 
     // 7. Log the inbound order
     await this.logService.log({
@@ -447,10 +457,20 @@ export class DeliveryOrderService {
     // platform-side bug or compromise could silently overcharge customers.
     // Drift > 5% (or > 1₺ absolute on small orders) gates the order into
     // approval-required so a human reviews before fulfilling.
-    const itemsSum = normalizedOrder.items.reduce(
-      (sum, it) => sum + Number(it.unitPrice) * Number(it.quantity),
-      0,
-    );
+    //
+    // The itemsSum MUST include paid-modifier charges (extra cheese, large
+    // size, add-ons), because claimedSubtotal = totalAmount - discount and the
+    // platform's totalAmount already bakes those modifier charges in. Summing
+    // only unitPrice*qty under-counted every order with paid add-ons, so the
+    // drift always equalled the modifier total → false-positive drift → orders
+    // with add-ons were wrongly forced into PENDING_APPROVAL.
+    const itemsSum = normalizedOrder.items.reduce((sum, it) => {
+      const lineModifiers = (it.modifiers || []).reduce(
+        (s, m) => s + Number(m.price) * Number(m.quantity),
+        0,
+      );
+      return sum + Number(it.unitPrice) * Number(it.quantity) + lineModifiers;
+    }, 0);
     const claimedSubtotal =
       Number(normalizedOrder.totalAmount) -
       Number(normalizedOrder.discount ?? 0);
@@ -701,103 +721,147 @@ export class DeliveryOrderService {
   }> {
     const { platform, remoteOrderId, tenantId, reason, refundId } = args;
 
-    // Run the read-mutate inside a transaction so a concurrent duplicate
-    // webhook can't both pass the idempotency check and double-append.
-    const outcome = await this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findFirst({
-        where: { tenantId, source: platform, externalOrderId: remoteOrderId },
-      });
-      if (!order) {
-        return { matched: false as const, applied: false as const };
-      }
+    // Run the read-append-write inside a SERIALIZABLE transaction so two
+    // concurrently-delivered refund webhooks can't both read the same
+    // externalData.refunds[] snapshot, both pass the idempotency check, and
+    // both append (double-counting the refund). Postgres' default READ
+    // COMMITTED does not catch this read-then-write skew on a single JSON
+    // column — Serializable serialises the pair (the loser gets a 40001 that
+    // Prisma surfaces as P2034 and the caller/queue retries). Mirrors the
+    // Serializable read-modify-write pattern used by customers/loyalty/stock.
+    const outcome = await this.prisma.$transaction(
+      async (tx) => {
+        const order = await tx.order.findFirst({
+          where: { tenantId, source: platform, externalOrderId: remoteOrderId },
+        });
+        if (!order) {
+          return { matched: false as const, applied: false as const };
+        }
 
-      const finalAmount = Number(order.finalAmount);
-      const rawAmount =
-        args.refundAmount == null ? null : Number(args.refundAmount);
-      // A non-finite / negative amount is treated as "amount unknown" → full.
-      const amount =
-        rawAmount != null && Number.isFinite(rawAmount) && rawAmount > 0
-          ? rawAmount
-          : null;
-      // Full when no usable amount, or it covers (≈) the whole order.
-      const isFull = amount == null || amount >= finalAmount - 0.001;
-      const type: "full" | "partial" = isFull ? "full" : "partial";
+        const finalAmount = Number(order.finalAmount);
+        const rawAmount =
+          args.refundAmount == null ? null : Number(args.refundAmount);
+        // A non-finite / negative amount is treated as "amount unknown" → full.
+        const amount =
+          rawAmount != null && Number.isFinite(rawAmount) && rawAmount > 0
+            ? rawAmount
+            : null;
+        // Full when no usable amount, or it covers (≈) the whole order.
+        const isFull = amount == null || amount >= finalAmount - 0.001;
+        const type: "full" | "partial" = isFull ? "full" : "partial";
 
-      const refundKey = refundId
-        ? `id:${refundId}`
-        : isFull
-          ? "full"
-          : `partial:${amount!.toFixed(2)}`;
+        // Dedup key. When the platform supplies a refundId we trust it as the
+        // strongest idempotency key. Without one we fall back to a
+        // shape-derived key (full, or partial:<amount>).
+        // LIMITATION: two genuinely-distinct partial refunds of the SAME amount
+        // and NO refundId collapse onto the same `partial:<amount>` key and the
+        // second is treated as a duplicate. We accept that over the opposite
+        // failure (double-counting a re-delivered webhook), since platforms
+        // that issue multiple equal partials in practice always carry a
+        // refundId. There is no safer deterministic key absent a platform id.
+        const refundKey = refundId
+          ? `id:${refundId}`
+          : isFull
+            ? "full"
+            : `partial:${amount!.toFixed(2)}`;
 
-      // Read the append-only refund ledger off externalData (may be absent).
-      const externalData =
-        order.externalData && typeof order.externalData === "object"
-          ? (order.externalData as Record<string, any>)
-          : {};
-      const existing: RecordedRefund[] = Array.isArray(externalData.refunds)
-        ? (externalData.refunds as RecordedRefund[])
-        : [];
+        // Read the append-only refund ledger off externalData (may be absent).
+        const externalData =
+          order.externalData && typeof order.externalData === "object"
+            ? (order.externalData as Record<string, any>)
+            : {};
+        const existing: RecordedRefund[] = Array.isArray(externalData.refunds)
+          ? (externalData.refunds as RecordedRefund[])
+          : [];
 
-      // Idempotency: same refundKey already recorded ⇒ no-op.
-      if (existing.some((r) => r.refundKey === refundKey)) {
-        this.logger.debug(
-          `Refund no-op (duplicate ${refundKey}) for ${platform} ${remoteOrderId}`,
-        );
+        // Idempotency: same refundKey already recorded ⇒ no-op.
+        if (existing.some((r) => r.refundKey === refundKey)) {
+          this.logger.debug(
+            `Refund no-op (duplicate ${refundKey}) for ${platform} ${remoteOrderId}`,
+          );
+          return {
+            matched: true as const,
+            applied: false as const,
+            type,
+            duplicate: true as const,
+            orderId: order.id,
+            branchId: order.branchId,
+          };
+        }
+
+        // Guard: accumulated partial refunds must not exceed finalAmount. Sum
+        // the already-recorded (numeric) partial amounts and clamp this one so
+        // the ledger can never claim more was refunded than the order was
+        // worth — a platform bug or duplicate-with-new-id could otherwise
+        // over-credit. A full refund is recorded as-is (it caps at the whole
+        // order by definition).
+        let recordedAmount = amount;
+        if (!isFull && amount != null) {
+          const priorPartialSum = existing.reduce(
+            (s, r) =>
+              r.type === "partial" && typeof r.amount === "number"
+                ? s + r.amount
+                : s,
+            0,
+          );
+          const remaining = finalAmount - priorPartialSum;
+          if (amount > remaining + 0.001) {
+            this.logger.warn(
+              `Partial refund ${amount.toFixed(2)} for ${platform} ${remoteOrderId} ` +
+                `exceeds remaining refundable ${Math.max(0, remaining).toFixed(2)} ` +
+                `(finalAmount ${finalAmount.toFixed(2)}, prior partials ${priorPartialSum.toFixed(2)}). Clamping.`,
+            );
+            recordedAmount = Math.max(0, remaining);
+          }
+        }
+
+        const recorded: RecordedRefund = {
+          refundKey,
+          type,
+          amount: recordedAmount,
+          reason: reason ?? undefined,
+          at: new Date().toISOString(),
+        };
+        const refunds = [...existing, recorded];
+
+        const noteLine = isFull
+          ? `[REFUND] Full refund from ${platform}${reason ? ` — ${reason}` : ""}`
+          : `[REFUND] Partial refund ${recordedAmount!.toFixed(2)} from ${platform}${reason ? ` — ${reason}` : ""}`;
+        const notes = order.notes ? `${order.notes}\n${noteLine}` : noteLine;
+
+        // A full refund moves the order to a cancelled-with-refund terminal
+        // state UNLESS it's already terminal (PAID/CANCELLED) — never bounce a
+        // settled order back. Partial keeps the current status.
+        const goCancel =
+          isFull &&
+          order.status !== OrderStatus.CANCELLED &&
+          order.status !== OrderStatus.PAID;
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            notes,
+            externalData: { ...externalData, refunds } as any,
+            ...(goCancel
+              ? { status: OrderStatus.CANCELLED, cancelledAt: new Date() }
+              : {}),
+          },
+        });
+
         return {
           matched: true as const,
-          applied: false as const,
+          applied: true as const,
           type,
-          duplicate: true as const,
+          amount: recordedAmount,
+          reason: reason ?? undefined,
+          refundKey,
+          statusChangedToCancelled: goCancel,
           orderId: order.id,
           branchId: order.branchId,
         };
-      }
-
-      const recorded: RecordedRefund = {
-        refundKey,
-        type,
-        amount,
-        reason: reason ?? undefined,
-        at: new Date().toISOString(),
-      };
-      const refunds = [...existing, recorded];
-
-      const noteLine = isFull
-        ? `[REFUND] Full refund from ${platform}${reason ? ` — ${reason}` : ""}`
-        : `[REFUND] Partial refund ${amount!.toFixed(2)} from ${platform}${reason ? ` — ${reason}` : ""}`;
-      const notes = order.notes ? `${order.notes}\n${noteLine}` : noteLine;
-
-      // A full refund moves the order to a cancelled-with-refund terminal
-      // state UNLESS it's already terminal (PAID/CANCELLED) — never bounce a
-      // settled order back. Partial keeps the current status.
-      const goCancel =
-        isFull &&
-        order.status !== OrderStatus.CANCELLED &&
-        order.status !== OrderStatus.PAID;
-
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          notes,
-          externalData: { ...externalData, refunds } as any,
-          ...(goCancel
-            ? { status: OrderStatus.CANCELLED, cancelledAt: new Date() }
-            : {}),
-        },
-      });
-
-      return {
-        matched: true as const,
-        applied: true as const,
-        type,
-        amount,
-        reason: reason ?? undefined,
-        refundKey,
-        statusChangedToCancelled: goCancel,
-        orderId: order.id,
-        branchId: order.branchId,
-      };
-    });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     if (!outcome.matched) {
       this.logger.debug(

@@ -8,6 +8,8 @@ import * as crypto from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { DeliveryConfigService } from "./delivery-config.service";
 import { DeliveryOrderService } from "./delivery-order.service";
+import { AdapterFactory } from "../adapters/adapter-factory";
+import { BaseAdapter } from "../adapters/base.adapter";
 import { DeliveryPlatform } from "../constants/platform.enum";
 import {
   NormalizedOrder,
@@ -30,6 +32,15 @@ import {
  *      We refuse on a "production" config so a synthetic order can never be
  *      injected into — and then auto-accepted/pushed back to — a live
  *      platform integration.
+ *   1b. SANDBOX-FAIL-CLOSED: "sandbox" alone is NOT enough. Several platforms
+ *      (Getir, Yemeksepeti, Migros) have no documented test host, so their
+ *      adapter's sandbox base URL defaults to the PRODUCTION host — a
+ *      "sandbox" config there still resolves to the live API, turning guard
+ *      rail #1 into a no-op (auto-accept would hit prod). We therefore also
+ *      require the platform's adapter to report hasRealSandbox() === true (a
+ *      sandbox base URL that is set AND differs from prod) and refuse
+ *      otherwise. This guarantees the simulator can never push a synthetic
+ *      order at a production host.
  *   2. The order is stamped TEST-<random> as its externalOrderId and carries a
  *      loud note, so the kitchen, the dedup key, and any operator scanning the
  *      DB can tell it apart from a genuine order.
@@ -42,6 +53,7 @@ export class DeliveryTestService {
     private prisma: PrismaService,
     private configService: DeliveryConfigService,
     private orderService: DeliveryOrderService,
+    private adapterFactory: AdapterFactory,
   ) {}
 
   /**
@@ -69,6 +81,28 @@ export class DeliveryTestService {
       throw new BadRequestException(
         `Test orders are only allowed when ${platform} is configured for the "sandbox" environment ` +
           `(current: "${config.environment ?? "production"}"). Switch the platform to sandbox before simulating.`,
+      );
+    }
+
+    // GUARD RAIL #1b: SANDBOX-FAIL-CLOSED. "sandbox" only protects us if the
+    // adapter actually resolves to a distinct, non-production host. For
+    // platforms whose sandbox base URL still points at prod (no documented
+    // test host), the resolver returns the LIVE API even under "sandbox" — so
+    // an auto-accepting synthetic order would hit production. Refuse unless
+    // the adapter reports a real sandbox endpoint. The adapter is the same
+    // singleton used on the real ingest/outbound path, so this reflects
+    // exactly where a simulated order would be pushed.
+    // The factory types its return as PlatformAdapter; hasRealSandbox lives on
+    // the shared BaseAdapter every concrete adapter extends. Narrow via the
+    // structural capability rather than widening the public adapter interface.
+    const adapter = this.adapterFactory.getAdapter(platform) as unknown as Pick<
+      BaseAdapter,
+      "hasRealSandbox"
+    >;
+    if (!adapter.hasRealSandbox()) {
+      throw new BadRequestException(
+        `${platform} has no configured sandbox endpoint (set ${platform}_SANDBOX_API_BASE_URL); ` +
+          `cannot safely simulate without hitting production.`,
       );
     }
 

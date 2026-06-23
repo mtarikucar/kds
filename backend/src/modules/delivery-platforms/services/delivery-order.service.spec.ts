@@ -283,6 +283,228 @@ describe('DeliveryOrderService (iter-39)', () => {
     });
   });
 
+  // ── Totals-drift guard (paid modifiers) ─────────────────────────────────
+
+  describe('totals-drift guard — paid modifiers', () => {
+    // Wire a create that ECHOES back the data the service computed, so the
+    // outside-txn print-gating can read the real `requiresApproval`/`status`.
+    function wireEchoingCreate() {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+        isEnabled: true,
+        autoAccept: true,
+      });
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
+      const create = jest.fn().mockImplementation(async ({ data }: any) => ({
+        id: 'ord-1',
+        orderNumber: 'YEM-1',
+        tenantId: 't1',
+        branchId: 'br-1',
+        type: 'DELIVERY',
+        notes: data.notes ?? null,
+        status: data.status,
+        requiresApproval: data.requiresApproval,
+        createdAt: new Date('2026-06-22T10:00:00Z'),
+        table: null,
+        orderItems: [],
+      }));
+      (prisma.$transaction as any).mockImplementation(async (cb: any) => {
+        const tx: any = {
+          order: { findFirst: jest.fn().mockResolvedValue(null), create },
+          menuItemMapping: {
+            findMany: jest.fn().mockResolvedValue([
+              { externalItemId: 'x-1', productId: 'prod-1', product: {} },
+            ]),
+          },
+          deliveryPlatformConfig: { findUnique: jest.fn() },
+        };
+        return cb(tx);
+      });
+      adapterFactory.getAdapter.mockReturnValue({
+        acceptOrder: jest.fn().mockResolvedValue(undefined),
+      });
+      authService.ensureValidToken.mockResolvedValue({ id: 'cfg-1' });
+      return { create };
+    }
+
+    it('does NOT trip the drift gate for an order whose platform total INCLUDES paid modifier charges', async () => {
+      // 1 burger @ 50 + a paid modifier (extra cheese 10 x1) ⇒ line value 60.
+      // The platform's totalAmount bakes the modifier in (totalAmount=60). The
+      // pre-fix itemsSum (50*1) would have drifted by exactly the 10 modifier,
+      // tripping the gate. With modifiers included, itemsSum=60 matches.
+      const { create } = wireEchoingCreate();
+      const orderWithModifier = {
+        platform: 'YEMEKSEPETI',
+        externalOrderId: 'ext-mod-1',
+        items: [
+          {
+            externalItemId: 'x-1',
+            name: 'Burger',
+            quantity: 1,
+            unitPrice: 50,
+            modifiers: [{ name: 'Extra cheese', price: 10, quantity: 1 }],
+          },
+        ],
+        totalAmount: 60,
+        discount: 0,
+        finalAmount: 60,
+        customerName: 'X',
+        customerPhone: '+90555',
+        rawPayload: {},
+      } as any;
+
+      const out = await svc.processIncomingOrder('t1', orderWithModifier);
+
+      // autoAccept=true + mapped item + no drift ⇒ auto-accepted (PENDING),
+      // NOT gated into approval.
+      const data = create.mock.calls[0][0].data;
+      expect(data.requiresApproval).toBe(false);
+      expect(data.status).toBe('PENDING');
+      expect(out).toMatchObject({ requiresApproval: false, status: 'PENDING' });
+    });
+
+    it('DOES trip the drift gate when the platform total is genuinely inconsistent', async () => {
+      // Same single item @ 50 (no modifiers) but the platform claims 100 ⇒
+      // real 50% drift ⇒ forced to PENDING_APPROVAL. Guards against the fix
+      // silently disabling the guard.
+      const { create } = wireEchoingCreate();
+      const driftingOrder = {
+        platform: 'YEMEKSEPETI',
+        externalOrderId: 'ext-mod-2',
+        items: [
+          {
+            externalItemId: 'x-1',
+            name: 'Burger',
+            quantity: 1,
+            unitPrice: 50,
+            modifiers: [],
+          },
+        ],
+        totalAmount: 100,
+        discount: 0,
+        finalAmount: 100,
+        customerName: 'X',
+        customerPhone: '+90555',
+        rawPayload: {},
+      } as any;
+
+      await svc.processIncomingOrder('t1', driftingOrder);
+
+      const data = create.mock.calls[0][0].data;
+      expect(data.requiresApproval).toBe(true);
+      expect(data.status).toBe('PENDING_APPROVAL');
+    });
+  });
+
+  // ── Auto-print gating on approval ───────────────────────────────────────
+
+  describe('kitchen-ticket auto-print — approval gating', () => {
+    // Reuse the echoing create so the print-gating reads the real
+    // requiresApproval the service computed.
+    function wireForApprovalState(opts: {
+      autoAccept: boolean;
+      mapped: boolean;
+      driftTotal?: number;
+    }) {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+        isEnabled: true,
+        autoAccept: opts.autoAccept,
+      });
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
+      const create = jest.fn().mockImplementation(async ({ data }: any) => ({
+        id: 'ord-1',
+        orderNumber: 'YEM-1',
+        tenantId: 't1',
+        branchId: 'br-1',
+        type: 'DELIVERY',
+        notes: data.notes ?? null,
+        status: data.status,
+        requiresApproval: data.requiresApproval,
+        createdAt: new Date('2026-06-22T10:00:00Z'),
+        table: null,
+        orderItems: [],
+      }));
+      (prisma.$transaction as any).mockImplementation(async (cb: any) => {
+        const tx: any = {
+          order: { findFirst: jest.fn().mockResolvedValue(null), create },
+          menuItemMapping: {
+            findMany: jest
+              .fn()
+              .mockResolvedValue(
+                opts.mapped
+                  ? [{ externalItemId: 'x-1', productId: 'prod-1', product: {} }]
+                  : [],
+              ),
+          },
+          deliveryPlatformConfig: { findUnique: jest.fn() },
+        };
+        return cb(tx);
+      });
+      adapterFactory.getAdapter.mockReturnValue({
+        acceptOrder: jest.fn().mockResolvedValue(undefined),
+      });
+      authService.ensureValidToken.mockResolvedValue({ id: 'cfg-1' });
+      return { create };
+    }
+
+    const mappedOrder = {
+      platform: 'YEMEKSEPETI',
+      externalOrderId: 'ext-print',
+      items: [
+        {
+          externalItemId: 'x-1',
+          name: 'Burger',
+          quantity: 1,
+          unitPrice: 50,
+          modifiers: [],
+        },
+      ],
+      totalAmount: 50,
+      discount: 0,
+      finalAmount: 50,
+      customerName: 'X',
+      customerPhone: '+90555',
+      rawPayload: {},
+    } as any;
+
+    it('an auto-accepted (PENDING) order DOES enqueue a kitchen print', async () => {
+      const { create } = wireForApprovalState({ autoAccept: true, mapped: true });
+      (prisma.device.findMany as any).mockResolvedValue([
+        { id: 'prn-1', config: null },
+      ]);
+
+      await svc.processIncomingOrder('t1', mappedOrder);
+
+      expect(create.mock.calls[0][0].data.requiresApproval).toBe(false);
+      expect(commandQueue.enqueue).toHaveBeenCalledTimes(1);
+      expect(commandQueue.enqueue).toHaveBeenCalledWith(
+        't1',
+        'prn-1',
+        expect.objectContaining({ kind: 'print_receipt' }),
+      );
+    });
+
+    it('a gated (PENDING_APPROVAL) order does NOT enqueue a kitchen print — not even a device lookup', async () => {
+      // autoAccept=false ⇒ requiresApproval=true ⇒ no ingest-time print.
+      const { create } = wireForApprovalState({ autoAccept: false, mapped: true });
+      (prisma.device.findMany as any).mockResolvedValue([
+        { id: 'prn-1', config: null },
+      ]);
+
+      const out = await svc.processIncomingOrder('t1', mappedOrder);
+
+      expect(create.mock.calls[0][0].data.requiresApproval).toBe(true);
+      // The order is still persisted + KDS-emitted...
+      expect(out).toMatchObject({ requiresApproval: true });
+      expect(kdsGateway.emitNewOrder).toHaveBeenCalled();
+      // ...but NOTHING printed (printer never even queried).
+      expect(prisma.device.findMany).not.toHaveBeenCalled();
+      expect(escpos.buildKitchenTicket).not.toHaveBeenCalled();
+      expect(commandQueue.enqueue).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Inbound cancellation ────────────────────────────────────────────────
 
   describe('applyPlatformStatusUpdate — inbound cancellation', () => {
@@ -465,6 +687,43 @@ describe('DeliveryOrderService (iter-39)', () => {
       // No second mutation, no duplicate domain event.
       expect(update).not.toHaveBeenCalled();
       expect(outbox.append).not.toHaveBeenCalled();
+    });
+
+    it('clamps a partial refund so accumulated partials cannot exceed finalAmount', async () => {
+      // finalAmount=100, a 60 partial already recorded ⇒ remaining=40. A second
+      // 70 partial (distinct refundId so it isn't deduped) must clamp to 40.
+      const order = {
+        id: 'ord-clamp',
+        branchId: 'br-1',
+        status: 'PREPARING',
+        finalAmount: 100,
+        notes: null,
+        externalData: {
+          refunds: [
+            { refundKey: 'id:rf-a', type: 'partial', amount: 60, at: 'x' },
+          ],
+        },
+      };
+      const { update } = wireTxn(order);
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: 'ord-clamp',
+        branchId: 'br-1',
+      });
+
+      const result = await svc.applyPlatformRefund({
+        platform: 'TRENDYOL',
+        remoteOrderId: 'ext-clamp',
+        tenantId: 't1',
+        refundAmount: 70,
+        refundId: 'rf-b',
+      });
+
+      expect(result).toMatchObject({ matched: true, applied: true, type: 'partial' });
+      const data = update.mock.calls[0][0].data;
+      const appended = data.externalData.refunds[1];
+      // Clamped to the 40 remaining, not the requested 70.
+      expect(appended.amount).toBe(40);
+      expect(data.notes).toContain('Partial refund 40.00');
     });
 
     it('returns matched:false when no order matches', async () => {

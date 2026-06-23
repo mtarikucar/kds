@@ -452,8 +452,17 @@ export interface DeliveryPlatformConfig {
   id: string;
   platform: string;
   isEnabled: boolean;
+  // SECURITY: the backend strips secrets on every read (stripSensitiveFields)
+  // and never serializes credentials/accessToken back to the client. These
+  // fields therefore only exist on the write path (create/update payloads) and
+  // are NEVER populated on a read — do not rely on them for display logic.
   credentials?: Record<string, any>;
   accessToken?: string;
+  // Server-derived presence flags returned in place of the stripped secrets.
+  // Use these (not local form state) to decide whether credentials are
+  // already configured for a previously-saved platform.
+  hasCredentials?: boolean;
+  hasAccessToken?: boolean;
   tokenExpiresAt?: string;
   remoteRestaurantId?: string;
   restaurantOpen: boolean;

@@ -54,6 +54,24 @@ export abstract class BaseAdapter {
   }
 
   /**
+   * True only when this adapter has a *real*, distinct sandbox endpoint — i.e.
+   * sandboxBaseURL is set AND differs from the production baseURL.
+   *
+   * SANDBOX-FAIL-CLOSED: several platforms (Getir, Yemeksepeti, Migros) have
+   * no publicly documented test host, so their sandboxBaseURL defaults to the
+   * production host. For those, a config with environment === "sandbox" still
+   * resolves to PRODUCTION, which would make the test-order simulator's
+   * sandbox-only guard a no-op and let a synthetic order auto-accept against
+   * the LIVE platform. Callers (notably DeliveryTestService.simulateOrder)
+   * MUST consult this before treating a "sandbox" config as safe to hit, and
+   * refuse when it returns false. Trendyol returns true once its distinct
+   * stage host is configured.
+   */
+  hasRealSandbox(): boolean {
+    return !!this.sandboxBaseURL && this.sandboxBaseURL !== this.baseURL;
+  }
+
+  /**
    * Resolve the base URL for a given config: the platform's sandbox host when
    * config.environment === "sandbox", otherwise the production host. Adapters
    * pass the result as the per-request `baseURL` (axios merges a per-request

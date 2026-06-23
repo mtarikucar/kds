@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
   Logger,
   Optional,
 } from "@nestjs/common";
@@ -78,6 +79,28 @@ export class DeliveryConfigService {
     };
   }
 
+  /**
+   * Security: a config's branchId routes a platform's orders to a branch, so
+   * a caller must not be able to point it at a branch that belongs to ANOTHER
+   * tenant. create()/update() previously wrote dto.branchId straight through
+   * with no tenant check. Verify the branch belongs to the caller's tenant
+   * before persisting a non-null branchId; null/undefined is a no-op here
+   * (clearing the override is always allowed and is handled by the caller).
+   */
+  private async assertBranchBelongsToTenant(
+    tenantId: string,
+    branchId: string | null | undefined,
+  ): Promise<void> {
+    if (branchId == null) return;
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, tenantId },
+      select: { id: true },
+    });
+    if (!branch) {
+      throw new BadRequestException("branchId is not a branch of this tenant");
+    }
+  }
+
   async findAll(tenantId: string) {
     const configs = await this.prisma.deliveryPlatformConfig.findMany({
       where: { tenantId, deletedAt: null },
@@ -135,6 +158,10 @@ export class DeliveryConfigService {
       );
     }
 
+    // Security: reject a branchId that isn't this tenant's. null/undefined is
+    // left to the "first active branch" fallback below.
+    await this.assertBranchBelongsToTenant(tenantId, dto.branchId);
+
     try {
       return await this.prisma.deliveryPlatformConfig.create({
         data: {
@@ -178,6 +205,12 @@ export class DeliveryConfigService {
     });
     if (!config) {
       throw new NotFoundException(`Configuration for ${platform} not found`);
+    }
+
+    // Security: a non-null branchId must belong to this tenant before we
+    // connect it. null still clears the override (handled below).
+    if (dto.branchId !== undefined && dto.branchId !== null) {
+      await this.assertBranchBelongsToTenant(tenantId, dto.branchId);
     }
 
     const data: Prisma.DeliveryPlatformConfigUpdateInput = {};
@@ -225,6 +258,18 @@ export class DeliveryConfigService {
         where: { id: config.id },
       });
     } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2025"
+      ) {
+        // The branch connect couldn't find the row — it was deleted between
+        // the tenant-ownership check above and this write (TOCTOU), or the
+        // relation otherwise resolved to a missing record. Surface a clear
+        // 400 rather than leaking a raw Prisma error.
+        throw new BadRequestException(
+          "branchId is not a branch of this tenant",
+        );
+      }
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
