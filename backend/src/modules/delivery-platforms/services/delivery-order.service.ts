@@ -52,24 +52,34 @@ export class DeliveryOrderService {
     });
     const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
 
-    // v3.0.0 — branchId is now NOT NULL on Order. Delivery orders come
-    // from an external platform without an inherent branch, so we resolve
-    // to the tenant's first active branch (ordered by creation) as a
-    // deterministic fallback. Multi-branch tenants that want platform
-    // orders routed elsewhere will need a per-platform branch mapping in
-    // a future iteration.
-    const fallbackBranch = await this.prisma.branch.findFirst({
-      where: { tenantId, status: "active" },
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    });
-    if (!fallbackBranch) {
+    // branchId is NOT NULL on Order. Multi-branch routing: if the config names
+    // a target branch (config.branchId) AND it is an active branch of THIS
+    // tenant, the platform's orders route there. Otherwise we fall back to the
+    // tenant's first active branch (legacy deterministic behaviour). The
+    // tenant-scope + active check defends against a config whose branch was
+    // re-assigned/retired or (defensively) points cross-tenant.
+    let branchId: string | null = null;
+    if (config?.branchId) {
+      const mapped = await this.prisma.branch.findFirst({
+        where: { id: config.branchId, tenantId, status: "active" },
+        select: { id: true },
+      });
+      branchId = mapped?.id ?? null;
+    }
+    if (!branchId) {
+      const fallbackBranch = await this.prisma.branch.findFirst({
+        where: { tenantId, status: "active" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      branchId = fallbackBranch?.id ?? null;
+    }
+    if (!branchId) {
       this.logger.warn(
         `No active branch for tenant ${tenantId} — cannot persist ${platform} order ${externalOrderId}`,
       );
       return null;
     }
-    const branchId = fallbackBranch.id;
 
     // 1-4. Deduplicate + map items + create order in a transaction.
     // Final dedup guarantee is the partial unique index
