@@ -4,6 +4,7 @@ import { SuperAdminLoginDto } from './login.dto';
 import { Verify2FADto } from './verify-2fa.dto';
 import { SuperAdminRefreshTokenDto } from './refresh-token.dto';
 import { CreatePlanDto, UpdatePlanDto } from './subscription-filter.dto';
+import { LimitOverridesDto } from './update-tenant-overrides.dto';
 
 /**
  * Iter-47 regression: every auth-shaped field on the superadmin API
@@ -213,5 +214,158 @@ describe('SuperAdmin DTO length caps (iter-47)', () => {
       });
       expect(msgs.some((m) => /discountStartDate/i.test(m))).toBe(true);
     });
+  });
+});
+
+// Regression: the superadmin Plans form resends EVERY field on save. When a
+// limit input is cleared it arrives as '' (empty string). Under the global
+// ValidationPipe (transform + enableImplicitConversion) a bare
+// @Type(() => Number) coerces '' through Number('') -> 0, which sails past
+// @Min(-1) and PERSISTS 0. For a BUSINESS plan whose limits are -1
+// (unlimited), this silently rewrites "unlimited" to "zero allowed" — the
+// dashboard then shows "X / 0" and PlanFeatureGuard blocks every create
+// (currentCount >= 0 is always true). The fix (@Type(() => String) +
+// @EmptyStringToNumber) makes '' coerce to undefined so @IsOptional() skips it
+// and Prisma leaves the column untouched on PATCH.
+describe('Plan limit fields: blank must not become 0 (unlimited regression)', () => {
+  // Faithful to the GLOBAL ValidationPipe (main.ts): transform with
+  // enableImplicitConversion. Returns the TRANSFORMED instance so we can
+  // assert the coerced value, not just validation messages.
+  function transformProd<T>(
+    cls: new () => T,
+    input: Record<string, unknown>,
+  ): T {
+    return plainToInstance(cls, input, {
+      enableImplicitConversion: true,
+    }) as T;
+  }
+
+  async function validateProd(
+    cls: any,
+    input: Record<string, unknown>,
+  ): Promise<string[]> {
+    const dto = plainToInstance(cls, input, {
+      enableImplicitConversion: true,
+    }) as object;
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: false,
+    });
+    return errors.flatMap((e) => Object.values(e.constraints ?? {}));
+  }
+
+  const LIMIT_FIELDS = [
+    'maxUsers',
+    'maxTables',
+    'maxBranches',
+    'maxProducts',
+    'maxCategories',
+    'maxMonthlyOrders',
+  ] as const;
+
+  describe('CreatePlanDto', () => {
+    const base = {
+      name: 'biz',
+      displayName: 'Business',
+      monthlyPrice: 2999,
+      yearlyPrice: 29990,
+    };
+
+    for (const field of LIMIT_FIELDS) {
+      it(`coerces blank ${field} to undefined (NOT 0)`, () => {
+        const dto = transformProd(CreatePlanDto, { ...base, [field]: '' });
+        expect((dto as Record<string, unknown>)[field]).toBeUndefined();
+      });
+    }
+
+    it('preserves -1 (unlimited) for every limit', () => {
+      const dto = transformProd(CreatePlanDto, {
+        ...base,
+        maxUsers: -1,
+        maxTables: -1,
+        maxBranches: -1,
+        maxProducts: -1,
+        maxCategories: -1,
+        maxMonthlyOrders: -1,
+      });
+      for (const field of LIMIT_FIELDS) {
+        expect((dto as Record<string, unknown>)[field]).toBe(-1);
+      }
+    });
+
+    it('parses a real numeric string into a number', () => {
+      const dto = transformProd(CreatePlanDto, { ...base, maxUsers: '5' });
+      expect(dto.maxUsers).toBe(5);
+    });
+
+    it('exposes maxBranches and accepts -1 / a real value', async () => {
+      expect(
+        await validateProd(CreatePlanDto, { ...base, maxBranches: -1 }),
+      ).toEqual([]);
+      expect(
+        await validateProd(CreatePlanDto, { ...base, maxBranches: 3 }),
+      ).toEqual([]);
+      const msgs = await validateProd(CreatePlanDto, {
+        ...base,
+        maxBranches: -2,
+      });
+      expect(msgs.some((m) => /maxBranches/i.test(m))).toBe(true);
+    });
+  });
+
+  describe('UpdatePlanDto (PATCH — touching only price must not zero limits)', () => {
+    it('coerces every blank limit to undefined so the column is left untouched', () => {
+      const dto = transformProd(UpdatePlanDto, {
+        monthlyPrice: 3499,
+        maxUsers: '',
+        maxTables: '',
+        maxBranches: '',
+        maxProducts: '',
+        maxCategories: '',
+        maxMonthlyOrders: '',
+      });
+      for (const field of LIMIT_FIELDS) {
+        expect((dto as Record<string, unknown>)[field]).toBeUndefined();
+      }
+    });
+  });
+});
+
+// A per-tenant limit override REPLACES the plan value in the entitlement
+// engine. With @Min(0) an override could NEVER express "unlimited" (-1), so a
+// 0 override permanently capped a BUSINESS tenant at zero and could not be
+// undone from the override form. Overrides must accept -1.
+describe('LimitOverridesDto allows -1 (unlimited)', () => {
+  async function validateProd(input: Record<string, unknown>): Promise<string[]> {
+    const dto = plainToInstance(LimitOverridesDto, input, {
+      enableImplicitConversion: true,
+    }) as object;
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: false,
+    });
+    return errors.flatMap((e) => Object.values(e.constraints ?? {}));
+  }
+
+  it('accepts -1 on every limit override', async () => {
+    expect(
+      await validateProd({
+        maxUsers: -1,
+        maxTables: -1,
+        maxBranches: -1,
+        maxProducts: -1,
+        maxCategories: -1,
+        maxMonthlyOrders: -1,
+      }),
+    ).toEqual([]);
+  });
+
+  it('still rejects values below -1', async () => {
+    const msgs = await validateProd({ maxUsers: -2 });
+    expect(msgs.some((m) => /maxUsers/i.test(m))).toBe(true);
+  });
+
+  it('still accepts a normal positive cap', async () => {
+    expect(await validateProd({ maxBranches: 3 })).toEqual([]);
   });
 });

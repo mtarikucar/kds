@@ -280,11 +280,17 @@ function PlanModal({
     monthlyPrice: plan?.monthlyPrice || 0,
     yearlyPrice: plan?.yearlyPrice || 0,
     currency: 'TRY', // TRY-only platform — never carry a legacy non-TRY value forward
-    maxUsers: plan?.maxUsers || 1,
-    maxTables: plan?.maxTables || 5,
-    maxProducts: plan?.maxProducts || 50,
-    maxCategories: plan?.maxCategories || 10,
-    maxMonthlyOrders: plan?.maxMonthlyOrders || 100,
+    // Limits are `number | ''`. Use ?? (NOT ||) so a stored 0 displays as 0
+    // (visible + fixable) rather than being silently shown as the default —
+    // and so -1 (unlimited) round-trips. A cleared input becomes '' (handled
+    // on submit by omitting the field), never Number('') === 0 which would
+    // rewrite an unlimited cap to "zero allowed" and 403 every create.
+    maxUsers: (plan?.maxUsers ?? 1) as number | '',
+    maxTables: (plan?.maxTables ?? 5) as number | '',
+    maxBranches: (plan?.maxBranches ?? 1) as number | '',
+    maxProducts: (plan?.maxProducts ?? 50) as number | '',
+    maxCategories: (plan?.maxCategories ?? 10) as number | '',
+    maxMonthlyOrders: (plan?.maxMonthlyOrders ?? 100) as number | '',
     advancedReports: plan?.advancedReports || false,
     multiLocation: plan?.multiLocation || false,
     customBranding: plan?.customBranding || false,
@@ -305,7 +311,22 @@ function PlanModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
-    onSave(formData);
+    // Omit any blank limit field so it's not sent at all: the backend treats a
+    // missing limit as "leave untouched" on PATCH (and applies the tier
+    // default on create). Sending it would either 400 or, worse, persist a 0.
+    const LIMIT_KEYS = [
+      'maxUsers',
+      'maxTables',
+      'maxBranches',
+      'maxProducts',
+      'maxCategories',
+      'maxMonthlyOrders',
+    ] as const;
+    const cleaned: Record<string, unknown> = { ...formData };
+    for (const key of LIMIT_KEYS) {
+      if (cleaned[key] === '') delete cleaned[key];
+    }
+    onSave(cleaned as Partial<SubscriptionPlan>);
   };
 
   return (
@@ -387,13 +408,17 @@ function PlanModal({
               </select>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* -1 = unlimited (Sınırsız) for every cap. A blank input is kept
+                blank (not coerced to 0) and omitted on save. */}
+            <p className="text-xs text-zinc-500">{t('plans.modal.limitHint', '-1 = sınırsız')}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.maxUsers')}</label>
                 <input
                   type="number"
+                  min={-1}
                   value={formData.maxUsers}
-                  onChange={(e) => setFormData({ ...formData, maxUsers: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, maxUsers: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>
@@ -401,8 +426,19 @@ function PlanModal({
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.maxTables')}</label>
                 <input
                   type="number"
+                  min={-1}
                   value={formData.maxTables}
-                  onChange={(e) => setFormData({ ...formData, maxTables: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, maxTables: e.target.value === '' ? '' : Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.maxBranches')}</label>
+                <input
+                  type="number"
+                  min={-1}
+                  value={formData.maxBranches}
+                  onChange={(e) => setFormData({ ...formData, maxBranches: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>
@@ -410,8 +446,9 @@ function PlanModal({
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.maxProducts')}</label>
                 <input
                   type="number"
+                  min={-1}
                   value={formData.maxProducts}
-                  onChange={(e) => setFormData({ ...formData, maxProducts: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, maxProducts: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>
@@ -419,8 +456,9 @@ function PlanModal({
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.categories')}</label>
                 <input
                   type="number"
+                  min={-1}
                   value={formData.maxCategories}
-                  onChange={(e) => setFormData({ ...formData, maxCategories: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, maxCategories: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>
@@ -428,8 +466,9 @@ function PlanModal({
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.ordersPerMonth')}</label>
                 <input
                   type="number"
+                  min={-1}
                   value={formData.maxMonthlyOrders}
-                  onChange={(e) => setFormData({ ...formData, maxMonthlyOrders: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, maxMonthlyOrders: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>

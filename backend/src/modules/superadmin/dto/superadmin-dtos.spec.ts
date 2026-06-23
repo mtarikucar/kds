@@ -92,10 +92,20 @@ describe("UpdateTenantOverridesDto", () => {
     expect(dto.featureOverrides!.apiAccess).toBe(false);
   });
 
-  it("rejects a negative limit override", async () => {
+  // -1 is the unlimited sentinel and a VALID override: a limit override
+  // REPLACES the plan value in the engine, so without -1 an override could
+  // never grant unlimited (and a 0 override could not be undone to unlimited).
+  it("accepts a -1 (unlimited) limit override", async () => {
     const dto = plainToInstance(UpdateTenantOverridesDto, {
-      limitOverrides: { maxUsers: -1 },
+      limitOverrides: { maxUsers: -1, maxBranches: -1 },
     });
-    expect((await errs(dto)).length).toBeGreaterThan(0);
+    expect(await errs(dto)).toEqual([]);
+  });
+
+  it("rejects a limit override below -1", async () => {
+    const dto = plainToInstance(UpdateTenantOverridesDto, {
+      limitOverrides: { maxUsers: -2 },
+    });
+    expect((await errs(dto)).some((m) => /maxUsers/.test(m))).toBe(true);
   });
 });

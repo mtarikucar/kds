@@ -421,3 +421,90 @@ describe("SuperAdminSubscriptionsService plan discount persistence", () => {
     expect(data.discountEndDate).toBeUndefined();
   });
 });
+
+/**
+ * Regression: maxBranches was a SubscriptionPlan column (added in v3.0.0) that
+ * createPlan/updatePlan never wrote and the DTO never exposed. A plan created
+ * via the superadmin form fell back to the schema default (1) instead of the
+ * intended cap, and a BUSINESS plan's unlimited (-1) branch cap could not be
+ * managed from the form at all. The branch cap must round-trip like the other
+ * five limits.
+ */
+describe("SuperAdminSubscriptionsService plan maxBranches persistence", () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let svc: SuperAdminSubscriptionsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      {} as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it("createPlan persists an explicit maxBranches", async () => {
+    prisma.subscriptionPlan.create.mockResolvedValue({ id: "plan-1" });
+
+    await svc.createPlan(
+      {
+        name: "chain",
+        displayName: "Chain",
+        monthlyPrice: 100,
+        yearlyPrice: 1000,
+        maxBranches: 3,
+      } as any,
+      "a1",
+      "a@x",
+    );
+
+    expect(prisma.subscriptionPlan.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ maxBranches: 3 }),
+      }),
+    );
+  });
+
+  it("createPlan defaults maxBranches to 1 when omitted", async () => {
+    prisma.subscriptionPlan.create.mockResolvedValue({ id: "plan-1" });
+
+    await svc.createPlan(
+      { name: "p", displayName: "P", monthlyPrice: 0, yearlyPrice: 0 } as any,
+      "a1",
+      "a@x",
+    );
+
+    const data = prisma.subscriptionPlan.create.mock.calls[0][0].data;
+    expect(data.maxBranches).toBe(1);
+  });
+
+  it("updatePlan persists maxBranches = -1 (unlimited)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: "plan-1" });
+    prisma.subscriptionPlan.update.mockResolvedValue({ id: "plan-1" });
+
+    await svc.updatePlan("plan-1", { maxBranches: -1 } as any, "a1", "a@x");
+
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ maxBranches: -1 }),
+      }),
+    );
+  });
+
+  it("updatePlan leaves maxBranches untouched (undefined) when omitted", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: "plan-1" });
+    prisma.subscriptionPlan.update.mockResolvedValue({ id: "plan-1" });
+
+    await svc.updatePlan("plan-1", { monthlyPrice: 200 } as any, "a1", "a@x");
+
+    const data = prisma.subscriptionPlan.update.mock.calls[0][0].data;
+    expect(data.maxBranches).toBeUndefined();
+  });
+});
