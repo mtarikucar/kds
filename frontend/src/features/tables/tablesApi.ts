@@ -103,6 +103,10 @@ export const useUpdateTableStatus = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // The live floor map (GET /floor-plan) carries table status too — recolor
+      // it immediately on this client (the backend also emits floor:layout-
+      // updated for other terminals).
+      queryClient.invalidateQueries({ queryKey: ['floorPlan'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));

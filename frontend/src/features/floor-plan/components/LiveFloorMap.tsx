@@ -16,7 +16,8 @@ function useElementSize() {
     const el = ref.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const r = entries[0].contentRect;
+      const r = entries[0]?.contentRect;
+      if (!r) return;
       setSize({ width: Math.floor(r.width), height: Math.floor(r.height) });
     });
     ro.observe(el);
