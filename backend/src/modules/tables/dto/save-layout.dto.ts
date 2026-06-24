@@ -12,8 +12,9 @@ import {
   Max,
   IsObject,
 } from "class-validator";
-import { Type } from "class-transformer";
+import { Type, Transform } from "class-transformer";
 import { TableShape } from "./table-spatial.dto";
+import { MaxJsonBytes } from "../../../common/dto/max-json-bytes.validator";
 
 const COORD_MIN = -2_000;
 const COORD_MAX = 12_000;
@@ -28,6 +29,9 @@ export class LayoutTableItemDto {
   id: string;
 
   @ApiProperty({ required: false, nullable: true })
+  // Blank → null so an empty-select serialization unplaces the table instead of
+  // hitting the zone FK with "" (a P2003 that would roll back the whole save).
+  @Transform(({ value }) => (value === "" ? null : value))
   @IsString()
   @IsOptional()
   zoneId?: string | null;
@@ -106,11 +110,15 @@ export class LayoutElementItemDto {
   rotation: number;
 
   @ApiProperty({ required: false })
+  @IsArray()
+  @ArrayMaxSize(4096)
+  @MaxJsonBytes(65_536)
   @IsOptional()
-  points?: any;
+  points?: any[];
 
   @ApiProperty({ required: false, type: "object" })
   @IsObject()
+  @MaxJsonBytes(4_096)
   @IsOptional()
   style?: Record<string, any>;
 }

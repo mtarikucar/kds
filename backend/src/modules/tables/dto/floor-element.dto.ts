@@ -10,7 +10,10 @@ import {
   Min,
   Max,
   IsObject,
+  IsArray,
+  ArrayMaxSize,
 } from "class-validator";
+import { MaxJsonBytes } from "../../../common/dto/max-json-bytes.validator";
 
 export enum FloorElementType {
   WALL = "WALL",
@@ -74,15 +77,20 @@ export class CreateFloorElementDto {
   @IsOptional()
   rotation?: number;
 
-  // points (polyline walls) and style are free-form JSON validated as
-  // objects/arrays only; the renderer owns their shape. Kept permissive so
-  // the editor can evolve element styling without a migration.
+  // points (polyline walls) and style are free-form JSON whose inner shape the
+  // renderer owns, but they are bounded: points must be an array (its documented
+  // shape) and both carry a serialized-size cap so a client can't persist an
+  // unbounded blob into JSONB that getPlan() then re-serializes on every read.
   @ApiProperty({ required: false, type: "array", items: { type: "object" } })
+  @IsArray()
+  @ArrayMaxSize(4096)
+  @MaxJsonBytes(65_536)
   @IsOptional()
-  points?: any;
+  points?: any[];
 
   @ApiProperty({ required: false, type: "object" })
   @IsObject()
+  @MaxJsonBytes(4_096)
   @IsOptional()
   style?: Record<string, any>;
 

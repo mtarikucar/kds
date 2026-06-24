@@ -2,10 +2,10 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { KdsGateway } from "../kds/kds.gateway";
+import { TablesService } from "./tables.service";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import { OrderStatus } from "../../common/constants/order-status.enum";
 import {
@@ -18,6 +18,13 @@ import {
   UpdateFloorElementDto,
 } from "./dto/floor-element.dto";
 import { SaveLayoutDto } from "./dto/save-layout.dto";
+
+// Defensive growth ceilings so a scripted ADMIN/MANAGER can't accumulate an
+// unbounded number of zones/elements one-per-request (the per-request array
+// caps in SaveLayoutDto only bound a single save). getPlan eagerly loads the
+// whole plan, so these keep that payload sane.
+const MAX_ZONES_PER_BRANCH = 100;
+const MAX_ELEMENTS_PER_ZONE = 2_000;
 
 /**
  * Owns the 2D floor-plan model: zones (kat/bahçe/teras), the decorative /
@@ -34,6 +41,10 @@ export class FloorPlanService {
   constructor(
     private prisma: PrismaService,
     private kdsGateway: KdsGateway,
+    // Reused to attach `upcomingReservation` to placed/unplaced tables so the
+    // floor-plan read matches the legacy GET /tables shape (one source of
+    // truth for the reservation-hold badge).
+    private tables: TablesService,
   ) {}
 
   private readonly ACTIVE_ORDER_FILTER = {
@@ -64,7 +75,13 @@ export class FloorPlanService {
       }),
     ]);
 
-    const shape = (t: (typeof tables)[number]) => ({
+    // Attach the next reservation-hold badge to each table (same window logic
+    // the legacy /tables list uses) so the live map can render it without a
+    // second request — required by the P1 endpoint contract.
+    const annotated = await this.tables.withUpcomingReservations(scope, tables);
+    const zoneIdSet = new Set(zones.map((z) => z.id));
+
+    const shape = (t: (typeof annotated)[number]) => ({
       id: t.id,
       number: t.number,
       capacity: t.capacity,
@@ -78,12 +95,17 @@ export class FloorPlanService {
       rotation: t.rotation,
       tableShape: t.shape,
       activeOrderCount: t._count.orders,
+      upcomingReservation: t.upcomingReservation ?? null,
     });
 
     const placedByZone = new Map<string, ReturnType<typeof shape>[]>();
     const unplaced: ReturnType<typeof shape>[] = [];
-    for (const t of tables) {
-      if (t.zoneId) {
+    for (const t of annotated) {
+      // A table only counts as "placed" if its zone is actually in the returned
+      // set. If a concurrent deleteZone removed the zone between the two reads,
+      // the table falls back to the unplaced tray rather than silently
+      // vanishing from the plan entirely.
+      if (t.zoneId && zoneIdSet.has(t.zoneId)) {
         const list = placedByZone.get(t.zoneId) ?? [];
         list.push(shape(t));
         placedByZone.set(t.zoneId, list);
@@ -103,6 +125,15 @@ export class FloorPlanService {
 
   async createZone(scope: BranchScope, dto: CreateFloorZoneDto) {
     await this.assertZoneNameFree(scope, dto.name);
+
+    const zoneCount = await this.prisma.floorZone.count({
+      where: { ...branchScope(scope) },
+    });
+    if (zoneCount >= MAX_ZONES_PER_BRANCH) {
+      throw new ConflictException(
+        `A branch can have at most ${MAX_ZONES_PER_BRANCH} floor zones`,
+      );
+    }
 
     // Append after the current last zone so a new zone shows up at the end of
     // the tab strip rather than fighting for sortOrder 0.
@@ -200,7 +231,7 @@ export class FloorPlanService {
   }
 
   async reorderZones(scope: BranchScope, dto: ReorderZonesDto) {
-    await this.prisma.$transaction(
+    const results = await this.prisma.$transaction(
       dto.zones.map((z) =>
         this.prisma.floorZone.updateMany({
           where: { id: z.id, ...branchScope(scope) },
@@ -208,12 +239,32 @@ export class FloorPlanService {
         }),
       ),
     );
-    this.kdsGateway.emitFloorLayoutUpdated(scope.tenantId, scope.branchId, {});
-    return { reordered: dto.zones.length };
+    // Report the rows that actually moved, not the request size — a stale /
+    // cross-branch id is a scope-safe no-op (count 0) and must not be counted
+    // as reordered, nor trigger a spurious live-map refresh.
+    const reordered = results.reduce((n, r) => n + r.count, 0);
+    if (reordered > 0) {
+      this.kdsGateway.emitFloorLayoutUpdated(
+        scope.tenantId,
+        scope.branchId,
+        {},
+      );
+    }
+    return { reordered };
   }
 
   async createElement(scope: BranchScope, dto: CreateFloorElementDto) {
     await this.assertZoneInScope(scope, dto.zoneId);
+
+    const elementCount = await this.prisma.floorElement.count({
+      where: { zoneId: dto.zoneId, ...branchScope(scope) },
+    });
+    if (elementCount >= MAX_ELEMENTS_PER_ZONE) {
+      throw new ConflictException(
+        `A zone can have at most ${MAX_ELEMENTS_PER_ZONE} elements`,
+      );
+    }
+
     const element = await this.prisma.floorElement.create({
       data: {
         zoneId: dto.zoneId,
@@ -301,64 +352,91 @@ export class FloorPlanService {
    * reparent a table into another branch's zone.
    */
   async saveLayout(scope: BranchScope, dto: SaveLayoutDto) {
-    // Validate every distinct target zone up front (one query), so a bad
-    // zoneId fails the whole save rather than silently dropping a table into
-    // limbo mid-transaction.
-    const zoneIds = [
-      ...new Set(
-        dto.tables
-          .map((t) => t.zoneId)
-          .filter((z): z is string => typeof z === "string" && z.length > 0),
-      ),
-    ];
-    if (zoneIds.length > 0) {
-      const found = await this.prisma.floorZone.findMany({
-        where: { id: { in: zoneIds }, ...branchScope(scope) },
-        select: { id: true },
-      });
-      if (found.length !== zoneIds.length) {
-        throw new BadRequestException(
-          "One or more target zones do not exist in this branch",
-        );
-      }
-    }
+    const elements = dto.elements ?? [];
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      let tableCount = 0;
-      for (const t of dto.tables) {
-        const claim = await tx.table.updateMany({
-          where: { id: t.id, ...branchScope(scope) },
-          data: {
-            zoneId: t.zoneId ?? null,
-            posX: t.posX,
-            posY: t.posY,
-            width: t.width,
-            height: t.height,
-            rotation: t.rotation,
-            shape: t.shape,
-          },
-        });
-        tableCount += claim.count;
-      }
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        // Validate every distinct target zone INSIDE the transaction so the
+        // existence check and the writes share one snapshot — a concurrent
+        // deleteZone can't slip the zone out from under a validated placement.
+        const zoneIds = [
+          ...new Set(
+            dto.tables
+              .map((t) => t.zoneId)
+              .filter(
+                (z): z is string => typeof z === "string" && z.length > 0,
+              ),
+          ),
+        ];
+        if (zoneIds.length > 0) {
+          const found = await tx.floorZone.findMany({
+            where: { id: { in: zoneIds }, ...branchScope(scope) },
+            select: { id: true },
+          });
+          if (found.length !== zoneIds.length) {
+            throw new NotFoundException(
+              "One or more target zones do not exist in this branch",
+            );
+          }
+        }
 
-      let elementCount = 0;
-      for (const e of dto.elements ?? []) {
-        const claim = await tx.floorElement.updateMany({
-          where: { id: e.id, ...branchScope(scope) },
-          data: {
-            x: e.x,
-            y: e.y,
-            width: e.width,
-            height: e.height,
-            rotation: e.rotation,
-            ...(e.points !== undefined ? { points: e.points } : {}),
-            ...(e.style !== undefined ? { style: e.style } : {}),
-          },
-        });
-        elementCount += claim.count;
-      }
-      return { tableCount, elementCount };
-    });
+        let tableCount = 0;
+        for (const t of dto.tables) {
+          const claim = await tx.table.updateMany({
+            where: { id: t.id, ...branchScope(scope) },
+            data: {
+              zoneId: t.zoneId ?? null,
+              posX: t.posX,
+              posY: t.posY,
+              width: t.width,
+              height: t.height,
+              rotation: t.rotation,
+              shape: t.shape,
+            },
+          });
+          tableCount += claim.count;
+        }
+        // Fail closed: a table id that is foreign / stale / since-deleted
+        // matches 0 rows. Rather than silently dropping it and returning a
+        // success the editor trusts (lost drag-save), reject the whole
+        // transaction — matching updateZone/updateElement which 404 on no
+        // match. The compound WHERE already makes cross-branch ids no-ops, so
+        // this only converts an invisible loss into an explicit failure.
+        if (tableCount !== dto.tables.length) {
+          throw new NotFoundException(
+            "One or more tables were not found in this branch — nothing was saved",
+          );
+        }
+
+        let elementCount = 0;
+        for (const e of elements) {
+          const claim = await tx.floorElement.updateMany({
+            where: { id: e.id, ...branchScope(scope) },
+            data: {
+              x: e.x,
+              y: e.y,
+              width: e.width,
+              height: e.height,
+              rotation: e.rotation,
+              ...(e.points !== undefined ? { points: e.points } : {}),
+              ...(e.style !== undefined ? { style: e.style } : {}),
+            },
+          });
+          elementCount += claim.count;
+        }
+        if (elementCount !== elements.length) {
+          throw new NotFoundException(
+            "One or more elements were not found in this branch — nothing was saved",
+          );
+        }
+        return { tableCount, elementCount };
+      },
+      // A full drag-session save can touch many rows; give the interactive
+      // transaction a generous budget so a large (but in-cap) layout doesn't
+      // trip Prisma's default 5s timeout (P2028 → rollback). Still bounded by
+      // the SaveLayoutDto array caps.
+      { timeout: 30_000, maxWait: 10_000 },
+    );
 
     this.kdsGateway.emitFloorLayoutUpdated(scope.tenantId, scope.branchId, {});
     return result;

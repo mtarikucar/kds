@@ -87,7 +87,7 @@ export class TablesService {
     // delete). Sourced from @CurrentScope() in the controller — the
     // table physically belongs to one branch and OrdersService.create
     // copies this onto each order.
-    return this.prisma.table.create({
+    const table = await this.prisma.table.create({
       data: {
         number: createTableDto.number,
         capacity: createTableDto.capacity,
@@ -119,6 +119,41 @@ export class TablesService {
         branchId: scope.branchId,
       },
     });
+
+    // A new table changes the floor plan — it appears either placed on a zone
+    // or in the editor's unplaced tray. Mirror FloorPlanService's emits so an
+    // open editor / live map in another session refreshes (the two write paths
+    // to the same spatial data must stay in sync).
+    this.kdsGateway.emitFloorLayoutUpdated(
+      scope.tenantId,
+      scope.branchId,
+      table.zoneId ? { zoneId: table.zoneId } : {},
+    );
+    return table;
+  }
+
+  // Spatial fields that, when present in an update, mean the floor-plan layout
+  // changed and open maps must re-fetch.
+  private static readonly SPATIAL_KEYS = [
+    "zoneId",
+    "posX",
+    "posY",
+    "width",
+    "height",
+    "rotation",
+    "shape",
+  ] as const;
+
+  /**
+   * Public wrapper so FloorPlanService can attach the same
+   * `upcomingReservation` badge to floor-plan tables that GET /tables exposes —
+   * one source of truth for the reservation-hold window.
+   */
+  async withUpcomingReservations<T extends { id: string }>(
+    scope: BranchScope,
+    tables: T[],
+  ): Promise<(T & { upcomingReservation: UpcomingReservation | null })[]> {
+    return this.annotateWithUpcomingReservations(scope, tables);
   }
 
   /**
@@ -383,7 +418,7 @@ export class TablesService {
     // mutation runs in one transaction so the guard count and the write
     // can't race a freshly-created order. (Status-less updates — number/
     // capacity/section — skip the count, same as updateStatus.)
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       if (updateTableDto.status === TableStatus.AVAILABLE) {
         const activeOrders = await tx.order.count({
           where: {
@@ -414,6 +449,21 @@ export class TablesService {
         where: { id, ...branchScope(scope) },
       });
     });
+
+    // Refresh open floor-plan/live maps only when the table's geometry or zone
+    // actually changed — a pure status/number/capacity edit isn't a layout
+    // change (those propagate via their own table/order events).
+    const spatialTouched = TablesService.SPATIAL_KEYS.some(
+      (k) => (updateTableDto as Record<string, unknown>)[k] !== undefined,
+    );
+    if (spatialTouched) {
+      this.kdsGateway.emitFloorLayoutUpdated(
+        scope.tenantId,
+        scope.branchId,
+        updated?.zoneId ? { zoneId: updated.zoneId } : {},
+      );
+    }
+    return updated;
   }
 
   async updateStatus(
@@ -470,7 +520,7 @@ export class TablesService {
     // Atomic remove: verify scope ownership + count active orders + delete in
     // a single transaction so an order created between the count and the
     // delete can't orphan the FK.
-    return this.prisma.$transaction(async (tx) => {
+    const removed = await this.prisma.$transaction(async (tx) => {
       const table = await tx.table.findFirst({
         where: { id, ...branchScope(scope) },
       });
@@ -493,8 +543,17 @@ export class TablesService {
         where: { id, ...branchScope(scope) },
       });
       if (claim.count === 0) throw new NotFoundException("Table not found");
-      return { id };
+      return { id, zoneId: table.zoneId };
     });
+
+    // A removed table disappears from the plan (placed map or unplaced tray) —
+    // refresh open editors/live maps.
+    this.kdsGateway.emitFloorLayoutUpdated(
+      scope.tenantId,
+      scope.branchId,
+      removed.zoneId ? { zoneId: removed.zoneId } : {},
+    );
+    return { id: removed.id };
   }
 
   // ========================================

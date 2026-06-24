@@ -42,6 +42,7 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
       emitTableUpdate: jest.fn(),
       emitTableUnmerge: jest.fn(),
       emitTableMerge: jest.fn(),
+      emitFloorLayoutUpdated: jest.fn(),
     } as any;
     // ReservationAvailabilityService — only resolvePublicBranchId is
     // consumed (the public customer-table-listing branch resolver).

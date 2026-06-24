@@ -153,8 +153,9 @@ export class FloorPlanController {
   })
   @ApiResponse({ status: 200, description: "Counts of rows updated" })
   @ApiResponse({
-    status: 400,
-    description: "A target zone is not in this branch",
+    status: 404,
+    description:
+      "A target zone, table, or element is not in this branch — nothing was saved",
   })
   saveLayout(@Body() dto: SaveLayoutDto, @CurrentScope() scope: BranchScope) {
     return this.floorPlan.saveLayout(scope, dto);

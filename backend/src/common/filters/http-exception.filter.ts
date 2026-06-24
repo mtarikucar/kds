@@ -234,6 +234,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
           error: "DatabaseTimeout",
         };
 
+      case "P2028": // Interactive transaction API error (most commonly timeout)
+        // A long-running interactive $transaction that blows its time budget
+        // aborts with P2028 and rolls back without committing. Surface it as a
+        // retryable 503 (mirrors the P2024 connection-timeout shape) instead of
+        // an opaque 500, so a client that sent an oversized batch (e.g. a huge
+        // floor-plan layout save) gets an actionable "retry / save less at
+        // once" signal rather than a generic server error.
+        return {
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          message:
+            "The operation took too long and was rolled back — please retry, or save fewer changes at once.",
+          error: "TransactionTimeout",
+        };
+
       case "P2034": // Serializable transaction conflict (Postgres 40001)
         // A serialization failure is the EXPECTED loser-outcome of a
         // Serializable transaction under contention (checkout settlement,

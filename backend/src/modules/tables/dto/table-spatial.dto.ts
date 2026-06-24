@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import {
   IsEnum,
   IsNumber,
@@ -27,6 +28,11 @@ export class TableSpatialFieldsDto {
     nullable: true,
     description: "Owning floor zone; null = unplaced",
   })
+  // Normalize a blank string to null so an empty <select> serialization means
+  // "unplaced" rather than a non-existent zone id. Without this, "" skips the
+  // in-branch zone guard (it is falsy) yet is still written verbatim, hitting
+  // the FK as a confusing P2003/400 instead of the intended unplace.
+  @Transform(({ value }) => (value === "" ? null : value))
   @IsString()
   @IsOptional()
   zoneId?: string | null;

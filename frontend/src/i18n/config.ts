@@ -18,6 +18,7 @@ import enValidation from './locales/en/validation.json';
 import enErrors from './locales/en/errors.json';
 import enOnboarding from './locales/en/onboarding.json';
 import enReservations from './locales/en/reservations.json';
+import enFloorPlan from './locales/en/floorPlan.json';
 import enPersonnel from './locales/en/personnel.json';
 import enStock from './locales/en/stock.json';
 import enHelp from './locales/en/help.json';
@@ -44,6 +45,7 @@ import trValidation from './locales/tr/validation.json';
 import trErrors from './locales/tr/errors.json';
 import trOnboarding from './locales/tr/onboarding.json';
 import trReservations from './locales/tr/reservations.json';
+import trFloorPlan from './locales/tr/floorPlan.json';
 import trPersonnel from './locales/tr/personnel.json';
 import trStock from './locales/tr/stock.json';
 import trHelp from './locales/tr/help.json';
@@ -70,6 +72,7 @@ import ruValidation from './locales/ru/validation.json';
 import ruErrors from './locales/ru/errors.json';
 import ruOnboarding from './locales/ru/onboarding.json';
 import ruReservations from './locales/ru/reservations.json';
+import ruFloorPlan from './locales/ru/floorPlan.json';
 import ruPersonnel from './locales/ru/personnel.json';
 import ruStock from './locales/ru/stock.json';
 import ruHelp from './locales/ru/help.json';
@@ -96,6 +99,7 @@ import uzValidation from './locales/uz/validation.json';
 import uzErrors from './locales/uz/errors.json';
 import uzOnboarding from './locales/uz/onboarding.json';
 import uzReservations from './locales/uz/reservations.json';
+import uzFloorPlan from './locales/uz/floorPlan.json';
 import uzPersonnel from './locales/uz/personnel.json';
 import uzStock from './locales/uz/stock.json';
 import uzHelp from './locales/uz/help.json';
@@ -122,6 +126,7 @@ import arValidation from './locales/ar/validation.json';
 import arErrors from './locales/ar/errors.json';
 import arOnboarding from './locales/ar/onboarding.json';
 import arReservations from './locales/ar/reservations.json';
+import arFloorPlan from './locales/ar/floorPlan.json';
 import arPersonnel from './locales/ar/personnel.json';
 import arStock from './locales/ar/stock.json';
 import arHelp from './locales/ar/help.json';
@@ -151,6 +156,7 @@ const resources = {
     errors: enErrors,
     onboarding: enOnboarding,
     reservations: enReservations,
+    floorPlan: enFloorPlan,
     personnel: enPersonnel,
     stock: enStock,
     help: enHelp,
@@ -178,6 +184,7 @@ const resources = {
     errors: trErrors,
     onboarding: trOnboarding,
     reservations: trReservations,
+    floorPlan: trFloorPlan,
     personnel: trPersonnel,
     stock: trStock,
     help: trHelp,
@@ -205,6 +212,7 @@ const resources = {
     errors: ruErrors,
     onboarding: ruOnboarding,
     reservations: ruReservations,
+    floorPlan: ruFloorPlan,
     personnel: ruPersonnel,
     stock: ruStock,
     help: ruHelp,
@@ -232,6 +240,7 @@ const resources = {
     errors: uzErrors,
     onboarding: uzOnboarding,
     reservations: uzReservations,
+    floorPlan: uzFloorPlan,
     personnel: uzPersonnel,
     stock: uzStock,
     help: uzHelp,
@@ -259,6 +268,7 @@ const resources = {
     errors: arErrors,
     onboarding: arOnboarding,
     reservations: arReservations,
+    floorPlan: arFloorPlan,
     personnel: arPersonnel,
     stock: arStock,
     help: arHelp,
@@ -354,7 +364,7 @@ i18next
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock', 'help', 'webhooks', 'partnerKeys', 'bridges', 'superadmin', 'hardware', 'analytics', 'deliveryOrders'],
+    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'floorPlan', 'personnel', 'stock', 'help', 'webhooks', 'partnerKeys', 'bridges', 'superadmin', 'hardware', 'analytics', 'deliveryOrders'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

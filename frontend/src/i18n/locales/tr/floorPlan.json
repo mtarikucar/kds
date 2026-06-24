@@ -1,0 +1,63 @@
+{
+  "title": "Salon Planı",
+  "subtitle": "Restoranınızı 2D harita gibi tasarlayın — katlar, bahçeler, masalar ve daha fazlası",
+  "addTable": "Masa",
+  "addElement": "Ekle",
+  "undo": "Geri al",
+  "redo": "Yinele",
+  "toggleGrid": "Izgarayı aç/kapat",
+  "saved": "Salon planı kaydedildi",
+  "loading": "Yükleniyor…",
+  "saving": "Kaydediliyor…",
+  "addZone": "Alan ekle",
+  "zoneSettings": "Alan ayarları",
+  "newZonePrompt": "Yeni alana ad verin (örn. Kat 2, Bahçe)",
+  "noZones": "Henüz alan yok. Tasarlamaya başlamak için bir kat veya bahçe ekleyin.",
+  "unplaced": "Yerleştirilmemiş masalar ({{count}})",
+  "placeOnZone": "Geçerli alana yerleştir",
+  "newTable": "Yeni masa",
+  "tableNumber": "Masa numarası",
+  "capacity": "Kapasite",
+  "shapes": {
+    "round": "Yuvarlak",
+    "square": "Kare",
+    "rect": "Dikdörtgen"
+  },
+  "elements": {
+    "wall": "Duvar",
+    "door": "Kapı",
+    "bar": "Bar",
+    "kitchen": "Mutfak",
+    "plant": "Bitki",
+    "decor": "Dekor",
+    "text": "Metin",
+    "rect": "Blok"
+  },
+  "inspector": {
+    "empty": "Düzenlemek için bir masa veya öğe seçin",
+    "multi": "{{count}} öğe seçildi",
+    "removeSelected": "Seçilenleri kaldır",
+    "table": "Masa",
+    "seats": "{{count}} kişilik",
+    "shape": "Şekil",
+    "unplaceTable": "Yerleştirilmemişlere gönder",
+    "unplaceHint": "Masa ve siparişleri korunur — yalnızca yerleşimi temizlenir.",
+    "element": "Öğe",
+    "label": "Etiket",
+    "labelPlaceholder": "İsteğe bağlı etiket",
+    "deleteElement": "Öğeyi sil"
+  },
+  "zone": {
+    "name": "Ad",
+    "kind": "Tür",
+    "indoor": "İç mekân",
+    "outdoor": "Dış mekân",
+    "width": "Genişlik",
+    "height": "Yükseklik",
+    "grid": "Izgara",
+    "background": "Arka plan görseli URL",
+    "opacity": "Arka plan saydamlığı (%{{value}})",
+    "delete": "Alanı sil",
+    "deleteConfirm": "\"{{name}}\" alanı silinsin mi? Masaları yerleştirilmemişlere taşınır."
+  }
+}

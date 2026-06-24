@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { FloorPlanService } from "./floor-plan.service";
 import {
   mockPrismaClient,
@@ -21,6 +17,7 @@ import {
 describe("FloorPlanService", () => {
   let prisma: MockPrismaClient;
   let gateway: { emitFloorLayoutUpdated: jest.Mock };
+  let tables: { withUpcomingReservations: jest.Mock };
   let svc: FloorPlanService;
 
   const scope = { tenantId: "t1", branchId: "b1" };
@@ -28,7 +25,15 @@ describe("FloorPlanService", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     gateway = { emitFloorLayoutUpdated: jest.fn() };
-    svc = new FloorPlanService(prisma as any, gateway as any);
+    // FloorPlanService delegates the reservation badge to TablesService; the
+    // pass-through mock just stamps upcomingReservation:null so getPlan's
+    // grouping/shape logic is what's under test.
+    tables = {
+      withUpcomingReservations: jest.fn(async (_s: any, ts: any[]) =>
+        ts.map((t) => ({ ...t, upcomingReservation: null })),
+      ),
+    };
+    svc = new FloorPlanService(prisma as any, gateway as any, tables as any);
 
     (prisma.$transaction as any).mockImplementation(async (arg: any) =>
       Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
@@ -63,6 +68,32 @@ describe("FloorPlanService", () => {
       expect((prisma.floorZone.findMany as any).mock.calls[0][0].where).toMatchObject({ tenantId: "t1", branchId: "b1" });
       expect((prisma.table.findMany as any).mock.calls[0][0].where).toMatchObject({ tenantId: "t1", branchId: "b1" });
     });
+
+    it("falls a table whose zone is gone back to unplaced instead of dropping it", async () => {
+      // z-gone is not in the returned zones (e.g. concurrently deleted between
+      // the two non-atomic reads) — the table must not vanish from the plan.
+      (prisma.floorZone.findMany as any).mockResolvedValue([
+        { id: "z1", name: "Kat 1", sortOrder: 0, elements: [] },
+      ]);
+      (prisma.table.findMany as any).mockResolvedValue([
+        { id: "tb-orphan", number: "9", capacity: 4, status: "AVAILABLE", groupId: null, zoneId: "z-gone", posX: 0, posY: 0, width: 80, height: 80, rotation: 0, shape: "ROUND", _count: { orders: 0 } },
+      ]);
+
+      const plan = await svc.getPlan(scope as any);
+
+      expect(plan.zones[0].tables).toHaveLength(0);
+      expect(plan.unplacedTables.map((t) => t.id)).toEqual(["tb-orphan"]);
+    });
+
+    it("attaches upcomingReservation via TablesService", async () => {
+      (prisma.floorZone.findMany as any).mockResolvedValue([]);
+      (prisma.table.findMany as any).mockResolvedValue([
+        { id: "tb1", number: "1", capacity: 2, status: "AVAILABLE", groupId: null, zoneId: null, posX: 0, posY: 0, width: 80, height: 80, rotation: 0, shape: "ROUND", _count: { orders: 0 } },
+      ]);
+      const plan = await svc.getPlan(scope as any);
+      expect(tables.withUpcomingReservations).toHaveBeenCalledWith(scope, expect.any(Array));
+      expect(plan.unplacedTables[0]).toHaveProperty("upcomingReservation", null);
+    });
   });
 
   describe("createZone", () => {
@@ -81,6 +112,7 @@ describe("FloorPlanService", () => {
         .mockReset()
         .mockResolvedValueOnce(null) // assertZoneNameFree
         .mockResolvedValueOnce({ sortOrder: 4 }); // last zone
+      (prisma.floorZone.count as any).mockResolvedValue(3); // under the cap
       (prisma.floorZone.create as any).mockResolvedValue({ id: "z-new", sortOrder: 5 });
 
       await svc.createZone(scope as any, { name: "Teras" } as any);
@@ -128,6 +160,7 @@ describe("FloorPlanService", () => {
 
     it("creates with branch scope stamped and emits", async () => {
       (prisma.floorZone.findFirst as any).mockResolvedValue({ id: "z1" });
+      (prisma.floorElement.count as any).mockResolvedValue(0); // under the cap
       (prisma.floorElement.create as any).mockResolvedValue({ id: "e1" });
       await svc.createElement(scope as any, { zoneId: "z1", type: "BAR", x: 5, y: 6 } as any);
       const data = (prisma.floorElement.create as any).mock.calls[0][0].data;
@@ -137,14 +170,38 @@ describe("FloorPlanService", () => {
   });
 
   describe("saveLayout", () => {
-    it("rejects when a target zone is not in the branch (before any write)", async () => {
+    it("rejects (404) when a target zone is not in the branch, before any write", async () => {
       (prisma.floorZone.findMany as any).mockResolvedValue([]); // none of the zoneIds resolve
       await expect(
         svc.saveLayout(scope as any, {
           tables: [{ id: "tb1", zoneId: "z-bad", posX: 0, posY: 0, width: 80, height: 80, rotation: 0, shape: "ROUND" }],
         } as any),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(NotFoundException);
       expect(prisma.table.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("fails closed (404, no emit) when a table id matches no in-branch row", async () => {
+      // zoneId null → no zone validation; the foreign/stale table id matches 0
+      // rows, so the whole save must be rejected rather than silently dropped.
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 0 });
+      await expect(
+        svc.saveLayout(scope as any, {
+          tables: [{ id: "tb-foreign", zoneId: null, posX: 0, posY: 0, width: 80, height: 80, rotation: 0, shape: "ROUND" }],
+        } as any),
+      ).rejects.toThrow(NotFoundException);
+      expect(gateway.emitFloorLayoutUpdated).not.toHaveBeenCalled();
+    });
+
+    it("fails closed (404) when an element id matches no in-branch row", async () => {
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.floorElement.updateMany as any).mockResolvedValue({ count: 0 });
+      await expect(
+        svc.saveLayout(scope as any, {
+          tables: [{ id: "tb1", zoneId: null, posX: 0, posY: 0, width: 80, height: 80, rotation: 0, shape: "ROUND" }],
+          elements: [{ id: "e-foreign", x: 1, y: 2, width: 50, height: 60, rotation: 0 }],
+        } as any),
+      ).rejects.toThrow(NotFoundException);
+      expect(gateway.emitFloorLayoutUpdated).not.toHaveBeenCalled();
     });
 
     it("persists table + element geometry scope-bound and emits", async () => {
@@ -177,9 +234,9 @@ describe("FloorPlanService", () => {
   });
 
   describe("reorderZones", () => {
-    it("updates each zone's sortOrder scope-bound and emits", async () => {
+    it("updates each zone's sortOrder scope-bound, returns the real count, and emits", async () => {
       (prisma.floorZone.updateMany as any).mockResolvedValue({ count: 1 });
-      await svc.reorderZones(scope as any, {
+      const res = await svc.reorderZones(scope as any, {
         zones: [
           { id: "z1", sortOrder: 1 },
           { id: "z2", sortOrder: 0 },
@@ -189,7 +246,17 @@ describe("FloorPlanService", () => {
         where: { id: "z1", tenantId: "t1", branchId: "b1" },
         data: { sortOrder: 1 },
       });
+      expect(res).toEqual({ reordered: 2 });
       expect(gateway.emitFloorLayoutUpdated).toHaveBeenCalled();
+    });
+
+    it("reports reordered:0 and skips the emit when no ids matched (stale/cross-branch)", async () => {
+      (prisma.floorZone.updateMany as any).mockResolvedValue({ count: 0 });
+      const res = await svc.reorderZones(scope as any, {
+        zones: [{ id: "z-stale", sortOrder: 0 }],
+      } as any);
+      expect(res).toEqual({ reordered: 0 });
+      expect(gateway.emitFloorLayoutUpdated).not.toHaveBeenCalled();
     });
   });
 });
