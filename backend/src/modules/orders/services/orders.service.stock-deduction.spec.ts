@@ -102,4 +102,134 @@ describe("OrdersService.deductStockForOrder — userless orders", () => {
       }),
     );
   });
+
+  it("is idempotent — skips a product already deducted for the same order", async () => {
+    jest.spyOn(service, "findOneByTenant").mockResolvedValue({
+      id: "order-3",
+      orderNumber: "ORD-3",
+      userId: null,
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      orderItems: [{ productId: "p-1", quantity: 2 }],
+    } as any);
+    (prisma.product.findUnique as any).mockResolvedValue({
+      id: "p-1",
+      name: "Cola",
+      stockTracked: true,
+      currentStock: new Prisma.Decimal("10"),
+    });
+    // An OUT movement for this order already exists → already counted.
+    (prisma.stockMovement.findFirst as any).mockResolvedValue({ id: "mv-1" });
+
+    await service.deductStockForOrder("order-3", "tenant-1");
+
+    expect(prisma.product.update).not.toHaveBeenCalled();
+    expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+  });
+
+  it("floors at 0 on oversell instead of throwing (best-effort, never rolls back the sale)", async () => {
+    jest.spyOn(service, "findOneByTenant").mockResolvedValue({
+      id: "order-4",
+      orderNumber: "ORD-4",
+      userId: null,
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      orderItems: [{ productId: "p-1", quantity: 3 }],
+    } as any);
+    (prisma.product.findUnique as any).mockResolvedValue({
+      id: "p-1",
+      name: "Cola",
+      stockTracked: true,
+      currentStock: new Prisma.Decimal("1"), // only 1 in stock, selling 3
+    });
+    (prisma.stockMovement.findFirst as any).mockResolvedValue(null);
+    (prisma.product.update as any).mockResolvedValue({});
+    (prisma.stockMovement.create as any).mockResolvedValue({});
+
+    await expect(
+      service.deductStockForOrder("order-4", "tenant-1"),
+    ).resolves.not.toThrow();
+
+    const updateArg = (prisma.product.update as any).mock.calls[0][0];
+    expect(updateArg.data.currentStock.toString()).toBe("0");
+    expect(updateArg.data.isAvailable).toBe(false);
+  });
+});
+
+describe("OrdersService.reverseProductStockForOrder", () => {
+  let service: OrdersService;
+  let prisma: MockPrismaClient;
+
+  beforeEach(async () => {
+    prisma = mockPrismaClient();
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb(prisma),
+    );
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        ReceiptSnapshotBuilder,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: KdsGateway,
+          useValue: { emitNewOrder: jest.fn(), emitLowStockAlert: jest.fn() },
+        },
+      ],
+    }).compile();
+    service = module.get(OrdersService);
+    jest.spyOn(service, "findOneByTenant").mockResolvedValue({
+      id: "order-1",
+      orderNumber: "ORD-1",
+      userId: null,
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      orderItems: [{ productId: "p-1", quantity: 2 }],
+    } as any);
+    (prisma.product.findUnique as any).mockResolvedValue({
+      id: "p-1",
+      name: "Cola",
+      stockTracked: true,
+      currentStock: new Prisma.Decimal("8"),
+    });
+    (prisma.product.update as any).mockResolvedValue({});
+    (prisma.stockMovement.create as any).mockResolvedValue({});
+  });
+
+  it("restores currentStock with a compensating IN when the order was deducted", async () => {
+    // findFirst #1 (was-deducted? → yes), #2 (already-reversed? → no)
+    (prisma.stockMovement.findFirst as any)
+      .mockResolvedValueOnce({ id: "out-1" })
+      .mockResolvedValueOnce(null);
+
+    await service.reverseProductStockForOrder("order-1", "tenant-1");
+
+    const updateArg = (prisma.product.update as any).mock.calls[0][0];
+    expect(updateArg.data.currentStock.toString()).toBe("10"); // 8 + 2
+    expect(prisma.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "IN",
+          reason: "Order ORD-1 reversal",
+          quantity: 2,
+        }),
+      }),
+    );
+  });
+
+  it("is a no-op when the product was never deducted for this order", async () => {
+    (prisma.stockMovement.findFirst as any).mockResolvedValue(null); // not deducted
+    await service.reverseProductStockForOrder("order-1", "tenant-1");
+    expect(prisma.product.update).not.toHaveBeenCalled();
+    expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent — does not double-credit when a reversal already exists", async () => {
+    // #1 was-deducted? → yes; #2 already-reversed? → yes
+    (prisma.stockMovement.findFirst as any)
+      .mockResolvedValueOnce({ id: "out-1" })
+      .mockResolvedValueOnce({ id: "rev-1" });
+    await service.reverseProductStockForOrder("order-1", "tenant-1");
+    expect(prisma.product.update).not.toHaveBeenCalled();
+    expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+  });
 });

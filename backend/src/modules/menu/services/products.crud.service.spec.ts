@@ -305,9 +305,15 @@ describe("ProductsService — create/update/remove/transform", () => {
     });
   });
 
-  // Orphaned ProductImage rows + files leaked on delete/detach/replace because
-  // the link is junction-only. These pin the auto-prune.
-  describe("orphaned-image prune", () => {
+  // Images are a REUSABLE, tenant-scoped library (linked to products only via
+  // the ProductToImage junction). A previous "auto-prune on detach/swap/delete"
+  // permanently destroyed library images the instant they lost their last
+  // product link — silent data loss that contradicted the "Unused images"
+  // screen (which exists so the operator can review + INTENTIONALLY delete
+  // unused images). The ONLY permanent-delete path is now that explicit
+  // operator-initiated unused-images delete, NOT any product mutation. These
+  // pin "product mutations never auto-delete library images".
+  describe("library images are NOT auto-deleted on detach/swap/delete", () => {
     beforeEach(() => {
       (prisma.product.findFirst as any).mockResolvedValue({
         id: "p-1",
@@ -316,53 +322,58 @@ describe("ProductsService — create/update/remove/transform", () => {
       });
     });
 
-    it("prunes images orphaned by a product delete", async () => {
-      // The product had img-1 + img-2 attached before delete...
+    it("does NOT delete library images when a product is deleted (kept for reuse)", async () => {
+      // The product had img-1 + img-2 attached; after delete img-1 is linked to
+      // nothing while img-2 is still on another product. NEITHER may be deleted:
+      // even an image attached only to the deleted product stays in the library
+      // as "unused" for the operator to remove on purpose.
       (prisma.productToImage.findMany as any)
-        .mockResolvedValueOnce([{ imageId: "img-1" }, { imageId: "img-2" }]) // attached-before-delete capture
-        .mockResolvedValueOnce([{ imageId: "img-2" }]); // img-2 still linked to another product after the cascade
+        .mockResolvedValueOnce([{ imageId: "img-1" }, { imageId: "img-2" }])
+        .mockResolvedValueOnce([{ imageId: "img-2" }]);
       (prisma.product.delete as any).mockResolvedValue({ id: "p-1" });
 
       await svc.remove("p-1", TENANT);
 
-      // img-1 is now orphaned → pruned; img-2 still linked → kept.
-      expect(uploadService.deleteProductImage).toHaveBeenCalledTimes(1);
-      expect(uploadService.deleteProductImage).toHaveBeenCalledWith(
-        "img-1",
-        TENANT,
-      );
+      expect(uploadService.deleteProductImage).not.toHaveBeenCalled();
     });
 
-    it("prunes a detached image that is no longer linked to any product", async () => {
+    it("does NOT delete a detached image even when it is no longer linked to any product", async () => {
       (prisma.productToImage.findFirst as any).mockResolvedValue({
         productId: "p-1",
         imageId: "img-1",
         image: { id: "img-1", tenantId: TENANT },
       });
-      // After deleting the junction link, the image is linked to nothing.
+      // After deleting the junction link the image is linked to nothing, but it
+      // must remain in the library (unlinked) so it surfaces under "Unused".
       (prisma.productToImage.findMany as any).mockResolvedValue([]);
 
       await svc.removeImageFromProduct("p-1", "img-1", TENANT);
 
-      expect(uploadService.deleteProductImage).toHaveBeenCalledWith(
-        "img-1",
-        TENANT,
-      );
+      // Only the junction link is removed; the library row/file is kept.
+      expect(prisma.productToImage.delete).toHaveBeenCalledWith({
+        where: { productId_imageId: { productId: "p-1", imageId: "img-1" } },
+      });
+      expect(uploadService.deleteProductImage).not.toHaveBeenCalled();
     });
 
-    it("keeps a detached image still attached to another product", async () => {
-      (prisma.productToImage.findFirst as any).mockResolvedValue({
-        productId: "p-1",
-        imageId: "img-1",
-        image: { id: "img-1", tenantId: TENANT },
-      });
-      // img-1 still has a link (to some other product) → not orphaned.
-      (prisma.productToImage.findMany as any).mockResolvedValue([
-        { imageId: "img-1" },
+    it("does NOT delete an image detached via an imageIds swap (orphaned by the new set)", async () => {
+      // p-1 had img-1 + img-2; the update swaps to only [img-2], orphaning img-1.
+      (prisma.product.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.productToImage.deleteMany as any).mockResolvedValue({ count: 2 });
+      // attachImagesToProduct ownership check for the new set.
+      (prisma.productImage.findMany as any).mockResolvedValue([
+        { id: "img-2" },
       ]);
+      (prisma.productToImage.createMany as any).mockResolvedValue({ count: 1 });
+      (prisma.$transaction as any).mockResolvedValue([]);
 
-      await svc.removeImageFromProduct("p-1", "img-1", TENANT);
+      await svc.update("p-1", { imageIds: ["img-2"] } as any, TENANT);
 
+      // Junction rows are cleared + the new link attached, but the orphaned
+      // img-1 library row/file is kept for the Unused screen.
+      expect(prisma.productToImage.deleteMany).toHaveBeenCalledWith({
+        where: { productId: "p-1" },
+      });
       expect(uploadService.deleteProductImage).not.toHaveBeenCalled();
     });
   });

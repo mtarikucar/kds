@@ -1113,6 +1113,19 @@ export class OrdersService {
       return updated;
     });
 
+    // Reverse finished-good (Product.currentStock) deductions on cancellation —
+    // symmetric with deductStockForOrder so a cancelled stockTracked sale
+    // restores its units (idempotent; no-op when nothing was deducted).
+    if (updateStatusDto.status === OrderStatus.CANCELLED) {
+      try {
+        await this.reverseProductStockForOrder(id, scope.tenantId);
+      } catch (error: any) {
+        this.logger.error(
+          `Product stock reversal failed for cancelled order ${id}: ${error.message}`,
+        );
+      }
+    }
+
     // Reverse ingredient deductions on cancellation
     if (
       updateStatusDto.status === OrderStatus.CANCELLED &&
@@ -1360,59 +1373,141 @@ export class OrdersService {
     });
   }
 
+  // The StockMovement.reason marker that ties an OUT movement to its order.
+  // StockMovement has no orderId column, so reverseProductStockForOrder keys
+  // both its "did we deduct?" lookup and its idempotency on these strings.
+  private static productDeductReason(orderNumber: string) {
+    return `Order ${orderNumber}`;
+  }
+  private static productReverseReason(orderNumber: string) {
+    return `Order ${orderNumber} reversal`;
+  }
+
   async deductStockForOrder(orderId: string, tenantId: string) {
     // System path — tenant-only (called from background jobs, settlement
     // flows where no BranchScope exists; the order's own branchId
     // propagates to the StockMovement.create below).
     const order = await this.findOneByTenant(orderId, tenantId);
+    const deductReason = OrdersService.productDeductReason(order.orderNumber);
 
     return this.prisma.$transaction(async (tx) => {
       for (const item of order.orderItems) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
         });
+        if (!product || !product.stockTracked) continue;
 
-        if (product && product.stockTracked) {
-          // v2.8.98 — currentStock is Decimal; route through Prisma.Decimal
-          // arithmetic so fractional units (kg cuts, pours) compose
-          // correctly and the JS Number precision ceiling is bypassed.
-          const newStock = new Prisma.Decimal(product.currentStock).sub(
-            item.quantity,
+        // Idempotency: never deduct the same order's product twice (a
+        // re-finalize, an approve-after-create edge, a retry). One OUT marker
+        // per (order, product) — if it exists, this product is already counted.
+        const alreadyDeducted = await tx.stockMovement.findFirst({
+          where: {
+            productId: product.id,
+            tenantId,
+            type: StockMovementType.OUT,
+            reason: deductReason,
+          },
+          select: { id: true },
+        });
+        if (alreadyDeducted) continue;
+
+        // v2.8.98 — currentStock is Decimal; route through Prisma.Decimal so
+        // fractional units (kg cuts, pours) compose correctly.
+        const cur = new Prisma.Decimal(product.currentStock);
+        const raw = cur.sub(item.quantity);
+        // Per-item + best-effort: NEVER throw (the caller runs this post-commit
+        // and must not roll back a real sale) and NEVER write negative stock —
+        // floor at 0 and log an oversell. Previously a single under-stocked
+        // item threw and rolled back the WHOLE order's decrements.
+        const newStock = raw.lt(0) ? new Prisma.Decimal(0) : raw;
+        if (raw.lt(0)) {
+          this.logger.warn(
+            `Oversell on order ${order.orderNumber}: product ${product.id} qty ${item.quantity} > stock ${product.currentStock} — flooring to 0`,
           );
-
-          if (newStock.lt(0)) {
-            throw new BadRequestException(
-              `Insufficient stock for product: ${product.name}`,
-            );
-          }
-
-          await tx.product.update({
-            where: { id: product.id },
-            data: {
-              currentStock: newStock as any,
-              isAvailable: newStock.gt(0),
-            },
-          });
-
-          // Create stock movement record
-          // v3.0.0 — branchId is NOT NULL on StockMovement; inherit from
-          // the originating order so the movement lives in the same
-          // branch scope as the sale that triggered it.
-          await tx.stockMovement.create({
-            data: {
-              type: StockMovementType.OUT,
-              quantity: item.quantity,
-              reason: `Order ${order.orderNumber}`,
-              productId: product.id,
-              // order.userId is null for customer / QR / delivery orders.
-              // StockMovement.userId is nullable for exactly this case — a
-              // movement triggered by a userless order has no staff actor.
-              userId: order.userId ?? null,
-              tenantId: order.tenantId,
-              branchId: order.branchId,
-            },
-          });
         }
+
+        await tx.product.update({
+          where: { id: product.id },
+          data: { currentStock: newStock as any, isAvailable: newStock.gt(0) },
+        });
+
+        // v3.0.0 — branchId is NOT NULL on StockMovement; inherit from the
+        // originating order. order.userId is null for customer/QR/delivery
+        // orders (StockMovement.userId is nullable for exactly that case).
+        await tx.stockMovement.create({
+          data: {
+            type: StockMovementType.OUT,
+            quantity: item.quantity,
+            reason: deductReason,
+            productId: product.id,
+            userId: order.userId ?? null,
+            tenantId: order.tenantId,
+            branchId: order.branchId,
+          },
+        });
+      }
+    });
+  }
+
+  /**
+   * Compensating reverse of deductStockForOrder — restores finished-good
+   * Product.currentStock when an order is cancelled/refunded, mirroring the
+   * ingredient subsystem's reverseForOrder. Idempotent (a reversal IN marker
+   * per order+product) so cancel + refund can't double-credit, and only
+   * reverses products that were actually deducted for THIS order.
+   */
+  async reverseProductStockForOrder(orderId: string, tenantId: string) {
+    const order = await this.findOneByTenant(orderId, tenantId);
+    const deductReason = OrdersService.productDeductReason(order.orderNumber);
+    const reverseReason = OrdersService.productReverseReason(order.orderNumber);
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const item of order.orderItems) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+        });
+        if (!product || !product.stockTracked) continue;
+
+        // Only reverse what we deducted, and only once.
+        const deducted = await tx.stockMovement.findFirst({
+          where: {
+            productId: product.id,
+            tenantId,
+            type: StockMovementType.OUT,
+            reason: deductReason,
+          },
+          select: { id: true },
+        });
+        if (!deducted) continue;
+        const alreadyReversed = await tx.stockMovement.findFirst({
+          where: {
+            productId: product.id,
+            tenantId,
+            type: StockMovementType.IN,
+            reason: reverseReason,
+          },
+          select: { id: true },
+        });
+        if (alreadyReversed) continue;
+
+        const newStock = new Prisma.Decimal(product.currentStock).add(
+          item.quantity,
+        );
+        await tx.product.update({
+          where: { id: product.id },
+          data: { currentStock: newStock as any, isAvailable: newStock.gt(0) },
+        });
+        await tx.stockMovement.create({
+          data: {
+            type: StockMovementType.IN,
+            quantity: item.quantity,
+            reason: reverseReason,
+            productId: product.id,
+            userId: order.userId ?? null,
+            tenantId: order.tenantId,
+            branchId: order.branchId,
+          },
+        });
       }
     });
   }
@@ -1508,6 +1603,21 @@ export class OrdersService {
         where: { id: updatedOrder.tableId },
         data: { status: TableStatus.OCCUPIED },
       });
+    }
+
+    // Decrement finished-good (Product.currentStock) for stockTracked products
+    // on the QR/customer self-order channel — these orders are created via
+    // CustomerOrdersService (not OrdersService.create, so the create-path
+    // deduct never ran) and only reach a deductable state at approval. POS
+    // orders are created directly as PENDING and never pass through here, so
+    // there is no double-deduction; deductStockForOrder is idempotent anyway.
+    // Best-effort: an inventory hiccup must never block the approval.
+    try {
+      await this.deductStockForOrder(orderId, tenantId);
+    } catch (error: any) {
+      this.logger.error(
+        `Product stock deduction failed on approval for order ${orderId}: ${error.message}`,
+      );
     }
 
     // Emit WebSocket events for real-time updates

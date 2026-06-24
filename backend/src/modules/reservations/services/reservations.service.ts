@@ -273,16 +273,25 @@ export class ReservationsService {
       // larger than ANY physical table. Reject when guestCount exceeds the
       // branch's largest table capacity — no single table could ever seat the
       // party (mirrors the per-table capacity check above for assigned tables).
+      //
+      // BUT: only enforce this when the branch ACTUALLY HAS tables. A
+      // reservation-enabled tenant that never defined tables (new tenants are
+      // NOT auto-seeded any) reports maxCapacity=0, and guestCount is @Min(1) —
+      // so an unconditional `guestCount > maxCapacity` guard rejects EVERY
+      // no-table public booking, bricking the established walk-in / no-table
+      // flow. When maxCapacity===0 (zero tables defined) table management is
+      // not in use here, so fall back to prior behavior: the party size is
+      // bounded only by settings.maxGuestsPerReservation, already enforced
+      // above. The "no single table can seat this party" guard only applies
+      // when tables exist and the party exceeds the largest.
       const largest = await this.prisma.table.aggregate({
         where: { tenantId, branchId: resolvedBranchId },
         _max: { capacity: true },
       });
       const maxCapacity = largest._max.capacity ?? 0;
-      if (dto.guestCount > maxCapacity) {
+      if (maxCapacity > 0 && dto.guestCount > maxCapacity) {
         throw new BadRequestException(
-          maxCapacity > 0
-            ? `No table can seat a party of ${dto.guestCount}. The largest table seats ${maxCapacity}.`
-            : `No table is available to seat a party of ${dto.guestCount}.`,
+          `No table can seat a party of ${dto.guestCount}. The largest table seats ${maxCapacity}.`,
         );
       }
     }

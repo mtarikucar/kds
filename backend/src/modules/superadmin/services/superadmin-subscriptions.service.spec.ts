@@ -615,9 +615,13 @@ describe("SuperAdminSubscriptionsService.extendSubscription reinstatement", () =
 
   const SUB_ID = "sub-1";
   const TENANT_ID = "tenant-1";
+  const PLAN_ID = "plan-1";
   const baseSub: any = {
     id: SUB_ID,
     tenantId: TENANT_ID,
+    // The subscription's OWN plan — Extend must restore tenant.currentPlanId to
+    // this so the projector grants the real plan (not FREE) on reinstatement.
+    planId: PLAN_ID,
     status: "EXPIRED",
     currentPeriodEnd: new Date("2026-01-01T00:00:00.000Z"),
     tenant: { id: TENANT_ID, name: "Test Restoran" },
@@ -668,6 +672,16 @@ describe("SuperAdminSubscriptionsService.extendSubscription reinstatement", () =
           cancellationReason: null,
           currentPeriodEnd: expect.any(Date),
         }),
+      }),
+    );
+    // Tenant plan pointer restored to the subscription's OWN plan IN the same
+    // transaction — without this the projector resolves effectivePlan=FREE
+    // (cron-expire/period-end-cancel may have cleared tenant.currentPlanId) and
+    // the tenant stays silently FREE-locked despite the ACTIVE status (M7).
+    expect(prisma.tenant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: TENANT_ID },
+        data: { currentPlanId: PLAN_ID },
       }),
     );
     // Reprojection invoked in the same transaction (tx === prisma here).
@@ -730,6 +744,9 @@ describe("SuperAdminSubscriptionsService.extendSubscription reinstatement", () =
     expect(data.status).toBeUndefined();
     expect(data.endedAt).toBeUndefined();
     expect(data.currentPeriodEnd).toBeInstanceOf(Date);
+    // An already-ACTIVE row must NOT touch the tenant's plan pointer — extending
+    // a healthy subscription is a pure date push, never a plan reinstatement.
+    expect(prisma.tenant.update).not.toHaveBeenCalled();
     expect(
       subscriptionService.emitSubscriptionReprojection,
     ).not.toHaveBeenCalled();

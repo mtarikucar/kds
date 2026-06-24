@@ -109,6 +109,24 @@ export class ReservationAvailabilityService {
   async listPublicBranches(
     tenantId: string,
   ): Promise<{ id: string; name: string }[]> {
+    // Plan-gate this PUBLIC, anonymous read so it matches the sibling public
+    // surfaces (getPublicSettings / getAvailableSlots / getAvailableTables) and
+    // the admin gate. Without it, a tenant whose plan excludes reservations
+    // still leaks its branch roster (id + name) on the booking branch-picker —
+    // an info leak the pre-prod audit flagged. Return [] when not granted, the
+    // same shape as a tenant with no active branches. @Optional() entitlements
+    // ⇒ ungated for bare-constructed unit-test instances (prod DI always sets).
+    if (this.entitlements) {
+      const featureEnabled = await isReservationFeatureEnabled(
+        this.prisma,
+        this.entitlements,
+        tenantId,
+      );
+      if (!featureEnabled) {
+        return [];
+      }
+    }
+
     return this.prisma.branch.findMany({
       where: { tenantId, status: "active" },
       orderBy: { createdAt: "asc" },
@@ -210,6 +228,16 @@ export class ReservationAvailabilityService {
     // using the same overlap math getAvailableTables uses. Guarded on
     // guestCount so the no-party-size view (and existing callers) are
     // unchanged.
+    //
+    // BUT: only apply the capacity gate when the branch ACTUALLY HAS tables.
+    // A reservation-enabled tenant that never defined tables would otherwise
+    // produce an empty capableTables array → every slot forced
+    // available:false → the whole day greyed out, bricking the no-table /
+    // walk-in flow. A branch with zero tables means "table management is not
+    // in use here", so leave capableTables=null (the per-slot gate below is
+    // skipped) and let slots stay bookable on capacity grounds; the
+    // createPublicReservation path bounds party size by
+    // settings.maxGuestsPerReservation instead.
     let capableTables: { id: string; capacity: number }[] | null = null;
     if (guestCount) {
       const tables =
@@ -217,7 +245,11 @@ export class ReservationAvailabilityService {
           where: { tenantId, branchId: resolvedBranchId },
           select: { id: true, capacity: true },
         })) ?? [];
-      capableTables = tables.filter((t) => t.capacity >= guestCount);
+      // Only gate on capacity when tables exist for this branch. Zero tables
+      // ⇒ table management not in use ⇒ don't force slots unavailable.
+      if (tables.length > 0) {
+        capableTables = tables.filter((t) => t.capacity >= guestCount);
+      }
     }
 
     // Reservations that hold a specific table (for the per-table freeness

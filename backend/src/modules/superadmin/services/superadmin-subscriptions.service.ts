@@ -544,6 +544,21 @@ export class SuperAdminSubscriptionsService {
       });
 
       if (!wasActive) {
+        // Restore the tenant's plan pointer to THIS subscription's own plan.
+        // The entitlement projector (plan-projector.service.projectTenantInner)
+        // resolves effectivePlan = isAccessPaid ? tenant.currentPlan : FREE.
+        // Once status flips to ACTIVE above, isAccessPaid becomes true — but a
+        // cron-EXPIRED / period-end-CANCELLED row may have left
+        // tenant.currentPlanId cleared or downgraded to FREE, so without this
+        // the reprojection below grants FREE features and the tenant stays
+        // silently locked despite the ACTIVE status. Mirror updateSubscription's
+        // tx.tenant.update({ data: { currentPlanId } }) (this file, ~line 432)
+        // using the subscription's planId column so the projector grants the
+        // real plan.
+        await tx.tenant.update({
+          where: { id: subscription.tenantId },
+          data: { currentPlanId: subscription.planId },
+        });
         await this.subscriptionService.emitSubscriptionReprojection(
           {
             id: sub.id,

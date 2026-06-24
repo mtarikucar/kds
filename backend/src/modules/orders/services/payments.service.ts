@@ -837,6 +837,22 @@ export class PaymentsService {
         }
       }
 
+      // Also reverse finished-good (Product.currentStock) deductions —
+      // symmetric with the deduct booked on sale/approval. Idempotent, so a
+      // cancel-then-refund (or vice versa) on the same order won't double-credit.
+      if (orderMovedToCancelled) {
+        try {
+          await this.ordersService.reverseProductStockForOrder(
+            payment.orderId,
+            tenantId,
+          );
+        } catch (err: any) {
+          this.logger.error(
+            `Product stock reversal failed for refunded order ${payment.orderId}: ${err.message}`,
+          );
+        }
+      }
+
       return result;
     }
 
