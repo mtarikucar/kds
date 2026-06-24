@@ -115,7 +115,8 @@
       "label": "Muhit",
       "production": "Ishlab chiqarish",
       "sandbox": "Sandbox",
-      "sandboxWarning": "Sandbox ushbu platformani sinov endpointlariga yo‘naltiradi va o‘rnatilgan sinov buyurtma simulyatorini yoqadi. Haqiqiy buyurtmalar qayta ishlanmaydi."
+      "sandboxWarning": "Sandbox ushbu platformani sinov endpointlariga yo‘naltiradi va o‘rnatilgan sinov buyurtma simulyatorini yoqadi. Haqiqiy buyurtmalar qayta ishlanmaydi.",
+      "noSandbox": "Bu platformada sandbox yo‘q — sinov endpointi sozlanmagan, sandbox tanlab bo‘lmaydi."
     }
   },
   "autoSave": {

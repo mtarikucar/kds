@@ -97,6 +97,16 @@ describe("LogoAdapter", () => {
       adapter.testConnection({ apiUrl: "x", username: "u", password: "p" }),
     ).resolves.toBe(true);
   });
+
+  it("pushInvoice THROWS when the response has no INTERNAL_REFERENCE (no fake id)", async () => {
+    const adapter = new LogoAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: {} });
+    (adapter as any).httpClient = http;
+    await expect(adapter.pushInvoice("tok", "co-1", invoice)).rejects.toThrow(
+      /no INTERNAL_REFERENCE/i,
+    );
+  });
 });
 
 describe("ForibaEfaturaAdapter", () => {
@@ -134,5 +144,15 @@ describe("ForibaEfaturaAdapter", () => {
     http.post.mockRejectedValue(new Error("bad creds"));
     (adapter as any).httpClient = http;
     await expect(adapter.testConnection({})).resolves.toBe(false);
+  });
+
+  it("pushInvoice THROWS when the response has no uuid/id (no fake id)", async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: {} });
+    (adapter as any).httpClient = http;
+    await expect(adapter.pushInvoice("tok", "co-1", invoice)).rejects.toThrow(
+      /no invoice id/i,
+    );
   });
 });

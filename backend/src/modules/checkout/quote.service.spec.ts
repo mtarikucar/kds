@@ -2,7 +2,6 @@ import { QuoteService } from './quote.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { AddOnCatalogService } from '../marketplace/addon-catalog.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
-import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * QuoteService is the pricing seam every cart goes through. These tests
@@ -27,51 +26,36 @@ describe('QuoteService', () => {
     svc = new QuoteService(prisma as any, catalog, addons);
   });
 
-  it('prices a PRO plan at the monthly rate by default', async () => {
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({
-      id: 'p-pro',
-      name: 'PRO',
-      displayName: 'Profesyonel',
-      monthlyPrice: new Decimal('1299'),
-      yearlyPrice: new Decimal('12990'),
-      currency: 'TRY',
-    } as any);
-
-    const q = await svc.quote({ items: [{ type: 'plan', code: 'PRO' }] });
-
-    expect(q.lines).toHaveLength(1);
-    // Line prices stay gross (KDV-inclusive).
-    expect(q.lines[0].subtotalCents).toBe(129900);
-    expect(q.lines[0].cadence).toBe('monthly');
-    // KDV is derived OUT of the gross, never added on top: subtotal is NET,
-    // tax is the embedded KDV, total is the gross price (== what's charged).
-    expect(q.subtotalCents).toBe(108250); // round(129900 / 1.2)
-    expect(q.taxCents).toBe(21650); // 129900 - 108250
-    expect(q.totalCents).toBe(129900); // gross, no shipping — NOT 155880
-    expect(q.subtotalCents + q.taxCents).toBe(129900);
-    expect(q.shippingCents).toBe(0);   // no hardware
-    expect(q.isPureRecurring).toBe(true);
+  // Plan changes do NOT belong in checkout. A `plan` line used to be priced
+  // AND charged, then emit subscription.upgrade.requested.v1 — an event with
+  // NO consumer, so the plan never changed: money taken for a no-op. The real
+  // plan-change rail is /subscriptions/change-plan → pendingPlanChange →
+  // settlement. QuoteService now REJECTS plan lines so nothing can ever charge
+  // for a checkout plan no-op. (No UI sends plan lines today; this is latent.)
+  it('rejects a plan line (plan changes go through /subscriptions/change-plan)', async () => {
+    await expect(
+      svc.quote({ items: [{ type: 'plan', code: 'PRO' }] }),
+    ).rejects.toThrow(/change-plan/i);
+    // Reject up-front — never even look the plan up (no pricing, no charge path).
+    expect(prisma.subscriptionPlan.findUnique).not.toHaveBeenCalled();
   });
 
-  it('switches to yearly price when billingCycle is YEARLY', async () => {
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({
-      id: 'p-pro',
-      name: 'PRO',
-      displayName: 'Profesyonel',
-      monthlyPrice: new Decimal('1299'),
-      yearlyPrice: new Decimal('12990'),
-      currency: 'TRY',
+  it('rejects a mixed cart the moment it hits a plan line', async () => {
+    addons.findByCodeOrThrow.mockResolvedValue({
+      code: 'kds_extra_screen', name: 'Extra KDS screen', status: 'published',
+      billing: 'recurring', priceCents: 5000, currency: 'TRY', id: 'a-1', kind: 'capacity',
     } as any);
-    const q = await svc.quote({ items: [{ type: 'plan', code: 'PRO', billingCycle: 'YEARLY' }] });
-    expect(q.lines[0].subtotalCents).toBe(1_299_000);
-    expect(q.lines[0].cadence).toBe('yearly');
+    await expect(
+      svc.quote({
+        items: [
+          { type: 'addon', code: 'kds_extra_screen', qty: 2 },
+          { type: 'plan', code: 'PRO' },
+        ],
+      }),
+    ).rejects.toThrow(/change-plan/i);
   });
 
-  it('mixes plan + addon + hardware + service into one quote', async () => {
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({
-      id: 'p-pro', name: 'PRO', displayName: 'Pro', monthlyPrice: new Decimal('1000'),
-      yearlyPrice: new Decimal('10000'), currency: 'TRY',
-    } as any);
+  it('still mixes addon + hardware + service into one quote (no plan)', async () => {
     addons.findByCodeOrThrow.mockResolvedValue({
       code: 'kds_extra_screen', name: 'Extra KDS screen', status: 'published',
       billing: 'recurring', priceCents: 5000, currency: 'TRY', id: 'a-1', kind: 'capacity',
@@ -97,7 +81,6 @@ describe('QuoteService', () => {
 
     const q = await svc.quote({
       items: [
-        { type: 'plan', code: 'PRO' },
         { type: 'addon', code: 'kds_extra_screen', qty: 2 },
         { type: 'hardware', sku: 'kds-21in', qty: 1 },
         { type: 'service', code: 'onsite_install_kds' },
@@ -105,21 +88,14 @@ describe('QuoteService', () => {
       shippingAddress: {},
     });
 
-    expect(q.lines).toHaveLength(4);
-    // gross lines = 100000 + 2*5000 + 75000 + 250000 = 435000 (KDV-inclusive).
+    expect(q.lines).toHaveLength(3);
+    // gross lines = 2*5000 + 75000 + 250000 = 335000 (KDV-inclusive).
     // subtotal is NET, total is gross + shipping.
-    expect(q.subtotalCents).toBe(362_500); // round(435000 / 1.2)
-    expect(q.taxCents).toBe(72_500); // 435000 - 362500
-    expect(q.totalCents).toBe(440_000); // 435000 gross + 5000 shipping
+    expect(q.subtotalCents).toBe(279_167); // round(335000 / 1.2)
+    expect(q.taxCents).toBe(55_833); // 335000 - 279167
+    expect(q.totalCents).toBe(340_000); // 335000 gross + 5000 shipping
     expect(q.shippingCents).toBe(5_000);
     expect(q.isPureRecurring).toBe(false);
-  });
-
-  it('emits a warning instead of failing when a plan code is unknown', async () => {
-    prisma.subscriptionPlan.findUnique.mockResolvedValue(null);
-    const q = await svc.quote({ items: [{ type: 'plan', code: 'NOPE' }] });
-    expect(q.lines).toHaveLength(0);
-    expect(q.warnings).toContainEqual(expect.stringContaining('NOPE'));
   });
 
   it('refuses to price a rental for SKUs without a rental price', async () => {

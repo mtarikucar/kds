@@ -11,6 +11,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreatePlatformConfigDto } from "../dto/create-platform-config.dto";
 import { UpdatePlatformConfigDto } from "../dto/update-platform-config.dto";
 import { AdapterFactory } from "../adapters/adapter-factory";
+import { BaseAdapter } from "../adapters/base.adapter";
 import {
   decryptJson,
   decryptString,
@@ -98,6 +99,43 @@ export class DeliveryConfigService {
     });
     if (!branch) {
       throw new BadRequestException("branchId is not a branch of this tenant");
+    }
+  }
+
+  /**
+   * SANDBOX-FAIL-CLOSED for platform-mutating / test actions.
+   *
+   * A config with environment === "sandbox" is meant to keep real-world side
+   * effects off the LIVE platform. But several platforms (Getir, Yemeksepeti,
+   * Migros) have no documented test host, so their adapter's sandbox base URL
+   * defaults to the PRODUCTION host (see BaseAdapter.hasRealSandbox). For those,
+   * a "sandbox" config still resolves to the live API — so test-connection /
+   * sync-menu / toggle-restaurant would silently hit PROD while the operator
+   * believes they are in a safe sandbox.
+   *
+   * This mirrors the guard rail #1b in DeliveryTestService.simulateOrder: when
+   * a config claims "sandbox" but the adapter has no real, distinct sandbox
+   * endpoint, REFUSE rather than quietly calling production. Production configs
+   * are unaffected (they are expected to hit prod). We narrow to the
+   * hasRealSandbox capability structurally rather than widening the public
+   * PlatformAdapter interface — it lives on the shared BaseAdapter every
+   * concrete adapter extends, and the factory returns that same singleton used
+   * on the real ingest/outbound path.
+   */
+  assertSandboxIsSafe(
+    platform: string,
+    environment: string | null | undefined,
+  ): void {
+    if (environment !== "sandbox") return;
+    const adapter = this.adapterFactory.getAdapter(platform) as unknown as Pick<
+      BaseAdapter,
+      "hasRealSandbox"
+    >;
+    if (!adapter.hasRealSandbox()) {
+      throw new BadRequestException(
+        `No sandbox endpoint configured for ${platform} (set ${platform}_SANDBOX_API_BASE_URL); ` +
+          `refusing to run this action against production. Switch the platform to the "production" environment instead.`,
+      );
     }
   }
 
@@ -284,12 +322,18 @@ export class DeliveryConfigService {
 
   async testConnection(tenantId: string, platform: string) {
     const config = await this.findOneInternal(tenantId, platform);
+    // SANDBOX-FAIL-CLOSED: refuse to "test" against prod when the config
+    // claims sandbox but the adapter has no real sandbox host (would hit prod).
+    this.assertSandboxIsSafe(platform, config.environment);
     const adapter = this.adapterFactory.getAdapter(platform);
     return adapter.testConnection(config);
   }
 
   async toggleRestaurant(tenantId: string, platform: string, open: boolean) {
     const config = await this.findOneInternal(tenantId, platform);
+    // SANDBOX-FAIL-CLOSED: opening/closing the restaurant is a live mutation;
+    // refuse when a "sandbox" config would actually resolve to production.
+    this.assertSandboxIsSafe(platform, config.environment);
     const adapter = this.adapterFactory.getAdapter(platform);
 
     if (open && adapter.openRestaurant) {

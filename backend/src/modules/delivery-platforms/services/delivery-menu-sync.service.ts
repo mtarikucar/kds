@@ -34,6 +34,17 @@ export class DeliveryMenuSyncService {
 
     if (!config?.isEnabled) return;
 
+    // SANDBOX-FAIL-CLOSED: pushing the catalog is a live mutation. When a
+    // config claims "sandbox" but the adapter has no real sandbox host (Getir,
+    // Yemeksepeti, Migros default their sandbox base URL to prod), this would
+    // overwrite the LIVE menu while the operator believes they are sandboxing.
+    // Refuse loudly (throws BadRequest to the caller) rather than silently
+    // syncing to production. Mirrors DeliveryConfigService.testConnection /
+    // toggleRestaurant and the test-order simulator's guard rail #1b. Placed
+    // BEFORE the try so it surfaces to the operator instead of being swallowed
+    // into a MENU_SYNC failure log entry.
+    this.configService.assertSandboxIsSafe(platform, config.environment);
+
     const adapter = this.adapterFactory.getAdapter(platform);
     if (!adapter.syncMenu) {
       this.logger.warn(`${platform} does not support menu sync`);

@@ -93,8 +93,9 @@ export class CheckoutController {
     });
   }
 
-  // Iter-88: confirmAndProvision allocates stock, mints HardwareOrder rows,
-  // and queues subscription.upgrade.requested events. Pre-iter-88 the
+  // Iter-88: confirmAndProvision allocates stock and mints HardwareOrder rows
+  // (plan changes are NOT handled here — QuoteService rejects plan lines; they
+  // go through /subscriptions/change-plan). Pre-iter-88 the
   // endpoint only required JwtAuthGuard, so a WAITER could replay a forged
   // paymentRef and provision hardware against their tenant. Restrict to
   // ADMIN/MANAGER and validate the payload via ConfirmCheckoutDto.

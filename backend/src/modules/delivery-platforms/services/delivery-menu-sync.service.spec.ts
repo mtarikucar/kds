@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DeliveryMenuSyncService } from './delivery-menu-sync.service';
 import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
@@ -28,7 +32,12 @@ describe('DeliveryMenuSyncService (iter-38)', () => {
     adapterFactory = { getAdapter: jest.fn() };
     logService = { log: jest.fn().mockResolvedValue(undefined) };
     authService = { ensureValidToken: jest.fn() };
-    configService = { recordError: jest.fn().mockResolvedValue({}) };
+    configService = {
+      recordError: jest.fn().mockResolvedValue({}),
+      // Default: a real sandbox host (no-op guard). The sandbox-fail-closed
+      // tests below make this throw to assert syncMenu is never reached.
+      assertSandboxIsSafe: jest.fn(),
+    };
     svc = new DeliveryMenuSyncService(
       prisma as any,
       adapterFactory,
@@ -140,6 +149,76 @@ describe('DeliveryMenuSyncService (iter-38)', () => {
       await svc.syncMenuToPlatform('t1', 'YEMEKSEPETI');
 
       expect(configService.recordError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sandbox-fail-closed (no-real-sandbox refuses live menu push)', () => {
+    it('REFUSES to sync when assertSandboxIsSafe throws (sandbox config resolving to prod)', async () => {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+        isEnabled: true,
+        tenantId: 't1',
+        platform: 'MIGROS',
+        environment: 'sandbox',
+      });
+      const syncMenu = jest.fn();
+      adapterFactory.getAdapter.mockReturnValue({ syncMenu });
+      // No real sandbox host → guard throws (mirrors prod behaviour).
+      configService.assertSandboxIsSafe.mockImplementation(() => {
+        throw new BadRequestException(
+          'No sandbox endpoint configured for MIGROS',
+        );
+      });
+
+      await expect(
+        svc.syncMenuToPlatform('t1', 'MIGROS'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      // Critical: the live catalog push never happens, and the refusal is
+      // NOT swallowed into a MENU_SYNC failure log / recordError bump.
+      expect(syncMenu).not.toHaveBeenCalled();
+      expect(logService.log).not.toHaveBeenCalled();
+      expect(configService.recordError).not.toHaveBeenCalled();
+      expect(configService.assertSandboxIsSafe).toHaveBeenCalledWith(
+        'MIGROS',
+        'sandbox',
+      );
+    });
+
+    it('checks the guard for an enabled config and proceeds when it does not throw', async () => {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+        isEnabled: true,
+        tenantId: 't1',
+        platform: 'TRENDYOL',
+        environment: 'sandbox',
+      });
+      adapterFactory.getAdapter.mockReturnValue({
+        syncMenu: jest.fn().mockResolvedValue(undefined),
+      });
+      authService.ensureValidToken.mockResolvedValue({ id: 'cfg-1' });
+      (prisma.menuItemMapping.findMany as any).mockResolvedValue([]);
+
+      await svc.syncMenuToPlatform('t1', 'TRENDYOL');
+
+      expect(configService.assertSandboxIsSafe).toHaveBeenCalledWith(
+        'TRENDYOL',
+        'sandbox',
+      );
+    });
+
+    it('does not reach the guard for a disabled config (no-op early return)', async () => {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+        isEnabled: false,
+        tenantId: 't1',
+        platform: 'MIGROS',
+        environment: 'sandbox',
+      });
+
+      await svc.syncMenuToPlatform('t1', 'MIGROS');
+
+      expect(configService.assertSandboxIsSafe).not.toHaveBeenCalled();
     });
   });
 });

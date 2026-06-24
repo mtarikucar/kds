@@ -62,8 +62,19 @@ export class LogoAdapter implements AccountingAdapter {
       },
     );
 
-    const externalId =
-      response.data?.INTERNAL_REFERENCE?.toString() || `logo-${Date.now()}`;
+    // Honesty: only succeed when Logo actually returned an internal
+    // reference. A synthetic `logo-<ts>` id would mark the invoice SYNCED
+    // while nothing was persisted upstream, masking a real failure. No
+    // reference ⇒ throw so the sync path records FAILED instead.
+    const externalId = response.data?.INTERNAL_REFERENCE?.toString();
+    if (!externalId) {
+      this.logger.error(
+        `Logo salesInvoices returned no INTERNAL_REFERENCE for invoice ${invoice.invoiceNumber}; treating as failure`,
+      );
+      throw new Error(
+        "Logo invoice create returned no INTERNAL_REFERENCE (id missing)",
+      );
+    }
     this.logger.log(`Logo invoice created: ${externalId}`);
     return { externalId };
   }

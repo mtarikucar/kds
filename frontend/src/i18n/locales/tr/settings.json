@@ -115,7 +115,8 @@
       "label": "Ortam",
       "production": "Canlı",
       "sandbox": "Sandbox",
-      "sandboxWarning": "Sandbox, bu platformu test uç noktalarına yönlendirir ve yerleşik test sipariş simülatörünü etkinleştirir. Gerçek sipariş işlenmez."
+      "sandboxWarning": "Sandbox, bu platformu test uç noktalarına yönlendirir ve yerleşik test sipariş simülatörünü etkinleştirir. Gerçek sipariş işlenmez.",
+      "noSandbox": "Bu platformda sandbox yok — test uç noktası tanımlı değil, sandbox seçilemez."
     }
   },
   "autoSave": {

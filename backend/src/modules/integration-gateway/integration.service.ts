@@ -11,7 +11,6 @@ import {
   createHash,
 } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
-import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
@@ -28,6 +27,19 @@ import { TrendyolYemekAdapter } from "./adapters/trendyol-yemek.adapter";
  * server's `INTEGRATION_KEY` env var using HKDF-style sha256 against the
  * tenantId so a single leaked key doesn't cross-decrypt other tenants'
  * credentials. Real KMS lands in Phase 12.
+ *
+ * SCOPE / HONESTY: this gateway is a scaffold. It can verify a provider's
+ * webhook signature, but it has NO order/event pipeline behind that — once a
+ * webhook is verified, ingestWebhook honestly rejects (it does not store or
+ * forward anything). The catalog is therefore seeded with all providers as
+ * `coming_soon` (non-connectable) in prisma/seeds/seed-marketplace.ts.
+ *
+ * The REAL delivery integration (Yemeksepeti/Getir/Trendyol/Migros order
+ * ingest, kitchen-ticket print, status push, polling, reconciliation) lives
+ * in the `delivery-platforms` module — not here. The yemeksepeti/getir/
+ * trendyol_yemek adapters wired into this service are duplicates kept only as
+ * a verifiable signing surface. Real payment webhooks (PayTR) live in the
+ * payments module. Do not route production traffic at this gateway.
  */
 @Injectable()
 export class IntegrationService {
@@ -36,9 +48,11 @@ export class IntegrationService {
   /**
    * Adapter registry — keyed by provider id (matches IntegrationProviderDef.id
    * and the URL path param). Webhook ingest looks the adapter up here and
-   * delegates HMAC verification before persisting. Providers without an
-   * adapter cannot receive webhooks; that's intentional — every public
-   * webhook MUST go through a signature-verifying code path.
+   * delegates HMAC verification. Providers without an adapter cannot receive
+   * webhooks; that's intentional — every public webhook MUST go through a
+   * signature-verifying code path. NOTE: a successful verify here does NOT
+   * persist or forward the order; see the honesty gate in ingestWebhook. The
+   * real delivery pipeline is the delivery-platforms module.
    */
   private readonly adapters: ReadonlyMap<string, IntegrationAdapter>;
 
@@ -236,7 +250,9 @@ export class IntegrationService {
     //
     // On any failure we return a 200-shaped { ignored, reason } so PayTR-
     // style infinite-retry providers don't hammer us, and we log internally
-    // for ops visibility.
+    // for ops visibility. NOTE: even on SUCCESS we now reject — the honesty
+    // gate at the end of this method drops the verified payload because the
+    // gateway has no order pipeline (the real flow is delivery-platforms).
     const adapter = this.adapters.get(providerId);
     if (!adapter || !adapter.parseWebhook) {
       this.logger.warn(
@@ -283,10 +299,11 @@ export class IntegrationService {
     // tenant) the race is rare and the worst case is an HMAC reject;
     // when traffic grows, switch to a stateless verify(secret, sig, raw)
     // method on the adapter and drop init().
-    let _events: unknown[];
     try {
       await adapter.init(credentials);
-      _events = await adapter.parseWebhook(signature, raw);
+      // Verify the signature so we still fail-closed on forged bodies, but
+      // intentionally discard the parsed result — see the honesty note below.
+      await adapter.parseWebhook(signature, raw);
     } catch (e: any) {
       this.logger.warn(
         `Webhook signature/parse failed for provider=${providerId} tenant=${tenantId}: ${e?.message ?? e}`,
@@ -294,125 +311,39 @@ export class IntegrationService {
       return { ignored: true, reason: "verify failed" };
     }
 
-    // Replay protection. The HMAC verify above proves the body+sig was
-    // signed by someone holding the connection's secret — but doesn't
-    // prevent the same captured body+sig from being POSTed N times.
-    // Without dedup an attacker (or a buggy provider retry loop) can
-    // pump the same valid webhook into our pipeline indefinitely,
-    // double-charging order downstreams, double-firing notifications,
-    // and inflating our outbox.
+    // ── HONESTY GATE: do not store-and-discard. ─────────────────────────
     //
-    // Signature is HMAC-SHA256 over the raw body — collision is
-    // cryptographically negligible, so (tenant, provider, signature)
-    // within a recent window is a reliable replay-detect key without
-    // requiring a schema change. 24h window is conservative; providers
-    // that legitimately resend identical bodies more than a day apart
-    // (e.g. daily heartbeats) won't trip the gate.
+    // This used to (a) JSON.parse the body, (b) persist a row in
+    // integration_webhook_events, and (c) emit
+    // `integration.webhook.<provider>.received.v1` to the outbox. The
+    // parsed order events from adapter.parseWebhook() were thrown away, and
+    // NOTHING downstream consumes that outbox topic to turn the payload into
+    // a real Order. The net effect was a misleading "we received your
+    // delivery order" success that went nowhere.
     //
-    // deep-review M20: the dedup used to be a bare findFirst followed by a
-    // separate create — a read-then-write TOCTOU. Two identical webhooks
-    // arriving concurrently (provider retry storm / attacker replay) each
-    // ran findFirst before the other committed, so neither saw the peer's
-    // row and BOTH created an event + emitted to the outbox, double-firing
-    // downstream order/payment consumers. A plain @@unique can't fix this
-    // cleanly here: signature is nullable (null-sig rows are intentionally
-    // never deduped — Postgres treats NULLs as distinct anyway) and a full
-    // unique index would also kill the deliberate 24h-resend escape hatch
-    // for daily-heartbeat bodies. Instead we run the dup-check + create in
-    // a single Serializable transaction (same pattern as Iter-68 in
-    // tenant-marketplace). Postgres detects the overlapping read/write
-    // predicate sets and aborts one of the two concurrent transactions;
-    // the loser surfaces as a serialization failure (40001 / P2034), which
-    // we map to the same { ignored, reason: "duplicate" } the sequential
-    // path returns — so only the winner ever appends to the outbox.
-    let parsed: any = {};
-    try {
-      parsed = JSON.parse(raw.toString("utf8"));
-    } catch {
-      // Some providers send urlencoded — leave parsed as raw bytes in payload.
-      parsed = { _raw: raw.toString("utf8") };
-    }
-
-    // `null` is the in-txn sentinel for a sequential-duplicate hit (the txn
-    // unwinds without writing); the non-null branch is the created row.
-    let row: Awaited<
-      ReturnType<typeof this.prisma.integrationWebhookEvent.create>
-    > | null;
-    try {
-      row = await this.prisma.$transaction(
-        async (tx) => {
-          if (signature) {
-            const recentDuplicate = await tx.integrationWebhookEvent.findFirst({
-              where: {
-                tenantId,
-                providerId,
-                signature,
-                receivedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
-              },
-              select: { id: true, receivedAt: true },
-            });
-            if (recentDuplicate) {
-              this.logger.warn(
-                `Replay rejected: duplicate signature for provider=${providerId} tenant=${tenantId} ` +
-                  `— original event ${recentDuplicate.id} received at ${recentDuplicate.receivedAt.toISOString()}`,
-              );
-              // Sentinel: unwind the txn without writing, distinguished from
-              // a real serialization abort by the P2034 check below.
-              return null;
-            }
-          }
-
-          return tx.integrationWebhookEvent.create({
-            data: {
-              id: uuidv7(),
-              tenantId,
-              connectionId: connection.id,
-              providerId,
-              type: parsed?.type ?? parsed?.event ?? "unknown",
-              signature,
-              payload: parsed as any,
-              result: "received",
-            },
-          });
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
-    } catch (err) {
-      // deep-review M20: the loser of a concurrent dup race aborts here with
-      // a Postgres serialization failure (40001 → Prisma P2034). Treat it as
-      // a duplicate so the loser neither retries nor touches the outbox.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === "P2034"
-      ) {
-        this.logger.warn(
-          `Replay rejected (serialization conflict): concurrent duplicate ` +
-            `signature for provider=${providerId} tenant=${tenantId}`,
-        );
-        return { ignored: true, reason: "duplicate" };
-      }
-      throw err;
-    }
-
-    // Sequential duplicate caught inside the txn (recentDuplicate hit).
-    if (row === null) {
-      return { ignored: true, reason: "duplicate" };
-    }
-
-    await this.outbox
-      .append({
-        type: `integration.webhook.${providerId}.received.v1`,
-        tenantId,
-        payload: { webhookEventId: row.id, providerId, type: row.type },
-      })
-      .catch(
-        captureSwallowedEmit(this.logger, {
-          module: "integration-gateway",
-          op: "webhook-ingest",
-        }),
-      );
-
-    return row;
+    // The REAL delivery flow — order ingest, kitchen ticket print, status
+    // push, polling, reconciliation — lives in the delivery-platforms
+    // module (DeliveryWebhookController + DeliveryOrderService). The three
+    // adapters wired here (yemeksepeti/getir/trendyol_yemek) are duplicates
+    // kept only so the gateway has a verifiable signing surface; they have
+    // no order pipeline behind them.
+    //
+    // So once the signature has been verified, we honestly reject rather
+    // than persist a forensic row + fire a no-op event. We still return the
+    // 200-shaped { ignored, reason } envelope (not a 4xx/5xx) so a real
+    // provider's retry loop doesn't hammer the public route, and we log at
+    // `warn` so ops can see a provider is (mis)pointed at this gateway
+    // instead of the delivery-platforms webhook URL.
+    //
+    // Re-enabling persistence requires a downstream consumer of the emitted
+    // event; until then, leaving it on would be the exact "hollow success"
+    // this cleanup removes.
+    this.logger.warn(
+      `Verified webhook for provider=${providerId} tenant=${tenantId} but ` +
+        `this gateway has no order pipeline — dropping (real delivery ingest ` +
+        `is the delivery-platforms module). No row stored, no event emitted.`,
+    );
+    return { ignored: true, reason: "not implemented" };
   }
 
   // -- Crypto helpers ----------------------------------------------------

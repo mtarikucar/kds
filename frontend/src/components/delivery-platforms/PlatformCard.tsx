@@ -36,6 +36,19 @@ const REQUIRED_CREDENTIALS: Record<string, string[]> = {
   MIGROS: ['apiKey'],
 };
 
+// Which platforms have a REAL, distinct sandbox host. Mirrors the backend
+// adapters: only Trendyol publishes a stage/sandbox gateway. Getir,
+// Yemeksepeti and Migros have no documented test host, so their adapter's
+// sandbox base URL defaults to PRODUCTION — selecting "sandbox" there would
+// silently hit the live API (test-connection / sync-menu / toggle-restaurant /
+// test-order all REFUSE on the backend via SANDBOX-FAIL-CLOSED). We must not
+// present sandbox as functional for those: disable the toggle with a tooltip.
+const PLATFORMS_WITH_REAL_SANDBOX = new Set<string>(['TRENDYOL']);
+
+function platformHasRealSandbox(platform: string): boolean {
+  return PLATFORMS_WITH_REAL_SANDBOX.has(platform);
+}
+
 function checkHasCredentials(
   platform: string,
   credentials: Record<string, any>,
@@ -132,6 +145,10 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
     config?.hasCredentials === true ||
     checkHasCredentials(platform, credentials);
   const isSandbox = environment === 'sandbox';
+  // This platform exposes a real, distinct sandbox endpoint. When false,
+  // selecting "sandbox" would resolve to PRODUCTION on the backend (and the
+  // backend now REFUSES the live actions), so we disable sandbox in the UI.
+  const hasRealSandbox = platformHasRealSandbox(platform);
 
   const handleToggleEnabled = async () => {
     if (!config) {
@@ -232,6 +249,14 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
   };
 
   const handleEnvironmentChange = (next: PlatformEnvironment) => {
+    // Guard: never let the operator select sandbox on a platform that has no
+    // real sandbox host — it would resolve to prod and every live/test action
+    // is refused by the backend. The button is also disabled, this is
+    // belt-and-braces.
+    if (next === 'sandbox' && !hasRealSandbox) {
+      toast.error(t('onlineOrders.environment.noSandbox'));
+      return;
+    }
     setEnvironment(next);
     setHasChanges(true);
   };
@@ -388,28 +413,53 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
                 </p>
               </div>
               <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
-                {(['production', 'sandbox'] as const).map((env) => (
-                  <button
-                    key={env}
-                    type="button"
-                    onClick={() => handleEnvironmentChange(env)}
-                    aria-pressed={environment === env}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      environment === env
-                        ? env === 'sandbox'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-primary-100 text-primary-700'
-                        : 'bg-white text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    {env === 'sandbox'
-                      ? t('onlineOrders.environment.sandbox')
-                      : t('onlineOrders.environment.production')}
-                  </button>
-                ))}
+                {(['production', 'sandbox'] as const).map((env) => {
+                  // Disable the sandbox option when the platform has no real
+                  // sandbox endpoint — selecting it would hit prod and the
+                  // backend refuses every live/test action.
+                  const isSandboxOption = env === 'sandbox';
+                  const disabled = isSandboxOption && !hasRealSandbox;
+                  return (
+                    <button
+                      key={env}
+                      type="button"
+                      onClick={() => handleEnvironmentChange(env)}
+                      aria-pressed={environment === env}
+                      disabled={disabled}
+                      title={
+                        disabled
+                          ? t('onlineOrders.environment.noSandbox')
+                          : undefined
+                      }
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                        disabled
+                          ? 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
+                          : environment === env
+                            ? env === 'sandbox'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-primary-100 text-primary-700'
+                            : 'bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {isSandboxOption
+                        ? t('onlineOrders.environment.sandbox')
+                        : t('onlineOrders.environment.production')}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            {isSandbox && (
+            {/* No real sandbox: explain why it's unavailable (don't present it
+                as functional). */}
+            {!hasRealSandbox && (
+              <div className="mt-2 flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <AlertTriangle className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-500">
+                  {t('onlineOrders.environment.noSandbox')}
+                </p>
+              </div>
+            )}
+            {hasRealSandbox && isSandbox && (
               <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-700">

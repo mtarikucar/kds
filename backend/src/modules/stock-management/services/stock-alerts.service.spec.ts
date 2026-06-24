@@ -131,6 +131,52 @@ describe('StockAlertsService — emit dedup', () => {
     expect(emit).toHaveBeenCalledTimes(2);
   });
 
+  // The scheduler now runs once PER active branch of a tenant. Dedup state is
+  // keyed per (tenant, branch), so two branches of the SAME tenant with the
+  // same item set must each get their own first emit — branch-1's alert must
+  // not silence branch-2's.
+  it('isolates per-branch state — same tenant, two branches each emit', async () => {
+    const sameItemSet = [
+      { id: 'item-1', name: 'Tomato', unit: 'kg', currentStock: 1, minStock: 5 },
+    ];
+    (prisma.$queryRaw as any)
+      .mockResolvedValueOnce(sameItemSet)
+      .mockResolvedValueOnce(sameItemSet);
+
+    await service.checkLowStock(tenantId, 'branch-1');
+    await service.checkLowStock(tenantId, 'branch-2');
+
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(
+      1,
+      tenantId,
+      'branch-1',
+      expect.objectContaining({ count: 1 }),
+    );
+    expect(emit).toHaveBeenNthCalledWith(
+      2,
+      tenantId,
+      'branch-2',
+      expect.objectContaining({ count: 1 }),
+    );
+  });
+
+  // Dedup still works within a single branch across consecutive scheduler
+  // ticks: the same item set on branch-1 emits once, not on every hourly run.
+  it('dedups per-branch across ticks (same branch, same set → one emit)', async () => {
+    const sameItemSet = [
+      { id: 'item-1', name: 'Tomato', unit: 'kg', currentStock: 1, minStock: 5 },
+    ];
+    (prisma.$queryRaw as any)
+      .mockResolvedValueOnce(sameItemSet)
+      .mockResolvedValueOnce(sameItemSet);
+
+    await service.checkLowStock(tenantId, 'branch-1');
+    await service.checkLowStock(tenantId, 'branch-1');
+
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
   // v3 branch-scope: the dashboard passes branchId so the raw low-stock
   // SQL gains `AND si."branchId" = $branchId`; the scheduler omits it and
   // runs tenant-wide.

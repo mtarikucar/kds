@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
-import { resolvePlanAmount } from "../subscriptions/plan-pricing.helper";
 import { CatalogService } from "../catalog/catalog.service";
 import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
 import { Cart, CartQuote, PricedLine } from "./checkout.types";
@@ -53,28 +52,18 @@ export class QuoteService {
     for (const item of cart.items) {
       const qty = Math.max(1, "qty" in item && item.qty ? item.qty : 1);
       if (item.type === "plan") {
-        const plan = await this.prisma.subscriptionPlan.findUnique({
-          where: { name: item.code },
-        });
-        if (!plan) {
-          warnings.push(`Unknown plan: ${item.code}`);
-          continue;
-        }
-        currency = plan.currency;
-        const cycle = item.billingCycle ?? "MONTHLY";
-        // Honor an active promotional discount — the advertised price.
-        const priceDec = resolvePlanAmount(plan, cycle);
-        const unitCents = Math.round(Number(priceDec) * 100);
-        lines.push({
-          type: "plan",
-          code: plan.name,
-          name: plan.displayName,
-          qty: 1,
-          unitCents,
-          subtotalCents: unitCents,
-          cadence: cycle === "YEARLY" ? "yearly" : "monthly",
-          meta: { planId: plan.id, billingCycle: cycle },
-        });
+        // Plan changes do NOT belong in checkout. A `plan` line here used to be
+        // priced + CHARGED, then emit subscription.upgrade.requested.v1 — an
+        // event with NO consumer, so the plan never actually changed: money was
+        // collected for a no-op. The real, money-honest plan-change rail is the
+        // separate subscription flow (POST /subscriptions/change-plan →
+        // pendingPlanChange → settlement), which prorates and applies the new
+        // plan. Reject the line up-front so nothing can ever charge for a plan
+        // change through checkout — fail loud instead of taking money silently.
+        // (No UI sends plan lines today; this closes a latent money-loss path.)
+        throw new BadRequestException(
+          "Plan changes go through /subscriptions/change-plan, not checkout",
+        );
       } else if (item.type === "addon") {
         const addOn = await this.addons.findByCodeOrThrow(item.code);
         if (addOn.status !== "published") {
