@@ -210,6 +210,13 @@ export interface UpcomingReservationOnTable {
   startsAt: string; // ISO datetime; clients can compute "in N minutes"
 }
 
+/** Silhouette a table renders as on the 2D floor plan. */
+export enum TableShape {
+  ROUND = 'ROUND',
+  SQUARE = 'SQUARE',
+  RECT = 'RECT',
+}
+
 export interface Table {
   id: string;
   number: string;
@@ -222,6 +229,14 @@ export interface Table {
   reservationHoldId?: string | null;
   /** Closest upcoming reservation (next ~2 h) — surfaced by GET /tables. */
   upcomingReservation?: UpcomingReservationOnTable | null;
+  // Floor-plan placement (v3.2.45+). zoneId=null ⇒ not yet placed.
+  zoneId?: string | null;
+  posX?: number;
+  posY?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  shape?: TableShape;
   tenantId: string;
   createdAt?: string;
   updatedAt?: string;
@@ -231,9 +246,147 @@ export interface CreateTableDto {
   number: string;
   capacity: number;
   status?: TableStatus;
+  // Optional geometry when a table is created directly onto the canvas.
+  zoneId?: string | null;
+  posX?: number;
+  posY?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  shape?: TableShape;
 }
 
 export interface UpdateTableDto extends Partial<CreateTableDto> {}
+
+// ----- Floor plan (2D restaurant map) -----
+
+export enum FloorZoneKind {
+  INDOOR = 'INDOOR',
+  OUTDOOR = 'OUTDOOR',
+}
+
+export enum FloorElementType {
+  WALL = 'WALL',
+  DOOR = 'DOOR',
+  BAR = 'BAR',
+  KITCHEN = 'KITCHEN',
+  PLANT = 'PLANT',
+  DECOR = 'DECOR',
+  TEXT = 'TEXT',
+  RECT = 'RECT',
+}
+
+export interface FloorElement {
+  id: string;
+  zoneId: string;
+  type: FloorElementType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  points?: { x: number; y: number }[] | null;
+  style?: Record<string, any> | null;
+  label?: string | null;
+  zIndex: number;
+}
+
+/** A placed table as returned inside the floor plan (geometry-focused;
+ *  `tableShape` avoids clashing with any reserved word and mirrors the
+ *  backend getPlan shape). */
+export interface FloorPlanTable {
+  id: string;
+  number: string;
+  capacity: number;
+  status: TableStatus;
+  groupId?: string | null;
+  zoneId: string | null;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+  rotation: number;
+  tableShape: TableShape;
+  activeOrderCount: number;
+}
+
+export interface FloorZone {
+  id: string;
+  name: string;
+  sortOrder: number;
+  kind: FloorZoneKind;
+  canvasWidth: number;
+  canvasHeight: number;
+  gridSize: number;
+  backgroundImageUrl?: string | null;
+  backgroundOpacity: number;
+  elements: FloorElement[];
+  tables: FloorPlanTable[];
+}
+
+export interface FloorPlan {
+  zones: FloorZone[];
+  unplacedTables: FloorPlanTable[];
+}
+
+export interface CreateFloorZoneDto {
+  name: string;
+  kind?: FloorZoneKind;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  gridSize?: number;
+  backgroundImageUrl?: string;
+  backgroundOpacity?: number;
+}
+
+export interface UpdateFloorZoneDto extends Partial<CreateFloorZoneDto> {}
+
+export interface CreateFloorElementDto {
+  zoneId: string;
+  type: FloorElementType;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  points?: { x: number; y: number }[];
+  style?: Record<string, any>;
+  label?: string;
+  zIndex?: number;
+}
+
+export interface UpdateFloorElementDto extends Partial<Omit<CreateFloorElementDto, 'zoneId'>> {
+  zoneId?: string;
+}
+
+/** One table's geometry in a bulk layout save. */
+export interface LayoutTableItem {
+  id: string;
+  zoneId: string | null;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+  rotation: number;
+  shape: TableShape;
+}
+
+/** One element's geometry in a bulk layout save. */
+export interface LayoutElementItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  points?: { x: number; y: number }[];
+  style?: Record<string, any>;
+}
+
+export interface SaveLayoutDto {
+  tables: LayoutTableItem[];
+  elements?: LayoutElementItem[];
+}
 
 // Table Merge/Split Types
 export interface MergeTablesDto {
