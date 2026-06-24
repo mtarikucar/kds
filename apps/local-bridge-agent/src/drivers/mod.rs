@@ -9,6 +9,7 @@ use crate::command_queue::{CommandOutcome, PendingCommand};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::path::Path;
 
 pub mod escpos;
 pub mod ingenico_iwl;
@@ -30,12 +31,15 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub async fn init() -> Result<Self> {
+    /// Initialise the driver registry. `data_dir` is the bridge's data
+    /// directory (`cfg.data_dir`); drivers read their LAN/transport config
+    /// (e.g. the ESC/POS `printers.toml`) from there.
+    pub async fn init(data_dir: &Path) -> Result<Self> {
         let mut drivers: HashMap<String, Box<dyn LocalDriver>> = HashMap::new();
         // Drivers self-discover their availability — a printer driver that
         // can't find any printer simply does not register, and the agent
         // surfaces that fact to the cloud at heartbeat time.
-        if let Some(d) = escpos::EscPosDriver::try_init().await? {
+        if let Some(d) = escpos::EscPosDriver::try_init(data_dir).await? {
             drivers.insert(d.kind().to_string(), Box::new(d));
         }
         if let Some(d) = yazarkasa_hugin::HuginDriver::try_init().await? {

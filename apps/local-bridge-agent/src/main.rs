@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
     // The drivers registry resolves device kinds → executors at runtime.
     // A driver that fails to initialise (e.g. printer not yet wired) is
     // logged but does NOT block the agent boot.
-    let drivers = drivers::Registry::init().await?;
+    let drivers = drivers::Registry::init(&cfg.data_dir).await?;
     info!(
         installed = drivers.installed_kinds().join(","),
         "drivers initialised"
