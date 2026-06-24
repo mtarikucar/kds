@@ -5,21 +5,19 @@ import { OutboxService } from "../outbox/outbox.service";
 import {
   PaymentIntent,
   PaymentIntentRequest,
-  PaymentTransaction,
-  ProviderWebhookEvent,
-  RefundRequest,
-  RefundTransaction,
 } from "./payment-provider.interface";
 import { PaymentProviderRegistry } from "./payment-provider.registry";
 
 /**
  * Provider-neutral payments façade.
  *
- * Every domain caller (subscriptions, hardware-orders, POS) uses this façade
- * and chooses a providerId by tenant region / capability rather than by
- * vendor SDK. The actual PayTR/Stripe/Iyzico code remains in its existing
- * modules; this façade does not replace them — it adds a uniform surface
- * for the new providers and for tests.
+ * The only live caller is CheckoutIntentService, which calls
+ * createIntent("paytr", …) for the mixed-cart checkout rail. The façade keeps
+ * a uniform surface so a future provider can be added without touching the
+ * caller. Status/refund/webhook-ingest helpers were removed (2026-06-24): they
+ * had zero callers and the ingest path was explicitly never wired (it lacked a
+ * replay-dedup gate). The real refund/webhook paths live in their own modules
+ * (PayTR webhook controller, integration-gateway ingest).
  */
 @Injectable()
 export class PaymentsFacadeService {
@@ -75,84 +73,5 @@ export class PaymentsFacadeService {
     );
 
     return intent;
-  }
-
-  async getStatus(
-    providerId: string,
-    intentId: string,
-  ): Promise<PaymentTransaction> {
-    return this.registry.get(providerId).status(intentId);
-  }
-
-  async refund(
-    providerId: string,
-    req: RefundRequest,
-    tenantId: string,
-  ): Promise<RefundTransaction> {
-    const refund = await this.registry.get(providerId).refund(req);
-    await this.outbox
-      .append({
-        type: "payment.refund_completed.v1",
-        tenantId,
-        payload: { providerId, ...refund },
-      })
-      .catch(
-        captureSwallowedEmit(this.logger, {
-          module: "payments-core",
-          op: "refund",
-        }),
-      );
-    // Track 2 — a completed refund is the "refunded" outcome of the intent
-    // lifecycle. ?.-guarded after the emit so it can never break the refund.
-    this.metrics?.incCounter(
-      "payment_intents_outcome_total",
-      "Payment intents by outcome (success|failed|refunded)",
-      { outcome: "refunded" },
-    );
-    return refund;
-  }
-
-  /**
-   * Webhook ingestion path. Caller is responsible for routing by HTTP path;
-   * the façade verifies signature via the adapter and emits one normalised
-   * event per provider event so downstream consumers don't care which
-   * vendor produced the message.
-   *
-   * ⚠️ REPLAY PRECONDITION (do NOT wire an HTTP route to this without it):
-   * this method has NO dedup gate. Signed iyzico/paytr webhooks carry no
-   * nonce/timestamp in the signed payload, so a captured (body, signature)
-   * pair is cryptographically replayable — a replay would re-emit
-   * `payment.succeeded` and double-fire settlement consumers. The sibling
-   * integration-gateway ingest (IntegrationService.ingestWebhook) already
-   * guards this with a Serializable-txn dedup on (tenant, provider, signature)
-   * within a 24h window; mirror that BEFORE exposing this façade over HTTP.
-   * Today this path is internal-only (no controller reaches it).
-   */
-  async ingestWebhook(
-    providerId: string,
-    signature: string,
-    raw: Buffer | string,
-  ): Promise<void> {
-    const events = await this.registry
-      .get(providerId)
-      .parseWebhook(signature, raw);
-    for (const ev of events) {
-      await this.outbox
-        .append({
-          type: `payment.webhook.${ev.type}.v1`,
-          tenantId: null,
-          payload: ev as any,
-        })
-        .catch(
-          captureSwallowedEmit(this.logger, {
-            module: "payments-core",
-            op: "ingestWebhook",
-          }),
-        );
-    }
-  }
-
-  listInstalledProviders() {
-    return this.registry.list().map((p) => ({ id: p.id, modes: p.modes }));
   }
 }

@@ -3,35 +3,32 @@ import { PaymentProviderRegistry } from "./payment-provider.registry";
 import { PaymentsFacadeService } from "./payments-facade.service";
 import { MockPaymentProvider } from "./adapters/mock-payment-provider";
 import { PaytrPaymentProvider } from "./adapters/paytr-payment-provider";
-import { IngenicoTerminalProvider } from "./adapters/ingenico-terminal-provider";
-import { IyzicoPaymentProvider } from "./adapters/iyzico-payment-provider";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
-// Ingenico card-present terminal routes charge_card commands through the
-// on-prem local bridge → CommandQueueService (exported by DeviceMeshModule).
-import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
 
 /**
  * Payments-core module. Exposes the provider-neutral interface that the
- * marketplace / hardware checkout / future POS terminal services consume.
+ * mixed-cart checkout rail (CheckoutIntentService → createIntent("paytr"))
+ * consumes.
  *
  * Marked @Global so adapters declared in their own modules (PayTR adapter
  * already exists at modules/payments/adapters/paytr-adapter.module.ts) can
  * inject PaymentProviderRegistry and register themselves at module init.
  *
  * NOTE: this module deliberately does not replace the existing PayTR /
- * subscription billing path. It coexists and offers a uniform surface for
- * new providers and the upcoming card-present terminal work.
+ * subscription billing path. It coexists and offers a uniform surface so a
+ * future provider can be added without touching the caller. The Iyzico /
+ * Ingenico adapters were removed (2026-06-24): they self-registered but were
+ * never dispatched (only "paytr" is ever requested), and the DeviceMeshModule
+ * import existed solely to feed the Ingenico card-present terminal — both gone.
  */
 @Global()
 @Module({
-  imports: [PaytrAdapterModule, DeviceMeshModule],
+  imports: [PaytrAdapterModule],
   providers: [
     PaymentProviderRegistry,
     PaymentsFacadeService,
     MockPaymentProvider,
     PaytrPaymentProvider,
-    IngenicoTerminalProvider,
-    IyzicoPaymentProvider,
   ],
   exports: [PaymentProviderRegistry, PaymentsFacadeService],
 })
