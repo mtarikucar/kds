@@ -47,6 +47,83 @@ describe('CashDrawerService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // ── Honesty (fake-working sweep #3): denominationBreakdown must sum to
+  //    the entered amount, otherwise the till count silently disagrees with
+  //    the figure it claims to back. No breakdown → no check (field stays
+  //    optional). ───────────────────────────────────────────────────────
+  describe('denominationBreakdown sum invariant', () => {
+    it('persists a CLOSING whose denomination count sums to the amount', async () => {
+      (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
+      // 5×100 + 10×50 + 15×20 = 500 + 500 + 300 = 1300
+      await svc.create('t-1', 'b-1', 'u-1', {
+        type: 'CLOSING' as any,
+        amount: 1300,
+        denominationBreakdown: { '100': 5, '50': 10, '20': 15 },
+      });
+      const args = (prisma.cashDrawerMovement.create as any).mock.calls[0][0];
+      expect(args.data.denominationBreakdown).toEqual({ '100': 5, '50': 10, '20': 15 });
+    });
+
+    it('rejects a denomination count that does NOT sum to the amount', async () => {
+      // 5×100 + 10×50 = 1000, but amount claims 1300 → mismatch.
+      await expect(
+        svc.create('t-1', 'b-1', 'u-1', {
+          type: 'CLOSING' as any,
+          amount: 1300,
+          denominationBreakdown: { '100': 5, '50': 10 },
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.cashDrawerMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts fractional face values (coins) that sum correctly', async () => {
+      (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
+      // 0.25×4 + 1×3 = 1 + 3 = 4.00 — float drift must not trip the check.
+      await svc.create('t-1', 'b-1', 'u-1', {
+        type: 'CLOSING' as any,
+        amount: 4,
+        denominationBreakdown: { '0.25': 4, '1': 3 },
+      });
+      expect(prisma.cashDrawerMovement.create).toHaveBeenCalled();
+    });
+
+    it('rejects a negative count', async () => {
+      await expect(
+        svc.create('t-1', 'b-1', 'u-1', {
+          type: 'CLOSING' as any,
+          amount: 100,
+          denominationBreakdown: { '100': -1 } as any,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a non-numeric face value', async () => {
+      await expect(
+        svc.create('t-1', 'b-1', 'u-1', {
+          type: 'CLOSING' as any,
+          amount: 100,
+          denominationBreakdown: { abc: 1 } as any,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('skips the check entirely when no breakdown is supplied', async () => {
+      (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
+      await svc.create('t-1', 'b-1', 'u-1', { type: 'CLOSING' as any, amount: 999 });
+      expect(prisma.cashDrawerMovement.create).toHaveBeenCalled();
+    });
+
+    it('treats an empty breakdown map as "not supplied" (no check)', async () => {
+      (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
+      await svc.create('t-1', 'b-1', 'u-1', {
+        type: 'CLOSING' as any,
+        amount: 999,
+        denominationBreakdown: {},
+      });
+      expect(prisma.cashDrawerMovement.create).toHaveBeenCalled();
+    });
+  });
+
   it('approve refuses non-manager roles with 403', async () => {
     await expect(
       svc.approve(scope, 'm-1', { id: 'u-1', role: UserRole.WAITER as any }),

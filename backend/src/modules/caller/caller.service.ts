@@ -14,6 +14,16 @@ import { NormalisedCallerEvent } from "./caller-provider.interface";
  *
  * Customer matching is best-effort: an exact e164 hit links the row, but the
  * lack of a match never blocks ingestion (you still want to see the call).
+ *
+ * NOTE (fake-working sweep #3): CallerEvent.orderId / CallerEvent.agentUserId
+ * exist in the schema as future-facing columns but NO application code writes
+ * them today — there is no call→order back-link path and the
+ * NormalisedCallerEvent adapter contract carries neither field. The Caller
+ * feed UI previously advertised an "Order" column + agent attribution that
+ * always rendered "—"; that dead UI was removed rather than left implying a
+ * working linkage. If/when phone-order creation back-links a call, set
+ * orderId/agentUserId here (or via a callerEvent.update at order-create time)
+ * and restore the column.
  */
 @Injectable()
 export class CallerService {

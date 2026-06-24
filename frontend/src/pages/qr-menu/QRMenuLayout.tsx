@@ -352,6 +352,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
         subdomain={subdomain}
         onCallWaiter={handleCallWaiter}
         isCallingWaiter={isCallingWaiter || waiterCooldown > 0}
+        showRestaurantInfo={settings.showRestaurantInfo}
       />
 
       {/* Main Content */}

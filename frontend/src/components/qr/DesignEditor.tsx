@@ -281,6 +281,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       }}
                       tenant={tenant}
                       compact
+                      caption={formData.tableQRMessage}
                       settings={{
                         primaryColor: formData.primaryColor,
                         backgroundColor: formData.backgroundColor

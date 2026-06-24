@@ -67,6 +67,22 @@ export class CashDrawerService {
 
     const requiresReview = CashDrawerService.REVIEW_TYPES.has(dto.type);
 
+    // Honesty (fake-working sweep #3): denominationBreakdown (the per-
+    // note/coin till count) was previously accepted + persisted verbatim
+    // but NEVER read — no expected-vs-counted variance, no surfacing, and
+    // crucially no check that the counted notes even add up to the entered
+    // `amount`. That made it a write-only black hole presented as a working
+    // till count. We now enforce the one invariant the data can verify on
+    // its own: Σ(faceValue × count) MUST equal the movement amount, so the
+    // count can never silently disagree with the number it claims to back.
+    // Reconciliation against the Z-Report expected cash remains future work
+    // (would need the breakdown threaded into ZReportAggregator + a UI
+    // till-count grid), but the count is no longer accepted blindly.
+    CashDrawerService.assertDenominationMatchesAmount(
+      dto.denominationBreakdown,
+      dto.amount,
+    );
+
     const movement = await this.prisma.cashDrawerMovement.create({
       data: {
         tenantId,
@@ -103,6 +119,55 @@ export class CashDrawerService {
     if (type === "OPENING") return "open";
     if (type === "CLOSING") return "close";
     return "movement";
+  }
+
+  /**
+   * Validate a denomination breakdown (a `{ faceValue: count }` map) sums
+   * to the claimed movement amount. The keys are face values in the tenant
+   * currency (e.g. "100", "0.25"); the values are the counted quantity of
+   * that note/coin. Σ(faceValue × count) must equal `amount` to the cent,
+   * otherwise the till count silently contradicts the figure it backs.
+   *
+   * No-op when no breakdown is supplied (the field stays optional). Rejects
+   * with 400 on: a non-numeric / negative / NaN face value or count, or a
+   * computed total that differs from `amount` by more than half a cent
+   * (float-rounding tolerance).
+   */
+  private static assertDenominationMatchesAmount(
+    breakdown: Record<string, number> | undefined,
+    amount: number,
+  ): void {
+    if (breakdown == null) return;
+    const entries = Object.entries(breakdown);
+    // An empty {} carries no count to validate — treat as "not supplied".
+    if (entries.length === 0) return;
+
+    let total = 0;
+    for (const [face, count] of entries) {
+      const faceValue = Number(face);
+      if (!Number.isFinite(faceValue) || faceValue < 0) {
+        throw new BadRequestException(
+          `denominationBreakdown has an invalid face value: "${face}"`,
+        );
+      }
+      if (typeof count !== "number" || !Number.isFinite(count) || count < 0) {
+        throw new BadRequestException(
+          `denominationBreakdown count for "${face}" must be a non-negative number`,
+        );
+      }
+      total += faceValue * count;
+    }
+
+    // Compare in integer cents so 0.10×3 style float drift can't trip the
+    // check. Allow a half-cent tolerance for any residual rounding.
+    const totalCents = Math.round(total * 100);
+    const amountCents = Math.round(amount * 100);
+    if (Math.abs(totalCents - amountCents) > 0) {
+      throw new BadRequestException(
+        `Denomination count (${(totalCents / 100).toFixed(2)}) does not match the entered amount (${(amountCents / 100).toFixed(2)}). ` +
+          "Re-count the till or correct the amount.",
+      );
+    }
   }
 
   async listPending(scope: BranchScope) {

@@ -163,6 +163,15 @@ interface SuccessCardProps {
  * lookup/cancel flow) and surfaces the "call us to cancel" guidance
  * for email-only customers whose phone-based auth path doesn't exist
  * yet.
+ *
+ * Honesty (fake-working sweep #3): the email-only hint copy is
+ * deliberately non-committal ("if the restaurant has email confirmations
+ * enabled, a message WILL be sent") rather than asserting a completed send
+ * ("we've sent confirmation"). The backend reservation notify path is
+ * fire-and-forget and gated on the per-event `emailOnReservationCreated`
+ * toggle + a configured mailer, so at response time the client cannot know
+ * an email was actually delivered — claiming it would be a lie when the
+ * toggle is off or the mailer is unconfigured.
  */
 export const SuccessCard: React.FC<SuccessCardProps> = ({
   reservationNumber,

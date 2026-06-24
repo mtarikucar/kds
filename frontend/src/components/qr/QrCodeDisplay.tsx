@@ -13,13 +13,34 @@ interface QrCodeDisplayProps {
     primaryColor?: string;
     backgroundColor?: string;
   };
+  /**
+   * Operator-configured table-QR caption (QrMenuSettings.tableQRMessage).
+   * Rendered under the code both on-screen and on the printed sheet,
+   * falling back to the translated default when empty/unset (legacy rows).
+   */
+  caption?: string;
 }
 
-const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisplayProps) => {
+// The table caption is operator-supplied free text that gets injected
+// into the raw print-window HTML; escape it so a promo string containing
+// `<`, `&` or quotes can't break (or inject into) the printed document.
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: QrCodeDisplayProps) => {
   const { t } = useTranslation('common');
   const [copied, setCopied] = useState(false);
   const [selectedSize, setSelectedSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [downloadFormat, setDownloadFormat] = useState<'png' | 'svg' | 'pdf'>('png');
+
+  // Prefer the operator's saved caption; fall back to the translated
+  // default for empty/legacy settings rows.
+  const resolvedCaption = caption?.trim() || t('admin.scanToViewMenu');
 
   const sizePresets = {
     small: { size: 150, label: t('admin.tableTent'), description: '150x150px' },
@@ -149,7 +170,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
             <h1>${tenant?.name}</h1>
             ${svgData}
             <p>${qrCode.label}</p>
-            <p style="font-size: 14px;">${t('admin.scanToViewMenu')}</p>
+            <p style="font-size: 14px;">${escapeHtml(resolvedCaption)}</p>
           </div>
         </body>
       </html>
@@ -216,7 +237,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
         <div className="space-y-4">
           <div className="text-center">
             <h3 className="text-xl font-bold text-slate-900 mb-2">{qrCode.label}</h3>
-            <p className="text-sm text-slate-600">{t('admin.scanToViewMenu')}</p>
+            <p className="text-sm text-slate-600">{resolvedCaption}</p>
           </div>
 
           {/* Size Selector */}

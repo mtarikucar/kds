@@ -9,6 +9,16 @@ import DesignEditor from '../../components/qr/DesignEditor';
 import QrCodeDisplay from '../../components/qr/QrCodeDisplay';
 import type { UpdateQrSettingsDto } from '../../types';
 
+// Escape operator-supplied free text before injecting it into the raw
+// print-window HTML (the table-QR caption can contain `<`, `&`, quotes).
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 const QRManagementPage = () => {
   const { t } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<'codes' | 'design'>('codes');
@@ -112,6 +122,13 @@ const QRManagementPage = () => {
       return;
     }
 
+    // Prefer the operator's saved table-QR caption; fall back to the
+    // translated default for empty/legacy settings. Escaped because it is
+    // operator free text injected into raw print-window HTML.
+    const tableQRCaption = escapeHtml(
+      settings?.tableQRMessage?.trim() || t('admin.scanToViewMenu'),
+    );
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -172,7 +189,7 @@ const QRManagementPage = () => {
               <div class="qr-item">
                 <h3>${qr.label}</h3>
                 ${svgElement}
-                <p class="instructions">${t('admin.scanToViewMenu')}</p>
+                <p class="instructions">${tableQRCaption}</p>
               </div>
             `).join('')}
           </div>
@@ -411,6 +428,7 @@ const QRManagementPage = () => {
                   key={qr.id}
                   qrCode={qr}
                   tenant={tenant}
+                  caption={settings?.tableQRMessage}
                   settings={{
                     primaryColor: settings?.primaryColor,
                     backgroundColor: settings?.backgroundColor
@@ -458,6 +476,7 @@ const QRManagementPage = () => {
                       qrCode={qr}
                       tenant={tenant}
                       compact
+                      caption={settings?.tableQRMessage}
                       settings={{
                         primaryColor: settings?.primaryColor,
                         backgroundColor: settings?.backgroundColor
