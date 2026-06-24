@@ -142,7 +142,13 @@
     "marketplace": {
       "title": "Marketplace",
       "subtitle": "Extend your subscription with add-ons. Effective immediately.",
-      "filter": { "all": "All", "software": "Software", "integration": "Integrations", "capacity": "Capacity", "support": "Support" },
+      "filter": {
+        "all": "All",
+        "software": "Software",
+        "integration": "Integrations",
+        "capacity": "Capacity",
+        "support": "Support"
+      },
       "purchase": "Purchase",
       "mine": "Your add-ons",
       "mineEmpty": "You have no active add-ons.",
@@ -157,7 +163,9 @@
     },
     "store": {
       "title": "Hardware Store",
-      "category": { "all": "All categories" },
+      "category": {
+        "all": "All categories"
+      },
       "empty": "No products in this category.",
       "addToCart": "Add to cart",
       "outOfStock": "Out of stock",
@@ -202,7 +210,12 @@
       "create": "Create subscription",
       "yours": "Your subscriptions",
       "noSubscriptions": "No subscriptions.",
-      "col": { "url": "URL", "events": "Events", "status": "Status", "lastDelivery": "Last delivery" },
+      "col": {
+        "url": "URL",
+        "events": "Events",
+        "status": "Status",
+        "lastDelivery": "Last delivery"
+      },
       "revoke": "Revoke",
       "createdBanner": "Subscription created.",
       "secretWarning": "Below is the signing secret. Copy it now — we cannot show it again.",
@@ -221,7 +234,13 @@
       "tokenWarning": "Token (single-use) — copy now and configure on the device:",
       "list": "Bridges",
       "noBridges": "No bridges provisioned yet.",
-      "col": { "branch": "Branch", "sku": "SKU", "hostname": "Hostname", "status": "Status", "lastSeen": "Last seen" },
+      "col": {
+        "branch": "Branch",
+        "sku": "SKU",
+        "hostname": "Hostname",
+        "status": "Status",
+        "lastSeen": "Last seen"
+      },
       "confirmRetire": "Retire this bridge?",
       "retire": "Retire"
     },
@@ -260,12 +279,10 @@
         "kind": "Kind",
         "phone": "Phone",
         "customer": "Customer",
-        "duration": "Duration",
-        "order": "Order"
+        "duration": "Duration"
       },
       "view": "View",
-      "unmatched": "unmatched",
-      "open": "Open"
+      "unmatched": "unmatched"
     },
     "setupChecklist": {
       "title": "Set up your restaurant",
@@ -284,7 +301,10 @@
     },
     "superAdminMarketplace": {
       "title": "Marketplace Admin",
-      "tabs": { "addons": "Add-ons", "products": "Hardware" },
+      "tabs": {
+        "addons": "Add-ons",
+        "products": "Hardware"
+      },
       "addons": {
         "title": "Add-on catalogue",
         "new": "New add-on",
@@ -434,7 +454,7 @@
     "subscriptionCancelledSuccessfully": "Subscription cancelled successfully",
     "planChangedSuccessfully": "Plan changed successfully",
     "redirectingToPayment": "Redirecting to payment...",
-    "downgradeScheduled": "Downgrade scheduled for {{date}}",
+    "downgradeScheduled": "Plan downgrade scheduled for {{date}}",
     "subscriptionReactivatedSuccessfully": "Subscription reactivated successfully",
     "userCreatedSuccessfully": "User created successfully",
     "userUpdatedSuccessfully": "User updated successfully",
@@ -454,7 +474,6 @@
     "cancelSubscriptionFailed": "Failed to cancel subscription",
     "reactivateSubscriptionFailed": "Failed to reactivate subscription",
     "scheduledDowngradeCancelled": "Scheduled downgrade cancelled",
-    "downgradeScheduled": "Plan downgrade scheduled for {{date}}",
     "qrSettingsResetSuccessfully": "QR settings reset to defaults",
     "qrSettingsCreateFailed": "Failed to create QR settings",
     "qrSettingsUpdateFailed": "Failed to update QR settings",
@@ -682,6 +701,9 @@
       "switchTo2D": "Switch to 2D view",
       "switchTo3D": "Switch to 3D view",
       "clickToSwitch": "Click to switch"
+    },
+    "kitchen": {
+      "printFailed": "Kitchen ticket print failed — reprint from the order."
     }
   },
   "qrDesigner": {

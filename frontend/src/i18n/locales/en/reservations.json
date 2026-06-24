@@ -198,7 +198,7 @@
       "title": "Reservations are not available",
       "description": "Please contact the restaurant directly to book."
     },
-    "successEmailOnlyCancelHint": "We’ve sent confirmation to your email. To cancel this reservation, please call the restaurant — phone-based self-cancel is unavailable for email-only bookings.",
+    "successEmailOnlyCancelHint": "If the restaurant has email confirmations enabled, a message will be sent to your email. To cancel this reservation, please call the restaurant — phone-based self-cancel is unavailable for email-only bookings.",
     "branch": "Branch"
   },
   "lookup": {

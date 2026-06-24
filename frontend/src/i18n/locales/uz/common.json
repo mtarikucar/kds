@@ -142,17 +142,30 @@
     "marketplace": {
       "title": "Bozor",
       "subtitle": "Obunangizni qo'shimchalar bilan kengaytiring. Darhol faollashadi.",
-      "filter": { "all": "Hammasi", "software": "Dasturiy ta'minot", "integration": "Integratsiyalar", "capacity": "Hajm", "support": "Qo'llab-quvvatlash" },
+      "filter": {
+        "all": "Hammasi",
+        "software": "Dasturiy ta'minot",
+        "integration": "Integratsiyalar",
+        "capacity": "Hajm",
+        "support": "Qo'llab-quvvatlash"
+      },
       "purchase": "Sotib olish",
       "mine": "Sizning qo'shimchalaringiz",
       "mineEmpty": "Faol qo'shimchalaringiz yo'q.",
       "requires": "Talab qilinadi:",
-      "col": { "addOn": "Qo'shimcha", "quantity": "Miqdor", "status": "Holat", "periodEnds": "Davr tugashi" },
+      "col": {
+        "addOn": "Qo'shimcha",
+        "quantity": "Miqdor",
+        "status": "Holat",
+        "periodEnds": "Davr tugashi"
+      },
       "cancelAtPeriodEnd": "davr oxirida bekor qilinadi"
     },
     "store": {
       "title": "Jihozlar do'koni",
-      "category": { "all": "Barcha kategoriyalar" },
+      "category": {
+        "all": "Barcha kategoriyalar"
+      },
       "empty": "Bu kategoriyada mahsulot yo'q.",
       "addToCart": "Savatga qo'shish",
       "outOfStock": "Stokda yo'q",
@@ -197,7 +210,12 @@
       "create": "Obuna yaratish",
       "yours": "Obunalaringiz",
       "noSubscriptions": "Obunalar yo'q.",
-      "col": { "url": "URL", "events": "Hodisalar", "status": "Holat", "lastDelivery": "Oxirgi yetkazish" },
+      "col": {
+        "url": "URL",
+        "events": "Hodisalar",
+        "status": "Holat",
+        "lastDelivery": "Oxirgi yetkazish"
+      },
       "revoke": "Bekor qilish",
       "createdBanner": "Obuna yaratildi.",
       "secretWarning": "Quyida imzolash maxfiy kaliti. Hozir nusxalang — uni qayta ko'rsata olmaymiz.",
@@ -216,7 +234,13 @@
       "tokenWarning": "Token (bir martalik) — hozir nusxalang va qurilmada sozlang:",
       "list": "Ko'priklar",
       "noBridges": "Hali tayyorlangan ko'prik yo'q.",
-      "col": { "branch": "Filial", "sku": "SKU", "hostname": "Hostname", "status": "Holat", "lastSeen": "Oxirgi ulanish" },
+      "col": {
+        "branch": "Filial",
+        "sku": "SKU",
+        "hostname": "Hostname",
+        "status": "Holat",
+        "lastSeen": "Oxirgi ulanish"
+      },
       "confirmRetire": "Bu ko'prik ishdan chiqarilsinmi?",
       "retire": "Ishdan chiqarish"
     },
@@ -255,12 +279,10 @@
         "kind": "Tur",
         "phone": "Telefon",
         "customer": "Mijoz",
-        "duration": "Davomiyligi",
-        "order": "Buyurtma"
+        "duration": "Davomiyligi"
       },
       "view": "Ko'rish",
-      "unmatched": "moslanmagan",
-      "open": "Ochish"
+      "unmatched": "moslanmagan"
     },
     "setupChecklist": {
       "title": "Restoraningizni sozlang",
@@ -279,7 +301,10 @@
     },
     "superAdminMarketplace": {
       "title": "Bozor boshqaruvi",
-      "tabs": { "addons": "Qo'shimchalar", "products": "Jihozlar" },
+      "tabs": {
+        "addons": "Qo'shimchalar",
+        "products": "Jihozlar"
+      },
       "addons": {
         "title": "Qo'shimchalar katalogi",
         "new": "Yangi qo'shimcha",
@@ -1129,6 +1154,9 @@
       "switchTo2D": "2D ko'rinishga o'tish",
       "switchTo3D": "3D ko'rinishga o'tish",
       "clickToSwitch": "O'tish uchun bosing"
+    },
+    "kitchen": {
+      "printFailed": "Oshxona chekini chop etib bo‘lmadi — buyurtmadan qayta chop eting."
     }
   }
 }

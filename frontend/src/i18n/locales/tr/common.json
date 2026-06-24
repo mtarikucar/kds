@@ -142,7 +142,13 @@
     "marketplace": {
       "title": "Eklenti Pazarı",
       "subtitle": "Aboneliğinizi eklentilerle genişletin. Anında devreye girer.",
-      "filter": { "all": "Tümü", "software": "Yazılım", "integration": "Entegrasyonlar", "capacity": "Kapasite", "support": "Destek" },
+      "filter": {
+        "all": "Tümü",
+        "software": "Yazılım",
+        "integration": "Entegrasyonlar",
+        "capacity": "Kapasite",
+        "support": "Destek"
+      },
       "purchase": "Satın Al",
       "mine": "Eklentileriniz",
       "mineEmpty": "Aktif eklentiniz yok.",
@@ -157,7 +163,9 @@
     },
     "store": {
       "title": "Donanım Mağazası",
-      "category": { "all": "Tüm kategoriler" },
+      "category": {
+        "all": "Tüm kategoriler"
+      },
       "empty": "Bu kategoride ürün yok.",
       "addToCart": "Sepete Ekle",
       "outOfStock": "Stokta Yok",
@@ -202,7 +210,12 @@
       "create": "Abonelik oluştur",
       "yours": "Abonelikleriniz",
       "noSubscriptions": "Aboneliğiniz yok.",
-      "col": { "url": "URL", "events": "Olaylar", "status": "Durum", "lastDelivery": "Son Teslim" },
+      "col": {
+        "url": "URL",
+        "events": "Olaylar",
+        "status": "Durum",
+        "lastDelivery": "Son Teslim"
+      },
       "revoke": "İptal et",
       "createdBanner": "Abonelik oluşturuldu.",
       "secretWarning": "Aşağıda imzalama secret'ı var. Şimdi kopyala — tekrar göstermeyeceğiz.",
@@ -221,7 +234,13 @@
       "tokenWarning": "Token (tek kullanımlık) — şimdi kopyala ve cihaza gir:",
       "list": "Köprüler",
       "noBridges": "Henüz hazırlanmış köprü yok.",
-      "col": { "branch": "Şube", "sku": "SKU", "hostname": "Hostname", "status": "Durum", "lastSeen": "Son Görülme" },
+      "col": {
+        "branch": "Şube",
+        "sku": "SKU",
+        "hostname": "Hostname",
+        "status": "Durum",
+        "lastSeen": "Son Görülme"
+      },
       "confirmRetire": "Bu köprü emekliye ayrılsın mı?",
       "retire": "Emekliye Ayır"
     },
@@ -260,12 +279,10 @@
         "kind": "Tür",
         "phone": "Telefon",
         "customer": "Müşteri",
-        "duration": "Süre",
-        "order": "Sipariş"
+        "duration": "Süre"
       },
       "view": "Görüntüle",
-      "unmatched": "eşleşmedi",
-      "open": "Aç"
+      "unmatched": "eşleşmedi"
     },
     "setupChecklist": {
       "title": "Restoranınızı kurun",
@@ -284,7 +301,10 @@
     },
     "superAdminMarketplace": {
       "title": "Pazar Yönetimi",
-      "tabs": { "addons": "Eklentiler", "products": "Donanım" },
+      "tabs": {
+        "addons": "Eklentiler",
+        "products": "Donanım"
+      },
       "addons": {
         "title": "Eklenti kataloğu",
         "new": "Yeni eklenti",
@@ -434,7 +454,7 @@
     "subscriptionCancelledSuccessfully": "Abonelik başarıyla iptal edildi",
     "planChangedSuccessfully": "Plan başarıyla değiştirildi",
     "redirectingToPayment": "Ödeme sayfasına yönlendiriliyor...",
-    "downgradeScheduled": "Plan düşürme {{date}} tarihine planlandı",
+    "downgradeScheduled": "Plan düşürme {{date}} için planlandı",
     "subscriptionReactivatedSuccessfully": "Abonelik başarıyla yeniden etkinleştirildi",
     "userCreatedSuccessfully": "Kullanıcı başarıyla oluşturuldu",
     "userUpdatedSuccessfully": "Kullanıcı başarıyla güncellendi",
@@ -454,7 +474,6 @@
     "cancelSubscriptionFailed": "Abonelik iptal edilemedi",
     "reactivateSubscriptionFailed": "Abonelik yeniden etkinleştirilemedi",
     "scheduledDowngradeCancelled": "Planlanmış düşürme iptal edildi",
-    "downgradeScheduled": "Plan düşürme {{date}} için planlandı",
     "qrSettingsResetSuccessfully": "QR ayarları varsayılanlara sıfırlandı",
     "qrSettingsCreateFailed": "QR ayarları oluşturulamadı",
     "qrSettingsUpdateFailed": "QR ayarları güncellenemedi",
@@ -682,6 +701,9 @@
       "switchTo2D": "2D görünüme geç",
       "switchTo3D": "3D görünüme geç",
       "clickToSwitch": "Geçiş için tıklayın"
+    },
+    "kitchen": {
+      "printFailed": "Mutfak fişi yazdırılamadı — siparişten yeniden yazdırın."
     }
   },
   "qrDesigner": {
