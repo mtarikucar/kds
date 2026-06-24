@@ -62,7 +62,7 @@ describe('LoyaltyPage', () => {
     fireEvent.click(screen.getByText('set-session'));
 
     await waitFor(() =>
-      expect(get).toHaveBeenCalledWith(expect.stringContaining('/customer-public/sessions/sess-9/loyalty/transactions')),
+      expect(get).toHaveBeenCalledWith(expect.stringContaining('/customer-public/loyalty/transactions?sessionId=sess-9')),
     );
     await waitFor(() =>
       expect(screen.getByTestId('loyalty').textContent).toBe('session:sess-9 tenant:t1 tx:1'),
