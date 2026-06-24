@@ -704,6 +704,27 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  /**
+   * Broadcast that the floor-plan layout (zones / placed tables / decorative
+   * elements) changed for a branch, so any open live POS map or read-only
+   * Tables map re-fetches and re-renders. `zoneId` narrows the hint when a
+   * single zone changed; omitted means "the whole plan" (zone add/remove/
+   * reorder). Pairs with floor-plan editor saves.
+   */
+  emitFloorLayoutUpdated(
+    tenantId: string,
+    branchId: string,
+    payload: { zoneId?: string } = {},
+  ) {
+    this.server
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("floor:layout-updated", { ...payload, timestamp: new Date() });
+    this.logger.debug(
+      `floor:layout-updated zone=${payload.zoneId ?? "*"} → kitchen/pos-${tenantId}`,
+    );
+  }
+
   // ========================================
   // CUSTOMER-SPECIFIC EVENTS
   // ========================================

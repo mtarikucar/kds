@@ -76,6 +76,13 @@ export class TablesService {
       );
     }
 
+    // If the table is being created directly onto a zone (e.g. the editor
+    // drops a new table on the canvas), the zone must belong to this branch
+    // — otherwise the table would be placed on another branch's plan.
+    if (createTableDto.zoneId) {
+      await this.assertZoneInScope(scope, createTableDto.zoneId);
+    }
+
     // v3.0.0 strict: every Table now requires a branchId (Restrict on
     // delete). Sourced from @CurrentScope() in the controller — the
     // table physically belongs to one branch and OrdersService.create
@@ -86,10 +93,47 @@ export class TablesService {
         capacity: createTableDto.capacity,
         section: createTableDto.section,
         status: createTableDto.status || TableStatus.AVAILABLE,
+        // Optional floor-plan geometry; DB defaults apply when omitted.
+        ...(createTableDto.zoneId !== undefined
+          ? { zoneId: createTableDto.zoneId }
+          : {}),
+        ...(createTableDto.posX !== undefined
+          ? { posX: createTableDto.posX }
+          : {}),
+        ...(createTableDto.posY !== undefined
+          ? { posY: createTableDto.posY }
+          : {}),
+        ...(createTableDto.width !== undefined
+          ? { width: createTableDto.width }
+          : {}),
+        ...(createTableDto.height !== undefined
+          ? { height: createTableDto.height }
+          : {}),
+        ...(createTableDto.rotation !== undefined
+          ? { rotation: createTableDto.rotation }
+          : {}),
+        ...(createTableDto.shape !== undefined
+          ? { shape: createTableDto.shape }
+          : {}),
         tenantId: scope.tenantId,
         branchId: scope.branchId,
       },
     });
+  }
+
+  /**
+   * Guard: a zoneId supplied via table create/update must reference a
+   * FloorZone in the caller's branch. Stops a table being parented into
+   * another branch's (or tenant's) floor plan.
+   */
+  private async assertZoneInScope(scope: BranchScope, zoneId: string) {
+    const zone = await this.prisma.floorZone.findFirst({
+      where: { id: zoneId, ...branchScope(scope) },
+      select: { id: true },
+    });
+    if (!zone) {
+      throw new NotFoundException("Floor zone not found in this branch");
+    }
   }
 
   async findAll(scope: BranchScope, section?: string) {
@@ -323,6 +367,12 @@ export class TablesService {
           `Table number ${updateTableDto.number} already exists`,
         );
       }
+    }
+
+    // A zoneId in the update payload must reference an in-branch zone (IDOR
+    // guard, mirrors create()). zoneId=null (unplace) is always allowed.
+    if (updateTableDto.zoneId) {
+      await this.assertZoneInScope(scope, updateTableDto.zoneId);
     }
 
     // Active-order guard parity with updateStatus(). UpdateTableDto =
