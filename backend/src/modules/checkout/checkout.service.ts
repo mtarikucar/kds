@@ -19,9 +19,11 @@ import { QuoteService } from "./quote.service";
  * Checkout orchestrator — turns a Cart into:
  *   - one HardwareOrder (if cart has hardware/service)
  *   - one or more TenantAddOn provisions (if cart has add-ons)
- *   - a subscription change command (if cart has a plan; lands as
- *     subscription.upgrade.requested for the existing SubscriptionService to
- *     pick up)
+ *
+ * Checkout does NOT handle subscription/plan changes. Those go through the
+ * dedicated /subscriptions/change-plan → pendingPlanChange → settlement rail.
+ * `type:'plan'` cart lines are rejected up-front by QuoteService, so a plan
+ * line can never reach this orchestrator (and never gets charged for a no-op).
  *
  * Provisioning is gated behind `paymentRef`. In MVP, this service is the
  * single entry point both for "paid checkout" (Iyzico/Stripe webhook calls
@@ -187,7 +189,6 @@ export class CheckoutService {
       (l) => l.type === "hardware" || l.type === "service",
     );
     const addOnLines = quote.lines.filter((l) => l.type === "addon");
-    const planLines = quote.lines.filter((l) => l.type === "plan");
 
     // v2.8.99.3 — tenant-scoped active-branch validation. The buyer
     // picked a branch in the shipping form; we trust the SPA to copy
@@ -348,29 +349,16 @@ export class CheckoutService {
           addOnIds.push(ta.id);
         }
 
-        // 3. Plan upgrades emit a request event for SubscriptionService to
-        // handle (it has the proration / per-plan trial logic). The checkout
-        // flow does NOT mutate Subscriptions directly to keep ownership clean.
-        for (const l of planLines) {
-          await tx.outboxEvent.create({
-            data: {
-              id: uuidv7(),
-              type: "subscription.upgrade.requested.v1",
-              tenantId,
-              payload: {
-                tenantId,
-                planCode: l.code,
-                billingCycle: l.meta?.billingCycle ?? "MONTHLY",
-                paymentRef,
-              } as any,
-              idempotencyKey: uuidv7(),
-              status: "queued",
-              nextAttemptAt: new Date(),
-            },
-          });
-        }
+        // NOTE: checkout no longer touches subscriptions. Plan changes go
+        // through the dedicated /subscriptions/change-plan →
+        // pendingPlanChange → settlement rail (which prorates and actually
+        // applies the new plan). The old "emit subscription.upgrade.requested.v1"
+        // step was dead: that event has NO consumer, so the plan never
+        // changed even though money was charged for the plan line. QuoteService
+        // now REJECTS `type:'plan'` lines, so a plan line can never reach
+        // provisioning here in the first place — the emit is gone, not gated.
 
-        // 4. Audit event — one row per provisioned cart so ops can answer
+        // Audit event — one row per provisioned cart so ops can answer
         // "where did this provisioning come from".
         await tx.outboxEvent.create({
           data: {
@@ -394,7 +382,7 @@ export class CheckoutService {
           },
         });
 
-        // 5. v2.8.86: surface a hardware-specific event when the cart minted
+        // 4. v2.8.86: surface a hardware-specific event when the cart minted
         // a HardwareOrder. CheckoutNotificationsService listens for this
         // and sends the order-placed email; physical-shipment downstreams
         // (fulfilment dashboards, carrier batching) can hook in later

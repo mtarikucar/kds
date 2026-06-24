@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { IntegrationService } from "./integration.service";
 import {
   mockPrismaClient,
@@ -99,16 +98,6 @@ describe("IntegrationService.ingestWebhook (iter-16 storage-DoS guards)", () => 
     outbox = { append: jest.fn().mockResolvedValue("outbox") };
     svc = buildSvc(prisma, outbox);
     process.env.INTEGRATION_KEY = "test-key-1234";
-    // deep-review M20 wrapped the replay dup-check + the event create in a
-    // Serializable $transaction. The deep-mocked prisma's $transaction
-    // doesn't forward the callback by default — wire it through so the
-    // inner tx.integrationWebhookEvent.* calls land on the same mock
-    // surface the tests already poke. Default the dup-check findFirst to
-    // null so the happy path doesn't have to set it on every test.
-    (prisma.$transaction as any).mockImplementation(async (fn: any) =>
-      fn(prisma),
-    );
-    (prisma.integrationWebhookEvent.findFirst as any).mockResolvedValue(null);
   });
 
   it("drops the webhook when tenantId is missing entirely", async () => {
@@ -185,16 +174,21 @@ describe("IntegrationService.ingestWebhook (iter-16 storage-DoS guards)", () => 
     ).toBe(0);
   });
 
-  it("writes the row and appends to outbox on the happy path", async () => {
+  it("honestly rejects a VERIFIED webhook (no store, no outbox) — gateway has no order pipeline", async () => {
+    // Honesty gate (2026-06): this gateway used to store the raw payload +
+    // emit `integration.webhook.<provider>.received.v1`, but the parsed
+    // orders were discarded and NOTHING consumed that topic to create a real
+    // Order. The real delivery ingest lives in the delivery-platforms module.
+    // So after a SUCCESSFUL signature verify we now drop the event instead of
+    // persisting a forensic row + firing a no-op outbox event.
     prisma.tenant.findUnique.mockResolvedValue({ id: "t1" } as any);
     prisma.integrationProviderDef.findUnique.mockResolvedValue({
       id: "yemeksepeti",
     } as any);
 
-    // The new HMAC-verification gate (iter-11) needs:
-    //   1. a `connected` IntegrationConnection row with non-null
-    //      credentialsEnc, decryptable with the test INTEGRATION_KEY.
-    //   2. the adapter's parseWebhook to resolve (fake adapter does).
+    // A `connected` IntegrationConnection row with non-null credentialsEnc,
+    // decryptable with the test INTEGRATION_KEY, so the adapter verify path
+    // is reached and resolves (the fake adapter's parseWebhook returns []).
     const credsBlob = (svc as any).encrypt(
       "t1",
       JSON.stringify({ secret: "s" }),
@@ -207,14 +201,6 @@ describe("IntegrationService.ingestWebhook (iter-16 storage-DoS guards)", () => 
       credentialsEnc: credsBlob,
     } as any);
 
-    let createArgs: any = null;
-    (prisma.integrationWebhookEvent.create as any).mockImplementation(
-      async ({ data }: any) => {
-        createArgs = data;
-        return { id: "wh-1", ...data };
-      },
-    );
-
     const out: any = await svc.ingestWebhook(
       "yemeksepeti",
       "t1",
@@ -222,20 +208,15 @@ describe("IntegrationService.ingestWebhook (iter-16 storage-DoS guards)", () => 
       Buffer.from('{"type":"order.created"}'),
     );
 
-    // id is a server-side UUIDv7 (the `wh-1` in the mock gets overwritten
-    // by the spread). The actual debugging hook is the createArgs shape.
-    expect(out.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(createArgs.tenantId).toBe("t1");
-    expect(createArgs.providerId).toBe("yemeksepeti");
-    expect(createArgs.connectionId).toBe("conn-1");
-    expect(createArgs.type).toBe("order.created");
-    expect(createArgs.signature).toBe("sig-value");
-    expect(outbox.append).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "integration.webhook.yemeksepeti.received.v1",
-        tenantId: "t1",
-      }),
-    );
+    // The signature WAS verified (adapter.parseWebhook was reached)...
+    const adapter = (svc as any).adapters.get("yemeksepeti");
+    expect(adapter.parseWebhook).toHaveBeenCalled();
+    // ...but we drop rather than persist/forward — the load-bearing change.
+    expect(out).toEqual({ ignored: true, reason: "not implemented" });
+    expect(
+      (prisma.integrationWebhookEvent.create as any).mock.calls.length,
+    ).toBe(0);
+    expect(outbox.append).not.toHaveBeenCalled();
   });
 
   it("drops the webhook when no IntegrationConnection exists for the tenant", async () => {
@@ -262,86 +243,13 @@ describe("IntegrationService.ingestWebhook (iter-16 storage-DoS guards)", () => 
     expect(outbox.append).not.toHaveBeenCalled();
   });
 
-  it("rejects a duplicate signature within the replay window (iter-17)", async () => {
-    // HMAC verify proves the body+sig was signed by the provider's secret.
-    // It does NOT prevent capture-and-replay. If a captured body+sig is
-    // POSTed twice, the second one must short-circuit so we don't double-
-    // process the same order/event downstream.
-    prisma.tenant.findUnique.mockResolvedValue({ id: "t1" } as any);
-    prisma.integrationProviderDef.findUnique.mockResolvedValue({
-      id: "yemeksepeti",
-    } as any);
-    const credsBlob = (svc as any).encrypt(
-      "t1",
-      JSON.stringify({ secret: "s" }),
-    );
-    prisma.integrationConnection.findFirst.mockResolvedValue({
-      id: "conn-1",
-      tenantId: "t1",
-      providerId: "yemeksepeti",
-      status: "connected",
-      credentialsEnc: credsBlob,
-    } as any);
-    prisma.integrationWebhookEvent.findFirst.mockResolvedValue({
-      id: "prev-event-id",
-      receivedAt: new Date("2026-05-25T10:00:00Z"),
-    } as any);
-
-    const out = await svc.ingestWebhook(
-      "yemeksepeti",
-      "t1",
-      { "x-signature": "replayed-sig" },
-      Buffer.from('{"type":"order.created"}'),
-    );
-
-    expect(out).toEqual({ ignored: true, reason: "duplicate" });
-    expect(
-      (prisma.integrationWebhookEvent.create as any).mock.calls.length,
-    ).toBe(0);
-    expect(outbox.append).not.toHaveBeenCalled();
-  });
-
-  it("rejects a CONCURRENT duplicate via serialization abort (deep-review M20)", async () => {
-    // The sequential gate above only catches a duplicate whose first row has
-    // already committed. Two identical webhooks racing each other both ran
-    // findFirst before either committed, so neither saw the peer and BOTH
-    // created an event + emitted to the outbox — double-firing downstream.
-    // The dup-check + create now run in one Serializable txn; the loser of
-    // the race aborts with Postgres 40001 → Prisma P2034, which we map to
-    // the same { ignored, reason: "duplicate" } WITHOUT touching the outbox.
-    prisma.tenant.findUnique.mockResolvedValue({ id: "t1" } as any);
-    prisma.integrationProviderDef.findUnique.mockResolvedValue({
-      id: "yemeksepeti",
-    } as any);
-    const credsBlob = (svc as any).encrypt(
-      "t1",
-      JSON.stringify({ secret: "s" }),
-    );
-    prisma.integrationConnection.findFirst.mockResolvedValue({
-      id: "conn-1",
-      tenantId: "t1",
-      providerId: "yemeksepeti",
-      status: "connected",
-      credentialsEnc: credsBlob,
-    } as any);
-    // The serialization failure surfaces from the $transaction itself.
-    (prisma.$transaction as any).mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("could not serialize access", {
-        code: "P2034",
-        clientVersion: "test",
-      }),
-    );
-
-    const out = await svc.ingestWebhook(
-      "yemeksepeti",
-      "t1",
-      { "x-signature": "racing-sig" },
-      Buffer.from('{"type":"order.created"}'),
-    );
-
-    expect(out).toEqual({ ignored: true, reason: "duplicate" });
-    expect(outbox.append).not.toHaveBeenCalled();
-  });
+  // NOTE: the former replay-dedup tests (iter-17 sequential duplicate +
+  // deep-review M20 concurrent serialization abort) were removed with the
+  // honesty cleanup (2026-06). Replay protection guarded the persist+emit
+  // path that no longer exists — ingestWebhook now drops every verified
+  // webhook before any DB write, so there is nothing to double-process and
+  // no duplicate semantics to assert. If a real order pipeline is ever
+  // re-introduced here, the replay guard (and its tests) must come back.
 
   it("drops the webhook when the adapter rejects the signature", async () => {
     prisma.tenant.findUnique.mockResolvedValue({ id: "t1" } as any);

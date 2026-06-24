@@ -122,7 +122,9 @@
     "calls": "Qo'ng'iroqlar",
     "bill": "Hisob",
     "bills": "Hisoblar",
-    "newRequest": "Yangi {{type}} so'rovi"
+    "newRequest": "Yangi {{type}} so'rovi",
+    "lowStockAlert": "Kam zaxira: {{count}} ta mahsulot minimumdan past",
+    "stockExpiryAlert": "Muddati tugayapti: {{count}} ta zaxira partiyasi"
   },
   "pendingOrders": {
     "title": "Kutilayotgan buyurtmalar",

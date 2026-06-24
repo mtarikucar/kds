@@ -637,6 +637,152 @@ describe('PaymentFinalizer', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────
+  // maybeIssueYazarkasaReceipt — gated physical-ÖKC fiscal issuance
+  // ────────────────────────────────────────────────────────────────────
+  describe('maybeIssueYazarkasaReceipt', () => {
+    let fiscal: { issueReceipt: jest.Mock };
+
+    function makeFinalizerWithFiscal() {
+      fiscal = { issueReceipt: jest.fn().mockResolvedValue({}) };
+      return new PaymentFinalizer(
+        prisma as any,
+        receiptSnapshotBuilder as any,
+        loyalty as any,
+        salesInvoice as any,
+        accountingSettings as any,
+        kdsGateway as any,
+        fiscal as any,
+      );
+    }
+
+    it('no-ops when FiscalService is not wired (the common bare-construction case)', async () => {
+      // `finalizer` from beforeEach has no fiscalService.
+      await expect(
+        finalizer.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID),
+      ).resolves.toBeUndefined();
+      expect(prisma.fiscalDeviceRecord.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('GATE: looks up a non-retired, non-efatura physical device and no-ops when none exists (dormant)', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
+
+      // The cloud e-Fatura pseudo-device is excluded so we never
+      // double-fiscalize against the accounting e-document rail.
+      expect(prisma.fiscalDeviceRecord.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: TENANT_ID,
+            status: { not: 'retired' },
+            providerId: { not: 'efatura' },
+          }),
+        }),
+      );
+      expect(fiscal.issueReceipt).not.toHaveBeenCalled();
+    });
+
+    it('issues a yazarkasa receipt with a deterministic per-order idempotency key and lines built from the paid order', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'dev-okc-1',
+        branchId: 'br-1',
+        providerId: 'hugin',
+        status: 'online',
+      });
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        id: ORDER_ID,
+        branchId: 'br-order',
+        status: 'PAID',
+        orderItems: [
+          {
+            productId: 'p1',
+            quantity: 2,
+            unitPrice: new Prisma.Decimal('50.00'),
+            taxRate: 20,
+            product: { name: 'Coffee' },
+          },
+        ],
+      });
+
+      await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
+
+      expect(fiscal.issueReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: TENANT_ID,
+          branchId: 'br-order',
+          fiscalDeviceId: 'dev-okc-1',
+          orderId: ORDER_ID,
+          idempotencyKey: `order-fiscal:${ORDER_ID}`,
+          kind: 'cash_receipt',
+          lines: [
+            expect.objectContaining({
+              productCode: 'p1',
+              name: 'Coffee',
+              qty: 2,
+              unitPriceCents: 5000,
+              vatRate: 20,
+            }),
+          ],
+          // single cash-equivalent summary == total (2 * 5000)
+          payments: [{ method: 'cash', amountCents: 10000 }],
+        }),
+      );
+    });
+
+    it('no-ops when the order is not (PAID) found or has no items', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'dev-okc-1',
+        branchId: 'br-1',
+        providerId: 'beko',
+        status: 'online',
+      });
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
+      expect(fiscal.issueReceipt).not.toHaveBeenCalled();
+    });
+
+    it('BEST-EFFORT: swallows a fiscal failure and captures to Sentry (never blocks payment)', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'dev-okc-1',
+        branchId: 'br-1',
+        providerId: 'hugin',
+        status: 'online',
+      });
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        id: ORDER_ID,
+        branchId: 'br-order',
+        status: 'PAID',
+        orderItems: [
+          {
+            productId: 'p1',
+            quantity: 1,
+            unitPrice: new Prisma.Decimal('10.00'),
+            taxRate: 10,
+            product: { name: 'X' },
+          },
+        ],
+      });
+      fiscal.issueReceipt.mockRejectedValue(new Error('queue down'));
+
+      await expect(
+        f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID),
+      ).resolves.toBeUndefined();
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({ event: 'FISCAL_RECEIPT_FAILED' }),
+          extra: expect.objectContaining({ orderId: ORDER_ID }),
+        }),
+      );
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────
   // safeEmitPaymentSuccess — swallows socket errors
   // ────────────────────────────────────────────────────────────────────
   describe('safeEmitPaymentSuccess', () => {

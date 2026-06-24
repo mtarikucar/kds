@@ -456,4 +456,46 @@ describe('IntegrationsService', () => {
       settings: { width: 80 },
     });
   });
+
+  // ----------------------------------------------------------------
+  // HONESTY: stored creds are not presented as "working"
+  // ----------------------------------------------------------------
+
+  it('surfaces activationState CONFIGURED_NOT_ACTIVE for a credential integration even when enabled', async () => {
+    (prisma.integrationSettings.findFirst as any).mockResolvedValue({
+      id: 'int-1',
+      tenantId: TENANT,
+      integrationType: 'PAYMENT_GATEWAY',
+      provider: 'stripe',
+      isEnabled: true,
+      config: encryptJson({ apiKey: 'sk_x' }),
+    });
+
+    const out = await svc.findOne('int-1', TENANT);
+    // Enabled toggle is operator intent, but no adapter consumes it yet.
+    expect(out.activationState).toBe('CONFIGURED_NOT_ACTIVE');
+  });
+
+  it('requestSync refuses to fake a sync — no lastSyncedAt stamp, honest payload', async () => {
+    (prisma.integrationSettings.findFirst as any).mockResolvedValue({
+      id: 'int-1',
+      integrationType: 'CRM',
+      isEnabled: true,
+    });
+
+    const out = await svc.requestSync('int-1', TENANT);
+
+    expect(out.synced).toBe(false);
+    expect(out.activationState).toBe('CONFIGURED_NOT_ACTIVE');
+    expect(out.message).toMatch(/not yet active|no live sync/i);
+    // Critically: it must NOT have stamped a success timestamp.
+    expect(prisma.integrationSettings.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('requestSync throws NotFound for a cross-tenant / missing id', async () => {
+    (prisma.integrationSettings.findFirst as any).mockResolvedValue(null);
+    await expect(svc.requestSync('nope', TENANT)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
 });

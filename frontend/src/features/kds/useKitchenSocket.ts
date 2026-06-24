@@ -98,11 +98,33 @@ export const useKitchenSocket = () => {
       queryClient.invalidateQueries({ queryKey: ['orders', event.orderId] });
     };
 
+    // Hourly stock-alert pushes (StockAlertsService → KdsGateway). These are
+    // the kitchen-room subscribers the backend emit was missing — without a
+    // listener the alert rendered nowhere. Mirror the order-toast pattern:
+    // a single warning toast with the item/batch count, top-center.
+    const handleStockLowAlert = (event: { count: number }) => {
+      console.log('[KDS Socket] Low stock alert received:', event);
+      toast.warning(i18n.t('kitchen:kitchen.lowStockAlert', { count: event?.count ?? 0 }), {
+        duration: 8000,
+        position: 'top-center',
+      });
+    };
+
+    const handleStockExpiryAlert = (event: { count: number }) => {
+      console.log('[KDS Socket] Stock expiry alert received:', event);
+      toast.warning(i18n.t('kitchen:kitchen.stockExpiryAlert', { count: event?.count ?? 0 }), {
+        duration: 8000,
+        position: 'top-center',
+      });
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
     socket.on('order:updated', handleOrderUpdated);
     socket.on('order:status-changed', handleOrderStatusChanged);
+    socket.on('stock:low-alert', handleStockLowAlert);
+    socket.on('stock:expiry-alert', handleStockExpiryAlert);
 
     // Room membership is decided server-side from the JWT role on connect;
     // no inbound join/leave messages are needed.
@@ -113,6 +135,8 @@ export const useKitchenSocket = () => {
       socket.off('order:new', handleNewOrder);
       socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
+      socket.off('stock:low-alert', handleStockLowAlert);
+      socket.off('stock:expiry-alert', handleStockExpiryAlert);
       disconnectSocket();
     };
   }, [queryClient]);

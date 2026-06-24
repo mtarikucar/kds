@@ -122,7 +122,9 @@
     "calls": "استدعاءات",
     "bill": "فاتورة",
     "bills": "فواتير",
-    "newRequest": "طلب {{type}} جديد"
+    "newRequest": "طلب {{type}} جديد",
+    "lowStockAlert": "مخزون منخفض: {{count}} صنف أقل من الحد الأدنى",
+    "stockExpiryAlert": "قرب انتهاء الصلاحية: {{count}} دفعة مخزون"
   },
   "pendingOrders": {
     "title": "الطلبات المعلقة",

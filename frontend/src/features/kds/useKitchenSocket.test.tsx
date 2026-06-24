@@ -27,8 +27,13 @@ vi.mock('../../lib/socket', () => ({
 
 const toastSuccess = vi.fn();
 const toastInfo = vi.fn();
+const toastWarning = vi.fn();
 vi.mock('sonner', () => ({
-  toast: { success: (...a: unknown[]) => toastSuccess(...a), info: (...a: unknown[]) => toastInfo(...a) },
+  toast: {
+    success: (...a: unknown[]) => toastSuccess(...a),
+    info: (...a: unknown[]) => toastInfo(...a),
+    warning: (...a: unknown[]) => toastWarning(...a),
+  },
 }));
 vi.mock('../../i18n/config', () => ({
   default: { t: (k: string, opts?: any) => (opts ? `${k}:${JSON.stringify(opts)}` : k) },
@@ -57,6 +62,8 @@ describe('useKitchenSocket — subscription + connection state', () => {
     expect(fakeSocket.on).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('order:updated', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('order:status-changed', expect.any(Function));
+    expect(fakeSocket.on).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
+    expect(fakeSocket.on).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
     expect(result.current.isConnected).toBe(false);
   });
 
@@ -111,6 +118,30 @@ describe('useKitchenSocket — event handlers', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(toastInfo).not.toHaveBeenCalled();
   });
+
+  it('stock:low-alert shows a warning toast with the item count', () => {
+    const client = new QueryClient();
+    renderHook(() => useKitchenSocket(), { wrapper: wrapper(client) });
+
+    act(() => handlers['stock:low-alert']({ count: 3, items: [] }));
+
+    expect(toastWarning).toHaveBeenCalledWith(
+      expect.stringContaining('kitchen:kitchen.lowStockAlert'),
+      expect.objectContaining({ position: 'top-center' }),
+    );
+  });
+
+  it('stock:expiry-alert shows a warning toast with the batch count', () => {
+    const client = new QueryClient();
+    renderHook(() => useKitchenSocket(), { wrapper: wrapper(client) });
+
+    act(() => handlers['stock:expiry-alert']({ count: 2, batches: [] }));
+
+    expect(toastWarning).toHaveBeenCalledWith(
+      expect.stringContaining('kitchen:kitchen.stockExpiryAlert'),
+      expect.objectContaining({ position: 'top-center' }),
+    );
+  });
 });
 
 describe('useKitchenSocket — cleanup', () => {
@@ -121,6 +152,8 @@ describe('useKitchenSocket — cleanup', () => {
     unmount();
     expect(fakeSocket.off).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('order:status-changed', expect.any(Function));
+    expect(fakeSocket.off).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
+    expect(fakeSocket.off).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
     expect(disconnectSocket).toHaveBeenCalledTimes(1);
   });
 });

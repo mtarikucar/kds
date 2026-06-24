@@ -69,8 +69,8 @@ export class StockDashboardService {
         where: { ...branchScope(scope), isActive: true },
       }),
       // Pass branchId so the dashboard's low-stock + expiry feeds are
-      // fenced to the caller's branch (the scheduler still calls these
-      // tenant-wide with branchId omitted).
+      // fenced to the caller's branch. The hourly scheduler likewise calls
+      // these per active branch (so its realtime emit fires).
       this.stockAlerts.checkLowStock(scope.tenantId, scope.branchId),
       this.stockAlerts.checkExpiringBatches(
         scope.tenantId,

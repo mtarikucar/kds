@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #DC2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .button { display: inline-block; padding: 12px 30px; background: #DC2626; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    .alert { background: #FEE2E2; padding: 15px; border-left: 4px solid #DC2626; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>{{#if expired}}Eklenti süresi doldu{{else}}Eklenti yenileme gerekiyor{{/if}}</h1>
+  </div>
+  <div class="content">
+    <p>Merhaba {{tenantName}},</p>
+
+    {{#if expired}}
+    <div class="alert">
+      <strong>{{addOnCode}} eklentinizin süresi doldu.</strong>
+      <br>
+      Yenileme yapılmadığı için bu eklentiye bağlı özellik hesabınızdan kaldırıldı.
+    </div>
+
+    <p>Eklentiyi tekrar etkinleştirmek için yeniden satın alabilirsiniz:</p>
+    {{else}}
+    <div class="alert">
+      <strong>{{addOnCode}} eklentinizin yenileme süresi geçti.</strong>
+      <br>
+      Hizmetinize 7 günlük ek süre tanıdık. Bu sürede ödeme yapmazsanız eklenti
+      sona erecek ve bağlı özellik hesabınızdan kaldırılacaktır.
+    </div>
+
+    <p>Eklentinizi şimdi yenileyin — tek tıkla aynı eklentiye geri dönebilirsiniz:</p>
+    {{/if}}
+
+    <a href="{{renewUrl}}" class="button">{{#if expired}}Tekrar Satın Al{{else}}Şimdi Yenile{{/if}} →</a>
+
+    <p>Sorularınız için: <a href="mailto:contact@hummytummy.com">contact@hummytummy.com</a></p>
+
+    <p>Saygılarımızla,<br>
+    HummyTummy Ekibi</p>
+  </div>
+</body>
+</html>

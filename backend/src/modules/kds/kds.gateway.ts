@@ -919,6 +919,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // join handlers above). StockAlertsService used to emit to bare
   // `kitchen-${tenantId}` rooms with no members, so the events were dropped —
   // these helpers own the correct room naming for the stock-alert payloads.
+  // The KDS + POS sockets subscribe to "stock:low-alert"/"stock:expiry-alert"
+  // (useKitchenSocket / usePosSocket) and surface a warning toast, so these
+  // emits now actually reach a screen.
   emitStockLowAlert(tenantId: string, branchId: string, payload: unknown) {
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)

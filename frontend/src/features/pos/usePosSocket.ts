@@ -477,6 +477,26 @@ export const usePosSocket = () => {
       }
     };
 
+    // Hourly stock-alert pushes (StockAlertsService → KdsGateway). The POS
+    // room is a subscriber the backend emit was missing — without a listener
+    // the alert rendered nowhere. Mirror the request-toast pattern: a single
+    // warning toast with the item/batch count, top-right (POS namespace key).
+    const handleStockLowAlert = (event: any) => {
+      console.log('[POS Socket] Low stock alert received:', event);
+      toast.warning(i18n.t('pos:notifications.lowStockAlert', { count: event?.count ?? 0 }), {
+        duration: 8000,
+        position: 'top-right',
+      });
+    };
+
+    const handleStockExpiryAlert = (event: any) => {
+      console.log('[POS Socket] Stock expiry alert received:', event);
+      toast.warning(i18n.t('pos:notifications.stockExpiryAlert', { count: event?.count ?? 0 }), {
+        duration: 8000,
+        position: 'top-right',
+      });
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -489,6 +509,8 @@ export const usePosSocket = () => {
     socket.on('waiter-request:new', handleWaiterRequestNew);
     socket.on('waiter-request:updated', handleWaiterRequestUpdated);
     socket.on('payment:success', handlePaymentSuccess);
+    socket.on('stock:low-alert', handleStockLowAlert);
+    socket.on('stock:expiry-alert', handleStockExpiryAlert);
 
     // Table merge/unmerge: invalidate tables cache
     const handleTableMergeOrUnmerge = () => {
@@ -516,6 +538,8 @@ export const usePosSocket = () => {
       socket.off('waiter-request:updated', handleWaiterRequestUpdated);
       socket.off('table:merged', handleTableMergeOrUnmerge);
       socket.off('table:unmerged', handleTableMergeOrUnmerge);
+      socket.off('stock:low-alert', handleStockLowAlert);
+      socket.off('stock:expiry-alert', handleStockExpiryAlert);
       disconnectSocket();
     };
   }, [queryClient]);

@@ -115,7 +115,8 @@
       "label": "Ortam",
       "production": "Canlı",
       "sandbox": "Sandbox",
-      "sandboxWarning": "Sandbox, bu platformu test uç noktalarına yönlendirir ve yerleşik test sipariş simülatörünü etkinleştirir. Gerçek sipariş işlenmez."
+      "sandboxWarning": "Sandbox, bu platformu test uç noktalarına yönlendirir ve yerleşik test sipariş simülatörünü etkinleştirir. Gerçek sipariş işlenmez.",
+      "noSandbox": "Bu platformda sandbox yok — test uç noktası tanımlı değil, sandbox seçilemez."
     }
   },
   "autoSave": {
@@ -405,7 +406,9 @@
     "loading": "Entegrasyonlar yükleniyor...",
     "none": "Henüz yapılandırılmış entegrasyon yok",
     "lastSynced": "Son senkronizasyon: {{date}}",
-    "comingSoon": "Özel entegrasyonlar yakında"
+    "comingSoon": "Özel entegrasyonlar yakında",
+    "configuredNotActive": "Yapılandırıldı, etkin değil",
+    "notWiredHint": "Kimlik bilgileri güvenle saklanıyor, ancak bu sağlayıcı için henüz canlı bir entegrasyon bağlı değil — etkin olarak çalışmıyor."
   },
   "noCashDrawersConfigured": "Yapılandırılmış kasa çekmecesi yok",
   "noPagersConfigured": "Yapılandırılmış çağrı cihazı yok",

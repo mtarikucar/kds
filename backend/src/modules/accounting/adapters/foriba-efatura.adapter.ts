@@ -55,8 +55,20 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
       },
     );
 
-    const externalId =
-      response.data?.uuid || response.data?.id || `foriba-${Date.now()}`;
+    // Honesty: only treat the dispatch as successful when the provider
+    // actually returned an identifier. Minting a synthetic `foriba-<ts>`
+    // id would mark the invoice SYNCED while nothing was accepted upstream
+    // — silently masking a real failure. No id ⇒ throw so the sync path
+    // records it as FAILED (with the error) instead.
+    const externalId = response.data?.uuid || response.data?.id;
+    if (!externalId) {
+      this.logger.error(
+        `e-Fatura dispatch returned no uuid/id for invoice ${invoice.invoiceNumber}; treating as failure`,
+      );
+      throw new Error(
+        "Foriba e-Fatura dispatch returned no invoice id (uuid/id missing)",
+      );
+    }
     this.logger.log(`e-Fatura dispatched: ${externalId}`);
     return { externalId };
   }

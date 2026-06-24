@@ -21,6 +21,8 @@ export interface EmailOptions {
 export class EmailService {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
+  private readonly isProduction =
+    (process.env.NODE_ENV ?? "development") === "production";
   private readonly templatesPath: string;
   // Iter-98: cache compiled handlebars templates for the process
   // lifetime. Same reasoning as iter-97 (NotificationService): pre-fix
@@ -48,9 +50,18 @@ export class EmailService {
     const pass = this.configService.get<string>("EMAIL_PASSWORD");
 
     if (!host || !user || !pass) {
-      this.logger.warn(
-        "Email configuration missing. Emails will be logged instead of sent.",
-      );
+      if (this.isProduction) {
+        // PROD must NOT silently mock-send. Surface loudly so ops sees
+        // that no email can actually be delivered; send paths below
+        // return false (a real failure) instead of faking success.
+        this.logger.error(
+          "Email is NOT configured (EMAIL_HOST/EMAIL_USER/EMAIL_PASSWORD missing) in production. Emails will NOT be sent.",
+        );
+      } else {
+        this.logger.warn(
+          "Email configuration missing. Emails will be logged instead of sent (dev mock mode).",
+        );
+      }
       return;
     }
 
@@ -84,8 +95,17 @@ export class EmailService {
       // Compile template
       const html = await this.compileTemplate(template, context);
 
-      // If no transporter (missing config), just log
+      // No transporter (missing config).
       if (!this.transporter) {
+        if (this.isProduction) {
+          // Honesty: in prod, an unconfigured mailer is a delivery
+          // FAILURE, not a success. Returning true here would let
+          // callers mark something "sent" that never left the box.
+          this.logger.error(
+            `Email NOT sent (mailer not configured in production). To: ${maskEmail(to)} Template: ${template}`,
+          );
+          return false;
+        }
         // v2.8.97 — mock-mode logging now masks the recipient AND
         // drops the raw context object. Pre-fix the [EMAIL MOCK]
         // stream re-exposed PII the production path is careful to
@@ -144,6 +164,13 @@ export class EmailService {
   ): Promise<boolean> {
     try {
       if (!this.transporter) {
+        if (this.isProduction) {
+          // Honesty: prod with no mailer = real failure, not a mock send.
+          this.logger.error(
+            `Plain email NOT sent (mailer not configured in production). To: ${maskEmail(to)}`,
+          );
+          return false;
+        }
         // v2.8.97 — same masking as sendEmail above. Body length is
         // logged in place of the body so ops can sanity-check "the
         // message wasn't truncated" without exposing OTP/token text.

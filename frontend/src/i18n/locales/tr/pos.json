@@ -122,7 +122,9 @@
     "calls": "Çağrı",
     "bill": "Hesap",
     "bills": "Hesap",
-    "newRequest": "Yeni {{type}} İsteği"
+    "newRequest": "Yeni {{type}} İsteği",
+    "lowStockAlert": "Düşük stok: {{count}} ürün minimumun altında",
+    "stockExpiryAlert": "Son kullanma yaklaşıyor: {{count}} stok partisi"
   },
   "pendingOrders": {
     "title": "Bekleyen Siparişler",

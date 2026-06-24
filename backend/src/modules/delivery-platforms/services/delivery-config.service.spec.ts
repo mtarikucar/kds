@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { DeliveryConfigService } from "./delivery-config.service";
 import {
@@ -51,6 +55,9 @@ describe("DeliveryConfigService", () => {
       testConnection: jest.fn().mockResolvedValue(true),
       openRestaurant: jest.fn().mockResolvedValue(undefined),
       closeRestaurant: jest.fn().mockResolvedValue(undefined),
+      // Default: a platform WITH a real, distinct sandbox host. The
+      // sandbox-fail-closed tests override this to false.
+      hasRealSandbox: jest.fn().mockReturnValue(true),
     };
     adapterFactory = { getAdapter: jest.fn().mockReturnValue(adapter) };
     outbox = { append: jest.fn().mockResolvedValue("evt-1") };
@@ -238,6 +245,104 @@ describe("DeliveryConfigService", () => {
           data: { restaurantOpen: true },
         }),
       );
+    });
+  });
+
+  describe("sandbox-fail-closed (no-real-sandbox refuses live actions)", () => {
+    // Mirrors the test-order simulator's guard rail #1b: a "sandbox" config on
+    // a platform whose adapter has no distinct sandbox host still resolves to
+    // PRODUCTION, so test-connection / toggle-restaurant must REFUSE rather
+    // than silently hit the live API.
+    const sandboxCfg = (platform = "GETIR") => ({
+      id: "cfg-1",
+      tenantId: "t1",
+      platform,
+      environment: "sandbox",
+      credentials: null,
+      accessToken: null,
+    });
+
+    it("testConnection() REFUSES a sandbox config when the adapter has no real sandbox host", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(
+        sandboxCfg("MIGROS"),
+      );
+      adapter.hasRealSandbox.mockReturnValue(false);
+
+      await expect(svc.testConnection("t1", "MIGROS")).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      // Critical: the adapter's live test call is never made.
+      expect(adapter.testConnection).not.toHaveBeenCalled();
+    });
+
+    it("testConnection() error names the platform-specific sandbox env var", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(
+        sandboxCfg("GETIR"),
+      );
+      adapter.hasRealSandbox.mockReturnValue(false);
+
+      await expect(svc.testConnection("t1", "GETIR")).rejects.toThrow(
+        /GETIR_SANDBOX_API_BASE_URL/,
+      );
+    });
+
+    it("testConnection() ALLOWS a sandbox config when the adapter has a real sandbox host", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(
+        sandboxCfg("TRENDYOL"),
+      );
+      adapter.hasRealSandbox.mockReturnValue(true);
+
+      const result = await svc.testConnection("t1", "TRENDYOL");
+
+      expect(adapter.testConnection).toHaveBeenCalledTimes(1);
+      expect(result).toBe(true);
+    });
+
+    it("testConnection() on a production config never consults hasRealSandbox and proceeds", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        ...sandboxCfg("MIGROS"),
+        environment: "production",
+      });
+      // Even if the adapter would report no sandbox, production is allowed.
+      adapter.hasRealSandbox.mockReturnValue(false);
+
+      await svc.testConnection("t1", "MIGROS");
+
+      expect(adapter.hasRealSandbox).not.toHaveBeenCalled();
+      expect(adapter.testConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it("toggleRestaurant() REFUSES a sandbox config when the adapter has no real sandbox host (no live mutation, no DB write)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(
+        sandboxCfg("YEMEKSEPETI"),
+      );
+      adapter.hasRealSandbox.mockReturnValue(false);
+
+      await expect(
+        svc.toggleRestaurant("t1", "YEMEKSEPETI", true),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // Critical: neither the live open call NOR the restaurantOpen DB write
+      // happen — the operator believed they were in a safe sandbox.
+      expect(adapter.openRestaurant).not.toHaveBeenCalled();
+      expect(prisma.deliveryPlatformConfig.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("toggleRestaurant() ALLOWS a sandbox config when the adapter has a real sandbox host", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue(
+        sandboxCfg("TRENDYOL"),
+      );
+      adapter.hasRealSandbox.mockReturnValue(true);
+      (prisma.deliveryPlatformConfig.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.toggleRestaurant("t1", "TRENDYOL", true);
+
+      expect(adapter.openRestaurant).toHaveBeenCalledTimes(1);
+      expect(prisma.deliveryPlatformConfig.updateMany).toHaveBeenCalled();
     });
   });
 

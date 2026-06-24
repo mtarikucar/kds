@@ -410,7 +410,10 @@ export class ZReportsService {
         finalizedById: userId ?? null,
         payloadHash,
         pdfExported: true,
-        excelExported: true,
+        // Honesty: there is NO Excel export path (only PDF via
+        // ZReportPdfService). Finalizing must not claim an export that
+        // never happened — keep this false until/unless XLSX ships.
+        excelExported: false,
       },
     });
     if (result.count !== 1) {

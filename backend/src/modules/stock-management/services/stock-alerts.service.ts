@@ -28,6 +28,12 @@ import { KdsGateway } from "../../kds/kds.gateway";
  */
 const RE_ALERT_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
 const itemSetSignature = (ids: string[]): string => [...ids].sort().join(",");
+// Dedup state is keyed per (tenant, branch): the hourly scheduler now runs
+// once PER active branch, so two branches of the same tenant must not clobber
+// each other's last-emitted signature. The branchId is always present on the
+// emit path, so this key is always well-formed there.
+const alertStateKey = (tenantId: string, branchId: string): string =>
+  `${tenantId}:${branchId}`;
 
 interface AlertState {
   signature: string;
@@ -38,7 +44,7 @@ interface AlertState {
 export class StockAlertsService {
   private readonly logger = new Logger(StockAlertsService.name);
 
-  // tenantId -> last alert signature + when we sent it
+  // `${tenantId}:${branchId}` -> last alert signature + when we sent it
   private readonly lowStockState = new Map<string, AlertState>();
   private readonly expiringBatchesState = new Map<string, AlertState>();
 
@@ -49,10 +55,12 @@ export class StockAlertsService {
     private kdsGateway?: KdsGateway,
   ) {}
 
-  // `branchId` is optional: the hourly scheduler runs tenant-wide (every
-  // active tenant, no branch axis), while the branch-scoped dashboard
-  // passes its branchId so the alert feed only reflects that branch's
-  // stock. When supplied, the raw SQL gains `AND si."branchId" = $branchId`.
+  // `branchId` is optional only for callers that want the raw list without an
+  // emit. The hourly scheduler now iterates each tenant's ACTIVE branches and
+  // passes a branchId (so the realtime emit fires — the branch-suffixed rooms
+  // are the only ones sockets join); the branch-scoped dashboard likewise
+  // passes its branchId. When supplied, the raw SQL gains
+  // `AND si."branchId" = $branchId`.
   async checkLowStock(tenantId: string, branchId?: string) {
     const branchFilter = branchId
       ? Prisma.sql`AND si."branchId" = ${branchId}`
@@ -70,15 +78,18 @@ export class StockAlertsService {
 
     // Emit only when we have a branch to target — the realtime rooms are
     // branch-suffixed (kitchen/pos-${tenantId}-${branchId}); a bare-room emit
-    // reaches zero clients. The tenant-wide cron path (no branchId) just
-    // computes the list for REST consumers and does not emit.
+    // reaches zero clients. A branchId-less call (raw list for REST consumers)
+    // simply skips the emit. The scheduler always supplies a branchId so its
+    // hourly run does emit. The KDS/POS sockets now subscribe to
+    // "stock:low-alert" (useKitchenSocket / usePosSocket) and show a warning
+    // toast, so the emit actually surfaces on a screen.
     if (
       branchId &&
       lowStockItems.length > 0 &&
       this.kdsGateway &&
       this.shouldEmitAlert(
         this.lowStockState,
-        tenantId,
+        alertStateKey(tenantId, branchId),
         lowStockItems.map((i) => i.id),
       )
     ) {
@@ -100,9 +111,10 @@ export class StockAlertsService {
     return lowStockItems;
   }
 
-  // `branchId` optional — same scheduler-vs-dashboard split as
-  // checkLowStock. When supplied, the batch query is fenced to that
-  // branch so the expiry feed never surfaces another branch's batches.
+  // `branchId` optional only for raw-list callers — same emit rule as
+  // checkLowStock (the scheduler passes a branchId per active branch so the
+  // emit fires). When supplied, the batch query is fenced to that branch so
+  // the expiry feed never surfaces another branch's batches.
   async checkExpiringBatches(
     tenantId: string,
     days?: number,
@@ -129,15 +141,15 @@ export class StockAlertsService {
       orderBy: { expiryDate: "asc" },
     });
 
-    // Branch-targeted emit only (see checkLowStock). Cron path computes the
-    // list for REST without emitting to empty bare rooms.
+    // Branch-targeted emit only (see checkLowStock). A branchId-less call
+    // computes the list for REST without emitting to empty bare rooms.
     if (
       branchId &&
       expiringBatches.length > 0 &&
       this.kdsGateway &&
       this.shouldEmitAlert(
         this.expiringBatchesState,
-        tenantId,
+        alertStateKey(tenantId, branchId),
         expiringBatches.map((b) => b.id),
       )
     ) {
@@ -166,11 +178,11 @@ export class StockAlertsService {
    */
   private shouldEmitAlert(
     state: Map<string, AlertState>,
-    tenantId: string,
+    key: string,
     itemIds: string[],
   ): boolean {
     const signature = itemSetSignature(itemIds);
-    const previous = state.get(tenantId);
+    const previous = state.get(key);
     const now = Date.now();
 
     // Empty set + no previous emit = nothing to do.
@@ -179,18 +191,18 @@ export class StockAlertsService {
     // Set changed (new item dropped below threshold, or one recovered) = emit.
     if (!previous || previous.signature !== signature) {
       if (signature !== "") {
-        state.set(tenantId, { signature, emittedAt: now });
+        state.set(key, { signature, emittedAt: now });
       } else {
         // All items recovered — drop the cache entry so a fresh problem
         // re-emits immediately rather than waiting for the next change.
-        state.delete(tenantId);
+        state.delete(key);
       }
       return signature !== "";
     }
 
     // Same items still problematic — nudge once per RE_ALERT_INTERVAL.
     if (now - previous.emittedAt >= RE_ALERT_INTERVAL_MS) {
-      state.set(tenantId, { signature, emittedAt: now });
+      state.set(key, { signature, emittedAt: now });
       return true;
     }
 

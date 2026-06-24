@@ -130,8 +130,9 @@ export class FiscalService {
       // and the bridge has not acked yet. A `queued` result MUST stay queued —
       // it is NOT a failure (no fiscal.receipt.failed.v1, no `failed` count)
       // and NOT an issuance. Only `issued` flips the row to issued; only
-      // `failed` flips it to failed. The e-Fatura adapter returns `issued`
-      // synchronously, so it is unaffected.
+      // `failed` flips it to failed. The e-Fatura adapter is an honesty shim
+      // that returns `failed` synchronously (it never issues — e-documents go
+      // through the Accounting rail on order payment).
       const nextStatus =
         result.status === "issued"
           ? "issued"

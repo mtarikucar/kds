@@ -78,6 +78,11 @@ export class IntegrationController {
    * Public webhook ingest. Tenant is encoded in the URL because most
    * providers issue one URL per connection — adapter-side signature
    * verification gates trust.
+   *
+   * SCAFFOLD: a verified webhook is NOT turned into an order here — the
+   * service honestly rejects after verification (the gateway has no order
+   * pipeline). Real delivery webhooks go to the delivery-platforms module's
+   * DeliveryWebhookController; real PayTR webhooks go to the payments module.
    */
   @Public()
   @Post("webhooks/:providerId/:tenantId")

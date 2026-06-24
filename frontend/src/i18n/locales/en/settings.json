@@ -115,7 +115,8 @@
       "label": "Environment",
       "production": "Production",
       "sandbox": "Sandbox",
-      "sandboxWarning": "Sandbox routes this platform to its test endpoints and enables the built-in test-order simulator. No real orders are processed."
+      "sandboxWarning": "Sandbox routes this platform to its test endpoints and enables the built-in test-order simulator. No real orders are processed.",
+      "noSandbox": "This platform has no sandbox — no test endpoint is configured, sandbox cannot be selected."
     }
   },
   "autoSave": {
@@ -405,7 +406,9 @@
     "loading": "Loading integrations...",
     "none": "No integrations configured yet",
     "lastSynced": "Last synced: {{date}}",
-    "comingSoon": "Custom integrations coming soon"
+    "comingSoon": "Custom integrations coming soon",
+    "configuredNotActive": "Configured, not active",
+    "notWiredHint": "Credentials are stored securely, but no live integration is connected for this provider yet — it is not actively running."
   },
   "noCashDrawersConfigured": "No cash drawers configured",
   "noPagersConfigured": "No pagers configured",

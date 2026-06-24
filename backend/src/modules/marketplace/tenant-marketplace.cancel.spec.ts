@@ -99,6 +99,41 @@ describe('TenantMarketplaceService.cancel', () => {
     expect(outbox.append).not.toHaveBeenCalled();
   });
 
+  it('cancels a past_due add-on immediately (forced) and emits AddOnCancelled to revoke', async () => {
+    (prisma.tenantAddOn.findFirst as any).mockResolvedValue({
+      id: 'ta-1',
+      status: 'past_due',
+    });
+    (prisma.tenantAddOn.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.tenantAddOn.findFirstOrThrow as any).mockResolvedValue({
+      id: 'ta-1',
+      status: 'cancelled',
+    });
+
+    // caller passes immediate=false, but past_due forces immediate semantics
+    await svc.cancel(TENANT, 'ta-1', false);
+
+    const call = (prisma.tenantAddOn.updateMany as any).mock.calls[0][0];
+    // claim is gated on the exact status we read (past_due)
+    expect(call.where).toEqual({ id: 'ta-1', tenantId: TENANT, status: 'past_due' });
+    expect(call.data.status).toBe('cancelled');
+    expect(call.data.endedAt).toBeInstanceOf(Date);
+    // revoke event emitted
+    expect(outbox.append).toHaveBeenCalledTimes(1);
+    expect(outbox.append.mock.calls[0][0].type).toBe(EventTypes.AddOnCancelled);
+  });
+
+  it('still rejects cancelling an expired add-on', async () => {
+    (prisma.tenantAddOn.findFirst as any).mockResolvedValue({
+      id: 'ta-1',
+      status: 'expired',
+    });
+
+    await expect(svc.cancel(TENANT, 'ta-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
   it('throws when the claim updateMany loses the race (count 0)', async () => {
     (prisma.tenantAddOn.findFirst as any).mockResolvedValue({
       id: 'ta-1',

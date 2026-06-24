@@ -4130,8 +4130,21 @@ model TenantAddOn {
   branchId           String?
   // Multiplies numeric grants (capacity add-ons buy in quantity).
   quantity           Int              @default(1)
-  // active during the period; cancelled stays visible until cancelAtPeriodEnd
-  // hits the next billing tick; expired = ended billing period, no entitlement.
+  // Lifecycle (free-form String, mirrors Subscription.status semantics —
+  // the manual-renewal model that exists because PayTR card-vault/recurring
+  // is disabled for this merchant):
+  //   active    — paid, in-period; entitlement granted.
+  //   past_due  — period ended on a non-cancelled RECURRING add-on and was
+  //               NOT auto-charged (no card vault). Entitlement is KEPT live
+  //               through a 7-day grace window (the projector still grants
+  //               past_due rows, matching Subscription PAST_DUE) so the
+  //               operator can re-pay through checkout before losing access.
+  //   cancelled — explicit cancel (immediate or at-period-end); no entitlement.
+  //   expired   — grace elapsed without re-payment; entitlement REVOKED.
+  // A past_due/expired RECURRING add-on is reactivated ONLY by a new payment
+  // through the same checkout→PayTR→confirmAndProvision rail (purchase()
+  // reactivates the existing row rather than minting a duplicate). One-time
+  // add-ons never enter past_due — they close out at period end.
   status             String           @default("active")
   // Billing cycle bookkeeping. One-time add-ons set start = end = activatedAt.
   activatedAt        DateTime         @default(now())
@@ -4182,51 +4195,51 @@ model Branch {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  devices               Device[]
-  bridges               LocalBridgeAgent[]
-  orders                Order[]
-  tables                Table[]
+  devices                 Device[]
+  bridges                 LocalBridgeAgent[]
+  orders                  Order[]
+  tables                  Table[]
   deliveryPlatformConfigs DeliveryPlatformConfig[]
   // v3.0.0 — strict branch-scope inverse relations.
-  deviceCommands        DeviceCommand[]
-  payments              Payment[]
-  orderItemPayments     OrderItemPayment[]
-  pendingSelfPayments   PendingSelfPayment[]
-  waiterRequests        WaiterRequest[]
-  billRequests          BillRequest[]
-  stockItems            StockItem[]
-  stockBatches          StockBatch[]
-  ingredientMovements   IngredientMovement[]
-  wasteLogs             WasteLog[]
-  stockMovements        StockMovement[]
-  stockCounts           StockCount[]
-  purchaseOrders        PurchaseOrder[]
-  recipes               Recipe[]
-  reservations          Reservation[]
-  zReports              ZReport[]
-  cashDrawerMovements   CashDrawerMovement[]
-  attendances           Attendance[]
-  shiftTemplates        ShiftTemplate[]
-  shiftAssignments      ShiftAssignment[]
-  shiftSwapRequests     ShiftSwapRequest[]
-  cameras               Camera[]
-  occupancyRecords      OccupancyRecord[]
-  trafficFlowRecords    TrafficFlowRecord[]
-  tableAnalytics        TableAnalytics[]
-  analyticsInsights     AnalyticsInsight[]
-  analyticsHeatmapCache AnalyticsHeatmapCache[]
-  edgeDevices           EdgeDevice[]
-  notifications         Notification[]
-  deliveryPlatformLogs  DeliveryPlatformLog[]
-  posSettings           PosSettings[]
-  qrMenuSettings        QrMenuSettings[]
-  reservationSettings   ReservationSettings[]
-  smsSettings           SmsSettings[]
-  accountingSettings    AccountingSettings[]
-  stockSettings         StockSettings[]
-  integrationSettings   IntegrationSettings[]
-  primaryUsers          User[]                  @relation("UserPrimaryBranch")
-  userAssignments       UserBranchAssignment[]
+  deviceCommands          DeviceCommand[]
+  payments                Payment[]
+  orderItemPayments       OrderItemPayment[]
+  pendingSelfPayments     PendingSelfPayment[]
+  waiterRequests          WaiterRequest[]
+  billRequests            BillRequest[]
+  stockItems              StockItem[]
+  stockBatches            StockBatch[]
+  ingredientMovements     IngredientMovement[]
+  wasteLogs               WasteLog[]
+  stockMovements          StockMovement[]
+  stockCounts             StockCount[]
+  purchaseOrders          PurchaseOrder[]
+  recipes                 Recipe[]
+  reservations            Reservation[]
+  zReports                ZReport[]
+  cashDrawerMovements     CashDrawerMovement[]
+  attendances             Attendance[]
+  shiftTemplates          ShiftTemplate[]
+  shiftAssignments        ShiftAssignment[]
+  shiftSwapRequests       ShiftSwapRequest[]
+  cameras                 Camera[]
+  occupancyRecords        OccupancyRecord[]
+  trafficFlowRecords      TrafficFlowRecord[]
+  tableAnalytics          TableAnalytics[]
+  analyticsInsights       AnalyticsInsight[]
+  analyticsHeatmapCache   AnalyticsHeatmapCache[]
+  edgeDevices             EdgeDevice[]
+  notifications           Notification[]
+  deliveryPlatformLogs    DeliveryPlatformLog[]
+  posSettings             PosSettings[]
+  qrMenuSettings          QrMenuSettings[]
+  reservationSettings     ReservationSettings[]
+  smsSettings             SmsSettings[]
+  accountingSettings      AccountingSettings[]
+  stockSettings           StockSettings[]
+  integrationSettings     IntegrationSettings[]
+  primaryUsers            User[]                   @relation("UserPrimaryBranch")
+  userAssignments         UserBranchAssignment[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -4813,7 +4826,11 @@ model IntegrationProviderDef {
   // Whether HummyTummy provides this adapter officially or it's a partner
   // contribution (community).
   isOfficial   Boolean  @default(true)
-  status       String   @default("published") // published|deprecated
+  // 'published' = connectable (shown by public GET /providers, connect()
+  // accepts it). 'coming_soon' = catalog placeholder, NOT connectable.
+  // 'deprecated' = retired. Only flip to 'published' when a real adapter +
+  // a downstream consumer of integration.webhook.*.received.v1 both exist.
+  status       String   @default("published") // published|coming_soon|deprecated
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
