@@ -240,6 +240,16 @@
       },
       "retry": "Yeniden Dene"
     },
+    "fiscalDevices": {
+      "title": "Mali Cihazlar",
+      "gateNote": "Cihaz kaydetmek fiş yolunu etkinleştirir, ancak tek başına fiş kesmez. Sertifikalı bir yazarkasa (Hugin/Beko) yalnızca donanımı yerel köprüye bağlandığında ve köprü onayladığında fiş keser — o zamana kadar ödenen siparişler aşağıda kuyruğa alınır.",
+      "provider": "Sağlayıcı",
+      "serial": "Seri No",
+      "model": "Model",
+      "register": "Kaydet",
+      "retire": "Emekliye ayır",
+      "empty": "Kayıtlı mali cihaz yok."
+    },
     "callerFeed": {
       "title": "Telefon Çağrıları",
       "subtitle": "Gelen arayan-ID olayları. Her 10 saniyede güncellenir.",

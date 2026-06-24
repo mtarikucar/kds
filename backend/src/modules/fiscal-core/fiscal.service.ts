@@ -47,6 +47,144 @@ export class FiscalService {
     );
   }
 
+  /**
+   * Register a physical fiscal device (the create-site that was missing —
+   * without it the payment-finalizer's yazarkasa path is permanently dormant).
+   *
+   * Validation:
+   *  - providerId must be a registered provider WITH the `receipt` capability
+   *    (a physical ÖKC). This naturally rejects `efatura` (capability
+   *    `invoice` only) — e-documents are not issued through a fiscal device.
+   *  - a linked `deviceId`, when given, must be a real device-mesh row in the
+   *    same tenant + branch and of a bridgeable kind (local_bridge / yazarkasa).
+   *  - the device starts `offline`; it only goes online once the bridge acks.
+   *
+   * This does NOT make receipts print — see RegisterFiscalDeviceDto. It only
+   * makes the (honest, queue-or-fail) issuance path reachable.
+   */
+  async registerDevice(
+    scope: BranchScope,
+    dto: {
+      providerId: string;
+      serial: string;
+      model?: string;
+      deviceId?: string;
+      branchId?: string;
+      config?: Record<string, unknown>;
+    },
+  ) {
+    // Unknown providerId → NotFoundException from the registry.
+    const provider = this.registry.get(dto.providerId);
+    if (!provider.capabilities.includes("receipt")) {
+      throw new BadRequestException(
+        `Provider '${dto.providerId}' cannot issue cash receipts (capabilities: ` +
+          `${provider.capabilities.join(", ") || "none"}). Register a physical ` +
+          `ÖKC provider (fiscal_hugin / fiscal_beko). e-Fatura/e-Arşiv is issued ` +
+          `automatically on order payment via the Accounting integration, not here.`,
+      );
+    }
+
+    const branchId = dto.branchId ?? scope.branchId ?? null;
+
+    // IDOR / integrity: an explicit branchId must belong to THIS tenant. Never
+    // write another tenant's (globally-unique) branchId onto our device row.
+    if (dto.branchId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: dto.branchId, tenantId: scope.tenantId },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new BadRequestException("Branch not found in this tenant.");
+      }
+    }
+
+    // Validate the optional bridge link: it must be a real device in this
+    // tenant + branch, and a kind that can actually carry GMP-3 fiscal
+    // commands. We do NOT auto-create it — the operator pairs the bridge via
+    // the device-mesh flow first, then links it here.
+    if (dto.deviceId) {
+      const device = await this.prisma.device.findFirst({
+        where: { id: dto.deviceId, tenantId: scope.tenantId },
+        select: { id: true, kind: true, branchId: true },
+      });
+      if (!device) {
+        throw new BadRequestException(
+          "Linked device not found — pair the local bridge / yazarkasa in " +
+            "Devices first, then link it here.",
+        );
+      }
+      if (!["local_bridge", "yazarkasa"].includes(device.kind)) {
+        throw new BadRequestException(
+          `Linked device is a '${device.kind}', not a bridge/yazarkasa. A ` +
+            `GMP-3 ÖKC must be wired through a local_bridge or yazarkasa device.`,
+        );
+      }
+      if (branchId && device.branchId !== branchId) {
+        throw new BadRequestException(
+          "Linked device belongs to a different branch.",
+        );
+      }
+    }
+
+    try {
+      return await this.prisma.fiscalDeviceRecord.create({
+        data: {
+          id: uuidv7(),
+          tenantId: scope.tenantId,
+          branchId,
+          providerId: dto.providerId,
+          deviceId: dto.deviceId ?? null,
+          serial: dto.serial,
+          model: dto.model ?? null,
+          capabilities: provider.capabilities,
+          status: "offline",
+          config: (dto.config ?? undefined) as any,
+        },
+      });
+    } catch (e) {
+      // @@unique([tenantId, providerId, serial]) — a re-register of the same
+      // serial is a conflict, not a 500.
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        throw new ConflictException(
+          `A '${dto.providerId}' device with serial '${dto.serial}' is already ` +
+            `registered for this tenant.`,
+        );
+      }
+      throw e;
+    }
+  }
+
+  /** List fiscal devices in the active branch scope. */
+  async listDevices(scope: BranchScope) {
+    const rows = await this.prisma.fiscalDeviceRecord.findMany({
+      where: branchScope(scope),
+      orderBy: { createdAt: "desc" },
+    });
+    // Strip provider `config` from the list view — it may hold a station code
+    // or (future) provider credentials, and operators don't need the raw blob
+    // to manage devices. Registration still accepts it.
+    return rows.map(({ config: _config, ...rest }) => rest);
+  }
+
+  /**
+   * Retire a fiscal device — decommissions it (issueReceipt/closeDay both
+   * refuse a retired device). Idempotent on an already-retired row.
+   */
+  async retireDevice(scope: BranchScope, fiscalDeviceId: string) {
+    const device = await this.prisma.fiscalDeviceRecord.findFirst({
+      where: { id: fiscalDeviceId, ...branchScope(scope) },
+    });
+    if (!device) throw new NotFoundException("Fiscal device not found");
+    if (device.status === "retired") return device;
+    return this.prisma.fiscalDeviceRecord.update({
+      where: { id: device.id },
+      data: { status: "retired" },
+    });
+  }
+
   async issueReceipt(req: FiscalReceiptRequest) {
     // Compound WHERE — same defense-in-depth pattern as iter-35
     // device-mesh findOrThrow. Fiscal records are TR-law-mandated

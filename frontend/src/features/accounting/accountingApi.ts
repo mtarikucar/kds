@@ -27,6 +27,28 @@ export const useTestAccountingConnection = () =>
       (await api.post('/accounting-settings/test-connection')).data as { success: boolean; error?: string },
   });
 
+export interface AccountingSyncStatus {
+  provider: string;
+  autoGenerateInvoice: boolean;
+  autoSync: boolean;
+  total: number;
+  synced: number;
+  failed: number;
+  pending: number;
+  lastSyncedAt: string | null;
+}
+
+export const useAccountingSyncStatus = (enabled = true) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<AccountingSyncStatus>({
+    queryKey: ['accountingSyncStatus', branchId],
+    queryFn: async () => (await api.get('/accounting-settings/sync-status')).data,
+    enabled,
+    // Light polling so a freshly-synced test order shows up without a reload.
+    refetchInterval: 15_000,
+  });
+};
+
 export const useGetSalesInvoices = (params?: Record<string, any>) => {
   const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PaginatedResponse<SalesInvoice>>({

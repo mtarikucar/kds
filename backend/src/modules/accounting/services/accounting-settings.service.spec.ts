@@ -300,4 +300,58 @@ describe('AccountingSettingsService', () => {
       expect(num).toBe('FTR-000001');
     });
   });
+
+  describe('getSyncStatus', () => {
+    it('reports real synced/failed/pending counts + provider flags for verification', async () => {
+      (prisma.accountingSettings.findFirst as any).mockResolvedValue({
+        id: 's-1',
+        tenantId: 't-1',
+        branchId: null,
+        provider: 'PARASUT',
+        autoGenerateInvoice: true,
+        autoSync: true,
+      });
+      // total=10, synced=7, failed=2 → pending = 10 - 7 - 2 = 1
+      (prisma.salesInvoice.count as any)
+        .mockResolvedValueOnce(10)
+        .mockResolvedValueOnce(7)
+        .mockResolvedValueOnce(2);
+      (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+        syncedAt: new Date('2026-06-24T00:00:00Z'),
+      });
+
+      const out = await svc.getSyncStatus('t-1');
+
+      expect(out).toMatchObject({
+        provider: 'PARASUT',
+        autoGenerateInvoice: true,
+        autoSync: true,
+        total: 10,
+        synced: 7,
+        failed: 2,
+        pending: 1,
+      });
+      expect(out.lastSyncedAt).toEqual(new Date('2026-06-24T00:00:00Z'));
+    });
+
+    it('never returns a negative pending count when counts race', async () => {
+      (prisma.accountingSettings.findFirst as any).mockResolvedValue({
+        tenantId: 't-1',
+        branchId: null,
+        provider: 'NONE',
+        autoGenerateInvoice: false,
+        autoSync: false,
+      });
+      // synced + failed (8) momentarily exceeds total (5) under a race.
+      (prisma.salesInvoice.count as any)
+        .mockResolvedValueOnce(5)
+        .mockResolvedValueOnce(6)
+        .mockResolvedValueOnce(2);
+      (prisma.salesInvoice.findFirst as any).mockResolvedValue(null);
+
+      const out = await svc.getSyncStatus('t-1');
+      expect(out.pending).toBe(0);
+      expect(out.lastSyncedAt).toBeNull();
+    });
+  });
 });

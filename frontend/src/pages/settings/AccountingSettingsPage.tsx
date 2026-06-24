@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Building2, Receipt, Plug } from 'lucide-react';
-import { useGetAccountingSettings, useUpdateAccountingSettings, useTestAccountingConnection } from '../../features/accounting/accountingApi';
+import { useGetAccountingSettings, useUpdateAccountingSettings, useTestAccountingConnection, useAccountingSyncStatus } from '../../features/accounting/accountingApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsToggle, SettingsSelect, SettingsInput } from '../../components/settings/SettingsToggle';
@@ -389,10 +389,11 @@ const AccountingSettingsPage = () => {
               </>
             )}
 
-            {/* Test Connection Button */}
+            {/* Test Connection Button + live sync status */}
             {settings.provider !== 'NONE' && (
               <>
                 <SettingsDivider />
+                <SyncStatusCard />
                 <div className="flex justify-end py-2">
                   <button
                     onClick={handleTestConnection}
@@ -410,5 +411,44 @@ const AccountingSettingsPage = () => {
     </div>
   );
 };
+
+/**
+ * At-a-glance e-Fatura sync status. Lets an operator verify the live rail:
+ * after entering credentials and placing a test order, the synced/failed/
+ * pending counts and last-sync time update here (polled) as invoices reach
+ * the provider — no need to scan the full invoice list.
+ */
+function SyncStatusCard() {
+  const { t } = useTranslation('settings');
+  const { data } = useAccountingSyncStatus();
+  if (!data) return null;
+
+  const stat = (label: string, value: number, cls: string) => (
+    <div className="flex flex-col items-center rounded-lg bg-slate-50 px-4 py-2">
+      <span className={`text-lg font-semibold tabular-nums ${cls}`}>{value}</span>
+      <span className="text-xs text-slate-500">{label}</span>
+    </div>
+  );
+
+  return (
+    <div className="my-2 rounded-lg border border-slate-200 p-4">
+      <div className="mb-2 text-sm font-medium text-slate-700">
+        {t('accounting.syncStatusCard.title')}
+      </div>
+      <div className="flex flex-wrap gap-3">
+        {stat(t('accounting.syncStatusCard.synced'), data.synced, 'text-green-700')}
+        {stat(t('accounting.syncStatusCard.failed'), data.failed, 'text-red-700')}
+        {stat(t('accounting.syncStatusCard.pending'), data.pending, 'text-amber-700')}
+      </div>
+      <div className="mt-2 text-xs text-slate-500">
+        {t('accounting.syncStatusCard.lastSynced')}:{' '}
+        {data.lastSyncedAt
+          ? new Date(data.lastSyncedAt).toLocaleString()
+          : t('accounting.syncStatusCard.never')}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{t('accounting.syncStatusCard.helper')}</p>
+    </div>
+  );
+}
 
 export default AccountingSettingsPage;

@@ -16,6 +16,7 @@ import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresIntegration } from "../subscriptions/decorators/requires-integration.decorator";
 import { FiscalService } from "./fiscal.service";
 import { CancelReceiptDto } from "./dto/cancel-receipt.dto";
+import { RegisterFiscalDeviceDto } from "./dto/register-fiscal-device.dto";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../common/scoping/branch-scope";
 
@@ -32,6 +33,32 @@ import { BranchScope } from "../../common/scoping/branch-scope";
 @Controller("v1/fiscal")
 export class FiscalController {
   constructor(private readonly fiscal: FiscalService) {}
+
+  @Get("devices")
+  @ApiOperation({ summary: "List registered fiscal devices for this branch" })
+  listDevices(@CurrentScope() scope: BranchScope) {
+    return this.fiscal.listDevices(scope);
+  }
+
+  @Post("devices")
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      "Register a physical fiscal device (yazarkasa/ÖKC). Does NOT print until a certified device is wired through the local bridge.",
+  })
+  registerDevice(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: RegisterFiscalDeviceDto,
+  ) {
+    return this.fiscal.registerDevice(scope, dto);
+  }
+
+  @Post("devices/:id/retire")
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: "Retire (decommission) a fiscal device" })
+  retireDevice(@CurrentScope() scope: BranchScope, @Param("id") id: string) {
+    return this.fiscal.retireDevice(scope, id);
+  }
 
   @Get("pending")
   @ApiOperation({

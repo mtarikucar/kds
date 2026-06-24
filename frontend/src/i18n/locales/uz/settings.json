@@ -528,6 +528,15 @@
     "testConnection": "Aloqani sinash",
     "testSuccess": "Aloqa muvaffaqiyatli o'rnatildi!",
     "testFailed": "Aloqa o'rnatilmadi",
+    "syncStatusCard": {
+      "title": "Sinxronizatsiya holati",
+      "helper": "Ma'lumotlarni kiriting, Aloqani sinashni bosing, so'ng test buyurtma yarating — hisob-fakturalar provayderga (GİB) yetib borgani sayin bu hisoblar va oxirgi sinxronizatsiya vaqti yangilanadi.",
+      "synced": "Yuborildi",
+      "failed": "Xato",
+      "pending": "Kutilmoqda",
+      "lastSynced": "Oxirgi sinxronizatsiya",
+      "never": "hech qachon"
+    },
     "parasutCompanyId": "Kompaniya ID",
     "parasutClientId": "Mijoz ID",
     "parasutClientSecret": "Mijoz maxfiy kaliti",

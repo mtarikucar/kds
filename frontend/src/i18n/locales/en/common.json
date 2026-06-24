@@ -240,6 +240,16 @@
       },
       "retry": "Retry"
     },
+    "fiscalDevices": {
+      "title": "Fiscal Devices",
+      "gateNote": "Registering a device activates the receipt path, but it does NOT print on its own. A certified yazarkasa (Hugin/Beko) only issues once its hardware is wired through the local bridge and the bridge confirms — until then paid orders queue a receipt below.",
+      "provider": "Provider",
+      "serial": "Serial",
+      "model": "Model",
+      "register": "Register",
+      "retire": "Retire",
+      "empty": "No fiscal devices registered."
+    },
     "callerFeed": {
       "title": "Phone Calls",
       "subtitle": "Inbound caller-ID events. Updates every 10 seconds.",

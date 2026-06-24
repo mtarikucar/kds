@@ -4,10 +4,17 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 const h = vi.hoisted(() => ({
   list: { data: [] as any[], isLoading: false, refetch: vi.fn() },
   retry: { mutate: vi.fn(), isPending: false },
+  devices: { data: [] as any[], isLoading: false },
+  register: { mutate: vi.fn(), isPending: false },
+  retire: { mutate: vi.fn(), isPending: false },
 }));
 vi.mock('./fiscalApi', () => ({
   useListPendingReceipts: () => h.list,
   useRetryReceipt: () => h.retry,
+  // FiscalDevicesPanel (the device-registration create-site) hooks.
+  useListFiscalDevices: () => h.devices,
+  useRegisterFiscalDevice: () => h.register,
+  useRetireFiscalDevice: () => h.retire,
 }));
 
 import FiscalRecoveryPage from './FiscalRecoveryPage';

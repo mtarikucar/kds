@@ -59,6 +59,43 @@ export class AccountingSettingsService {
     }
   }
 
+  /**
+   * At-a-glance sync status for the settings page — lets an operator verify
+   * the e-Fatura rail end-to-end (enter creds → test connection → make a test
+   * order → watch these counts move / lastSyncedAt update) without scanning
+   * the full invoice list. Counts reflect the REAL sales_invoices sync state:
+   * `synced` = reached the provider (syncedAt set), `failed` = a sync attempt
+   * errored, `pending` = generated but not yet synced.
+   */
+  async getSyncStatus(tenantId: string) {
+    const settings = await this.findByTenant(tenantId);
+    const [total, synced, failed, last] = await Promise.all([
+      this.prisma.salesInvoice.count({ where: { tenantId } }),
+      this.prisma.salesInvoice.count({
+        where: { tenantId, syncedAt: { not: null } },
+      }),
+      this.prisma.salesInvoice.count({
+        where: { tenantId, syncedAt: null, syncError: { not: null } },
+      }),
+      this.prisma.salesInvoice.findFirst({
+        where: { tenantId, syncedAt: { not: null } },
+        orderBy: { syncedAt: "desc" },
+        select: { syncedAt: true },
+      }),
+    ]);
+    return {
+      provider: settings.provider,
+      autoGenerateInvoice: settings.autoGenerateInvoice,
+      autoSync: settings.autoSync,
+      total,
+      synced,
+      failed,
+      // total - synced - failed; never negative if counts race.
+      pending: Math.max(0, total - synced - failed),
+      lastSyncedAt: last?.syncedAt ?? null,
+    };
+  }
+
   async update(tenantId: string, dto: UpdateAccountingSettingsDto) {
     const safeDto = encryptDto(dto);
     const existing = await this.prisma.accountingSettings.findFirst({

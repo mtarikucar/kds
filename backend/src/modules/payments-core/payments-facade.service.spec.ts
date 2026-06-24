@@ -4,9 +4,10 @@ import { MockPaymentProvider } from './adapters/mock-payment-provider';
 import { PaymentProvider } from './payment-provider.interface';
 
 /**
- * The façade is a thin dispatch over the registry. We exercise the
- * mock provider end-to-end to confirm idempotency + status round-trips
- * land where the rest of the codebase expects them.
+ * The façade is a thin dispatch over the registry. Its only live method is
+ * createIntent (the mixed-cart checkout rail). We exercise the mock provider
+ * to confirm the intent path + outcome metrics land where the rest of the
+ * codebase expects them.
  */
 describe('PaymentsFacadeService + MockPaymentProvider', () => {
   let registry: PaymentProviderRegistry;
@@ -24,7 +25,7 @@ describe('PaymentsFacadeService + MockPaymentProvider', () => {
     mock.onModuleInit();
   });
 
-  it('createIntent → status → refund round-trip', async () => {
+  it('createIntent dispatches to the named provider and emits intent_created', async () => {
     const intent = await facade.createIntent('mock', {
       tenantId: 't1',
       externalRef: 'sub:abc',
@@ -35,25 +36,23 @@ describe('PaymentsFacadeService + MockPaymentProvider', () => {
     });
     expect(intent.status).toBe('succeeded');
     expect(intent.intentId).toBeTruthy();
-
-    const status = await facade.getStatus('mock', intent.intentId);
-    expect(status.amountCents).toBe(12345);
-    expect(status.cardLast4).toBe('4242');
-
-    const refund = await facade.refund(
-      'mock',
-      { intentId: intent.intentId, idempotencyKey: 'r1' },
-      't1',
-    );
-    expect(refund.status).toBe('refunded');
-    expect(refund.amountCents).toBe(12345);
+    expect(intent.amountCents).toBe(12345);
     expect(outbox.append).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'payment.refund_completed.v1',
+      type: 'payment.intent_created.v1',
     }));
   });
 
-  it('returns 404-style throw for unknown provider', async () => {
-    await expect(facade.getStatus('does-not-exist', 'whatever')).rejects.toThrow(/Unknown payment provider/);
+  it('throws for an unknown provider', async () => {
+    await expect(
+      facade.createIntent('does-not-exist', {
+        tenantId: 't1',
+        externalRef: 'sub:abc',
+        idempotencyKey: 'k-unknown',
+        amountCents: 100,
+        currency: 'TRY',
+        purpose: 'subscription',
+      }),
+    ).rejects.toThrow(/Unknown payment provider/);
   });
 
   // ── Track 2 domain counters ────────────────────────────────────────
@@ -113,29 +112,6 @@ describe('PaymentsFacadeService + MockPaymentProvider', () => {
         'payment_intents_outcome_total',
         expect.any(String),
         { outcome: 'failed' },
-      );
-    });
-
-    it('records outcome=refunded on refund', async () => {
-      const intent = await facade.createIntent('mock', {
-        tenantId: 't1',
-        externalRef: 'sub:abc',
-        idempotencyKey: 'k-ref',
-        amountCents: 100,
-        currency: 'TRY',
-        purpose: 'subscription',
-      });
-      metrics.incCounter.mockClear();
-
-      await facade.refund(
-        'mock',
-        { intentId: intent.intentId, idempotencyKey: 'r1' },
-        't1',
-      );
-      expect(metrics.incCounter).toHaveBeenCalledWith(
-        'payment_intents_outcome_total',
-        expect.any(String),
-        { outcome: 'refunded' },
       );
     });
   });

@@ -528,6 +528,15 @@
     "testConnection": "Bağlantıyı Test Et",
     "testSuccess": "Bağlantı başarılı!",
     "testFailed": "Bağlantı başarısız",
+    "syncStatusCard": {
+      "title": "Senkronizasyon durumu",
+      "helper": "Bilgileri girin, Bağlantıyı Test Et'e basın, sonra bir test siparişi oluşturun — faturalar sağlayıcıya (GİB) ulaştıkça bu sayılar ve son senkronizasyon zamanı güncellenir.",
+      "synced": "Gönderildi",
+      "failed": "Başarısız",
+      "pending": "Bekliyor",
+      "lastSynced": "Son senkronizasyon",
+      "never": "hiç"
+    },
     "parasutCompanyId": "Şirket ID",
     "parasutClientId": "Client ID",
     "parasutClientSecret": "Client Secret",

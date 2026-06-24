@@ -235,6 +235,16 @@
       },
       "retry": "Qayta urinish"
     },
+    "fiscalDevices": {
+      "title": "Fiskal qurilmalar",
+      "gateNote": "Qurilmani ro'yxatdan o'tkazish chek yo'lini faollashtiradi, lekin o'zi chek chiqarmaydi. Sertifikatlangan yozarkassa (Hugin/Beko) faqat uskunasi mahalliy ko'prik orqali ulanib, ko'prik tasdiqlagandan keyin chek chiqaradi — shu vaqtgacha to'langan buyurtmalar quyida navbatga olinadi.",
+      "provider": "Provayder",
+      "serial": "Seriya raqami",
+      "model": "Model",
+      "register": "Ro'yxatdan o'tkazish",
+      "retire": "Ishdan chiqarish",
+      "empty": "Ro'yxatdan o'tgan fiskal qurilma yo'q."
+    },
     "callerFeed": {
       "title": "Telefon qo'ng'iroqlari",
       "subtitle": "Kiruvchi caller-ID hodisalari. Har 10 soniyada yangilanadi.",
