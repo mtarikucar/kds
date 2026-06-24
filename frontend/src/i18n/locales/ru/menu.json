@@ -37,6 +37,7 @@
     "selectCategory": "Выберите категорию",
     "currentStock": "Текущий остаток",
     "taxRate": "Ставка НДС (KDV)",
+    "stockTracked": "Учёт остатка (списывать при продаже)",
     "productImages": "Изображения продукта",
     "primary": "Основное",
     "noImagesSelected": "Изображения не выбраны",

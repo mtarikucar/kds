@@ -103,6 +103,42 @@ async fn main() -> Result<()> {
 
     // Cloud transport. WSS is the primary channel; REST polling is fallback.
     let cloud = cloud_ws::CloudClient::new(cfg.clone())?;
+
+    // M9 — first-boot claim. If we have no bearer token yet but DO have a
+    // one-shot provisioning token, exchange it for a bearer via
+    // POST /v1/bridges/claim and persist the result so every authenticated
+    // call below (warm-up sweep, heartbeat, commands/next, ack) uses it.
+    //
+    // Best-effort: a failed claim (invalid/already-used token, cloud down)
+    // is logged and the agent continues. It will run in offline mode and
+    // its authenticated calls will 401 until a bearer is supplied — which is
+    // strictly better than crashing the daemon on a transient cloud blip.
+    if config::resolve_bearer_token().is_none() {
+        match cfg.provisioning_token.as_deref() {
+            Some(prov) if !prov.is_empty() => {
+                info!("no bearer token found — attempting first-boot claim");
+                match cloud.claim(prov).await {
+                    Ok(resp) => {
+                        if let Err(e) = config::persist_bearer_token(&resp.token) {
+                            warn!(error = %e, "claim succeeded but persisting bearer token failed");
+                        } else {
+                            // Never log the token itself; the bridge id is safe.
+                            info!(bridge_id = %resp.bridge_id, "bridge claimed — bearer token persisted");
+                        }
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "bridge claim failed — continuing without a bearer (offline mode); authenticated calls will be rejected until a token is provided");
+                    }
+                }
+            }
+            _ => {
+                warn!(
+                    "no bearer token and no provisioning_token — set provisioning_token in bridge.toml or HUMMY_BRIDGE_TOKEN; authenticated calls will be rejected"
+                );
+            }
+        }
+    }
+
     if let Err(e) = cloud.warm_up().await {
         warn!(error = %e, "cloud warm-up failed — agent continues in offline mode");
     }

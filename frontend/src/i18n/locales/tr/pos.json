@@ -124,7 +124,8 @@
     "bills": "Hesap",
     "newRequest": "Yeni {{type}} İsteği",
     "lowStockAlert": "Düşük stok: {{count}} ürün minimumun altında",
-    "stockExpiryAlert": "Son kullanma yaklaşıyor: {{count}} stok partisi"
+    "stockExpiryAlert": "Son kullanma yaklaşıyor: {{count}} stok partisi",
+    "stockReversalFailed": "Stok iadesi başarısız: sipariş #{{orderNumber}} — stoğu kontrol edin"
   },
   "pendingOrders": {
     "title": "Bekleyen Siparişler",

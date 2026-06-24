@@ -155,6 +155,7 @@ const MenuManagementPage = () => {
         image: product.image || '',
         imageIds: productImagesList.map((img) => img.id),
         isAvailable: product.isAvailable ?? true,
+        stockTracked: product.stockTracked ?? false,
         taxRate: product.taxRate ?? 10,
       });
       setPreselectedCategoryId(null);
@@ -165,6 +166,7 @@ const MenuManagementPage = () => {
       setPreselectedCategoryId(categoryId || null);
       productForm.reset({
         isAvailable: true,
+        stockTracked: false,
         categoryId: categoryId || '',
         taxRate: 10,
       });
@@ -628,6 +630,17 @@ const MenuManagementPage = () => {
             />
             <label htmlFor="isAvailable" className="text-sm font-medium">
               {t('menu.available')}
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="stockTracked"
+              {...productForm.register('stockTracked')}
+              className="rounded"
+            />
+            <label htmlFor="stockTracked" className="text-sm font-medium">
+              {t('menu.stockTracked')}
             </label>
           </div>
           <div className="flex gap-3">

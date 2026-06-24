@@ -124,7 +124,8 @@
     "bills": "Bills",
     "newRequest": "New {{type}} Request",
     "lowStockAlert": "Low stock: {{count}} item(s) below minimum",
-    "stockExpiryAlert": "Expiring soon: {{count}} stock batch(es)"
+    "stockExpiryAlert": "Expiring soon: {{count}} stock batch(es)",
+    "stockReversalFailed": "Stock reversal failed for order #{{orderNumber}} — verify inventory"
   },
   "pendingOrders": {
     "title": "Pending Orders",

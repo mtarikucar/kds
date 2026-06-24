@@ -39,6 +39,7 @@
     "orderUpdatedNotification": "Заказ обновлен: №{{orderNumber}}",
     "lowStockAlert": "Низкий запас: {{count}} позиц. ниже минимума",
     "stockExpiryAlert": "Скоро истекает срок: {{count}} партий запаса",
+    "stockReversalFailed": "Не удалось вернуть остатки по заказу #{{orderNumber}} — проверьте склад",
     "stats": {
       "activeOrders": "Активные заказы",
       "avgWaitTime": "Сред. ожидание",

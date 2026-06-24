@@ -641,6 +641,20 @@ export class OrdersService {
           }
         }
 
+        // Decrement finished-good (menu-product) stock for stockTracked
+        // products. This is the writer the POS currentStock badge / out-of-stock
+        // gate depended on — without it the badge never moved after a sale.
+        // Best-effort + post-commit: an oversell on a race is logged, never
+        // blocks the already-created order (the POS card already gates on
+        // currentStock===0, so this only matters under concurrency).
+        try {
+          await this.deductStockForOrder(createdOrder.id, tenantId);
+        } catch (error: any) {
+          this.logger.error(
+            `Product stock deduction failed for order ${createdOrder.orderNumber}: ${error.message}`,
+          );
+        }
+
         addBreadcrumb("Order created successfully", "order", {
           orderId: createdOrder.id,
           orderNumber: createdOrder.orderNumber,
@@ -1111,12 +1125,13 @@ export class OrdersService {
           `CRITICAL: Stock reversal failed for cancelled order ${id}. Manual stock adjustment may be needed. Error: ${error.message}`,
           error.stack,
         );
-        this.kdsGateway.emitLowStockAlert(
+        this.kdsGateway.emitStockReversalFailed(
           scope.tenantId,
           updatedOrder.branchId,
-          [
-            `Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`,
-          ],
+          {
+            orderNumber: updatedOrder.orderNumber,
+            message: `Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`,
+          },
         );
       }
     }

@@ -48,6 +48,33 @@ pub fn resolve_bearer_token() -> Option<String> {
     // unit tests don't need a keyring service running.
 }
 
+/// Persist a bearer token issued by a successful first-boot claim so the rest
+/// of this process (and, ideally, subsequent boots) authenticate without the
+/// provisioning token.
+///
+/// Today we set the in-process `HUMMY_BRIDGE_TOKEN` env var, which is exactly
+/// the slot [`resolve_bearer_token`] reads first — so every authenticated call
+/// for the remainder of this run (heartbeat, commands/next, ack) immediately
+/// picks it up. The token is written to the same place a headless deploy would
+/// supply it, keeping a single source of truth.
+///
+/// NOTE: this is in-process only and does NOT survive a restart. The durable
+/// store is the OS keyring (the same TODO that gates [`resolve_bearer_token`]):
+/// once the `keyring` crate is wired behind its feature flag, this function
+/// should also write the bearer to the keyring so a re-boot resolves it without
+/// re-claiming. Until then, headless deploys should set `HUMMY_BRIDGE_TOKEN`
+/// from the claim output, or accept that a single-use provisioning token can
+/// only be claimed once (the server invalidates it on first claim).
+pub fn persist_bearer_token(token: &str) -> Result<()> {
+    if token.is_empty() {
+        anyhow::bail!("refusing to persist an empty bearer token");
+    }
+    // SAFETY/threading: called once, on the single-threaded tokio runtime,
+    // during first-boot bootstrap before any other task reads the token.
+    env::set_var("HUMMY_BRIDGE_TOKEN", token);
+    Ok(())
+}
+
 fn dirs_config_dir() -> Option<PathBuf> {
     if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
         return Some(Path::new(&xdg).join("hummytummy"));

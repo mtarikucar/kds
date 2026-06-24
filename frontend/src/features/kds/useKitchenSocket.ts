@@ -118,6 +118,18 @@ export const useKitchenSocket = () => {
       });
     };
 
+    // CRITICAL: stock reversal failed on a cancelled order — counts are now
+    // wrong until reconciled. Error toast (not a routine warning).
+    const handleStockReversalFailed = (event: { orderNumber?: string }) => {
+      console.log('[KDS Socket] Stock reversal failed:', event);
+      toast.error(
+        i18n.t('kitchen:kitchen.stockReversalFailed', {
+          orderNumber: event?.orderNumber ?? '',
+        }),
+        { duration: 15000, position: 'top-center' },
+      );
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -125,6 +137,7 @@ export const useKitchenSocket = () => {
     socket.on('order:status-changed', handleOrderStatusChanged);
     socket.on('stock:low-alert', handleStockLowAlert);
     socket.on('stock:expiry-alert', handleStockExpiryAlert);
+    socket.on('stock:reversal-failed', handleStockReversalFailed);
 
     // Room membership is decided server-side from the JWT role on connect;
     // no inbound join/leave messages are needed.
@@ -137,6 +150,7 @@ export const useKitchenSocket = () => {
       socket.off('order:status-changed', handleOrderStatusChanged);
       socket.off('stock:low-alert', handleStockLowAlert);
       socket.off('stock:expiry-alert', handleStockExpiryAlert);
+      socket.off('stock:reversal-failed', handleStockReversalFailed);
       disconnectSocket();
     };
   }, [queryClient]);
