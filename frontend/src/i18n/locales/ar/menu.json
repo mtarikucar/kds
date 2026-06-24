@@ -120,7 +120,12 @@
       "noImagesFound": "لم يتم العثور على صور",
       "noImagesYet": "لا توجد صور بعد",
       "tryDifferentSearch": "جرب بحثاً مختلفاً",
-      "uploadToStart": "ارفع للبدء"
+      "uploadToStart": "ارفع للبدء",
+      "allImages": "كل الصور",
+      "unusedImages": "غير مستخدمة",
+      "unusedHint": "صور غير مرتبطة بأي منتج. احذفها لاستعادة مساحة التخزين.",
+      "noUnusedImages": "لا توجد صور غير مستخدمة",
+      "noUnusedHint": "كل صورة مرتبطة بمنتج واحد على الأقل."
     }
   }
 }

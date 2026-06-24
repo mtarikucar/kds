@@ -189,6 +189,32 @@ describe("AttendanceService branch-scope reads (track-1)", () => {
     expect(where.tenantId).toBe("t-1");
   });
 
+  it("getAttendanceSummaryCsv emits worked/overtime/late columns and NO wage/money column", async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      {
+        userId: "u-1",
+        user: { id: "u-1", firstName: "Ada", lastName: "Lovelace", role: "WAITER" },
+        totalWorkedMinutes: 480,
+        totalBreakMinutes: 30,
+        overtimeMinutes: 60,
+        isLate: true,
+        lateMinutes: 15,
+      },
+    ]);
+
+    const csv = await svc.getAttendanceSummaryCsv(scope, {} as any);
+    const lines = csv.split("\n");
+
+    // Header is attendance/hours only — no wage/pay/salary/cost columns.
+    expect(lines[0]).toBe(
+      "Staff,Role,Total Days,Worked Minutes,Overtime Minutes,Break Minutes,Late Days,Late Minutes",
+    );
+    expect(csv.toLowerCase()).not.toMatch(/wage|salary|pay|cost|rate/);
+
+    // Data row carries the real worked/overtime numbers.
+    expect(lines[1]).toBe("Ada Lovelace,WAITER,1,480,60,30,1,15");
+  });
+
   it("getMyStatus self-scopes by tenant+user+date WITHOUT pinning the active branch (deep-review M8)", async () => {
     (prisma.attendance.findFirst as any).mockResolvedValue(null);
 

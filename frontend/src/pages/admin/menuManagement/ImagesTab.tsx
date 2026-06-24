@@ -20,6 +20,7 @@ import {
 import { cn } from '../../../lib/utils';
 import {
   useProductImages,
+  useUnusedImages,
   useDeleteProductImage,
   useUploadProductImages,
 } from '../../../features/upload/uploadApi';
@@ -37,6 +38,10 @@ const ImagesTab = () => {
   // Image library state
   const [imageSearchTerm, setImageSearchTerm] = useState('');
   const [imageViewMode, setImageViewMode] = useState<'grid' | 'list'>('grid');
+  // Library filter: 'all' (every image) or 'unused' (images not attached to
+  // any product — surfaces the orphan-reclaim capability that previously had
+  // no UI consumer, via the existing useUnusedImages hook).
+  const [libraryFilter, setLibraryFilter] = useState<'all' | 'unused'>('all');
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [bgRemovalEnabled, setBgRemovalEnabled] = useState(false);
@@ -45,11 +50,16 @@ const ImagesTab = () => {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const bgRemovalSupported = isBackgroundRemovalSupported();
 
-  const { data: allImages, isLoading: imagesLoading } = useProductImages();
+  const { data: allImages, isLoading: allImagesLoading } = useProductImages();
+  const { data: unusedImages, isLoading: unusedImagesLoading } = useUnusedImages();
   const { mutate: deleteImage } = useDeleteProductImage();
   const uploadImagesMutation = useUploadProductImages();
 
-  const filteredImages = allImages?.filter((img) =>
+  const isUnusedView = libraryFilter === 'unused';
+  const sourceImages = isUnusedView ? unusedImages : allImages;
+  const imagesLoading = isUnusedView ? unusedImagesLoading : allImagesLoading;
+
+  const filteredImages = sourceImages?.filter((img) =>
     img.filename.toLowerCase().includes(imageSearchTerm.toLowerCase())
   ) || [];
 
@@ -232,6 +242,36 @@ const ImagesTab = () => {
           </div>
         </div>
 
+        {/* Library Filter: All / Unused */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setLibraryFilter('all'); setSelectedImages(new Set()); }}
+              className={cn(
+                'flex-1 py-2 rounded-lg text-sm font-medium transition-colors',
+                libraryFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+              )}
+            >
+              {t('menu.imageLibraryUI.allImages')}
+            </button>
+            <button
+              onClick={() => { setLibraryFilter('unused'); setSelectedImages(new Set()); }}
+              className={cn(
+                'flex-1 py-2 rounded-lg text-sm font-medium transition-colors',
+                libraryFilter === 'unused' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'
+              )}
+            >
+              {t('menu.imageLibraryUI.unusedImages')}
+              {(unusedImages?.length ?? 0) > 0 && (
+                <span className="ml-1.5 text-xs">({unusedImages?.length})</span>
+              )}
+            </button>
+          </div>
+          {isUnusedView && (
+            <p className="mt-2 text-xs text-slate-500">{t('menu.imageLibraryUI.unusedHint')}</p>
+          )}
+        </div>
+
         {/* View Toggle */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex gap-2">
@@ -281,10 +321,18 @@ const ImagesTab = () => {
                 <ImageIcon className="w-7 h-7 text-slate-400" />
               </div>
               <h3 className="text-base font-medium text-slate-900">
-                {imageSearchTerm ? t('menu.imageLibraryUI.noImagesFound') : t('menu.imageLibraryUI.noImagesYet')}
+                {imageSearchTerm
+                  ? t('menu.imageLibraryUI.noImagesFound')
+                  : isUnusedView
+                    ? t('menu.imageLibraryUI.noUnusedImages')
+                    : t('menu.imageLibraryUI.noImagesYet')}
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                {imageSearchTerm ? t('menu.imageLibraryUI.tryDifferentSearch') : t('menu.imageLibraryUI.uploadToStart')}
+                {imageSearchTerm
+                  ? t('menu.imageLibraryUI.tryDifferentSearch')
+                  : isUnusedView
+                    ? t('menu.imageLibraryUI.noUnusedHint')
+                    : t('menu.imageLibraryUI.uploadToStart')}
               </p>
             </div>
           ) : imageViewMode === 'grid' ? (

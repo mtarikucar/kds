@@ -1,4 +1,9 @@
 {
+  "cvDisclosure": {
+    "requiresCameras": "Doluluk kameraları gerektirir",
+    "noData": "Kamera verisi yok",
+    "noOccupancyTelemetry": "Bu metrikleri ölçmek için sahada doluluk kameraları gerekir. Kamera donanımı olmadan sıfır/varsayılan olarak görünür ve gerçek etkinliği yansıtmaz."
+  },
   "heatmap": {
     "settings": "Isı Haritası Ayarları",
     "visualizationType": "Görselleştirme Türü",

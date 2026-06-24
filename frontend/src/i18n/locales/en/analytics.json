@@ -1,4 +1,9 @@
 {
+  "cvDisclosure": {
+    "requiresCameras": "Requires occupancy cameras",
+    "noData": "No camera data",
+    "noOccupancyTelemetry": "These metrics need on-site occupancy cameras to measure. Without camera hardware they read as zero/default and do not reflect real activity."
+  },
   "heatmap": {
     "settings": "Heatmap Settings",
     "visualizationType": "Visualization Type",

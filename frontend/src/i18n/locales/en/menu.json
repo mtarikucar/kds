@@ -120,7 +120,12 @@
       "noImagesFound": "No images found",
       "noImagesYet": "No images yet",
       "tryDifferentSearch": "Try different search",
-      "uploadToStart": "Upload to get started"
+      "uploadToStart": "Upload to get started",
+      "allImages": "All images",
+      "unusedImages": "Unused",
+      "unusedHint": "Images not attached to any product. Delete to reclaim storage.",
+      "noUnusedImages": "No unused images",
+      "noUnusedHint": "Every image is attached to at least one product."
     }
   }
 }

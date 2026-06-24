@@ -517,4 +517,56 @@ export class AttendanceService {
 
     return Array.from(userMap.values());
   }
+
+  /**
+   * Export the attendance summary as CSV. This is an ATTENDANCE/HOURS export
+   * — worked, overtime and late minutes per staff member — NOT a payroll or
+   * wage export: the system stores no wage/hourly rate and computes no labor
+   * cost, so no monetary columns are emitted. Honest by construction.
+   */
+  async getAttendanceSummaryCsv(
+    scope: BranchScope,
+    query: AttendanceSummaryQueryDto,
+  ): Promise<string> {
+    const rows = await this.getAttendanceSummary(scope, query);
+
+    const header = [
+      "Staff",
+      "Role",
+      "Total Days",
+      "Worked Minutes",
+      "Overtime Minutes",
+      "Break Minutes",
+      "Late Days",
+      "Late Minutes",
+    ];
+
+    const escape = (value: unknown): string => {
+      const s = value === null || value === undefined ? "" : String(value);
+      // RFC-4180 quoting: wrap in double quotes and double any embedded quote
+      // when the field contains a comma, quote, or newline.
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const lines = [header.join(",")];
+    for (const r of rows) {
+      const name =
+        `${r.user?.firstName ?? ""} ${r.user?.lastName ?? ""}`.trim();
+      lines.push(
+        [
+          escape(name),
+          escape(r.user?.role ?? ""),
+          escape(r.totalDays),
+          escape(r.totalWorkedMinutes),
+          escape(r.totalOvertimeMinutes),
+          escape(r.totalBreakMinutes),
+          escape(r.lateDays),
+          escape(r.totalLateMinutes),
+        ].join(","),
+      );
+    }
+
+    // Leading CRLF-free join; clients split on \n fine and Excel accepts it.
+    return lines.join("\n");
+  }
 }

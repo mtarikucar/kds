@@ -31,7 +31,9 @@ describe("ProductsService.updateStock", () => {
     // updateStock now runs its writes inside $transaction; drive the mock
     // so the callback executes against the same deep-mocked client (tx).
     (prisma.$transaction as any).mockImplementation((cb: any) => cb(prisma));
-    svc = new ProductsService(prisma as any);
+    svc = new ProductsService(prisma as any, {
+      deleteProductImage: jest.fn().mockResolvedValue(undefined),
+    } as any);
   });
 
   it("uses atomic increment with no gate when quantity is positive", async () => {
@@ -166,7 +168,9 @@ describe("ProductsService.findAll — pagination", () => {
       const end = args?.take == null ? undefined : skip + args.take;
       return Promise.resolve(rows.slice(skip, end)) as any;
     });
-    svc = new ProductsService(prisma as any);
+    svc = new ProductsService(prisma as any, {
+      deleteProductImage: jest.fn().mockResolvedValue(undefined),
+    } as any);
   });
 
   it("returns the full list with undefined take/skip when no pagination passed (old behavior)", async () => {

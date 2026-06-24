@@ -9,10 +9,50 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateProductDto } from "../dto/create-product.dto";
 import { UpdateProductDto } from "../dto/update-product.dto";
 import { sanitizePage } from "../../../common/dto/list-query.dto";
+import { UploadService } from "../../upload/upload.service";
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private uploadService: UploadService,
+  ) {}
+
+  /**
+   * Best-effort GC of images that just lost their last product link.
+   *
+   * The ProductImage<->Product link is the junction table only (ProductImage
+   * has no direct FK to Product), so deleting a product, replacing its image
+   * set, or detaching an image leaves the ProductImage row + its on-disk .jpg
+   * behind forever. After any of those operations, pass the image IDs that
+   * were attached: any that are now linked to NO product get pruned via
+   * UploadService.deleteProductImage (unlinks the file + deletes the row, with
+   * the uploadsRoot path guard). Tenant-scoped and non-fatal so a prune
+   * failure never breaks the product mutation that triggered it.
+   */
+  private async pruneOrphanedImages(
+    imageIds: string[],
+    tenantId: string,
+  ): Promise<void> {
+    if (!imageIds || imageIds.length === 0) return;
+
+    // Which of these images still have at least one product link?
+    const stillLinked = await this.prisma.productToImage.findMany({
+      where: { imageId: { in: imageIds }, image: { tenantId } },
+      select: { imageId: true },
+    });
+    const linkedIds = new Set(stillLinked.map((l) => l.imageId));
+
+    const orphanIds = imageIds.filter((id) => !linkedIds.has(id));
+    for (const id of orphanIds) {
+      try {
+        await this.uploadService.deleteProductImage(id, tenantId);
+      } catch {
+        // Non-fatal: a missing/already-deleted image must not fail the
+        // product mutation. The unused-images screen is the backstop.
+      }
+    }
+  }
 
   // Helper method to transform product response
   private transformProductResponse(product: any) {
@@ -224,6 +264,13 @@ export class ProductsService {
 
     // Update images if provided
     if (imageIds !== undefined) {
+      // Capture the previously-attached image IDs so we can prune any that
+      // the new set leaves orphaned (row + file would otherwise leak).
+      const previousLinks = await this.prisma.productToImage.findMany({
+        where: { productId: id, image: { tenantId } },
+        select: { imageId: true },
+      });
+
       // Delete all current product-image links from junction table
       await this.prisma.productToImage.deleteMany({
         where: { productId: id },
@@ -233,6 +280,13 @@ export class ProductsService {
       if (imageIds.length > 0) {
         await this.attachImagesToProduct(id, imageIds, tenantId);
       }
+
+      // Prune previously-attached images that are no longer linked to any
+      // product after the swap.
+      const detached = previousLinks
+        .map((l) => l.imageId)
+        .filter((imageId) => !imageIds.includes(imageId));
+      await this.pruneOrphanedImages(detached, tenantId);
     }
 
     // Return updated product with relations
@@ -242,9 +296,28 @@ export class ProductsService {
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
 
+    // Capture the product's attached image IDs before delete. product.delete
+    // cascades only the junction rows (ProductToImage onDelete:Cascade) — the
+    // ProductImage rows + files survive — so we prune them afterward.
+    const attachedLinks = await this.prisma.productToImage.findMany({
+      where: { productId: id, image: { tenantId } },
+      select: { imageId: true },
+    });
+
     try {
       // Compound WHERE — tenantId IDOR guard on delete (B41-B45 pattern).
-      return await this.prisma.product.delete({ where: { id, tenantId } });
+      const deleted = await this.prisma.product.delete({
+        where: { id, tenantId },
+      });
+
+      // The junction rows are gone now; prune any of these images left
+      // orphaned (best-effort, non-fatal).
+      await this.pruneOrphanedImages(
+        attachedLinks.map((l) => l.imageId),
+        tenantId,
+      );
+
+      return deleted;
     } catch (err) {
       // OrderItem.productId uses onDelete: Restrict, so a product that was
       // ever ordered cannot be hard-deleted. Translate the P2003 into a
@@ -463,7 +536,7 @@ export class ProductsService {
       throw new NotFoundException("Image not found on this product");
     }
 
-    // Delete the link from junction table (image stays in library for reuse)
+    // Delete the link from junction table
     await this.prisma.productToImage.delete({
       where: {
         productId_imageId: {
@@ -472,6 +545,10 @@ export class ProductsService {
         },
       },
     });
+
+    // If this image is no longer attached to any product, prune the row + file
+    // so detached images don't leak (best-effort, non-fatal).
+    await this.pruneOrphanedImages([imageId], tenantId);
 
     // Reorder remaining images in junction table
     const remainingLinks = await this.prisma.productToImage.findMany({

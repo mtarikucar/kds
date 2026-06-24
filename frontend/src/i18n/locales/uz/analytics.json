@@ -1,4 +1,9 @@
 {
+  "cvDisclosure": {
+    "requiresCameras": "Bandlik kameralari talab qilinadi",
+    "noData": "Kamera ma'lumotlari yo'q",
+    "noOccupancyTelemetry": "Bu ko'rsatkichlarni o'lchash uchun joyda bandlik kameralari kerak. Kamera uskunasisiz ular nol/standart qiymat sifatida ko'rinadi va haqiqiy faollikni aks ettirmaydi."
+  },
   "heatmap": {
     "settings": "Heatmap Settings",
     "visualizationType": "Visualization Type",

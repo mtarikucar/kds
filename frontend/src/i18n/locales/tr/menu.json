@@ -120,7 +120,12 @@
       "noImagesFound": "Görsel bulunamadı",
       "noImagesYet": "Henüz görsel yok",
       "tryDifferentSearch": "Farklı arama deneyin",
-      "uploadToStart": "Başlamak için yükleyin"
+      "uploadToStart": "Başlamak için yükleyin",
+      "allImages": "Tüm görseller",
+      "unusedImages": "Kullanılmayan",
+      "unusedHint": "Hiçbir ürüne eklenmemiş görseller. Depolama alanı için silin.",
+      "noUnusedImages": "Kullanılmayan görsel yok",
+      "noUnusedHint": "Her görsel en az bir ürüne ekli."
     }
   }
 }

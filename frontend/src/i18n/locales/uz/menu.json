@@ -120,7 +120,12 @@
       "noImagesFound": "Rasmlar topilmadi",
       "noImagesYet": "Hali rasmlar yo'q",
       "tryDifferentSearch": "Boshqa qidiruvni sinab ko'ring",
-      "uploadToStart": "Boshlash uchun yuklang"
+      "uploadToStart": "Boshlash uchun yuklang",
+      "allImages": "Barcha rasmlar",
+      "unusedImages": "Ishlatilmagan",
+      "unusedHint": "Hech bir mahsulotga biriktirilmagan rasmlar. Joy bo'shatish uchun o'chiring.",
+      "noUnusedImages": "Ishlatilmagan rasmlar yo'q",
+      "noUnusedHint": "Har bir rasm kamida bitta mahsulotga biriktirilgan."
     }
   }
 }

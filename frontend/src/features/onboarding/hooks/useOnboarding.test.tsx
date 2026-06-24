@@ -25,8 +25,18 @@ vi.mock('./useTourSteps', () => ({
 
 // Auth + UI stores.
 let user: any = { id: 'u1', role: 'ADMIN' };
+let demoMode = false;
 vi.mock('../../../store/authStore', () => ({
-  useAuthStore: (selector: any) => selector({ user }),
+  useAuthStore: (selector: any) => selector({ user, demoMode }),
+}));
+
+// Server-side onboarding persistence — mocked so the hook doesn't need a real
+// QueryClient. updateOnboarding.mutate captures the write-through payloads.
+const updateOnboardingMutate = vi.fn();
+let serverOnboarding: any = undefined;
+vi.mock('../onboardingApi', () => ({
+  useOnboardingData: () => ({ data: serverOnboarding }),
+  useUpdateOnboarding: () => ({ mutate: updateOnboardingMutate }),
 }));
 
 const updateTourProgress = vi.fn();
@@ -34,6 +44,7 @@ const setHasSeenWelcome = vi.fn();
 const setSkipAllTours = vi.fn();
 const setPosTourPreview = vi.fn();
 const resetAllOnboarding = vi.fn();
+const hydrateOnboarding = vi.fn();
 let onboarding: any = {
   hasSeenWelcome: false,
   skipAllTours: false,
@@ -47,6 +58,7 @@ vi.mock('../../../store/uiStore', () => ({
     setSkipAllTours,
     resetAllOnboarding,
     setPosTourPreview,
+    hydrateOnboarding,
   }),
 }));
 
@@ -55,7 +67,11 @@ beforeEach(() => {
   pathname = '/dashboard';
   tourId = 'admin-tour';
   user = { id: 'u1', role: 'ADMIN' };
+  demoMode = false;
   onboarding = { hasSeenWelcome: false, skipAllTours: false, tourProgress: {} };
+  // Server fetch resolved (not undefined) so shouldShowWelcome isn't gated by
+  // a pending hydration in these tests.
+  serverOnboarding = { hasSeenWelcome: false, skipAllTours: false, tourProgress: {} };
 });
 
 describe('useOnboarding.shouldShowWelcome', () => {
