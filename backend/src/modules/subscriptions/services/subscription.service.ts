@@ -1347,8 +1347,12 @@ export class SubscriptionService {
       // Engine-empty fallback fold extracted to a pure, tested helper
       // (effective-features.fold.ts) — mirrors PlanProjectorService's
       // FEATURE_COLUMNS/LIMIT_COLUMNS in one named place.
+      // Wave D — include `past_due` so the engine-empty fallback matches the
+      // projector: a recurring add-on whose period lapsed keeps its grant
+      // through the grace window (mirrors Subscription PAST_DUE). Only
+      // `cancelled` / `expired` drop out.
       const activeAddOns = await this.prisma.tenantAddOn.findMany({
-        where: { tenantId, status: "active" },
+        where: { tenantId, status: { in: ["active", "past_due"] } },
         include: { addOn: { select: { grants: true } } },
       });
       const folded = foldPlanGrants(

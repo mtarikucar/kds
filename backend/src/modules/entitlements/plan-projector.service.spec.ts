@@ -312,3 +312,102 @@ describe("PlanProjectorService.projectTenant", () => {
     );
   });
 });
+
+/**
+ * Wave D — add-on grace projection. A recurring add-on in `past_due` keeps
+ * its capability through the grace window (mirrors Subscription PAST_DUE);
+ * an `expired` / `cancelled` add-on loses it. The projector encodes the
+ * grace by projecting past_due rows alongside active ones and extending the
+ * grant's validUntil to the grace deadline.
+ */
+describe("PlanProjectorService.projectTenant — add-on grace (Wave D)", () => {
+  const TENANT = "tenant-1";
+  let prisma: MockPrismaClient;
+  let entitlements: any;
+  let svc: PlanProjectorService;
+
+  const extraBranchAddOn = (status: string, periodEnd: Date) => ({
+    id: "ta-branch",
+    tenantId: TENANT,
+    branchId: null,
+    quantity: 1,
+    status,
+    currentPeriodEnd: periodEnd,
+    addOn: {
+      code: "extra_branch",
+      grants: { "limit.maxBranches": 1, "feature.multiLocation": true },
+    },
+  });
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    entitlements = {
+      setGrantsForSourceTx: jest.fn().mockResolvedValue(undefined),
+      invalidate: jest.fn(),
+    } as any;
+    svc = new PlanProjectorService(prisma as any, entitlements);
+    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({
+      count: 0,
+    });
+    (prisma.$transaction as any).mockImplementation(async (fn: any) =>
+      fn(prisma),
+    );
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: TENANT,
+      featureOverrides: null,
+      limitOverrides: null,
+      currentPlan: { id: "p", name: "PRO" },
+    } as any);
+    (prisma.subscription.findFirst as any).mockResolvedValue({
+      id: "sub-1",
+      status: "ACTIVE",
+    });
+  });
+
+  function addOnGrantCall() {
+    return entitlements.setGrantsForSourceTx.mock.calls.find((c: any[]) =>
+      String(c[2]).startsWith("addon:"),
+    );
+  }
+
+  it("queries active AND past_due add-ons (past_due keeps its grant during grace)", async () => {
+    const periodEnd = new Date(Date.now() - 1000);
+    (prisma.tenantAddOn.findMany as any).mockResolvedValue([
+      extraBranchAddOn("past_due", periodEnd),
+    ]);
+
+    await svc.projectTenant(TENANT);
+
+    // The projector reads the add-on cohort with status in [active, past_due].
+    const findCall = (prisma.tenantAddOn.findMany as any).mock.calls.find(
+      (c: any[]) => c[0]?.where?.status?.in,
+    );
+    expect(findCall[0].where.status.in).toEqual(["active", "past_due"]);
+
+    // A past_due add-on still produces a grant.
+    const call = addOnGrantCall();
+    expect(call).toBeDefined();
+    const grants = call[3];
+    expect(grants.some((g: any) => g.key === "limit.maxBranches")).toBe(true);
+
+    // validUntil extended past currentPeriodEnd by the grace window.
+    const branchGrant = grants.find((x: any) => x.key === "limit.maxBranches");
+    expect(branchGrant.validUntil.getTime()).toBeGreaterThan(
+      periodEnd.getTime(),
+    );
+  });
+
+  it("an expired add-on is not in the cohort → no grant projected for it", async () => {
+    // Expired rows are excluded by the status filter, so findMany returns [].
+    (prisma.tenantAddOn.findMany as any).mockResolvedValue([]);
+
+    await svc.projectTenant(TENANT);
+
+    expect(addOnGrantCall()).toBeUndefined();
+    // Stale addon:* sources are swept.
+    const sweep = (prisma.featureEntitlement.deleteMany as any).mock.calls.find(
+      (c: any[]) => c[0]?.where?.source?.startsWith === "addon:",
+    );
+    expect(sweep).toBeDefined();
+  });
+});

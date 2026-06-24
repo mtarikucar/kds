@@ -256,4 +256,86 @@ describe("TenantMarketplaceService.purchase", () => {
       expect(out.id).toBe("ta-free");
     });
   });
+
+  /**
+   * Wave D — manual-renewal re-payment. A recurring add-on that lapsed to
+   * past_due / expired must be reactivatable ONLY by a fresh payment through
+   * the checkout → PayTR → confirmAndProvision rail (paymentRef supplied),
+   * and that renewal must reuse the existing row (reset period + restore
+   * entitlement) rather than minting a duplicate.
+   */
+  describe("Wave D: renewal reactivates a lapsed recurring add-on", () => {
+    const paidCatalog = {
+      id: "a-cap",
+      code: "extra_branch",
+      status: "published",
+      deps: [],
+      billing: "recurring",
+      priceCents: 49900,
+    };
+
+    function wireReactivate() {
+      // dup-check / idempotency findFirst should not find a duplicate here;
+      // the renewable findFirst (status past_due|expired) is what matters.
+      (prisma.tenantAddOn.findFirst as any).mockImplementation(
+        async ({ where }: any) => {
+          if (
+            where?.status?.in &&
+            where.status.in.includes("past_due") &&
+            where.status.in.includes("expired")
+          ) {
+            return {
+              id: "ta-lapsed",
+              tenantId: TENANT,
+              addOnId: "a-cap",
+              branchId: null,
+              status: "expired",
+              activatedAt: new Date(),
+            };
+          }
+          return null;
+        },
+      );
+      (prisma.tenantAddOn.update as any).mockImplementation(
+        async ({ where, data }: any) => ({ id: where.id, ...data }),
+      );
+    }
+
+    it("reactivates the existing past_due/expired row instead of creating a new one", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(paidCatalog as any);
+      wireReactivate();
+
+      const out = await svc.purchase(TENANT, {
+        addOnCode: "extra_branch",
+        paymentRef: "CK-renew-1",
+      });
+
+      // Reused the lapsed row; reset to active with a fresh period + ref.
+      expect(out.id).toBe("ta-lapsed");
+      expect(out.status).toBe("active");
+      expect(out.paymentRef).toBe("CK-renew-1");
+      expect(out.currentPeriodStart).toBeInstanceOf(Date);
+      expect(out.currentPeriodEnd).toBeInstanceOf(Date);
+      expect(out.endedAt).toBeNull();
+      expect(out.cancelAtPeriodEnd).toBe(false);
+      // No NEW row minted.
+      expect((prisma.tenantAddOn.create as any).mock.calls.length).toBe(0);
+      // Reprojection signal emitted so the entitlement is restored.
+      const ev = (outbox.append as jest.Mock).mock.calls.find(
+        (c) => c[0]?.type === "addon.purchased.v1",
+      );
+      expect(ev).toBeDefined();
+    });
+
+    it("still refuses renewal of a paid add-on with no paymentRef (no auto-charge / free renewal)", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(paidCatalog as any);
+      wireReactivate();
+
+      await expect(
+        svc.purchase(TENANT, { addOnCode: "extra_branch" }),
+      ).rejects.toThrow(/requires payment/i);
+      expect((prisma.tenantAddOn.update as any).mock.calls.length).toBe(0);
+      expect((prisma.tenantAddOn.create as any).mock.calls.length).toBe(0);
+    });
+  });
 });

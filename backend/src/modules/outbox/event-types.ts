@@ -21,6 +21,12 @@ export const EventTypes = {
   // Add-on lifecycle (marketplace).
   AddOnPurchased: "addon.purchased.v1",
   AddOnCancelled: "addon.cancelled.v1",
+  // Recurring add-on whose paid period ended without re-payment. Manual-
+  // renewal model (no PayTR card vault) — the add-on enters a 7-day grace
+  // window in which the entitlement is KEPT live; this event drives the
+  // operator "renew now" nudge. The projector also reprojects on it so the
+  // past_due grace grant gets a fresh validUntil.
+  AddOnPastDue: "addon.past_due.v1",
 
   // Entitlement-side fact: emitted by the projector AFTER it writes new rows.
   FeatureEntitlementChanged: "feature.entitlement.changed.v1",
@@ -125,6 +131,9 @@ export interface AddOnLifecyclePayload {
   addOnId: string;
   addOnCode: string;
   branchId?: string | null;
+  // Set on addon.past_due.v1: ISO-8601 end of the 7-day grace window after
+  // which the add-on is expired + its entitlement revoked unless re-paid.
+  graceEndsAt?: string;
 }
 
 /**

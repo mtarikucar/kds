@@ -134,6 +134,10 @@ export class EntitlementsModule
     };
     this.bus.on(EventTypes.AddOnPurchased, addOn);
     this.bus.on(EventTypes.AddOnCancelled, addOn);
+    // A recurring add-on entering past_due keeps its grant through grace, but
+    // we reproject so the projector refreshes the grant's validUntil to the
+    // grace deadline (and so a renewal that already raced in is reflected).
+    this.bus.on(EventTypes.AddOnPastDue, addOn);
   }
 
   /**

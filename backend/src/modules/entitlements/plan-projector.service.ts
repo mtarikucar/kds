@@ -5,6 +5,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { EntitlementService } from "./entitlement.service";
 import { EntitlementGrant } from "./entitlement.types";
+import { ADDON_GRACE_DAYS } from "../marketplace/marketplace.types";
 
 /**
  * Projects the legacy SubscriptionPlan + Tenant.featureOverrides /
@@ -317,13 +318,23 @@ export class PlanProjectorService {
    * multiplied by `quantity` (capacity add-ons buy in bulk). Stale sources
    * (add-ons that were cancelled or expired since the last projection) are
    * detected by diffing the current source list and revoked atomically.
+   *
+   * Manual-renewal grace: `past_due` rows still grant. A recurring add-on
+   * whose paid period ended without re-payment (no PayTR card vault) is
+   * flipped to `past_due` by the sweeper and KEEPS its capability through a
+   * 7-day grace window — mirroring Subscription PAST_DUE, which the status
+   * guard also treats as live. Only when the sweeper flips it to `expired`
+   * at grace end does the row drop out of this query and lose its grant.
+   * For a past_due row the grant's `validUntil` is the grace deadline
+   * (currentPeriodEnd + 7d) so the entitlement-engine grace sweeper doesn't
+   * prematurely drop it on its own clock.
    */
   private async projectAddOnsTx(
     tx: Prisma.TransactionClient,
     tenantId: string,
   ): Promise<void> {
     const activeAddOns = await tx.tenantAddOn.findMany({
-      where: { tenantId, status: "active" },
+      where: { tenantId, status: { in: ["active", "past_due"] } },
       include: { addOn: true },
     });
 
@@ -334,7 +345,16 @@ export class PlanProjectorService {
 
       const grants: Array<Omit<EntitlementGrant, "tenantId" | "source">> = [];
       const catalogGrants = (ta.addOn.grants as Record<string, unknown>) ?? {};
-      const validUntil = ta.currentPeriodEnd ?? null;
+      // past_due keeps the grant alive through the 7-day grace window; extend
+      // validUntil past currentPeriodEnd so the engine's own validUntil sweep
+      // doesn't expire it before the marketplace sweeper revokes at grace end.
+      const validUntil =
+        ta.status === "past_due" && ta.currentPeriodEnd
+          ? new Date(
+              ta.currentPeriodEnd.getTime() +
+                ADDON_GRACE_DAYS * 24 * 3600 * 1000,
+            )
+          : (ta.currentPeriodEnd ?? null);
 
       for (const [key, raw] of Object.entries(catalogGrants)) {
         if (key.startsWith("feature.")) {

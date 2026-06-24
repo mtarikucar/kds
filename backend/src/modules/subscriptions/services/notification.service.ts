@@ -527,6 +527,38 @@ export class NotificationService {
   }
 
   /**
+   * Notify the operator that a recurring marketplace add-on lapsed. Manual-
+   * renewal model (no PayTR card vault): when a recurring add-on's paid
+   * period ends it goes `past_due` (entitlement kept live through grace) and
+   * the operator must re-pay through the marketplace/checkout to keep it; if
+   * grace elapses without re-payment it is `expired` and the capability is
+   * revoked. So the add-on never silently stops, this fires at both stages.
+   */
+  async sendAddOnPastDue(
+    email: string,
+    tenantName: string,
+    addOnCode: string,
+    stage: "past_due" | "expired",
+  ) {
+    const subject =
+      stage === "expired"
+        ? `Eklenti süresi doldu — ${addOnCode}`
+        : `Eklenti yenileme gerekiyor — ${addOnCode}`;
+    return this.sendEmail({
+      to: email,
+      subject,
+      template: "addon-past-due",
+      context: {
+        tenantName,
+        addOnCode,
+        expired: stage === "expired",
+        renewUrl: `${this.appUrl}/marketplace?renew=${encodeURIComponent(addOnCode)}`,
+        appUrl: this.appUrl,
+      },
+    });
+  }
+
+  /**
    * Send welcome email for new subscription
    */
   async sendWelcomeEmail(email: string, tenantName: string, planName: string) {

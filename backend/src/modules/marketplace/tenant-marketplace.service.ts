@@ -151,6 +151,57 @@ export class TenantMarketplaceService {
         if (existing) return existing;
       }
 
+      // RE-PAYMENT / RENEWAL (manual-renewal model). A recurring add-on whose
+      // period lapsed sits in 'past_due' (grace) or 'expired' (revoked). The
+      // operator renews by paying again through the SAME checkout → PayTR →
+      // confirmAndProvision rail — there is no card vault, so we never
+      // auto-charge. Rather than minting a duplicate row (which would orphan
+      // the lapsed one and break the (tenant,addOn,branch) identity the dup-
+      // guard relies on), reactivate the existing row in place: reset the
+      // period, status → active, attach the new paymentRef. Mirrors the
+      // Subscription PAST_DUE/EXPIRED → ACTIVE renewal that reuses the row.
+      // Pick the most-recently-activated lapsed row for this identity.
+      const renewable = await tx.tenantAddOn.findFirst({
+        where: {
+          tenantId,
+          addOnId: addOn.id,
+          branchId: input.branchId ?? null,
+          status: { in: ["past_due", "expired"] },
+        },
+        orderBy: { activatedAt: "desc" },
+      });
+      if (renewable) {
+        const reactivated = await tx.tenantAddOn.update({
+          where: { id: renewable.id },
+          data: {
+            status: "active",
+            quantity: qty,
+            activatedAt: now,
+            currentPeriodStart: now,
+            currentPeriodEnd,
+            cancelAtPeriodEnd: false,
+            cancelledAt: null,
+            endedAt: null,
+            paymentRef: input.paymentRef ?? null,
+          },
+        });
+        await this.outbox.append(
+          {
+            type: EventTypes.AddOnPurchased,
+            tenantId,
+            payload: {
+              tenantId,
+              addOnId: reactivated.id,
+              addOnCode: addOn.code,
+              branchId: input.branchId ?? null,
+              quantity: qty,
+            },
+          },
+          tx,
+        );
+        return reactivated;
+      }
+
       // Tenant-scope duplicate guard.
       const dup = await tx.tenantAddOn.findFirst({
         where: {
@@ -229,8 +280,14 @@ export class TenantMarketplaceService {
       where: { id: tenantAddOnId, tenantId },
     });
     if (!row) throw new NotFoundException("Add-on not found for this tenant");
-    if (row.status !== "active")
+    // Cancellable from 'active' (normal) or 'past_due' (the operator opts not
+    // to renew a lapsed recurring add-on). A past_due row's paid period has
+    // already ended, so cancellation is always immediate for it — there is no
+    // remaining period to honour, and leaving it cancelAtPeriodEnd would keep
+    // the grace grant live with no path to revoke before grace expiry.
+    if (row.status !== "active" && row.status !== "past_due")
       throw new BadRequestException(`Cannot cancel — status is ${row.status}`);
+    const effectiveImmediate = immediate || row.status === "past_due";
 
     const now = new Date();
     // v2.8.96 — fold claim + post-fetch + emit into one transaction.
@@ -239,15 +296,17 @@ export class TenantMarketplaceService {
     // projector signal, so the granted limits/features stayed live
     // until the next reconcile cron caught it.
     //
-    // Compound WHERE (B41-B45 pattern, iter-31 onward) + status='active'
-    // gate so two concurrent cancel calls converge on a single
-    // transition. The previous shape (.update by id) accepted the
-    // second writer too and would double-emit the AddOnCancelled
-    // outbox event; the count check below makes the loser explicit.
+    // Compound WHERE (B41-B45 pattern, iter-31 onward) + status gate so two
+    // concurrent cancel calls converge on a single transition. The previous
+    // shape (.update by id) accepted the second writer too and would
+    // double-emit the AddOnCancelled outbox event; the count check below
+    // makes the loser explicit. The claim's status filter pins the exact
+    // state we read so a concurrent renewal (past_due → active) or sweep
+    // (past_due → expired) makes us a clean no-op.
     return this.prisma.$transaction(async (tx) => {
       const claim = await tx.tenantAddOn.updateMany({
-        where: { id: tenantAddOnId, tenantId, status: "active" },
-        data: immediate
+        where: { id: tenantAddOnId, tenantId, status: row.status },
+        data: effectiveImmediate
           ? {
               status: "cancelled",
               cancelledAt: now,
@@ -268,7 +327,7 @@ export class TenantMarketplaceService {
       // Immediate cancellation revokes entitlements right away. At-period-end
       // cancellation leaves the row active until the nightly sweep / billing
       // cycle close transitions it.
-      if (immediate) {
+      if (effectiveImmediate) {
         // Emit INSIDE the tx with NO .catch — a failed append must roll the
         // cancellation back (mirrors purchase()), otherwise the row flips to
         // cancelled with no projector signal and the granted limits/features
