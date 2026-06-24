@@ -33,6 +33,13 @@ const statusStyles = {
   DELETED: 'bg-red-50 text-red-700 border-red-100',
 };
 
+// M10: these keys must mirror the backend FEATURE_KEYS / LIMIT_KEYS whitelist
+// in superadmin-tenants.service.ts. featureStates/limitValues are keyed off
+// Object.keys() of these maps and buildFeatureOverridesPayload/
+// buildLimitOverridesPayload iterate those state maps, so a key absent here can
+// NEVER be sent even though the backend accepts it. deliveryIntegration /
+// externalDisplay / posAccess (the revenue-gating modules) and the maxBranches
+// limit were missing, so the override editor could not grant them.
 const FEATURE_LABELS: Record<string, string> = {
   advancedReports: 'Advanced Reports',
   multiLocation: 'Multi-Location',
@@ -43,11 +50,15 @@ const FEATURE_LABELS: Record<string, string> = {
   kdsIntegration: 'KDS Integration',
   reservationSystem: 'Reservation System',
   personnelManagement: 'Personnel Management',
+  deliveryIntegration: 'Delivery Integration',
+  externalDisplay: 'External Display (Partner Display)',
+  posAccess: 'POS Access',
 };
 
 const LIMIT_LABELS: Record<string, string> = {
   maxUsers: 'Max Users',
   maxTables: 'Max Tables',
+  maxBranches: 'Max Branches',
   maxProducts: 'Max Products',
   maxCategories: 'Max Categories',
   maxMonthlyOrders: 'Max Monthly Orders',

@@ -508,3 +508,235 @@ describe("SuperAdminSubscriptionsService plan maxBranches persistence", () => {
     expect(data.maxBranches).toBeUndefined();
   });
 });
+
+/**
+ * Regression (M10): posAccess + externalDisplay + deliveryIntegration are real
+ * tier-gating plan columns. externalDisplay/deliveryIntegration were already
+ * persisted but had no plan-form toggle; posAccess was missing from the DTO and
+ * the create/update writes entirely, so a superadmin building a custom plan
+ * could neither grant the two highest-value modules nor disable POS — only a
+ * DB edit could. They must round-trip through createPlan/updatePlan.
+ */
+describe("SuperAdminSubscriptionsService plan feature-flag persistence (M10)", () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let svc: SuperAdminSubscriptionsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      {} as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it("createPlan persists externalDisplay, deliveryIntegration and posAccess", async () => {
+    prisma.subscriptionPlan.create.mockResolvedValue({ id: "plan-1" });
+
+    await svc.createPlan(
+      {
+        name: "delivery",
+        displayName: "Delivery",
+        monthlyPrice: 100,
+        yearlyPrice: 1000,
+        externalDisplay: true,
+        deliveryIntegration: true,
+        posAccess: false,
+      } as any,
+      "a1",
+      "a@x",
+    );
+
+    expect(prisma.subscriptionPlan.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          externalDisplay: true,
+          deliveryIntegration: true,
+          posAccess: false,
+        }),
+      }),
+    );
+  });
+
+  it("createPlan defaults posAccess to true (schema parity) when omitted", async () => {
+    prisma.subscriptionPlan.create.mockResolvedValue({ id: "plan-1" });
+
+    await svc.createPlan(
+      { name: "p", displayName: "P", monthlyPrice: 0, yearlyPrice: 0 } as any,
+      "a1",
+      "a@x",
+    );
+
+    const data = prisma.subscriptionPlan.create.mock.calls[0][0].data;
+    expect(data.posAccess).toBe(true);
+  });
+
+  it("updatePlan persists an explicit posAccess=false and leaves it untouched when omitted", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: "plan-1" });
+    prisma.subscriptionPlan.update.mockResolvedValue({ id: "plan-1" });
+
+    await svc.updatePlan("plan-1", { posAccess: false } as any, "a1", "a@x");
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ posAccess: false }),
+      }),
+    );
+
+    prisma.subscriptionPlan.update.mockClear();
+    await svc.updatePlan("plan-1", { monthlyPrice: 200 } as any, "a1", "a@x");
+    const data = prisma.subscriptionPlan.update.mock.calls[0][0].data;
+    expect(data.posAccess).toBeUndefined();
+  });
+});
+
+/**
+ * Regression (M7): the superadmin "Extend" button is rendered for EVERY
+ * subscription row regardless of status, but extendSubscription only pushed
+ * currentPeriodEnd — it never moved status off EXPIRED/TRIAL_ENDED/PAST_DUE/
+ * CANCELLED and never reprojected entitlements. So an operator extending a
+ * locked tenant got a success toast while the tenant stayed 403'd (and a
+ * PAST_DUE row was pushed out of the dunning-expiry cron window forever).
+ * Extend on a non-ACTIVE row must reinstate: status→ACTIVE, clear the
+ * terminal/cancellation fields, and emit the SAME reprojection the activation
+ * path uses, all in one transaction.
+ */
+describe("SuperAdminSubscriptionsService.extendSubscription reinstatement", () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let subscriptionService: { emitSubscriptionReprojection: jest.Mock };
+  let svc: SuperAdminSubscriptionsService;
+
+  const SUB_ID = "sub-1";
+  const TENANT_ID = "tenant-1";
+  const baseSub: any = {
+    id: SUB_ID,
+    tenantId: TENANT_ID,
+    status: "EXPIRED",
+    currentPeriodEnd: new Date("2026-01-01T00:00:00.000Z"),
+    tenant: { id: TENANT_ID, name: "Test Restoran" },
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    subscriptionService = {
+      emitSubscriptionReprojection: jest.fn().mockResolvedValue(undefined),
+    };
+    // The mocked $transaction must invoke the callback with a tx client so the
+    // service's tx.subscription.update + emitSubscriptionReprojection(tx) run.
+    (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      async (cb: any) => cb(prisma),
+    );
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      subscriptionService as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it("EXPIRED row: flips status to ACTIVE, clears terminal fields, and reprojects", async () => {
+    prisma.subscription.findUnique.mockResolvedValue({ ...baseSub });
+    prisma.subscription.update.mockImplementation(async (args: any) => ({
+      ...baseSub,
+      ...args.data,
+      plan: { id: "plan-1", name: "business", displayName: "Business" },
+    }));
+
+    await svc.extendSubscription(SUB_ID, { days: 30 }, "actor-1", "actor@x");
+
+    // Status reinstated + terminal/cancellation fields cleared in the write.
+    expect(prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: SUB_ID },
+        data: expect.objectContaining({
+          status: "ACTIVE",
+          endedAt: null,
+          cancelAtPeriodEnd: false,
+          cancelledAt: null,
+          cancellationReason: null,
+          currentPeriodEnd: expect.any(Date),
+        }),
+      }),
+    );
+    // Reprojection invoked in the same transaction (tx === prisma here).
+    expect(
+      subscriptionService.emitSubscriptionReprojection,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      subscriptionService.emitSubscriptionReprojection,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ id: SUB_ID, tenantId: TENANT_ID }),
+      prisma,
+    );
+    // Audit records the reinstatement.
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "EXTEND",
+        newData: expect.objectContaining({ status: "ACTIVE", reinstated: true }),
+      }),
+    );
+  });
+
+  it.each(["TRIAL_ENDED", "PAST_DUE", "CANCELLED"])(
+    "%s row: also reinstated to ACTIVE with reprojection",
+    async (status) => {
+      prisma.subscription.findUnique.mockResolvedValue({ ...baseSub, status });
+      prisma.subscription.update.mockImplementation(async (args: any) => ({
+        ...baseSub,
+        ...args.data,
+        plan: { id: "plan-1", name: "business", displayName: "Business" },
+      }));
+
+      await svc.extendSubscription(SUB_ID, { days: 7 }, "a1", "a@x");
+
+      expect(prisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "ACTIVE" }),
+        }),
+      );
+      expect(
+        subscriptionService.emitSubscriptionReprojection,
+      ).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("ACTIVE row: only pushes currentPeriodEnd — does NOT touch status or reproject", async () => {
+    prisma.subscription.findUnique.mockResolvedValue({
+      ...baseSub,
+      status: "ACTIVE",
+    });
+    prisma.subscription.update.mockImplementation(async (args: any) => ({
+      ...baseSub,
+      status: "ACTIVE",
+      ...args.data,
+      plan: { id: "plan-1", name: "business", displayName: "Business" },
+    }));
+
+    await svc.extendSubscription(SUB_ID, { days: 30 }, "a1", "a@x");
+
+    const data = prisma.subscription.update.mock.calls[0][0].data;
+    expect(data.status).toBeUndefined();
+    expect(data.endedAt).toBeUndefined();
+    expect(data.currentPeriodEnd).toBeInstanceOf(Date);
+    expect(
+      subscriptionService.emitSubscriptionReprojection,
+    ).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        newData: expect.objectContaining({ reinstated: false }),
+      }),
+    );
+  });
+});

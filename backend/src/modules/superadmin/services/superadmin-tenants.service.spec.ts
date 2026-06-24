@@ -234,6 +234,49 @@ describe("SuperAdminTenantsService", () => {
       expect(res.effective.limits.maxUsers).toBe(99); // override
       expect(res.effective.limits.maxTables).toBe(10); // plan default
     });
+
+    // M10: posAccess (feature) and maxBranches (limit) are in
+    // FEATURE_KEYS/LIMIT_KEYS so updateOverrides accepts them, but the plan
+    // default the override editor reads on the left omitted them — the editor
+    // was blind to those keys on read. Surface the plan default so the
+    // override row shows the correct baseline + effective value.
+    it("exposes posAccess and maxBranches plan defaults so the override editor can show them", async () => {
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: TENANT_ID,
+        featureOverrides: null,
+        limitOverrides: null,
+        currentPlan: {
+          advancedReports: false,
+          multiLocation: false,
+          customBranding: false,
+          apiAccess: false,
+          externalDisplay: true,
+          prioritySupport: false,
+          inventoryTracking: false,
+          kdsIntegration: true,
+          reservationSystem: false,
+          personnelManagement: false,
+          deliveryIntegration: true,
+          posAccess: false,
+          maxUsers: 5,
+          maxTables: 10,
+          maxBranches: -1,
+          maxProducts: 100,
+          maxCategories: 20,
+          maxMonthlyOrders: 1000,
+        },
+      } as any);
+
+      const res = await svc.getOverrides(TENANT_ID);
+      // Plan-default column now carries the previously-omitted keys.
+      expect(res.planDefaults.features.posAccess).toBe(false);
+      expect(res.planDefaults.features.deliveryIntegration).toBe(true);
+      expect(res.planDefaults.features.externalDisplay).toBe(true);
+      expect(res.planDefaults.limits.maxBranches).toBe(-1);
+      // ...and they flow through to effective with no override.
+      expect(res.effective.features.posAccess).toBe(false);
+      expect(res.effective.limits.maxBranches).toBe(-1);
+    });
   });
 
   describe("updateOverrides", () => {

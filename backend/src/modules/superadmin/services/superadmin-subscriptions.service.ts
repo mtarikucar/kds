@@ -21,7 +21,10 @@ import { AuditAction, EntityType } from "../dto/audit-filter.dto";
 import { SubscriptionService } from "../../subscriptions/services/subscription.service";
 import { SubscriptionSchedulerService } from "../../subscriptions/services/subscription-scheduler.service";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
-import { PaymentStatus } from "../../../common/constants/subscription.enum";
+import {
+  PaymentStatus,
+  SubscriptionStatus,
+} from "../../../common/constants/subscription.enum";
 import { captureException } from "../../../sentry.config";
 
 @Injectable()
@@ -123,6 +126,9 @@ export class SuperAdminSubscriptionsService {
         reservationSystem: createDto.reservationSystem ?? false,
         personnelManagement: createDto.personnelManagement ?? false,
         deliveryIntegration: createDto.deliveryIntegration ?? false,
+        // posAccess defaults to true (schema parity) so omitting it doesn't
+        // silently strip POS from a newly-created plan.
+        posAccess: createDto.posAccess ?? true,
         isActive: createDto.isActive ?? true,
         // Discount block — previously omitted, so plan discounts created via
         // the superadmin form silently never persisted. Dates arrive as ISO
@@ -194,6 +200,9 @@ export class SuperAdminSubscriptionsService {
         reservationSystem: updateDto.reservationSystem,
         personnelManagement: updateDto.personnelManagement,
         deliveryIntegration: updateDto.deliveryIntegration,
+        // PATCH: undefined leaves posAccess untouched; an explicit false
+        // disables POS on this plan.
+        posAccess: updateDto.posAccess,
         isActive: updateDto.isActive,
         // Discount block — previously omitted, so discount edits returned 200
         // but never saved. PATCH semantics: undefined leaves the column
@@ -493,19 +502,62 @@ export class SuperAdminSubscriptionsService {
     const newEndDate = new Date(subscription.currentPeriodEnd);
     newEndDate.setDate(newEndDate.getDate() + extendDto.days);
 
-    const updated = await this.prisma.subscription.update({
-      where: { id },
-      data: {
+    // Extend on a non-ACTIVE row must REINSTATE the tenant, not just push a
+    // date. M7: when a subscription is EXPIRED / TRIAL_ENDED / PAST_DUE /
+    // CANCELLED, both gates (subscription-status.guard + plan-feature.guard)
+    // either hard-lock the tenant (EXPIRED/TRIAL_ENDED/CANCELLED → 403
+    // PLAN_SELECTION_REQUIRED) or leave it stuck in the dunning window
+    // (PAST_DUE never leaves the 7-day expiry cron window once its
+    // currentPeriodEnd is pushed forward). The previous implementation only
+    // wrote currentPeriodEnd, so an operator clicking "Extend" on those rows
+    // got a success toast while the tenant stayed locked. Flip status→ACTIVE
+    // and clear the terminal/cancellation fields so the tenant is genuinely
+    // unlocked, and reproject entitlements in the SAME transaction (mirroring
+    // updateSubscription + the tenant-side activation / bank-transfer-confirm
+    // paths) so the engine re-grants feature.*/limit.* immediately instead of
+    // waiting for the nightly reconcile.
+    const wasActive = subscription.status === SubscriptionStatus.ACTIVE;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const data: Prisma.SubscriptionUpdateInput = {
         currentPeriodEnd: newEndDate,
-      },
-      include: {
-        tenant: {
-          select: { id: true, name: true },
+      };
+      if (!wasActive) {
+        data.status = SubscriptionStatus.ACTIVE;
+        data.endedAt = null;
+        data.cancelAtPeriodEnd = false;
+        data.cancelledAt = null;
+        data.cancellationReason = null;
+      }
+
+      const sub = await tx.subscription.update({
+        where: { id },
+        data,
+        include: {
+          tenant: {
+            select: { id: true, name: true },
+          },
+          plan: {
+            select: { id: true, name: true, displayName: true },
+          },
         },
-        plan: {
-          select: { id: true, name: true, displayName: true },
-        },
-      },
+      });
+
+      if (!wasActive) {
+        await this.subscriptionService.emitSubscriptionReprojection(
+          {
+            id: sub.id,
+            tenantId: subscription.tenantId,
+            plan: sub.plan,
+            currentPeriodStart: (sub as { currentPeriodStart?: Date | null })
+              .currentPeriodStart,
+            currentPeriodEnd: newEndDate,
+          },
+          tx,
+        );
+      }
+
+      return sub;
     });
 
     await this.auditService.log({
@@ -516,11 +568,16 @@ export class SuperAdminSubscriptionsService {
       actorEmail,
       previousData: {
         currentPeriodEnd: subscription.currentPeriodEnd,
+        status: subscription.status,
       },
       newData: {
         currentPeriodEnd: newEndDate,
         daysExtended: extendDto.days,
         reason: extendDto.reason,
+        // Record the reinstatement so a later "why is this tenant ACTIVE"
+        // forensic question resolves to this Extend action.
+        status: updated.status,
+        reinstated: !wasActive,
       },
       targetTenantId: subscription.tenant.id,
       targetTenantName: subscription.tenant.name,

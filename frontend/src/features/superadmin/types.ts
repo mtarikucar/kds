@@ -197,6 +197,14 @@ export interface SubscriptionPlan {
   // PlansPage form added this toggle in 2026-04 but the type wasn't
   // bumped, so reads/writes through the interface looked invalid to TS.
   personnelManagement?: boolean;
+  // M10: revenue-gating module flags the SA Plans form must round-trip.
+  // deliveryIntegration gates the entire delivery-platforms module
+  // (Yemeksepeti/Getir/Trendyol/Migros), externalDisplay gates the Partner
+  // Display API, posAccess gates the POS surface. Optional so older cached
+  // payloads without the fields still typecheck.
+  deliveryIntegration?: boolean;
+  externalDisplay?: boolean;
+  posAccess?: boolean;
   isActive: boolean;
   discountPercentage?: number;
   discountLabel?: string;

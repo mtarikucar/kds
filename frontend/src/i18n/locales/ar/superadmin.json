@@ -190,14 +190,18 @@
       "inventoryTracking": "Inventory Tracking",
       "kdsIntegration": "KDS Integration",
       "reservationSystem": "Reservation System",
-      "personnelManagement": "Personnel Management"
+      "personnelManagement": "Personnel Management",
+      "deliveryIntegration": "Delivery Integration",
+      "externalDisplay": "External Display (Partner Display)",
+      "posAccess": "POS Access"
     },
     "limitLabels": {
       "maxUsers": "Max Users",
       "maxTables": "Max Tables",
       "maxProducts": "Max Products",
       "maxCategories": "Max Categories",
-      "maxMonthlyOrders": "Max Monthly Orders"
+      "maxMonthlyOrders": "Max Monthly Orders",
+      "maxBranches": "Max Branches"
     }
   },
   "subscriptions": {
@@ -335,7 +339,10 @@
       "endDate": "End Date",
       "cancel": "Cancel",
       "update": "Update",
-      "create": "Create"
+      "create": "Create",
+      "deliveryIntegration": "Delivery Integration",
+      "externalDisplay": "External Display (Partner Display)",
+      "posAccess": "POS Access"
     }
   },
   "marketplace": {

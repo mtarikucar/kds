@@ -300,6 +300,13 @@ function PlanModal({
     kdsIntegration: plan?.kdsIntegration ?? true,
     reservationSystem: plan?.reservationSystem || false,
     personnelManagement: plan?.personnelManagement || false,
+    // M10: revenue-gating modules previously absent from the form, so a plan
+    // built via the SA form silently had delivery/partner-display OFF and POS
+    // ON with no way to change either. posAccess defaults to true (schema
+    // parity) so existing behavior is preserved unless explicitly disabled.
+    deliveryIntegration: plan?.deliveryIntegration || false,
+    externalDisplay: plan?.externalDisplay || false,
+    posAccess: plan?.posAccess ?? true,
     isActive: plan?.isActive ?? true,
     discountPercentage: plan?.discountPercentage || 0,
     discountLabel: plan?.discountLabel || '',
@@ -555,6 +562,33 @@ function PlanModal({
                   className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                 />
                 <span className="text-sm text-zinc-700">{t('plans.modal.personnelManagement')}</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.deliveryIntegration}
+                  onChange={(e) => setFormData({ ...formData, deliveryIntegration: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">{t('plans.modal.deliveryIntegration', 'Teslimat entegrasyonu')}</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.externalDisplay}
+                  onChange={(e) => setFormData({ ...formData, externalDisplay: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">{t('plans.modal.externalDisplay', 'Harici ekran (Partner Display)')}</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.posAccess}
+                  onChange={(e) => setFormData({ ...formData, posAccess: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">{t('plans.modal.posAccess', 'POS erişimi')}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
