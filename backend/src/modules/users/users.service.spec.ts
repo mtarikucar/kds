@@ -92,3 +92,61 @@ describe('UsersService.findAll filters (iter-74)', () => {
     ]);
   });
 });
+
+/**
+ * sweep-3 B2 regression. create() for a front-line role (WAITER/KITCHEN/
+ * COURIER) MUST set primaryBranchId or the DB CHECK
+ * users_restricted_role_requires_primary_branch rejects the INSERT — which
+ * used to surface as an opaque 500 and meant front-line staff could not be
+ * created at all. (The CHECK itself only fires against a real DB; this pins
+ * the resolution LOGIC — set primaryBranchId + the allow-list row.)
+ */
+describe('UsersService.create — front-line branch pinning (sweep-3 B2)', () => {
+  let prisma: MockPrismaClient;
+  let svc: UsersService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new UsersService(
+      prisma as any,
+      { get: () => undefined } as any,
+      {} as any,
+      { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {}, computedAt: '' }) } as any,
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(prisma));
+    (prisma.user.findUnique as any).mockResolvedValue(null); // email free
+    (prisma.subscription.findFirst as any).mockResolvedValue(null); // no cap
+    (prisma.user.create as any).mockResolvedValue({ id: 'u-new', role: 'WAITER' });
+    (prisma.userBranchAssignment.create as any).mockResolvedValue({});
+  });
+
+  const dto = { email: 'w@x.y', password: 'pw', firstName: 'W', lastName: 'X', role: 'WAITER' } as any;
+  const admin = { id: 'a-1', role: 'ADMIN' };
+
+  it('pins a WAITER to the scoped branch and writes the allow-list row', async () => {
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'b-scope' }); // scope branch valid in tenant
+    await svc.create(dto, 't1', admin, 'b-scope');
+    expect((prisma.user.create as any).mock.calls[0][0].data.primaryBranchId).toBe('b-scope');
+    expect(prisma.userBranchAssignment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ branchId: 'b-scope', tenantId: 't1' }) }),
+    );
+  });
+
+  it('falls back to the first active branch when no scope is supplied', async () => {
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'b-first' });
+    await svc.create(dto, 't1', admin);
+    expect((prisma.user.create as any).mock.calls[0][0].data.primaryBranchId).toBe('b-first');
+  });
+
+  it('rejects with a clear 400 when the tenant has no active branch', async () => {
+    (prisma.branch.findFirst as any).mockResolvedValue(null);
+    await expect(svc.create(dto, 't1', admin)).rejects.toThrow(/no active branch/i);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('leaves ADMIN branch-less (CHECK exempts roaming roles)', async () => {
+    await svc.create({ ...dto, role: 'ADMIN' }, 't1', admin);
+    expect((prisma.user.create as any).mock.calls[0][0].data.primaryBranchId).toBeNull();
+    expect(prisma.userBranchAssignment.create).not.toHaveBeenCalled();
+  });
+});

@@ -90,7 +90,12 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
         items: items.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
-          modifiers: item.modifiers,
+          // Remap CartModifier `id` → server `modifierId` (see CartPage): raw
+          // posting made every customized order 400 under the whitelist pipe.
+          modifiers: (item.modifiers ?? []).map((m) => ({
+            modifierId: m.id,
+            quantity: m.quantity,
+          })),
           notes: item.notes,
         })),
       });

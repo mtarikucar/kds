@@ -12,7 +12,7 @@ describe('UsersController', () => {
   let onboarding: Record<string, jest.Mock>;
   let ctrl: UsersController;
 
-  const req = { tenantId: 't1' };
+  const req = { tenantId: 't1', scope: { branchId: 'b1' } };
   const actor = { id: 'admin-1', role: 'ADMIN' };
 
   beforeEach(() => {
@@ -36,10 +36,10 @@ describe('UsersController', () => {
     ctrl = new UsersController(usersService as any, onboarding as any);
   });
 
-  it('create forwards dto, tenantId and the current actor', () => {
+  it('create forwards dto, tenantId, the current actor, and the branch scope', () => {
     const dto = { email: 'a@b.c' } as any;
     ctrl.create(dto, req as any, actor);
-    expect(usersService.create).toHaveBeenCalledWith(dto, 't1', actor);
+    expect(usersService.create).toHaveBeenCalledWith(dto, 't1', actor, 'b1');
   });
 
   it('findAll parses page/limit into numbers and forwards filters', () => {

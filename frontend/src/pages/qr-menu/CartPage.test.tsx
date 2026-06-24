@@ -158,6 +158,33 @@ describe("CartPage — order submission", () => {
     );
   });
 
+  it("remaps selected modifiers from cart `id` to server `modifierId` (sweep-3 B1)", async () => {
+    // Regression: the cart posted modifiers raw (keyed `id`); the server DTO
+    // requires `modifierId`, and the whitelist ValidationPipe stripped the
+    // rest → 400, so ANY customized item failed to order. The existing tests
+    // only ever asserted `modifiers: []`, so they never caught it.
+    cart.items = [
+      {
+        product: { id: "p1" },
+        quantity: 1,
+        modifiers: [
+          { id: "m1", name: "Large", displayName: "Large", priceAdjustment: 5, quantity: 1 },
+          { id: "m2", name: "Extra cheese", displayName: "Extra cheese", priceAdjustment: 3, quantity: 2 },
+        ],
+        notes: "",
+      },
+    ];
+    post.mockResolvedValue({ data: {} });
+    await loadAndSubmit();
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.items[0].modifiers).toEqual([
+      { modifierId: "m1", quantity: 1 },
+      { modifierId: "m2", quantity: 2 },
+    ]);
+  });
+
   it("toasts the server error and does NOT clear the cart on failure", async () => {
     post.mockRejectedValue({
       response: { data: { message: "kitchen closed" } },

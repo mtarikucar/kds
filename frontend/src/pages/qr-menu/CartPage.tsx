@@ -89,7 +89,14 @@ const CartPage = () => {
         items: items.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
-          modifiers: item.modifiers,
+          // Remap the cart's CartModifier (keyed `id`) to the server contract
+          // (`modifierId`). Posting raw left modifierId undefined → the
+          // whitelist ValidationPipe stripped the rest → 400, so ANY
+          // customized item failed to order. Mirrors the staff POS path.
+          modifiers: (item.modifiers ?? []).map((m) => ({
+            modifierId: m.id,
+            quantity: m.quantity,
+          })),
           notes: item.notes,
         })),
       });
