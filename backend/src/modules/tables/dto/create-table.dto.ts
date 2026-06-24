@@ -9,6 +9,7 @@ import {
   Min,
   IsEnum,
 } from "class-validator";
+import { TableSpatialFieldsDto } from "./table-spatial.dto";
 
 export enum TableStatus {
   AVAILABLE = "AVAILABLE",
@@ -16,7 +17,10 @@ export enum TableStatus {
   RESERVED = "RESERVED",
 }
 
-export class CreateTableDto {
+// Extends the optional floor-plan geometry (zoneId/posX/posY/width/height/
+// rotation/shape) so a table may be created directly onto the canvas; all
+// geometry fields are optional and default in the DB when omitted.
+export class CreateTableDto extends TableSpatialFieldsDto {
   // Caps protect Table.number / Table.section (Postgres TEXT — no implicit
   // ceiling) and the @@unique(tenantId, number) constraint from accepting
   // a multi-MB blob as the canonical id of a physical table. Realistic

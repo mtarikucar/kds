@@ -82,6 +82,8 @@ model Tenant {
   modifierGroups      ModifierGroup[]
   modifiers           Modifier[]
   tables              Table[]
+  floorZones          FloorZone[]
+  floorElements       FloorElement[]
   orders              Order[]
   stockMovements      StockMovement[]
   subscriptions       Subscription[]
@@ -553,6 +555,22 @@ model Table {
   // Table grouping (merge/split)
   groupId String? // Shared UUID for merged tables; null = standalone
 
+  // Floor-plan spatial placement (v3.2.45). A table belongs to at most one
+  // FloorZone (a kat / bahçe / teras); posX/posY are canvas coordinates
+  // within that zone, width/height the rendered footprint, rotation in
+  // degrees, shape the silhouette. zoneId=null ⇒ not yet placed (the editor
+  // surfaces it in an "unplaced" tray). Seats are rendered from `capacity`.
+  // The legacy free-text `section` above is retained for now and dropped in
+  // a later phase once the admin page is rebuilt around zones.
+  zoneId   String?
+  zone     FloorZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  posX     Float      @default(0)
+  posY     Float      @default(0)
+  width    Float      @default(80)
+  height   Float      @default(80)
+  rotation Float      @default(0)
+  shape    String     @default("ROUND") // ROUND, SQUARE, RECT
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -587,7 +605,78 @@ model Table {
   @@index([tenantId])
   @@index([tenantId, groupId])
   @@index([tenantId, branchId])
+  @@index([zoneId])
   @@map("tables")
+}
+
+// ========================================
+// FLOOR PLAN (2D restaurant map)
+// ========================================
+
+// A designable area of the restaurant — a floor, garden, terrace, etc.
+// (kat / bahçe / teras). Each zone is its own 2D canvas that holds placed
+// Tables and decorative/structural FloorElements. Branch-scoped: every
+// branch designs its own floor plan independently.
+model FloorZone {
+  id                 String  @id @default(uuid())
+  name               String
+  sortOrder          Int     @default(0)
+  kind               String  @default("INDOOR") // INDOOR, OUTDOOR
+  // Logical canvas size in design units (px-equivalent). The live view
+  // scales this to fit the viewport; the editor pans/zooms within it.
+  canvasWidth        Int     @default(1200)
+  canvasHeight       Int     @default(800)
+  gridSize           Int     @default(20)
+  // Optional blueprint image the operator can trace the plan over.
+  backgroundImageUrl String?
+  backgroundOpacity  Float   @default(1.0)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tables   Table[]
+  elements FloorElement[]
+
+  @@unique([tenantId, branchId, name])
+  @@index([tenantId, branchId])
+  @@map("floor_zones")
+}
+
+// A non-table item on a zone's canvas: walls, doors, the bar, the kitchen
+// block, plants/decor, or free text labels. Purely visual — gives the map
+// the feel of a real restaurant blueprint.
+model FloorElement {
+  id       String  @id @default(uuid())
+  type     String // WALL, DOOR, BAR, KITCHEN, PLANT, DECOR, TEXT, RECT
+  x        Float   @default(0)
+  y        Float   @default(0)
+  width    Float   @default(100)
+  height   Float   @default(100)
+  rotation Float   @default(0)
+  points   Json? // polyline walls: [{ x, y }, ...]
+  style    Json? // { fill, stroke, strokeWidth, fontSize, color, ... }
+  label    String?
+  zIndex   Int     @default(0)
+
+  zoneId String
+  zone   FloorZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([zoneId])
+  @@index([tenantId, branchId])
+  @@map("floor_elements")
 }
 
 // ========================================
@@ -4211,6 +4300,8 @@ model Branch {
   bridges                 LocalBridgeAgent[]
   orders                  Order[]
   tables                  Table[]
+  floorZones              FloorZone[]
+  floorElements           FloorElement[]
   deliveryPlatformConfigs DeliveryPlatformConfig[]
   // v3.0.0 — strict branch-scope inverse relations.
   deviceCommands          DeviceCommand[]
