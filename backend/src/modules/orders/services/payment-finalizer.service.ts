@@ -621,7 +621,10 @@ export class PaymentFinalizer {
 
       const order = await this.prisma.order.findFirst({
         where: { id: orderId, tenantId, status: "PAID" },
-        include: { orderItems: { include: { product: true } } },
+        include: {
+          orderItems: { include: { product: true } },
+          payments: true,
+        },
       });
       if (!order || order.orderItems.length === 0) return;
 
@@ -630,29 +633,60 @@ export class PaymentFinalizer {
       // GMP-3 adapter buckets lines into KDV departments from device config,
       // not by a catalogue SKU lookup.
       //
-      // TODO(fiscal-reconcile): these lines + the single cash tender below use
-      // unitPrice*qty with discountCents=0 and a synthetic "cash" total. That
-      // is fine ONLY because this method is a dormant no-op today — there is NO
-      // fiscalDeviceRecord create-site yet, so `device` is always null and we
-      // return at line 620. BEFORE a physical ÖKC is ever activated this MUST
-      // be reconciled against the actual Payment rows / order.finalAmount:
-      // apply real per-line discounts (order/item discounts → discountCents),
-      // and emit the real per-method tender breakdown (card/cash/online) from
-      // the Payment rows instead of one lumped cash amount. Shipping as-is
-      // would mis-state KDV and the tender on a legally-binding fiş.
-      const lines = order.orderItems.map((it) => ({
+      // RECONCILE: the order-level discount is apportioned across the lines by
+      // value (largest-remainder, so the per-line discountCents sum equals
+      // order.discount EXACTLY — no rounding drift on a legally-binding fiş),
+      // and the tender comes from the real COMPLETED Payment rows (cash/card
+      // split), not a lumped cash total. Both are required for a correct KDV
+      // breakdown + tender on the fiş before a physical ÖKC is activated.
+      const unitPricesCents = order.orderItems.map((it) =>
+        Math.round(Number(it.unitPrice) * 100),
+      );
+      const lineValuesCents = order.orderItems.map((it, i) =>
+        Math.round(it.quantity * unitPricesCents[i]),
+      );
+      const orderDiscountCents = Math.round(Number(order.discount) * 100);
+      const perLineDiscount = this.apportionDiscount(
+        lineValuesCents,
+        orderDiscountCents,
+      );
+
+      const lines = order.orderItems.map((it, i) => ({
         productCode: it.productId,
         name: it.product?.name ?? "Ürün",
         qty: it.quantity,
-        unitPriceCents: Math.round(Number(it.unitPrice) * 100),
+        unitPriceCents: unitPricesCents[i],
         vatRate: it.taxRate ?? 10,
-        discountCents: 0,
+        discountCents: perLineDiscount[i],
       }));
 
-      const totalCents = lines.reduce(
-        (acc, l) => acc + Math.round(l.qty * l.unitPriceCents),
+      // Net the fiş must balance to (line totals after the apportioned discount).
+      const netCents = lineValuesCents.reduce(
+        (acc, v, i) => acc + v - perLineDiscount[i],
         0,
       );
+
+      // Real per-method tender from the COMPLETED Payment rows.
+      const completed = order.payments.filter((p) => p.status === "COMPLETED");
+      let payments = completed.map((p) => ({
+        method: this.toFiscalTender(p.method),
+        amountCents: Math.round(Number(p.amount) * 100),
+      }));
+      const tenderedCents = payments.reduce((a, p) => a + p.amountCents, 0);
+
+      // The tender lines MUST sum to the goods total on a fiş. Use the real
+      // per-method split only when it reconciles to the net; otherwise (no
+      // COMPLETED rows, tips/change, partial settlement) fall back to a single
+      // balanced cash line and warn — never emit a mismatched legal receipt.
+      if (payments.length === 0 || tenderedCents !== netCents) {
+        if (payments.length > 0) {
+          this.logger.warn(
+            `Yazarkasa tender mismatch for order ${orderId}: ` +
+              `payments=${tenderedCents}c net=${netCents}c — using net cash fallback`,
+          );
+        }
+        payments = [{ method: "cash", amountCents: netCents }];
+      }
 
       await this.fiscalService.issueReceipt({
         tenantId,
@@ -664,10 +698,7 @@ export class PaymentFinalizer {
         // tenantId+idempotencyKey, so a retry/double-finalize won't double-print).
         idempotencyKey: `order-fiscal:${orderId}`,
         lines,
-        // Single cash-equivalent payment summary equal to the total; the ÖKC
-        // only needs the tender breakdown to balance the receipt, and the
-        // canonical per-method split lives on the Payment rows.
-        payments: [{ method: "cash", amountCents: totalCents }],
+        payments,
         kind: "cash_receipt",
       });
     } catch (err: any) {
@@ -682,6 +713,52 @@ export class PaymentFinalizer {
         tags: { event: "FISCAL_RECEIPT_FAILED", tenantId },
         extra: { orderId },
       });
+    }
+  }
+
+  /**
+   * Apportion an order-level discount (kuruş) across line values using the
+   * largest-remainder method. Guarantees `sum(result) === min(discount, total)`
+   * exactly so the per-line discountCents never drift off the order discount on
+   * a legally-binding fiş. Returns all-zero when there is no discount or no
+   * value to split against.
+   */
+  private apportionDiscount(
+    lineValuesCents: number[],
+    discountCents: number,
+  ): number[] {
+    const total = lineValuesCents.reduce((a, b) => a + b, 0);
+    if (discountCents <= 0 || total <= 0) {
+      return lineValuesCents.map(() => 0);
+    }
+    // Never apportion more than the goods are worth.
+    const toSplit = Math.min(discountCents, total);
+    const raw = lineValuesCents.map((v) => (toSplit * v) / total);
+    const result = raw.map((r) => Math.floor(r));
+    let leftover = toSplit - result.reduce((a, b) => a + b, 0);
+    // Hand the leftover kuruş to the largest fractional parts first.
+    const byFrac = raw
+      .map((r, i) => ({ i, frac: r - Math.floor(r) }))
+      .sort((a, b) => b.frac - a.frac);
+    for (let k = 0; leftover > 0 && byFrac.length > 0; k++, leftover--) {
+      result[byFrac[k % byFrac.length].i] += 1;
+    }
+    return result;
+  }
+
+  /**
+   * Map a Payment.method (CASH/CARD/DIGITAL, case-insensitive) to the GMP-3
+   * fiscal tender category. Cash is the one legally-distinct category; every
+   * electronic tender is non-cash (card), with wallet/QR mapped to `qr`.
+   */
+  private toFiscalTender(method: string): "cash" | "card" | "qr" {
+    switch ((method ?? "").toUpperCase()) {
+      case "CASH":
+        return "cash";
+      case "DIGITAL":
+        return "qr";
+      default:
+        return "card";
     }
   }
 }

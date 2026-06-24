@@ -695,6 +695,7 @@ describe('PaymentFinalizer', () => {
         id: ORDER_ID,
         branchId: 'br-order',
         status: 'PAID',
+        discount: new Prisma.Decimal('0'),
         orderItems: [
           {
             productId: 'p1',
@@ -704,6 +705,8 @@ describe('PaymentFinalizer', () => {
             product: { name: 'Coffee' },
           },
         ],
+        // No COMPLETED payment rows → balanced cash fallback (= net).
+        payments: [],
       });
 
       await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
@@ -723,12 +726,67 @@ describe('PaymentFinalizer', () => {
               qty: 2,
               unitPriceCents: 5000,
               vatRate: 20,
+              discountCents: 0,
             }),
           ],
-          // single cash-equivalent summary == total (2 * 5000)
+          // no completed payments → single balanced cash fallback (2 * 5000)
           payments: [{ method: 'cash', amountCents: 10000 }],
         }),
       );
+    });
+
+    it('apportions the order discount across lines and emits the real cash/card tender split', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'dev-okc-1',
+        branchId: 'br-1',
+        providerId: 'hugin',
+        status: 'online',
+      });
+      // Two lines worth 6000c + 4000c = 10000c gross; a 1000c order discount
+      // apportions 600c / 400c by value → net 9000c. Customer paid 5000 cash +
+      // 4000 card = 9000 → the real split must be passed through verbatim.
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        id: ORDER_ID,
+        branchId: 'br-order',
+        status: 'PAID',
+        discount: new Prisma.Decimal('10.00'),
+        orderItems: [
+          {
+            productId: 'p1',
+            quantity: 2,
+            unitPrice: new Prisma.Decimal('30.00'), // 6000c
+            taxRate: 20,
+            product: { name: 'Burger' },
+          },
+          {
+            productId: 'p2',
+            quantity: 1,
+            unitPrice: new Prisma.Decimal('40.00'), // 4000c
+            taxRate: 10,
+            product: { name: 'Salad' },
+          },
+        ],
+        payments: [
+          { method: 'CASH', amount: new Prisma.Decimal('50.00'), status: 'COMPLETED' },
+          { method: 'CARD', amount: new Prisma.Decimal('40.00'), status: 'COMPLETED' },
+          // A FAILED row must be ignored by the tender reconciliation.
+          { method: 'CARD', amount: new Prisma.Decimal('99.00'), status: 'FAILED' },
+        ],
+      });
+
+      await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
+
+      const arg = fiscal.issueReceipt.mock.calls[0][0];
+      expect(arg.lines).toEqual([
+        expect.objectContaining({ productCode: 'p1', unitPriceCents: 3000, discountCents: 600 }),
+        expect.objectContaining({ productCode: 'p2', unitPriceCents: 4000, discountCents: 400 }),
+      ]);
+      // Real per-method split, FAILED row excluded, sums to net 9000c.
+      expect(arg.payments).toEqual([
+        { method: 'cash', amountCents: 5000 },
+        { method: 'card', amountCents: 4000 },
+      ]);
     });
 
     it('no-ops when the order is not (PAID) found or has no items', async () => {
@@ -757,6 +815,7 @@ describe('PaymentFinalizer', () => {
         id: ORDER_ID,
         branchId: 'br-order',
         status: 'PAID',
+        discount: new Prisma.Decimal('0'),
         orderItems: [
           {
             productId: 'p1',
@@ -766,6 +825,7 @@ describe('PaymentFinalizer', () => {
             product: { name: 'X' },
           },
         ],
+        payments: [],
       });
       fiscal.issueReceipt.mockRejectedValue(new Error('queue down'));
 

@@ -1,5 +1,14 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListPendingReceipts, useRetryReceipt, type FiscalReceipt } from './fiscalApi';
+import {
+  useListPendingReceipts,
+  useRetryReceipt,
+  useListFiscalDevices,
+  useRegisterFiscalDevice,
+  useRetireFiscalDevice,
+  type FiscalReceipt,
+  type FiscalDevice,
+} from './fiscalApi';
 
 /**
  * Manual recovery panel for fiscal receipts.
@@ -28,6 +37,9 @@ export default function FiscalRecoveryPage() {
         </button>
       </header>
 
+      <FiscalDevicesPanel />
+
+      <h2 className="pt-2 text-lg font-semibold">{t('hummytummy.fiscalRecovery.title')}</h2>
       {isLoading ? (
         <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
       ) : rows.length === 0 ? (
@@ -77,6 +89,120 @@ export default function FiscalRecoveryPage() {
         </table>
       )}
     </div>
+  );
+}
+
+/**
+ * Register / list / retire physical fiscal devices (yazarkasa / ÖKC).
+ *
+ * HONESTY: this is the create-site that makes the payment-finalizer's
+ * yazarkasa-receipt path reachable — but it does NOT make receipts print.
+ * A real GMP-3 ÖKC only issues once its certified hardware is wired through
+ * the local bridge and the bridge acks. The banner says so plainly so an
+ * operator never reads "registered" as "fiscalizing".
+ */
+function FiscalDevicesPanel() {
+  const { t } = useTranslation('common');
+  const { data: devices = [], isLoading } = useListFiscalDevices();
+  const register = useRegisterFiscalDevice();
+  const retire = useRetireFiscalDevice();
+
+  const [providerId, setProviderId] = useState('fiscal_hugin');
+  const [serial, setSerial] = useState('');
+  const [model, setModel] = useState('');
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serial.trim()) return;
+    register.mutate(
+      { providerId, serial: serial.trim(), model: model.trim() || undefined },
+      {
+        onSuccess: () => {
+          setSerial('');
+          setModel('');
+        },
+      },
+    );
+  };
+
+  return (
+    <section className="space-y-3 rounded border p-4">
+      <div>
+        <h2 className="text-lg font-semibold">{t('hummytummy.fiscalDevices.title')}</h2>
+        <p className="mt-1 rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {t('hummytummy.fiscalDevices.gateNote')}
+        </p>
+      </div>
+
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-gray-600">{t('hummytummy.fiscalDevices.provider')}</span>
+          <select
+            value={providerId}
+            onChange={(e) => setProviderId(e.target.value)}
+            className="rounded border px-2 py-1.5 text-sm"
+          >
+            <option value="fiscal_hugin">Hugin</option>
+            <option value="fiscal_beko">Beko</option>
+          </select>
+        </label>
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-gray-600">{t('hummytummy.fiscalDevices.serial')}</span>
+          <input
+            value={serial}
+            onChange={(e) => setSerial(e.target.value)}
+            className="rounded border px-2 py-1.5 text-sm"
+            placeholder="ÖKC-…"
+          />
+        </label>
+        <label className="flex flex-col text-xs">
+          <span className="mb-1 text-gray-600">{t('hummytummy.fiscalDevices.model')}</span>
+          <input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="rounded border px-2 py-1.5 text-sm"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={register.isPending || !serial.trim()}
+          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {t('hummytummy.fiscalDevices.register')}
+        </button>
+      </form>
+
+      {isLoading ? (
+        <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
+      ) : devices.length === 0 ? (
+        <div className="text-sm text-gray-500">{t('hummytummy.fiscalDevices.empty')}</div>
+      ) : (
+        <ul className="divide-y rounded border text-sm">
+          {devices.map((d: FiscalDevice) => (
+            <li key={d.id} className="flex items-center justify-between px-3 py-2">
+              <div>
+                <span className="font-mono text-xs">{d.providerId}</span>
+                <span className="mx-2 text-gray-400">·</span>
+                <span>{d.serial}</span>
+                {d.model && <span className="ml-2 text-gray-500">{d.model}</span>}
+                <span className="ml-2 inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs">
+                  {d.status}
+                </span>
+              </div>
+              {d.status !== 'retired' && (
+                <button
+                  className="rounded border px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  disabled={retire.isPending}
+                  onClick={() => retire.mutate(d.id)}
+                >
+                  {t('hummytummy.fiscalDevices.retire')}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
