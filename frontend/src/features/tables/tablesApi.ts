@@ -62,6 +62,10 @@ export const useUpdateTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // A table edit (status/geometry/zone) also shows on the live floor map —
+      // recolor/refresh it on this client (the backend emits for other
+      // terminals when status or geometry changed).
+      queryClient.invalidateQueries({ queryKey: ['floorPlan'] });
       toast.success(i18n.t('common:notifications.tableUpdatedSuccessfully'));
     },
     onError: (error: any) => {

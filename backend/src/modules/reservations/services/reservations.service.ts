@@ -19,6 +19,7 @@ import { ReservationQueryDto } from "../dto/reservation-query.dto";
 import { ReservationSettingsService } from "./reservation-settings.service";
 import { ReservationStatus } from "../constants/reservation-status.enum";
 import { ReservationNotificationService } from "./reservation-notification.service";
+import { KdsGateway } from "../../kds/kds.gateway";
 import {
   ReservationAvailabilityService,
   timeToMinutes,
@@ -49,7 +50,21 @@ export class ReservationsService {
     // @Optional() so bare-constructed test instances keep working; production
     // DI always provides the global EntitlementService.
     @Optional() private readonly entitlements?: EntitlementService,
+    // Live floor-plan map refresh on reservation-driven table status flips.
+    // @Optional() so bare-constructed unit tests keep working (the emit is then
+    // a no-op); production DI provides it via KdsModule.
+    @Optional() private readonly kdsGateway?: KdsGateway,
   ) {}
+
+  /**
+   * Recolor every open live floor map after a reservation changed a table's
+   * status (seat → OCCUPIED, complete/cancel/no-show/reject → AVAILABLE).
+   * Best-effort + null-safe: a socket hiccup or a bare-constructed test
+   * instance must never fail the reservation write.
+   */
+  private emitFloorRefresh(tenantId: string, branchId: string) {
+    this.kdsGateway?.emitFloorLayoutUpdated(tenantId, branchId, {});
+  }
 
   private countReservation(status: string): void {
     this.metrics?.incCounter(
@@ -767,6 +782,9 @@ export class ReservationsService {
     // (CONFIRMED rejections within the 30-min window), release it now
     // so a walk-in can use the table immediately.
     await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+    if (reservation.tableId) {
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
+    }
 
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
@@ -834,6 +852,7 @@ export class ReservationsService {
         where: { id: reservation.tableId, ...branchScope(scope) },
         data: { status: "OCCUPIED", reservationHoldId: null },
       });
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
     return this.prisma.reservation.update({
@@ -890,6 +909,7 @@ export class ReservationsService {
         where: { id: reservation.tableId, ...branchScope(scope) },
         data: { status: "AVAILABLE", reservationHoldId: null },
       });
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
     return this.prisma.reservation.update({
@@ -920,6 +940,9 @@ export class ReservationsService {
     // but doing it inline keeps the staff-visible state in sync with
     // the action they just took.
     await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+    if (reservation.tableId) {
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
+    }
 
     return this.prisma.reservation.update({
       where: { id: reservation.id },
@@ -958,6 +981,9 @@ export class ReservationsService {
       });
     } else {
       await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+    }
+    if (reservation.tableId) {
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
     const cancelled = await this.prisma.reservation.update({
@@ -1047,6 +1073,9 @@ export class ReservationsService {
     // this row's assigned table — staff/customers shouldn't have to
     // wait for the next cron tick for the table to free up.
     await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+    if (reservation.tableId) {
+      this.emitFloorRefresh(tenantId, reservation.branchId);
+    }
 
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },

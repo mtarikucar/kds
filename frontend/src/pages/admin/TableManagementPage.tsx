@@ -24,7 +24,8 @@ import {
   useUpdateTableStatus,
 } from '../../features/tables/tablesApi';
 import LiveFloorMap from '../../features/floor-plan/components/LiveFloorMap';
-import { Table, TableStatus, FloorPlanTable } from '../../types';
+import { useFloorPlan } from '../../features/floor-plan/floorPlanApi';
+import { Table, TableStatus } from '../../types';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
@@ -50,8 +51,17 @@ const TableManagementPage = () => {
   const navigate = useNavigate();
   // 'list' = the classic card grid; 'plan' = the live 2D floor map.
   const [view, setView] = useState<'list' | 'plan'>('list');
-  // Table tapped on the live plan → opens the quick status action sheet.
-  const [statusTarget, setStatusTarget] = useState<FloorPlanTable | null>(null);
+  // Table tapped on the live plan → opens the quick status action sheet. We hold
+  // only the id and re-derive the live row from the (socket-refreshed) plan, so
+  // the sheet's status/active-state can't go stale while it's open.
+  const [statusTargetId, setStatusTargetId] = useState<string | null>(null);
+  const { data: livePlan } = useFloorPlan();
+  const statusTarget = statusTargetId
+    ? (livePlan?.zones
+        .flatMap((z) => z.tables)
+        .concat(livePlan?.unplacedTables ?? [])
+        .find((tbl) => tbl.id === statusTargetId) ?? null)
+    : null;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   // Styled delete confirmation replaces the native confirm(); holds the
@@ -315,16 +325,13 @@ const TableManagementPage = () => {
       )}
 
       {/* Main Content */}
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : view === 'plan' ? (
+      {view === 'plan' ? (
         /* Live 2D floor map — same plan as the editor, with real-time status.
-           Tapping a table opens the quick status action sheet. */
+           Tapping a table opens the quick status action sheet. The map drives
+           its OWN useFloorPlan loading; don't gate it on the tables-list query. */
         <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden h-[72vh]">
           <LiveFloorMap
-            onTableClick={(tbl) => setStatusTarget(tbl)}
+            onTableClick={(tbl) => setStatusTargetId(tbl.id)}
             emptyAction={
               <Button onClick={() => navigate('/admin/floor-plan')}>
                 <MapIcon className="h-4 w-4 mr-2" />
@@ -332,6 +339,10 @@ const TableManagementPage = () => {
               </Button>
             }
           />
+        </div>
+      ) : isLoading ? (
+        <div className="flex justify-center py-16">
+          <Spinner />
         </div>
       ) : !tables || tables.length === 0 ? (
         /* Empty State */
@@ -596,7 +607,7 @@ const TableManagementPage = () => {
           plan. Sets the table status (the map recolors via socket/invalidate). */}
       <Modal
         isOpen={!!statusTarget}
-        onClose={() => setStatusTarget(null)}
+        onClose={() => setStatusTargetId(null)}
         title={
           statusTarget
             ? t('admin.tableNumberLabel', { number: statusTarget.number })
@@ -616,13 +627,17 @@ const TableManagementPage = () => {
                   <button
                     key={s}
                     type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={() =>
+                    // Already-active status is a no-op — disable it (mirrors the
+                    // list-card segments) so a "confirm" tap doesn't fire a
+                    // redundant write + cross-terminal invalidation.
+                    disabled={isUpdatingStatus || active}
+                    onClick={() => {
+                      if (active) return;
                       updateTableStatus(
                         { id: statusTarget.id, status: s },
-                        { onSuccess: () => setStatusTarget(null) },
-                      )
-                    }
+                        { onSuccess: () => setStatusTargetId(null) },
+                      );
+                    }}
                     className={`flex items-center gap-2.5 h-11 px-4 rounded-xl border text-sm transition-colors ${
                       active
                         ? `${cfg.chip} font-medium`

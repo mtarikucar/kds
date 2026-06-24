@@ -26,6 +26,7 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
   let prisma: MockPrismaClient;
   let svc: TablesService;
   let availability: { resolvePublicBranchId: jest.Mock };
+  let kdsGateway: { emitFloorLayoutUpdated: jest.Mock } & Record<string, jest.Mock>;
 
   const scope: BranchScope = {
     tenantId: 't1',
@@ -38,7 +39,7 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
     prisma = mockPrismaClient();
     // The service emits realtime updates via KdsGateway after writes;
     // a no-op mock keeps the tests focused on the DB-layer invariants.
-    const kdsGateway = {
+    kdsGateway = {
       emitTableUpdate: jest.fn(),
       emitTableUnmerge: jest.fn(),
       emitTableMerge: jest.fn(),
@@ -102,6 +103,26 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
       await expect(
         svc.updateStatus(scope, 'tab-other', { status: TableStatus.OCCUPIED }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('emits floor:layout-updated when the status actually changes (live map recolor)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', zoneId: 'z1', status: TableStatus.AVAILABLE } as any);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.table.findFirstOrThrow as any).mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', zoneId: 'z1', status: TableStatus.OCCUPIED } as any);
+
+      await svc.updateStatus(scope, 'tab-1', { status: TableStatus.OCCUPIED });
+
+      expect(kdsGateway.emitFloorLayoutUpdated).toHaveBeenCalledWith('t1', 'b1', { zoneId: 'z1' });
+    });
+
+    it('skips the emit when the status is unchanged (no-op confirm tap)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', zoneId: null, status: TableStatus.OCCUPIED } as any);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.table.findFirstOrThrow as any).mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', zoneId: null, status: TableStatus.OCCUPIED } as any);
+
+      await svc.updateStatus(scope, 'tab-1', { status: TableStatus.OCCUPIED });
+
+      expect(kdsGateway.emitFloorLayoutUpdated).not.toHaveBeenCalled();
     });
   });
 
@@ -429,6 +450,26 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
       await svc.update(scope, 'tab-1', { capacity: 6 } as any);
 
       expect((prisma.order.count as any).mock.calls.length).toBe(0);
+    });
+
+    it('emits floor:layout-updated when the edit modal changes status (live-map parity)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', zoneId: 'z1', status: TableStatus.OCCUPIED } as any);
+      (prisma.order.count as any).mockResolvedValue(0);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.update(scope, 'tab-1', { status: TableStatus.AVAILABLE } as any);
+
+      expect(kdsGateway.emitFloorLayoutUpdated).toHaveBeenCalledWith('t1', 'b1', { zoneId: 'z1' });
+    });
+
+    it('does NOT emit floor:layout-updated on a pure capacity edit (no status/geometry change)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', zoneId: 'z1', status: TableStatus.OCCUPIED } as any);
+      (prisma.table.findUnique as any).mockResolvedValue(null);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.update(scope, 'tab-1', { capacity: 6 } as any);
+
+      expect(kdsGateway.emitFloorLayoutUpdated).not.toHaveBeenCalled();
     });
   });
 });
