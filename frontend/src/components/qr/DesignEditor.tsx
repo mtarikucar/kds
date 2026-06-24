@@ -181,7 +181,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               className={`
                 py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors
                 ${activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }
               `}
@@ -327,7 +327,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         onClick={() => setPreviewMode('mobile')}
                         className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           previewMode === 'mobile'
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-primary-600 text-white'
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
@@ -338,7 +338,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         onClick={() => setPreviewMode('tablet')}
                         className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           previewMode === 'tablet'
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-primary-600 text-white'
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >

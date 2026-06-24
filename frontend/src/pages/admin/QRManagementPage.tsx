@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQrSettings, useUpdateQrSettings, useQrCodes } from '../../features/qr/qrApi';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
-import { QrCode, Download, Palette, Eye, DownloadCloud, FileArchive, LayoutGrid, Store } from 'lucide-react';
+import { QrCode, Download, Palette, Printer, LayoutGrid, Store, Lightbulb } from 'lucide-react';
 import DesignEditor from '../../components/qr/DesignEditor';
 import QrCodeDisplay from '../../components/qr/QrCodeDisplay';
 import type { UpdateQrSettingsDto } from '../../types';
@@ -288,15 +287,31 @@ const QRManagementPage = () => {
 
   return (
     <div className="space-y-6" data-tour="qr-management">
-      {/* Page Header */}
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-          <QrCode className="w-7 h-7 text-white" />
+      {/* Page Header + global batch actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <QrCode className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.qrCodeManagement')}</h1>
+            <p className="text-slate-500 mt-0.5">{t('admin.generateCustomizeQR')}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.qrCodeManagement')}</h1>
-          <p className="text-slate-500 mt-0.5">{t('admin.generateCustomizeQR')}</p>
-        </div>
+        {activeTab === 'codes' && qrCodes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {settings?.enableTableQR && stats.tableQRs > 0 && (
+              <Button onClick={printAllTableQRs} variant="primary" className="flex items-center gap-2">
+                <Printer className="h-4 w-4" />
+                {t('admin.printTableQRSheet')}
+              </Button>
+            )}
+            <Button onClick={downloadAllQRs} variant="outline" className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              {t('admin.downloadAllQR')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Statistics Overview */}
@@ -372,57 +387,21 @@ const QRManagementPage = () => {
       {/* Tab Content */}
       {activeTab === 'codes' && (
         <div className="space-y-6" data-tour="qr-codes-list">
-          {/* Batch Operations */}
-          <Card data-tour="qr-download">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileArchive className="h-5 w-5" />
-                {t('admin.batchOperations')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-500 mb-4">
-                {t('admin.batchOperationsDesc')}
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={downloadAllQRs}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <DownloadCloud className="h-4 w-4" />
-                  {t('admin.downloadAllQR')}
-                </Button>
-                {settings?.enableTableQR && qrCodes.filter(qr => qr.type === 'TABLE').length > 0 && (
-                  <Button
-                    onClick={printAllTableQRs}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    <Eye className="h-4 w-4" />
-                    {t('admin.printTableQRSheet')}
-                  </Button>
-                )}
+          {/* Restaurant-wide QR — the hero code */}
+          <section
+            className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden"
+            data-tour="qr-download"
+          >
+            <div className="px-5 md:px-6 pt-5 pb-4 border-b border-slate-100 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+                <Store className="h-5 w-5 text-primary-600" />
               </div>
-              <div className="mt-4 px-6 py-5 bg-primary-50 border border-primary-200 rounded-xl">
-                <p className="text-xs font-medium text-primary-900 mb-1">{t('admin.batchTips')}:</p>
-                <ul className="text-xs text-primary-800 space-y-1">
-                  <li>• {t('admin.batchTip1')}</li>
-                  <li>• {t('admin.batchTip2')}</li>
-                  <li>• {t('admin.batchTip3')}</li>
-                </ul>
+              <div>
+                <h2 className="font-semibold text-slate-900">{t('admin.restaurantQRCode')}</h2>
+                <p className="text-sm text-slate-500">{t('admin.restaurantQRDesc')}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('admin.restaurantQRCode')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-500 mb-4">
-                {t('admin.restaurantQRDesc')}
-              </p>
+            </div>
+            <div className="p-5 md:p-6">
               {qrCodes.filter(qr => qr.type === 'TENANT').map(qr => (
                 <QrCodeDisplay
                   key={qr.id}
@@ -435,57 +414,60 @@ const QRManagementPage = () => {
                   }}
                 />
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
+          {/* Per-table QR codes */}
           {settings?.enableTableQR && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>{t('admin.tableSpecificQRCodes')}</CardTitle>
-                {qrCodes.filter(qr => qr.type === 'TABLE').length > 0 && (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={downloadTableQRs}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-1"
-                    >
-                      <Download className="h-4 w-4" />
-                      {t('admin.downloadAllQR')}
-                    </Button>
-                    <Button
-                      onClick={printAllTableQRs}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      {t('admin.printTableQRSheet')}
-                    </Button>
+            <section className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
+              <div className="px-5 md:px-6 pt-5 pb-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                    <LayoutGrid className="h-5 w-5 text-emerald-600" />
                   </div>
-                )}
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-500 mb-4">
-                  {t('admin.tableSpecificQRDesc')}
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {qrCodes.filter(qr => qr.type === 'TABLE').map(qr => (
-                    <QrCodeDisplay
-                      key={qr.id}
-                      qrCode={qr}
-                      tenant={tenant}
-                      compact
-                      caption={settings?.tableQRMessage}
-                      settings={{
-                        primaryColor: settings?.primaryColor,
-                        backgroundColor: settings?.backgroundColor
-                      }}
-                    />
-                  ))}
+                  <div>
+                    <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                      {t('admin.tableSpecificQRCodes')}
+                      {stats.tableQRs > 0 && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                          {stats.tableQRs}
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-sm text-slate-500">{t('admin.tableSpecificQRDesc')}</p>
+                  </div>
                 </div>
-                {qrCodes.filter(qr => qr.type === 'TABLE').length === 0 && (
-                  <div className="col-span-full py-12 text-center">
+                {stats.tableQRs > 0 && (
+                  <Button
+                    onClick={downloadTableQRs}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                  >
+                    <Download className="h-4 w-4" />
+                    {t('admin.downloadAllQR')}
+                  </Button>
+                )}
+              </div>
+              <div className="p-5 md:p-6">
+                {stats.tableQRs > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                    {qrCodes.filter(qr => qr.type === 'TABLE').map(qr => (
+                      <QrCodeDisplay
+                        key={qr.id}
+                        qrCode={qr}
+                        tenant={tenant}
+                        compact
+                        caption={settings?.tableQRMessage}
+                        settings={{
+                          primaryColor: settings?.primaryColor,
+                          backgroundColor: settings?.backgroundColor
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center">
                     <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                       <LayoutGrid className="w-8 h-8 text-slate-400" />
                     </div>
@@ -495,8 +477,20 @@ const QRManagementPage = () => {
                     </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
+          )}
+
+          {/* Subtle batch tips (was a heavy card) */}
+          {qrCodes.length > 0 && (
+            <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100">
+              <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+                <span>{t('admin.batchTip1')}</span>
+                <span>{t('admin.batchTip2')}</span>
+                <span>{t('admin.batchTip3')}</span>
+              </div>
+            </div>
           )}
         </div>
       )}
