@@ -86,6 +86,18 @@ export class FiscalService {
 
     const branchId = dto.branchId ?? scope.branchId ?? null;
 
+    // IDOR / integrity: an explicit branchId must belong to THIS tenant. Never
+    // write another tenant's (globally-unique) branchId onto our device row.
+    if (dto.branchId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: dto.branchId, tenantId: scope.tenantId },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new BadRequestException("Branch not found in this tenant.");
+      }
+    }
+
     // Validate the optional bridge link: it must be a real device in this
     // tenant + branch, and a kind that can actually carry GMP-3 fiscal
     // commands. We do NOT auto-create it — the operator pairs the bridge via
@@ -147,10 +159,14 @@ export class FiscalService {
 
   /** List fiscal devices in the active branch scope. */
   async listDevices(scope: BranchScope) {
-    return this.prisma.fiscalDeviceRecord.findMany({
+    const rows = await this.prisma.fiscalDeviceRecord.findMany({
       where: branchScope(scope),
       orderBy: { createdAt: "desc" },
     });
+    // Strip provider `config` from the list view — it may hold a station code
+    // or (future) provider credentials, and operators don't need the raw blob
+    // to manage devices. Registration still accepts it.
+    return rows.map(({ config: _config, ...rest }) => rest);
   }
 
   /**

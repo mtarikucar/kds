@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../../store/authStore';
+import { UserRole } from '../../types';
 import {
   useListPendingReceipts,
   useRetryReceipt,
@@ -106,6 +108,9 @@ function FiscalDevicesPanel() {
   const { data: devices = [], isLoading } = useListFiscalDevices();
   const register = useRegisterFiscalDevice();
   const retire = useRetireFiscalDevice();
+  // Register / retire are ADMIN-only on the backend; don't show controls that
+  // would just 403 for a MANAGER. MANAGERs still see the device list.
+  const isAdmin = useAuthStore((s) => s.user?.role) === UserRole.ADMIN;
 
   const [providerId, setProviderId] = useState('fiscal_hugin');
   const [serial, setSerial] = useState('');
@@ -134,6 +139,7 @@ function FiscalDevicesPanel() {
         </p>
       </div>
 
+      {isAdmin && (
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col text-xs">
           <span className="mb-1 text-gray-600">{t('hummytummy.fiscalDevices.provider')}</span>
@@ -171,6 +177,7 @@ function FiscalDevicesPanel() {
           {t('hummytummy.fiscalDevices.register')}
         </button>
       </form>
+      )}
 
       {isLoading ? (
         <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
@@ -189,7 +196,7 @@ function FiscalDevicesPanel() {
                   {d.status}
                 </span>
               </div>
-              {d.status !== 'retired' && (
+              {isAdmin && d.status !== 'retired' && (
                 <button
                   className="rounded border px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
                   disabled={retire.isPending}

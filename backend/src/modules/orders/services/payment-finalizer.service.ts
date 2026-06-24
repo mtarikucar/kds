@@ -619,6 +619,23 @@ export class PaymentFinalizer {
       });
       if (!device) return; // dormant: no physical ÖKC configured for this tenant
 
+      // DOUBLE-FISCALIZATION GUARD: a sale is fiscalized ONCE. If this tenant
+      // already reports turnover to GİB via the e-Fatura/e-Arşiv accounting
+      // rail (auto-sync to a real provider), issuing a physical fiş for the
+      // same sale would double-report. The accounting rail owns it — skip.
+      if (this.accountingSettingsService) {
+        const acc = await this.accountingSettingsService
+          .findByTenant(tenantId)
+          .catch(() => null);
+        if (acc?.autoSync && acc.provider !== "NONE") {
+          this.logger.warn(
+            `Skipping yazarkasa receipt for order ${orderId}: tenant has ` +
+              `e-Fatura auto-sync active (${acc.provider}) — double-fiscalization guard.`,
+          );
+          return;
+        }
+      }
+
       const order = await this.prisma.order.findFirst({
         where: { id: orderId, tenantId, status: "PAID" },
         include: {
@@ -639,11 +656,20 @@ export class PaymentFinalizer {
       // and the tender comes from the real COMPLETED Payment rows (cash/card
       // split), not a lumped cash total. Both are required for a correct KDV
       // breakdown + tender on the fiş before a physical ÖKC is activated.
-      const unitPricesCents = order.orderItems.map((it) =>
-        Math.round(Number(it.unitPrice) * 100),
+      //
+      // The line value MUST include paid modifiers. OrderItem stores the base
+      // price in `unitPrice` and the per-unit modifier cost in `modifierTotal`
+      // separately, with `subtotal = qty*(unitPrice+modifierTotal)` and
+      // `order.totalAmount = Σ subtotal`. Building the line from unitPrice
+      // ALONE understates the fiş goods total + KDV and (since Payment rows
+      // DO include modifiers) makes the tender never reconcile. The effective
+      // per-unit price (unitPrice + modifierTotal) makes netCents equal
+      // order.finalAmount exactly.
+      const effUnitCents = order.orderItems.map((it) =>
+        Math.round((Number(it.unitPrice) + Number(it.modifierTotal)) * 100),
       );
-      const lineValuesCents = order.orderItems.map((it, i) =>
-        Math.round(it.quantity * unitPricesCents[i]),
+      const lineValuesCents = order.orderItems.map(
+        (it, i) => it.quantity * effUnitCents[i],
       );
       const orderDiscountCents = Math.round(Number(order.discount) * 100);
       const perLineDiscount = this.apportionDiscount(
@@ -655,12 +681,13 @@ export class PaymentFinalizer {
         productCode: it.productId,
         name: it.product?.name ?? "Ürün",
         qty: it.quantity,
-        unitPriceCents: unitPricesCents[i],
+        unitPriceCents: effUnitCents[i],
         vatRate: it.taxRate ?? 10,
         discountCents: perLineDiscount[i],
       }));
 
       // Net the fiş must balance to (line totals after the apportioned discount).
+      // Equals order.finalAmount in kuruş by construction.
       const netCents = lineValuesCents.reduce(
         (acc, v, i) => acc + v - perLineDiscount[i],
         0,
@@ -674,11 +701,28 @@ export class PaymentFinalizer {
       }));
       const tenderedCents = payments.reduce((a, p) => a + p.amountCents, 0);
 
-      // The tender lines MUST sum to the goods total on a fiş. Use the real
-      // per-method split only when it reconciles to the net; otherwise (no
-      // COMPLETED rows, tips/change, partial settlement) fall back to a single
-      // balanced cash line and warn — never emit a mismatched legal receipt.
-      if (payments.length === 0 || tenderedCents !== netCents) {
+      // The tender lines MUST sum to the goods total on a fiş. With the
+      // modifier-inclusive value above, a single payment reconciles exactly.
+      // Split-bill per-split amounts are validated to ±0.01 of finalAmount, so
+      // they can leave a few-kuruş gap — absorb that into the largest tender
+      // line so the REAL per-method split is preserved and the fiş still
+      // balances. Only a genuine mismatch (no COMPLETED rows, partial
+      // settlement, tips/change) falls back to a single balanced cash line.
+      const drift = netCents - tenderedCents;
+      const toleranceCents = Math.max(1, payments.length);
+      if (payments.length > 0 && Math.abs(drift) <= toleranceCents) {
+        if (drift !== 0) {
+          let maxIdx = 0;
+          for (let i = 1; i < payments.length; i++) {
+            if (payments[i].amountCents > payments[maxIdx].amountCents)
+              maxIdx = i;
+          }
+          payments[maxIdx] = {
+            ...payments[maxIdx],
+            amountCents: payments[maxIdx].amountCents + drift,
+          };
+        }
+      } else {
         if (payments.length > 0) {
           this.logger.warn(
             `Yazarkasa tender mismatch for order ${orderId}: ` +
@@ -749,16 +793,11 @@ export class PaymentFinalizer {
   /**
    * Map a Payment.method (CASH/CARD/DIGITAL, case-insensitive) to the GMP-3
    * fiscal tender category. Cash is the one legally-distinct category; every
-   * electronic tender is non-cash (card), with wallet/QR mapped to `qr`.
+   * electronic tender (CARD, DIGITAL) is non-cash and maps to `card`. There is
+   * no QR/wallet payment producer in the system today, so we never emit `qr`
+   * (a future wallet rail that persists a distinct method can add it).
    */
-  private toFiscalTender(method: string): "cash" | "card" | "qr" {
-    switch ((method ?? "").toUpperCase()) {
-      case "CASH":
-        return "cash";
-      case "DIGITAL":
-        return "qr";
-      default:
-        return "card";
-    }
+  private toFiscalTender(method: string): "cash" | "card" {
+    return (method ?? "").toUpperCase() === "CASH" ? "cash" : "card";
   }
 }
