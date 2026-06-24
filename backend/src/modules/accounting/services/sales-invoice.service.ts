@@ -29,6 +29,36 @@ export class SalesInvoiceService {
     @Optional() private syncService?: AccountingSyncService,
   ) {}
 
+  /**
+   * Snapshot the issuer/seller (satıcı) identity from the tenant's
+   * AccountingSettings "Company Info" onto the invoice at build time.
+   *
+   * fake-working sweep #3: these six fields were collected + persisted in
+   * settings but never placed on any generated SalesInvoice nor in the
+   * provider-sync payload — the operator's configured invoice issuer
+   * identity appeared on nothing the system issued. Snapshotting (rather
+   * than joining at read time) keeps the historical document stable if the
+   * operator later edits their company info. Returns only set fields so an
+   * empty-Company-Info tenant leaves the columns null (unchanged behaviour).
+   */
+  private static sellerSnapshot(settings: {
+    companyName?: string | null;
+    companyTaxId?: string | null;
+    companyTaxOffice?: string | null;
+    companyAddress?: string | null;
+    companyPhone?: string | null;
+    companyEmail?: string | null;
+  }) {
+    return {
+      sellerName: settings.companyName || null,
+      sellerTaxId: settings.companyTaxId || null,
+      sellerTaxOffice: settings.companyTaxOffice || null,
+      sellerAddress: settings.companyAddress || null,
+      sellerPhone: settings.companyPhone || null,
+      sellerEmail: settings.companyEmail || null,
+    };
+  }
+
   async createFromOrder(
     orderId: string,
     tenantId: string,
@@ -220,6 +250,8 @@ export class SalesInvoiceService {
             customerEmail: dto?.customerEmail,
             customerTaxId: dto?.customerTaxId,
             customerTaxOffice: dto?.customerTaxOffice,
+            // Issuer identity from Company Info (fake-working sweep #3).
+            ...SalesInvoiceService.sellerSnapshot(settings),
             subtotal: Math.round(subtotal * 100) / 100,
             taxAmount: Math.round(taxAmount * 100) / 100,
             totalAmount,
@@ -358,6 +390,8 @@ export class SalesInvoiceService {
             status: InvoiceStatus.ISSUED,
             customerName: payment.order.customerName,
             customerPhone: payment.order.customerPhone,
+            // Issuer identity from Company Info (fake-working sweep #3).
+            ...SalesInvoiceService.sellerSnapshot(settings),
             subtotal: Math.round(subtotal * 100) / 100,
             taxAmount: Math.round(taxAmount * 100) / 100,
             totalAmount,

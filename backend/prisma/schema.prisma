@@ -3839,6 +3839,18 @@ model SalesInvoice {
   customerTaxId     String?
   customerTaxOffice String?
 
+  // Issuer / seller (satıcı) identity — snapshotted from AccountingSettings
+  // "Company Info" at invoice-build time so the seller block on the document
+  // is stable even if the operator later edits their settings. Populated from
+  // companyName/companyTaxId/companyTaxOffice/companyAddress/companyPhone/
+  // companyEmail. Required (when set) for a valid UBL-TR AccountingSupplierParty.
+  sellerName      String?
+  sellerTaxId     String?
+  sellerTaxOffice String?
+  sellerAddress   String?
+  sellerPhone     String?
+  sellerEmail     String?
+
   subtotal    Decimal @db.Decimal(10, 2)
   taxAmount   Decimal @db.Decimal(10, 2)
   totalAmount Decimal @db.Decimal(10, 2)

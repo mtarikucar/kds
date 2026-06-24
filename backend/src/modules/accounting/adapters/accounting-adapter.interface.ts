@@ -5,6 +5,15 @@ export interface AccountingInvoiceData {
   customerName?: string;
   customerTaxId?: string;
   customerTaxOffice?: string;
+  // Issuer / seller (satıcı) identity — snapshotted onto the SalesInvoice
+  // from the tenant's AccountingSettings "Company Info". A valid UBL-TR
+  // document needs an AccountingSupplierParty; these feed that block.
+  sellerName?: string;
+  sellerTaxId?: string;
+  sellerTaxOffice?: string;
+  sellerAddress?: string;
+  sellerPhone?: string;
+  sellerEmail?: string;
   currency: string;
   items: Array<{
     description: string;
