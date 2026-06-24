@@ -476,7 +476,7 @@ export class TablesService {
     // moments apart can both succeed even if a new order was just
     // created — leaving the table free to be seated again while an
     // unpaid bill is still open.
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const table = await tx.table.findFirst({
         where: { id, ...branchScope(scope) },
       });
@@ -514,6 +514,14 @@ export class TablesService {
         where: { id, ...branchScope(scope) },
       });
     });
+
+    // A status change recolors the live floor map. Emit the same event the
+    // map listens for so every open POS/Tables map (incl. other terminals)
+    // refreshes — parity with update()/remove()/merge which already emit.
+    this.kdsGateway.emitFloorLayoutUpdated(scope.tenantId, updated.branchId, {
+      zoneId: updated.zoneId ?? undefined,
+    });
+    return updated;
   }
 
   async remove(scope: BranchScope, id: string) {
