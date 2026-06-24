@@ -36,6 +36,7 @@ import { MetricsService } from "../../../common/metrics/metrics.service";
 import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 import { toIntCents } from "../../../common/money/to-int-cents";
 import { ORDER_DETAIL_INCLUDE, buildFindAllWhere } from "./order-query.builder";
+import { validateModifierSelections } from "../../../common/validators/modifier-selection.validator";
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -354,12 +355,29 @@ export class OrdersService {
           );
         }
 
-        // Validate all products exist and belong to tenant
+        // Validate all products exist and belong to tenant.
+        // Eager-load the modifier groups (active) → available modifiers so the
+        // staff POS path enforces the SAME ModifierGroup required/min/max rules
+        // the customer QR path enforces (see validateModifierSelections below).
         const productIds = createOrderDto.items.map((item) => item.productId);
         const products = await this.prisma.product.findMany({
           where: {
             id: { in: productIds },
             tenantId,
+          },
+          include: {
+            modifierGroups: {
+              include: {
+                group: {
+                  include: {
+                    modifiers: {
+                      where: { isAvailable: true },
+                      select: { id: true },
+                    },
+                  },
+                },
+              },
+            },
           },
         });
 
@@ -444,6 +462,22 @@ export class OrdersService {
               }
             }
           }
+        }
+
+        // M7 — enforce ModifierGroup required / minSelections / maxSelections
+        // on the staff POS path, mirroring the customer QR path
+        // (customer-orders.service.validateAndCalculateItems). Without this a
+        // waiter could ring a steak with no cooking-temperature (required group
+        // skipped) or stack a "max 2 sauces" group past its limit — producing
+        // ambiguous kitchen tickets / unlimited free extras. Pure shared helper
+        // over the eager-loaded product.modifierGroups → group → modifiers{id}.
+        for (const item of createOrderDto.items) {
+          const product = products.find((p) => p.id === item.productId);
+          if (!product) continue; // already caught above
+          validateModifierSelections(
+            product,
+            (item.modifiers ?? []).map((m) => m.modifierId),
+          );
         }
 
         // Build product price map from DB (never trust client-supplied prices)
@@ -765,11 +799,28 @@ export class OrdersService {
     if (updateOrderDto.items && updateOrderDto.items.length > 0) {
       // Validate all products exist and belong to tenant
       // (Product/Modifier are tenant-scoped catalog rows, not branch-scoped.)
+      // Eager-load modifier groups so update() enforces the SAME
+      // belongs-to-product + required/min/max rules as createInner / the QR
+      // path — previously update() did neither (M7).
       const productIds = updateOrderDto.items.map((item) => item.productId);
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: productIds },
           tenantId: scope.tenantId,
+        },
+        include: {
+          modifierGroups: {
+            include: {
+              group: {
+                include: {
+                  modifiers: {
+                    where: { isAvailable: true },
+                    select: { id: true },
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -811,6 +862,19 @@ export class OrdersService {
             `Modifier ${modifierId} not found or unavailable`,
           );
         }
+      }
+
+      // M7 — update() previously skipped the belongs-to-product cross-reference
+      // AND the required/min/max enforcement entirely. Apply the same shared
+      // helper as createInner so a PATCH can't smuggle in a foreign modifier,
+      // skip a required group, or exceed a group's max.
+      for (const item of updateOrderDto.items) {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) continue; // already caught above
+        validateModifierSelections(
+          product,
+          (item.modifiers ?? []).map((m) => m.modifierId),
+        );
       }
 
       // Build product price map from DB (never trust client-supplied prices)
