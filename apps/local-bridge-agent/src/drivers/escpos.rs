@@ -123,27 +123,18 @@ impl PrinterEntry {
     fn resolve(self) -> Result<Printer> {
         let transport = match self.transport.to_ascii_lowercase().as_str() {
             "tcp" | "network" => {
-                let host = self
-                    .host
-                    .filter(|h| !h.trim().is_empty())
-                    .ok_or_else(|| {
-                        anyhow!("printer '{}': transport=tcp requires a `host`", self.id)
-                    })?;
+                let host = self.host.filter(|h| !h.trim().is_empty()).ok_or_else(|| {
+                    anyhow!("printer '{}': transport=tcp requires a `host`", self.id)
+                })?;
                 Transport::Tcp {
                     host,
                     port: self.port.unwrap_or(DEFAULT_TCP_PORT),
                 }
             }
             "device" | "serial" | "usb" => {
-                let path = self
-                    .path
-                    .filter(|p| !p.trim().is_empty())
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "printer '{}': transport=device requires a `path`",
-                            self.id
-                        )
-                    })?;
+                let path = self.path.filter(|p| !p.trim().is_empty()).ok_or_else(|| {
+                    anyhow!("printer '{}': transport=device requires a `path`", self.id)
+                })?;
                 Transport::Device {
                     path: PathBuf::from(path),
                 }
@@ -308,10 +299,7 @@ impl LocalDriver for EscPosDriver {
             .with_context(|| {
                 format!(
                     "escpos: writing {} bytes to printer '{}' ({:?}) for command {}",
-                    byte_len,
-                    printer.id,
-                    printer.transport,
-                    cmd.id
+                    byte_len, printer.id, printer.transport, cmd.id
                 )
             })?;
 
@@ -401,8 +389,8 @@ fn write_device(path: &Path, bytes: &[u8]) -> Result<usize> {
 fn load_printers(path: &Path) -> Result<Vec<Printer>> {
     let raw = std::fs::read_to_string(path)
         .with_context(|| format!("reading printer config {}", path.display()))?;
-    let cfg: PrintersConfig =
-        toml::from_str(&raw).with_context(|| format!("parsing printer config {}", path.display()))?;
+    let cfg: PrintersConfig = toml::from_str(&raw)
+        .with_context(|| format!("parsing printer config {}", path.display()))?;
     if cfg.printer.is_empty() {
         return Err(anyhow!(
             "printer config {} has no [[printer]] entries",
@@ -487,10 +475,8 @@ fn base64_decode(input: &str) -> Result<Vec<u8>> {
 /// Emit the decoded bytes of one 4-sextet group, dropping `pad` trailing bytes
 /// (0 → 3 bytes, 1 → 2 bytes, 2 → 1 byte).
 fn emit(quad: &[u8; 4], pad: usize, out: &mut Vec<u8>) -> Result<()> {
-    let n = (quad[0] as u32) << 18
-        | (quad[1] as u32) << 12
-        | (quad[2] as u32) << 6
-        | (quad[3] as u32);
+    let n =
+        (quad[0] as u32) << 18 | (quad[1] as u32) << 12 | (quad[2] as u32) << 6 | (quad[3] as u32);
     let b0 = (n >> 16) as u8;
     let b1 = (n >> 8) as u8;
     let b2 = n as u8;
@@ -748,7 +734,9 @@ mod tests {
         assert_eq!(outcome.error, None);
         assert_eq!(outcome.result["bytes_written"], json!(receipt.len()));
 
-        let received = rx.recv_timeout(Duration::from_secs(5)).expect("printer got bytes");
+        let received = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("printer got bytes");
         server.join().unwrap();
         assert_eq!(
             received, receipt,

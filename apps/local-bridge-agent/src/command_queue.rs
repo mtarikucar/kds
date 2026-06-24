@@ -338,6 +338,7 @@ impl CommandQueue {
     /// charges/prints fail). Only fully-settled rows are eligible:
     ///   - `acked`: executed AND cloud-confirmed — safe to drop.
     ///   - `failed`: terminal failure, already attempted to ack.
+    ///
     /// `done` (ack still pending) and `needs_review` (awaiting human action) are
     /// deliberately retained until they reach a settled state.
     pub async fn sweep(&self, max_age_ms: i64) -> Result<usize> {
