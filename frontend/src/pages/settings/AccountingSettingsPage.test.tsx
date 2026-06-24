@@ -18,6 +18,9 @@ vi.mock('../../features/accounting/accountingApi', () => ({
     mutateAsync: h.testConnection,
     isPending: false,
   }),
+  // SyncStatusCard renders null until data resolves; returning no data keeps
+  // these tests focused on the settings form.
+  useAccountingSyncStatus: () => ({ data: undefined }),
 }));
 vi.mock('../../hooks/useAutoSave', () => ({
   useAutoSave: () => ({ status: 'idle', setValue: h.triggerSave, retry: vi.fn() }),
