@@ -35,6 +35,7 @@ import {
   CreditCard,
   Building2,
   Sparkles,
+  Map as MapIcon,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -135,6 +136,12 @@ const SECTIONS: NavSection[] = [
         to: '/admin/tables',
         icon: Table,
         labelKey: 'navigation.tables',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/floor-plan',
+        icon: MapIcon,
+        labelKey: 'navigation.floorPlan',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
       {

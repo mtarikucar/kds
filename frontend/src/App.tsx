@@ -55,6 +55,7 @@ import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
 // Admin Pages (lazy-loaded)
 const MenuManagementPage = lazy(() => import('./pages/admin/MenuManagementPage'));
 const TableManagementPage = lazy(() => import('./pages/admin/TableManagementPage'));
+const FloorPlanEditorPage = lazy(() => import('./pages/admin/FloorPlanEditorPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 const QRManagementPage = lazy(() => import('./pages/admin/QRManagementPage'));
 const ReportsPage = lazy(() => import('./pages/admin/ReportsPage'));
@@ -236,6 +237,7 @@ function App() {
       <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.MANAGER]}><Layout /></ProtectedRoute>}>
         <Route path="/admin/menu" element={<MenuManagementPage />} />
         <Route path="/admin/tables" element={<TableManagementPage />} />
+        <Route path="/admin/floor-plan" element={<FloorPlanEditorPage />} />
         <Route path="/admin/users" element={<UserManagementPage />} />
         <Route path="/admin/qr-codes" element={<QRManagementPage />} />
         {/* v2.8.88 page-root FeatureGate: direct URL access shows an

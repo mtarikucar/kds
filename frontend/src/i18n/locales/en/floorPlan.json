@@ -1,0 +1,61 @@
+{
+  "title": "Floor Plan",
+  "subtitle": "Design your restaurant as a 2D map — floors, gardens, tables and more",
+  "addTable": "Table",
+  "addElement": "Add",
+  "undo": "Undo",
+  "redo": "Redo",
+  "toggleGrid": "Toggle grid",
+  "saved": "Floor plan saved",
+  "addZone": "Add area",
+  "zoneSettings": "Area settings",
+  "newZonePrompt": "Name the new area (e.g. Floor 2, Garden)",
+  "noZones": "No areas yet. Add a floor or garden to start designing.",
+  "unplaced": "Unplaced tables ({{count}})",
+  "placeOnZone": "Place on the current area",
+  "newTable": "New table",
+  "tableNumber": "Table number",
+  "capacity": "Capacity",
+  "shapes": {
+    "round": "Round",
+    "square": "Square",
+    "rect": "Rectangle"
+  },
+  "elements": {
+    "wall": "Wall",
+    "door": "Door",
+    "bar": "Bar",
+    "kitchen": "Kitchen",
+    "plant": "Plant",
+    "decor": "Decor",
+    "text": "Text",
+    "rect": "Block"
+  },
+  "inspector": {
+    "empty": "Select a table or element to edit it",
+    "multi": "{{count}} items selected",
+    "removeSelected": "Remove selected",
+    "table": "Table",
+    "seats": "{{count}} seats",
+    "shape": "Shape",
+    "unplaceTable": "Send to unplaced",
+    "unplaceHint": "The table and its orders are kept — only its placement is cleared.",
+    "element": "Element",
+    "label": "Label",
+    "labelPlaceholder": "Optional label",
+    "deleteElement": "Delete element"
+  },
+  "zone": {
+    "name": "Name",
+    "kind": "Type",
+    "indoor": "Indoor",
+    "outdoor": "Outdoor",
+    "width": "Width",
+    "height": "Height",
+    "grid": "Grid",
+    "background": "Background image URL",
+    "opacity": "Background opacity ({{value}}%)",
+    "delete": "Delete area",
+    "deleteConfirm": "Delete the area \"{{name}}\"? Its tables move to unplaced."
+  }
+}

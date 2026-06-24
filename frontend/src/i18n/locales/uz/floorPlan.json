@@ -1,0 +1,61 @@
+{
+  "title": "Zal rejasi",
+  "subtitle": "Restoraningizni 2D xarita sifatida loyihalang — qavatlar, bog'lar, stollar va boshqalar",
+  "addTable": "Stol",
+  "addElement": "Qo'shish",
+  "undo": "Bekor qilish",
+  "redo": "Qaytarish",
+  "toggleGrid": "To'rni yoqish/o'chirish",
+  "saved": "Zal rejasi saqlandi",
+  "addZone": "Hudud qo'shish",
+  "zoneSettings": "Hudud sozlamalari",
+  "newZonePrompt": "Yangi hududga nom bering (masalan, 2-qavat, Bog')",
+  "noZones": "Hali hudud yo'q. Loyihalashni boshlash uchun qavat yoki bog' qo'shing.",
+  "unplaced": "Joylashtirilmagan stollar ({{count}})",
+  "placeOnZone": "Joriy hududga joylashtirish",
+  "newTable": "Yangi stol",
+  "tableNumber": "Stol raqami",
+  "capacity": "Sig'imi",
+  "shapes": {
+    "round": "Dumaloq",
+    "square": "Kvadrat",
+    "rect": "To'rtburchak"
+  },
+  "elements": {
+    "wall": "Devor",
+    "door": "Eshik",
+    "bar": "Bar",
+    "kitchen": "Oshxona",
+    "plant": "O'simlik",
+    "decor": "Bezak",
+    "text": "Matn",
+    "rect": "Blok"
+  },
+  "inspector": {
+    "empty": "Tahrirlash uchun stol yoki elementni tanlang",
+    "multi": "{{count}} ta element tanlandi",
+    "removeSelected": "Tanlanganlarni o'chirish",
+    "table": "Stol",
+    "seats": "{{count}} o'rin",
+    "shape": "Shakl",
+    "unplaceTable": "Joylashtirilmaganlarga yuborish",
+    "unplaceHint": "Stol va uning buyurtmalari saqlanadi — faqat joylashuvi tozalanadi.",
+    "element": "Element",
+    "label": "Yorliq",
+    "labelPlaceholder": "Ixtiyoriy yorliq",
+    "deleteElement": "Elementni o'chirish"
+  },
+  "zone": {
+    "name": "Nomi",
+    "kind": "Turi",
+    "indoor": "Ichki",
+    "outdoor": "Tashqi",
+    "width": "Kenglik",
+    "height": "Balandlik",
+    "grid": "To'r",
+    "background": "Fon rasmi URL",
+    "opacity": "Fon shaffofligi ({{value}}%)",
+    "delete": "Hududni o'chirish",
+    "deleteConfirm": "\"{{name}}\" hududi o'chirilsinmi? Uning stollari joylashtirilmaganlarga o'tadi."
+  }
+}
