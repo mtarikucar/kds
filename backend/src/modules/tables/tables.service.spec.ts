@@ -371,4 +371,63 @@ describe('TablesService (iter-9 defense-in-depth + v3 branch scope)', () => {
       ).rejects.toThrow(ConflictException);
     });
   });
+
+  /**
+   * fake-working-sweep-3 M3 regression. PATCH /tables/:id (the generic
+   * update) wrote `data: updateTableDto` directly with NO active-order
+   * check, while PATCH /tables/:id/status (updateStatus) refuses to mark a
+   * table AVAILABLE that still has an unpaid order. Since UpdateTableDto =
+   * PartialType(CreateTableDto) and CreateTableDto carries an optional
+   * `status`, an operator could free an occupied table with an open bill
+   * via the admin edit modal's status dropdown. update() now applies the
+   * same guard inside a transaction. These specs pin it.
+   */
+  describe('update active-order guard (status: AVAILABLE)', () => {
+    it('rejects mark-AVAILABLE via update() while active orders exist', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1' } as any);
+      (prisma.order.count as any).mockResolvedValue(1);
+
+      await expect(
+        svc.update(scope, 'tab-1', { status: TableStatus.AVAILABLE } as any),
+      ).rejects.toThrow(ConflictException);
+
+      // The write must NOT fire when the guard trips — the table cannot
+      // be freed while an unpaid bill is open.
+      expect((prisma.table.updateMany as any).mock.calls.length).toBe(0);
+    });
+
+    it('allows mark-AVAILABLE via update() when no active orders exist', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1' } as any);
+      (prisma.order.count as any).mockResolvedValue(0);
+      let updateWhere: any = null;
+      (prisma.table.updateMany as any).mockImplementation(async ({ where }: any) => {
+        updateWhere = where;
+        return { count: 1 };
+      });
+
+      await svc.update(scope, 'tab-1', { status: TableStatus.AVAILABLE } as any);
+
+      expect(updateWhere).toEqual({ id: 'tab-1', tenantId: 't1', branchId: 'b1' });
+    });
+
+    it('skips the active-order count for non-AVAILABLE status writes (e.g. OCCUPIED)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1' } as any);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.update(scope, 'tab-1', { status: TableStatus.OCCUPIED } as any);
+
+      // order.count only runs when status === AVAILABLE.
+      expect((prisma.order.count as any).mock.calls.length).toBe(0);
+    });
+
+    it('skips the active-order count for status-less updates (number/capacity only)', async () => {
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1', tenantId: 't1', branchId: 'b1', number: '1' } as any);
+      (prisma.table.findUnique as any).mockResolvedValue(null);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await svc.update(scope, 'tab-1', { capacity: 6 } as any);
+
+      expect((prisma.order.count as any).mock.calls.length).toBe(0);
+    });
+  });
 });
