@@ -190,14 +190,18 @@
       "inventoryTracking": "Stok Takibi",
       "kdsIntegration": "KDS Entegrasyonu",
       "reservationSystem": "Rezervasyon Sistemi",
-      "personnelManagement": "Personel Yönetimi"
+      "personnelManagement": "Personel Yönetimi",
+      "deliveryIntegration": "Teslimat Entegrasyonu",
+      "externalDisplay": "Harici Ekran (Partner Display)",
+      "posAccess": "POS Erişimi"
     },
     "limitLabels": {
       "maxUsers": "Maks. Kullanıcı",
       "maxTables": "Maks. Masa",
       "maxProducts": "Maks. Ürün",
       "maxCategories": "Maks. Kategori",
-      "maxMonthlyOrders": "Maks. Aylık Sipariş"
+      "maxMonthlyOrders": "Maks. Aylık Sipariş",
+      "maxBranches": "Maks. Şube"
     }
   },
   "subscriptions": {
@@ -335,7 +339,10 @@
       "endDate": "Bitiş Tarihi",
       "cancel": "İptal",
       "update": "Güncelle",
-      "create": "Oluştur"
+      "create": "Oluştur",
+      "deliveryIntegration": "Teslimat Entegrasyonu",
+      "externalDisplay": "Harici Ekran (Partner Display)",
+      "posAccess": "POS Erişimi"
     }
   },
   "marketplace": {

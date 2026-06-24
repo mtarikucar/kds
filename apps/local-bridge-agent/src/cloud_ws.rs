@@ -25,8 +25,64 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::warn;
+
+/// Self-describing identity the bridge sends with `claim` and `heartbeat`.
+///
+/// The backend `BridgeHeartbeatDto` / `ClaimBridgeDto` accept exactly
+/// `hostname` / `os` / `agentVersion` (all optional), persisted on the
+/// `LocalBridgeAgent` row so operators can see what's running where. We
+/// serialize with `camelCase` to match the NestJS DTO field names and skip
+/// `None` so the ValidationPipe whitelist doesn't see stray nulls.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BridgeIdentity {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hostname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub os: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_version: Option<String>,
+}
+
+impl BridgeIdentity {
+    /// Best-effort self-description from the running process. `os` and
+    /// `agent_version` are always known at compile time; `hostname` is
+    /// looked up from the environment and is `None` on hosts that don't
+    /// export it (the backend column is optional, so that's fine).
+    pub fn detect() -> Self {
+        Self {
+            hostname: std::env::var("HOSTNAME").ok().filter(|s| !s.is_empty()),
+            os: Some(std::env::consts::OS.to_string()),
+            agent_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        }
+    }
+}
+
+/// The provisioning-token → bearer-token exchange request body sent to
+/// `POST /v1/bridges/claim`. `provisioningToken` is required; the identity
+/// fields are flattened alongside it to match `ClaimBridgeDto`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimRequest {
+    pub provisioning_token: String,
+    #[serde(flatten)]
+    pub identity: BridgeIdentity,
+}
+
+/// Decoded `POST /v1/bridges/claim` response. The backend returns
+/// `{ bridgeId, tenantId, branchId, token, tokenExpiresAt }`; we only need
+/// the bearer `token` (and surface `bridge_id` for logging). The remaining
+/// fields are simply not declared here, so serde ignores them by default.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimResponse {
+    pub bridge_id: String,
+    /// The long-lived bearer token to use as `Authorization: Bridge <token>`.
+    pub token: String,
+}
 
 /// Result of a `commands/next` poll, decoded into plain data so the
 /// queue-push logic in [`CloudClient::fetch_more`] is hardware/HTTP-free.
@@ -65,6 +121,17 @@ pub trait CloudTransport: Send + Sync {
     /// POST an outcome to `/v1/devices/commands/:id/ack`. Errors on a
     /// non-success HTTP status so the caller can retry/fail uniformly.
     async fn post_ack(&self, cmd_id: &str, outcome: &CommandOutcome) -> Result<()>;
+
+    /// POST `/v1/bridges/heartbeat` with the bridge bearer token + identity.
+    /// This is the call that keeps the bridge marked `online` cloud-side
+    /// (60s grace). Errors on a non-success HTTP status so the caller can log
+    /// it; the heartbeat loop treats failures as best-effort.
+    async fn post_heartbeat(&self, identity: &BridgeIdentity) -> Result<()>;
+
+    /// POST `/v1/bridges/claim` to exchange a one-shot provisioning token for
+    /// a long-lived bearer token. Returns the decoded [`ClaimResponse`].
+    /// Errors on a non-success HTTP status (e.g. an already-used token → 404).
+    async fn post_claim(&self, req: &ClaimRequest) -> Result<ClaimResponse>;
 }
 
 #[derive(Clone)]
@@ -148,6 +215,23 @@ impl CloudClient {
             },
         )
         .await
+    }
+
+    /// Post a heartbeat to the cloud so the bridge stays `online`. This is the
+    /// real liveness signal — distinct from [`CloudClient::warm_up`], which is
+    /// only a one-shot boot reachability probe and never updates `lastSeenAt`.
+    pub async fn post_heartbeat(&self, identity: &BridgeIdentity) -> Result<()> {
+        self.inner.transport.post_heartbeat(identity).await
+    }
+
+    /// First-boot claim: exchange a provisioning token for a bearer token.
+    /// Returns the decoded [`ClaimResponse`] (carrying the new bearer token).
+    pub async fn claim(&self, provisioning_token: &str) -> Result<ClaimResponse> {
+        let req = ClaimRequest {
+            provisioning_token: provisioning_token.to_string(),
+            identity: BridgeIdentity::detect(),
+        };
+        self.inner.transport.post_claim(&req).await
     }
 }
 
@@ -235,6 +319,36 @@ impl CloudTransport for ReqwestTransport {
             .error_for_status()?;
         Ok(())
     }
+
+    async fn post_heartbeat(&self, identity: &BridgeIdentity) -> Result<()> {
+        let url = format!("{}/v1/bridges/heartbeat", self.cfg.cloud_url);
+        let token = crate::config::resolve_bearer_token().unwrap_or_default();
+        self.http
+            .post(url)
+            .header("Authorization", format!("Bridge {}", token))
+            .json(identity)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
+    }
+
+    async fn post_claim(&self, req: &ClaimRequest) -> Result<ClaimResponse> {
+        // /v1/bridges/claim is @Public (no bearer yet — that's the whole
+        // point of the exchange). error_for_status() turns an already-used
+        // token (404) or a malformed request (400) into an Err the caller
+        // logs; a success body is decoded into the bearer token.
+        let url = format!("{}/v1/bridges/claim", self.cfg.cloud_url);
+        let resp = self
+            .http
+            .post(url)
+            .json(req)
+            .send()
+            .await?
+            .error_for_status()?;
+        let claim: ClaimResponse = resp.json().await?;
+        Ok(claim)
+    }
 }
 
 #[cfg(test)]
@@ -254,11 +368,25 @@ mod tests {
         acks: Mutex<Vec<(String, CommandOutcome)>>,
         /// If true, post_ack returns an error (simulates the cloud rejecting).
         ack_fails: bool,
+        /// Identities received via post_heartbeat, so tests can assert the
+        /// heartbeat tick actually posts (and what it posts).
+        heartbeats: Mutex<Vec<BridgeIdentity>>,
+        /// Provisioning tokens received via post_claim.
+        claims: Mutex<Vec<String>>,
+        /// If true, post_claim returns an error (simulates an invalid /
+        /// already-used provisioning token → 4xx).
+        claim_fails: bool,
     }
 
     impl FakeTransport {
         fn acks(&self) -> Vec<(String, CommandOutcome)> {
             self.acks.lock().unwrap().clone()
+        }
+        fn heartbeat_count(&self) -> usize {
+            self.heartbeats.lock().unwrap().len()
+        }
+        fn claims(&self) -> Vec<String> {
+            self.claims.lock().unwrap().clone()
         }
     }
 
@@ -284,6 +412,23 @@ mod tests {
                 .unwrap()
                 .push((cmd_id.to_string(), outcome.clone()));
             Ok(())
+        }
+        async fn post_heartbeat(&self, identity: &BridgeIdentity) -> Result<()> {
+            self.heartbeats.lock().unwrap().push(identity.clone());
+            Ok(())
+        }
+        async fn post_claim(&self, req: &ClaimRequest) -> Result<ClaimResponse> {
+            if self.claim_fails {
+                anyhow::bail!("cloud rejected claim (invalid/used provisioning token)");
+            }
+            self.claims
+                .lock()
+                .unwrap()
+                .push(req.provisioning_token.clone());
+            Ok(ClaimResponse {
+                bridge_id: "bridge-xyz".to_string(),
+                token: "bearer-from-claim".to_string(),
+            })
         }
     }
 
@@ -451,5 +596,69 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("c-3"));
+    }
+
+    #[tokio::test]
+    async fn post_heartbeat_forwards_identity_to_the_transport() {
+        // M8: the heartbeat tick must reach the cloud (not just /healthz). A
+        // single post_heartbeat call records exactly one identity payload.
+        let (client, fake) = client_with(FakeTransport::default());
+        let identity = BridgeIdentity {
+            hostname: Some("box-01".to_string()),
+            os: Some("linux".to_string()),
+            agent_version: Some("9.9.9".to_string()),
+        };
+        client.post_heartbeat(&identity).await.unwrap();
+
+        assert_eq!(fake.heartbeat_count(), 1);
+        let beats = fake.heartbeats.lock().unwrap();
+        assert_eq!(beats[0].hostname.as_deref(), Some("box-01"));
+        assert_eq!(beats[0].agent_version.as_deref(), Some("9.9.9"));
+    }
+
+    #[tokio::test]
+    async fn claim_exchanges_provisioning_token_for_bearer() {
+        // M9: claim posts the provisioning token once and returns the new
+        // bearer token from the response body.
+        let (client, fake) = client_with(FakeTransport::default());
+        let resp = client.claim("prov-token-123").await.unwrap();
+
+        assert_eq!(resp.token, "bearer-from-claim");
+        assert_eq!(resp.bridge_id, "bridge-xyz");
+        assert_eq!(fake.claims(), vec!["prov-token-123".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn claim_propagates_transport_errors() {
+        // An invalid / already-used provisioning token (4xx) must surface as
+        // an Err so main.rs can log it and continue in offline mode rather
+        // than pretending it has a bearer.
+        let (client, _) = client_with(FakeTransport {
+            claim_fails: true,
+            ..Default::default()
+        });
+        let err = client.claim("bad-token").await.unwrap_err();
+        assert!(err.to_string().contains("rejected claim"));
+    }
+
+    #[test]
+    fn bridge_identity_detect_fills_os_and_version() {
+        // detect() always knows os + agentVersion at compile time; hostname is
+        // best-effort. The serialized JSON must use camelCase to match the
+        // NestJS ClaimBridgeDto / BridgeHeartbeatDto field names.
+        let id = BridgeIdentity::detect();
+        assert!(id.os.is_some(), "os is known from std::env::consts::OS");
+        assert_eq!(id.agent_version.as_deref(), Some(env!("CARGO_PKG_VERSION")));
+
+        let json = serde_json::to_value(&BridgeIdentity {
+            hostname: None,
+            os: Some("linux".to_string()),
+            agent_version: Some("1.2.3".to_string()),
+        })
+        .unwrap();
+        // camelCase + None hostname skipped (no stray null for the whitelist).
+        assert_eq!(json["agentVersion"], "1.2.3");
+        assert_eq!(json["os"], "linux");
+        assert!(json.get("hostname").is_none());
     }
 }

@@ -77,6 +77,14 @@ const AnalyticsPage = () => {
     setDateRange(data);
   };
 
+  // CV/occupancy telemetry is camera-hardware-gated. Without on-site cameras,
+  // congestion + behavior metrics fall back to zero/default (e.g. party size
+  // 2.5, idle 0 min, congestion 100/100), which read as real measurements.
+  // Treat "no congestion points" as the honest signal that no occupancy
+  // telemetry exists for the period and surface a "requires cameras"
+  // disclosure on those cards instead of the misleading defaults.
+  const hasCameraData = (congestion?.congestionPoints?.length ?? 0) > 0;
+
   const handleGenerateMockData = async () => {
     try {
       const result = await generateMockData.mutateAsync(7);
@@ -276,10 +284,10 @@ const AnalyticsPage = () => {
                 />
                 <StatCard
                   title="Congestion Score"
-                  value={`${congestion?.overallScore || 100}/100`}
-                  subtitle={`${congestion?.congestionPoints?.length || 0} hotspots`}
+                  value={hasCameraData ? `${congestion?.overallScore ?? 0}/100` : t('analytics:cvDisclosure.noData')}
+                  subtitle={hasCameraData ? `${congestion?.congestionPoints?.length || 0} hotspots` : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Activity}
-                  color={congestion?.overallScore && congestion.overallScore < 70 ? 'bg-yellow-500' : 'bg-green-500'}
+                  color={!hasCameraData ? 'bg-slate-400' : congestion?.overallScore && congestion.overallScore < 70 ? 'bg-yellow-500' : 'bg-green-500'}
                 />
                 <StatCard
                   title="Active Insights"
@@ -502,10 +510,10 @@ const AnalyticsPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
                   title="Congestion Score"
-                  value={`${congestion?.overallScore || 100}/100`}
-                  subtitle="Higher is better"
+                  value={hasCameraData ? `${congestion?.overallScore ?? 0}/100` : t('analytics:cvDisclosure.noData')}
+                  subtitle={hasCameraData ? 'Higher is better' : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Activity}
-                  color={congestion?.overallScore && congestion.overallScore < 70 ? 'bg-yellow-500' : 'bg-green-500'}
+                  color={!hasCameraData ? 'bg-slate-400' : congestion?.overallScore && congestion.overallScore < 70 ? 'bg-yellow-500' : 'bg-green-500'}
                 />
                 <StatCard
                   title="Congestion Hotspots"
@@ -604,6 +612,20 @@ const AnalyticsPage = () => {
             <Spinner />
           ) : customerBehavior ? (
             <>
+              {/* CV/occupancy telemetry disclosure — idle time and party size
+                  are camera-derived and read as 0/2.5 defaults without
+                  on-site cameras. Surface that honestly. */}
+              {!hasCameraData && (
+                <div className="mb-4 md:mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-slate-500 mt-0.5" />
+                    <p className="text-sm text-slate-600">
+                      {t('analytics:cvDisclosure.noOccupancyTelemetry')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Behavior Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
@@ -614,16 +636,17 @@ const AnalyticsPage = () => {
                 />
                 <StatCard
                   title="Avg Idle Time"
-                  value={`${customerBehavior.avgIdleTime.toFixed(0)} min`}
-                  subtitle="Time after dining"
+                  value={hasCameraData ? `${customerBehavior.avgIdleTime.toFixed(0)} min` : t('analytics:cvDisclosure.noData')}
+                  subtitle={hasCameraData ? 'Time after dining' : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Clock}
-                  color="bg-yellow-500"
+                  color={hasCameraData ? 'bg-yellow-500' : 'bg-slate-400'}
                 />
                 <StatCard
                   title="Avg Party Size"
-                  value={customerBehavior.avgPartySize.toFixed(1)}
+                  value={hasCameraData ? customerBehavior.avgPartySize.toFixed(1) : t('analytics:cvDisclosure.noData')}
+                  subtitle={hasCameraData ? undefined : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Users}
-                  color="bg-green-500"
+                  color={hasCameraData ? 'bg-green-500' : 'bg-slate-400'}
                 />
                 <StatCard
                   title="Avg Order Value"

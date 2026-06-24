@@ -39,6 +39,7 @@
     "orderUpdatedNotification": "تم تحديث الطلب: #{{orderNumber}}",
     "lowStockAlert": "مخزون منخفض: {{count}} صنف أقل من الحد الأدنى",
     "stockExpiryAlert": "قرب انتهاء الصلاحية: {{count}} دفعة مخزون",
+    "stockReversalFailed": "فشل عكس المخزون للطلب #{{orderNumber}} — تحقق من المخزون",
     "stats": {
       "activeOrders": "الطلبات النشطة",
       "avgWaitTime": "متوسط الانتظار",

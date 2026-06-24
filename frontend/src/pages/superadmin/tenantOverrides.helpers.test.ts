@@ -36,6 +36,19 @@ describe('buildFeatureOverridesPayload', () => {
   it('returns an empty object for empty input', () => {
     expect(buildFeatureOverridesPayload({})).toEqual({});
   });
+
+  // M10: the override editor must be able to grant the revenue-gating modules.
+  // The helper iterates featureStates dynamically, so as long as the new
+  // FEATURE_LABELS keys seed featureStates they round-trip. Lock the contract.
+  it('round-trips the M10 module flags (deliveryIntegration / externalDisplay / posAccess)', () => {
+    expect(
+      buildFeatureOverridesPayload({
+        deliveryIntegration: 'on',
+        externalDisplay: 'on',
+        posAccess: 'off',
+      }),
+    ).toEqual({ deliveryIntegration: true, externalDisplay: true, posAccess: false });
+  });
 });
 
 describe('buildLimitOverridesPayload', () => {
@@ -43,6 +56,13 @@ describe('buildLimitOverridesPayload', () => {
     expect(
       buildLimitOverridesPayload({ maxUsers: '5', maxTables: '', maxProducts: '0' }),
     ).toEqual({ maxUsers: 5, maxTables: null, maxProducts: 0 });
+  });
+
+  // M10: maxBranches is a per-tenant limit the override editor must send.
+  it('round-trips the maxBranches limit override', () => {
+    expect(buildLimitOverridesPayload({ maxBranches: '3' })).toEqual({ maxBranches: 3 });
+    // Empty -> null (remove override) like every other limit.
+    expect(buildLimitOverridesPayload({ maxBranches: '' })).toEqual({ maxBranches: null });
   });
 });
 

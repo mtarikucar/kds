@@ -1,4 +1,9 @@
 {
+  "cvDisclosure": {
+    "requiresCameras": "Требуются камеры заполняемости",
+    "noData": "Нет данных с камер",
+    "noOccupancyTelemetry": "Для измерения этих показателей нужны камеры заполняемости на объекте. Без камер они отображаются как ноль/значение по умолчанию и не отражают реальную активность."
+  },
   "heatmap": {
     "settings": "Heatmap Settings",
     "visualizationType": "Visualization Type",

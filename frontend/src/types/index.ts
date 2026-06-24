@@ -152,6 +152,7 @@ export interface Product {
   stockTracked: boolean;
   isAvailable: boolean;
   displayOrder: number;
+  taxRate?: number; // KDV rate (0/1/10/20); backend defaults to 10
   tenantId: string;
   createdAt: string;
   updatedAt: string;
@@ -168,6 +169,7 @@ export interface CreateProductDto {
   stockTracked?: boolean;
   isAvailable?: boolean;
   displayOrder?: number;
+  taxRate?: number;
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}

@@ -561,6 +561,12 @@ export class SuperAdminTenantsService {
           reservationSystem: plan.reservationSystem,
           personnelManagement: plan.personnelManagement,
           deliveryIntegration: plan.deliveryIntegration,
+          // M10: posAccess is in FEATURE_KEYS (so updateOverrides accepts it)
+          // but was omitted from the plan-default column the override editor
+          // reads — so the editor was blind to it on read. The override editor
+          // is the canonical grant path for posAccess (no plan-form toggle by
+          // default), so the plan default must be surfaced here.
+          posAccess: plan.posAccess,
         }
       : {};
 
@@ -568,6 +574,10 @@ export class SuperAdminTenantsService {
       ? {
           maxUsers: plan.maxUsers,
           maxTables: plan.maxTables,
+          // M10: maxBranches is in LIMIT_KEYS (updateOverrides accepts it) but
+          // was missing from the plan-default column shown by the override
+          // editor, so the per-tenant branch-cap override row had no default.
+          maxBranches: plan.maxBranches,
           maxProducts: plan.maxProducts,
           maxCategories: plan.maxCategories,
           maxMonthlyOrders: plan.maxMonthlyOrders,

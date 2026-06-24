@@ -45,8 +45,10 @@ const LoginPage = () => {
   const locationState = location.state as LocationState | null;
 
   const loginSchema = z.object({
-    email: z.string().email(t('validation:email')),
-    password: z.string().min(6, t('validation:minLength', { count: 6 })),
+    email: z.string().email(t('validation:validation.email', 'Please enter a valid email address')),
+    password: z
+      .string()
+      .min(6, t('validation:validation.minLength', { count: 6, defaultValue: 'Must be at least {{count}} characters' })),
   });
 
   type LoginFormData = z.infer<typeof loginSchema>;

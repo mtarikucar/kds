@@ -60,7 +60,29 @@ const LoyaltyDisplay = ({
       const referralRes = await axios.get(
         `${API_URL}/customer-public/referral/stats?sessionId=${sessionId}`
       );
-      setReferralData(referralRes.data);
+      let referral = referralRes.data;
+
+      // Mint a referral code if the customer is identified but doesn't have
+      // one yet, so the "Share & Earn" card can actually show a shareable code
+      // instead of the permanent "no code" empty state. The generate endpoint
+      // is idempotent (returns the existing code if one is already set), and
+      // only succeeds once a customer is attached to the session.
+      if (balanceRes.data?.identified && !referral?.referralCode) {
+        try {
+          await axios.post(`${API_URL}/customer-public/referral/generate`, {
+            sessionId,
+          });
+          const refreshed = await axios.get(
+            `${API_URL}/customer-public/referral/stats?sessionId=${sessionId}`
+          );
+          referral = refreshed.data;
+        } catch (genError) {
+          // Best-effort: if minting fails the card falls back to its existing
+          // empty state rather than breaking the whole loyalty view.
+          console.error('Failed to generate referral code:', genError);
+        }
+      }
+      setReferralData(referral);
     } catch (error) {
       console.error('Failed to fetch loyalty data:', error);
     } finally {
@@ -146,25 +168,17 @@ const LoyaltyDisplay = ({
           {tierData && getTierIcon(tierData.currentTier)}
         </div>
 
-        <div className="bg-white/20 rounded-lg p-3">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-white/90 text-sm">
-              {t('loyalty.redeemable')}
-            </span>
-            <span className="text-lg font-bold">
-              ${loyaltyData.redeemableAmount?.toFixed(2) || '0.00'}
-            </span>
-          </div>
-          {loyaltyData.canRedeem ? (
-            <p className="text-white/70 text-xs">
-              {t('loyalty.canRedeem')}
-            </p>
-          ) : (
-            <p className="text-white/70 text-xs">
-              {t('loyalty.minimumPoints', { min: loyaltyData.minRedeemPoints })}
-            </p>
-          )}
-        </div>
+        {/*
+          Honest-gate (findings M4/M6): the "Redeemable Amount: $X" block and the
+          "You can redeem your points!" banner were removed because there is no
+          customer-facing redemption path yet — no redeem endpoint is exposed and
+          no checkout/self-pay step consumes points, so the card was advertising
+          an action the system cannot honor (and rendered a hardcoded "$" in a
+          TRY-only platform). The points balance above remains accurate.
+          TODO: full points-redemption-at-checkout is a planned future feature —
+          when it ships, reintroduce a redeem CTA (gated on a real redeem rail)
+          and render any monetary value via formatCurrency() (TRY), not a literal "$".
+        */}
       </div>
 
       {/* Tier Progress Card */}

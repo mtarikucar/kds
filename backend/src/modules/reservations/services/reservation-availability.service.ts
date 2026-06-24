@@ -3,10 +3,13 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { ReservationSettingsService } from "./reservation-settings.service";
 import { ReservationStatus } from "../constants/reservation-status.enum";
+import { EntitlementService } from "../../entitlements/entitlement.service";
+import { isReservationFeatureEnabled } from "./reservation-entitlement.util";
 
 /**
  * Pure string→minutes helper shared between the availability reads here and
@@ -31,6 +34,11 @@ export class ReservationAvailabilityService {
   constructor(
     private prisma: PrismaService,
     private settingsService: ReservationSettingsService,
+    // Public-surface plan gate (mirrors PlanFeatureGuard on the admin path).
+    // @Optional() so bare-constructed unit-test instances keep working; when
+    // absent the availability reads are not feature-gated (tests cover the
+    // algorithm, not the gate). Production DI always provides it.
+    @Optional() private readonly entitlements?: EntitlementService,
   ) {}
 
   private async validateTenant(tenantId: string) {
@@ -101,6 +109,24 @@ export class ReservationAvailabilityService {
   async listPublicBranches(
     tenantId: string,
   ): Promise<{ id: string; name: string }[]> {
+    // Plan-gate this PUBLIC, anonymous read so it matches the sibling public
+    // surfaces (getPublicSettings / getAvailableSlots / getAvailableTables) and
+    // the admin gate. Without it, a tenant whose plan excludes reservations
+    // still leaks its branch roster (id + name) on the booking branch-picker —
+    // an info leak the pre-prod audit flagged. Return [] when not granted, the
+    // same shape as a tenant with no active branches. @Optional() entitlements
+    // ⇒ ungated for bare-constructed unit-test instances (prod DI always sets).
+    if (this.entitlements) {
+      const featureEnabled = await isReservationFeatureEnabled(
+        this.prisma,
+        this.entitlements,
+        tenantId,
+      );
+      if (!featureEnabled) {
+        return [];
+      }
+    }
+
     return this.prisma.branch.findMany({
       where: { tenantId, status: "active" },
       orderBy: { createdAt: "asc" },
@@ -124,6 +150,20 @@ export class ReservationAvailabilityService {
       tenantId,
       branchId,
     );
+
+    // Plan-gate the PUBLIC availability read so it matches the admin gate and
+    // the public create path — a tenant whose plan excludes reservations must
+    // not see bookable slots. Returning [] makes the wizard show no slots.
+    if (this.entitlements) {
+      const featureEnabled = await isReservationFeatureEnabled(
+        this.prisma,
+        this.entitlements,
+        tenantId,
+      );
+      if (!featureEnabled) {
+        return [];
+      }
+    }
 
     const settings = await this.settingsService.getOrCreate(tenantId);
 
@@ -180,6 +220,44 @@ export class ReservationAvailabilityService {
       },
     });
 
+    // When the caller passes a party size, a slot must only be "available" if
+    // at least one table that can SEAT the party is free for that slot's
+    // window — otherwise the wizard shows a slot that can never be honored
+    // (e.g. a party of 50 at a venue whose biggest table seats 8). Load the
+    // branch's tables once (capacity-filtered) and compute per-slot freeness
+    // using the same overlap math getAvailableTables uses. Guarded on
+    // guestCount so the no-party-size view (and existing callers) are
+    // unchanged.
+    //
+    // BUT: only apply the capacity gate when the branch ACTUALLY HAS tables.
+    // A reservation-enabled tenant that never defined tables would otherwise
+    // produce an empty capableTables array → every slot forced
+    // available:false → the whole day greyed out, bricking the no-table /
+    // walk-in flow. A branch with zero tables means "table management is not
+    // in use here", so leave capableTables=null (the per-slot gate below is
+    // skipped) and let slots stay bookable on capacity grounds; the
+    // createPublicReservation path bounds party size by
+    // settings.maxGuestsPerReservation instead.
+    let capableTables: { id: string; capacity: number }[] | null = null;
+    if (guestCount) {
+      const tables =
+        (await this.prisma.table.findMany({
+          where: { tenantId, branchId: resolvedBranchId },
+          select: { id: true, capacity: true },
+        })) ?? [];
+      // Only gate on capacity when tables exist for this branch. Zero tables
+      // ⇒ table management not in use ⇒ don't force slots unavailable.
+      if (tables.length > 0) {
+        capableTables = tables.filter((t) => t.capacity >= guestCount);
+      }
+    }
+
+    // Reservations that hold a specific table (for the per-table freeness
+    // check above). Reservations with no table don't block a specific table.
+    const tableReservations = existingReservations.filter(
+      (r) => r.tableId != null,
+    );
+
     while (currentMinutes + settings.defaultDuration <= closeMinutes) {
       const h = Math.floor(currentMinutes / 60);
       const m = currentMinutes % 60;
@@ -208,6 +286,31 @@ export class ReservationAvailabilityService {
         }
       }
 
+      // Party-size capacity: a slot is only bookable if at least one table
+      // that can seat the party is free for [slotStart, slotStart+duration).
+      // capableTables is non-null only when guestCount was supplied; when the
+      // venue has no table big enough it is empty → every slot is unavailable.
+      if (available && capableTables !== null) {
+        const slotStart = currentMinutes;
+        const slotEnd = currentMinutes + settings.defaultDuration;
+        const hasFreeTable = capableTables.some((table) => {
+          for (const res of tableReservations) {
+            if (res.tableId !== table.id) continue;
+            const resStart = timeToMinutes(res.startTime);
+            const resEnd = timeToMinutes(res.endTime);
+            // Strict overlap (boundary-touch is not an overlap), same as
+            // getAvailableTables.
+            if (slotStart < resEnd && slotEnd > resStart) {
+              return false; // this table is busy for the slot window
+            }
+          }
+          return true; // table can seat the party and is free
+        });
+        if (!hasFreeTable) {
+          available = false;
+        }
+      }
+
       slots.push({ time: timeStr, available });
       currentMinutes += interval;
     }
@@ -224,6 +327,20 @@ export class ReservationAvailabilityService {
     branchId?: string,
   ) {
     await this.validateTenant(tenantId);
+
+    // Plan-gate the PUBLIC table read so it matches the admin gate and the
+    // public create/slots paths — a tenant whose plan excludes reservations
+    // must not surface bookable tables.
+    if (this.entitlements) {
+      const featureEnabled = await isReservationFeatureEnabled(
+        this.prisma,
+        this.entitlements,
+        tenantId,
+      );
+      if (!featureEnabled) {
+        return [];
+      }
+    }
 
     // PUBLIC read — no @CurrentScope. Resolve the single branch this
     // availability view is for (explicit branchId when valid, else the

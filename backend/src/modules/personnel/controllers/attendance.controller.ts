@@ -5,8 +5,10 @@ import {
   Body,
   Query,
   Request,
+  Res,
   UseGuards,
 } from "@nestjs/common";
+import { Response } from "express";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -123,5 +125,28 @@ export class AttendanceController {
     @Query() query: AttendanceSummaryQueryDto,
   ) {
     return this.attendanceService.getAttendanceSummary(scope, query);
+  }
+
+  @Get("summary/export")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Export the attendance summary (worked/overtime/late minutes) as CSV. Attendance/hours only — not a payroll or wage export.",
+  })
+  async exportSummary(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: AttendanceSummaryQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.attendanceService.getAttendanceSummaryCsv(
+      scope,
+      query,
+    );
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=attendance-summary.csv",
+    );
+    res.send(csv);
   }
 }

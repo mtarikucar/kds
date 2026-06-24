@@ -9,6 +9,17 @@ export { MascotButton } from './MascotButton';
 export { useOnboarding } from './hooks/useOnboarding';
 export { useTourSteps } from './hooks/useTourSteps';
 
+// Onboarding persistence (server-side per-account state)
+export {
+  useOnboardingData,
+  useUpdateOnboarding,
+} from './onboardingApi';
+export type {
+  OnboardingData,
+  UpdateOnboardingPayload,
+  TourProgressEntry,
+} from './onboardingApi';
+
 // Types
 export type {
   TourStep,

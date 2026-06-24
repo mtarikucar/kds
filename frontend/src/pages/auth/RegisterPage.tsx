@@ -27,10 +27,12 @@ const RegisterPage = () => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const registerSchema = z.object({
-    email: z.string().email(t('validation:email')),
-    password: z.string().min(8, t('validation:minLength', { count: 8 })),
-    firstName: z.string().min(1, t('validation:required')),
-    lastName: z.string().min(1, t('validation:required')),
+    email: z.string().email(t('validation:validation.email', 'Please enter a valid email address')),
+    password: z
+      .string()
+      .min(8, t('validation:validation.minLength', { count: 8, defaultValue: 'Must be at least {{count}} characters' })),
+    firstName: z.string().min(1, t('validation:validation.required', 'This field is required')),
+    lastName: z.string().min(1, t('validation:validation.required', 'This field is required')),
     // Required: PayTR checkout needs a phone. PhoneInput emits E.164 ("+90…")
     // or '' — so we require a non-empty E.164 value.
     phone: z

@@ -72,8 +72,16 @@ export class AccountingSyncService {
       const adapter = this.getAdapter(settings.provider);
       if (!adapter) return;
 
-      const token = await this.getToken(tenantId, settings, adapter);
-      const companyId = this.getCompanyId(settings);
+      // The secret credential fields (parasutClientSecret/parasutPassword/
+      // logoPassword/foribaPassword) are stored AES-256-GCM encrypted (`v1:…`).
+      // findByTenant returns them encrypted; we MUST decrypt before handing
+      // them to the adapter or every authenticate() fails and the invoice
+      // never reaches the provider. Non-secret fields (companyId/firmNumber/
+      // apiUrl) pass through unchanged.
+      const creds =
+        await this.settingsService.getDecryptedCredentials(tenantId);
+      const token = await this.getToken(tenantId, creds ?? settings, adapter);
+      const companyId = this.getCompanyId(creds ?? settings);
 
       const invoiceData: AccountingInvoiceData = {
         invoiceNumber: invoice.invoiceNumber,
@@ -123,7 +131,11 @@ export class AccountingSyncService {
   async testConnection(
     tenantId: string,
   ): Promise<{ success: boolean; error?: string }> {
-    const settings = await this.settingsService.findByTenant(tenantId);
+    // Decrypt the stored secrets before testing — testing with the raw `v1:…`
+    // blob would always fail even when the operator entered correct creds.
+    const settings =
+      (await this.settingsService.getDecryptedCredentials(tenantId)) ??
+      (await this.settingsService.findByTenant(tenantId));
     const adapter = this.getAdapter(settings.provider);
     if (!adapter) return { success: false, error: "No provider configured" };
 

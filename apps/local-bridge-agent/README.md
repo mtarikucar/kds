@@ -54,4 +54,6 @@ cargo build --release
 
 ## What ships in this scaffold
 
-This commit lands the workspace boilerplate, command queue, cloud transport stubs, and one driver (`escpos`). The yazarkasa and ingenico drivers are stubbed; their `execute` methods return `not_implemented` so a real device test surfaces immediately.
+This commit lands the workspace boilerplate, command queue, and one driver (`escpos`). The cloud transport is wired end-to-end: first-boot **claim** (`POST /v1/bridges/claim`, exchanging the provisioning token for a bearer), a real 20s **heartbeat** (`POST /v1/bridges/heartbeat`, which is what keeps the bridge `online`), and `commands/next` + ack. The yazarkasa and ingenico drivers are stubbed; their `execute` methods return `not_implemented` so a real device test surfaces immediately.
+
+> Persistence caveat: a claimed bearer token is currently kept only in-process (via `HUMMY_BRIDGE_TOKEN`) for the life of the daemon. Durable cross-boot storage in the OS keyring is still a TODO (`config::persist_bearer_token` / `resolve_bearer_token`); until it lands, a headless restart needs `HUMMY_BRIDGE_TOKEN` set, because the provisioning token is single-use server-side.

@@ -51,7 +51,7 @@ describe('SubdomainLoyaltyPage', () => {
     fireEvent.click(screen.getByText('set-session'));
 
     await waitFor(() =>
-      expect(get).toHaveBeenCalledWith(expect.stringContaining('/sessions/sess-3/loyalty/transactions')),
+      expect(get).toHaveBeenCalledWith(expect.stringContaining('/customer-public/loyalty/transactions?sessionId=sess-3')),
     );
     await waitFor(() => expect(screen.getByTestId('loyalty').textContent).toBe('tenant:t2 tx:2'));
   });

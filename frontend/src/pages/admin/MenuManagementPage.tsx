@@ -155,6 +155,8 @@ const MenuManagementPage = () => {
         image: product.image || '',
         imageIds: productImagesList.map((img) => img.id),
         isAvailable: product.isAvailable ?? true,
+        stockTracked: product.stockTracked ?? false,
+        taxRate: product.taxRate ?? 10,
       });
       setPreselectedCategoryId(null);
     } else {
@@ -164,7 +166,9 @@ const MenuManagementPage = () => {
       setPreselectedCategoryId(categoryId || null);
       productForm.reset({
         isAvailable: true,
+        stockTracked: false,
         categoryId: categoryId || '',
+        taxRate: 10,
       });
     }
     setProductModalOpen(true);
@@ -196,6 +200,7 @@ const MenuManagementPage = () => {
       ...data,
       price: Number(data.price),
       currentStock: data.currentStock ? Number(data.currentStock) : 0,
+      taxRate: data.taxRate != null ? Number(data.taxRate) : 10,
       imageIds: productImages.map((img) => img.id),
     };
 
@@ -531,6 +536,22 @@ const MenuManagementPage = () => {
             {...productForm.register('currentStock', { valueAsNumber: true })}
           />
 
+          {/* KDV (VAT) rate — drives receipt + z-report tax breakdown */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('menu.taxRate')}
+            </label>
+            <select
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              {...productForm.register('taxRate', { valueAsNumber: true })}
+            >
+              <option value={0}>%0</option>
+              <option value={1}>%1</option>
+              <option value={10}>%10</option>
+              <option value={20}>%20</option>
+            </select>
+          </div>
+
           {/* Product Images */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -609,6 +630,17 @@ const MenuManagementPage = () => {
             />
             <label htmlFor="isAvailable" className="text-sm font-medium">
               {t('menu.available')}
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="stockTracked"
+              {...productForm.register('stockTracked')}
+              className="rounded"
+            />
+            <label htmlFor="stockTracked" className="text-sm font-medium">
+              {t('menu.stockTracked')}
             </label>
           </div>
           <div className="flex gap-3">

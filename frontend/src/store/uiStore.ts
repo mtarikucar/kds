@@ -37,6 +37,10 @@ interface UiState {
   resetTour: (tourId: string) => void;
   setSkipAllTours: (skip: boolean) => void;
   resetAllOnboarding: () => void;
+  // Replace local onboarding state with the account's server-side truth on
+  // boot so welcome/tour dismissals follow the user across browsers/devices
+  // (the server is authoritative; localStorage is just an offline cache).
+  hydrateOnboarding: (data: OnboardingState) => void;
 
   // Transient flag set by the onboarding tour to force POSPage into
   // its 'order' view (menu-panel + order-cart visible) while those
@@ -140,6 +144,16 @@ export const useUiStore = create<UiState>()(
 
       resetAllOnboarding: () => {
         set({ onboarding: initialOnboardingState });
+      },
+
+      hydrateOnboarding: (data: OnboardingState) => {
+        set({
+          onboarding: {
+            hasSeenWelcome: data.hasSeenWelcome ?? false,
+            skipAllTours: data.skipAllTours ?? false,
+            tourProgress: data.tourProgress ?? {},
+          },
+        });
       },
 
       posTourPreview: false,

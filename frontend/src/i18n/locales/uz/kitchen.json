@@ -39,6 +39,7 @@
     "orderUpdatedNotification": "Buyurtma yangilandi: №{{orderNumber}}",
     "lowStockAlert": "Kam zaxira: {{count}} ta mahsulot minimumdan past",
     "stockExpiryAlert": "Muddati tugayapti: {{count}} ta zaxira partiyasi",
+    "stockReversalFailed": "Zaxira qaytarilmadi: buyurtma #{{orderNumber}} — zaxirani tekshiring",
     "stats": {
       "activeOrders": "Faol buyurtmalar",
       "avgWaitTime": "O'rt. kutish",

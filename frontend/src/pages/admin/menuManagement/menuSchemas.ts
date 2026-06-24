@@ -22,6 +22,11 @@ export const createProductSchema = (t: (key: string) => string) =>
     image: z.string().url(t('menu.validation.invalidUrl')).optional().or(z.literal('')),
     imageIds: z.array(z.string()).optional(),
     isAvailable: z.boolean().optional(),
+    // When true, this product's currentStock decrements on each sale and the
+    // POS shows a live low-stock / out-of-stock badge.
+    stockTracked: z.boolean().optional(),
+    // KDV (VAT) rate — TR allows 0/1/10/20. Optional; backend defaults to 10.
+    taxRate: z.number().optional(),
   });
 
 export type CategoryFormData = z.infer<ReturnType<typeof createCategorySchema>>;

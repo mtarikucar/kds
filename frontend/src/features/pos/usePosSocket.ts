@@ -497,6 +497,17 @@ export const usePosSocket = () => {
       });
     };
 
+    // CRITICAL inventory-integrity alert (reversal failed on cancel).
+    const handleStockReversalFailed = (event: any) => {
+      console.log('[POS Socket] Stock reversal failed:', event);
+      toast.error(
+        i18n.t('pos:notifications.stockReversalFailed', {
+          orderNumber: event?.orderNumber ?? '',
+        }),
+        { duration: 15000, position: 'top-right' },
+      );
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -511,6 +522,7 @@ export const usePosSocket = () => {
     socket.on('payment:success', handlePaymentSuccess);
     socket.on('stock:low-alert', handleStockLowAlert);
     socket.on('stock:expiry-alert', handleStockExpiryAlert);
+    socket.on('stock:reversal-failed', handleStockReversalFailed);
 
     // Table merge/unmerge: invalidate tables cache
     const handleTableMergeOrUnmerge = () => {
@@ -540,6 +552,7 @@ export const usePosSocket = () => {
       socket.off('table:unmerged', handleTableMergeOrUnmerge);
       socket.off('stock:low-alert', handleStockLowAlert);
       socket.off('stock:expiry-alert', handleStockExpiryAlert);
+      socket.off('stock:reversal-failed', handleStockReversalFailed);
       disconnectSocket();
     };
   }, [queryClient]);

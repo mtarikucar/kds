@@ -36,6 +36,8 @@
     "category": "الفئة",
     "selectCategory": "اختر فئة",
     "currentStock": "المخزون الحالي",
+    "taxRate": "نسبة ضريبة القيمة المضافة (KDV)",
+    "stockTracked": "تتبّع المخزون (خصم عند البيع)",
     "productImages": "صور المنتج",
     "primary": "أساسي",
     "noImagesSelected": "لم يتم اختيار صور",
@@ -118,7 +120,12 @@
       "noImagesFound": "لم يتم العثور على صور",
       "noImagesYet": "لا توجد صور بعد",
       "tryDifferentSearch": "جرب بحثاً مختلفاً",
-      "uploadToStart": "ارفع للبدء"
+      "uploadToStart": "ارفع للبدء",
+      "allImages": "كل الصور",
+      "unusedImages": "غير مستخدمة",
+      "unusedHint": "صور غير مرتبطة بأي منتج. احذفها لاستعادة مساحة التخزين.",
+      "noUnusedImages": "لا توجد صور غير مستخدمة",
+      "noUnusedHint": "كل صورة مرتبطة بمنتج واحد على الأقل."
     }
   }
 }

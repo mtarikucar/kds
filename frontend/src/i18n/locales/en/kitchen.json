@@ -39,6 +39,7 @@
     "orderUpdatedNotification": "Order Updated: #{{orderNumber}}",
     "lowStockAlert": "Low stock: {{count}} item(s) below minimum",
     "stockExpiryAlert": "Expiring soon: {{count}} stock batch(es)",
+    "stockReversalFailed": "Stock reversal failed for order #{{orderNumber}} — verify inventory",
     "stats": {
       "activeOrders": "Active Orders",
       "avgWaitTime": "Avg Wait",

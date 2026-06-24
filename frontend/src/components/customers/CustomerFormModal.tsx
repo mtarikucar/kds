@@ -30,8 +30,12 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
   // Zod validation schema
   const customerSchema = z.object({
-    name: z.string().min(2, t('validation:nameMin')),
-    email: z.string().email(t('validation:email')).optional().or(z.literal('')),
+    name: z.string().min(2, t('validation:validation.nameMin', 'Name must be at least 2 characters')),
+    email: z
+      .string()
+      .email(t('validation:validation.email', 'Please enter a valid email address'))
+      .optional()
+      .or(z.literal('')),
     // <PhoneInput> emits canonical E.164 ('+90…') or '' while incomplete —
     // both already valid, so the field just needs to be an optional string.
     phone: z.string().optional().or(z.literal('')),

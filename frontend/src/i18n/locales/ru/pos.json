@@ -124,7 +124,8 @@
     "bills": "Счета",
     "newRequest": "Новый запрос: {{type}}",
     "lowStockAlert": "Низкий запас: {{count}} позиц. ниже минимума",
-    "stockExpiryAlert": "Скоро истекает срок: {{count}} партий запаса"
+    "stockExpiryAlert": "Скоро истекает срок: {{count}} партий запаса",
+    "stockReversalFailed": "Не удалось вернуть остатки по заказу #{{orderNumber}} — проверьте склад"
   },
   "pendingOrders": {
     "title": "Ожидающие заказы",

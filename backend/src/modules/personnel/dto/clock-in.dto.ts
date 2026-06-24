@@ -2,10 +2,11 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { IsOptional, IsString, MaxLength } from "class-validator";
 
 export class ClockInDto {
-  // Notes are persisted to Attendance.notes which appears on payroll
-  // export and labor audit trail. Cap at 500 — generous for "stuck
-  // in traffic, will make it up at end of shift" without leaving the
-  // column unbounded.
+  // Free-text note persisted to Attendance.notes (e.g. "stuck in traffic,
+  // will make it up at end of shift"). Capped at 500 to keep the column
+  // bounded. Note: there is no payroll/wage rail in the system — worked and
+  // overtime minutes are attendance/scheduling metrics only and are not
+  // converted to compensation anywhere.
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

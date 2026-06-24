@@ -36,6 +36,8 @@
     "category": "Category",
     "selectCategory": "Select a category",
     "currentStock": "Current Stock",
+    "taxRate": "VAT rate (KDV)",
+    "stockTracked": "Track stock (decrement on sale)",
     "productImages": "Product Images",
     "primary": "Primary",
     "noImagesSelected": "No images selected",
@@ -118,7 +120,12 @@
       "noImagesFound": "No images found",
       "noImagesYet": "No images yet",
       "tryDifferentSearch": "Try different search",
-      "uploadToStart": "Upload to get started"
+      "uploadToStart": "Upload to get started",
+      "allImages": "All images",
+      "unusedImages": "Unused",
+      "unusedHint": "Images not attached to any product. Delete to reclaim storage.",
+      "noUnusedImages": "No unused images",
+      "noUnusedHint": "Every image is attached to at least one product."
     }
   }
 }

@@ -906,12 +906,36 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========================================
 
   emitLowStockAlert(tenantId: string, branchId: string, items: string[]) {
+    // Emit the SAME event the KDS/POS sockets actually subscribe to
+    // ("stock:low-alert" with a `count`), not the orphaned
+    // "stock:low-stock-alert" name (which nothing handled, so order-driven
+    // low-stock alerts silently reached zero screens).
     this.server
       .to(`kitchen-${tenantId}-${branchId}`)
       .to(`pos-${tenantId}-${branchId}`)
-      .emit("stock:low-stock-alert", { items, timestamp: new Date() });
+      .emit("stock:low-alert", { count: items.length, items });
     this.logger.debug(
-      `stock:low-stock-alert ${items.length} items → kitchen/pos-${tenantId}`,
+      `stock:low-alert ${items.length} items → kitchen/pos-${tenantId}`,
+    );
+  }
+
+  /**
+   * CRITICAL inventory-integrity alert: stock reversal failed on a cancelled
+   * order (counts are now wrong until manually reconciled). This is NOT a
+   * low-stock warning — it gets its own event + an error toast so an operator
+   * can't mistake it for a routine low-stock notice.
+   */
+  emitStockReversalFailed(
+    tenantId: string,
+    branchId: string,
+    payload: { orderNumber: string; message: string },
+  ) {
+    this.server
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("stock:reversal-failed", payload);
+    this.logger.warn(
+      `stock:reversal-failed order=${payload.orderNumber} → kitchen/pos-${tenantId}`,
     );
   }
 

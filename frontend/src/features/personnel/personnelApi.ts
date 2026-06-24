@@ -73,6 +73,33 @@ export const useAttendanceSummary = (params?: { startDate?: string; endDate?: st
   });
 };
 
+/**
+ * Download the attendance summary as a CSV (worked/overtime/late minutes per
+ * staff member). This is an attendance/hours export — NOT payroll: the system
+ * stores no wage rate and the CSV carries no monetary columns. Fetches through
+ * the api client so the auth header + branch scope are applied, then triggers
+ * a browser download from the blob.
+ */
+export const downloadAttendanceSummaryCsv = async (params?: {
+  startDate?: string;
+  endDate?: string;
+  period?: string;
+}): Promise<void> => {
+  const response = await api.get('/personnel/attendance/summary/export', {
+    params,
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'attendance-summary.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 export const useClockIn = () => {
   const queryClient = useQueryClient();
   return useMutation({

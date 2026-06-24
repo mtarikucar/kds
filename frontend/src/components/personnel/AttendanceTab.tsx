@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import {
   Clock,
   LogIn,
@@ -9,6 +10,7 @@ import {
   CheckCircle,
   Users,
   Loader2,
+  Download,
 } from 'lucide-react';
 import {
   useMyAttendanceStatus,
@@ -19,6 +21,7 @@ import {
   useClockOut,
   useStartBreak,
   useEndBreak,
+  downloadAttendanceSummaryCsv,
 } from '../../features/personnel/personnelApi';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole, Attendance } from '../../types';
@@ -47,6 +50,18 @@ const AttendanceTab = () => {
   const clockOut = useClockOut();
   const startBreak = useStartBreak();
   const endBreak = useEndBreak();
+
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportSummary = async () => {
+    setIsExporting(true);
+    try {
+      await downloadAttendanceSummaryCsv({});
+    } catch {
+      toast.error(t('attendance.exportError'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const myStatusValue = myStatus?.status || 'NOT_CLOCKED_IN';
   const myAttendance = myStatus && isAttendanceRecord(myStatus) ? myStatus : null;
@@ -316,6 +331,17 @@ const AttendanceTab = () => {
           {/* Summary */}
           {activeSection === 'summary' && (
             <div className="bg-white rounded-xl border border-gray-200">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
+                <p className="text-xs text-gray-500">{t('attendance.hoursNote')}</p>
+                <button
+                  onClick={handleExportSummary}
+                  disabled={isExporting || !summary || summary.length === 0}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex-shrink-0"
+                >
+                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {t('attendance.exportCsv')}
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">

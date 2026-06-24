@@ -28,7 +28,7 @@ const SubdomainLoyaltyPage: React.FC<SubdomainLoyaltyPageProps> = ({ subdomain }
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
         const response = await axios.get(
-          `${API_URL}/customer-public/sessions/${sessionId}/loyalty/transactions`
+          `${API_URL}/customer-public/loyalty/transactions?sessionId=${sessionId}`
         );
         setTransactions(response.data);
       } catch (error) {

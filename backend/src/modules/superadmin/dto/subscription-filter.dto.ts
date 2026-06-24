@@ -218,6 +218,15 @@ export class CreatePlanDto {
   @IsBoolean()
   deliveryIntegration?: boolean = false;
 
+  // M10: posAccess is a real, tier-gating column (schema default true). It was
+  // never exposed on the plan create/update path, so a superadmin building a
+  // custom plan could not turn POS off. Default true to mirror the schema so
+  // omitting it on create keeps the historical behavior.
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  posAccess?: boolean = true;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

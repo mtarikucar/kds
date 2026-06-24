@@ -43,26 +43,30 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
       return;
     }
 
+    if (!sessionId) {
+      toast.error(t('loyalty.mustIdentify'));
+      return;
+    }
+
     setIsApplyingReferral(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const sessionRes = await axios.get(`${API_URL}/customer-public/sessions/${sessionId}`);
-      const customerId = sessionRes.data.customerId;
 
-      if (!customerId) {
-        toast.error(t('loyalty.mustIdentify'));
-        return;
-      }
-
-      await axios.post(`${API_URL}/customer-public/loyalty/apply-referral`, {
-        customerId,
+      // The backend resolves the customerId from the server-side session
+      // (POST /customer-public/referral/apply takes { sessionId, referralCode }),
+      // so no separate session lookup is needed. The endpoint additionally
+      // requires the customer's phone to be verified; if it is not, the API
+      // returns a 403 whose message we surface verbatim so the customer knows
+      // to verify their phone first.
+      await axios.post(`${API_URL}/customer-public/referral/apply`, {
+        sessionId,
         referralCode: referralCode.toUpperCase(),
       });
 
       toast.success(t('loyalty.referralApplied'));
       setReferralCode('');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || t('loyalty.referralError'));
+      toast.error(error.response?.data?.message || t('loyalty.referralFailed'));
     } finally {
       setIsApplyingReferral(false);
     }

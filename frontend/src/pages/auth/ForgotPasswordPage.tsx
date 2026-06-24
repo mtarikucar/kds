@@ -16,7 +16,7 @@ const ForgotPasswordPage = () => {
   const { mutate: forgotPassword, isPending } = useForgotPassword();
 
   const forgotPasswordSchema = z.object({
-    email: z.string().email(t('validation:email')),
+    email: z.string().email(t('validation:validation.email', 'Please enter a valid email address')),
   });
 
   type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;

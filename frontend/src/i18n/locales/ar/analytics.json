@@ -1,4 +1,9 @@
 {
+  "cvDisclosure": {
+    "requiresCameras": "يتطلب كاميرات إشغال",
+    "noData": "لا توجد بيانات كاميرا",
+    "noOccupancyTelemetry": "تتطلب هذه المقاييس كاميرات إشغال في الموقع لقياسها. بدون أجهزة الكاميرا تظهر كصفر/قيمة افتراضية ولا تعكس النشاط الفعلي."
+  },
   "heatmap": {
     "settings": "Heatmap Settings",
     "visualizationType": "Visualization Type",

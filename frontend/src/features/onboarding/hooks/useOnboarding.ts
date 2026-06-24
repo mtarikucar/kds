@@ -5,6 +5,11 @@ import { useUiStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useTourSteps } from './useTourSteps';
 import { TourStep } from '../tours/types';
+import {
+  useOnboardingData,
+  useUpdateOnboarding,
+  type UpdateOnboardingPayload,
+} from '../onboardingApi';
 
 // Tour targets that require POSPage to be in 'order' view. The onboarding
 // flow flips uiStore.posTourPreview when one of these is the active step so
@@ -46,6 +51,7 @@ export function useOnboarding(): UseOnboardingReturn {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
+  const demoMode = useAuthStore((state) => state.demoMode);
   const { tourConfig, steps, tourId } = useTourSteps();
 
   const {
@@ -55,7 +61,58 @@ export function useOnboarding(): UseOnboardingReturn {
     setSkipAllTours,
     resetAllOnboarding,
     setPosTourPreview,
+    hydrateOnboarding,
   } = useUiStore();
+
+  // Server-side onboarding store (per account). Skip entirely while exploring
+  // the shared demo restaurant: that session is access-only and ephemeral, so
+  // its tour state must not overwrite the real account's progress.
+  const enableServerSync = !!user && !demoMode;
+  const { data: serverOnboarding } = useOnboardingData(enableServerSync);
+  const updateOnboarding = useUpdateOnboarding();
+
+  // Hydrate local state from the account once the server responds, so a fresh
+  // browser/device inherits a prior "skip all tours" / "seen welcome" /
+  // completed-tour dismissal instead of re-triggering the intro. Runs once per
+  // fetched payload (the server is source of truth on boot).
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!enableServerSync) {
+      hydratedRef.current = false;
+      return;
+    }
+    if (serverOnboarding && !hydratedRef.current) {
+      hydratedRef.current = true;
+      // Normalize the server's partial tour-progress entries to the store's
+      // strict shape (completed/lastStep are optional over the wire).
+      const normalizedProgress: Record<
+        string,
+        { completed: boolean; lastStep: number; completedAt?: string }
+      > = {};
+      for (const [id, p] of Object.entries(serverOnboarding.tourProgress ?? {})) {
+        normalizedProgress[id] = {
+          completed: p?.completed ?? false,
+          lastStep: p?.lastStep ?? 0,
+          completedAt: p?.completedAt,
+        };
+      }
+      hydrateOnboarding({
+        hasSeenWelcome: serverOnboarding.hasSeenWelcome,
+        skipAllTours: serverOnboarding.skipAllTours,
+        tourProgress: normalizedProgress,
+      });
+    }
+  }, [enableServerSync, serverOnboarding, hydrateOnboarding]);
+
+  // Best-effort write-through to the account. Fire-and-forget; localStorage
+  // (uiStore) is already updated by the caller and stays the offline cache.
+  const persistOnboarding = useCallback(
+    (payload: UpdateOnboardingPayload) => {
+      if (!enableServerSync) return;
+      updateOnboarding.mutate(payload);
+    },
+    [enableServerSync, updateOnboarding]
+  );
 
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [isTourRunning, setIsTourRunning] = useState(false);
@@ -71,8 +128,14 @@ export function useOnboarding(): UseOnboardingReturn {
     ? onboarding.tourProgress[tourId]?.completed ?? false
     : false;
 
+  // Wait for the server fetch to resolve (or be skipped) before deciding to
+  // show the welcome modal, so a fresh browser that has actually dismissed it
+  // on the account doesn't flash the modal before hydration lands.
+  const onboardingHydrated = !enableServerSync || serverOnboarding !== undefined;
+
   const shouldShowWelcome =
     !!user &&
+    onboardingHydrated &&
     !onboarding.hasSeenWelcome &&
     !onboarding.skipAllTours &&
     !hasCompletedTour;
@@ -117,11 +180,13 @@ export function useOnboarding(): UseOnboardingReturn {
   const closeWelcomeModal = useCallback(() => {
     setIsWelcomeModalOpen(false);
     setHasSeenWelcome(true);
-  }, [setHasSeenWelcome]);
+    persistOnboarding({ hasSeenWelcome: true });
+  }, [setHasSeenWelcome, persistOnboarding]);
 
   const startTour = useCallback(() => {
     setIsWelcomeModalOpen(false);
     setHasSeenWelcome(true);
+    persistOnboarding({ hasSeenWelcome: true });
 
     if (steps.length > 0) {
       // Navigate to the first step's route if specified
@@ -136,14 +201,35 @@ export function useOnboarding(): UseOnboardingReturn {
         setIsTourRunning(true);
       }, 300);
     }
-  }, [steps, location.pathname, navigate, setHasSeenWelcome]);
+  }, [steps, location.pathname, navigate, setHasSeenWelcome, persistOnboarding]);
 
   const skipTour = useCallback(() => {
     setIsWelcomeModalOpen(false);
     setHasSeenWelcome(true);
     setSkipAllTours(true);
     setIsTourRunning(false);
-  }, [setHasSeenWelcome, setSkipAllTours]);
+    persistOnboarding({ hasSeenWelcome: true, skipAllTours: true });
+  }, [setHasSeenWelcome, setSkipAllTours, persistOnboarding]);
+
+  // Write tour progress locally and mirror it to the account. Completion
+  // (completed === true) is the bit that must survive a device switch so the
+  // tour doesn't re-trigger, so always persist that; intermediate step
+  // updates also write through (cheap, keeps lastStep in sync).
+  const syncTourProgress = useCallback(
+    (id: string, step: number, completed: boolean) => {
+      updateTourProgress(id, step, completed);
+      persistOnboarding({
+        tourProgress: {
+          [id]: {
+            completed,
+            lastStep: step,
+            completedAt: completed ? new Date().toISOString() : undefined,
+          },
+        },
+      });
+    },
+    [updateTourProgress, persistOnboarding]
+  );
 
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
@@ -154,7 +240,7 @@ export function useOnboarding(): UseOnboardingReturn {
         setIsTourRunning(false);
         setCurrentStep(0);
         if (tourId) {
-          updateTourProgress(tourId, index, false);
+          syncTourProgress(tourId, index, false);
         }
         return;
       }
@@ -165,7 +251,7 @@ export function useOnboarding(): UseOnboardingReturn {
         setIsTourRunning(false);
         setCurrentStep(0);
         if (tourId) {
-          updateTourProgress(tourId, steps.length - 1, true);
+          syncTourProgress(tourId, steps.length - 1, true);
         }
         return;
       }
@@ -175,7 +261,7 @@ export function useOnboarding(): UseOnboardingReturn {
         setIsTourRunning(false);
         setCurrentStep(0);
         if (tourId) {
-          updateTourProgress(tourId, index, false);
+          syncTourProgress(tourId, index, false);
         }
         return;
       }
@@ -204,14 +290,14 @@ export function useOnboarding(): UseOnboardingReturn {
 
           // Update progress
           if (tourId) {
-            updateTourProgress(tourId, nextIndex, false);
+            syncTourProgress(tourId, nextIndex, false);
           }
         } else if (nextIndex >= steps.length) {
           // Tour completed - clicked "Finish" on last step
           setIsTourRunning(false);
           setCurrentStep(0);
           if (tourId) {
-            updateTourProgress(tourId, steps.length - 1, true);
+            syncTourProgress(tourId, steps.length - 1, true);
           }
         }
       }
@@ -254,13 +340,13 @@ export function useOnboarding(): UseOnboardingReturn {
           } else {
             setIsTourRunning(false);
             if (tourId) {
-              updateTourProgress(tourId, steps.length - 1, true);
+              syncTourProgress(tourId, steps.length - 1, true);
             }
           }
         }, TARGET_RETRY_DELAY_MS);
       }
     },
-    [steps, tourId, location.pathname, navigate, updateTourProgress]
+    [steps, tourId, location.pathname, navigate, syncTourProgress]
   );
 
   const resetOnboarding = useCallback(() => {

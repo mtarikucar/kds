@@ -9,10 +9,27 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateProductDto } from "../dto/create-product.dto";
 import { UpdateProductDto } from "../dto/update-product.dto";
 import { sanitizePage } from "../../../common/dto/list-query.dto";
+import { UploadService } from "../../upload/upload.service";
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private uploadService: UploadService,
+  ) {}
+
+  // NOTE: images are a REUSABLE, tenant-scoped library (ProductImage rows are
+  // linked to products only through the ProductToImage junction; they carry no
+  // direct product FK). Detaching an image from a product, swapping a product's
+  // imageIds, or deleting a product must therefore LEAVE the ProductImage row +
+  // its on-disk file intact so the operator can reuse it on another product.
+  // An earlier "auto-prune on detach/swap/delete" deleted those library images
+  // the instant they lost their last product link — silent data loss that also
+  // contradicted the "Unused images" library screen, which exists precisely so
+  // the operator can review and INTENTIONALLY delete unused images. The only
+  // path that permanently deletes a library image is now that explicit,
+  // operator-initiated unused-images delete (UploadService.deleteProductImage,
+  // surfaced via the ImagesTab); product mutations never auto-delete images.
 
   // Helper method to transform product response
   private transformProductResponse(product: any) {
@@ -68,6 +85,9 @@ export class ProductsService {
         isAvailable: createProductDto.isAvailable ?? true,
         stockTracked: createProductDto.stockTracked ?? false,
         currentStock: createProductDto.currentStock ?? 0,
+        // KDV rate per product (0/1/10/20). Defaults to 10 when unset so the
+        // fiscal/receipt math is correct for non-10% items once configured.
+        taxRate: createProductDto.taxRate ?? 10,
         categoryId: createProductDto.categoryId,
         tenantId,
       },
@@ -221,7 +241,11 @@ export class ProductsService {
 
     // Update images if provided
     if (imageIds !== undefined) {
-      // Delete all current product-image links from junction table
+      // Delete all current product-image links from junction table. We only
+      // drop the JUNCTION rows here — the ProductImage library rows + files
+      // are intentionally kept. Any image the swap leaves attached to no
+      // product stays in the library (unlinked) and surfaces under the
+      // "Unused" filter for the operator to delete on purpose.
       await this.prisma.productToImage.deleteMany({
         where: { productId: id },
       });
@@ -241,7 +265,17 @@ export class ProductsService {
 
     try {
       // Compound WHERE — tenantId IDOR guard on delete (B41-B45 pattern).
-      return await this.prisma.product.delete({ where: { id, tenantId } });
+      // product.delete cascades the junction rows (ProductToImage
+      // onDelete:Cascade) but DELIBERATELY leaves the ProductImage library
+      // rows + their on-disk files intact: images are a reusable library and
+      // may be reattached to other products. Any image the delete leaves
+      // attached to no product becomes "unused" and is removed only when the
+      // operator deletes it explicitly from the Unused-images screen.
+      const deleted = await this.prisma.product.delete({
+        where: { id, tenantId },
+      });
+
+      return deleted;
     } catch (err) {
       // OrderItem.productId uses onDelete: Restrict, so a product that was
       // ever ordered cannot be hard-deleted. Translate the P2003 into a
@@ -460,7 +494,10 @@ export class ProductsService {
       throw new NotFoundException("Image not found on this product");
     }
 
-    // Delete the link from junction table (image stays in library for reuse)
+    // Delete the link from junction table only. The ProductImage row + file
+    // are intentionally KEPT: detaching returns the image to the reusable
+    // library (now unlinked), where it shows under the "Unused" filter for the
+    // operator to delete on purpose. We never auto-delete it here.
     await this.prisma.productToImage.delete({
       where: {
         productId_imageId: {

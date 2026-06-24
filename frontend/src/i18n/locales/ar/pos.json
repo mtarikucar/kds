@@ -124,7 +124,8 @@
     "bills": "فواتير",
     "newRequest": "طلب {{type}} جديد",
     "lowStockAlert": "مخزون منخفض: {{count}} صنف أقل من الحد الأدنى",
-    "stockExpiryAlert": "قرب انتهاء الصلاحية: {{count}} دفعة مخزون"
+    "stockExpiryAlert": "قرب انتهاء الصلاحية: {{count}} دفعة مخزون",
+    "stockReversalFailed": "فشل عكس المخزون للطلب #{{orderNumber}} — تحقق من المخزون"
   },
   "pendingOrders": {
     "title": "الطلبات المعلقة",
