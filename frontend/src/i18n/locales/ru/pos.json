@@ -122,7 +122,9 @@
     "calls": "Вызовы",
     "bill": "Счет",
     "bills": "Счета",
-    "newRequest": "Новый запрос: {{type}}"
+    "newRequest": "Новый запрос: {{type}}",
+    "lowStockAlert": "Низкий запас: {{count}} позиц. ниже минимума",
+    "stockExpiryAlert": "Скоро истекает срок: {{count}} партий запаса"
   },
   "pendingOrders": {
     "title": "Ожидающие заказы",

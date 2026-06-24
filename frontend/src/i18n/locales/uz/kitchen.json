@@ -37,6 +37,8 @@
     "moreOptions": "Qo'shimcha variantlar",
     "newOrderNotification": "Yangi buyurtma: №{{orderNumber}}",
     "orderUpdatedNotification": "Buyurtma yangilandi: №{{orderNumber}}",
+    "lowStockAlert": "Kam zaxira: {{count}} ta mahsulot minimumdan past",
+    "stockExpiryAlert": "Muddati tugayapti: {{count}} ta zaxira partiyasi",
     "stats": {
       "activeOrders": "Faol buyurtmalar",
       "avgWaitTime": "O'rt. kutish",

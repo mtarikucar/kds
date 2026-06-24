@@ -8,7 +8,6 @@ import {
   ZReport,
 } from "../fiscal-provider.interface";
 import { FiscalProviderRegistry } from "../fiscal-provider.registry";
-import { PrismaService } from "../../../prisma/prisma.service";
 
 /**
  * e-Fatura / e-Arşiv adapter — HONESTY SHIM (does NOT issue e-documents).
@@ -46,10 +45,10 @@ export class EfaturaFiscalProvider implements FiscalProvider, OnModuleInit {
   readonly capabilities: FiscalCapability[] = ["invoice"];
   private readonly logger = new Logger(EfaturaFiscalProvider.name);
 
-  constructor(
-    private readonly registry: FiscalProviderRegistry,
-    private readonly prisma: PrismaService,
-  ) {}
+  // PrismaService was removed: this honesty shim no longer writes a
+  // SalesInvoice row (that orphaned the ledger) — it only registers itself
+  // and refuses to fake an issuance, so it needs no DB access.
+  constructor(private readonly registry: FiscalProviderRegistry) {}
 
   onModuleInit(): void {
     this.registry.register(this);

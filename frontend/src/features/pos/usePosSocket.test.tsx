@@ -38,8 +38,9 @@ vi.mock('../../lib/tauri', () => ({
   },
 }));
 
+const toastWarning = vi.fn();
 vi.mock('sonner', () => ({
-  toast: { warning: vi.fn(), info: vi.fn(), success: vi.fn() },
+  toast: { warning: (...a: unknown[]) => toastWarning(...a), info: vi.fn(), success: vi.fn() },
 }));
 vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
@@ -83,6 +84,8 @@ describe('usePosSocket — wiring + connection', () => {
     expect(fakeSocket.on).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('payment:success', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('bill-request:new', expect.any(Function));
+    expect(fakeSocket.on).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
+    expect(fakeSocket.on).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
 
     act(() => handlers['connect']());
     expect(result.current.isConnected).toBe(true);
@@ -222,12 +225,38 @@ describe('handlePaymentSuccess — self-action print guard', () => {
   });
 });
 
+describe('handleStockAlerts — warning toasts', () => {
+  it('stock:low-alert shows a POS-namespace warning toast', () => {
+    const client = new QueryClient();
+    renderHook(() => usePosSocket(), { wrapper: wrapper(client) });
+
+    act(() => handlers['stock:low-alert']({ count: 4, items: [] }));
+    expect(toastWarning).toHaveBeenCalledWith(
+      'pos:notifications.lowStockAlert',
+      expect.objectContaining({ position: 'top-right' }),
+    );
+  });
+
+  it('stock:expiry-alert shows a POS-namespace warning toast', () => {
+    const client = new QueryClient();
+    renderHook(() => usePosSocket(), { wrapper: wrapper(client) });
+
+    act(() => handlers['stock:expiry-alert']({ count: 1, batches: [] }));
+    expect(toastWarning).toHaveBeenCalledWith(
+      'pos:notifications.stockExpiryAlert',
+      expect.objectContaining({ position: 'top-right' }),
+    );
+  });
+});
+
 describe('usePosSocket — cleanup', () => {
   it('removes its listeners and disconnects on unmount', () => {
     const client = new QueryClient();
     const { unmount } = renderHook(() => usePosSocket(), { wrapper: wrapper(client) });
     unmount();
     expect(fakeSocket.off).toHaveBeenCalledWith('payment:success', expect.any(Function));
+    expect(fakeSocket.off).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
+    expect(fakeSocket.off).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
     expect(disconnectSocket).toHaveBeenCalledTimes(1);
   });
 });

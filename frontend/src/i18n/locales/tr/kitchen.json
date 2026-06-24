@@ -37,6 +37,8 @@
     "moreOptions": "Daha fazla seçenek",
     "newOrderNotification": "Yeni Sipariş: #{{orderNumber}}",
     "orderUpdatedNotification": "Sipariş Güncellendi: #{{orderNumber}}",
+    "lowStockAlert": "Düşük stok: {{count}} ürün minimumun altında",
+    "stockExpiryAlert": "Son kullanma yaklaşıyor: {{count}} stok partisi",
     "stats": {
       "activeOrders": "Aktif Siparişler",
       "avgWaitTime": "Ort. Bekleme",

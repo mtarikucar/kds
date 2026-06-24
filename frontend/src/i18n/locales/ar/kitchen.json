@@ -37,6 +37,8 @@
     "moreOptions": "خيارات إضافية",
     "newOrderNotification": "طلب جديد: #{{orderNumber}}",
     "orderUpdatedNotification": "تم تحديث الطلب: #{{orderNumber}}",
+    "lowStockAlert": "مخزون منخفض: {{count}} صنف أقل من الحد الأدنى",
+    "stockExpiryAlert": "قرب انتهاء الصلاحية: {{count}} دفعة مخزون",
     "stats": {
       "activeOrders": "الطلبات النشطة",
       "avgWaitTime": "متوسط الانتظار",

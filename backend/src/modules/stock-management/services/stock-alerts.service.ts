@@ -80,7 +80,9 @@ export class StockAlertsService {
     // branch-suffixed (kitchen/pos-${tenantId}-${branchId}); a bare-room emit
     // reaches zero clients. A branchId-less call (raw list for REST consumers)
     // simply skips the emit. The scheduler always supplies a branchId so its
-    // hourly run does emit.
+    // hourly run does emit. The KDS/POS sockets now subscribe to
+    // "stock:low-alert" (useKitchenSocket / usePosSocket) and show a warning
+    // toast, so the emit actually surfaces on a screen.
     if (
       branchId &&
       lowStockItems.length > 0 &&

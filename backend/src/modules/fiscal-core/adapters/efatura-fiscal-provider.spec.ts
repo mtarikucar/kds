@@ -1,6 +1,5 @@
 import { EfaturaFiscalProvider } from "./efatura-fiscal-provider";
 import { FiscalProviderRegistry } from "../fiscal-provider.registry";
-import { PrismaService } from "../../../prisma/prisma.service";
 import { FiscalReceiptRequest } from "../fiscal-provider.interface";
 
 /**
@@ -10,19 +9,17 @@ import { FiscalReceiptRequest } from "../fiscal-provider.interface";
  * e-Fatura/e-Arşiv rail lives in the accounting module (SalesInvoiceService →
  * AccountingSyncService) and fires on order payment. So this adapter MUST:
  *   - NEVER return status:'issued' (it submits nothing to the GİB),
- *   - NEVER write a SalesInvoice row (that orphan-diverged the ledger),
+ *   - NEVER write a SalesInvoice row (it now has NO DB access at all — the
+ *     PrismaService injection was removed once the fake-issuance was deleted),
  *   - NEVER mint a fake fiscalNo,
  *   - return status:'failed' with a message pointing at Settings → Accounting.
  */
 describe("EfaturaFiscalProvider", () => {
-  function makeProvider(createImpl: jest.Mock = jest.fn()) {
+  function makeProvider() {
     const registry = {
       register: jest.fn(),
     } as unknown as FiscalProviderRegistry;
-    const prisma = {
-      salesInvoice: { create: createImpl },
-    } as unknown as PrismaService;
-    return { provider: new EfaturaFiscalProvider(registry, prisma), create: createImpl };
+    return { provider: new EfaturaFiscalProvider(registry) };
   }
 
   const req: FiscalReceiptRequest = {
@@ -51,19 +48,18 @@ describe("EfaturaFiscalProvider", () => {
     expect(result.error).toMatch(/Accounting/i);
   });
 
-  it("NEVER writes a SalesInvoice row (no orphaned/diverged invoice)", async () => {
-    const { provider, create } = makeProvider();
-    await provider.issueReceipt(req);
-    expect(create).not.toHaveBeenCalled();
+  it("has no DB dependency (cannot write a SalesInvoice — orphan-divergence is structurally impossible)", () => {
+    // The provider no longer takes a PrismaService; constructing it with only
+    // the registry proves the fake-issuance write path is gone for good.
+    const { provider } = makeProvider();
+    expect(provider).toBeInstanceOf(EfaturaFiscalProvider);
   });
 
   it("registers itself on module init", () => {
     const registry = {
       register: jest.fn(),
     } as unknown as FiscalProviderRegistry;
-    const provider = new EfaturaFiscalProvider(registry, {
-      salesInvoice: { create: jest.fn() },
-    } as unknown as PrismaService);
+    const provider = new EfaturaFiscalProvider(registry);
     provider.onModuleInit();
     expect(registry.register).toHaveBeenCalledWith(provider);
   });

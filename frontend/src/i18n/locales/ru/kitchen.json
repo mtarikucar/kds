@@ -37,6 +37,8 @@
     "moreOptions": "Дополнительные опции",
     "newOrderNotification": "Новый заказ: №{{orderNumber}}",
     "orderUpdatedNotification": "Заказ обновлен: №{{orderNumber}}",
+    "lowStockAlert": "Низкий запас: {{count}} позиц. ниже минимума",
+    "stockExpiryAlert": "Скоро истекает срок: {{count}} партий запаса",
     "stats": {
       "activeOrders": "Активные заказы",
       "avgWaitTime": "Сред. ожидание",

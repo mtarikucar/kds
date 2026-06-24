@@ -122,7 +122,9 @@
     "calls": "Calls",
     "bill": "Bill",
     "bills": "Bills",
-    "newRequest": "New {{type}} Request"
+    "newRequest": "New {{type}} Request",
+    "lowStockAlert": "Low stock: {{count}} item(s) below minimum",
+    "stockExpiryAlert": "Expiring soon: {{count}} stock batch(es)"
   },
   "pendingOrders": {
     "title": "Pending Orders",

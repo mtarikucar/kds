@@ -629,6 +629,17 @@ export class PaymentFinalizer {
       // (yazarkasa firmware is integer-only). productCode = productId; the
       // GMP-3 adapter buckets lines into KDV departments from device config,
       // not by a catalogue SKU lookup.
+      //
+      // TODO(fiscal-reconcile): these lines + the single cash tender below use
+      // unitPrice*qty with discountCents=0 and a synthetic "cash" total. That
+      // is fine ONLY because this method is a dormant no-op today — there is NO
+      // fiscalDeviceRecord create-site yet, so `device` is always null and we
+      // return at line 620. BEFORE a physical ÖKC is ever activated this MUST
+      // be reconciled against the actual Payment rows / order.finalAmount:
+      // apply real per-line discounts (order/item discounts → discountCents),
+      // and emit the real per-method tender breakdown (card/cash/online) from
+      // the Payment rows instead of one lumped cash amount. Shipping as-is
+      // would mis-state KDV and the tender on a legally-binding fiş.
       const lines = order.orderItems.map((it) => ({
         productCode: it.productId,
         name: it.product?.name ?? "Ürün",
