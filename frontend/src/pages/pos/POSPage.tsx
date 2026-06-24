@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt, LayoutGrid, Map as MapIcon } from 'lucide-react';
+import LiveFloorMap from '../../features/floor-plan/components/LiveFloorMap';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
@@ -51,6 +52,8 @@ const POSPage = () => {
 
   // View state: table-selection or order
   const [currentView, setCurrentView] = useState<POSView>('table-selection');
+  // Table-selection layout: classic grid, or the live 2D floor map.
+  const [tableViewMode, setTableViewMode] = useState<'grid' | 'map'>('grid');
 
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   // Cart persisted in localStorage so an accidental tab close / refresh
@@ -714,13 +717,36 @@ const POSPage = () => {
       {currentView === 'table-selection' && !isTablelessMode && (
         <div className="h-[calc(100vh-12rem)] flex flex-col">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-heading font-bold text-slate-900">
-              {t('tableSelection.title')}
-            </h1>
-            <p className="text-sm md:text-base text-slate-500 mt-1">
-              {t('tableSelection.description')}
-            </p>
+          <div className="mb-6 flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-heading font-bold text-slate-900">
+                {t('tableSelection.title')}
+              </h1>
+              <p className="text-sm md:text-base text-slate-500 mt-1">
+                {t('tableSelection.description')}
+              </p>
+            </div>
+            {/* Grid / live-map view toggle */}
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTableViewMode('grid')}
+                aria-pressed={tableViewMode === 'grid'}
+                aria-label={t('tableSelection.viewGrid', 'Izgara')}
+                className={`flex items-center justify-center w-10 h-9 rounded-md transition-colors ${tableViewMode === 'grid' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTableViewMode('map')}
+                aria-pressed={tableViewMode === 'map'}
+                aria-label={t('tableSelection.viewMap', 'Plan')}
+                className={`flex items-center justify-center w-10 h-9 rounded-md transition-colors ${tableViewMode === 'map' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <MapIcon className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Takeaway Hero Card (if tableless mode enabled) */}
@@ -755,7 +781,7 @@ const POSPage = () => {
           )}
 
           {/* Tables Grid */}
-          {!isLoadingTables && tables && (
+          {!isLoadingTables && tables && tableViewMode === 'grid' && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 auto-rows-max overflow-auto pb-4" data-tour="table-grid">
               {tables.map((table) => {
                 const notifications = getTableNotifications(table.id);
@@ -830,6 +856,20 @@ const POSPage = () => {
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* Live 2D floor map — tap a table to start/resume its order. Looks
+              up the full Table by id so handleSelectTable keeps every branch
+              (reservation dialog, manual-lock, load-existing-order). */}
+          {!isLoadingTables && tableViewMode === 'map' && (
+            <div className="flex-1 min-h-0 rounded-2xl border border-slate-200 overflow-hidden bg-white">
+              <LiveFloorMap
+                onTableClick={(fpt) => {
+                  const full = tables?.find((tb) => tb.id === fpt.id);
+                  if (full) handleSelectTable(full);
+                }}
+              />
             </div>
           )}
         </div>

@@ -167,6 +167,8 @@
   },
   "tableSelection": {
     "title": "Select a Table",
+    "viewGrid": "Grid",
+    "viewMap": "Map",
     "description": "Choose a table to start taking orders",
     "takeawayOrder": "Takeaway Order",
     "takeawayDescription": "Order without a table",

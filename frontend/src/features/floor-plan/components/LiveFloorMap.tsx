@@ -53,7 +53,10 @@ export default function LiveFloorMap({ onTableClick, emptyAction }: Props) {
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   const { ref: wrapRef, size } = useElementSize();
 
-  if (isLoading) {
+  // `!plan` covers the branch-unresolved case: useFloorPlan is enabled:!!branchId,
+  // so while branchId is null the query is idle (isLoading false) with no data —
+  // show the loader, not the misleading "no zones designed yet" empty state.
+  if (isLoading || !plan) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400">
         <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t('floorPlan:loading')}

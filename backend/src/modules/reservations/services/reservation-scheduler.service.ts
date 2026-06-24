@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { ReservationStatus } from "../constants/reservation-status.enum";
 import { TableStatus } from "../../tables/dto/create-table.dto";
+import { KdsGateway } from "../../kds/kds.gateway";
 // v2.8.95 — both autoHoldUpcoming and releaseExpiredHolds mutate
 // shared table state on a 5-minute tick. Without a per-replica lock
 // every replica double-flips tables and double-emits NO_SHOW events.
@@ -51,7 +52,25 @@ const GRACE_AFTER_START_MINUTES = 30;
 export class ReservationSchedulerService {
   private readonly logger = new Logger(ReservationSchedulerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Live floor-map refresh when the crons flip table status (auto-hold
+    // AVAILABLE→RESERVED / release RESERVED→AVAILABLE). @Optional() so the
+    // bare-constructed scheduler unit tests keep working (emit no-ops there).
+    @Optional() private readonly kdsGateway?: KdsGateway,
+  ) {}
+
+  /**
+   * Emit one floor:layout-updated per affected (tenant, branch) after a cron
+   * batch so every open live map recolors. `touched` holds "tenantId|branchId"
+   * keys. Null-safe + best-effort — an emit must never fail the cron.
+   */
+  private emitTouchedBranches(touched: Set<string>) {
+    for (const key of touched) {
+      const [tenantId, branchId] = key.split("|");
+      this.kdsGateway?.emitFloorLayoutUpdated(tenantId, branchId, {});
+    }
+  }
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: "reservation-auto-hold" })
   async autoHoldUpcoming(): Promise<{ held: number }> {
@@ -87,6 +106,7 @@ export class ReservationSchedulerService {
       select: {
         id: true,
         tenantId: true,
+        branchId: true,
         date: true,
         startTime: true,
         tableId: true,
@@ -101,6 +121,7 @@ export class ReservationSchedulerService {
     );
 
     let held = 0;
+    const touched = new Set<string>();
     for (const r of candidates) {
       const offsetMin =
         offsetByTenant.get(r.tenantId) ?? DEFAULT_HOLD_OFFSET_MINUTES;
@@ -127,7 +148,10 @@ export class ReservationSchedulerService {
           reservationHoldId: r.id,
         },
       });
-      if (updated.count > 0) held += 1;
+      if (updated.count > 0) {
+        held += 1;
+        touched.add(`${r.tenantId}|${r.branchId}`);
+      }
     }
 
     if (held > 0) {
@@ -135,6 +159,7 @@ export class ReservationSchedulerService {
         `auto-hold: marked ${held} table(s) RESERVED for upcoming reservations`,
       );
     }
+    this.emitTouchedBranches(touched);
     return { held };
   }
 
@@ -164,6 +189,7 @@ export class ReservationSchedulerService {
 
     const now = new Date();
     let released = 0;
+    const touched = new Set<string>();
 
     for (const table of heldTables) {
       const r = table.reservationHold;
@@ -240,7 +266,10 @@ export class ReservationSchedulerService {
           reservationHoldId: null,
         },
       });
-      if (updated.count > 0) released += 1;
+      if (updated.count > 0) {
+        released += 1;
+        touched.add(`${table.tenantId}|${table.branchId}`);
+      }
     }
 
     if (released > 0) {
@@ -248,6 +277,7 @@ export class ReservationSchedulerService {
         `release-holds: cleared ${released} stale RESERVED hold(s)`,
       );
     }
+    this.emitTouchedBranches(touched);
     return { released };
   }
 

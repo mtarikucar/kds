@@ -381,8 +381,9 @@ export class TablesService {
   }
 
   async update(scope: BranchScope, id: string, updateTableDto: UpdateTableDto) {
-    // Check if table exists and belongs to scope
-    await this.findOne(scope, id);
+    // Check if table exists and belongs to scope. Keep the prior row so we can
+    // tell whether a status change actually happened (live-map emit below).
+    const prior = await this.findOne(scope, id);
 
     // If table number is being updated, check for conflicts
     if (updateTableDto.number) {
@@ -450,13 +451,17 @@ export class TablesService {
       });
     });
 
-    // Refresh open floor-plan/live maps only when the table's geometry or zone
-    // actually changed — a pure status/number/capacity edit isn't a layout
-    // change (those propagate via their own table/order events).
+    // Refresh open floor-plan/live maps when the table's geometry/zone OR its
+    // status changed. A status edit via the admin Edit modal fires no order
+    // event, so without this the live map would keep the old color on every
+    // terminal until an unrelated refetch (parity with updateStatus()).
     const spatialTouched = TablesService.SPATIAL_KEYS.some(
       (k) => (updateTableDto as Record<string, unknown>)[k] !== undefined,
     );
-    if (spatialTouched) {
+    const statusChanged =
+      updateTableDto.status !== undefined &&
+      updateTableDto.status !== prior.status;
+    if (spatialTouched || statusChanged) {
       this.kdsGateway.emitFloorLayoutUpdated(
         scope.tenantId,
         scope.branchId,
@@ -476,11 +481,13 @@ export class TablesService {
     // moments apart can both succeed even if a new order was just
     // created — leaving the table free to be seated again while an
     // unpaid bill is still open.
+    let priorStatus: string | undefined;
     const updated = await this.prisma.$transaction(async (tx) => {
       const table = await tx.table.findFirst({
         where: { id, ...branchScope(scope) },
       });
       if (!table) throw new NotFoundException("Table not found");
+      priorStatus = table.status;
 
       // Marking AVAILABLE must not happen while active orders are open.
       // The frontend already filters for this, but two concurrent waiters
@@ -515,12 +522,16 @@ export class TablesService {
       });
     });
 
-    // A status change recolors the live floor map. Emit the same event the
+    // A real status change recolors the live floor map. Emit the same event the
     // map listens for so every open POS/Tables map (incl. other terminals)
-    // refreshes — parity with update()/remove()/merge which already emit.
-    this.kdsGateway.emitFloorLayoutUpdated(scope.tenantId, updated.branchId, {
-      zoneId: updated.zoneId ?? undefined,
-    });
+    // refreshes — parity with update()/remove()/merge. Skip the broadcast when
+    // the status didn't actually change (a "confirm" tap on the current status)
+    // so we don't invalidate every terminal's plan query for a no-op.
+    if (priorStatus !== updated.status) {
+      this.kdsGateway.emitFloorLayoutUpdated(scope.tenantId, updated.branchId, {
+        zoneId: updated.zoneId ?? undefined,
+      });
+    }
     return updated;
   }
 

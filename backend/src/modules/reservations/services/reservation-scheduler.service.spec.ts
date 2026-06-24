@@ -91,6 +91,19 @@ describe('ReservationSchedulerService.autoHoldUpcomingInner', () => {
     const res = await (svc as any).autoHoldUpcomingInner();
     expect(res.held).toBe(0);
   });
+
+  it('emits floor:layout-updated once per branch for held tables (live-map recolor)', async () => {
+    const prisma = makePrisma();
+    const { date, time } = hhmmFromNow(10);
+    prisma.reservation.findMany.mockResolvedValue([
+      { id: 'r1', tenantId: 't1', branchId: 'b1', date, startTime: time, tableId: 'tbl1' },
+    ]);
+    prisma.table.updateMany.mockResolvedValue({ count: 1 });
+    const gateway = { emitFloorLayoutUpdated: jest.fn() };
+    const svc = new ReservationSchedulerService(prisma as any, gateway as any);
+    await (svc as any).autoHoldUpcomingInner();
+    expect(gateway.emitFloorLayoutUpdated).toHaveBeenCalledWith('t1', 'b1', {});
+  });
 });
 
 describe('ReservationSchedulerService.releaseExpiredHoldsInner', () => {
@@ -129,6 +142,18 @@ describe('ReservationSchedulerService.releaseExpiredHoldsInner', () => {
     prisma.table.updateMany.mockResolvedValue({ count: 1 });
     const svc = new ReservationSchedulerService(prisma as any);
     expect((await (svc as any).releaseExpiredHoldsInner()).released).toBe(1);
+  });
+
+  it('emits floor:layout-updated once per branch for released tables (live-map recolor)', async () => {
+    const prisma = makePrisma();
+    prisma.table.findMany.mockResolvedValue([
+      { id: 'tbl1', tenantId: 't1', branchId: 'b1', reservationHoldId: 'r1', reservationHold: { id: 'r1', status: ReservationStatus.CANCELLED } },
+    ]);
+    prisma.table.updateMany.mockResolvedValue({ count: 1 });
+    const gateway = { emitFloorLayoutUpdated: jest.fn() };
+    const svc = new ReservationSchedulerService(prisma as any, gateway as any);
+    await (svc as any).releaseExpiredHoldsInner();
+    expect(gateway.emitFloorLayoutUpdated).toHaveBeenCalledWith('t1', 'b1', {});
   });
 
   // These two cases use fake timers pinned to local noon so the HH:mm ↔

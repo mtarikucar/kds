@@ -3,6 +3,9 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import { SmsSettingsModule } from "../sms-settings/sms-settings.module";
+// KdsGateway: reservation status flips (seat/cancel/no-show + the auto-hold /
+// release crons) emit floor:layout-updated so live POS/Tables maps recolor.
+import { KdsModule } from "../kds/kds.module";
 import { ReservationsController } from "./controllers/reservations.controller";
 import { PublicReservationsController } from "./controllers/public-reservations.controller";
 import { ReservationsService } from "./services/reservations.service";
@@ -17,6 +20,7 @@ import { ReservationNotificationService } from "./services/reservation-notificat
     NotificationsModule,
     SubscriptionsModule,
     SmsSettingsModule,
+    KdsModule,
   ],
   controllers: [ReservationsController, PublicReservationsController],
   providers: [
