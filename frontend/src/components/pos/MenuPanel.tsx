@@ -184,7 +184,7 @@ const MenuPanel = ({
           </div>
         ) : viewMode === 'grid' ? (
           /* Grid View */
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-4">
             {filteredProducts.map((product) => {
               const inCartQty = cartQuantities[product.id] ?? 0;
               const requiresModifiers = hasRequiredModifiers(product);

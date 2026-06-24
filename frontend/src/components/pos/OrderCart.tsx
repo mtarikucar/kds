@@ -299,9 +299,13 @@ const OrderCart = ({
                 </div>
               )}
 
-              <div className="flex justify-between text-lg font-bold">
-                <span className="text-slate-900">{t('total')}:</span>
-                <span className="text-primary-600">{formatPrice(total)}</span>
+              {/* TOTAL — the single most important number on the screen, so
+                  it's the largest/boldest element in the footer. */}
+              <div className="flex items-end justify-between">
+                <span className="text-sm font-medium text-slate-500">{t('total')}</span>
+                <span className="text-3xl font-extrabold text-primary-600 tabular-nums leading-none">
+                  {formatPrice(total)}
+                </span>
               </div>
 
               {/* Conditional button rendering based on checkout mode */}
@@ -321,10 +325,11 @@ const OrderCart = ({
 
                   {/* Payment button - uses canProceedToPayment for eligibility.
                       deep-review FH2: also blocked while the cart diverged from
-                      the saved order, so we never charge the stale amount. */}
+                      the saved order, so we never charge the stale amount.
+                      Tall (h-14) primary tap target — the page's main action. */}
                   <Button
                     variant="primary"
-                    className="w-full"
+                    className="w-full h-14 text-base font-semibold"
                     size="lg"
                     onClick={onCheckout}
                     disabled={!hasActiveOrder || !canProceedToPayment || cartDirty}
@@ -347,10 +352,10 @@ const OrderCart = ({
                   )}
                 </div>
               ) : (
-                /* Single-step checkout button */
+                /* Single-step checkout button — tall primary tap target. */
                 <Button
                   variant="primary"
-                  className="w-full"
+                  className="w-full h-14 text-base font-semibold"
                   size="lg"
                   onClick={onCheckout}
                   isLoading={isCheckingOut}

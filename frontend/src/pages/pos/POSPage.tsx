@@ -25,8 +25,8 @@ import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUn
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment } from '../../types';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive, BREAKPOINTS } from '../../hooks/useResponsive';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import Spinner from '../../components/ui/Spinner';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
@@ -47,6 +47,7 @@ import type { POSView, CartItem } from './posTypes';
 
 const POSPage = () => {
   const { t } = useTranslation('pos');
+  const formatPrice = useFormatCurrency();
 
   // View state: table-selection or order
   const [currentView, setCurrentView] = useState<POSView>('table-selection');
@@ -869,17 +870,22 @@ const POSPage = () => {
                 )}
               </p>
             </div>
-            {/* Cart indicator for mobile (only when the side cart is hidden) */}
+            {/* Cart pill for mobile (only when the side cart is hidden). Now
+                surfaces the running TOTAL alongside the count so the cashier
+                can glance the bill without opening the drawer. */}
             {!useSideBySideLayout && hasCartItems && (
               <button
                 onClick={() => setIsCartDrawerOpen(true)}
-                className="relative p-2 bg-primary-50 text-primary-700 rounded-lg"
+                className="flex items-center gap-2 pl-3 pr-4 py-2.5 bg-primary-600 text-white rounded-xl shadow-sm active:scale-95 transition-transform"
                 aria-label={t('cart.yourOrder')}
               >
-                <ShoppingBag className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartItems.length}
+                <span className="relative">
+                  <ShoppingBag className="h-5 w-5" />
+                  <span className="absolute -top-2 -right-2 bg-white text-primary-700 text-[10px] font-bold rounded-full h-4 min-w-[1rem] px-1 flex items-center justify-center">
+                    {cartItems.length}
+                  </span>
                 </span>
+                <span className="font-bold tabular-nums">{formatPrice(total)}</span>
               </button>
             )}
           </div>
@@ -895,21 +901,17 @@ const POSPage = () => {
           {/* DESKTOP + LANDSCAPE TABLET (>=768): 2/3 Menu + 1/3 Cart Layout */}
           {useSideBySideLayout && (
             <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6 min-h-0">
-              {/* Menu Panel - 2/3 width */}
-              <div className="col-span-2" data-tour="menu-panel">
-                <Card className="h-full">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
-                    <MenuPanel
-                      onAddItem={handleAddItem}
-                      cartQuantities={cartQuantities}
-                      onIncrement={handleMenuIncrement}
-                      onDecrement={handleMenuDecrement}
-                    />
-                  </CardContent>
-                </Card>
+              {/* Menu Panel - 2/3 width. Rendered chrome-free (no redundant
+                  "Menu" Card header) so the product grid uses the FULL column
+                  height — MenuPanel has its own header (search + categories)
+                  and internal scroll. */}
+              <div className="col-span-2 min-h-0" data-tour="menu-panel">
+                <MenuPanel
+                  onAddItem={handleAddItem}
+                  cartQuantities={cartQuantities}
+                  onIncrement={handleMenuIncrement}
+                  onDecrement={handleMenuDecrement}
+                />
               </div>
 
               {/* Order Cart - 1/3 width */}
@@ -945,22 +947,17 @@ const POSPage = () => {
             </div>
           )}
 
-          {/* PHONE: Full-screen Menu (cart lives in the drawer) */}
+          {/* PHONE: Full-screen Menu (cart lives in the drawer). Chrome-free
+              for the same reason as the side-by-side branch — MenuPanel owns
+              its header + scroll and fills the full height. */}
           {!useSideBySideLayout && (
             <div className="flex-1 min-h-0">
-              <Card className="h-full">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
-                </CardHeader>
-                <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
-                  <MenuPanel
-                    onAddItem={handleAddItem}
-                    cartQuantities={cartQuantities}
-                    onIncrement={handleMenuIncrement}
-                    onDecrement={handleMenuDecrement}
-                  />
-                </CardContent>
-              </Card>
+              <MenuPanel
+                onAddItem={handleAddItem}
+                cartQuantities={cartQuantities}
+                onIncrement={handleMenuIncrement}
+                onDecrement={handleMenuDecrement}
+              />
             </div>
           )}
         </div>
