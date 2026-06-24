@@ -36,6 +36,7 @@
     "category": "Category",
     "selectCategory": "Select a category",
     "currentStock": "Current Stock",
+    "taxRate": "VAT rate (KDV)",
     "productImages": "Product Images",
     "primary": "Primary",
     "noImagesSelected": "No images selected",

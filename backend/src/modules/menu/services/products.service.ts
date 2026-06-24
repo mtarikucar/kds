@@ -68,6 +68,9 @@ export class ProductsService {
         isAvailable: createProductDto.isAvailable ?? true,
         stockTracked: createProductDto.stockTracked ?? false,
         currentStock: createProductDto.currentStock ?? 0,
+        // KDV rate per product (0/1/10/20). Defaults to 10 when unset so the
+        // fiscal/receipt math is correct for non-10% items once configured.
+        taxRate: createProductDto.taxRate ?? 10,
         categoryId: createProductDto.categoryId,
         tenantId,
       },

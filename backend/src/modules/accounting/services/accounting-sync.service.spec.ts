@@ -25,7 +25,7 @@ import { AccountingProvider } from '../constants/accounting.enum';
  */
 describe('AccountingSyncService.syncInvoice', () => {
   let prisma: MockPrismaClient;
-  let settings: { findByTenant: jest.Mock };
+  let settings: { findByTenant: jest.Mock; getDecryptedCredentials: jest.Mock };
   let svc: AccountingSyncService;
 
   const TENANT = 't-1';
@@ -71,7 +71,13 @@ describe('AccountingSyncService.syncInvoice', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    settings = { findByTenant: jest.fn() };
+    settings = {
+      findByTenant: jest.fn(),
+      // Default null → callers fall through to the findByTenant value (which
+      // in tests is already plaintext). Individual tests override to assert
+      // the decrypted creds are what reach the adapter.
+      getDecryptedCredentials: jest.fn().mockResolvedValue(null),
+    };
     svc = new AccountingSyncService(prisma as any, settings as any);
   });
 
@@ -127,6 +133,31 @@ describe('AccountingSyncService.syncInvoice', () => {
 
     await svc.syncInvoice(INVOICE_ID, TENANT);
 
+    expect(adapter.pushInvoice).toHaveBeenCalled();
+  });
+
+  it('authenticates with the DECRYPTED secret, never the stored v1: blob (M14 regression)', async () => {
+    // findByTenant returns the encrypted blob; getDecryptedCredentials returns
+    // the plaintext. The adapter MUST receive the plaintext or every push fails.
+    settings.findByTenant.mockResolvedValue({
+      ...foribaSettings,
+      foribaPassword: 'v1:nonce:tag:ciphertext',
+    });
+    settings.getDecryptedCredentials.mockResolvedValue({
+      ...foribaSettings,
+      foribaPassword: 'real-plaintext-pass',
+    });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT);
+
+    expect(settings.getDecryptedCredentials).toHaveBeenCalledWith(TENANT);
+    const creds = adapter.authenticate.mock.calls[0][0];
+    expect(creds.password).toBe('real-plaintext-pass');
+    expect(creds.password).not.toMatch(/^v1:/);
     expect(adapter.pushInvoice).toHaveBeenCalled();
   });
 
@@ -234,12 +265,18 @@ describe('AccountingSyncService.syncInvoice', () => {
 
 describe('AccountingSyncService.testConnection', () => {
   let prisma: MockPrismaClient;
-  let settings: { findByTenant: jest.Mock };
+  let settings: { findByTenant: jest.Mock; getDecryptedCredentials: jest.Mock };
   let svc: AccountingSyncService;
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    settings = { findByTenant: jest.fn() };
+    settings = {
+      findByTenant: jest.fn(),
+      // Default null → callers fall through to the findByTenant value (which
+      // in tests is already plaintext). Individual tests override to assert
+      // the decrypted creds are what reach the adapter.
+      getDecryptedCredentials: jest.fn().mockResolvedValue(null),
+    };
     svc = new AccountingSyncService(prisma as any, settings as any);
   });
 
@@ -289,5 +326,33 @@ describe('AccountingSyncService.testConnection', () => {
       username: 'fuser',
       password: 'fpass',
     });
+  });
+
+  it('decrypts the stored secret before testing — the adapter must NOT receive the v1: blob', async () => {
+    // findByTenant would return the encrypted blob; getDecryptedCredentials
+    // returns the plaintext. testConnection must use the plaintext.
+    settings.findByTenant.mockResolvedValue({
+      provider: AccountingProvider.FORIBA,
+      foribaApiUrl: 'https://foriba.test',
+      foribaUsername: 'fuser',
+      foribaPassword: 'v1:nonce:tag:ciphertext',
+    });
+    settings.getDecryptedCredentials.mockResolvedValue({
+      provider: AccountingProvider.FORIBA,
+      foribaApiUrl: 'https://foriba.test',
+      foribaUsername: 'fuser',
+      foribaPassword: 'real-plaintext-pass',
+    });
+    const adapter = {
+      name: 'foriba',
+      testConnection: jest.fn().mockResolvedValue(true),
+    };
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.testConnection('t-1');
+
+    const creds = adapter.testConnection.mock.calls[0][0];
+    expect(creds.password).toBe('real-plaintext-pass');
+    expect(creds.password).not.toMatch(/^v1:/);
   });
 });

@@ -36,6 +36,7 @@
     "category": "الفئة",
     "selectCategory": "اختر فئة",
     "currentStock": "المخزون الحالي",
+    "taxRate": "نسبة ضريبة القيمة المضافة (KDV)",
     "productImages": "صور المنتج",
     "primary": "أساسي",
     "noImagesSelected": "لم يتم اختيار صور",

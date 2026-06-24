@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -102,4 +103,19 @@ export class CreateProductDto {
   @Min(0)
   @IsOptional()
   displayOrder?: number;
+
+  // KDV (VAT) rate for this product. TR allows 0 / 1 / 10 / 20. Defaults to 10
+  // server-side. Previously fixed at 10 for every item with no way to set it —
+  // mixed-rate menus (alcohol 20%, staples 1%) computed wrong KDV on every
+  // receipt + z-report.
+  @ApiProperty({
+    example: 10,
+    default: 10,
+    required: false,
+    enum: [0, 1, 10, 20],
+  })
+  @IsInt()
+  @IsIn([0, 1, 10, 20])
+  @IsOptional()
+  taxRate?: number;
 }
