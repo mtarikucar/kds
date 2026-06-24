@@ -20,7 +20,9 @@ const ResetPasswordPage = () => {
 
   const resetPasswordSchema = z
     .object({
-      newPassword: z.string().min(8, t('validation:minLength', { count: 8 })),
+      newPassword: z
+        .string()
+        .min(8, t('validation:validation.minLength', { count: 8, defaultValue: 'Must be at least {{count}} characters' })),
       confirmPassword: z.string(),
     })
     .refine((data) => data.newPassword === data.confirmPassword, {
