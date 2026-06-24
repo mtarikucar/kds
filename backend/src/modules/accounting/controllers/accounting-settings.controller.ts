@@ -52,4 +52,10 @@ export class AccountingSettingsController {
   testConnection(@Request() req) {
     return this.syncService.testConnection(req.tenantId);
   }
+
+  @Get("sync-status")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  syncStatus(@Request() req) {
+    return this.service.getSyncStatus(req.tenantId);
+  }
 }

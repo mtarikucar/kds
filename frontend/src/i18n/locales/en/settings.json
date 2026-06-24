@@ -528,6 +528,15 @@
     "testConnection": "Test Connection",
     "testSuccess": "Connection successful!",
     "testFailed": "Connection failed",
+    "syncStatusCard": {
+      "title": "Sync status",
+      "helper": "Enter credentials, run Test Connection, then place a test order — these counts and the last-sync time update as invoices reach the provider (GİB).",
+      "synced": "Synced",
+      "failed": "Failed",
+      "pending": "Pending",
+      "lastSynced": "Last synced",
+      "never": "never"
+    },
     "parasutCompanyId": "Company ID",
     "parasutClientId": "Client ID",
     "parasutClientSecret": "Client Secret",
