@@ -150,11 +150,11 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
         <head>
           <title>${tenant?.name} - ${qrCode.label}</title>
           <style>
-            body { 
-              display: flex; 
-              justify-content: center; 
-              align-items: center; 
-              min-height: 100vh; 
+            body {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
               margin: 0;
               text-align: center;
             }
@@ -188,10 +188,30 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
     window.open(qrCode.url, '_blank');
   };
 
+  // A single compact action button (icon + accessible label).
+  const IconAction = ({
+    onClick,
+    label,
+    children,
+  }: {
+    onClick: () => void;
+    label: string;
+    children: React.ReactNode;
+  }) => (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex-1 h-9 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 transition-colors"
+    >
+      {children}
+    </button>
+  );
+
   if (compact) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col items-center">
-        <div className="bg-gradient-to-br from-gray-50 to-white p-3 rounded-lg border border-slate-100 mb-3">
+      <div className="group bg-white border border-slate-200/70 rounded-2xl shadow-sm hover:shadow-md hover:border-primary-200 transition-all p-4 flex flex-col items-center">
+        <div className="relative bg-white p-3 rounded-xl border border-slate-100 ring-1 ring-slate-100 mb-3">
           <QRCode
             id={`qr-${qrCode.id}-small`}
             value={qrCode.url}
@@ -201,189 +221,162 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
             bgColor={settings?.backgroundColor || '#FFFFFF'}
           />
         </div>
-        <p className="font-semibold text-sm text-slate-900 mb-1">{qrCode.label}</p>
-        <p className="text-xs text-slate-500 mb-3">{t('admin.clickToViewOptions')}</p>
+        <p className="font-semibold text-sm text-slate-900 text-center">{qrCode.label}</p>
+        <p className="text-xs text-slate-400 mb-3">{t('admin.tableQRCodes')}</p>
         <div className="flex gap-2 w-full">
-          <button
-            onClick={() => downloadQR('small')}
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-            title={t('qr.downloadQrCode')}
-          >
-            <Download className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={openPreview}
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-            title={t('qr.previewMenu')}
-          >
-            <Search className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => printQR('small')}
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-            title={t('qr.printQrCode')}
-          >
-            <Printer className="h-3.5 w-3.5" />
-          </button>
+          <IconAction onClick={() => downloadQR('small')} label={t('qr.downloadQrCode')}>
+            <Download className="h-4 w-4" />
+          </IconAction>
+          <IconAction onClick={openPreview} label={t('qr.previewMenu')}>
+            <Search className="h-4 w-4" />
+          </IconAction>
+          <IconAction onClick={() => printQR('small')} label={t('qr.printQrCode')}>
+            <Printer className="h-4 w-4" />
+          </IconAction>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-      <div className="grid md:grid-cols-2 gap-8">
-        {/* QR Code Display Section */}
-        <div className="space-y-4">
-          <div className="text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">{qrCode.label}</h3>
-            <p className="text-sm text-slate-600">{resolvedCaption}</p>
-          </div>
+    <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
+      {/* QR Code Display Section */}
+      <div className="space-y-4">
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-slate-900">{qrCode.label}</h3>
+          <p className="text-sm text-slate-500 mt-0.5">{resolvedCaption}</p>
+        </div>
 
-          {/* Size Selector */}
-          <div className="bg-slate-50 rounded-lg p-3">
-            <p className="text-xs font-medium text-slate-700 mb-2 uppercase tracking-wide">{t('qr.previewSize')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              {Object.entries(sizePresets).map(([key, preset]) => (
-                <button
-                  key={key}
-                  onClick={() => setSelectedSize(key as any)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedSize === key
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:border-blue-300'
-                    }`}
-                >
-                  <div className="text-xs">{preset.label}</div>
-                  <div className="text-xs opacity-75">{preset.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* QR Code Preview */}
-          <div className="flex justify-center">
-            <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border-2 border-slate-200 shadow-inner">
-              <QRCode
-                id={`qr-${qrCode.id}-${selectedSize}`}
-                value={qrCode.url}
-                size={currentSize.size}
-                level="H"
-                fgColor={settings?.primaryColor || '#000000'}
-                bgColor={settings?.backgroundColor || '#FFFFFF'}
-              />
-            </div>
+        {/* QR Code Preview */}
+        <div className="flex justify-center">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 ring-1 ring-slate-100 shadow-sm">
+            <QRCode
+              id={`qr-${qrCode.id}-${selectedSize}`}
+              value={qrCode.url}
+              size={currentSize.size}
+              level="H"
+              fgColor={settings?.primaryColor || '#000000'}
+              bgColor={settings?.backgroundColor || '#FFFFFF'}
+            />
           </div>
         </div>
 
-        {/* Actions Section */}
-        <div className="space-y-4">
-          {/* URL Display */}
-          <div className="bg-slate-50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">{t('qr.menuUrl')}</p>
+        {/* Size Selector */}
+        <div>
+          <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">{t('qr.previewSize')}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(sizePresets).map(([key, preset]) => (
               <button
-                onClick={copyToClipboard}
-                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                key={key}
+                onClick={() => setSelectedSize(key as any)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${selectedSize === key
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-primary-300'
+                  }`}
               >
-                {copied ? (
-                  <><Check className="h-3 w-3" /> {t('qr.copied')}</>
-                ) : (
-                  <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>)}
+                <div className="text-xs">{preset.label}</div>
+                <div className={`text-[11px] ${selectedSize === key ? 'opacity-80' : 'text-slate-400'}`}>{preset.description}</div>
               </button>
-            </div>
-            <p className="text-sm text-slate-900 font-mono break-all bg-white rounded p-2 border border-slate-200">
-              {qrCode.url}
-            </p>
+            ))}
           </div>
+        </div>
+      </div>
 
-          {/* Download Options */}
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">{t('qr.downloadFormat')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setDownloadFormat('png')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'png'
-                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
-                  }`}
-              >
-                <FileImage className="h-4 w-4" />
-                {t('qr.png')}
-              </button>
-              <button
-                onClick={() => setDownloadFormat('svg')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'svg'
-                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
-                  }`}
-              >
-                <FileImage className="h-4 w-4" />
-                {t('qr.svg')}
-              </button>
-              <button
-                onClick={() => setDownloadFormat('pdf')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'pdf'
-                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
-                  }`}
-              >
-                <FileText className="h-4 w-4" />
-                {t('qr.pdf')}
-              </button>
-            </div>
+      {/* Actions Section */}
+      <div className="space-y-5">
+        {/* URL Display */}
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('qr.menuUrl')}</p>
+            <button
+              onClick={copyToClipboard}
+              className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
+            >
+              {copied ? (
+                <><Check className="h-3 w-3" /> {t('qr.copied')}</>
+              ) : (
+                <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>)}
+            </button>
           </div>
+          <p className="text-sm text-slate-900 font-mono break-all bg-white rounded-lg p-2.5 border border-slate-200">
+            {qrCode.url}
+          </p>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3 pt-4">
+        {/* Download Options */}
+        <div className="space-y-2.5">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('qr.downloadFormat')}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { fmt: 'png' as const, icon: FileImage, label: t('qr.png') },
+              { fmt: 'svg' as const, icon: FileImage, label: t('qr.svg') },
+              { fmt: 'pdf' as const, icon: FileText, label: t('qr.pdf') },
+            ]).map(({ fmt, icon: Icon, label }) => (
+              <button
+                key={fmt}
+                onClick={() => setDownloadFormat(fmt)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all border ${downloadFormat === fmt
+                  ? 'bg-primary-50 text-primary-700 border-primary-300'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                  }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <Button
+            onClick={() => downloadQR()}
+            variant="primary"
+            className="w-full flex items-center justify-center gap-2"
+          >
+            <Download className="h-5 w-5" />
+            {t('qr.downloadFile', { format: downloadFormat.toUpperCase(), size: currentSize.label })}
+          </Button>
+
+          <div className="grid grid-cols-2 gap-3">
             <Button
-              onClick={() => downloadQR()}
-              variant="primary"
+              onClick={() => printQR()}
+              variant="outline"
+              className="flex items-center justify-center gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              {t('buttons.print')}
+            </Button>
+            <Button
+              onClick={openPreview}
+              variant="outline"
+              className="flex items-center justify-center gap-2"
+            >
+              <Search className="h-4 w-4" />
+              {t('buttons.preview')}
+            </Button>
+          </div>
+
+          {typeof (navigator as any).share === 'function' && (
+            <Button
+              onClick={shareQR}
+              variant="outline"
               className="w-full flex items-center justify-center gap-2"
             >
-              <Download className="h-5 w-5" />
-              {t('qr.downloadFile', { format: downloadFormat.toUpperCase(), size: currentSize.label })}
+              <Share2 className="h-4 w-4" />
+              {t('qr.shareQrCode')}
             </Button>
+          )}
+        </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={() => printQR()}
-                variant="outline"
-                className="flex items-center justify-center gap-2"
-              >
-                <Printer className="h-4 w-4" />
-                {t('buttons.print')}
-              </Button>
-              <Button
-                onClick={openPreview}
-                variant="outline"
-                className="flex items-center justify-center gap-2"
-              >
-                <Search className="h-4 w-4" />
-                {t('buttons.preview')}
-              </Button>
-            </div>
-
-            {typeof (navigator as any).share === 'function' && (
-              <Button
-                onClick={shareQR}
-                variant="outline"
-                className="w-full flex items-center justify-center gap-2"
-              >
-                <Share2 className="h-4 w-4" />
-                {t('qr.shareQrCode')}
-              </Button>
-            )}
-          </div>
-
-          {/* Usage Tips */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-            <p className="text-xs font-medium text-blue-900 mb-1">{t('qr.proTipsTitle')}</p>
-            <ul className="text-xs text-blue-800 space-y-1">
-              <li>• {t('qr.proTip1')}</li>
-              <li>• {t('qr.proTip2')}</li>
-              <li>• {t('qr.proTip3')}</li>
-            </ul>
-          </div>
+        {/* Usage Tips */}
+        <div className="bg-primary-50/60 border border-primary-100 rounded-xl p-3.5">
+          <p className="text-xs font-semibold text-primary-900 mb-1">{t('qr.proTipsTitle')}</p>
+          <ul className="text-xs text-primary-800/90 space-y-1">
+            <li>• {t('qr.proTip1')}</li>
+            <li>• {t('qr.proTip2')}</li>
+            <li>• {t('qr.proTip3')}</li>
+          </ul>
         </div>
       </div>
     </div>
