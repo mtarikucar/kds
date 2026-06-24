@@ -86,6 +86,10 @@ vi.mock('./useTableSelection', () => ({
 }));
 
 vi.mock('../../hooks/useResponsive', () => ({ useResponsive: () => ({ isDesktop: true }) }));
+// POSPage now calls useFormatCurrency at top level (header total pill). The
+// real hook reads i18n.language via useLocale, which the bare react-i18next
+// mock above doesn't provide — stub it to a simple formatter.
+vi.mock('../../hooks/useFormatCurrency', () => ({ useFormatCurrency: () => (n: number) => `₺${n}` }));
 vi.mock('../../lib/tauri', () => ({ isTauri: () => false, HardwareService: {} }));
 vi.mock('../../store/uiStore', () => ({ useUiStore: { getState: () => ({}) } }));
 
