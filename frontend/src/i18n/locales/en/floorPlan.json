@@ -13,6 +13,7 @@
   "zoneSettings": "Area settings",
   "newZonePrompt": "Name the new area (e.g. Floor 2, Garden)",
   "noZones": "No areas yet. Add a floor or garden to start designing.",
+  "noZonesLive": "No floor plan yet. Open the editor to design your restaurant.",
   "unplaced": "Unplaced tables ({{count}})",
   "placeOnZone": "Place on the current area",
   "newTable": "New table",

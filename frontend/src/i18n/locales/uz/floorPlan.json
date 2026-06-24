@@ -13,6 +13,7 @@
   "zoneSettings": "Hudud sozlamalari",
   "newZonePrompt": "Yangi hududga nom bering (masalan, 2-qavat, Bog')",
   "noZones": "Hali hudud yo'q. Loyihalashni boshlash uchun qavat yoki bog' qo'shing.",
+  "noZonesLive": "Hali zal rejasi yo'q. Restoraningizni loyihalash uchun muharrirni oching.",
   "unplaced": "Joylashtirilmagan stollar ({{count}})",
   "placeOnZone": "Joriy hududga joylashtirish",
   "newTable": "Yangi stol",

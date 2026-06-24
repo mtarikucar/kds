@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Edit,
@@ -12,6 +13,8 @@ import {
   LayoutGrid,
   Users,
   Clock,
+  Map as MapIcon,
+  List as ListIcon,
 } from 'lucide-react';
 import {
   useTables,
@@ -20,7 +23,8 @@ import {
   useDeleteTable,
   useUpdateTableStatus,
 } from '../../features/tables/tablesApi';
-import { Table, TableStatus } from '../../types';
+import LiveFloorMap from '../../features/floor-plan/components/LiveFloorMap';
+import { Table, TableStatus, FloorPlanTable } from '../../types';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
@@ -43,6 +47,11 @@ const TableManagementPage = () => {
   });
 
   type TableFormData = z.infer<typeof tableSchema>;
+  const navigate = useNavigate();
+  // 'list' = the classic card grid; 'plan' = the live 2D floor map.
+  const [view, setView] = useState<'list' | 'plan'>('list');
+  // Table tapped on the live plan → opens the quick status action sheet.
+  const [statusTarget, setStatusTarget] = useState<FloorPlanTable | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   // Styled delete confirmation replaces the native confirm(); holds the
@@ -170,6 +179,25 @@ const TableManagementPage = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* List / live-plan view toggle */}
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'list' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+              aria-pressed={view === 'list'}
+            >
+              <ListIcon className="w-4 h-4" /> {t('admin.viewList', 'Liste')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('plan')}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'plan' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+              aria-pressed={view === 'plan'}
+            >
+              <MapIcon className="w-4 h-4" /> {t('admin.viewPlan', 'Plan')}
+            </button>
+          </div>
           <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
             {canAddTable ? (
               <Plus className="h-4 w-4 mr-2" />
@@ -226,7 +254,7 @@ const TableManagementPage = () => {
       {/* Stats strip — surfaces the already-computed totals (was never
           rendered before) using the shared status palette. Includes a
           live occupancy % indicator. Hidden while empty/loading. */}
-      {!isLoading && tables && tables.length > 0 && (
+      {view === 'list' && !isLoading && tables && tables.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
             <div className="flex items-center gap-3">
@@ -290,6 +318,20 @@ const TableManagementPage = () => {
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Spinner />
+        </div>
+      ) : view === 'plan' ? (
+        /* Live 2D floor map — same plan as the editor, with real-time status.
+           Tapping a table opens the quick status action sheet. */
+        <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden h-[72vh]">
+          <LiveFloorMap
+            onTableClick={(tbl) => setStatusTarget(tbl)}
+            emptyAction={
+              <Button onClick={() => navigate('/admin/floor-plan')}>
+                <MapIcon className="h-4 w-4 mr-2" />
+                {t('admin.openFloorPlanEditor', 'Salon planını düzenle')}
+              </Button>
+            }
+          />
         </div>
       ) : !tables || tables.length === 0 ? (
         /* Empty State */
@@ -545,6 +587,54 @@ const TableManagementPage = () => {
               >
                 {t('app.delete')}
               </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Quick status action sheet — opened by tapping a table on the live
+          plan. Sets the table status (the map recolors via socket/invalidate). */}
+      <Modal
+        isOpen={!!statusTarget}
+        onClose={() => setStatusTarget(null)}
+        title={
+          statusTarget
+            ? t('admin.tableNumberLabel', { number: statusTarget.number })
+            : ''
+        }
+        size="sm"
+      >
+        {statusTarget && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">{t('admin.setStatus', 'Durumu değiştir')}</p>
+            <div className="grid grid-cols-1 gap-2">
+              {(Object.values(TableStatus) as TableStatus[]).map((s) => {
+                const cfg = getTableStatusConfig(s);
+                const Icon = cfg.icon;
+                const active = statusTarget.status === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={() =>
+                      updateTableStatus(
+                        { id: statusTarget.id, status: s },
+                        { onSuccess: () => setStatusTarget(null) },
+                      )
+                    }
+                    className={`flex items-center gap-2.5 h-11 px-4 rounded-xl border text-sm transition-colors ${
+                      active
+                        ? `${cfg.chip} font-medium`
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    } ${isUpdatingStatus ? 'opacity-50' : ''}`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {getTableStatusLabel(s, t)}
+                    {active && <span className="ml-auto text-xs">✓</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

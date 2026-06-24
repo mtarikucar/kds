@@ -13,6 +13,7 @@
   "zoneSettings": "Alan ayarları",
   "newZonePrompt": "Yeni alana ad verin (örn. Kat 2, Bahçe)",
   "noZones": "Henüz alan yok. Tasarlamaya başlamak için bir kat veya bahçe ekleyin.",
+  "noZonesLive": "Henüz salon planı yok. Restoranınızı tasarlamak için editörü açın.",
   "unplaced": "Yerleştirilmemiş masalar ({{count}})",
   "placeOnZone": "Geçerli alana yerleştir",
   "newTable": "Yeni masa",
