@@ -315,6 +315,21 @@ export class PaymentsService {
     );
   }
 
+  /**
+   * Post-commit physical-yazarkasa (ÖKC) fiscal receipt. Best-effort and
+   * strictly gated inside the finalizer (only fires when the tenant has a
+   * physical yazarkasa FiscalDeviceRecord — the cloud e-Fatura/e-Arşiv path
+   * is owned by the accounting auto-invoice above, so the two never
+   * double-fiscalize). Idempotent per order. Called only on the order's
+   * FULLY-PAID transition; a no-op for everyone without an ÖKC device.
+   */
+  private async maybeIssueYazarkasaReceipt(
+    orderId: string,
+    tenantId: string,
+  ): Promise<void> {
+    return this.finalizer.maybeIssueYazarkasaReceipt(orderId, tenantId);
+  }
+
   async create(
     orderId: string,
     createPaymentDto: CreatePaymentDto,
@@ -562,6 +577,7 @@ export class PaymentsService {
         // inline copy is no longer needed — kept the helper because
         // splitBill and payByItems share it too.
         await this.maybeGenerateAutoInvoice(orderId, tenantId);
+        await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
         await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
         this.safeEmitPaymentSuccess(tenantId, result, initiatedByUserId);
 
@@ -998,6 +1014,7 @@ export class PaymentsService {
     // Auto-generate invoice AFTER transaction commits
     if (result.isFullyPaid) {
       await this.maybeGenerateAutoInvoice(orderId, tenantId);
+      await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
       await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
     }
     // Emit per-payment so each Tauri terminal prints its own fiş.
@@ -1514,6 +1531,13 @@ export class PaymentsService {
         // replay returns the existing invoice.
         if (!replayedFromInnerCatch) {
           await this.maybeGenerateAutoInvoice(orderId, tenantId, payment.id);
+          // Physical yazarkasa prints ONE fiscal receipt for the whole order,
+          // only once it is fully settled (not per progressive item-payment).
+          // Idempotent per order, so even if multiple paths reach PAID it
+          // issues once.
+          if (orderFullyPaid) {
+            await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
+          }
           await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
           // Tell the POS to auto-print + open cash drawer (Tauri).
           // Skip the emit on idempotent replay — the first call
@@ -1683,6 +1707,9 @@ export class PaymentsService {
           tenantId,
           result.payment.id,
         );
+        // Order is fully settled by the write-off; issue the yazarkasa
+        // receipt once (idempotent per order, gated on a physical ÖKC).
+        await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
         await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
         this.safeEmitPaymentSuccess(
           tenantId,

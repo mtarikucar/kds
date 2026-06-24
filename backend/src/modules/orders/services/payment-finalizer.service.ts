@@ -20,6 +20,7 @@ import { SalesInvoiceService } from "../../accounting/services/sales-invoice.ser
 import { AccountingSettingsService } from "../../accounting/services/accounting-settings.service";
 import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
 import { KdsGateway } from "../../kds/kds.gateway";
+import { FiscalService } from "../../fiscal-core/fiscal.service";
 
 /**
  * PASS 2 of the payments.service refactor. The finalization cluster —
@@ -51,6 +52,12 @@ export class PaymentFinalizer {
     @Optional()
     @Inject(forwardRef(() => KdsGateway))
     private kdsGateway?: KdsGateway,
+    // FiscalCoreModule is @Global, so this resolves in production. Kept
+    // @Optional so the many unit specs that construct PaymentFinalizer bare
+    // (and the partial-payment paths that never touch fiscalization) keep
+    // working — a null fiscalService simply skips the yazarkasa leg.
+    @Optional()
+    private fiscalService?: FiscalService,
   ) {}
 
   /**
@@ -528,6 +535,116 @@ export class PaymentFinalizer {
       Sentry.captureException(err, {
         tags: { event: "REVENUE_SYNC_FAILED", tenantId },
         extra: { orderId, phase: "settings-lookup" },
+      });
+    }
+  }
+
+  /**
+   * Post-commit physical-yazarkasa (ÖKC) fiscal-receipt issuance.
+   *
+   * Turkey has TWO mutually-exclusive fiscalization regimes for a sale:
+   *   - e-Fatura / e-Arşiv (cloud e-document) → handled by
+   *     maybeGenerateAutoInvoice → SalesInvoiceService → AccountingSync, and
+   *   - a physical "new generation" yazarkasa (YN ÖKC, GMP-3 via Hugin/Beko/
+   *     Profilo) that prints a paper fiscal receipt at the counter.
+   *
+   * A tenant uses ONE of them, never both — issuing both for the same sale is
+   * a double-fiscalization (the turnover would be reported twice). So this
+   * leg is STRICTLY GATED: it only fires when the tenant has a configured,
+   * non-retired PHYSICAL yazarkasa FiscalDeviceRecord. The cloud `efatura`
+   * provider is explicitly excluded here (that pseudo-device represents the
+   * e-document path, which the accounting rail already owns) — gating on it
+   * would double-issue against e-Fatura.
+   *
+   * HONESTY NOTE: actual receipt printing depends on a certified ÖKC unit +
+   * the branch's local-bridge driver (a separate wave). Until a tenant
+   * registers such a device, NO FiscalDeviceRecord matches and this method is
+   * a no-op — the WIRING is real even while the feature is dormant. When a
+   * device IS present, FiscalService.issueReceipt enqueues the GMP-3 command
+   * onto the device-mesh queue (status 'queued' until the bridge acks); it
+   * never claims a fake issuance.
+   *
+   * Idempotent: the FiscalReceipt idempotencyKey is derived deterministically
+   * from the orderId, and FiscalService.issueReceipt dedupes on
+   * (tenantId, idempotencyKey) — a re-run for the same order returns the
+   * existing receipt instead of double-printing.
+   *
+   * Best-effort: wrapped in try/catch so a fiscal-device outage NEVER blocks
+   * or rolls back the payment (mirrors maybeGenerateAutoInvoice). Runs
+   * post-commit, like loyalty/auto-invoice.
+   */
+  async maybeIssueYazarkasaReceipt(
+    orderId: string,
+    tenantId: string,
+  ): Promise<void> {
+    if (!this.fiscalService) return;
+    try {
+      // GATE: only a tenant with a real physical yazarkasa gets a paper
+      // fiscal receipt. Exclude the cloud `efatura` pseudo-device (e-document
+      // path owned by accounting) to avoid double-fiscalization, and skip
+      // retired units. providerId in ('hugin','beko','profilo',…) = a GMP-3
+      // ÖKC routed through the local bridge.
+      const device = await this.prisma.fiscalDeviceRecord.findFirst({
+        where: {
+          tenantId,
+          status: { not: "retired" },
+          providerId: { not: "efatura" },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!device) return; // dormant: no physical ÖKC configured for this tenant
+
+      const order = await this.prisma.order.findFirst({
+        where: { id: orderId, tenantId, status: "PAID" },
+        include: { orderItems: { include: { product: true } } },
+      });
+      if (!order || order.orderItems.length === 0) return;
+
+      // Build GMP-3 fiscal lines from the paid order. Money in integer kuruş
+      // (yazarkasa firmware is integer-only). productCode = productId; the
+      // GMP-3 adapter buckets lines into KDV departments from device config,
+      // not by a catalogue SKU lookup.
+      const lines = order.orderItems.map((it) => ({
+        productCode: it.productId,
+        name: it.product?.name ?? "Ürün",
+        qty: it.quantity,
+        unitPriceCents: Math.round(Number(it.unitPrice) * 100),
+        vatRate: it.taxRate ?? 10,
+        discountCents: 0,
+      }));
+
+      const totalCents = lines.reduce(
+        (acc, l) => acc + Math.round(l.qty * l.unitPriceCents),
+        0,
+      );
+
+      await this.fiscalService.issueReceipt({
+        tenantId,
+        // Order.branchId is NOT NULL; the receipt is issued at the order's branch.
+        branchId: order.branchId,
+        fiscalDeviceId: device.id,
+        orderId,
+        // Deterministic key → idempotent per order (FiscalService dedupes on
+        // tenantId+idempotencyKey, so a retry/double-finalize won't double-print).
+        idempotencyKey: `order-fiscal:${orderId}`,
+        lines,
+        // Single cash-equivalent payment summary equal to the total; the ÖKC
+        // only needs the tender breakdown to balance the receipt, and the
+        // canonical per-method split lives on the Payment rows.
+        payments: [{ method: "cash", amountCents: totalCents }],
+        kind: "cash_receipt",
+      });
+    } catch (err: any) {
+      // Never block the payment on a fiscal-device problem. The FiscalReceipt
+      // row (queued/failed) and the ops manual-recovery panel are the durable
+      // record; surface to logs/Sentry for alerting.
+      this.logger.error(
+        `Yazarkasa fiscal issuance failed for order ${orderId}: ${err?.message ?? err}`,
+        err?.stack,
+      );
+      Sentry.captureException(err, {
+        tags: { event: "FISCAL_RECEIPT_FAILED", tenantId },
+        extra: { orderId },
       });
     }
   }
