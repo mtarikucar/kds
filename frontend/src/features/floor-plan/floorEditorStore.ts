@@ -6,7 +6,13 @@ import {
   FloorPlanTable,
   TableShape,
 } from '../../types';
-import { snap } from './geometry';
+import {
+  snap,
+  clampCoord,
+  clampTableSize,
+  clampElementSize,
+  normalizeRotation,
+} from './geometry';
 
 /**
  * Editor working-copy store. On load it ingests the server FloorPlan into a
@@ -50,10 +56,26 @@ interface FloorEditorState {
   past: Snapshot[];
   future: Snapshot[];
   tempSeq: number;
+  /**
+   * Ids the user actually changed this session (moved/resized/rotated/(un)placed
+   * /reshaped). Only these go into the bulk-save layout, so an untouched table
+   * that another session concurrently deleted can't 404 the fail-closed save.
+   * Monotonic + not snapshotted: re-sending a touched-then-undone row is a
+   * harmless no-op (its id still exists), so undo need not rewind it.
+   */
+  touchedTableIds: Set<string>;
+  touchedElementIds: Set<string>;
 
   // lifecycle
   load: (plan: FloorPlan, preferredZoneId?: string | null) => void;
   setActiveZone: (zoneId: string) => void;
+  /**
+   * Reconcile locally-created (_new, temp-id) elements with the server rows the
+   * POST returned: swap each temp id for the real id, clear _new, remap any
+   * selection. The page MUST call this with the create results before
+   * markSavedClean — otherwise the next buildSavePayload re-POSTs them.
+   */
+  applyCreated: (created: Record<string, FloorElement>) => void;
 
   // selection
   select: (sel: Selection | null, additive?: boolean) => void;
@@ -107,6 +129,37 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
     });
   };
 
+  // Mark a row as user-changed. The touched Sets are not part of snapshots, so
+  // mutate them in place (the ref survives every set() that omits them).
+  const touchTable = (id: string) => get().touchedTableIds.add(id);
+  const touchElement = (id: string) => get().touchedElementIds.add(id);
+
+  // Sanitize a partial geometry update to the backend's value bounds so the
+  // working copy is always saveable (a Transformer can hand us an out-of-range
+  // or flipped size, or a cumulative rotation past ±360).
+  const sanitizeTableGeo = (
+    geo: Partial<Pick<EditorTable, 'posX' | 'posY' | 'width' | 'height' | 'rotation'>>,
+  ) => {
+    const out: typeof geo = { ...geo };
+    if (out.posX !== undefined) out.posX = clampCoord(out.posX);
+    if (out.posY !== undefined) out.posY = clampCoord(out.posY);
+    if (out.width !== undefined) out.width = clampTableSize(out.width);
+    if (out.height !== undefined) out.height = clampTableSize(out.height);
+    if (out.rotation !== undefined) out.rotation = normalizeRotation(out.rotation);
+    return out;
+  };
+  const sanitizeElementGeo = (
+    geo: Partial<Pick<EditorElement, 'x' | 'y' | 'width' | 'height' | 'rotation'>>,
+  ) => {
+    const out: typeof geo = { ...geo };
+    if (out.x !== undefined) out.x = clampCoord(out.x);
+    if (out.y !== undefined) out.y = clampCoord(out.y);
+    if (out.width !== undefined) out.width = clampElementSize(out.width);
+    if (out.height !== undefined) out.height = clampElementSize(out.height);
+    if (out.rotation !== undefined) out.rotation = normalizeRotation(out.rotation);
+    return out;
+  };
+
   return {
     loaded: false,
     activeZoneId: null,
@@ -118,6 +171,8 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
     past: [],
     future: [],
     tempSeq: 0,
+    touchedTableIds: new Set<string>(),
+    touchedElementIds: new Set<string>(),
 
     load: (plan, preferredZoneId) => {
       const tables: Record<string, EditorTable> = {};
@@ -141,11 +196,33 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
         dirty: false,
         past: [],
         future: [],
+        tempSeq: 0,
+        touchedTableIds: new Set<string>(),
+        touchedElementIds: new Set<string>(),
         activeZoneId,
       });
     },
 
     setActiveZone: (zoneId) => set({ activeZoneId: zoneId, selection: [] }),
+
+    applyCreated: (created) => {
+      const s = get();
+      const elements = { ...s.elements };
+      const touched = new Set(s.touchedElementIds);
+      const remap = new Map<string, string>();
+      for (const [tempId, serverEl] of Object.entries(created)) {
+        if (elements[tempId]) delete elements[tempId];
+        elements[serverEl.id] = { ...serverEl };
+        touched.delete(tempId);
+        remap.set(tempId, serverEl.id);
+      }
+      const selection = s.selection.map((sel) =>
+        sel.kind === 'element' && remap.has(sel.id)
+          ? { ...sel, id: remap.get(sel.id)! }
+          : sel,
+      );
+      set({ elements, selection, touchedElementIds: touched });
+    },
 
     select: (sel, additive) => {
       if (!sel) return set({ selection: [] });
@@ -167,30 +244,48 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
     moveTable: (id, posX, posY, gridSize) => {
       const t = get().tables[id];
       if (!t) return;
+      touchTable(id);
       pushHistory({
-        tables: { ...get().tables, [id]: { ...t, posX: snap(posX, gridSize), posY: snap(posY, gridSize) } },
+        tables: {
+          ...get().tables,
+          [id]: {
+            ...t,
+            posX: clampCoord(snap(posX, gridSize)),
+            posY: clampCoord(snap(posY, gridSize)),
+          },
+        },
       });
     },
 
     transformTable: (id, geo) => {
       const t = get().tables[id];
       if (!t) return;
-      pushHistory({ tables: { ...get().tables, [id]: { ...t, ...geo } } });
+      touchTable(id);
+      pushHistory({
+        tables: { ...get().tables, [id]: { ...t, ...sanitizeTableGeo(geo) } },
+      });
     },
 
     setTableShape: (id, shape) => {
       const t = get().tables[id];
       if (!t) return;
+      touchTable(id);
       pushHistory({ tables: { ...get().tables, [id]: { ...t, tableShape: shape } } });
     },
 
     assignTableToZone: (id, zoneId, posX, posY) => {
       const t = get().tables[id];
       if (!t) return;
+      touchTable(id);
       pushHistory({
         tables: {
           ...get().tables,
-          [id]: { ...t, zoneId, posX: posX ?? t.posX, posY: posY ?? t.posY },
+          [id]: {
+            ...t,
+            zoneId,
+            posX: clampCoord(posX ?? t.posX),
+            posY: clampCoord(posY ?? t.posY),
+          },
         },
       });
     },
@@ -198,20 +293,32 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
     moveElement: (id, x, y, gridSize) => {
       const e = get().elements[id];
       if (!e) return;
+      touchElement(id);
       pushHistory({
-        elements: { ...get().elements, [id]: { ...e, x: snap(x, gridSize), y: snap(y, gridSize) } },
+        elements: {
+          ...get().elements,
+          [id]: {
+            ...e,
+            x: clampCoord(snap(x, gridSize)),
+            y: clampCoord(snap(y, gridSize)),
+          },
+        },
       });
     },
 
     transformElement: (id, geo) => {
       const e = get().elements[id];
       if (!e) return;
-      pushHistory({ elements: { ...get().elements, [id]: { ...e, ...geo } } });
+      touchElement(id);
+      pushHistory({
+        elements: { ...get().elements, [id]: { ...e, ...sanitizeElementGeo(geo) } },
+      });
     },
 
     setElementLabel: (id, label) => {
       const e = get().elements[id];
       if (!e) return;
+      touchElement(id);
       pushHistory({ elements: { ...get().elements, [id]: { ...e, label } } });
     },
 
@@ -222,10 +329,10 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
         id: tempId,
         zoneId,
         type,
-        x: geo.x,
-        y: geo.y,
-        width: geo.width,
-        height: geo.height,
+        x: clampCoord(geo.x),
+        y: clampCoord(geo.y),
+        width: clampElementSize(geo.width),
+        height: clampElementSize(geo.height),
         rotation: 0,
         points: null,
         style: geo.style ?? null,
@@ -256,9 +363,14 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
           if (!el._new) deleted.push(sel.id);
         } else if (sel.kind === 'table') {
           // Tables are never deleted from the floor plan — they're unplaced
-          // (sent back to the tray) so the entity + its orders survive.
+          // (sent back to the tray) so the entity + its orders survive. Reset
+          // its canvas geometry so a later re-place lands at the fresh drop
+          // point rather than its old (often off-screen) ghost position.
           const t = tables[sel.id];
-          if (t) tables[sel.id] = { ...t, zoneId: null };
+          if (t) {
+            tables[sel.id] = { ...t, zoneId: null, posX: 0, posY: 0, rotation: 0 };
+            touchTable(sel.id);
+          }
         }
       }
       pushHistory({ elements, tables, deletedElementIds: deleted, selection: [] });
@@ -268,13 +380,16 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
       const s = get();
       if (s.past.length === 0) return;
       const prev = s.past[s.past.length - 1];
+      const newPast = s.past.slice(0, -1);
       set({
-        past: s.past.slice(0, -1),
+        past: newPast,
         future: [snapshot(s), ...s.future].slice(0, 100),
         tables: prev.tables,
         elements: prev.elements,
         deletedElementIds: prev.deletedElementIds,
-        dirty: true,
+        // markSavedClean/load clear `past`, so an empty stack == the saved
+        // baseline → not dirty. Undoing the last change must un-dirty too.
+        dirty: newPast.length > 0,
         selection: [],
       });
     },
@@ -294,7 +409,17 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
       });
     },
 
-    markSavedClean: () => set({ dirty: false, deletedElementIds: [], past: [], future: [] }),
+    // Mark the working copy persisted. Call AFTER applyCreated so no _new
+    // temp-id elements survive into the next buildSavePayload (double-create).
+    markSavedClean: () =>
+      set({
+        dirty: false,
+        deletedElementIds: [],
+        past: [],
+        future: [],
+        touchedTableIds: new Set<string>(),
+        touchedElementIds: new Set<string>(),
+      }),
 
     buildSavePayload: () => {
       const s = get();
@@ -304,36 +429,43 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
           tempId: e.id,
           zoneId: e.zoneId,
           type: e.type,
-          x: e.x,
-          y: e.y,
-          width: e.width,
-          height: e.height,
-          rotation: e.rotation,
+          x: clampCoord(e.x),
+          y: clampCoord(e.y),
+          width: clampElementSize(e.width),
+          height: clampElementSize(e.height),
+          rotation: normalizeRotation(e.rotation),
           style: e.style ?? undefined,
           label: e.label ?? undefined,
         }));
+      // Only persisted (non-_new) elements the user actually touched go into the
+      // bulk layout; clamp/normalize as a final guard so the fail-closed save
+      // can never be rejected 400 on a value the working copy let through.
       const layoutElements = Object.values(s.elements)
-        .filter((e) => !e._new)
+        .filter((e) => !e._new && s.touchedElementIds.has(e.id))
         .map((e) => ({
           id: e.id,
-          x: e.x,
-          y: e.y,
-          width: e.width,
-          height: e.height,
-          rotation: e.rotation,
+          x: clampCoord(e.x),
+          y: clampCoord(e.y),
+          width: clampElementSize(e.width),
+          height: clampElementSize(e.height),
+          rotation: normalizeRotation(e.rotation),
           points: e.points ?? undefined,
           style: e.style ?? undefined,
         }));
-      const layoutTables = Object.values(s.tables).map((t) => ({
-        id: t.id,
-        zoneId: t.zoneId,
-        posX: t.posX,
-        posY: t.posY,
-        width: t.width,
-        height: t.height,
-        rotation: t.rotation,
-        shape: t.tableShape,
-      }));
+      // Only touched tables — an untouched table another session deleted must
+      // not be in the payload (the fail-closed save 404s on a missing id).
+      const layoutTables = Object.values(s.tables)
+        .filter((t) => s.touchedTableIds.has(t.id))
+        .map((t) => ({
+          id: t.id,
+          zoneId: t.zoneId,
+          posX: clampCoord(t.posX),
+          posY: clampCoord(t.posY),
+          width: clampTableSize(t.width),
+          height: clampTableSize(t.height),
+          rotation: normalizeRotation(t.rotation),
+          shape: t.tableShape,
+        }));
       return {
         creates,
         deletes: s.deletedElementIds,

@@ -17,15 +17,24 @@ import type {
 /** Shared cache key — branch-scoped so switching branch refetches the plan. */
 export const floorPlanKey = (branchId: string | null) => ['floorPlan', branchId];
 
-const fail = (error: any) =>
+const fail = (error: any) => {
+  // class-validator 400s carry a string[] message; show the first line, not a
+  // garbled "[object Object]" / comma-joined blob.
+  const m = error?.response?.data?.message;
   toast.error(
-    error?.response?.data?.message || i18n.t('common:notifications.operationFailed'),
+    (Array.isArray(m) ? m[0] : m) ||
+      i18n.t('common:notifications.operationFailed'),
   );
+};
 
 export const useFloorPlan = () => {
   const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
     queryKey: floorPlanKey(branchId),
+    // /floor-plan is branch-scoped; the api interceptor rejects branch-scoped
+    // requests while branchId is null (first paint / mid branch-switch). Gate
+    // the query so it only fires once a branch is resolved.
+    enabled: !!branchId,
     queryFn: async (): Promise<FloorPlan> => {
       const res = await api.get<FloorPlan>('/floor-plan');
       return res.data;
@@ -136,6 +145,13 @@ export const useSaveLayout = () => {
       invalidate();
       toast.success(i18n.t('floorPlan:saved', 'Floor plan saved'));
     },
-    onError: fail,
+    onError: (error: any) => {
+      fail(error);
+      // The bulk save is fail-closed: a 404 means a referenced row/zone no
+      // longer exists in this branch (e.g. another session deleted it), and it
+      // will 404 forever on the same stale id. Refetch the plan so the page can
+      // rebuild a saveable working copy instead of looping on the stale state.
+      if (error?.response?.status === 404) invalidate();
+    },
   });
 };

@@ -12,6 +12,28 @@ export const snapPoint = (
 export const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+// Geometry bounds — MUST mirror the backend bulk-layout DTO
+// (save-layout.dto.ts / table-spatial.dto.ts). The editor keeps its working
+// copy inside these so a drag/resize/rotate can never push a value the
+// fail-closed PATCH /floor-plan/layout would reject 400 (which now rolls back
+// the WHOLE save). Math.abs guards a Transformer flip producing a negative size.
+export const COORD_MIN = -2000;
+export const COORD_MAX = 12000;
+export const TABLE_MIN_SIZE = 10;
+export const TABLE_MAX_SIZE = 2000;
+export const ELEMENT_MIN_SIZE = 1;
+export const ELEMENT_MAX_SIZE = 12000;
+
+export const clampCoord = (v: number): number => clamp(v, COORD_MIN, COORD_MAX);
+export const clampTableSize = (v: number): number =>
+  clamp(Math.abs(v), TABLE_MIN_SIZE, TABLE_MAX_SIZE);
+export const clampElementSize = (v: number): number =>
+  clamp(Math.abs(v), ELEMENT_MIN_SIZE, ELEMENT_MAX_SIZE);
+
+/** Normalize any (possibly cumulative Konva) rotation into [0,360) ⊂ [-360,360]. */
+export const normalizeRotation = (r: number): number =>
+  Number.isFinite(r) ? ((r % 360) + 360) % 360 : 0;
+
 /** Keep a placed item's top-left inside the canvas bounds. */
 export const clampToCanvas = (
   x: number,
@@ -62,6 +84,10 @@ export function computeSeatPositions(
   const perimeterLeft = h;
   const perimeterRight = h;
   const total = perimeterTop + perimeterBottom + perimeterLeft + perimeterRight;
+  // Degenerate (w=0 & h=0) table: total=0 would make every share NaN and drop
+  // all seats. Bail to no seats rather than render garbage. (Size clamping in
+  // the store keeps real tables ≥ min, so this is a pure safety net.)
+  if (total <= 0) return [];
 
   // Largest-remainder apportionment so the counts sum exactly to n.
   const rawShares = [

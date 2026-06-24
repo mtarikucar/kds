@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { snap, snapPoint, clamp, clampToCanvas, computeSeatPositions } from './geometry';
+import {
+  snap,
+  snapPoint,
+  clamp,
+  clampToCanvas,
+  computeSeatPositions,
+  normalizeRotation,
+  clampCoord,
+  clampTableSize,
+  clampElementSize,
+} from './geometry';
 import { TableShape } from '../../types';
 
 describe('floor-plan geometry', () => {
@@ -43,6 +53,10 @@ describe('floor-plan geometry', () => {
     it('returns no seats for capacity 0', () => {
       expect(computeSeatPositions(TableShape.SQUARE, 80, 80, 0)).toHaveLength(0);
     });
+    it('returns no seats (no NaN) for a degenerate 0×0 rectangular table', () => {
+      const seats = computeSeatPositions(TableShape.RECT, 0, 0, 4);
+      expect(seats).toHaveLength(0);
+    });
     it('round seats lie roughly on a circle outside the table', () => {
       const seats = computeSeatPositions(TableShape.ROUND, 80, 80, 8);
       const cx = 40;
@@ -59,6 +73,31 @@ describe('floor-plan geometry', () => {
       const seats = computeSeatPositions(TableShape.RECT, 300, 60, 10);
       const onLongEdges = seats.filter((s) => s.y < 0 || s.y > 60).length;
       expect(onLongEdges).toBeGreaterThan(seats.length / 2);
+    });
+  });
+
+  describe('backend-bound clamps (keep the working copy saveable)', () => {
+    it('normalizeRotation folds any cumulative rotation into [0,360)', () => {
+      expect(normalizeRotation(725)).toBe(5);
+      expect(normalizeRotation(-90)).toBe(270);
+      expect(normalizeRotation(360)).toBe(0);
+      expect(normalizeRotation(45)).toBe(45);
+      expect(normalizeRotation(Number.NaN)).toBe(0);
+    });
+    it('clampCoord pins coordinates to [-2000, 12000]', () => {
+      expect(clampCoord(-99999)).toBe(-2000);
+      expect(clampCoord(99999)).toBe(12000);
+      expect(clampCoord(500)).toBe(500);
+    });
+    it('clampTableSize pins (abs) size to [10, 2000]', () => {
+      expect(clampTableSize(-50)).toBe(50); // flip → abs
+      expect(clampTableSize(5)).toBe(10);
+      expect(clampTableSize(9000)).toBe(2000);
+    });
+    it('clampElementSize pins (abs) size to [1, 12000]', () => {
+      expect(clampElementSize(-3)).toBe(3);
+      expect(clampElementSize(0)).toBe(1);
+      expect(clampElementSize(99999)).toBe(12000);
     });
   });
 });
