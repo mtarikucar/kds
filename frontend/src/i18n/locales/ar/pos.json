@@ -167,6 +167,8 @@
   },
   "tableSelection": {
     "title": "اختر طاولة",
+    "viewGrid": "شبكة",
+    "viewMap": "خريطة",
     "description": "اختر طاولة لبدء استلام الطلبات",
     "takeawayOrder": "طلب للاستلام",
     "takeawayDescription": "طلب بدون طاولة",

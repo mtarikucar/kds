@@ -31,6 +31,9 @@ vi.mock('../../components/pos/ProgressiveSplitModal', () => ({ default: () => nu
 vi.mock('../../components/pos/ReservationActionDialog', () => ({ default: () => null }));
 vi.mock('../../components/pos/ManualLockDialog', () => ({ default: () => null }));
 vi.mock('../../components/ui/Spinner', () => ({ default: () => <div data-testid="spinner" /> }));
+// Heavy Konva live map — stub it (jsdom has no canvas, and its import chain
+// pulls i18n/config which this test's react-i18next mock doesn't initialize).
+vi.mock('../../features/floor-plan/components/LiveFloorMap', () => ({ default: () => <div data-testid="live-floor-map" /> }));
 
 // --- i18n ----------------------------------------------------------------
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));

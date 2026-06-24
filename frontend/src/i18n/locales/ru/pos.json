@@ -167,6 +167,8 @@
   },
   "tableSelection": {
     "title": "Выберите стол",
+    "viewGrid": "Сетка",
+    "viewMap": "Карта",
     "description": "Выберите стол чтобы начать принимать заказы",
     "takeawayOrder": "Заказ на вынос",
     "takeawayDescription": "Заказ без стола",

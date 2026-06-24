@@ -167,6 +167,8 @@
   },
   "tableSelection": {
     "title": "Stol tanlang",
+    "viewGrid": "Katak",
+    "viewMap": "Xarita",
     "description": "Buyurtma olishni boshlash uchun stol tanlang",
     "takeawayOrder": "Olib ketish buyurtmasi",
     "takeawayDescription": "Stolsiz buyurtma",

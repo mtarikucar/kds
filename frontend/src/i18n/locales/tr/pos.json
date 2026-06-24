@@ -167,6 +167,8 @@
   },
   "tableSelection": {
     "title": "Masa Seçin",
+    "viewGrid": "Izgara",
+    "viewMap": "Plan",
     "description": "Sipariş almaya başlamak için bir masa seçin",
     "takeawayOrder": "Paket Sipariş",
     "takeawayDescription": "Masa olmadan sipariş",
