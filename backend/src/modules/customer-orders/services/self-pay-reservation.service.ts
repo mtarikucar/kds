@@ -16,7 +16,10 @@ import { selfPayError } from "./self-pay-pricing.util";
  * PayTR session.
  */
 export async function fetchOrderItemReservations(
-  prisma: PrismaService,
+  // Accepts either the base client or a TransactionClient so the read can run
+  // INSIDE a FOR UPDATE tx (the intent-create re-check) and observe a
+  // just-committed competing reservation under the order lock.
+  prisma: PrismaService | Prisma.TransactionClient,
   orderIds: string[],
   tenantId: string,
   excludeIntentId?: string,
@@ -70,9 +73,12 @@ export class SelfPayReservationService {
     orderIds: string[],
     tenantId: string,
     excludeIntentId?: string,
+    // Pass a TransactionClient to run the read inside a FOR UPDATE tx (the
+    // intent-create re-check); defaults to the base client for the fast-fail.
+    client?: PrismaService | Prisma.TransactionClient,
   ): Promise<Map<string, number>> {
     return fetchOrderItemReservations(
-      this.prisma,
+      client ?? this.prisma,
       orderIds,
       tenantId,
       excludeIntentId,

@@ -406,22 +406,57 @@ export class SelfPayIntentService {
           SELECT id FROM orders WHERE id = ${oid} AND "tenantId" = ${session.tenantId} FOR UPDATE
         `;
       }
-      // Re-validate item ids still exist after acquiring the lock.
-      // A waiter rewrite committed BEFORE our lock would already be
-      // visible; one that lands while we hold the lock is serialized
-      // until our intent commits.
-      const stillExistingItemIds = await tx.orderItem.findMany({
+      // Re-validate existence AND remaining (alreadyPaid + reserved) UNDER the
+      // lock — not just the pre-tx fast-fail above. Two concurrent intents for
+      // the same units serialize on the same order FOR UPDATE row, so the
+      // loser, re-reading here AFTER the winner commits, must observe the
+      // winner's now-committed PENDING reservation and 409 BEFORE minting a
+      // PayTR token (else both customers get charged and the second settlement
+      // fails to a manual refund). Mirrors PaymentsService.payByItems' in-tx
+      // re-check; the pre-tx check at the top stays as a cheap early-out.
+      const lockedItems = await tx.orderItem.findMany({
         where: {
           orderId: { in: lockOrderIds },
           id: { in: dto.items.map((it) => it.orderItemId) },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          quantity: true,
+          orderItemPayments: {
+            where: { payment: { status: PaymentStatus.COMPLETED } },
+            select: { quantity: true },
+          },
+        },
       });
-      const stillExistingSet = new Set(stillExistingItemIds.map((r) => r.id));
+      const lockedById = new Map(lockedItems.map((it) => [it.id, it]));
+      // Reservations re-read on the tx client so they participate in the lock.
+      const reservedUnderLock =
+        await this.reservations.fetchOrderItemReservations(
+          lockOrderIds,
+          session.tenantId,
+          undefined,
+          tx,
+        );
       for (const it of dto.items) {
-        if (!stillExistingSet.has(it.orderItemId)) {
+        const dbItem = lockedById.get(it.orderItemId);
+        if (!dbItem) {
           throw new BadRequestException(
             `Item ${it.orderItemId} no longer exists — order was modified. Refresh and retry.`,
+          );
+        }
+        const alreadyPaidNow = dbItem.orderItemPayments.reduce(
+          (s, a) => s + a.quantity,
+          0,
+        );
+        const reservedNow = reservedUnderLock.get(it.orderItemId) ?? 0;
+        const remainingNow = dbItem.quantity - alreadyPaidNow - reservedNow;
+        if (it.quantity > remainingNow) {
+          const reasonSuffix =
+            reservedNow > 0
+              ? ` (${reservedNow} reserved by another in-flight payment)`
+              : "";
+          throw new ConflictException(
+            `Item ${it.orderItemId} has ${remainingNow} units remaining, cannot pay ${it.quantity}${reasonSuffix}`,
           );
         }
       }
