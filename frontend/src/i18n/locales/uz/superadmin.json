@@ -191,9 +191,9 @@
       "kdsIntegration": "KDS Integration",
       "reservationSystem": "Reservation System",
       "personnelManagement": "Personnel Management",
-      "deliveryIntegration": "Delivery Integration",
-      "externalDisplay": "External Display (Partner Display)",
-      "posAccess": "POS Access"
+      "deliveryIntegration": "Yetkazib berish integratsiyasi",
+      "externalDisplay": "Tashqi displey (hamkor displey)",
+      "posAccess": "POS kirish"
     },
     "limitLabels": {
       "maxUsers": "Max Users",
@@ -201,7 +201,7 @@
       "maxProducts": "Max Products",
       "maxCategories": "Max Categories",
       "maxMonthlyOrders": "Max Monthly Orders",
-      "maxBranches": "Max Branches"
+      "maxBranches": "Maksimal filiallar"
     }
   },
   "subscriptions": {
@@ -340,9 +340,9 @@
       "cancel": "Cancel",
       "update": "Update",
       "create": "Create",
-      "deliveryIntegration": "Delivery Integration",
-      "externalDisplay": "External Display (Partner Display)",
-      "posAccess": "POS Access"
+      "deliveryIntegration": "Yetkazib berish integratsiyasi",
+      "externalDisplay": "Tashqi displey (hamkor displey)",
+      "posAccess": "POS kirish"
     }
   },
   "marketplace": {

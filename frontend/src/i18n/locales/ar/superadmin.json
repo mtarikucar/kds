@@ -191,9 +191,9 @@
       "kdsIntegration": "KDS Integration",
       "reservationSystem": "Reservation System",
       "personnelManagement": "Personnel Management",
-      "deliveryIntegration": "Delivery Integration",
-      "externalDisplay": "External Display (Partner Display)",
-      "posAccess": "POS Access"
+      "deliveryIntegration": "تكامل التوصيل",
+      "externalDisplay": "شاشة خارجية (شاشة الشريك)",
+      "posAccess": "وصول نقطة البيع"
     },
     "limitLabels": {
       "maxUsers": "Max Users",
@@ -201,7 +201,7 @@
       "maxProducts": "Max Products",
       "maxCategories": "Max Categories",
       "maxMonthlyOrders": "Max Monthly Orders",
-      "maxBranches": "Max Branches"
+      "maxBranches": "الحد الأقصى للفروع"
     }
   },
   "subscriptions": {
@@ -340,9 +340,9 @@
       "cancel": "Cancel",
       "update": "Update",
       "create": "Create",
-      "deliveryIntegration": "Delivery Integration",
-      "externalDisplay": "External Display (Partner Display)",
-      "posAccess": "POS Access"
+      "deliveryIntegration": "تكامل التوصيل",
+      "externalDisplay": "شاشة خارجية (شاشة الشريك)",
+      "posAccess": "وصول نقطة البيع"
     }
   },
   "marketplace": {
