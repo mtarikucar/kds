@@ -17,6 +17,7 @@ import { OrderItemStatus } from "./dto/update-order-item-status.dto";
 import { KdsGateway } from "./kds.gateway";
 import { DeliveryStatusSyncService } from "../delivery-platforms/services/delivery-status-sync.service";
 import { StockDeductionService } from "../stock-management/services/stock-deduction.service";
+import { OrdersService } from "../orders/services/orders.service";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
@@ -45,6 +46,13 @@ export class KdsService {
     // physical-device fan-out, marketing relay) only see KDS-originated
     // transitions when the outbox is wired in production.
     @Optional() private readonly outbox?: OutboxService,
+    // For finished-good (Product.currentStock) reversal on KDS-side cancel —
+    // this is a second cancel route (separate from OrdersService.updateStatus)
+    // and must restore product stock too, or stockTracked sales leak here.
+    // Appended LAST so positional bare-construction in unit specs is unaffected.
+    @Optional()
+    @Inject(forwardRef(() => OrdersService))
+    private ordersService?: OrdersService,
   ) {}
 
   /**
@@ -435,6 +443,23 @@ export class KdsService {
         table: true,
       },
     });
+
+    // Reverse finished-good (Product.currentStock) deductions — this KDS cancel
+    // route is independent of OrdersService.updateStatus and would otherwise
+    // leak stockTracked stock on a POS-created order cancelled from the KDS.
+    // Idempotent + best-effort.
+    if (this.ordersService) {
+      try {
+        await this.ordersService.reverseProductStockForOrder(
+          id,
+          scope.tenantId,
+        );
+      } catch (error: any) {
+        this.logger.error(
+          `Product stock reversal failed for cancelled order ${id}: ${error.message}`,
+        );
+      }
+    }
 
     // Reverse ingredient deductions on cancellation
     if (this.stockDeductionService) {

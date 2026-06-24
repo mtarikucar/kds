@@ -1461,55 +1461,66 @@ export class OrdersService {
     const deductReason = OrdersService.productDeductReason(order.orderNumber);
     const reverseReason = OrdersService.productReverseReason(order.orderNumber);
 
-    return this.prisma.$transaction(async (tx) => {
-      for (const item of order.orderItems) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
-        });
-        if (!product || !product.stockTracked) continue;
+    // Serializable: the two reverse callers (updateStatus→CANCELLED and the
+    // refund→CANCELLED path) can fire concurrently for the same order. Under
+    // READ COMMITTED both could pass the findFirst "already-reversed?" check
+    // and double-credit. Serializable makes the loser fail (P2034) — swallowed
+    // by the best-effort caller — so exactly one reversal IN is written.
+    return this.prisma.$transaction(
+      async (tx) => {
+        for (const item of order.orderItems) {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+          });
+          if (!product || !product.stockTracked) continue;
 
-        // Only reverse what we deducted, and only once.
-        const deducted = await tx.stockMovement.findFirst({
-          where: {
-            productId: product.id,
-            tenantId,
-            type: StockMovementType.OUT,
-            reason: deductReason,
-          },
-          select: { id: true },
-        });
-        if (!deducted) continue;
-        const alreadyReversed = await tx.stockMovement.findFirst({
-          where: {
-            productId: product.id,
-            tenantId,
-            type: StockMovementType.IN,
-            reason: reverseReason,
-          },
-          select: { id: true },
-        });
-        if (alreadyReversed) continue;
+          // Only reverse what we deducted, and only once.
+          const deducted = await tx.stockMovement.findFirst({
+            where: {
+              productId: product.id,
+              tenantId,
+              type: StockMovementType.OUT,
+              reason: deductReason,
+            },
+            select: { id: true },
+          });
+          if (!deducted) continue;
+          const alreadyReversed = await tx.stockMovement.findFirst({
+            where: {
+              productId: product.id,
+              tenantId,
+              type: StockMovementType.IN,
+              reason: reverseReason,
+            },
+            select: { id: true },
+          });
+          if (alreadyReversed) continue;
 
-        const newStock = new Prisma.Decimal(product.currentStock).add(
-          item.quantity,
-        );
-        await tx.product.update({
-          where: { id: product.id },
-          data: { currentStock: newStock as any, isAvailable: newStock.gt(0) },
-        });
-        await tx.stockMovement.create({
-          data: {
-            type: StockMovementType.IN,
-            quantity: item.quantity,
-            reason: reverseReason,
-            productId: product.id,
-            userId: order.userId ?? null,
-            tenantId: order.tenantId,
-            branchId: order.branchId,
-          },
-        });
-      }
-    });
+          const newStock = new Prisma.Decimal(product.currentStock).add(
+            item.quantity,
+          );
+          await tx.product.update({
+            where: { id: product.id },
+            data: {
+              currentStock: newStock as any,
+              isAvailable: newStock.gt(0),
+            },
+          });
+          await tx.stockMovement.create({
+            data: {
+              type: StockMovementType.IN,
+              quantity: item.quantity,
+              reason: reverseReason,
+              productId: product.id,
+              userId: order.userId ?? null,
+              tenantId: order.tenantId,
+              branchId: order.branchId,
+            },
+          });
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async approveOrder(scope: BranchScope, orderId: string) {
