@@ -62,16 +62,70 @@ export class SelfPayWebhookService {
       this.logger.warn(`self-pay webhook: unknown merchantOid=${merchantOid}`);
       return;
     }
-    // deep-review H10 — PARTIALLY_SETTLED must re-enter the loop on a
-    // PayTR retry so the remaining (unbooked) buckets get a chance to
-    // settle. payByItems' idempotency fast-path turns already-booked
-    // buckets into no-ops, so a retry only books what's still missing
-    // and eventually reaches SUCCEEDED. Terminal states (SUCCEEDED /
-    // FAILED) still short-circuit.
-    if (intent.status !== "PENDING" && intent.status !== "PARTIALLY_SETTLED") {
-      // Idempotent — PayTR retried; we already settled (or gave up).
+    // SUCCEEDED is the only true terminal short-circuit: the money is
+    // already booked, so a PayTR retry must be an idempotent no-op.
+    if (intent.status === "SUCCEEDED") {
       return;
     }
+
+    // sweep-3 finding #4 — inquiry-recovery parity with the subscription
+    // rail. A genuinely-paid intent can be flipped to a terminal EXPIRED
+    // / FAILED by wall-clock alone (lazy-expire in getPayStatus, the
+    // 5-min SelfPaySweeperService cron, the 30-min self-pay-orphan-cleanup
+    // cron) BEFORE its late/lost success callback lands. Pre-fix the
+    // callback then hit this guard and was silently dropped — customer
+    // charged, order never settled, no refund, no alert.
+    //
+    // The webhook hash is verified upstream (paytr-webhook.controller.ts
+    // verifyCallbackHash) BEFORE we are called, so a status==="success"
+    // callback is authoritative proof of charge. We therefore RE-OPEN a
+    // recoverable terminal row (EXPIRED, or a FAILED row that booked
+    // nothing) back to PENDING and re-enter the settle loop instead of
+    // dropping it. payByItems' idempotency (selfpay:<oid>:<orderId>) makes
+    // the replay safe even against a concurrent retry — a real paid intent
+    // settles exactly once. SUCCEEDED already short-circuited above.
+    const isRecoveryReplay =
+      intent.status === "EXPIRED" || intent.status === "FAILED";
+    if (isRecoveryReplay) {
+      // Compound-WHERE reopen: only flip a still-terminal row to PENDING.
+      // If a concurrent retry already reopened+settled it (now SUCCEEDED /
+      // PARTIALLY_SETTLED) this updates 0 rows and we bail — no double
+      // settlement. The settle path below re-reads nothing; it uses the
+      // already-loaded itemsByOrder snapshot, which is immutable.
+      const reopened = await this.prisma.pendingSelfPayment.updateMany({
+        where: {
+          id: intent.id,
+          status: { in: ["EXPIRED", "FAILED"] },
+        },
+        data: { status: "PENDING", failureReason: null },
+      });
+      if (reopened.count === 0) {
+        // Another caller won the reopen race and is settling it.
+        return;
+      }
+      // Near-miss alert: money was confirmed paid on a row we had already
+      // written off as abandoned/failed. Surface it so ops sees the
+      // recovery even though it self-healed.
+      Sentry.captureMessage("SELF_PAY_RECOVERED_ON_WEBHOOK", {
+        level: "warning",
+        tags: {
+          event: "SELF_PAY_RECOVERED_ON_WEBHOOK",
+          tenantId: intent.tenantId,
+        },
+        extra: {
+          merchantOid,
+          priorStatus: intent.status,
+          priorFailureReason: intent.failureReason,
+          sessionId: intent.sessionId,
+          amount: new Prisma.Decimal(intent.amount).toFixed(2),
+        },
+      });
+    }
+    // deep-review H10 — PARTIALLY_SETTLED (and the just-reopened recovery
+    // rows) must re-enter the loop so the remaining (unbooked) buckets get
+    // a chance to settle. payByItems' idempotency fast-path turns
+    // already-booked buckets into no-ops, so a retry only books what's
+    // still missing and eventually reaches SUCCEEDED.
 
     const itemsByOrder = intent.itemsByOrder as unknown as ItemsByOrderShape[];
 
