@@ -1,8 +1,8 @@
+use crate::hardware::errors::{HardwareError, HardwareResult};
+use crate::hardware::traits::{DeviceStatus, HardwareDevice};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::traits::{HardwareDevice, DeviceStatus};
 
 /// Device registry for managing active hardware devices
 pub struct DeviceRegistry {
@@ -106,7 +106,11 @@ impl DeviceRegistry {
         for (device_id, device_arc) in devices.drain() {
             let mut device = device_arc.write().await;
             if let Err(e) = device.disconnect().await {
-                tracing::warn!("Failed to disconnect device {} during clear: {}", device_id, e);
+                tracing::warn!(
+                    "Failed to disconnect device {} during clear: {}",
+                    device_id,
+                    e
+                );
             }
         }
 
@@ -117,7 +121,10 @@ impl DeviceRegistry {
     /// Execute an operation on a device
     pub async fn with_device<F, R>(&self, device_id: &str, f: F) -> HardwareResult<R>
     where
-        F: FnOnce(&mut Box<dyn HardwareDevice>) -> std::pin::Pin<Box<dyn std::future::Future<Output = HardwareResult<R>> + '_>>,
+        F: FnOnce(
+            &mut Box<dyn HardwareDevice>,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = HardwareResult<R>> + '_>>,
     {
         let device_arc = self.get_device(device_id).await?;
         let mut device = device_arc.write().await;

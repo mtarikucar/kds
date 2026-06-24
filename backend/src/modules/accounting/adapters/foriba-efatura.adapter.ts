@@ -147,6 +147,7 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
   <cbc:IssueDate>${invoice.issueDate}</cbc:IssueDate>
   <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
+${this.supplierPartyXml(invoice)}
   <cac:AccountingCustomerParty>
     <cac:Party>
       <cac:PartyName><cbc:Name>${this.escapeXml(invoice.customerName || "Musteri")}</cbc:Name></cac:PartyName>
@@ -163,6 +164,55 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
   </cac:LegalMonetaryTotal>
   ${lineItems}
 </Invoice>`;
+  }
+
+  /**
+   * cac:AccountingSupplierParty — the seller (satıcı) block. A valid UBL-TR
+   * document REQUIRES a supplier party; pre-fix the issuer identity the
+   * operator configured in Accounting "Company Info" was never emitted, so
+   * the XML carried no seller at all. Built from the seller* fields
+   * snapshotted onto the invoice. PartyTaxScheme/TaxScheme/Name carries the
+   * tax office (vergi dairesi); CompanyID under PartyTaxScheme is the VKN.
+   * Optional sub-elements are omitted when blank rather than emitting empty
+   * tags. When no seller name/VKN is configured we emit a minimal party with
+   * a "Satici" placeholder so the document still validates structurally.
+   */
+  private supplierPartyXml(invoice: AccountingInvoiceData): string {
+    const name = invoice.sellerName?.trim();
+    const vkn = invoice.sellerTaxId?.trim();
+    const taxOffice = invoice.sellerTaxOffice?.trim();
+    const address = invoice.sellerAddress?.trim();
+    const phone = invoice.sellerPhone?.trim();
+    const email = invoice.sellerEmail?.trim();
+
+    const taxSchemeXml = vkn
+      ? `
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>${this.escapeXml(vkn)}</cbc:CompanyID>
+        <cac:TaxScheme><cbc:Name>${this.escapeXml(taxOffice || "")}</cbc:Name></cac:TaxScheme>
+      </cac:PartyTaxScheme>`
+      : "";
+    const addressXml = address
+      ? `
+      <cac:PostalAddress><cbc:StreetName>${this.escapeXml(address)}</cbc:StreetName></cac:PostalAddress>`
+      : "";
+    const contactXml =
+      phone || email
+        ? `
+      <cac:Contact>${
+        phone ? `<cbc:Telephone>${this.escapeXml(phone)}</cbc:Telephone>` : ""
+      }${
+        email
+          ? `<cbc:ElectronicMail>${this.escapeXml(email)}</cbc:ElectronicMail>`
+          : ""
+      }</cac:Contact>`
+        : "";
+
+    return `  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>${this.escapeXml(name || "Satici")}</cbc:Name></cac:PartyName>${taxSchemeXml}${addressXml}${contactXml}
+    </cac:Party>
+  </cac:AccountingSupplierParty>`;
   }
 
   private escapeXml(str: string): string {

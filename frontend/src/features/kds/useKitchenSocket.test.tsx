@@ -62,6 +62,7 @@ describe('useKitchenSocket — subscription + connection state', () => {
     expect(fakeSocket.on).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('order:updated', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('order:status-changed', expect.any(Function));
+    expect(fakeSocket.on).toHaveBeenCalledWith('table:orders-transferred', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
     expect(result.current.isConnected).toBe(false);
@@ -119,6 +120,25 @@ describe('useKitchenSocket — event handlers', () => {
     expect(toastInfo).not.toHaveBeenCalled();
   });
 
+  it('table:orders-transferred invalidates the orders list so the moved order re-renders under the new table (silent, no toast)', () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    renderHook(() => useKitchenSocket(), { wrapper: wrapper(client) });
+
+    act(() =>
+      handlers['table:orders-transferred']({
+        sourceTableId: 't4',
+        targetTableId: 't9',
+        transferredCount: 1,
+      }),
+    );
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['orders'] });
+    // Re-route is a silent board refresh — no toast (mirrors status-changed).
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastInfo).not.toHaveBeenCalled();
+  });
+
   it('stock:low-alert shows a warning toast with the item count', () => {
     const client = new QueryClient();
     renderHook(() => useKitchenSocket(), { wrapper: wrapper(client) });
@@ -152,6 +172,7 @@ describe('useKitchenSocket — cleanup', () => {
     unmount();
     expect(fakeSocket.off).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('order:status-changed', expect.any(Function));
+    expect(fakeSocket.off).toHaveBeenCalledWith('table:orders-transferred', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
     expect(disconnectSocket).toHaveBeenCalledTimes(1);

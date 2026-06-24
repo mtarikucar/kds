@@ -142,17 +142,30 @@
     "marketplace": {
       "title": "متجر الإضافات",
       "subtitle": "وسّع اشتراكك بالإضافات. تفعيل فوري.",
-      "filter": { "all": "الكل", "software": "البرمجيات", "integration": "التكاملات", "capacity": "السعة", "support": "الدعم" },
+      "filter": {
+        "all": "الكل",
+        "software": "البرمجيات",
+        "integration": "التكاملات",
+        "capacity": "السعة",
+        "support": "الدعم"
+      },
       "purchase": "شراء",
       "mine": "إضافاتك",
       "mineEmpty": "ليس لديك إضافات نشطة.",
       "requires": "يتطلب:",
-      "col": { "addOn": "الإضافة", "quantity": "الكمية", "status": "الحالة", "periodEnds": "نهاية الفترة" },
+      "col": {
+        "addOn": "الإضافة",
+        "quantity": "الكمية",
+        "status": "الحالة",
+        "periodEnds": "نهاية الفترة"
+      },
       "cancelAtPeriodEnd": "سيتم إلغاؤه في نهاية الفترة"
     },
     "store": {
       "title": "متجر المعدات",
-      "category": { "all": "كل الفئات" },
+      "category": {
+        "all": "كل الفئات"
+      },
       "empty": "لا توجد منتجات في هذه الفئة.",
       "addToCart": "أضف إلى السلة",
       "outOfStock": "غير متوفر",
@@ -197,7 +210,12 @@
       "create": "إنشاء اشتراك",
       "yours": "اشتراكاتك",
       "noSubscriptions": "لا توجد اشتراكات.",
-      "col": { "url": "الرابط", "events": "الأحداث", "status": "الحالة", "lastDelivery": "آخر تسليم" },
+      "col": {
+        "url": "الرابط",
+        "events": "الأحداث",
+        "status": "الحالة",
+        "lastDelivery": "آخر تسليم"
+      },
       "revoke": "إلغاء",
       "createdBanner": "تم إنشاء الاشتراك.",
       "secretWarning": "أدناه مفتاح التوقيع السري. انسخه الآن — لا يمكننا عرضه مرة أخرى.",
@@ -216,7 +234,13 @@
       "tokenWarning": "الرمز (يُستخدم مرة واحدة) — انسخه الآن وأعدّ الجهاز:",
       "list": "الجسور",
       "noBridges": "لم يتم تجهيز أي جسور بعد.",
-      "col": { "branch": "الفرع", "sku": "رمز المنتج", "hostname": "اسم المضيف", "status": "الحالة", "lastSeen": "آخر اتصال" },
+      "col": {
+        "branch": "الفرع",
+        "sku": "رمز المنتج",
+        "hostname": "اسم المضيف",
+        "status": "الحالة",
+        "lastSeen": "آخر اتصال"
+      },
       "confirmRetire": "هل تريد إيقاف هذا الجسر؟",
       "retire": "إيقاف"
     },
@@ -255,12 +279,10 @@
         "kind": "النوع",
         "phone": "الهاتف",
         "customer": "العميل",
-        "duration": "المدة",
-        "order": "الطلب"
+        "duration": "المدة"
       },
       "view": "عرض",
-      "unmatched": "غير مطابق",
-      "open": "فتح"
+      "unmatched": "غير مطابق"
     },
     "setupChecklist": {
       "title": "إعداد مطعمك",
@@ -279,7 +301,10 @@
     },
     "superAdminMarketplace": {
       "title": "إدارة متجر الإضافات",
-      "tabs": { "addons": "الإضافات", "products": "المعدات" },
+      "tabs": {
+        "addons": "الإضافات",
+        "products": "المعدات"
+      },
       "addons": {
         "title": "كتالوج الإضافات",
         "new": "إضافة جديدة",
@@ -1149,6 +1174,9 @@
       "switchTo2D": "التبديل إلى عرض ثنائي الأبعاد",
       "switchTo3D": "التبديل إلى عرض ثلاثي الأبعاد",
       "clickToSwitch": "انقر للتبديل"
+    },
+    "kitchen": {
+      "printFailed": "فشلت طباعة تذكرة المطبخ — أعد الطباعة من الطلب."
     }
   }
 }

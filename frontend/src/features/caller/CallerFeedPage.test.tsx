@@ -5,9 +5,13 @@ import type { CallerEvent } from './callerApi';
 
 // CallerFeedPage renders the recent-calls table from useListCallerEvents.
 // We mock the query hook so each test pins loading/empty/data, and assert:
-// matched calls link to the customer + order, unmatched calls show the
-// "unmatched" copy, durations are rounded to seconds, and the kind pill takes
-// the right colour. Uses the `common` namespace (loaded by the shared setup).
+// matched calls link to the customer, unmatched calls show the "unmatched"
+// copy, durations are rounded to seconds, and the kind pill takes the right
+// colour. Uses the `common` namespace (loaded by the shared setup).
+//
+// fake-working sweep #3: the dead "Order" column (orderId/agentUserId are
+// never written by any backend code — see caller.service.ingest) was removed,
+// so there is no longer an "Open" link to assert on.
 
 const state: { data: CallerEvent[]; isLoading: boolean } = { data: [], isLoading: false };
 vi.mock('./callerApi', () => ({
@@ -27,7 +31,6 @@ function makeEvent(over: Partial<CallerEvent> = {}): CallerEvent {
     customerId: null,
     durationMs: null,
     occurredAt: '2026-06-14T10:00:00Z',
-    orderId: null,
     ...over,
   };
 }
@@ -76,13 +79,6 @@ describe('CallerFeedPage', () => {
     expect(screen.queryByRole('link', { name: 'View' })).not.toBeInTheDocument();
   });
 
-  it('links to POS with the orderId when the call produced an order', () => {
-    state.data = [makeEvent({ orderId: 'ord-77' })];
-    renderFeed();
-    const open = screen.getByRole('link', { name: 'Open' });
-    expect(open).toHaveAttribute('href', '/pos?orderId=ord-77');
-  });
-
   it('rounds durationMs to whole seconds and shows em-dash when absent', () => {
     state.data = [
       makeEvent({ id: 'a', e164: '+900000000001', durationMs: 95_400 }), // -> 95s
@@ -91,10 +87,9 @@ describe('CallerFeedPage', () => {
     renderFeed();
     expect(screen.getByText('95s')).toBeInTheDocument();
 
-    // The null-duration row renders "—" for both the duration cell and the
-    // (also-absent) order cell.
+    // The null-duration row renders "—" for the duration cell.
     const row = screen.getByText('+900000000002').closest('tr')!;
-    expect(within(row).getAllByText('—').length).toBe(2);
+    expect(within(row).getAllByText('—').length).toBe(1);
   });
 
   it('colours the kind pill: missed -> amber, answered -> green', () => {

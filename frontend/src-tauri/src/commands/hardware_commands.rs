@@ -1,9 +1,6 @@
+use crate::hardware::{DeviceStatus, HardwareManager, KitchenOrderData, ReceiptData};
 use tauri::State;
 use tokio::sync::Mutex;
-use crate::hardware::{
-    HardwareManager, DeviceStatus,
-    ReceiptData, KitchenOrderData,
-};
 
 pub type HardwareManagerState<'a> = State<'a, Mutex<HardwareManager>>;
 
@@ -16,8 +13,7 @@ pub async fn initialize_hardware(
     let mut mgr = manager.lock().await;
 
     // Set backend client
-    *mgr = HardwareManager::new(mgr.event_emitter().clone())
-        .with_backend_client(backend_url);
+    *mgr = HardwareManager::new(mgr.event_emitter().clone()).with_backend_client(backend_url);
 
     mgr.initialize_from_backend()
         .await
@@ -29,9 +25,7 @@ pub async fn initialize_hardware(
 
 /// Get all device statuses
 #[tauri::command]
-pub async fn list_devices(
-    manager: HardwareManagerState<'_>,
-) -> Result<Vec<DeviceStatus>, String> {
+pub async fn list_devices(manager: HardwareManagerState<'_>) -> Result<Vec<DeviceStatus>, String> {
     let mgr = manager.lock().await;
     Ok(mgr.get_all_device_statuses().await)
 }
@@ -77,11 +71,18 @@ pub async fn print_receipt(
 #[tauri::command]
 pub async fn print_kitchen_order(
     device_id: String,
-    order: KitchenOrderData,
+    // The frontend invokes this command with the key `ticket` (it ships
+    // Order.kitchenTicketSnapshot / KitchenTicketSnapshot). Tauri maps the
+    // camelCased param name to the invoke key, so this param MUST be named
+    // `ticket` (not `order`) or the IPC layer rejects every call with
+    // "missing required key order" before the handler runs — silently
+    // killing kitchen auto-print in the desktop build. Mirrors `receipt`
+    // on print_receipt.
+    ticket: KitchenOrderData,
     manager: HardwareManagerState<'_>,
 ) -> Result<String, String> {
     let mgr = manager.lock().await;
-    mgr.print_kitchen_order(&device_id, &order)
+    mgr.print_kitchen_order(&device_id, &ticket)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -104,13 +105,9 @@ pub async fn reconnect_device(
 
 /// Shutdown hardware system
 #[tauri::command]
-pub async fn shutdown_hardware(
-    manager: HardwareManagerState<'_>,
-) -> Result<String, String> {
+pub async fn shutdown_hardware(manager: HardwareManagerState<'_>) -> Result<String, String> {
     let mgr = manager.lock().await;
-    mgr.shutdown()
-        .await
-        .map_err(|e| e.to_string())?;
+    mgr.shutdown().await.map_err(|e| e.to_string())?;
 
     Ok("Hardware system shutdown".to_string())
 }

@@ -216,6 +216,57 @@ describe('AccountingSyncService.syncInvoice', () => {
     expect(successCall.data.syncedAt).toBeInstanceOf(Date);
   });
 
+  it('carries the snapshotted seller identity into the provider payload (fake-working sweep #3)', async () => {
+    settings.findByTenant.mockResolvedValue(foribaSettings);
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+      sellerName: 'Lezzet Lokantası A.Ş.',
+      sellerTaxId: '1234567890',
+      sellerTaxOffice: 'Kadıköy',
+      sellerAddress: 'Bağdat Cad. No:1',
+      sellerPhone: '+902161234567',
+      sellerEmail: 'fatura@lezzet.example',
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT);
+
+    const pushed = adapter.pushInvoice.mock.calls[0][2];
+    expect(pushed.sellerName).toBe('Lezzet Lokantası A.Ş.');
+    expect(pushed.sellerTaxId).toBe('1234567890');
+    expect(pushed.sellerTaxOffice).toBe('Kadıköy');
+    expect(pushed.sellerAddress).toBe('Bağdat Cad. No:1');
+    expect(pushed.sellerPhone).toBe('+902161234567');
+    expect(pushed.sellerEmail).toBe('fatura@lezzet.example');
+  });
+
+  it('falls back to current Company Info for legacy rows with no seller snapshot', async () => {
+    // Legacy invoice row written before the seller columns existed (all
+    // seller* null) — sync should backfill from the tenant's current
+    // Company Info so the document still carries a supplier party.
+    settings.findByTenant.mockResolvedValue({
+      ...foribaSettings,
+      companyName: 'Eski Firma Ltd.',
+      companyTaxId: '9876543210',
+    });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+      sellerName: null,
+      sellerTaxId: null,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT);
+
+    const pushed = adapter.pushInvoice.mock.calls[0][2];
+    expect(pushed.sellerName).toBe('Eski Firma Ltd.');
+    expect(pushed.sellerTaxId).toBe('9876543210');
+  });
+
   it('records FAILED + syncError (so the row is reclaimable) when the adapter throws', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
     (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });

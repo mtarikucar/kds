@@ -37,7 +37,6 @@ export default function CallerFeedPage() {
               <th className="px-3 py-2 font-medium">{t('hummytummy.callerFeed.col.phone')}</th>
               <th className="px-3 py-2 font-medium">{t('hummytummy.callerFeed.col.customer')}</th>
               <th className="px-3 py-2 font-medium">{t('hummytummy.callerFeed.col.duration')}</th>
-              <th className="px-3 py-2 font-medium">{t('hummytummy.callerFeed.col.order')}</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -60,15 +59,6 @@ export default function CallerFeedPage() {
                 </td>
                 <td className="px-3 py-2 tabular-nums text-xs">
                   {e.durationMs != null ? `${Math.round(e.durationMs / 1000)}s` : '—'}
-                </td>
-                <td className="px-3 py-2 text-xs">
-                  {e.orderId ? (
-                    <Link to={`/pos?orderId=${e.orderId}`} className="text-blue-600 hover:underline">
-                      {t('hummytummy.callerFeed.open')}
-                    </Link>
-                  ) : (
-                    '—'
-                  )}
                 </td>
               </tr>
             ))}

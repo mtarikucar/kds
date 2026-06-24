@@ -90,6 +90,18 @@ export class AccountingSyncService {
         customerName: invoice.customerName || undefined,
         customerTaxId: invoice.customerTaxId || undefined,
         customerTaxOffice: invoice.customerTaxOffice || undefined,
+        // Issuer/seller identity snapshotted on the invoice at build time
+        // (fake-working sweep #3). Falls back to the tenant's current
+        // Company Info for legacy rows written before the seller columns
+        // existed, so historical invoices still carry a supplier party.
+        sellerName: invoice.sellerName || settings.companyName || undefined,
+        sellerTaxId: invoice.sellerTaxId || settings.companyTaxId || undefined,
+        sellerTaxOffice:
+          invoice.sellerTaxOffice || settings.companyTaxOffice || undefined,
+        sellerAddress:
+          invoice.sellerAddress || settings.companyAddress || undefined,
+        sellerPhone: invoice.sellerPhone || settings.companyPhone || undefined,
+        sellerEmail: invoice.sellerEmail || settings.companyEmail || undefined,
         currency: invoice.currency,
         paymentMethod: invoice.paymentMethod || undefined,
         totalAmount: Number(invoice.totalAmount),

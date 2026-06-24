@@ -11,7 +11,6 @@ export interface CallerEvent {
   customerId: string | null;
   durationMs: number | null;
   occurredAt: string;
-  orderId: string | null;
 }
 
 export const callerKeys = {

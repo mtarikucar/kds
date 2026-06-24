@@ -138,6 +138,49 @@ describe("ForibaEfaturaAdapter", () => {
     expect(Buffer.from(body.content, "base64").toString()).toContain("Invoice");
   });
 
+  it("emits cac:AccountingSupplierParty with the configured seller VKN + name (fake-working sweep #3)", async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: "fb-uuid-2" } });
+    (adapter as any).httpClient = http;
+    await adapter.pushInvoice("tok", "co-1", {
+      ...invoice,
+      sellerName: "Lezzet Lokantası A.Ş.",
+      sellerTaxId: "1234567890",
+      sellerTaxOffice: "Kadıköy",
+      sellerAddress: "Bağdat Cad. No:1",
+      sellerPhone: "+902161234567",
+      sellerEmail: "fatura@lezzet.example",
+    });
+    const xml = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(xml).toContain("<cac:AccountingSupplierParty>");
+    expect(xml).toContain("Lezzet Lokantası A.Ş."); // name present (no XML-special chars)
+    expect(xml).toContain("<cbc:CompanyID>1234567890</cbc:CompanyID>"); // VKN
+    expect(xml).toContain("Kadıköy"); // tax office
+    expect(xml).toContain("Bağdat Cad. No:1"); // address
+    expect(xml).toContain("+902161234567"); // phone
+    expect(xml).toContain("fatura@lezzet.example"); // email
+  });
+
+  it("emits a minimal supplier party with a 'Satici' placeholder when no seller is configured", async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: "fb-uuid-3" } });
+    (adapter as any).httpClient = http;
+    await adapter.pushInvoice("tok", "co-1", invoice); // no seller* fields
+    const xml = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(xml).toContain("<cac:AccountingSupplierParty>");
+    expect(xml).toContain("Satici");
+    // no VKN configured -> no PartyTaxScheme block (no empty CompanyID tag).
+    expect(xml).not.toContain("<cac:PartyTaxScheme>");
+  });
+
   it("testConnection returns false when authenticate throws", async () => {
     const adapter = new ForibaEfaturaAdapter();
     const http = fakeHttp();

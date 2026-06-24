@@ -268,3 +268,137 @@ describe("SalesInvoiceService.createFromOrder delivery reconciliation (CONCERN B
     expect(Math.round(lineTotalSum * 100) / 100).toBe(invoice.totalAmount);
   });
 });
+
+/**
+ * fake-working sweep #3: the issuer/seller identity from AccountingSettings
+ * "Company Info" must be snapshotted onto each generated SalesInvoice. Pre-fix
+ * those six fields were collected + persisted but appeared on nothing the
+ * system issued. We assert createFromOrder / createFromPayment copy
+ * company* -> seller* on the created row, and that an empty Company Info
+ * leaves the columns null (no behaviour change for unconfigured tenants).
+ */
+describe("SalesInvoiceService seller-identity snapshot (fake-working sweep #3)", () => {
+  let prisma: MockPrismaClient;
+  let svc: SalesInvoiceService;
+
+  const companyInfo = {
+    companyName: "Lezzet Lokantası A.Ş.",
+    companyTaxId: "1234567890",
+    companyTaxOffice: "Kadıköy",
+    companyAddress: "Bağdat Cad. No:1, İstanbul",
+    companyPhone: "+902161234567",
+    companyEmail: "fatura@lezzet.example",
+  };
+
+  function buildSvc(settingsOverride: Record<string, any>) {
+    const settings: any = {
+      findByTenant: jest.fn().mockResolvedValue({
+        defaultPaymentTermDays: 0,
+        autoSync: false,
+        provider: "NONE",
+        ...settingsOverride,
+      }),
+      getNextInvoiceNumber: jest.fn().mockResolvedValue("INV-S"),
+    };
+    return new SalesInvoiceService(
+      prisma as any,
+      settings,
+      new TaxCalculationService(),
+    );
+  }
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => {
+      // createFromPayment passes no options; createFromOrder passes the
+      // serializable-isolation options object as the 2nd arg. Support both.
+      const tx: any = {
+        salesInvoice: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockImplementation(async ({ data }: any) => ({
+            id: "inv-s",
+            ...data,
+            items: data.items.create,
+          })),
+        },
+      };
+      return cb(tx);
+    });
+  });
+
+  it("createFromOrder snapshots company* -> seller* onto the invoice", async () => {
+    svc = buildSvc(companyInfo);
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: "order-s",
+      tenantId: "t1",
+      customerName: "Müşteri",
+      customerPhone: null,
+      totalAmount: 100,
+      discount: 0,
+      finalAmount: 100,
+      payments: [{ method: "CASH" }],
+      salesInvoices: [],
+      orderItems: [
+        { id: "oi-1", quantity: 1, subtotal: 100, taxRate: 10, product: { name: "X" } },
+      ],
+    });
+
+    const invoice: any = await svc.createFromOrder("order-s", "t1");
+
+    expect(invoice.sellerName).toBe("Lezzet Lokantası A.Ş.");
+    expect(invoice.sellerTaxId).toBe("1234567890");
+    expect(invoice.sellerTaxOffice).toBe("Kadıköy");
+    expect(invoice.sellerAddress).toBe("Bağdat Cad. No:1, İstanbul");
+    expect(invoice.sellerPhone).toBe("+902161234567");
+    expect(invoice.sellerEmail).toBe("fatura@lezzet.example");
+  });
+
+  it("leaves seller* null when Company Info is unset (no behaviour change)", async () => {
+    svc = buildSvc({}); // no company* fields
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: "order-e",
+      tenantId: "t1",
+      customerName: "Müşteri",
+      customerPhone: null,
+      totalAmount: 100,
+      discount: 0,
+      finalAmount: 100,
+      payments: [{ method: "CASH" }],
+      salesInvoices: [],
+      orderItems: [
+        { id: "oi-1", quantity: 1, subtotal: 100, taxRate: 10, product: { name: "X" } },
+      ],
+    });
+
+    const invoice: any = await svc.createFromOrder("order-e", "t1");
+
+    expect(invoice.sellerName).toBeNull();
+    expect(invoice.sellerTaxId).toBeNull();
+    expect(invoice.sellerTaxOffice).toBeNull();
+  });
+
+  it("createFromPayment snapshots company* -> seller* onto the per-payment invoice", async () => {
+    svc = buildSvc(companyInfo);
+    (prisma.payment.findFirst as any).mockResolvedValue({
+      id: "pay-s",
+      tenantId: "t1",
+      amount: 50,
+      method: "CARD",
+      orderId: "order-s",
+      order: { customerName: "Müşteri", customerPhone: null },
+      salesInvoices: [],
+      orderItemPayments: [
+        {
+          quantity: 1,
+          amount: 50,
+          orderItem: { quantity: 1, taxRate: 10, product: { name: "Y" } },
+        },
+      ],
+    });
+
+    const invoice: any = await svc.createFromPayment("pay-s", "t1");
+
+    expect(invoice.sellerName).toBe("Lezzet Lokantası A.Ş.");
+    expect(invoice.sellerTaxId).toBe("1234567890");
+  });
+});

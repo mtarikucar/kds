@@ -1,13 +1,12 @@
+use crate::hardware::connections::Connection;
+use crate::hardware::errors::{HardwareError, HardwareResult};
+use crate::hardware::traits::{
+    BarcodeType, ConnectionStatus, DeviceStatus, DeviceType, HardwareDevice, HealthStatus,
+    KitchenOrderData, PaperStatus, PrinterDevice, ReceiptData, TextAlignment, TextStyle,
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::traits::{
-    HardwareDevice, PrinterDevice, DeviceStatus, DeviceType,
-    ConnectionStatus, HealthStatus, ReceiptData, KitchenOrderData,
-    TextAlignment, TextStyle, PaperStatus, BarcodeType,
-};
-use crate::hardware::connections::Connection;
 
 /// ESC/POS compatible thermal printer
 pub struct EscPosPrinter {
@@ -18,11 +17,7 @@ pub struct EscPosPrinter {
 }
 
 impl EscPosPrinter {
-    pub fn new(
-        id: String,
-        name: String,
-        connection: Box<dyn Connection>,
-    ) -> Self {
+    pub fn new(id: String, name: String, connection: Box<dyn Connection>) -> Self {
         Self {
             id,
             name,
@@ -39,22 +34,54 @@ impl EscPosPrinter {
     }
 
     // ESC/POS Commands
-    fn cmd_init() -> &'static [u8] { &[0x1B, 0x40] }
-    fn cmd_cut_full() -> &'static [u8] { &[0x1D, 0x56, 0x00] }
-    fn cmd_cut_partial() -> &'static [u8] { &[0x1D, 0x56, 0x01] }
-    fn cmd_align_left() -> &'static [u8] { &[0x1B, 0x61, 0x00] }
-    fn cmd_align_center() -> &'static [u8] { &[0x1B, 0x61, 0x01] }
-    fn cmd_align_right() -> &'static [u8] { &[0x1B, 0x61, 0x02] }
-    fn cmd_bold_on() -> &'static [u8] { &[0x1B, 0x45, 0x01] }
-    fn cmd_bold_off() -> &'static [u8] { &[0x1B, 0x45, 0x00] }
-    fn cmd_underline_on() -> &'static [u8] { &[0x1B, 0x2D, 0x01] }
-    fn cmd_underline_off() -> &'static [u8] { &[0x1B, 0x2D, 0x00] }
-    fn cmd_double_height() -> &'static [u8] { &[0x1B, 0x21, 0x10] }
-    fn cmd_double_width() -> &'static [u8] { &[0x1B, 0x21, 0x20] }
-    fn cmd_double_both() -> &'static [u8] { &[0x1B, 0x21, 0x30] }
-    fn cmd_normal_size() -> &'static [u8] { &[0x1B, 0x21, 0x00] }
-    fn cmd_open_drawer() -> &'static [u8] { &[0x1B, 0x70, 0x00, 0x19, 0xFA] }
-    fn cmd_newline() -> &'static [u8] { &[0x0A] }
+    fn cmd_init() -> &'static [u8] {
+        &[0x1B, 0x40]
+    }
+    fn cmd_cut_full() -> &'static [u8] {
+        &[0x1D, 0x56, 0x00]
+    }
+    fn cmd_cut_partial() -> &'static [u8] {
+        &[0x1D, 0x56, 0x01]
+    }
+    fn cmd_align_left() -> &'static [u8] {
+        &[0x1B, 0x61, 0x00]
+    }
+    fn cmd_align_center() -> &'static [u8] {
+        &[0x1B, 0x61, 0x01]
+    }
+    fn cmd_align_right() -> &'static [u8] {
+        &[0x1B, 0x61, 0x02]
+    }
+    fn cmd_bold_on() -> &'static [u8] {
+        &[0x1B, 0x45, 0x01]
+    }
+    fn cmd_bold_off() -> &'static [u8] {
+        &[0x1B, 0x45, 0x00]
+    }
+    fn cmd_underline_on() -> &'static [u8] {
+        &[0x1B, 0x2D, 0x01]
+    }
+    fn cmd_underline_off() -> &'static [u8] {
+        &[0x1B, 0x2D, 0x00]
+    }
+    fn cmd_double_height() -> &'static [u8] {
+        &[0x1B, 0x21, 0x10]
+    }
+    fn cmd_double_width() -> &'static [u8] {
+        &[0x1B, 0x21, 0x20]
+    }
+    fn cmd_double_both() -> &'static [u8] {
+        &[0x1B, 0x21, 0x30]
+    }
+    fn cmd_normal_size() -> &'static [u8] {
+        &[0x1B, 0x21, 0x00]
+    }
+    fn cmd_open_drawer() -> &'static [u8] {
+        &[0x1B, 0x70, 0x00, 0x19, 0xFA]
+    }
+    fn cmd_newline() -> &'static [u8] {
+        &[0x0A]
+    }
 
     async fn set_alignment(&self, alignment: TextAlignment) -> HardwareResult<()> {
         let cmd = match alignment {
@@ -184,67 +211,81 @@ impl PrinterDevice for EscPosPrinter {
     async fn print_receipt(&mut self, receipt: &ReceiptData) -> HardwareResult<()> {
         self.send_command(Self::cmd_init()).await?;
 
-        // Header
+        // Header — restaurant name from the snapshot.
         self.set_alignment(TextAlignment::Center).await?;
         self.apply_style(&TextStyle {
             bold: true,
             double_height: true,
             ..Default::default()
-        }).await?;
-        self.send_command(b"KDS RESTAURANT\n").await?;
+        })
+        .await?;
+        let header = format!("{}\n", receipt.restaurant.name);
+        self.send_command(header.as_bytes()).await?;
         self.clear_style().await?;
         self.send_command(b"\n").await?;
 
         // Order Info
         self.set_alignment(TextAlignment::Left).await?;
-        let order_line = format!("Order: #{}\n", receipt.order_id);
+        let order_line = format!("Order: #{}\n", receipt.order.order_number);
         self.send_command(order_line.as_bytes()).await?;
 
-        if let Some(table) = &receipt.table_number {
+        if let Some(table) = &receipt.order.table_number {
             let table_line = format!("Table: {}\n", table);
             self.send_command(table_line.as_bytes()).await?;
         }
 
-        let timestamp = receipt.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-        let time_line = format!("Time: {}\n", timestamp);
+        let time_line = format!("Time: {}\n", receipt.printed_at);
         self.send_command(time_line.as_bytes()).await?;
 
-        self.send_command(b"--------------------------------\n").await?;
+        self.send_command(b"--------------------------------\n")
+            .await?;
 
-        // Items
+        // Items — totalPrice is a decimal string, printed verbatim with the
+        // snapshot currency (no float round-trip).
+        let currency = &receipt.restaurant.currency;
         for item in &receipt.items {
             let line = format!(
-                "{} x {}  ${:.2}\n",
-                item.quantity, item.name, item.total_price
+                "{} x {}  {} {}\n",
+                item.quantity, item.name, item.total_price, currency
             );
             self.send_command(line.as_bytes()).await?;
 
-            if let Some(modifiers) = &item.modifiers {
-                for modifier in modifiers {
-                    let mod_line = format!("  + {}\n", modifier);
-                    self.send_command(mod_line.as_bytes()).await?;
-                }
+            for modifier in &item.modifiers {
+                let mod_line = format!("  + {}\n", modifier);
+                self.send_command(mod_line.as_bytes()).await?;
+            }
+
+            if let Some(notes) = &item.notes {
+                let note_line = format!("  NOTE: {}\n", notes);
+                self.send_command(note_line.as_bytes()).await?;
             }
         }
 
-        self.send_command(b"--------------------------------\n").await?;
+        self.send_command(b"--------------------------------\n")
+            .await?;
 
         // Totals
-        let subtotal = format!("Subtotal:     ${:.2}\n", receipt.subtotal);
+        let subtotal = format!("Subtotal:     {} {}\n", receipt.totals.subtotal, currency);
         self.send_command(subtotal.as_bytes()).await?;
 
-        let tax = format!("Tax:          ${:.2}\n", receipt.tax);
+        let tax = format!("Tax:          {} {}\n", receipt.totals.tax, currency);
         self.send_command(tax.as_bytes()).await?;
+
+        if receipt.totals.discount.parse::<f64>().unwrap_or(0.0) != 0.0 {
+            let discount = format!("Discount:     {} {}\n", receipt.totals.discount, currency);
+            self.send_command(discount.as_bytes()).await?;
+        }
 
         self.apply_style(&TextStyle {
             bold: true,
             ..Default::default()
-        }).await?;
-        let total = format!("TOTAL:        ${:.2}\n", receipt.total);
+        })
+        .await?;
+        let total = format!("TOTAL:        {} {}\n", receipt.totals.total, currency);
         self.send_command(total.as_bytes()).await?;
         self.clear_style().await?;
 
-        let payment = format!("Payment: {}\n", receipt.payment_method);
+        let payment = format!("Payment: {}\n", receipt.payment.method);
         self.send_command(payment.as_bytes()).await?;
 
         // Footer
@@ -257,7 +298,7 @@ impl PrinterDevice for EscPosPrinter {
         // Cut paper
         self.cut_paper(false).await?;
 
-        tracing::info!("Receipt printed for order {}", receipt.order_id);
+        tracing::info!("Receipt printed for order {}", receipt.order.id);
         Ok(())
     }
 
@@ -271,7 +312,8 @@ impl PrinterDevice for EscPosPrinter {
             double_height: true,
             double_width: true,
             ..Default::default()
-        }).await?;
+        })
+        .await?;
         self.send_command(b"KITCHEN ORDER\n").await?;
         self.clear_style().await?;
         self.send_command(b"\n").await?;
@@ -281,42 +323,42 @@ impl PrinterDevice for EscPosPrinter {
         self.apply_style(&TextStyle {
             bold: true,
             ..Default::default()
-        }).await?;
-        let order_line = format!("Order: #{}\n", order.order_id);
+        })
+        .await?;
+        let order_line = format!("Order: #{}\n", order.order.order_number);
         self.send_command(order_line.as_bytes()).await?;
 
-        if let Some(table) = &order.table_number {
+        if let Some(table) = &order.order.table_number {
             let table_line = format!("Table: {}\n", table);
             self.send_command(table_line.as_bytes()).await?;
         }
 
-        let time = order.timestamp.format("%H:%M:%S").to_string();
-        let time_line = format!("Time: {}\n", time);
+        let time_line = format!("Time: {}\n", order.created_at);
         self.send_command(time_line.as_bytes()).await?;
         self.clear_style().await?;
 
-        self.send_command(b"--------------------------------\n").await?;
+        self.send_command(b"--------------------------------\n")
+            .await?;
 
         // Items
         for item in &order.items {
             self.apply_style(&TextStyle {
                 bold: true,
                 ..Default::default()
-            }).await?;
+            })
+            .await?;
             let line = format!("{} x {}\n", item.quantity, item.name);
             self.send_command(line.as_bytes()).await?;
             self.clear_style().await?;
 
-            if let Some(modifiers) = &item.modifiers {
-                for modifier in modifiers {
-                    let mod_line = format!("  + {}\n", modifier);
-                    self.send_command(mod_line.as_bytes()).await?;
-                }
+            for modifier in &item.modifiers {
+                let mod_line = format!("  + {}\n", modifier);
+                self.send_command(mod_line.as_bytes()).await?;
             }
 
-            if let Some(instructions) = &item.cooking_instructions {
-                let inst_line = format!("  NOTE: {}\n", instructions);
-                self.send_command(inst_line.as_bytes()).await?;
+            if let Some(notes) = &item.notes {
+                let note_line = format!("  NOTE: {}\n", notes);
+                self.send_command(note_line.as_bytes()).await?;
             }
 
             self.send_command(b"\n").await?;
@@ -327,7 +369,8 @@ impl PrinterDevice for EscPosPrinter {
             self.apply_style(&TextStyle {
                 bold: true,
                 ..Default::default()
-            }).await?;
+            })
+            .await?;
             let inst_line = format!("{}\n", special_instructions);
             self.send_command(inst_line.as_bytes()).await?;
             self.clear_style().await?;
@@ -336,7 +379,7 @@ impl PrinterDevice for EscPosPrinter {
         self.send_command(b"\n\n\n").await?;
         self.cut_paper(false).await?;
 
-        tracing::info!("Kitchen order printed for order {}", order.order_id);
+        tracing::info!("Kitchen order printed for order {}", order.order.id);
         Ok(())
     }
 
@@ -413,10 +456,12 @@ impl PrinterDevice for EscPosPrinter {
 
     async fn print_qr_code(&mut self, data: &str, size: u8) -> HardwareResult<()> {
         // QR Code Model
-        self.send_command(&[0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]).await?;
+        self.send_command(&[0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00])
+            .await?;
 
         // QR Code Size
-        self.send_command(&[0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size]).await?;
+        self.send_command(&[0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size])
+            .await?;
 
         // QR Code Data
         let len = data.len() + 3;
@@ -427,7 +472,8 @@ impl PrinterDevice for EscPosPrinter {
         self.send_command(&cmd).await?;
 
         // Print QR Code
-        self.send_command(&[0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]).await?;
+        self.send_command(&[0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30])
+            .await?;
         self.send_command(Self::cmd_newline()).await?;
 
         Ok(())

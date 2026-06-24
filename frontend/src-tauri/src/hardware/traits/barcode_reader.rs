@@ -1,7 +1,7 @@
+use super::device::HardwareDevice;
+use crate::hardware::errors::HardwareResult;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::hardware::errors::HardwareResult;
-use super::device::HardwareDevice;
 
 /// Barcode scan result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,9 +15,9 @@ pub struct BarcodeScanResult {
 /// Barcode reader mode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ScanMode {
-    Continuous,    // Continuously scan
-    SingleShot,    // Scan once per trigger
-    Manual,        // Require explicit trigger
+    Continuous, // Continuously scan
+    SingleShot, // Scan once per trigger
+    Manual,     // Require explicit trigger
 }
 
 /// Barcode reader device trait

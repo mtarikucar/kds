@@ -325,19 +325,44 @@ export class TablesService {
       }
     }
 
-    // Compound WHERE — IDOR guard (B41-B45 pattern). findOne above is
-    // a TOCTOU check; the write also has to be (tenantId, branchId)-
-    // scoped so a regression there can't leak into a cross-tenant or
-    // cross-branch rename.
-    const claim = await this.prisma.table.updateMany({
-      where: { id, ...branchScope(scope) },
-      data: updateTableDto,
-    });
-    if (claim.count === 0) {
-      throw new NotFoundException("Table not found");
-    }
-    return this.prisma.table.findFirst({
-      where: { id, ...branchScope(scope) },
+    // Active-order guard parity with updateStatus(). UpdateTableDto =
+    // PartialType(CreateTableDto), so `status` is a whitelisted, accepted
+    // field — PATCH /tables/:id with { status: "AVAILABLE" } would
+    // otherwise free an OCCUPIED table that still has an unpaid bill open,
+    // exactly the invariant updateStatus() exists to protect. The whole
+    // mutation runs in one transaction so the guard count and the write
+    // can't race a freshly-created order. (Status-less updates — number/
+    // capacity/section — skip the count, same as updateStatus.)
+    return this.prisma.$transaction(async (tx) => {
+      if (updateTableDto.status === TableStatus.AVAILABLE) {
+        const activeOrders = await tx.order.count({
+          where: {
+            tableId: id,
+            ...branchScope(scope),
+            status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+          },
+        });
+        if (activeOrders > 0) {
+          throw new ConflictException(
+            "Cannot mark table AVAILABLE while it has active orders",
+          );
+        }
+      }
+
+      // Compound WHERE — IDOR guard (B41-B45 pattern). findOne above is
+      // a TOCTOU check; the write also has to be (tenantId, branchId)-
+      // scoped so a regression there can't leak into a cross-tenant or
+      // cross-branch rename.
+      const claim = await tx.table.updateMany({
+        where: { id, ...branchScope(scope) },
+        data: updateTableDto,
+      });
+      if (claim.count === 0) {
+        throw new NotFoundException("Table not found");
+      }
+      return tx.table.findFirst({
+        where: { id, ...branchScope(scope) },
+      });
     });
   }
 

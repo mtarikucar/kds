@@ -1,12 +1,12 @@
+use crate::hardware::connections::Connection;
+use crate::hardware::errors::{HardwareError, HardwareResult};
+use crate::hardware::traits::{
+    ConnectionStatus, DeviceStatus, DeviceType, HardwareDevice, HealthStatus, PagerCallType,
+    PagerDevice, PagerMessage,
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::traits::{
-    HardwareDevice, PagerDevice, DeviceStatus, DeviceType,
-    ConnectionStatus, HealthStatus, PagerMessage, PagerCallType,
-};
-use crate::hardware::connections::Connection;
 
 /// Generic restaurant pager system
 /// This is a basic implementation that can be extended for specific systems (LRS, Retekess, etc.)
@@ -19,11 +19,7 @@ pub struct GenericPager {
 }
 
 impl GenericPager {
-    pub fn new(
-        id: String,
-        name: String,
-        connection: Box<dyn Connection>,
-    ) -> Self {
+    pub fn new(id: String, name: String, connection: Box<dyn Connection>) -> Self {
         Self {
             id,
             name,
@@ -188,7 +184,7 @@ impl PagerDevice for GenericPager {
     async fn configure_base_station(&mut self, _config: serde_json::Value) -> HardwareResult<()> {
         // Implementation depends on specific pager system
         Err(HardwareError::UnsupportedOperation(
-            "Base station configuration not implemented for generic pager".to_string()
+            "Base station configuration not implemented for generic pager".to_string(),
         ))
     }
 

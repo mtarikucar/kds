@@ -198,7 +198,7 @@
       "title": "Bron mavjud emas",
       "description": "Restoranga qo‘ng‘iroq qiling."
     },
-    "successEmailOnlyCancelHint": "Tasdiq email yuborildi. Bekor qilish uchun restoranga qo‘ng‘iroq qiling.",
+    "successEmailOnlyCancelHint": "Agar restoran email tasdiqlarini yoqgan bo‘lsa, emailingizga xabar yuboriladi. Bekor qilish uchun restoranga qo‘ng‘iroq qiling.",
     "branch": "Filial"
   },
   "lookup": {

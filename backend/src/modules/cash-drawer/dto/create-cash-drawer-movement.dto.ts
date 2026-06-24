@@ -42,7 +42,11 @@ export class CreateCashDrawerMovementDto {
   notes?: string;
 
   @ApiPropertyOptional({
-    description: "Cash denomination counting breakdown (for CLOSING type)",
+    description:
+      "Per-note/coin till count as a { faceValue: count } map. When supplied, " +
+      "the server enforces Σ(faceValue × count) === amount (rejects on mismatch) " +
+      "so the count cannot silently disagree with the entered amount. Full " +
+      "expected-vs-counted Z-Report reconciliation is not yet wired.",
     example: { 100: 5, 50: 10, 20: 15 },
   })
   @IsOptional()

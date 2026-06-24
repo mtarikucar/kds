@@ -1,6 +1,6 @@
-use tauri::State;
-use crate::hardware::BarcodeScanResult;
 use super::hardware_commands::HardwareManagerState;
+use crate::hardware::BarcodeScanResult;
+use tauri::State;
 
 /// Start barcode scanning
 #[tauri::command]

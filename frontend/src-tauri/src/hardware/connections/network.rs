@@ -1,8 +1,8 @@
+use super::connection::{Connection, ConnectionType, NetworkProtocol};
+use crate::hardware::errors::{HardwareError, HardwareResult};
 use async_trait::async_trait;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, UdpSocket};
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use super::connection::{Connection, ConnectionType, NetworkProtocol};
 
 pub struct NetworkConnection {
     host: String,
@@ -50,32 +50,30 @@ impl Connection for NetworkConnection {
                 let connect_future = TcpStream::connect(&address);
                 let stream = tokio::time::timeout(timeout, connect_future)
                     .await
-                    .map_err(|_| HardwareError::Timeout(format!(
-                        "TCP connection timeout to {}",
-                        address
-                    )))?
-                    .map_err(|e| HardwareError::ConnectionError(format!(
-                        "Failed to connect to {}: {}",
-                        address, e
-                    )))?;
+                    .map_err(|_| {
+                        HardwareError::Timeout(format!("TCP connection timeout to {}", address))
+                    })?
+                    .map_err(|e| {
+                        HardwareError::ConnectionError(format!(
+                            "Failed to connect to {}: {}",
+                            address, e
+                        ))
+                    })?;
 
                 self.tcp_stream = Some(stream);
                 tracing::info!("TCP connection established to {}", address);
             }
             NetworkProtocol::Udp => {
-                let socket = UdpSocket::bind("0.0.0.0:0")
-                    .await
-                    .map_err(|e| HardwareError::ConnectionError(format!(
-                        "Failed to bind UDP socket: {}",
-                        e
-                    )))?;
+                let socket = UdpSocket::bind("0.0.0.0:0").await.map_err(|e| {
+                    HardwareError::ConnectionError(format!("Failed to bind UDP socket: {}", e))
+                })?;
 
-                socket.connect(&address)
-                    .await
-                    .map_err(|e| HardwareError::ConnectionError(format!(
+                socket.connect(&address).await.map_err(|e| {
+                    HardwareError::ConnectionError(format!(
                         "Failed to connect UDP socket to {}: {}",
                         address, e
-                    )))?;
+                    ))
+                })?;
 
                 self.udp_socket = Some(socket);
                 tracing::info!("UDP connection established to {}", address);
@@ -103,17 +101,26 @@ impl Connection for NetworkConnection {
     async fn send(&mut self, data: &[u8]) -> HardwareResult<usize> {
         match self.protocol {
             NetworkProtocol::Tcp => {
-                let stream = self.tcp_stream.as_mut()
+                let stream = self
+                    .tcp_stream
+                    .as_mut()
                     .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
                 let written = stream.write(data).await?;
                 stream.flush().await?;
 
-                tracing::debug!("Sent {} bytes via TCP to {}:{}", written, self.host, self.port);
+                tracing::debug!(
+                    "Sent {} bytes via TCP to {}:{}",
+                    written,
+                    self.host,
+                    self.port
+                );
                 Ok(written)
             }
             NetworkProtocol::Udp => {
-                let socket = self.udp_socket.as_ref()
+                let socket = self
+                    .udp_socket
+                    .as_ref()
                     .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
                 let sent = socket.send(data).await?;
@@ -128,13 +135,20 @@ impl Connection for NetworkConnection {
 
         match self.protocol {
             NetworkProtocol::Tcp => {
-                let stream = self.tcp_stream.as_mut()
+                let stream = self
+                    .tcp_stream
+                    .as_mut()
                     .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
                 let read_future = stream.read(buffer);
                 match tokio::time::timeout(timeout, read_future).await {
                     Ok(Ok(bytes_read)) => {
-                        tracing::debug!("Received {} bytes via TCP from {}:{}", bytes_read, self.host, self.port);
+                        tracing::debug!(
+                            "Received {} bytes via TCP from {}:{}",
+                            bytes_read,
+                            self.host,
+                            self.port
+                        );
                         Ok(bytes_read)
                     }
                     Ok(Err(e)) => Err(HardwareError::IoError(e)),
@@ -145,13 +159,20 @@ impl Connection for NetworkConnection {
                 }
             }
             NetworkProtocol::Udp => {
-                let socket = self.udp_socket.as_ref()
+                let socket = self
+                    .udp_socket
+                    .as_ref()
                     .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
                 let recv_future = socket.recv(buffer);
                 match tokio::time::timeout(timeout, recv_future).await {
                     Ok(Ok(bytes_read)) => {
-                        tracing::debug!("Received {} bytes via UDP from {}:{}", bytes_read, self.host, self.port);
+                        tracing::debug!(
+                            "Received {} bytes via UDP from {}:{}",
+                            bytes_read,
+                            self.host,
+                            self.port
+                        );
                         Ok(bytes_read)
                     }
                     Ok(Err(e)) => Err(HardwareError::IoError(e)),

@@ -129,6 +129,50 @@ describe('tauri wrapper (web mode)', () => {
     });
   });
 
+  /**
+   * Desktop mode (`__TAURI__` present): pin the EXACT Tauri command names the
+   * IPC layer invokes. The Rust `invoke_handler` only registers these literal
+   * names (main.rs) — a wrong string silently rejects with "command X not
+   * found", which is how the cash-drawer pop and auto-print previously died.
+   * The mocked `invoke` here lets us assert the command string without a real
+   * Tauri runtime (the web-mode tests above never reach `invoke`).
+   */
+  describe('HardwareService desktop-mode command names', () => {
+    beforeEach(() => {
+      (window as any).__TAURI__ = {};
+      invokeMock.mockReset();
+      invokeMock.mockResolvedValue('ok');
+    });
+    afterEach(() => {
+      delete (window as any).__TAURI__;
+    });
+
+    it('openCashDrawer invokes the registered "open_cash_drawer_via_printer" command', async () => {
+      await HardwareService.openCashDrawer('printer-1');
+      expect(invokeMock).toHaveBeenCalledWith('open_cash_drawer_via_printer', {
+        deviceId: 'printer-1',
+      });
+    });
+
+    it('printReceipt invokes "print_receipt" with the snapshot passed through', async () => {
+      const snapshot = { version: 1 } as any;
+      await HardwareService.printReceipt('printer-1', snapshot);
+      expect(invokeMock).toHaveBeenCalledWith('print_receipt', {
+        deviceId: 'printer-1',
+        receipt: snapshot,
+      });
+    });
+
+    it('printKitchenOrder invokes "print_kitchen_order" with the ticket passed through', async () => {
+      const ticket = { version: 1 } as any;
+      await HardwareService.printKitchenOrder('printer-1', ticket);
+      expect(invokeMock).toHaveBeenCalledWith('print_kitchen_order', {
+        deviceId: 'printer-1',
+        ticket,
+      });
+    });
+  });
+
   describe('WindowService web fallbacks', () => {
     it('minimize is a no-op that does not touch the Tauri window', async () => {
       await WindowService.minimize();

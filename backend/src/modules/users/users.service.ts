@@ -16,7 +16,10 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
 import { AuthService } from "../auth/auth.service";
-import { UserRole } from "../../common/constants/roles.enum";
+import {
+  UserRole,
+  isHardRestrictedRole,
+} from "../../common/constants/roles.enum";
 import { EntitlementService } from "../entitlements/entitlement.service";
 
 const LIST_SELECT = {
@@ -130,6 +133,12 @@ export class UsersService {
     createUserDto: CreateUserDto,
     tenantId: string,
     actor: { id: string; role: string },
+    // The acting admin's current branch scope (X-Branch-Id). Front-line roles
+    // (WAITER/KITCHEN/COURIER) REQUIRE a primaryBranchId — the DB CHECK
+    // `users_restricted_role_requires_primary_branch` rejects the insert
+    // otherwise — so we pin them to this branch (falling back to the tenant's
+    // first active branch). Without it, "Add Staff" crashed with an opaque 500.
+    scopeBranchId?: string,
   ) {
     // A MANAGER must not be able to mint an ADMIN — that would be a
     // privilege escalation. Only an existing ADMIN can create ADMINs.
@@ -182,7 +191,37 @@ export class UsersService {
         }
       }
 
-      return tx.user.create({
+      // Restricted roles (WAITER/KITCHEN/COURIER) must land on a concrete
+      // branch or the users_restricted_role_requires_primary_branch CHECK
+      // rejects the INSERT (previously surfaced as an opaque 500). Prefer the
+      // admin's current branch scope; fall back to the tenant's first active
+      // branch (mirrors auth registration). ADMIN/MANAGER stay branch-less
+      // (they roam; the CHECK exempts them).
+      let primaryBranchId: string | null = null;
+      if (isHardRestrictedRole(createUserDto.role)) {
+        if (scopeBranchId) {
+          const inTenant = await tx.branch.findFirst({
+            where: { id: scopeBranchId, tenantId, status: "active" },
+            select: { id: true },
+          });
+          primaryBranchId = inTenant?.id ?? null;
+        }
+        if (!primaryBranchId) {
+          const firstBranch = await tx.branch.findFirst({
+            where: { tenantId, status: "active" },
+            orderBy: { createdAt: "asc" },
+            select: { id: true },
+          });
+          if (!firstBranch) {
+            throw new BadRequestException(
+              "Tenant has no active branch — add a branch before creating front-line staff (waiter/kitchen/courier).",
+            );
+          }
+          primaryBranchId = firstBranch.id;
+        }
+      }
+
+      const created = await tx.user.create({
         data: {
           email: createUserDto.email,
           password: hashedPassword,
@@ -193,9 +232,21 @@ export class UsersService {
           // PENDING_APPROVAL flow used by public self-registration.
           status: "ACTIVE",
           tenantId,
+          primaryBranchId,
         },
         select: LIST_SELECT,
       });
+
+      // Restricted roles get an explicit allow-list row equal to their primary
+      // branch (mirrors auth-provisioning.createUserWithAssignment) so the
+      // admin branch view is uniform across roles.
+      if (primaryBranchId && isHardRestrictedRole(createUserDto.role)) {
+        await tx.userBranchAssignment.create({
+          data: { userId: created.id, branchId: primaryBranchId, tenantId },
+        });
+      }
+
+      return created;
     });
   }
 

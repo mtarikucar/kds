@@ -8,6 +8,7 @@ import { SelfPayQueryService } from "./services/self-pay-query.service";
 import { SelfPayIntentService } from "./services/self-pay-intent.service";
 import { SelfPayWebhookService } from "./services/self-pay-webhook.service";
 import { SelfPaySweeperService } from "./services/self-pay-sweeper.service";
+import { SelfPayRecoveryService } from "./services/self-pay-recovery.service";
 import { CustomerSelfPayController } from "./controllers/customer-self-pay.controller";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { PosSettingsModule } from "../pos-settings/pos-settings.module";
@@ -37,6 +38,7 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SelfPayIntentService,
     SelfPayWebhookService,
     SelfPaySweeperService,
+    SelfPayRecoveryService,
   ],
   exports: [
     CustomerOrdersService,

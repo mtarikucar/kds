@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use crate::hardware::connections::ConnectionConfig;
 use crate::hardware::traits::DeviceType;
+use serde::{Deserialize, Serialize};
 
 /// Device configuration from backend API
 #[derive(Debug, Clone, Serialize, Deserialize)]

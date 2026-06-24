@@ -109,6 +109,14 @@ interface MenuDrawerProps {
   subdomain?: string;
   onCallWaiter?: () => void;
   isCallingWaiter?: boolean;
+  /**
+   * Mirrors the persisted QrMenuSettings.showRestaurantInfo toggle. When
+   * the operator turns it OFF the public menu must hide the WiFi block
+   * (SSID + copyable password) and the social-media links. Defaults to
+   * `true` so legacy callers / rows without the field keep their old
+   * always-visible behavior.
+   */
+  showRestaurantInfo?: boolean;
 }
 
 const MenuDrawer: React.FC<MenuDrawerProps> = ({
@@ -121,6 +129,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
   subdomain,
   onCallWaiter,
   isCallingWaiter = false,
+  showRestaurantInfo = true,
 }) => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
@@ -281,7 +290,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
               )}
 
               {/* WiFi */}
-              {tenant.wifi?.ssid && (
+              {showRestaurantInfo && tenant.wifi?.ssid && (
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <div className="flex items-center gap-3 mb-3">
                     <div
@@ -361,7 +370,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
               )}
 
               {/* Social Media */}
-              {socialLinks.length > 0 && (
+              {showRestaurantInfo && socialLinks.length > 0 && (
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <h3 className="font-semibold text-slate-900 mb-3">{t('qrMenu.socialMedia', 'Social Media')}</h3>
                   <div className="grid grid-cols-4 gap-3">

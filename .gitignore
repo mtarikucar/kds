@@ -67,6 +67,10 @@ frontend/src-tauri/target/
 **/target/
 **/*.rs.bk
 Cargo.lock
+# Linux-only Tauri ACL schema, regenerated on every `cargo build` on a Linux
+# dev box. Prod ships the Windows/AppImage bundles whose schemas CI regenerates
+# at build time; only windows-schema.json/desktop-schema.json are tracked.
+frontend/src-tauri/gen/schemas/linux-schema.json
 
 
 

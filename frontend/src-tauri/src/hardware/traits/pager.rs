@@ -1,7 +1,7 @@
+use super::device::HardwareDevice;
+use crate::hardware::errors::HardwareResult;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::hardware::errors::HardwareResult;
-use super::device::HardwareDevice;
 
 /// Pager call type
 #[derive(Debug, Clone, Serialize, Deserialize)]

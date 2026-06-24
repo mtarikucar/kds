@@ -1,6 +1,6 @@
-use reqwest::Client;
+use crate::hardware::config::{DeviceConfig, HardwareConfig};
 use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::config::{HardwareConfig, DeviceConfig};
+use reqwest::Client;
 
 /// Client for fetching hardware configuration from backend API
 pub struct BackendClient {
@@ -22,7 +22,8 @@ impl BackendClient {
 
         tracing::info!("Fetching hardware config from: {}", url);
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
@@ -31,9 +32,7 @@ impl BackendClient {
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(HardwareError::Unknown(
-                format!("HTTP {}: {}", status, text)
-            ));
+            return Err(HardwareError::Unknown(format!("HTTP {}: {}", status, text)));
         }
 
         let config: HardwareConfig = response
@@ -55,7 +54,8 @@ impl BackendClient {
 
         tracing::info!("Fetching device config from: {}", url);
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
@@ -79,11 +79,15 @@ impl BackendClient {
         device_id: &str,
         status: &serde_json::Value,
     ) -> HardwareResult<()> {
-        let url = format!("{}/api/hardware/devices/{}/status", self.base_url, device_id);
+        let url = format!(
+            "{}/api/hardware/devices/{}/status",
+            self.base_url, device_id
+        );
 
         tracing::debug!("Updating device status for {}", device_id);
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(status)
             .send()
@@ -91,10 +95,7 @@ impl BackendClient {
             .map_err(|e| HardwareError::HttpError(e))?;
 
         if !response.status().is_success() {
-            tracing::warn!(
-                "Failed to update device status: HTTP {}",
-                response.status()
-            );
+            tracing::warn!("Failed to update device status: HTTP {}", response.status());
         }
 
         Ok(())
@@ -107,7 +108,10 @@ impl BackendClient {
         event_type: &str,
         event_data: &serde_json::Value,
     ) -> HardwareResult<()> {
-        let url = format!("{}/api/hardware/devices/{}/events", self.base_url, device_id);
+        let url = format!(
+            "{}/api/hardware/devices/{}/events",
+            self.base_url, device_id
+        );
 
         let payload = serde_json::json!({
             "event_type": event_type,
@@ -117,7 +121,8 @@ impl BackendClient {
 
         tracing::debug!("Reporting device event: {} for {}", event_type, device_id);
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(&payload)
             .send()
@@ -125,10 +130,7 @@ impl BackendClient {
             .map_err(|e| HardwareError::HttpError(e))?;
 
         if !response.status().is_success() {
-            tracing::warn!(
-                "Failed to report device event: HTTP {}",
-                response.status()
-            );
+            tracing::warn!("Failed to report device event: HTTP {}", response.status());
         }
 
         Ok(())

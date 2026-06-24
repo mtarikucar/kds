@@ -40,6 +40,17 @@ describe('OrdersService — line-item pricing / totals / tax (characterization)'
 
   // Two products with DIFFERENT tax rates so multi-line tax accumulation is
   // exercised (and the proportional discount adjustment is non-trivial).
+  // group g-1 holds modX; not required, no max → unconstrained. Eager-loaded
+  // shape mirrors orders.service's product.findMany include so the M7
+  // validateModifierSelections call sees the allowed modifier set.
+  const groupG1 = {
+    isActive: true,
+    isRequired: false,
+    minSelections: 0,
+    maxSelections: null,
+    displayName: 'Extras',
+    modifiers: [{ id: 'm-X' }],
+  };
   const productA = {
     id: 'p-A',
     name: 'Adana',
@@ -47,6 +58,7 @@ describe('OrdersService — line-item pricing / totals / tax (characterization)'
     taxRate: 18,
     tenantId,
     isAvailable: true,
+    modifierGroups: [{ group: groupG1 }],
   };
   const productB = {
     id: 'p-B',
@@ -55,6 +67,7 @@ describe('OrdersService — line-item pricing / totals / tax (characterization)'
     taxRate: 8,
     tenantId,
     isAvailable: true,
+    modifierGroups: [],
   };
   const modX = {
     id: 'm-X',

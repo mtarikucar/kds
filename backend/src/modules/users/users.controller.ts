@@ -70,7 +70,15 @@ export class UsersController {
     @Request() req,
     @CurrentUser() actor: { id: string; role: string },
   ) {
-    return this.usersService.create(createUserDto, req.tenantId, actor);
+    // Pass the acting admin's branch scope so a new front-line user (which the
+    // DB CHECK requires to have a primaryBranchId) is pinned to the branch the
+    // admin is working in (service falls back to the first active branch).
+    return this.usersService.create(
+      createUserDto,
+      req.tenantId,
+      actor,
+      req.scope?.branchId,
+    );
   }
 
   @Get()

@@ -1,11 +1,13 @@
+use crate::hardware::api::BackendClient;
+use crate::hardware::config::{DeviceRegistry, GlobalHardwareSettings, HardwareConfig};
+use crate::hardware::errors::{HardwareError, HardwareResult};
+use crate::hardware::events::HardwareEventEmitter;
+use crate::hardware::factory::DeviceFactory;
+use crate::hardware::traits::{
+    DeviceStatus, HardwareDevice, KitchenOrderData, PrinterDevice, ReceiptData,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::config::{DeviceRegistry, HardwareConfig, GlobalHardwareSettings};
-use crate::hardware::factory::DeviceFactory;
-use crate::hardware::api::BackendClient;
-use crate::hardware::events::HardwareEventEmitter;
-use crate::hardware::traits::{DeviceStatus, HardwareDevice, PrinterDevice, ReceiptData, KitchenOrderData};
 
 /// Central hardware management system
 pub struct HardwareManager {
@@ -36,10 +38,9 @@ impl HardwareManager {
 
     /// Initialize hardware from backend API
     pub async fn initialize_from_backend(&mut self) -> HardwareResult<()> {
-        let backend = self.backend_client.as_ref()
-            .ok_or_else(|| HardwareError::InitializationError(
-                "Backend client not configured".to_string()
-            ))?;
+        let backend = self.backend_client.as_ref().ok_or_else(|| {
+            HardwareError::InitializationError("Backend client not configured".to_string())
+        })?;
 
         tracing::info!("Initializing hardware from backend...");
 
@@ -62,10 +63,7 @@ impl HardwareManager {
 
     /// Initialize hardware from configuration
     pub async fn initialize_from_config(&mut self, config: &HardwareConfig) -> HardwareResult<()> {
-        let enabled_devices: Vec<_> = config.enabled_devices()
-            .into_iter()
-            .cloned()
-            .collect();
+        let enabled_devices: Vec<_> = config.enabled_devices().into_iter().cloned().collect();
 
         tracing::info!("Initializing {} enabled devices", enabled_devices.len());
 
@@ -73,11 +71,7 @@ impl HardwareManager {
             match self.factory.create_and_connect(&device_config).await {
                 Ok(device) => {
                     if let Err(e) = self.registry.register(device).await {
-                        tracing::error!(
-                            "Failed to register device {}: {}",
-                            device_config.id,
-                            e
-                        );
+                        tracing::error!("Failed to register device {}: {}", device_config.id, e);
                         self.event_emitter.emit_device_error(
                             device_config.id.clone(),
                             device_config.name.clone(),
@@ -177,15 +171,20 @@ impl HardwareManager {
         let mut device = device_arc.write().await;
 
         // Downcast to PrinterDevice
-        let printer = device.as_any_mut()
+        let printer = device
+            .as_any_mut()
             .downcast_mut::<Box<dyn PrinterDevice>>()
-            .ok_or_else(|| HardwareError::UnsupportedOperation(
-                format!("Device {} is not a printer", device_id)
-            ))?;
+            .ok_or_else(|| {
+                HardwareError::UnsupportedOperation(format!(
+                    "Device {} is not a printer",
+                    device_id
+                ))
+            })?;
 
         printer.print_receipt(receipt).await?;
 
-        self.event_emitter.emit_print_completed(device_id.to_string(), Some(receipt.order_id.clone()));
+        self.event_emitter
+            .emit_print_completed(device_id.to_string(), Some(receipt.order.id.clone()));
 
         Ok(())
     }
@@ -200,15 +199,48 @@ impl HardwareManager {
         let mut device = device_arc.write().await;
 
         // Downcast to PrinterDevice
-        let printer = device.as_any_mut()
+        let printer = device
+            .as_any_mut()
             .downcast_mut::<Box<dyn PrinterDevice>>()
-            .ok_or_else(|| HardwareError::UnsupportedOperation(
-                format!("Device {} is not a printer", device_id)
-            ))?;
+            .ok_or_else(|| {
+                HardwareError::UnsupportedOperation(format!(
+                    "Device {} is not a printer",
+                    device_id
+                ))
+            })?;
 
         printer.print_kitchen_order(order).await?;
 
-        self.event_emitter.emit_print_completed(device_id.to_string(), Some(order.order_id.clone()));
+        self.event_emitter
+            .emit_print_completed(device_id.to_string(), Some(order.order.id.clone()));
+
+        Ok(())
+    }
+
+    /// Pop the cash drawer wired to a printer (ESC/POS drawer-kick pulse).
+    ///
+    /// Resolves the device, downcasts to `PrinterDevice`, and dispatches the
+    /// drawer-kick command — mirroring `print_receipt`'s dispatch. Surfaces a
+    /// `CashDrawerOpened` event on success so the UI can confirm the pop.
+    pub async fn open_cash_drawer(&self, device_id: &str) -> HardwareResult<()> {
+        let device_arc = self.registry.get_device(device_id).await?;
+        let mut device = device_arc.write().await;
+
+        // Downcast to PrinterDevice — the drawer kicks off the printer's
+        // RJ-11/RJ-12 port via the ESC/POS pulse command.
+        let printer = device
+            .as_any_mut()
+            .downcast_mut::<Box<dyn PrinterDevice>>()
+            .ok_or_else(|| {
+                HardwareError::UnsupportedOperation(format!(
+                    "Device {} is not a printer",
+                    device_id
+                ))
+            })?;
+
+        printer.open_cash_drawer().await?;
+
+        self.event_emitter.emit_drawer_opened(device_id.to_string());
 
         Ok(())
     }
@@ -220,7 +252,10 @@ impl HardwareManager {
         operation: F,
     ) -> HardwareResult<R>
     where
-        F: FnOnce(&mut Box<dyn HardwareDevice>) -> std::pin::Pin<Box<dyn std::future::Future<Output = HardwareResult<R>> + '_>>,
+        F: FnOnce(
+            &mut Box<dyn HardwareDevice>,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = HardwareResult<R>> + '_>>,
     {
         self.registry.with_device(device_id, operation).await
     }
@@ -248,10 +283,8 @@ impl HardwareManager {
         // Reconnect
         device.connect().await?;
 
-        self.event_emitter.emit_device_connected(
-            device_id.to_string(),
-            device.name().to_string(),
-        );
+        self.event_emitter
+            .emit_device_connected(device_id.to_string(), device.name().to_string());
 
         Ok(())
     }
@@ -271,8 +304,6 @@ impl HardwareManager {
 // This is a workaround for trait object downcasting
 impl dyn HardwareDevice {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        unsafe {
-            std::mem::transmute::<&mut dyn HardwareDevice, &mut dyn std::any::Any>(self)
-        }
+        unsafe { std::mem::transmute::<&mut dyn HardwareDevice, &mut dyn std::any::Any>(self) }
     }
 }

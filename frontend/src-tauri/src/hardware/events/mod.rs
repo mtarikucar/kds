@@ -1,5 +1,5 @@
-pub mod event;
 pub mod emitter;
+pub mod event;
 
-pub use event::HardwareEvent;
 pub use emitter::HardwareEventEmitter;
+pub use event::HardwareEvent;
