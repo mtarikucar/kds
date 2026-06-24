@@ -118,6 +118,19 @@ export const useKitchenSocket = () => {
       });
     };
 
+    // M8 — a table transfer (POS "move order to another table") re-routes the
+    // order's tableId in the DB and emits table:orders-transferred to the
+    // kitchen room, but the board never listened, so the moved order kept
+    // rendering under the OLD table indefinitely (food delivered to the wrong
+    // table). Invalidate the orders list so the board re-fetches and the card
+    // moves to the new table. A prefix invalidate on ['orders'] is correct
+    // because the KDS query key is ['orders', filters, branchId]; POS's
+    // per-table setQueryData approach does not apply to this flat list.
+    const handleTableTransfer = (event: any) => {
+      console.log('[KDS Socket] Table orders transferred:', event);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    };
+
     // CRITICAL: stock reversal failed on a cancelled order — counts are now
     // wrong until reconciled. Error toast (not a routine warning).
     const handleStockReversalFailed = (event: { orderNumber?: string }) => {
@@ -135,6 +148,7 @@ export const useKitchenSocket = () => {
     socket.on('order:new', handleNewOrder);
     socket.on('order:updated', handleOrderUpdated);
     socket.on('order:status-changed', handleOrderStatusChanged);
+    socket.on('table:orders-transferred', handleTableTransfer);
     socket.on('stock:low-alert', handleStockLowAlert);
     socket.on('stock:expiry-alert', handleStockExpiryAlert);
     socket.on('stock:reversal-failed', handleStockReversalFailed);
@@ -148,6 +162,7 @@ export const useKitchenSocket = () => {
       socket.off('order:new', handleNewOrder);
       socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
+      socket.off('table:orders-transferred', handleTableTransfer);
       socket.off('stock:low-alert', handleStockLowAlert);
       socket.off('stock:expiry-alert', handleStockExpiryAlert);
       socket.off('stock:reversal-failed', handleStockReversalFailed);

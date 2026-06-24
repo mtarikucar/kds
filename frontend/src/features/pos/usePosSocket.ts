@@ -67,6 +67,15 @@ export const usePosSocket = () => {
             event.kitchenTicketSnapshot,
           ).catch((err) => {
             console.error('Kitchen ticket print failed:', err);
+            // Non-blocking: the snapshot is persisted on the order so the
+            // ticket can be reprinted, but the kitchen needs to know the
+            // auto-print silently failed (previously this was console-only).
+            toast.error(
+              i18n.t(
+                'pos.kitchen.printFailed',
+                'Kitchen ticket print failed — reprint from the order.',
+              ),
+            );
           });
         }
       }
