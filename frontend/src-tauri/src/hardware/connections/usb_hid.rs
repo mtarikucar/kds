@@ -1,8 +1,8 @@
+use super::connection::{Connection, ConnectionType};
+use crate::hardware::errors::{HardwareError, HardwareResult};
 use async_trait::async_trait;
 use hidapi::{HidApi, HidDevice};
 use std::sync::Mutex;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use super::connection::{Connection, ConnectionType};
 
 pub struct UsbHidConnection {
     vendor_id: u16,
@@ -47,17 +47,21 @@ impl Connection for UsbHidConnection {
         let device = if let Some(serial) = &self.serial_number {
             self.hid_api
                 .open_serial(self.vendor_id, self.product_id, serial)
-                .map_err(|e| HardwareError::HidError(format!(
-                    "Failed to open HID device {:04x}:{:04x} ({}): {}",
-                    self.vendor_id, self.product_id, serial, e
-                )))?
+                .map_err(|e| {
+                    HardwareError::HidError(format!(
+                        "Failed to open HID device {:04x}:{:04x} ({}): {}",
+                        self.vendor_id, self.product_id, serial, e
+                    ))
+                })?
         } else {
             self.hid_api
                 .open(self.vendor_id, self.product_id)
-                .map_err(|e| HardwareError::HidError(format!(
-                    "Failed to open HID device {:04x}:{:04x}: {}",
-                    self.vendor_id, self.product_id, e
-                )))?
+                .map_err(|e| {
+                    HardwareError::HidError(format!(
+                        "Failed to open HID device {:04x}:{:04x}: {}",
+                        self.vendor_id, self.product_id, e
+                    ))
+                })?
         };
 
         self.device = Some(Mutex::new(device));
@@ -85,11 +89,14 @@ impl Connection for UsbHidConnection {
     }
 
     async fn send(&mut self, data: &[u8]) -> HardwareResult<usize> {
-        let device = self.device.as_ref()
+        let device = self
+            .device
+            .as_ref()
             .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
         let device_guard = device.lock().unwrap();
-        let written = device_guard.write(data)
+        let written = device_guard
+            .write(data)
             .map_err(|e| HardwareError::HidError(format!("Write failed: {}", e)))?;
 
         tracing::debug!("Sent {} bytes via USB HID", written);
@@ -97,11 +104,14 @@ impl Connection for UsbHidConnection {
     }
 
     async fn receive(&mut self, buffer: &mut [u8]) -> HardwareResult<usize> {
-        let device = self.device.as_ref()
+        let device = self
+            .device
+            .as_ref()
             .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
         let device_guard = device.lock().unwrap();
-        let bytes_read = device_guard.read_timeout(buffer, self.timeout_ms)
+        let bytes_read = device_guard
+            .read_timeout(buffer, self.timeout_ms)
             .map_err(|e| HardwareError::HidError(format!("Read failed: {}", e)))?;
 
         tracing::debug!("Received {} bytes via USB HID", bytes_read);
@@ -127,7 +137,8 @@ pub fn list_hid_devices() -> HardwareResult<Vec<(u16, u16, String)>> {
     let api = HidApi::new()
         .map_err(|e| HardwareError::HidError(format!("Failed to initialize HID API: {}", e)))?;
 
-    let devices: Vec<_> = api.device_list()
+    let devices: Vec<_> = api
+        .device_list()
         .map(|info| {
             (
                 info.vendor_id(),

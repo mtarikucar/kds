@@ -1,7 +1,7 @@
+use super::event::HardwareEvent;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::broadcast;
-use std::sync::Arc;
-use super::event::HardwareEvent;
 
 /// Event emitter for hardware events
 /// Broadcasts events both internally (via broadcast channel) and to frontend (via Tauri events)

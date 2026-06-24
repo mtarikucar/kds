@@ -1,9 +1,9 @@
-pub mod printers;
+pub mod barcode_readers;
 pub mod cash_drawers;
 pub mod pagers;
-pub mod barcode_readers;
+pub mod printers;
 
-pub use printers::EscPosPrinter;
+pub use barcode_readers::GenericBarcodeReader;
 pub use cash_drawers::GenericCashDrawer;
 pub use pagers::GenericPager;
-pub use barcode_readers::GenericBarcodeReader;
+pub use printers::EscPosPrinter;

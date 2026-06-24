@@ -1,11 +1,11 @@
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::traits::{HardwareDevice, DeviceType};
+use super::connection_factory::ConnectionFactory;
 use crate::hardware::config::DeviceConfig;
 use crate::hardware::devices::{
-    EscPosPrinter, GenericCashDrawer, GenericPager, GenericBarcodeReader,
+    EscPosPrinter, GenericBarcodeReader, GenericCashDrawer, GenericPager,
 };
+use crate::hardware::errors::{HardwareError, HardwareResult};
 use crate::hardware::events::HardwareEventEmitter;
-use super::connection_factory::ConnectionFactory;
+use crate::hardware::traits::{DeviceType, HardwareDevice};
 
 /// Factory for creating device instances
 pub struct DeviceFactory {
@@ -27,9 +27,10 @@ impl DeviceFactory {
     /// Create a device from configuration
     pub fn create(&self, config: &DeviceConfig) -> HardwareResult<Box<dyn HardwareDevice>> {
         if !config.enabled {
-            return Err(HardwareError::InvalidConfiguration(
-                format!("Device {} is disabled", config.id)
-            ));
+            return Err(HardwareError::InvalidConfiguration(format!(
+                "Device {} is disabled",
+                config.id
+            )));
         }
 
         // Validate connection config
@@ -69,11 +70,8 @@ impl DeviceFactory {
 
             DeviceType::BarcodeReader => {
                 let connection = ConnectionFactory::create(&config.connection)?;
-                let reader = GenericBarcodeReader::new(
-                    config.id.clone(),
-                    config.name.clone(),
-                    connection,
-                );
+                let reader =
+                    GenericBarcodeReader::new(config.id.clone(), config.name.clone(), connection);
 
                 // Add event emitter if available
                 if let Some(emitter) = &self.event_emitter {
@@ -83,13 +81,14 @@ impl DeviceFactory {
                 }
             }
 
-            DeviceType::CustomerDisplay |
-            DeviceType::KitchenDisplay |
-            DeviceType::ScaleDevice |
-            DeviceType::Other(_) => {
-                return Err(HardwareError::UnsupportedOperation(
-                    format!("Device type {:?} not yet implemented", config.device_type)
-                ));
+            DeviceType::CustomerDisplay
+            | DeviceType::KitchenDisplay
+            | DeviceType::ScaleDevice
+            | DeviceType::Other(_) => {
+                return Err(HardwareError::UnsupportedOperation(format!(
+                    "Device type {:?} not yet implemented",
+                    config.device_type
+                )));
             }
         };
 
@@ -129,10 +128,7 @@ impl DeviceFactory {
 
             // Emit connection event
             if let Some(emitter) = &self.event_emitter {
-                emitter.emit_device_connected(
-                    config.id.clone(),
-                    config.name.clone(),
-                );
+                emitter.emit_device_connected(config.id.clone(), config.name.clone());
             }
         }
 

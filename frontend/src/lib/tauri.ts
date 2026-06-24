@@ -205,7 +205,12 @@ export class HardwareService {
   }
 
   /**
-   * Open cash drawer via printer
+   * Open the cash drawer wired to the configured printer.
+   *
+   * Invokes the registered Tauri command `open_cash_drawer_via_printer`
+   * (main.rs invoke_handler) — this is the ONLY registered drawer command;
+   * there is no bare `open_cash_drawer` command. Tauri auto-maps the
+   * snake_case `device_id` param from `{ deviceId }`.
    */
   static async openCashDrawer(deviceId: string): Promise<string> {
     if (!isTauri()) {
@@ -213,7 +218,7 @@ export class HardwareService {
     }
 
     try {
-      return await invoke<string>('open_cash_drawer', { deviceId });
+      return await invoke<string>('open_cash_drawer_via_printer', { deviceId });
     } catch (error) {
       console.error('Failed to open cash drawer:', error);
       throw error;

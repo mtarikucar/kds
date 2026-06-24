@@ -1,6 +1,6 @@
+use crate::hardware::errors::HardwareResult;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::hardware::errors::HardwareResult;
 
 /// Device status information
 #[derive(Debug, Clone, Serialize, Deserialize)]

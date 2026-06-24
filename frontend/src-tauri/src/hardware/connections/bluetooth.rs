@@ -1,8 +1,8 @@
+use super::connection::{Connection, ConnectionType};
+use crate::hardware::errors::{HardwareError, HardwareResult};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use super::connection::{Connection, ConnectionType};
 
 // This is a placeholder implementation for Bluetooth
 // Full BLE implementation would require btleplug and more complex handling

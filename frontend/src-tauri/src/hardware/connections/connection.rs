@@ -1,6 +1,6 @@
+use crate::hardware::errors::HardwareResult;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::hardware::errors::HardwareResult;
 
 /// Connection type enum
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -66,11 +66,7 @@ pub trait Connection: Send + Sync {
     async fn receive(&mut self, buffer: &mut [u8]) -> HardwareResult<usize>;
 
     /// Send data and wait for response
-    async fn send_and_receive(
-        &mut self,
-        data: &[u8],
-        buffer: &mut [u8],
-    ) -> HardwareResult<usize> {
+    async fn send_and_receive(&mut self, data: &[u8], buffer: &mut [u8]) -> HardwareResult<usize> {
         self.send(data).await?;
         self.receive(buffer).await
     }

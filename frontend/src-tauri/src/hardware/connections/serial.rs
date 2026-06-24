@@ -1,8 +1,8 @@
+use super::connection::{Connection, ConnectionType};
+use crate::hardware::errors::{HardwareError, HardwareResult};
 use async_trait::async_trait;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_serial::{SerialPort, SerialPortBuilderExt, SerialStream};
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use super::connection::{Connection, ConnectionType};
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -39,10 +39,12 @@ impl Connection for SerialConnection {
         let stream = tokio_serial::new(&self.port_name, self.baud_rate)
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .open_native_async()
-            .map_err(|e| HardwareError::ConnectionError(format!(
-                "Failed to open serial port {}: {}",
-                self.port_name, e
-            )))?;
+            .map_err(|e| {
+                HardwareError::ConnectionError(format!(
+                    "Failed to open serial port {}: {}",
+                    self.port_name, e
+                ))
+            })?;
 
         self.stream = Some(Arc::new(Mutex::new(stream)));
         tracing::info!("Serial connection established on {}", self.port_name);
@@ -63,7 +65,9 @@ impl Connection for SerialConnection {
     }
 
     async fn send(&mut self, data: &[u8]) -> HardwareResult<usize> {
-        let stream_arc = self.stream.as_ref()
+        let stream_arc = self
+            .stream
+            .as_ref()
             .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
         let mut stream = stream_arc.lock().await;
@@ -75,7 +79,9 @@ impl Connection for SerialConnection {
     }
 
     async fn receive(&mut self, buffer: &mut [u8]) -> HardwareResult<usize> {
-        let stream_arc = self.stream.as_ref()
+        let stream_arc = self
+            .stream
+            .as_ref()
             .ok_or_else(|| HardwareError::ConnectionError("Not connected".to_string()))?;
 
         let mut stream = stream_arc.lock().await;
@@ -84,7 +90,11 @@ impl Connection for SerialConnection {
 
         match tokio::time::timeout(timeout, read_future).await {
             Ok(Ok(bytes_read)) => {
-                tracing::debug!("Received {} bytes from serial port {}", bytes_read, self.port_name);
+                tracing::debug!(
+                    "Received {} bytes from serial port {}",
+                    bytes_read,
+                    self.port_name
+                );
                 Ok(bytes_read)
             }
             Ok(Err(e)) => Err(HardwareError::IoError(e)),

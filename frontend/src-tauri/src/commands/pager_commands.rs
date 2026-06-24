@@ -1,6 +1,6 @@
-use tauri::State;
-use crate::hardware::PagerMessage;
 use super::hardware_commands::HardwareManagerState;
+use crate::hardware::PagerMessage;
+use tauri::State;
 
 /// Call a pager
 #[tauri::command]

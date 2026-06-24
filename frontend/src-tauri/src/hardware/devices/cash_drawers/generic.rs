@@ -1,12 +1,12 @@
+use crate::hardware::connections::Connection;
+use crate::hardware::errors::{HardwareError, HardwareResult};
+use crate::hardware::traits::{
+    CashDrawerDevice, ConnectionStatus, DeviceStatus, DeviceType, DrawerStatus, HardwareDevice,
+    HealthStatus,
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::traits::{
-    HardwareDevice, CashDrawerDevice, DeviceStatus, DeviceType,
-    ConnectionStatus, HealthStatus, DrawerStatus,
-};
-use crate::hardware::connections::Connection;
 
 /// Generic cash drawer device (typically connected via printer or serial)
 pub struct GenericCashDrawer {
@@ -18,11 +18,7 @@ pub struct GenericCashDrawer {
 }
 
 impl GenericCashDrawer {
-    pub fn new(
-        id: String,
-        name: String,
-        connection: Box<dyn Connection>,
-    ) -> Self {
+    pub fn new(id: String, name: String, connection: Box<dyn Connection>) -> Self {
         Self {
             id,
             name,
@@ -172,7 +168,7 @@ impl CashDrawerDevice for GenericCashDrawer {
     async fn enable_open_alert(&mut self, _enable: bool) -> HardwareResult<()> {
         // Not supported on generic cash drawers
         Err(HardwareError::UnsupportedOperation(
-            "Open alert not supported on this device".to_string()
+            "Open alert not supported on this device".to_string(),
         ))
     }
 }

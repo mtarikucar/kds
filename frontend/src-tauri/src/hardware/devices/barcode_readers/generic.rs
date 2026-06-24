@@ -1,13 +1,13 @@
+use crate::hardware::connections::Connection;
+use crate::hardware::errors::{HardwareError, HardwareResult};
+use crate::hardware::events::HardwareEventEmitter;
+use crate::hardware::traits::{
+    BarcodeReaderDevice, BarcodeScanResult, ConnectionStatus, DeviceStatus, DeviceType,
+    HardwareDevice, HealthStatus, ScanMode,
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::hardware::errors::{HardwareError, HardwareResult};
-use crate::hardware::traits::{
-    HardwareDevice, BarcodeReaderDevice, DeviceStatus, DeviceType,
-    ConnectionStatus, HealthStatus, BarcodeScanResult, ScanMode,
-};
-use crate::hardware::connections::Connection;
-use crate::hardware::events::HardwareEventEmitter;
 
 /// Generic barcode/QR code reader
 pub struct GenericBarcodeReader {
@@ -22,11 +22,7 @@ pub struct GenericBarcodeReader {
 }
 
 impl GenericBarcodeReader {
-    pub fn new(
-        id: String,
-        name: String,
-        connection: Box<dyn Connection>,
-    ) -> Self {
+    pub fn new(id: String, name: String, connection: Box<dyn Connection>) -> Self {
         Self {
             id,
             name,
@@ -69,11 +65,21 @@ impl GenericBarcodeReader {
     }
 
     // Scanner commands (varies by manufacturer)
-    fn cmd_enable_continuous() -> &'static [u8] { b"SCNENA\r" }
-    fn cmd_disable_scanning() -> &'static [u8] { b"SCNDIS\r" }
-    fn cmd_trigger_scan() -> &'static [u8] { b"SCNTRG\r" }
-    fn cmd_beep_on() -> &'static [u8] { b"BEPEN1\r" }
-    fn cmd_beep_off() -> &'static [u8] { b"BEPEN0\r" }
+    fn cmd_enable_continuous() -> &'static [u8] {
+        b"SCNENA\r"
+    }
+    fn cmd_disable_scanning() -> &'static [u8] {
+        b"SCNDIS\r"
+    }
+    fn cmd_trigger_scan() -> &'static [u8] {
+        b"SCNTRG\r"
+    }
+    fn cmd_beep_on() -> &'static [u8] {
+        b"BEPEN1\r"
+    }
+    fn cmd_beep_off() -> &'static [u8] {
+        b"BEPEN0\r"
+    }
 }
 
 #[async_trait]
@@ -250,11 +256,7 @@ impl BarcodeReaderDevice for GenericBarcodeReader {
 
             // Emit event
             if let Some(emitter) = &self.event_emitter {
-                emitter.emit_barcode_scanned(
-                    self.id.clone(),
-                    data,
-                    "Unknown".to_string(),
-                );
+                emitter.emit_barcode_scanned(self.id.clone(), data, "Unknown".to_string());
             }
 
             return Ok(Some(result));
@@ -282,7 +284,11 @@ impl BarcodeReaderDevice for GenericBarcodeReader {
         self.send_command(cmd).await?;
         *self.beep_enabled.lock().await = enabled;
 
-        tracing::info!("Barcode reader {} beep {}", self.name, if enabled { "enabled" } else { "disabled" });
+        tracing::info!(
+            "Barcode reader {} beep {}",
+            self.name,
+            if enabled { "enabled" } else { "disabled" }
+        );
         Ok(())
     }
 
