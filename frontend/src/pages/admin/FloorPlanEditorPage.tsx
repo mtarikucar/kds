@@ -71,7 +71,7 @@ export default function FloorPlanEditorPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh] text-slate-400">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" /> {t('common:loading', 'Loading…')}
+        <Loader2 className="w-6 h-6 animate-spin mr-2" /> {t('floorPlan:loading')}
       </div>
     );
   }
@@ -117,7 +117,8 @@ export default function FloorPlanEditorPage() {
     try {
       await createTable.mutateAsync({
         number: newTableNumber.trim(),
-        capacity: newTableCapacity,
+        // Clamp to the backend bounds so a cleared field (→ 0) can't 400.
+        capacity: Math.min(200, Math.max(1, Number(newTableCapacity) || 1)),
         zoneId: activeZone.id,
         posX: c.x, posY: c.y,
         width: DEFAULT_TABLE_SIZE.width, height: DEFAULT_TABLE_SIZE.height,
@@ -149,12 +150,18 @@ export default function FloorPlanEditorPage() {
     const payload = store.buildSavePayload();
     setSaving(true);
     try {
+      // Create new elements one at a time and reconcile each success into the
+      // store IMMEDIATELY (temp id → server id, clears _new). So if a later
+      // step throws, the store no longer holds the just-created element as a
+      // pending create — a retry sends only what's truly left (no duplicate
+      // POST). Deletes are idempotent (the hook swallows 404).
       for (const c of payload.creates) {
-        await createElement.mutateAsync({
+        const created = await createElement.mutateAsync({
           zoneId: c.zoneId, type: c.type, x: c.x, y: c.y,
           width: c.width, height: c.height, rotation: c.rotation,
           style: c.style, label: c.label,
         });
+        store.applyCreated({ [c.tempId]: created });
       }
       for (const id of payload.deletes) {
         await deleteElement.mutateAsync(id);
@@ -281,9 +288,9 @@ export default function FloorPlanEditorPage() {
               className="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-sm focus:border-primary-400 focus:outline-none" />
           </label>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setNewTable(null)}>{t('common:cancel', 'Cancel')}</Button>
+            <Button variant="outline" onClick={() => setNewTable(null)}>{t('common:app.cancel')}</Button>
             <Button variant="primary" onClick={handleCreateTable} isLoading={createTable.isPending} disabled={!newTableNumber.trim()}>
-              {t('common:add', 'Add')}
+              {t('common:app.add')}
             </Button>
           </div>
         </div>

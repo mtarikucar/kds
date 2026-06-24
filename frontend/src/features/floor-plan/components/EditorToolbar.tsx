@@ -95,7 +95,7 @@ export default function EditorToolbar({
         ].join(' ')}
       >
         <Save className="w-4 h-4" />
-        {saving ? t('common:saving', 'Saving…') : t('common:save', 'Save')}
+        {saving ? t('floorPlan:saving') : t('common:app.save')}
         {dirty && !saving && <span className="w-2 h-2 rounded-full bg-white/90" />}
       </button>
     </div>

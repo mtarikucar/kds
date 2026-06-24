@@ -7,6 +7,8 @@
   "redo": "Qaytarish",
   "toggleGrid": "To'rni yoqish/o'chirish",
   "saved": "Zal rejasi saqlandi",
+  "loading": "Yuklanmoqda…",
+  "saving": "Saqlanmoqda…",
   "addZone": "Hudud qo'shish",
   "zoneSettings": "Hudud sozlamalari",
   "newZonePrompt": "Yangi hududga nom bering (masalan, 2-qavat, Bog')",

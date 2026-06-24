@@ -125,8 +125,17 @@ export const useUpdateElement = () => {
 export const useDeleteElement = () => {
   const invalidate = useInvalidatePlan();
   return useMutation({
+    // Idempotent: a 404 means the element is already gone — the desired end
+    // state. Swallow it so a save that's retried after a mid-sequence failure
+    // (element deleted on the first attempt, a later step threw) doesn't wedge
+    // on re-deleting an absent row.
     mutationFn: async (id: string): Promise<void> => {
-      await api.delete(`/floor-plan/elements/${id}`);
+      try {
+        await api.delete(`/floor-plan/elements/${id}`);
+      } catch (e: any) {
+        if (e?.response?.status === 404) return;
+        throw e;
+      }
     },
     onSuccess: invalidate,
     onError: fail,

@@ -7,6 +7,8 @@
   "redo": "Yinele",
   "toggleGrid": "Izgarayı aç/kapat",
   "saved": "Salon planı kaydedildi",
+  "loading": "Yükleniyor…",
+  "saving": "Kaydediliyor…",
   "addZone": "Alan ekle",
   "zoneSettings": "Alan ayarları",
   "newZonePrompt": "Yeni alana ad verin (örn. Kat 2, Bahçe)",

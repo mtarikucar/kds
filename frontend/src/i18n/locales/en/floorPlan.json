@@ -7,6 +7,8 @@
   "redo": "Redo",
   "toggleGrid": "Toggle grid",
   "saved": "Floor plan saved",
+  "loading": "Loading…",
+  "saving": "Saving…",
   "addZone": "Add area",
   "zoneSettings": "Area settings",
   "newZonePrompt": "Name the new area (e.g. Floor 2, Garden)",

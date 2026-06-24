@@ -32,13 +32,20 @@ export default function ZoneSettingsModal({ zone, isOpen, onClose, onSave, onDel
   const [backgroundImageUrl, setBg] = useState(zone.backgroundImageUrl ?? '');
   const [backgroundOpacity, setOpacity] = useState(zone.backgroundOpacity);
 
+  // Clamp to the backend DTO bounds so a cleared/typo'd field (which yields 0
+  // or NaN from a number input) can never 400 the save.
+  const clampNum = (v: number, min: number, max: number, fallback: number) =>
+    Number.isFinite(v) && v > 0 ? Math.min(max, Math.max(min, v)) : fallback;
+
   const submit = () => {
     onSave({
       name: name.trim(),
       kind,
-      canvasWidth,
-      canvasHeight,
-      gridSize,
+      canvasWidth: clampNum(canvasWidth, 200, 10000, 1200),
+      canvasHeight: clampNum(canvasHeight, 200, 10000, 800),
+      gridSize: clampNum(gridSize, 2, 200, 20),
+      // Only send a real URL (the DTO's @IsUrl would 400 on ""). Clearing an
+      // existing background needs coordinated null handling — deferred to P4.
       backgroundImageUrl: backgroundImageUrl.trim() || undefined,
       backgroundOpacity,
     });
@@ -89,8 +96,8 @@ export default function ZoneSettingsModal({ zone, isOpen, onClose, onSave, onDel
             <Trash2 className="w-4 h-4" /> {t('floorPlan:zone.delete')}
           </button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>{t('common:cancel', 'Cancel')}</Button>
-            <Button variant="primary" onClick={submit} isLoading={saving} disabled={!name.trim()}>{t('common:save', 'Save')}</Button>
+            <Button variant="outline" onClick={onClose}>{t('common:app.cancel')}</Button>
+            <Button variant="primary" onClick={submit} isLoading={saving} disabled={!name.trim()}>{t('common:app.save')}</Button>
           </div>
         </div>
       </div>
