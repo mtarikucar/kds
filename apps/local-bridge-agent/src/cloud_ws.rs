@@ -74,8 +74,8 @@ pub struct ClaimRequest {
 
 /// Decoded `POST /v1/bridges/claim` response. The backend returns
 /// `{ bridgeId, tenantId, branchId, token, tokenExpiresAt }`; we only need
-/// the bearer `token` (and surface `bridge_id` for logging), so the rest is
-/// ignored via `#[serde(default)]`/skipped unknown fields.
+/// the bearer `token` (and surface `bridge_id` for logging). The remaining
+/// fields are simply not declared here, so serde ignores them by default.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaimResponse {
@@ -610,8 +610,8 @@ mod tests {
         };
         client.post_heartbeat(&identity).await.unwrap();
 
-        let beats = fake.heartbeats.lock().unwrap();
         assert_eq!(fake.heartbeat_count(), 1);
+        let beats = fake.heartbeats.lock().unwrap();
         assert_eq!(beats[0].hostname.as_deref(), Some("box-01"));
         assert_eq!(beats[0].agent_version.as_deref(), Some("9.9.9"));
     }
