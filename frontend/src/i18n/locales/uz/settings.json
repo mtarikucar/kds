@@ -385,7 +385,9 @@
     "loading": "Integratsiyalar yuklanmoqda...",
     "none": "Hali integratsiyalar sozlanmagan",
     "lastSynced": "Oxirgi sinxronlash: {{date}}",
-    "comingSoon": "Maxsus integratsiyalar tez orada"
+    "comingSoon": "Maxsus integratsiyalar tez orada",
+    "configuredNotActive": "Sozlangan, faol emas",
+    "notWiredHint": "Hisob maʼlumotlari xavfsiz saqlangan, ammo bu provayder uchun hali jonli integratsiya ulanmagan — u faol ishlamayapti."
   },
   "noCashDrawersConfigured": "Kassa qutilari sozlanmagan",
   "noPagersConfigured": "Peyjerlar sozlanmagan",

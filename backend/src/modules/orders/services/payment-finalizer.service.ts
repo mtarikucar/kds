@@ -21,6 +21,7 @@ import { AccountingSettingsService } from "../../accounting/services/accounting-
 import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
 import { KdsGateway } from "../../kds/kds.gateway";
 import { FiscalService } from "../../fiscal-core/fiscal.service";
+import { TableAnalyticsProducerService } from "../../analytics/services/table-analytics-producer.service";
 
 /**
  * PASS 2 of the payments.service refactor. The finalization cluster —
@@ -58,7 +59,31 @@ export class PaymentFinalizer {
     // working — a null fiscalService simply skips the yazarkasa leg.
     @Optional()
     private fiscalService?: FiscalService,
+    // REAL producer for the paid Table-Analytics / Customer-Behavior tabs.
+    // @Optional for the same reason as fiscalService: the bare-constructor
+    // unit specs don't supply it, and a missing producer simply skips the
+    // metrics write (the source of truth is the Order/Payment rows).
+    @Optional()
+    private tableAnalyticsProducer?: TableAnalyticsProducerService,
   ) {}
+
+  /**
+   * Post-commit, best-effort REAL analytics aggregation. Called on a
+   * fully-paid transition (alongside loyalty/auto-invoice/yazarkasa) so the
+   * paid "Table Analytics" + "Customer Behavior" tabs are populated from
+   * genuine Order/Payment data — never the dev-only MockDataGenerator.
+   * Swallows errors: a metrics failure must never affect the payment.
+   */
+  async recordTableAnalyticsForPaidOrder(
+    orderId: string,
+    tenantId: string,
+  ): Promise<void> {
+    if (!this.tableAnalyticsProducer) return;
+    await this.tableAnalyticsProducer.recordTableAnalyticsForPaidOrder(
+      orderId,
+      tenantId,
+    );
+  }
 
   /**
    * Wrapper around KdsGateway.emitPaymentSuccess that swallows

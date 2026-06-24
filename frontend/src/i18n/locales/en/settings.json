@@ -406,7 +406,9 @@
     "loading": "Loading integrations...",
     "none": "No integrations configured yet",
     "lastSynced": "Last synced: {{date}}",
-    "comingSoon": "Custom integrations coming soon"
+    "comingSoon": "Custom integrations coming soon",
+    "configuredNotActive": "Configured, not active",
+    "notWiredHint": "Credentials are stored securely, but no live integration is connected for this provider yet — it is not actively running."
   },
   "noCashDrawersConfigured": "No cash drawers configured",
   "noPagersConfigured": "No pagers configured",

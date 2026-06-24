@@ -432,15 +432,24 @@ const IntegrationsSettingsPage = () => {
                   key={integration.id}
                   className="flex items-center justify-between px-6 py-5 border border-slate-200/60 rounded-xl hover:shadow-md transition-shadow duration-200"
                 >
+                  {(() => {
+                    // HONEST status. Credential integrations have no live
+                    // adapter consuming them yet, so the backend reports
+                    // CONFIGURED_NOT_ACTIVE even when toggled on — never show
+                    // such a row as "Active".
+                    const notWired =
+                      integration.activationState === 'CONFIGURED_NOT_ACTIVE';
+                    const isLive = !notWired && integration.isEnabled;
+                    return (
                   <div className="flex items-center gap-4 flex-1">
                     <div
                       className={`p-3 rounded-lg ${
-                        integration.isEnabled ? 'bg-green-100' : 'bg-slate-100'
+                        isLive ? 'bg-green-100' : 'bg-slate-100'
                       }`}
                     >
                       <Plug
                         className={`h-5 w-5 ${
-                          integration.isEnabled ? 'text-green-600' : 'text-slate-400'
+                          isLive ? 'text-green-600' : 'text-slate-400'
                         }`}
                       />
                     </div>
@@ -449,7 +458,9 @@ const IntegrationsSettingsPage = () => {
                         <h3 className="font-semibold text-slate-900">
                           {integration.provider}
                         </h3>
-                        {integration.isEnabled ? (
+                        {notWired ? (
+                          <Badge variant="warning">{t('integrations.configuredNotActive')}</Badge>
+                        ) : integration.isEnabled ? (
                           <Badge variant="success">{t('common:statuses.active')}</Badge>
                         ) : (
                           <Badge variant="default">{t('common:statuses.inactive')}</Badge>
@@ -458,12 +469,22 @@ const IntegrationsSettingsPage = () => {
                       <p className="text-sm text-slate-500">
                         {getIntegrationTypeLabel(integration.integrationType)} •{' '}
                         {integration.provider}
-                        {integration.lastSyncedAt && (
+                        {/* Only show "last synced" when a real sync exists.
+                            Credential integrations never sync, so suppress it
+                            instead of implying one happened. */}
+                        {!notWired && integration.lastSyncedAt && (
                             <> • {t('integrations.lastSynced', { date: new Date(integration.lastSyncedAt).toLocaleString() })}</>
                           )}
                       </p>
+                      {notWired && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          {t('integrations.notWiredHint')}
+                        </p>
+                      )}
                     </div>
                   </div>
+                    );
+                  })()}
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"

@@ -65,3 +65,52 @@ describe("MockDataGeneratorService helpers", () => {
     });
   });
 });
+
+/**
+ * Defence-in-depth: the mock generator must NEVER write fabricated analytics
+ * into a production tenant, even if a future caller bypasses the controller's
+ * env guard. Each public write method fails closed when NODE_ENV=production.
+ */
+describe("MockDataGeneratorService production gate", () => {
+  const prevEnv = process.env.NODE_ENV;
+  const prisma = {
+    table: { findMany: jest.fn() },
+  } as unknown as PrismaService;
+  const svc = new MockDataGeneratorService(prisma);
+
+  afterEach(() => {
+    process.env.NODE_ENV = prevEnv;
+  });
+
+  it("refuses every write generator in production", async () => {
+    process.env.NODE_ENV = "production";
+    const s = new Date();
+    const e = new Date();
+    await expect(svc.generateOccupancyData("t", "b", s, e)).rejects.toThrow(
+      /disabled in production/i,
+    );
+    await expect(svc.generateTrafficFlowData("t", "b", s, e)).rejects.toThrow(
+      /disabled in production/i,
+    );
+    await expect(
+      svc.generateTableAnalyticsData("t", "b", s, e),
+    ).rejects.toThrow(/disabled in production/i);
+    await expect(svc.generateInsights("t", "b")).rejects.toThrow(
+      /disabled in production/i,
+    );
+    await expect(svc.generateAllMockData("t", "b")).rejects.toThrow(
+      /disabled in production/i,
+    );
+    // No fabricated row ever reached the DB.
+    expect((prisma as any).table.findMany).not.toHaveBeenCalled();
+  });
+
+  it("allows the generators outside production (e.g. development/test)", async () => {
+    process.env.NODE_ENV = "development";
+    (prisma as any).table.findMany.mockResolvedValue([]);
+    // No tables → early return 0, but crucially it does NOT throw the guard.
+    await expect(
+      svc.generateTableAnalyticsData("t", "b", new Date(), new Date()),
+    ).resolves.toBe(0);
+  });
+});

@@ -25,7 +25,7 @@ describe("IntegrationsController", () => {
       update: jest.fn().mockResolvedValue({}),
       delete: jest.fn().mockResolvedValue({}),
       toggleStatus: jest.fn().mockResolvedValue({}),
-      updateLastSync: jest.fn().mockResolvedValue({}),
+      requestSync: jest.fn().mockResolvedValue({ synced: false }),
     };
     ctrl = new IntegrationsController(svc as unknown as IntegrationsService);
   });
@@ -54,6 +54,11 @@ describe("IntegrationsController", () => {
   it("toggleStatus forwards the isEnabled flag", () => {
     ctrl.toggleStatus(req, "i1", { isEnabled: false } as any);
     expect(svc.toggleStatus).toHaveBeenCalledWith("i1", "t1", false);
+  });
+
+  it("requestSync forwards to the honest sync handler (no fake timestamp)", () => {
+    ctrl.requestSync(req, "i1");
+    expect(svc.requestSync).toHaveBeenCalledWith("i1", "t1");
   });
 });
 

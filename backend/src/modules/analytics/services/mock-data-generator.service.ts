@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
@@ -30,6 +30,23 @@ export class MockDataGeneratorService {
   constructor(private prisma: PrismaService) {}
 
   /**
+   * Defence-in-depth env gate mirroring MockFiscalProvider /
+   * MockPaymentProvider (which only self-register when
+   * NODE_ENV !== 'production'). The AnalyticsController already refuses the
+   * mock-data endpoints in production, but the service must ALSO fail closed
+   * so that no future caller (a seeder, a script, a new route) can ever write
+   * fabricated analytics into a production tenant. Prod analytics is
+   * real-or-empty, never mock.
+   */
+  private assertNotProduction(): void {
+    if (process.env.NODE_ENV === "production") {
+      throw new ForbiddenException(
+        "Mock analytics generation is disabled in production",
+      );
+    }
+  }
+
+  /**
    * Generate mock occupancy data for a time range
    */
   async generateOccupancyData(
@@ -39,6 +56,7 @@ export class MockDataGeneratorService {
     endDate: Date,
     intervalMinutes: number = 5,
   ): Promise<number> {
+    this.assertNotProduction();
     const tables = await this.getTables(tenantId);
     if (tables.length === 0) {
       this.logger.warn(`No tables found for tenant ${tenantId}`);
@@ -145,6 +163,7 @@ export class MockDataGeneratorService {
     startDate: Date,
     endDate: Date,
   ): Promise<number> {
+    this.assertNotProduction();
     const records: Array<{
       hourBucket: Date;
       cellX: number;
@@ -252,6 +271,7 @@ export class MockDataGeneratorService {
     startDate: Date,
     endDate: Date,
   ): Promise<number> {
+    this.assertNotProduction();
     const tables = await this.getTables(tenantId);
     if (tables.length === 0) {
       return 0;
@@ -389,6 +409,7 @@ export class MockDataGeneratorService {
    * Generate mock AI insights
    */
   async generateInsights(tenantId: string, branchId: string): Promise<number> {
+    this.assertNotProduction();
     const tables = await this.getTables(tenantId);
 
     const insights: Array<{
@@ -556,6 +577,7 @@ export class MockDataGeneratorService {
     tableAnalyticsRecords: number;
     insights: number;
   }> {
+    this.assertNotProduction();
     const endDate = new Date();
     const startDate = new Date(
       endDate.getTime() - daysBack * 24 * 60 * 60 * 1000,

@@ -11,6 +11,16 @@ export enum IntegrationType {
   INVENTORY = 'INVENTORY',
 }
 
+// Honest activation state from the backend. Credential integrations
+// (payment/CRM/accounting/delivery/third-party) currently have NO live
+// adapter consuming their stored credentials, so the backend reports them as
+// CONFIGURED_NOT_ACTIVE even when the operator has toggled them on — the UI
+// must not present a stored-but-inert integration as "working".
+export type IntegrationActivationState =
+  | 'CONFIGURED_NOT_ACTIVE'
+  | 'ACTIVE'
+  | 'DISABLED';
+
 export interface Integration {
   id: string;
   tenantId: string;
@@ -20,6 +30,7 @@ export interface Integration {
   config: Record<string, any>;
   isEnabled: boolean;
   isConfigured: boolean;
+  activationState?: IntegrationActivationState;
   lastSyncedAt: string | null;
   notes: string | null;
   createdAt: string;

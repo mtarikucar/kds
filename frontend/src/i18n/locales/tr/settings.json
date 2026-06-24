@@ -406,7 +406,9 @@
     "loading": "Entegrasyonlar yükleniyor...",
     "none": "Henüz yapılandırılmış entegrasyon yok",
     "lastSynced": "Son senkronizasyon: {{date}}",
-    "comingSoon": "Özel entegrasyonlar yakında"
+    "comingSoon": "Özel entegrasyonlar yakında",
+    "configuredNotActive": "Yapılandırıldı, etkin değil",
+    "notWiredHint": "Kimlik bilgileri güvenle saklanıyor, ancak bu sağlayıcı için henüz canlı bir entegrasyon bağlı değil — etkin olarak çalışmıyor."
   },
   "noCashDrawersConfigured": "Yapılandırılmış kasa çekmecesi yok",
   "noPagersConfigured": "Yapılandırılmış çağrı cihazı yok",

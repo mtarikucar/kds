@@ -119,10 +119,21 @@ export class IntegrationsController {
 
   @Post(":id/sync")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: "Update last sync time" })
-  @ApiResponse({ status: 200, description: "Last sync time updated" })
-  updateLastSync(@Request() req, @Param("id") id: string) {
-    return this.integrationsService.updateLastSync(id, req.tenantId);
+  @ApiOperation({
+    summary: "Request a sync for an integration",
+    description:
+      "HONEST behavior: credential integrations (payment/CRM/accounting/" +
+      "delivery/third-party) have no live adapter wired yet, so this does " +
+      "NOT stamp a success timestamp. It returns { synced: false } with the " +
+      "integration's real activation state instead of pretending a sync ran.",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Sync request result. synced=false until a real adapter is wired.",
+  })
+  requestSync(@Request() req, @Param("id") id: string) {
+    return this.integrationsService.requestSync(id, req.tenantId);
   }
 }
 

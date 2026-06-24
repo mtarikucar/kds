@@ -28,6 +28,32 @@ const SENSITIVE_INTEGRATION_TYPES = new Set([
   "CRM",
 ]);
 
+// Integration types whose credentials are STORED but NOT yet consumed by any
+// production adapter. Building real adapters for each provider is out of
+// scope here, so — to avoid fooling an operator into thinking a saved
+// integration is actively running — every row of these types is reported
+// with activationState "CONFIGURED_NOT_ACTIVE" (even when isEnabled=true).
+// The day a real adapter ships for a provider, drop it from this set (or
+// switch to a per-provider allow-list of wired adapters).
+const ACTIVATION_NOT_WIRED_TYPES = new Set([
+  "PAYMENT_GATEWAY",
+  "THIRD_PARTY_API",
+  "DELIVERY_APP",
+  "ACCOUNTING",
+  "CRM",
+]);
+
+// Honest activation states surfaced on the public view so the UI never
+// renders a stored-but-inert integration as "working".
+export const IntegrationActivationState = {
+  // Credentials saved + no live adapter consuming them yet.
+  CONFIGURED_NOT_ACTIVE: "CONFIGURED_NOT_ACTIVE",
+  // A real adapter consumes this integration AND the operator enabled it.
+  ACTIVE: "ACTIVE",
+  // A real adapter exists but the operator has it switched off.
+  DISABLED: "DISABLED",
+} as const;
+
 // Fields the tenant-facing list/find endpoints MUST NOT surface in plaintext
 // even for ADMIN role. A MANAGER-scoped UI would otherwise see provider
 // credentials on screen. When redacted, a marker string replaces the value.
@@ -69,10 +95,36 @@ export class IntegrationsService {
   }
 
   /**
-   * Transparent decrypt — callers get the plaintext config. Used by
-   * adapter-side code (StripeAdapter, PaytrAdapter, etc.) that needs
-   * real credentials. NEVER returned to HTTP responses without first
-   * routing through `toPublicView`.
+   * Compute the HONEST activation state for an integration row. Credential
+   * integration types have no live adapter yet, so they are reported as
+   * "configured, not yet active" regardless of the isEnabled toggle — the
+   * toggle records operator intent, but nothing in production actually
+   * consumes the stored credentials. Hardware/other types (consumed by the
+   * Tauri desktop app) reflect their real enabled/disabled state.
+   */
+  private activationState(row: {
+    integrationType: string;
+    isEnabled: boolean;
+  }): string {
+    if (ACTIVATION_NOT_WIRED_TYPES.has(row.integrationType)) {
+      return IntegrationActivationState.CONFIGURED_NOT_ACTIVE;
+    }
+    return row.isEnabled
+      ? IntegrationActivationState.ACTIVE
+      : IntegrationActivationState.DISABLED;
+  }
+
+  /**
+   * Transparent decrypt — callers get the plaintext config.
+   *
+   * HONESTY NOTE: there is currently NO production adapter that consumes
+   * these stored credentials (the credential integration types below have
+   * no live integration wired yet — see ACTIVATION_NOT_WIRED_TYPES). This
+   * helper exists so a future adapter can read the envelope-encrypted
+   * config at its boundary; until one is built, `findOneWithSecrets` has no
+   * runtime callers and these integrations are surfaced as "configured, not
+   * yet active" rather than presented as working. NEVER returned to HTTP
+   * responses without first routing through `toPublicView`.
    */
   private decryptConfig(row: any): any {
     if (!row) return row;
@@ -102,6 +154,9 @@ export class IntegrationsService {
     if (this.isSensitive(row.integrationType)) {
       decrypted.config = redactSensitiveKeys(decrypted.config);
     }
+    // Surface the honest activation state so the UI doesn't present a
+    // stored-but-inert integration as "active/working".
+    decrypted.activationState = this.activationState(row);
     return decrypted;
   }
 
@@ -231,13 +286,40 @@ export class IntegrationsService {
     return this.toPublicView(row);
   }
 
-  async updateLastSync(id: string, tenantId: string) {
-    const result = await this.prisma.integrationSettings.updateMany({
+  /**
+   * Honest "sync" handler. Previously this stamped lastSyncedAt=now() which
+   * IMPLIED a real sync had run — but no production adapter consumes these
+   * stored credentials, so nothing was ever synced. We now refuse to fake a
+   * success timestamp: the row is left untouched and the caller is told that
+   * no live sync is wired for this integration. (The storage is preserved so
+   * a future real adapter can flip this on.)
+   */
+  async requestSync(id: string, tenantId: string) {
+    const integration = await this.prisma.integrationSettings.findFirst({
       where: { id, tenantId },
-      data: { lastSyncedAt: new Date() },
+      select: { id: true, integrationType: true, isEnabled: true },
     });
-    if (result.count !== 1)
-      throw new NotFoundException("Integration not found");
+    if (!integration) throw new NotFoundException("Integration not found");
+
+    // No live adapter is wired for any of these credential integration types
+    // yet — so do NOT stamp lastSyncedAt (that would be a fake success). Tell
+    // the caller plainly that the sync is not connected.
+    if (ACTIVATION_NOT_WIRED_TYPES.has(integration.integrationType)) {
+      return {
+        synced: false,
+        activationState: IntegrationActivationState.CONFIGURED_NOT_ACTIVE,
+        message:
+          "This integration is configured but not yet active — no live sync is connected for this provider. Credentials are stored securely for when the integration is wired.",
+      };
+    }
+
+    // For types that DO have a real consumer (none today; future-proofing the
+    // contract), an actual sync would run here before recording the time.
+    return {
+      synced: false,
+      activationState: this.activationState(integration),
+      message: "No live sync is available for this integration type.",
+    };
   }
 
   async getHardwareConfig(tenantId: string) {

@@ -8,6 +8,7 @@ import {
   MockDataGeneratorService,
   HeatmapService,
   TableAnalyticsService,
+  TableAnalyticsProducerService,
   InsightsService,
   CameraService,
 } from "./services";
@@ -36,6 +37,7 @@ import {
     MockDataGeneratorService,
     HeatmapService,
     TableAnalyticsService,
+    TableAnalyticsProducerService,
     InsightsService,
     CameraService,
     AnalyticsGateway,
@@ -44,6 +46,7 @@ import {
     MockDataGeneratorService,
     HeatmapService,
     TableAnalyticsService,
+    TableAnalyticsProducerService,
     InsightsService,
     CameraService,
     AnalyticsGateway,

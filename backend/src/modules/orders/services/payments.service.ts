@@ -330,6 +330,18 @@ export class PaymentsService {
     return this.finalizer.maybeIssueYazarkasaReceipt(orderId, tenantId);
   }
 
+  /**
+   * Post-commit REAL table-analytics aggregation. Runs on every fully-paid
+   * transition so the paid analytics tabs reflect genuine Order/Payment data.
+   * Best-effort inside the finalizer (never blocks the payment).
+   */
+  private async recordTableAnalyticsForPaidOrder(
+    orderId: string,
+    tenantId: string,
+  ): Promise<void> {
+    return this.finalizer.recordTableAnalyticsForPaidOrder(orderId, tenantId);
+  }
+
   async create(
     orderId: string,
     createPaymentDto: CreatePaymentDto,
@@ -579,6 +591,7 @@ export class PaymentsService {
         await this.maybeGenerateAutoInvoice(orderId, tenantId);
         await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
         await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
+        await this.recordTableAnalyticsForPaidOrder(orderId, tenantId);
         this.safeEmitPaymentSuccess(tenantId, result, initiatedByUserId);
 
         return result;
@@ -1016,6 +1029,7 @@ export class PaymentsService {
       await this.maybeGenerateAutoInvoice(orderId, tenantId);
       await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
       await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
+      await this.recordTableAnalyticsForPaidOrder(orderId, tenantId);
     }
     // Emit per-payment so each Tauri terminal prints its own fiş.
     // Skip replayed entries (P2002 recovery): the original call
@@ -1537,6 +1551,7 @@ export class PaymentsService {
           // issues once.
           if (orderFullyPaid) {
             await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
+            await this.recordTableAnalyticsForPaidOrder(orderId, tenantId);
           }
           await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
           // Tell the POS to auto-print + open cash drawer (Tauri).
@@ -1711,6 +1726,7 @@ export class PaymentsService {
         // receipt once (idempotent per order, gated on a physical ÖKC).
         await this.maybeIssueYazarkasaReceipt(orderId, tenantId);
         await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
+        await this.recordTableAnalyticsForPaidOrder(orderId, tenantId);
         this.safeEmitPaymentSuccess(
           tenantId,
           result.payment,

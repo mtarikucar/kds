@@ -16,6 +16,7 @@ import { AccountingModule } from "../accounting/accounting.module";
 import { KdsModule } from "../kds/kds.module";
 import { DeliveryPlatformsModule } from "../delivery-platforms/delivery-platforms.module";
 import { StockManagementModule } from "../stock-management/stock-management.module";
+import { AnalyticsModule } from "../analytics/analytics.module";
 
 @Module({
   imports: [
@@ -26,6 +27,11 @@ import { StockManagementModule } from "../stock-management/stock-management.modu
     CustomersModule,
     SmsSettingsModule,
     AccountingModule,
+    // Provides TableAnalyticsProducerService — the REAL producer of the
+    // tableAnalytics rows that back the paid Table-Analytics / Customer-
+    // Behavior tabs. PaymentFinalizer calls it post-commit on every
+    // fully-paid transition.
+    AnalyticsModule,
   ],
   controllers: [OrdersController, PaymentsController],
   providers: [
