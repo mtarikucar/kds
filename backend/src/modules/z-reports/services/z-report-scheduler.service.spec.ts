@@ -66,6 +66,11 @@ describe("ZReportSchedulerService", () => {
       primaryBranchId: "b-primary",
     } as any);
     prisma.branch.findMany.mockResolvedValue([]);
+    // Default fallback branch (primary-branch path) — tenant-tz fallback.
+    prisma.branch.findFirst.mockResolvedValue({
+      id: "b-primary",
+      timezone: null,
+    } as any);
     zReports.generateAndSendReport.mockResolvedValue({
       reportId: "zr-1",
       emailSent: true,
@@ -80,7 +85,7 @@ describe("ZReportSchedulerService", () => {
   // ---------------------------------------------------------------------------
   // Tenant selection filter
   // ---------------------------------------------------------------------------
-  describe("getTenantsAtClosingTime (via handleZReportEmails)", () => {
+  describe("per-branch closing-window match (via handleZReportEmails)", () => {
     it("queries only ACTIVE tenants that have email enabled with recipients", async () => {
       prisma.tenant.findMany.mockResolvedValue([]);
 
@@ -156,6 +161,93 @@ describe("ZReportSchedulerService", () => {
         "t-1",
         "b-1",
         "admin-1",
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Per-branch timezone — the closing window is matched in the BRANCH's tz
+  // (falling back to tenant tz), not the single tenant tz. This is the
+  // fake-working-sweep-3 fix: Branch.timezone is finally read.
+  // ---------------------------------------------------------------------------
+  describe("per-branch timezone authority", () => {
+    it("fires a London branch under an Istanbul tenant at LONDON's closing instant", async () => {
+      // NOW = 14:05 UTC. London (Europe/London) is UTC+1 in June (BST) ->
+      // 15:05 local; Istanbul is UTC+3 -> 17:05 local. With closingTime
+      // "15:00", London is 5 min into its window (MATCH) while Istanbul is
+      // 2h05m past (would NOT match on tenant tz). The branch tz wins.
+      prisma.tenant.findMany.mockResolvedValue([
+        eligibleTenant({ timezone: "Europe/Istanbul", closingTime: "15:00" }),
+      ] as any);
+      prisma.branch.findMany.mockResolvedValue([
+        { id: "b-london", timezone: "Europe/London" },
+      ] as any);
+
+      await svc.handleZReportEmails();
+
+      expect(zReports.generateAndSendReport).toHaveBeenCalledWith(
+        "t-1",
+        "b-london",
+        "admin-1",
+      );
+    });
+
+    it("does NOT fire a branch whose OWN tz is outside the window even if the tenant tz is inside it", async () => {
+      // closingTime "17:00". Istanbul (tenant) at 14:05 UTC is 17:05 ->
+      // inside the window. But the branch is in London (15:05) -> 1h55m
+      // before closing -> NOT yet. Pre-fix this branch would have fired on
+      // the tenant's window; now it correctly waits for London's 17:00.
+      prisma.tenant.findMany.mockResolvedValue([
+        eligibleTenant({ timezone: "Europe/Istanbul", closingTime: "17:00" }),
+      ] as any);
+      prisma.branch.findMany.mockResolvedValue([
+        { id: "b-london", timezone: "Europe/London" },
+      ] as any);
+
+      await svc.handleZReportEmails();
+
+      expect(zReports.generateAndSendReport).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the tenant tz when a branch has no timezone set", async () => {
+      // Branch tz null -> use tenant tz "UTC"; closing 14:00, now 14:05 UTC
+      // -> in window -> fires.
+      prisma.tenant.findMany.mockResolvedValue([
+        eligibleTenant({ timezone: "UTC", closingTime: "14:00" }),
+      ] as any);
+      prisma.branch.findMany.mockResolvedValue([
+        { id: "b-1", timezone: null },
+      ] as any);
+
+      await svc.handleZReportEmails();
+
+      expect(zReports.generateAndSendReport).toHaveBeenCalledWith(
+        "t-1",
+        "b-1",
+        "admin-1",
+      );
+    });
+
+    it("dedups per branch using the BRANCH-tz midnight", async () => {
+      prisma.tenant.findMany.mockResolvedValue([
+        eligibleTenant({ timezone: "Europe/Istanbul", closingTime: "15:00" }),
+      ] as any);
+      prisma.branch.findMany.mockResolvedValue([
+        { id: "b-london", timezone: "Europe/London" },
+      ] as any);
+      prisma.zReport.findFirst.mockResolvedValue(null);
+
+      await svc.handleZReportEmails();
+
+      const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
+      expect(where.branchId).toBe("b-london");
+      expect(where.isFinalized).toBe(true);
+      // dedup midnight is computed in the BRANCH tz, not the tenant tz.
+      expect(where.reportDate.getTime()).toBe(
+        getTenantMidnight(NOW, "Europe/London").getTime(),
+      );
+      expect(where.reportDate.getTime()).not.toBe(
+        getTenantMidnight(NOW, "Europe/Istanbul").getTime(),
       );
     });
   });
@@ -323,6 +415,12 @@ describe("ZReportSchedulerService", () => {
     it("falls back to the admin's primary branch when no active branches exist", async () => {
       prisma.tenant.findMany.mockResolvedValue([eligibleTenant()] as any);
       prisma.branch.findMany.mockResolvedValue([] as any); // none active
+      // Per-branch tz fix: the fallback branch is now resolved via
+      // branch.findFirst (so its timezone can be loaded too).
+      prisma.branch.findFirst.mockResolvedValue({
+        id: "b-primary",
+        timezone: null,
+      } as any);
       prisma.user.findFirst.mockResolvedValue({
         id: "admin-1",
         primaryBranchId: "b-primary",

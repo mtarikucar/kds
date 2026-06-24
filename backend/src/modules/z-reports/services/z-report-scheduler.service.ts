@@ -38,13 +38,16 @@ export class ZReportSchedulerService {
       }
 
       try {
-        const tenantsAtClosingTime = await this.getTenantsAtClosingTime();
-        if (tenantsAtClosingTime.length === 0) return;
+        // We no longer pre-filter tenants by the tenant-tz closing window
+        // here. The closing-time match is now evaluated PER BRANCH in the
+        // branch's own timezone (see processEndOfDayReport) so a London
+        // branch under an Istanbul tenant fires at London's closing instant
+        // rather than Istanbul's. We still only load tenants that have the
+        // report email enabled with recipients — the cheap coarse filter.
+        const tenants = await this.getEmailEnabledTenants();
+        if (tenants.length === 0) return;
 
-        this.logger.log(
-          `Found ${tenantsAtClosingTime.length} tenant(s) at closing time`,
-        );
-        for (const tenant of tenantsAtClosingTime) {
+        for (const tenant of tenants) {
           await this.processEndOfDayReport(tenant);
         }
       } finally {
@@ -71,11 +74,13 @@ export class ZReportSchedulerService {
   }
 
   /**
-   * Get tenants whose closing time matches the current time (within 15-minute window)
+   * Get tenants with report email enabled + recipients. No closing-window
+   * filtering here — the window match is evaluated PER BRANCH in the
+   * branch's own timezone (isAtClosingWindow), so we hand every eligible
+   * tenant to processEndOfDayReport and let it decide per branch.
    */
-  private async getTenantsAtClosingTime() {
-    // Get all tenants with report email enabled
-    const tenants = await this.prisma.tenant.findMany({
+  private async getEmailEnabledTenants() {
+    return this.prisma.tenant.findMany({
       where: {
         reportEmailEnabled: true,
         reportEmails: {
@@ -91,51 +96,37 @@ export class ZReportSchedulerService {
         reportEmails: true,
       },
     });
+  }
 
-    if (tenants.length === 0) {
-      return [];
+  /**
+   * True when `now` falls in the 0-14min window after the tenant's
+   * `closingTime` (HH:mm), evaluated in `timezone`.
+   *
+   * `closingTime` currently lives only on the Tenant (there is no per-branch
+   * closingTime column), so all of a tenant's branches share the same wall-
+   * clock closing time — but each branch evaluates that time in its OWN
+   * timezone. A London branch (Europe/London) under an Istanbul tenant whose
+   * closingTime is "23:00" thus fires when it is 23:00 in London, not when it
+   * is 23:00 in Istanbul. Fully independent per-branch closing times would
+   * need a Branch.closingTime column (noted as remaining work).
+   */
+  private isAtClosingWindow(
+    now: Date,
+    closingTime: string | null | undefined,
+    timezone: string,
+  ): boolean {
+    if (!closingTime) return false;
+    const [closingHour, closingMinute] = closingTime.split(":").map(Number);
+    if (!Number.isFinite(closingHour) || !Number.isFinite(closingMinute)) {
+      return false;
     }
-
-    const now = new Date();
-    const matchingTenants: typeof tenants = [];
-
-    for (const tenant of tenants) {
-      if (!tenant.closingTime) continue;
-
-      // Parse tenant's closing time (HH:mm format)
-      const [closingHour, closingMinute] = tenant.closingTime
-        .split(":")
-        .map(Number);
-
-      // Get current time in tenant's timezone
-      const tenantNow = this.getTimeInTimezone(now, tenant.timezone || "UTC");
-      const currentHour = tenantNow.getHours();
-      const currentMinute = tenantNow.getMinutes();
-
-      // Check if current time matches closing time (within 15-minute window)
-      // We check if we're within 0-14 minutes after the closing time
-      const closingTimeInMinutes = closingHour * 60 + closingMinute;
-      const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-      // Match if current time is within 0-14 minutes after closing time
-      const minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
-      if (minutesSinceClosing >= 0 && minutesSinceClosing < 15) {
-        // Window match only. The "already done today" dedup is now done
-        // PER BRANCH in runForBranch(), keyed on (tenantId, branchId,
-        // reportDate, isFinalized).
-        //
-        // The old tenant-level dedup checked only {tenantId, reportDate,
-        // isFinalized} with NO branchId, so the instant the FIRST branch
-        // under a multi-branch tenant finalized its report, this filter
-        // saw "a finalized report exists for today" and dropped the WHOLE
-        // tenant from matchingTenants — every other branch was then
-        // silently skipped for the rest of the closing window. Z-Reports
-        // are per-branch fiscal records; the done-check must be too.
-        matchingTenants.push(tenant);
-      }
-    }
-
-    return matchingTenants;
+    const localNow = this.getTimeInTimezone(now, timezone || "UTC");
+    const currentHour = localNow.getHours();
+    const currentMinute = localNow.getMinutes();
+    const closingTimeInMinutes = closingHour * 60 + closingMinute;
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    const minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
+    return minutesSinceClosing >= 0 && minutesSinceClosing < 15;
   }
 
   private getTimeInTimezone(date: Date, timezone: string): Date {
@@ -183,14 +174,21 @@ export class ZReportSchedulerService {
    * each branch closes independently for fiscal purposes. The admin user's
    * primary branch is used only as a fallback when a tenant has a single
    * active branch.
+   *
+   * `force` (manual trigger) bypasses the per-branch closing-window match so
+   * an operator/test can generate immediately regardless of wall-clock time.
+   * The scheduled path passes force=false so each branch only closes inside
+   * its own-timezone closing window.
    */
-  private async processEndOfDayReport(tenant: {
-    id: string;
-    name: string;
-    timezone?: string | null;
-  }) {
-    this.logger.log(`Processing end-of-day report for tenant: ${tenant.name}`);
-
+  private async processEndOfDayReport(
+    tenant: {
+      id: string;
+      name: string;
+      timezone?: string | null;
+      closingTime?: string | null;
+    },
+    force = false,
+  ) {
     try {
       // Get or create admin user for this tenant
       const adminUser = await this.prisma.user.findFirst({
@@ -212,26 +210,43 @@ export class ZReportSchedulerService {
       // back to the admin's primary branch when listing branches yields
       // nothing (e.g. legacy single-branch tenants whose only branch is
       // referenced solely via User.primaryBranchId).
-      const branches = await this.prisma.branch.findMany({
+      //
+      // We load each branch's `timezone` so the closing-time window match
+      // and the dedup midnight are evaluated in the BRANCH's timezone
+      // (falling back to the tenant tz when a branch has none) — this is
+      // the per-branch-timezone fix: a multi-tz chain's off-tz branch no
+      // longer fires/buckets on the single tenant timezone.
+      let branches = await this.prisma.branch.findMany({
         where: { tenantId: tenant.id, status: "active" },
-        select: { id: true },
+        select: { id: true, timezone: true },
       });
-      const branchIds = branches.length
-        ? branches.map((b) => b.id)
-        : adminUser.primaryBranchId
-          ? [adminUser.primaryBranchId]
-          : [];
+      if (branches.length === 0 && adminUser.primaryBranchId) {
+        const fallback = await this.prisma.branch.findFirst({
+          where: { id: adminUser.primaryBranchId },
+          select: { id: true, timezone: true },
+        });
+        if (fallback) branches = [fallback];
+      }
 
-      if (branchIds.length === 0) {
+      if (branches.length === 0) {
         this.logger.warn(
           `No branches resolved for tenant ${tenant.name}, skipping`,
         );
         return;
       }
 
-      // Generate and send report for each branch
-      for (const branchId of branchIds) {
-        await this.runForBranch(tenant, branchId, adminUser.id);
+      const now = new Date();
+      // Generate and send report for each branch that is at its closing
+      // window in ITS OWN timezone (or every branch when force=true).
+      for (const branch of branches) {
+        const branchTz = branch.timezone || tenant.timezone || "UTC";
+        if (
+          !force &&
+          !this.isAtClosingWindow(now, tenant.closingTime, branchTz)
+        ) {
+          continue;
+        }
+        await this.runForBranch(tenant, branch.id, adminUser.id, branchTz);
       }
       return;
     } catch (error) {
@@ -245,28 +260,27 @@ export class ZReportSchedulerService {
     tenant: { id: string; name: string; timezone?: string | null },
     branchId: string,
     userId: string,
+    branchTz: string,
   ) {
     try {
       // PER-BRANCH dedup: skip only THIS branch if it already has a
-      // finalized report for today (tenant-tz midnight). Each branch
+      // finalized report for today (BRANCH-tz midnight). Each branch
       // closes independently, so one branch being done must NOT skip the
       // others — that was the leak when the check lived at tenant level.
       //
-      // Tenant-tz midnight: ZReportsService writes `reportDate` as the
-      // tenant-local midnight instant via the same getTenantMidnight
-      // helper, so the dedup-read and the generate-and-send-write key off
-      // the same UTC instant. isFinalized (not emailSent) is the dedup
-      // axis: a finalized-but-email-failed report must NOT re-enter the
-      // whole generate-and-send loop every 15 minutes.
-      const tenantTzMidnight = getTenantMidnight(
-        new Date(),
-        tenant.timezone || "UTC",
-      );
+      // Branch-tz midnight: ZReportsService.generateAndSendReport now writes
+      // `reportDate` as the BRANCH-local midnight instant via the same
+      // getTenantMidnight helper (branchTz resolved below), so the dedup-read
+      // and the generate-and-send-write key off the same UTC instant. Falls
+      // back to tenant tz when the branch has none. isFinalized (not
+      // emailSent) is the dedup axis: a finalized-but-email-failed report
+      // must NOT re-enter the whole generate-and-send loop every 15 minutes.
+      const branchTzMidnight = getTenantMidnight(new Date(), branchTz);
       const existingReport = await this.prisma.zReport.findFirst({
         where: {
           tenantId: tenant.id,
           branchId,
-          reportDate: tenantTzMidnight,
+          reportDate: branchTzMidnight,
           isFinalized: true,
         },
       });
@@ -307,7 +321,7 @@ export class ZReportSchedulerService {
   ): Promise<{ success: boolean; message: string }> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, timezone: true, closingTime: true },
     });
 
     if (!tenant) {
@@ -315,7 +329,9 @@ export class ZReportSchedulerService {
     }
 
     try {
-      await this.processEndOfDayReport(tenant);
+      // Manual trigger forces generation for every branch regardless of the
+      // closing-window match (the operator asked for it now).
+      await this.processEndOfDayReport(tenant, true);
       return { success: true, message: "Report processed successfully" };
     } catch (error) {
       return { success: false, message: error.message };

@@ -73,6 +73,50 @@ describe('ZReportsService.generateAndSendReport (iter-35)', () => {
     const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
     expect(where.reportDate.getTime()).toBe(expectedMidnight.getTime());
   });
+
+  it('uses the BRANCH timezone over the tenant timezone for reportDate (fake-working sweep #3)', async () => {
+    // Tenant in Istanbul, branch in London. reportDate must key off the
+    // branch (London) midnight — the per-branch-timezone fix. Pre-fix the
+    // branch tz was never read and this would have keyed on Istanbul.
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 't1',
+      timezone: 'Europe/Istanbul',
+      reportEmailEnabled: false,
+      reportEmails: [],
+    } as any);
+    prisma.branch.findFirst.mockResolvedValue({ timezone: 'Europe/London' } as any);
+
+    const londonMidnight = getTenantMidnight(new Date(), 'Europe/London');
+    const istanbulMidnight = getTenantMidnight(new Date(), 'Europe/Istanbul');
+    prisma.zReport.findFirst.mockResolvedValue({ id: 'zr-london' } as any);
+
+    await svc.generateAndSendReport('t1', 'b-london', 'user-1');
+
+    const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
+    expect(where.reportDate.getTime()).toBe(londonMidnight.getTime());
+    // London midnight != Istanbul midnight (different UTC offset), so this
+    // also proves we did NOT fall back to the tenant tz.
+    expect(where.reportDate.getTime()).not.toBe(istanbulMidnight.getTime());
+  });
+
+  it('falls back to the tenant timezone when the branch has none set', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 't1',
+      timezone: 'Europe/Istanbul',
+      reportEmailEnabled: false,
+      reportEmails: [],
+    } as any);
+    // branch row exists but timezone is null -> fall back to tenant tz.
+    prisma.branch.findFirst.mockResolvedValue({ timezone: null } as any);
+
+    const istanbulMidnight = getTenantMidnight(new Date(), 'Europe/Istanbul');
+    prisma.zReport.findFirst.mockResolvedValue({ id: 'zr-x' } as any);
+
+    await svc.generateAndSendReport('t1', 'b1', 'user-1');
+
+    const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
+    expect(where.reportDate.getTime()).toBe(istanbulMidnight.getTime());
+  });
 });
 
 /**

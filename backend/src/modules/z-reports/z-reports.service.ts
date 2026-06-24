@@ -34,6 +34,34 @@ export class ZReportsService {
   ) {}
 
   /**
+   * Resolve the timezone that defines a branch's sales day: the branch's
+   * own IANA `timezone` when set, else the tenant's, else "UTC".
+   *
+   * Per-branch-timezone fix (fake-working sweep #3): Branch.timezone was an
+   * editable, validated, persisted setting that NO reporting/scheduling code
+   * read — every Z-report day boundary and closing-time match used the single
+   * tenant timezone, mis-bucketing an off-tz branch's sales day. Branch-scoped
+   * fiscal day math now flows through here. (Tenant-wide reports with no
+   * branchId still use the tenant tz — see reports.service.ts, which remains
+   * tenant-tz and is noted as remaining work.)
+   */
+  private async resolveBranchTimezone(
+    tenantId: string,
+    branchId: string,
+  ): Promise<string> {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, tenantId },
+      select: { timezone: true },
+    });
+    if (branch?.timezone) return branch.timezone;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    return tenant?.timezone || "UTC";
+  }
+
+  /**
    * Generate a Z-Report for end-of-day reconciliation.
    *
    * v3.0.0: `branchId` is now a NOT-NULL column on ZReport (schema-strict
@@ -63,15 +91,17 @@ export class ZReportsService {
       throw new BadRequestException("Z-Report already exists for this date");
     }
 
-    // Tenant-local day bounds. Uses the shared helper (same as the
-    // scheduler) so a tenant in Istanbul doesn't miss 23:00-00:00 when
+    // Branch-local day bounds. Uses the shared helper (same as the
+    // scheduler) so a branch in Istanbul doesn't miss 23:00-00:00 when
     // the API pod runs in UTC. Half-open interval [start, end) avoids
     // the prior `.999` fudge.
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { timezone: true, currency: true },
-    });
-    const tz = tenant?.timezone || "UTC";
+    //
+    // Per-branch tz fix: the day boundary is computed in the BRANCH's
+    // timezone (falling back to the tenant tz, then UTC) so a London branch
+    // under an Istanbul tenant buckets its sales day on London midnight, not
+    // Istanbul midnight — matching the closing-time match + dedup midnight
+    // the scheduler now uses.
+    const tz = await this.resolveBranchTimezone(tenantId, branchId);
     const dateStr = new Date(reportDate).toISOString().slice(0, 10);
     const { start: startOfDay, end: endOfDay } = getTenantDayBounds(
       dateStr,
@@ -642,21 +672,24 @@ export class ZReportsService {
     branchId: string,
     userId: string,
   ): Promise<{ reportId: string; emailSent: boolean }> {
-    // Tenant timezone matters: a TR restaurant closing at 23:00 TR with
-    // the API pod in UTC needs "today" to mean "the TR calendar date
-    // we're currently in", not "the UTC calendar date the server is in".
-    // The earlier code used `today.setHours(0,0,0,0)` which gave SERVER-
-    // local midnight — for a UTC container with a TR tenant this saved
-    // reportDate as one UTC instant while the scheduler's "already
-    // sent?" check searched for a different (tenant-local-midnight)
-    // instant. Result: the scheduler re-entered generate every 15 min
-    // during the closing window, each time hitting the service's own
-    // dedup throw, polluting logs. Same getTenantMidnight helper the
-    // scheduler uses keeps the two sides in lockstep.
+    // Timezone matters: a TR restaurant closing at 23:00 TR with the API
+    // pod in UTC needs "today" to mean "the TR calendar date we're
+    // currently in", not "the UTC calendar date the server is in". The
+    // earlier code used `today.setHours(0,0,0,0)` which gave SERVER-local
+    // midnight — for a UTC container with a TR tenant this saved reportDate
+    // as one UTC instant while the scheduler's "already sent?" check
+    // searched for a different (local-midnight) instant. Result: the
+    // scheduler re-entered generate every 15 min during the closing window,
+    // each time hitting the service's own dedup throw, polluting logs.
+    //
+    // Per-branch tz fix: we resolve the BRANCH's timezone (falling back to
+    // the tenant tz, then UTC) so a multi-tz chain's off-tz branch buckets
+    // its sales day on ITS OWN midnight — matching the scheduler's
+    // branch-tz dedup midnight so the two sides stay in lockstep.
+    const tz = await this.resolveBranchTimezone(tenantId, branchId);
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    const tz = tenant?.timezone || "UTC";
     const today = getTenantMidnight(new Date(), tz);
 
     // Check if report already exists for today
