@@ -2,13 +2,23 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { UpdateReservationSettingsDto } from "../dto/update-reservation-settings.dto";
+import { EntitlementService } from "../../entitlements/entitlement.service";
+import { isReservationFeatureEnabled } from "./reservation-entitlement.util";
 
 @Injectable()
 export class ReservationSettingsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Public-surface plan gate. @Optional() so unit tests constructing the
+    // service bare (prisma-only) keep working — when absent the entitlement
+    // check is skipped (tests assert the field projection, not the gate).
+    // Production DI always provides the global EntitlementService.
+    @Optional() private readonly entitlements?: EntitlementService,
+  ) {}
 
   private async validateTenant(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
@@ -86,8 +96,24 @@ export class ReservationSettingsService {
     await this.validateTenant(tenantId);
 
     const settings = await this.getOrCreate(tenantId);
+
+    // Plan-gate the PUBLIC surface server-side so it matches the admin gate
+    // (PlanFeatureGuard + @RequiresFeature(RESERVATION_SYSTEM)). Without this,
+    // a tenant whose plan excludes reservations still advertises isEnabled:true
+    // and the wizard accepts bookings the operator can never see/manage. When
+    // the feature is not granted, report disabled so the FE shows "reservations
+    // unavailable" instead of taking a booking into a void. NOT coupled to
+    // ReservationSettings.isEnabled (schema default true, never plan-linked).
+    const featureEnabled = this.entitlements
+      ? await isReservationFeatureEnabled(
+          this.prisma,
+          this.entitlements,
+          tenantId,
+        )
+      : true;
+
     return {
-      isEnabled: settings.isEnabled,
+      isEnabled: featureEnabled && settings.isEnabled,
       timeSlotInterval: settings.timeSlotInterval,
       minAdvanceBooking: settings.minAdvanceBooking,
       maxAdvanceDays: settings.maxAdvanceDays,

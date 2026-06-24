@@ -53,4 +53,25 @@ describe("ReservationsService notify observability", () => {
       expect.objectContaining({ event: "confirmed", tenantId: "t-1" }),
     );
   });
+
+  // MINOR: reject/cancel/cancelPublic previously called notify() directly
+  // (unawaited, no .catch), silently swallowing send failures. They now route
+  // through notifyCustomer() so failures reach Sentry like created/confirmed.
+  it.each(["rejected", "cancelled"] as const)(
+    "captures a %s notify failure to Sentry without throwing",
+    async (event) => {
+      const notify = jest.fn().mockRejectedValue(new Error("smtp down"));
+      const { svc } = build(notify);
+
+      expect(() =>
+        (svc as any).notifyCustomer("t-1", event, {}),
+      ).not.toThrow();
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ event, tenantId: "t-1" }),
+      );
+    },
+  );
 });

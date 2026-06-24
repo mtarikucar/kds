@@ -24,6 +24,8 @@ import {
   timeToMinutes,
 } from "./reservation-availability.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { EntitlementService } from "../../entitlements/entitlement.service";
+import { isReservationFeatureEnabled } from "./reservation-entitlement.util";
 
 @Injectable()
 export class ReservationsService {
@@ -43,12 +45,16 @@ export class ReservationsService {
     private availability: ReservationAvailabilityService,
     // Optional so unit tests constructing the service bare keep working.
     @Optional() private readonly metrics?: MetricsService,
+    // Public-surface plan gate (mirrors PlanFeatureGuard on the admin path).
+    // @Optional() so bare-constructed test instances keep working; production
+    // DI always provides the global EntitlementService.
+    @Optional() private readonly entitlements?: EntitlementService,
   ) {}
 
   private countReservation(status: string): void {
     this.metrics?.incCounter(
       "reservations_total",
-      "Reservations by lifecycle event (created|confirmed)",
+      "Reservations by lifecycle event (created|confirmed|rejected|cancelled)",
       { status },
     );
   }
@@ -60,7 +66,7 @@ export class ReservationsService {
    */
   private notifyCustomer(
     tenantId: string,
-    event: "created" | "confirmed",
+    event: "created" | "confirmed" | "rejected" | "cancelled",
     payload: Parameters<ReservationNotificationService["notify"]>[2],
   ): void {
     this.countReservation(event);
@@ -123,6 +129,22 @@ export class ReservationsService {
 
   async createPublicReservation(tenantId: string, dto: CreateReservationDto) {
     await this.validateTenant(tenantId);
+
+    // Plan-gate the PUBLIC create path server-side BEFORE persisting, matching
+    // the admin gate (PlanFeatureGuard + @RequiresFeature(RESERVATION_SYSTEM)).
+    // This is the @Public() surface the guard short-circuits past, so without
+    // this a tenant whose plan excludes reservations would accept a booking the
+    // operator can never see/confirm/manage (book-into-a-void).
+    if (this.entitlements) {
+      const featureEnabled = await isReservationFeatureEnabled(
+        this.prisma,
+        this.entitlements,
+        tenantId,
+      );
+      if (!featureEnabled) {
+        throw new ForbiddenException("Reservation system is not enabled");
+      }
+    }
 
     const settings = await this.settingsService.getOrCreate(tenantId);
 
@@ -245,6 +267,24 @@ export class ReservationsService {
         tenantId,
         dto.branchId,
       );
+
+      // No explicit table assigned: the table-pick step is optional in the
+      // public wizard, so a guest can submit a no-table booking for a party
+      // larger than ANY physical table. Reject when guestCount exceeds the
+      // branch's largest table capacity — no single table could ever seat the
+      // party (mirrors the per-table capacity check above for assigned tables).
+      const largest = await this.prisma.table.aggregate({
+        where: { tenantId, branchId: resolvedBranchId },
+        _max: { capacity: true },
+      });
+      const maxCapacity = largest._max.capacity ?? 0;
+      if (dto.guestCount > maxCapacity) {
+        throw new BadRequestException(
+          maxCapacity > 0
+            ? `No table can seat a party of ${dto.guestCount}. The largest table seats ${maxCapacity}.`
+            : `No table is available to seat a party of ${dto.guestCount}.`,
+        );
+      }
     }
 
     const status = settings.requireApproval
@@ -747,7 +787,7 @@ export class ReservationsService {
       reservation.date instanceof Date
         ? reservation.date.toISOString().split("T")[0]
         : String(reservation.date);
-    this.reservationNotificationService.notify(scope.tenantId, "rejected", {
+    this.notifyCustomer(scope.tenantId, "rejected", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,
@@ -926,7 +966,7 @@ export class ReservationsService {
       reservation.date instanceof Date
         ? reservation.date.toISOString().split("T")[0]
         : String(reservation.date);
-    this.reservationNotificationService.notify(scope.tenantId, "cancelled", {
+    this.notifyCustomer(scope.tenantId, "cancelled", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,
@@ -1028,7 +1068,7 @@ export class ReservationsService {
       reservation.date instanceof Date
         ? reservation.date.toISOString().split("T")[0]
         : String(reservation.date);
-    this.reservationNotificationService.notify(tenantId, "cancelled", {
+    this.notifyCustomer(tenantId, "cancelled", {
       customerName: reservation.customerName,
       customerEmail: reservation.customerEmail,
       customerPhone: reservation.customerPhone,
