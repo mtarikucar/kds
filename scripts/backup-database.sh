@@ -10,12 +10,21 @@
 # plausible schema. Failure exits non-zero; the caller (deploy.sh)
 # treats that as a deploy abort.
 #
-# Retention: 14 days for prod, 3 days for staging.
+# Retention: 14 days for prod, 3 days for staging (LOCAL copies).
 #
-# TODO (out of scope, separate issue):
-#   - rclone/aws s3 cp off-site upload
-#   - WAL streaming for PITR
-#   - monthly restore drill runbook
+# Location: backups go to KDS_BACKUP_DIR (default
+# /var/lib/kds-deploy/backups/database) — OUTSIDE the repo tree, because the
+# dump contains real customer PII and must never reach git.
+#
+# Off-site: set KDS_BACKUP_RCLONE_REMOTE (e.g. "b2:kds-backups/prod") OR
+# KDS_BACKUP_S3_BUCKET (e.g. "my-bucket/kds/prod") to ship each verified dump
+# off the VPS. Without one, the backup lives only on the same disk as the DB
+# it protects and the script prints a loud NO-OFFSITE-TARGET warning.
+#
+# Scheduling: see ops/backup/ for the systemd timer / cron that runs this
+# out-of-band (deploy-time backup alone gives an unbounded RPO).
+#
+# Still TODO (separate issue): WAL streaming for PITR; monthly restore drill.
 
 set -euo pipefail
 
@@ -54,7 +63,10 @@ case "$ENV" in
     ;;
 esac
 
-BACKUP_DIR="$PROJECT_ROOT/backups/database"
+# Out of the repo tree by default — the dump holds real PII, and writing it
+# under $PROJECT_ROOT/backups is exactly how 20 prod dumps once leaked into
+# git. Override per host with KDS_BACKUP_DIR.
+BACKUP_DIR="${KDS_BACKUP_DIR:-/var/lib/kds-deploy/backups/database}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="$BACKUP_DIR/backup_${ENV}_${TIMESTAMP}.sql.gz"
 
@@ -121,6 +133,37 @@ if [ "$create_count" -lt 5 ]; then
 fi
 
 ok "Backup verified ($size_bytes bytes, $create_count create stmts)"
+
+# Off-site copy ------------------------------------------------------
+# A backup that dies with the server it protects is not a backup. Failure
+# here is LOUD but non-fatal (the verified local copy still exists, so a
+# deploy must not abort on a transient upload blip) — monitoring should
+# alert on the OFFSITE-UPLOAD-FAILED / NO-OFFSITE-TARGET markers.
+upload_offsite() {
+  local f="$1"
+  if [ -n "${KDS_BACKUP_RCLONE_REMOTE:-}" ]; then
+    if ! command -v rclone >/dev/null 2>&1; then
+      err "OFFSITE-UPLOAD-FAILED: rclone not installed but KDS_BACKUP_RCLONE_REMOTE is set"
+    elif rclone copy "$f" "${KDS_BACKUP_RCLONE_REMOTE%/}/"; then
+      ok "Off-site (rclone) → ${KDS_BACKUP_RCLONE_REMOTE%/}/$(basename "$f")"
+    else
+      err "OFFSITE-UPLOAD-FAILED: rclone → ${KDS_BACKUP_RCLONE_REMOTE} (local copy kept)"
+    fi
+    return 0
+  fi
+  if [ -n "${KDS_BACKUP_S3_BUCKET:-}" ]; then
+    if ! command -v aws >/dev/null 2>&1; then
+      err "OFFSITE-UPLOAD-FAILED: aws cli not installed but KDS_BACKUP_S3_BUCKET is set"
+    elif aws s3 cp "$f" "s3://${KDS_BACKUP_S3_BUCKET%/}/$(basename "$f")" >/dev/null; then
+      ok "Off-site (s3) → s3://${KDS_BACKUP_S3_BUCKET%/}/$(basename "$f")"
+    else
+      err "OFFSITE-UPLOAD-FAILED: s3 → ${KDS_BACKUP_S3_BUCKET} (local copy kept)"
+    fi
+    return 0
+  fi
+  err "NO-OFFSITE-TARGET: backup is on the same disk as the DB it protects. Set KDS_BACKUP_RCLONE_REMOTE or KDS_BACKUP_S3_BUCKET."
+}
+upload_offsite "$BACKUP_FILE"
 
 # Retention ----------------------------------------------------------
 pruned=$(find "$BACKUP_DIR" -name "backup_${ENV}_*.sql.gz" -mtime "+${RETENTION_DAYS}" -print -delete 2>/dev/null | wc -l)

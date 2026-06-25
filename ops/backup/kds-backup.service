@@ -1,0 +1,25 @@
+# systemd one-shot that runs a verified, off-site KDS database backup.
+# Driven by kds-backup.timer (every 6h). See ops/backup/README.md.
+#
+# Install (on the prod VPS, as root):
+#   1. Edit WorkingDirectory + ExecStart below to your repo checkout path.
+#   2. Create /etc/kds-backup.env (see README) with the off-site target.
+#   3. cp ops/backup/kds-backup.{service,timer} /etc/systemd/system/
+#      systemctl daemon-reload && systemctl enable --now kds-backup.timer
+[Unit]
+Description=KDS verified database backup (prod) + off-site copy
+Documentation=file://ops/backup/README.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# >>> EDIT to the prod repo checkout on this host (where scripts/ lives) <<<
+WorkingDirectory=/opt/kds
+# KDS_BACKUP_DIR (out-of-repo dir) + KDS_BACKUP_RCLONE_REMOTE / KDS_BACKUP_S3_BUCKET.
+# Leading '-' = tolerate the file being absent (script still makes a LOCAL backup
+# and prints a NO-OFFSITE-TARGET warning).
+EnvironmentFile=-/etc/kds-backup.env
+ExecStart=/opt/kds/scripts/backup-database.sh prod
+# A backup must not run unbounded.
+TimeoutStartSec=1800

@@ -55,6 +55,14 @@ const RULES: EnvRule[] = [
   // Production-only
   { key: "CORS_ORIGIN", required: true, prodOnly: true },
   { key: "SENTRY_DSN", required: false, prodOnly: true },
+  // METRICS_TOKEN gates GET /api/metrics. When unset, MetricsController
+  // serves the Prometheus registry to ANYONE who can reach the route —
+  // payment/subscription/fiscal volumes, login-failure counts, outbox/DLQ
+  // depth, per-route latency: a BI + attack-recon leak. Required in
+  // production so the bearer-token check is always armed (defence in depth
+  // alongside the nginx `location = /api/metrics` deny + 127.0.0.1 port
+  // binding). 16+ chars.
+  { key: "METRICS_TOKEN", required: true, prodOnly: true, minLength: 16 },
   // PayTR — required in production because the Turkish payment flow is
   // useless without them. Dev can run without (PaymentsService throws a
   // clear "credentials not configured" error if the user actually tries

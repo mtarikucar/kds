@@ -52,11 +52,23 @@ describe("ZReportSchedulerService", () => {
     zReports = { generateAndSendReport: jest.fn() };
     svc = new ZReportSchedulerService(prisma as any, zReports as any);
 
+    // The advisory lock now uses a single interactive transaction that
+    // takes a transaction-scoped lock (pg_try_advisory_xact_lock) and is
+    // released automatically on commit/rollback. Wire $transaction so the
+    // interactive callback runs with tx === prisma, which means the test's
+    // existing $queryRawUnsafe stub (matching the "pg_try_advisory_lock"
+    // substring, still present in "pg_try_advisory_xact_lock") drives the
+    // lock outcome. This same passthrough also covers any inner
+    // $transaction usage in the service's own work.
+    (prisma.$transaction as any).mockImplementation(async (arg: any) =>
+      typeof arg === "function" ? arg(prisma) : Promise.all(arg),
+    );
+
     // Sensible defaults; individual tests override as needed.
     grantLock();
     (prisma.$queryRawUnsafe as any).mockImplementation((sql: string) => {
-      // try_advisory_lock returns a row; unlock returns whatever.
-      if (sql.includes("pg_try_advisory_lock")) return [{ locked: true }];
+      // try_advisory_xact_lock returns a row; nothing else is queried now.
+      if (sql.includes("pg_try_advisory_xact_lock")) return [{ locked: true }];
       return [];
     });
     prisma.tenant.findMany.mockResolvedValue([]);
@@ -331,7 +343,7 @@ describe("ZReportSchedulerService", () => {
   describe("concurrency guards", () => {
     it("does NO tenant work when another replica holds the advisory lock", async () => {
       (prisma.$queryRawUnsafe as any).mockImplementation((sql: string) => {
-        if (sql.includes("pg_try_advisory_lock")) return [{ locked: false }];
+        if (sql.includes("pg_try_advisory_xact_lock")) return [{ locked: false }];
         return [];
       });
 
@@ -341,29 +353,40 @@ describe("ZReportSchedulerService", () => {
       expect(zReports.generateAndSendReport).not.toHaveBeenCalled();
     });
 
-    it("releases the advisory lock after a successful run", async () => {
+    it("acquires the lock inside a transaction (auto-released on commit) for a successful run", async () => {
       prisma.tenant.findMany.mockResolvedValue([]);
 
       await svc.handleZReportEmails();
 
+      // The lock is taken via a single interactive transaction; the
+      // xact-scoped lock is released automatically on commit, so there is
+      // no explicit pg_advisory_unlock query anymore.
+      expect(prisma.$transaction).toHaveBeenCalled();
       const calls = (prisma.$queryRawUnsafe as any).mock.calls.map(
         (c: any[]) => c[0] as string,
       );
-      expect(calls.some((s) => s.includes("pg_try_advisory_lock"))).toBe(true);
-      expect(calls.some((s) => s.includes("pg_advisory_unlock"))).toBe(true);
+      expect(calls.some((s) => s.includes("pg_try_advisory_xact_lock"))).toBe(
+        true,
+      );
+      expect(calls.some((s) => s.includes("pg_advisory_unlock"))).toBe(false);
     });
 
-    it("releases the advisory lock even when tenant processing throws", async () => {
+    it("holds the lock in a transaction (auto-released on rollback) even when tenant processing throws", async () => {
       prisma.tenant.findMany.mockResolvedValue([eligibleTenant()] as any);
       // Make branch resolution explode AFTER the lock is held.
       (prisma.branch.findMany as any).mockRejectedValue(new Error("db down"));
 
       await svc.handleZReportEmails();
 
+      // Lock was acquired inside the transaction; release is automatic on
+      // the transaction unwinding, so no explicit unlock query is issued.
       const calls = (prisma.$queryRawUnsafe as any).mock.calls.map(
         (c: any[]) => c[0] as string,
       );
-      expect(calls.some((s) => s.includes("pg_advisory_unlock"))).toBe(true);
+      expect(calls.some((s) => s.includes("pg_try_advisory_xact_lock"))).toBe(
+        true,
+      );
+      expect(calls.some((s) => s.includes("pg_advisory_unlock"))).toBe(false);
     });
 
     it("does NOT acquire/unlock the lock again on a re-entrant call (isRunning guard)", async () => {

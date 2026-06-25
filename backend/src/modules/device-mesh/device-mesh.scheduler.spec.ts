@@ -12,13 +12,20 @@ import { LocalBridgeService } from "../local-bridge/local-bridge.service";
  */
 describe("DeviceMeshScheduler.sweep", () => {
   function makePrismaWithLock() {
-    return {
+    const prisma = {
       $queryRawUnsafe: jest.fn((sql: string) =>
-        sql.includes("pg_try_advisory_lock")
+        sql.includes("pg_try_advisory")
           ? Promise.resolve([{ locked: true }])
           : Promise.resolve([]),
       ),
+      // New advisory-lock contract: the helper takes a transaction-scoped
+      // lock inside an interactive $transaction and runs the body with the
+      // tx client. Run the callback with `tx === prisma` so the existing
+      // $queryRawUnsafe lock stub (matching "pg_try_advisory") drives the
+      // winner path for the new pg_try_advisory_xact_lock query.
+      $transaction: jest.fn((cb: any) => cb(prisma)),
     } as unknown as PrismaService;
+    return prisma;
   }
 
   it("runs all three sweeps when the advisory lock is held", async () => {
@@ -53,8 +60,10 @@ describe("DeviceMeshScheduler.sweep", () => {
   });
 
   it("skips the sweeps when another replica holds the lock", async () => {
+    const queryRawUnsafe = jest.fn(() => Promise.resolve([{ locked: false }]));
     const prisma = {
-      $queryRawUnsafe: jest.fn(() => Promise.resolve([{ locked: false }])),
+      $queryRawUnsafe: queryRawUnsafe,
+      $transaction: jest.fn((cb: any) => cb(prisma)),
     } as unknown as PrismaService;
     const devices = { sweepStale: jest.fn() } as unknown as DeviceService;
     const sched = new DeviceMeshScheduler(
@@ -64,6 +73,12 @@ describe("DeviceMeshScheduler.sweep", () => {
       { sweepStale: jest.fn() } as unknown as LocalBridgeService,
     );
     await sched.sweep();
+    // Lock query WAS issued (acquisition attempted) but returned not-locked,
+    // so the loser skips the body. Release is automatic on tx end — no
+    // pg_advisory_unlock query exists to assert anymore.
+    expect(queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining("pg_try_advisory_xact_lock"),
+    );
     expect(devices.sweepStale).not.toHaveBeenCalled();
   });
 });

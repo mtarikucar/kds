@@ -250,9 +250,16 @@ describe("CustomerSelfPayService (characterization)", () => {
 
   describe("expireStaleIntents (sweeper)", () => {
     it("transitions PENDING+expired rows to EXPIRED under advisory lock", async () => {
+      // The advisory lock now runs inside an interactive $transaction; wire
+      // it to invoke the callback with the same mock (tx === prisma) so the
+      // xact-lock query below drives the winner/loser decision.
+      (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+        async (cb: any) => cb(prisma),
+      );
       (prisma.$queryRawUnsafe as unknown as jest.Mock).mockImplementation(
         (sql: string) => {
-          if (sql.includes("pg_try_advisory_lock")) {
+          // New SQL "pg_try_advisory_xact_lock" still contains this substring.
+          if (sql.includes("pg_try_advisory_xact_lock")) {
             return Promise.resolve([{ locked: true }]);
           }
           return Promise.resolve([]);
@@ -263,6 +270,11 @@ describe("CustomerSelfPayService (characterization)", () => {
       });
 
       await svc.expireStaleIntents();
+
+      // Winner acquired the lock: the xact-lock query was issued and the body ran.
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("pg_try_advisory_xact_lock"),
+      );
 
       expect(prisma.pendingSelfPayment.updateMany).toHaveBeenCalledTimes(1);
       const arg = (prisma.pendingSelfPayment.updateMany as any).mock
@@ -276,9 +288,15 @@ describe("CustomerSelfPayService (characterization)", () => {
     });
 
     it("skips the sweep when the advisory lock is held by another replica", async () => {
+      // Run the lock transaction inline so the loser's lock query (locked:false)
+      // actually short-circuits the body, rather than relying on an unwired
+      // $transaction never invoking the callback.
+      (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+        async (cb: any) => cb(prisma),
+      );
       (prisma.$queryRawUnsafe as unknown as jest.Mock).mockImplementation(
         (sql: string) => {
-          if (sql.includes("pg_try_advisory_lock")) {
+          if (sql.includes("pg_try_advisory_xact_lock")) {
             return Promise.resolve([{ locked: false }]);
           }
           return Promise.resolve([]);
@@ -287,6 +305,10 @@ describe("CustomerSelfPayService (characterization)", () => {
 
       await svc.expireStaleIntents();
 
+      // Lock query was issued (we attempted acquisition) but lost → body skipped.
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("pg_try_advisory_xact_lock"),
+      );
       expect(prisma.pendingSelfPayment.updateMany).not.toHaveBeenCalled();
     });
   });

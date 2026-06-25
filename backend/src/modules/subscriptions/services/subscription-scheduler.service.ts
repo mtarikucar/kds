@@ -20,6 +20,7 @@ import {
 } from "../../../common/constants/subscription.enum";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 /**
  * All jobs acquire a Postgres advisory lock per job name before running,
@@ -48,41 +49,20 @@ export class SubscriptionSchedulerService {
   ) {}
 
   /**
-   * Take a 64-bit advisory lock keyed by job name. Returns true on
-   * acquisition; false means another replica is already running. Lock
-   * releases automatically at the end of the current DB session, so we
-   * explicitly release it when the job body is done.
+   * Cross-replica leader election for a cron, keyed by job name. Delegates
+   * to the shared transaction-scoped advisory lock so acquire + release ride
+   * the SAME pooled connection. The prior inline implementation paired
+   * `pg_try_advisory_lock` with a separate `pg_advisory_unlock` over the
+   * connection pool — the unlock often landed on a different connection and
+   * no-op'd, leaking the lock and silently wedging these billing jobs (no
+   * renewals / past-due transitions / orphan sweeps) until a restart. See
+   * `withAdvisoryLock` for the full rationale.
    */
-  private async withJobLock(
+  private withJobLock(
     jobName: string,
     run: () => Promise<void>,
   ): Promise<void> {
-    const lockId = this.jobLockId(jobName);
-    const rows = await this.prisma.$queryRawUnsafe<{ locked: boolean }[]>(
-      `SELECT pg_try_advisory_lock(${lockId}) AS locked`,
-    );
-    if (!rows[0]?.locked) {
-      this.logger.warn(
-        `Skipping ${jobName}: advisory lock held by another process`,
-      );
-      return;
-    }
-    try {
-      await run();
-    } finally {
-      await this.prisma.$queryRawUnsafe(`SELECT pg_advisory_unlock(${lockId})`);
-    }
-  }
-
-  private jobLockId(jobName: string): number {
-    // Deterministic bigint from the job name (DJB2 → int32-safe).
-    let hash = 5381;
-    for (let i = 0; i < jobName.length; i += 1) {
-      hash = ((hash << 5) + hash + jobName.charCodeAt(i)) | 0;
-    }
-    // Postgres accepts any 64-bit signed integer; a 32-bit hash is plenty
-    // for 6 job names.
-    return hash;
+    return withAdvisoryLock(this.prisma, jobName, run, this.logger);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: "trial-expirations" })

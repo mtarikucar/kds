@@ -21,6 +21,16 @@ describe('RetryScheduler (iter-40)', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
+    // withAdvisoryLock now takes a transaction-scoped lock inside a single
+    // interactive $transaction: it calls cb(tx), and the xact-scoped lock is
+    // released automatically on commit/rollback (no pg_advisory_unlock). Run
+    // the callback with tx === prisma so the per-test $queryRawUnsafe stub
+    // (matching the new "pg_try_advisory_xact_lock" SQL) still drives the
+    // lock decision. This single mockImplementation also covers any inner
+    // $transaction the service uses for its own work.
+    (prisma.$transaction as any).mockImplementation((arg: any) =>
+      typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
+    );
     logService = {
       getFailedOperations: jest.fn().mockResolvedValue([]),
       markRetrySuccess: jest.fn().mockResolvedValue(undefined),
@@ -40,19 +50,17 @@ describe('RetryScheduler (iter-40)', () => {
   });
 
   it('acquires a pg advisory lock before processing (cross-replica safety)', async () => {
-    // withAdvisoryLock invokes $queryRawUnsafe with pg_try_advisory_lock.
-    // Stub to return locked=true so the inner runRetries fires; then
-    // assert the lock query was issued at all.
+    // withAdvisoryLock now takes a transaction-scoped lock via
+    // pg_try_advisory_xact_lock inside one interactive $transaction. There
+    // is NO pg_advisory_unlock anymore —
+    // release is automatic on commit. Stub the lock query to return
+    // locked=true (winner) so the inner runRetries fires; assert the lock
+    // query was issued AND the lock-protected body ran.
     let lockQueried = false;
-    let unlockQueried = false;
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) {
+      if (sql.includes('pg_try_advisory_xact_lock')) {
         lockQueried = true;
         return [{ locked: true }];
-      }
-      if (sql.includes('pg_advisory_unlock')) {
-        unlockQueried = true;
-        return [{}];
       }
       return [];
     });
@@ -60,14 +68,18 @@ describe('RetryScheduler (iter-40)', () => {
     await svc.retryFailedOperations();
 
     expect(lockQueried).toBe(true);
-    expect(unlockQueried).toBe(true);
+    // The xact lock is acquired inside the interactive transaction.
+    expect(prisma.$transaction).toHaveBeenCalled();
+    // Winner ran the body (release is now automatic on commit, so the
+    // obsolete pg_advisory_unlock assertion is replaced by this body-ran
+    // check — equivalent coverage of "we held the lock and did the work").
     expect(logService.getFailedOperations).toHaveBeenCalled();
   });
 
   it('SKIPS the retry loop when another replica holds the lock', async () => {
     // Simulate the loser case: lock query returns locked=false.
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) return [{ locked: false }];
+      if (sql.includes('pg_try_advisory_xact_lock')) return [{ locked: false }];
       return [];
     });
 
@@ -86,7 +98,7 @@ describe('RetryScheduler (iter-40)', () => {
     // First tick: lock acquired, getFailedOperations hangs on the
     // inFlight promise so the tick stays "running".
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      if (sql.includes('pg_try_advisory_xact_lock')) return [{ locked: true }];
       return [];
     });
     logService.getFailedOperations.mockReturnValue(inFlight.then(() => []));
@@ -109,7 +121,7 @@ describe('RetryScheduler (iter-40)', () => {
 
   it('scopes order lookup by op.tenantId (defence-in-depth)', async () => {
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      if (sql.includes('pg_try_advisory_xact_lock')) return [{ locked: true }];
       return [];
     });
     logService.getFailedOperations.mockResolvedValue([

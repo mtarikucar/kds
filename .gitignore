@@ -44,6 +44,12 @@ Thumbs.db
 *.sqlite3
 pgdata/
 
+# Database backups — NEVER commit. pg_dump output contains real customer
+# PII + api_keys + bcrypt password hashes. Backups must live OUTSIDE the repo
+# tree (scripts/backup-database.sh writes to KDS_BACKUP_DIR, default
+# /var/lib/kds-deploy/backups); this rule is the backstop against recurrence.
+backups/
+
 # Logs
 logs/
 *.log

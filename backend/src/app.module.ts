@@ -80,6 +80,25 @@ import { validate } from "./config/env.validation";
     // leader-election / distributed locks live in the schedulers themselves.
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
+      // The "default" throttler MUST be registered for the per-route
+      // `@Throttle({ default: { limit, ttl } })` overrides to take effect.
+      // @nestjs/throttler's guard only consults throttlers whose `name`
+      // it finds in this list; a `default`-keyed override on a route with
+      // no registered `default` throttler is SILENTLY INERT. Before this
+      // entry, every `@Throttle({ default: ... })` in the codebase —
+      // /auth/login (5/min), /auth/register (3/hr), forgot/verify/
+      // change-password, /auth/refresh, superadmin 2FA, device pair, the
+      // public QR-menu / self-pay / reservation / webhook surfaces — fell
+      // back to the much looser global `long` (100/min) bucket, leaving
+      // auth brute-force and abuse effectively unthrottled. Its global
+      // limit matches `long` so adding it tightens nothing globally; it
+      // exists so the per-route overrides bind. (Guarded by
+      // default-throttler.integration.spec.ts.)
+      {
+        name: "default",
+        ttl: 60000,
+        limit: 100,
+      },
       {
         name: "short",
         ttl: 1000,

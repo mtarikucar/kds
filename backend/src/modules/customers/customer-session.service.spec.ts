@@ -66,24 +66,38 @@ describe('CustomerSessionService (iter-77 cleanup + cap)', () => {
 
   describe('sweepSessions cron entrypoint', () => {
     it('runs deactivate + hard-delete inside the advisory lock callback', async () => {
-      // withAdvisoryLock uses $queryRawUnsafe for both acquire and
-      // release. Stub to return the locked=true row Postgres would
-      // emit for `SELECT pg_try_advisory_lock(...) AS locked`.
+      // withAdvisoryLock now wraps the body in ONE interactive
+      // transaction and takes a transaction-scoped lock via
+      // `SELECT pg_try_advisory_xact_lock(...) AS locked` (released
+      // automatically on commit). Run the interactive callback with
+      // tx === prisma so the $queryRawUnsafe stub below drives it.
+      (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(prisma));
+      // Stub to return the locked=true row Postgres would emit for the
+      // `SELECT pg_try_advisory_xact_lock(...) AS locked` acquire.
       (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
       (prisma.customerSession.updateMany as any).mockResolvedValue({ count: 2 });
       (prisma.customerSession.deleteMany as any).mockResolvedValue({ count: 3 });
 
       await svc.sweepSessions();
 
-      // Both writers fire — deactivate sweep AND hard-delete sweep —
-      // and both inside the same lock acquisition.
+      // The lock was acquired (the xact-lock query was issued) and the
+      // body ran: both writers fire — deactivate sweep AND hard-delete
+      // sweep — inside the same (winning) lock acquisition.
+      expect(
+        (prisma.$queryRawUnsafe as any).mock.calls.some((c: any[]) =>
+          /pg_try_advisory(_xact)?_lock/.test(String(c[0])),
+        ),
+      ).toBe(true);
       expect((prisma.customerSession.updateMany as any).mock.calls.length).toBe(1);
       expect((prisma.customerSession.deleteMany as any).mock.calls.length).toBe(1);
     });
 
     it('skips both writers when the advisory lock is held by a peer (locked=false)', async () => {
-      // Peer replica already holds the lock — the helper returns early
-      // without running the callback, so neither sweep fires here.
+      // Peer replica already holds the xact lock — inside the
+      // interactive transaction the acquire returns locked=false, so
+      // the helper returns from the callback early without running the
+      // body, and neither sweep fires here.
+      (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(prisma));
       (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: false }]);
 
       await svc.sweepSessions();

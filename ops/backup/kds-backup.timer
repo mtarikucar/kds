@@ -1,0 +1,16 @@
+# Runs kds-backup.service every 6 hours (00/06/12/18, host TZ) with catch-up
+# after downtime. The deploy-time backup (scripts/deploy.sh step 2/10) only
+# fires on release; without this timer a release-free stretch leaves an
+# unbounded RPO — a day+ of real orders/payments with no backup. See README.
+[Unit]
+Description=Run KDS database backup every 6 hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00
+# Run a missed backup as soon as the box is back up (don't skip the slot).
+Persistent=true
+# Smear load so it doesn't collide with other on-the-hour jobs.
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

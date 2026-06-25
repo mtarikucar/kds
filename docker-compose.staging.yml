@@ -88,7 +88,8 @@ services:
       KMS_PROVIDER: ${KMS_PROVIDER:-env}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
-      - '3002:3002'
+      # Loopback only — nginx (staging.hummytummy.com) is the public ingress.
+      - '127.0.0.1:3002:3002'
     volumes:
       - invoice_storage_staging:/app/storage
     healthcheck:
@@ -134,7 +135,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - '5175:80'
+      - '127.0.0.1:5175:80'
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:80']
       interval: 30s
@@ -164,7 +165,7 @@ services:
       NEXT_PUBLIC_API_URL: https://staging.hummytummy.com/api
       NEXT_PUBLIC_SITE_URL: https://staging.hummytummy.com
     ports:
-      - '3102:3000'
+      - '127.0.0.1:3102:3000'
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '-', 'http://0.0.0.0:3000/api/health']
       interval: 30s
@@ -194,7 +195,7 @@ services:
     ports:
       # Host 3202 (distinct from prod's 3200) so staging + prod developer
       # containers coexist on the shared VPS without a host-port collision.
-      - '3202:3000'
+      - '127.0.0.1:3202:3000'
     healthcheck:
       # No /api/health route; /tr is the default-locale page (nextra/locales
       # middleware redirects / → /tr) and returns 200 — durable liveness probe.
@@ -226,7 +227,7 @@ services:
     ports:
       # Host 3203 (distinct from prod's 3201, and from staging developer's 3202)
       # so all docs containers coexist on the shared VPS.
-      - '3203:3000'
+      - '127.0.0.1:3203:3000'
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/tr']
       interval: 30s

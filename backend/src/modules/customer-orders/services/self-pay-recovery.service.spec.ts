@@ -180,7 +180,19 @@ describe("self-pay inquiry-recovery (sweep-3 #4)", () => {
     let svc: SelfPayRecoveryService;
 
     beforeEach(() => {
-      // Advisory lock acquired.
+      // The advisory-lock wrapper now runs inside ONE interactive
+      // $transaction and takes a transaction-scoped lock via
+      // tx.$queryRawUnsafe("...pg_try_advisory_xact_lock..."). Run the
+      // callback inline against the same mock (tx === prisma) so the
+      // $queryRawUnsafe stub below drives the lock; this also runs any
+      // inner service-owned $transaction usage. Preserve the array form.
+      (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+        async (fn: any) => {
+          if (typeof fn === "function") return fn(prisma);
+          return Promise.all(fn);
+        },
+      );
+      // Advisory lock acquired (winner): the xact-lock query returns locked.
       (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue([
         { locked: true },
       ]);

@@ -29,7 +29,18 @@ function buildSvc(
     settlement,
     outbox,
   );
-  // Bypass the advisory-lock SQL probe — assume we acquired the lock.
+  // The advisory-lock wrapper now takes a transaction-scoped lock inside a
+  // single interactive `$transaction(async (tx) => …)` — `tx` runs the
+  // `pg_try_advisory_xact_lock` probe and, on a win, the job body; the
+  // xact-scoped lock releases automatically on commit (no pg_advisory_unlock).
+  // Run the callback with `tx === prisma` so the existing $queryRawUnsafe stub
+  // (which still matches the "pg_try_advisory_lock" substring) drives the
+  // acquire/skip decision. The same pass-through also serves the service's own
+  // inner $transaction usage (e.g. pending cancellations).
+  (prisma.$transaction as any).mockImplementation(async (arg: any) =>
+    typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
+  );
+  // Bypass the advisory-lock SQL probe — assume we acquired the lock (winner).
   prisma.$queryRawUnsafe.mockResolvedValue([{ locked: true }]);
   return svc;
 }
@@ -128,6 +139,57 @@ describe('SubscriptionSchedulerService.handleSubscriptionPeriodEnd', () => {
     await svc.handleSubscriptionPeriodEnd();
 
     expect(notifications.sendSubscriptionPastDue).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Cross-replica advisory-lock coordination. The shared `withAdvisoryLock`
+ * helper now takes a transaction-scoped lock (`pg_try_advisory_xact_lock`)
+ * inside one interactive `$transaction`: the winner (lock row `locked:true`)
+ * runs the job body, the loser (`locked:false`, lock held by another replica)
+ * skips it. The lock releases automatically on commit — there is no longer a
+ * `pg_advisory_unlock` query to assert (release is implicit). These tests
+ * replace the obsolete unlock-issued assertion with the equivalent intent:
+ * the lock probe IS issued, the winner runs the body, the loser does not.
+ */
+describe('SubscriptionSchedulerService advisory-lock coordination', () => {
+  let prisma: MockPrismaClient;
+  let notifications: any;
+  let svc: SubscriptionSchedulerService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    notifications = {
+      sendSubscriptionPastDue: jest.fn().mockResolvedValue(undefined),
+    };
+    svc = buildSvc(prisma, {}, notifications);
+  });
+
+  it('winner acquires the lock (probe issued) and runs the job body', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ locked: true }]);
+    prisma.subscription.findMany.mockResolvedValue([] as any);
+
+    await svc.handleSubscriptionPeriodEnd();
+
+    // The transaction-scoped acquire probe is issued...
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('pg_try_advisory_xact_lock'),
+    );
+    // ...and, having won, the body runs (it queried for expiring subs).
+    expect(prisma.subscription.findMany).toHaveBeenCalled();
+  });
+
+  it('loser (lock held by another replica) skips the job body', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ locked: false }]);
+    prisma.subscription.findMany.mockResolvedValue([] as any);
+
+    await svc.handleSubscriptionPeriodEnd();
+
+    // Probe still issued, but the body is skipped — no work done.
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('pg_try_advisory_xact_lock'),
+    );
+    expect(prisma.subscription.findMany).not.toHaveBeenCalled();
   });
 });
 

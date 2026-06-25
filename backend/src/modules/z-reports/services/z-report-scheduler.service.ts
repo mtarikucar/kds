@@ -1,8 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { ZReportsService } from "../z-reports.service";
 import { getTenantMidnight } from "../../../common/helpers/timezone.helper";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 @Injectable()
 export class ZReportSchedulerService {
@@ -27,34 +28,25 @@ export class ZReportSchedulerService {
     if (this.isRunning) return;
     this.isRunning = true;
     try {
-      const [{ locked }] = await this.prisma.$queryRawUnsafe<
-        { locked: boolean }[]
-      >(
-        `SELECT pg_try_advisory_lock(${this.lockId("z-report-scheduler")}) AS locked`,
+      await withAdvisoryLock(
+        this.prisma,
+        "z-report-scheduler",
+        async () => {
+          // We no longer pre-filter tenants by the tenant-tz closing window
+          // here. The closing-time match is now evaluated PER BRANCH in the
+          // branch's own timezone (see processEndOfDayReport) so a London
+          // branch under an Istanbul tenant fires at London's closing instant
+          // rather than Istanbul's. We still only load tenants that have the
+          // report email enabled with recipients — the cheap coarse filter.
+          const tenants = await this.getEmailEnabledTenants();
+          if (tenants.length === 0) return;
+
+          for (const tenant of tenants) {
+            await this.processEndOfDayReport(tenant);
+          }
+        },
+        this.logger,
       );
-      if (!locked) {
-        this.logger.debug("Another replica holds the z-report scheduler lock");
-        return;
-      }
-
-      try {
-        // We no longer pre-filter tenants by the tenant-tz closing window
-        // here. The closing-time match is now evaluated PER BRANCH in the
-        // branch's own timezone (see processEndOfDayReport) so a London
-        // branch under an Istanbul tenant fires at London's closing instant
-        // rather than Istanbul's. We still only load tenants that have the
-        // report email enabled with recipients — the cheap coarse filter.
-        const tenants = await this.getEmailEnabledTenants();
-        if (tenants.length === 0) return;
-
-        for (const tenant of tenants) {
-          await this.processEndOfDayReport(tenant);
-        }
-      } finally {
-        await this.prisma.$queryRawUnsafe(
-          `SELECT pg_advisory_unlock(${this.lockId("z-report-scheduler")})`,
-        );
-      }
     } catch (error: any) {
       this.logger.error(
         `Failed to process Z-Report emails: ${error.message}`,
@@ -63,14 +55,6 @@ export class ZReportSchedulerService {
     } finally {
       this.isRunning = false;
     }
-  }
-
-  private lockId(name: string): number {
-    let hash = 5381;
-    for (let i = 0; i < name.length; i += 1) {
-      hash = ((hash << 5) + hash + name.charCodeAt(i)) | 0;
-    }
-    return hash;
   }
 
   /**

@@ -15,6 +15,7 @@ import {
   PlatformLogDirection,
   PlatformLogAction,
 } from "../constants/platform.enum";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 /** Maximum number of tenants to poll in parallel per tick. */
 const CONCURRENCY = 10;
@@ -45,31 +46,15 @@ export class OrderPollingScheduler {
     try {
       // Advisory lock across replicas so horizontal scaling doesn't
       // double-poll the platforms (and double-bill our API quotas).
-      const [{ locked }] = await this.prisma.$queryRawUnsafe<
-        { locked: boolean }[]
-      >(
-        `SELECT pg_try_advisory_lock(${this.lockId("order-polling")}) AS locked`,
+      await withAdvisoryLock(
+        this.prisma,
+        "order-polling",
+        () => this.runOnce(),
+        this.logger,
       );
-      if (!locked) return;
-
-      try {
-        await this.runOnce();
-      } finally {
-        await this.prisma.$queryRawUnsafe(
-          `SELECT pg_advisory_unlock(${this.lockId("order-polling")})`,
-        );
-      }
     } finally {
       this.isRunning = false;
     }
-  }
-
-  private lockId(name: string): number {
-    let hash = 5381;
-    for (let i = 0; i < name.length; i += 1) {
-      hash = ((hash << 5) + hash + name.charCodeAt(i)) | 0;
-    }
-    return hash;
   }
 
   private async runOnce() {

@@ -213,7 +213,9 @@ preflight() {
 }
 
 backup_database() {
-  local backup_dir="$PROJECT_ROOT/backups/database"
+  # Out of the repo tree (the dump holds real PII; under $PROJECT_ROOT it
+  # would be a candidate to leak into git). Matches scripts/backup-database.sh.
+  local backup_dir="${KDS_BACKUP_DIR:-/var/lib/kds-deploy/backups/database}"
   mkdir -p "$backup_dir"
   local ts; ts=$(date +%Y%m%d_%H%M%S)
   local backup_file="$backup_dir/backup_${BACKUP_PREFIX}_${ts}.sql.gz"
