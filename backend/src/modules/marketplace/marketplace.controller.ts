@@ -54,6 +54,23 @@ export class MarketplaceController {
     return this.tenant.listMine(req.user.tenantId);
   }
 
+  // Tenant-aware catalogue: published add-ons annotated with `includedInPlan`
+  // so the storefront marks features the tenant's plan already grants instead
+  // of trying to sell them. Authenticated (unlike the @Public() list above)
+  // because the annotation depends on the caller's entitlements. The landing
+  // site keeps using the public, un-annotated endpoint.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiBearerAuth()
+  @Get("addons/available")
+  @ApiOperation({
+    summary:
+      "Published add-ons annotated with includedInPlan for the authenticated tenant",
+  })
+  available(@Req() req: any, @Query("kind") kind?: string) {
+    return this.tenant.listAvailable(req.user.tenantId, kind);
+  }
+
   // SECURITY (deep-review C2): the tenant-facing free-grant endpoint
   // POST /v1/marketplace/addons/purchase has been REMOVED. It was guarded
   // only by @Roles(ADMIN) (an ordinary tenant-realm role) and called

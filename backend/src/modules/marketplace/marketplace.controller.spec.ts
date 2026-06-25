@@ -23,6 +23,7 @@ describe("MarketplaceController", () => {
     };
     tenant = {
       listMine: jest.fn().mockResolvedValue([]),
+      listAvailable: jest.fn().mockResolvedValue([]),
       purchase: jest.fn().mockResolvedValue({}),
       cancel: jest.fn().mockResolvedValue({}),
     };
@@ -45,6 +46,11 @@ describe("MarketplaceController", () => {
   it("mine forwards the authenticated tenantId", () => {
     ctrl.mine(req);
     expect(tenant.listMine).toHaveBeenCalledWith("t1");
+  });
+
+  it("available forwards the tenantId + kind for the includedInPlan annotation", () => {
+    ctrl.available(req, "software");
+    expect(tenant.listAvailable).toHaveBeenCalledWith("t1", "software");
   });
 
   it("does NOT expose a free-grant purchase endpoint (deep-review C2)", () => {

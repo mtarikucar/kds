@@ -22,7 +22,7 @@ describe("TenantMarketplaceService.purchase", () => {
     prisma = mockPrismaClient();
     catalog = { findByCodeOrThrow: jest.fn() } as any;
     outbox = { append: jest.fn().mockResolvedValue("ok") };
-    svc = new TenantMarketplaceService(prisma as any, catalog, outbox as any);
+    svc = new TenantMarketplaceService(prisma as any, catalog, outbox as any, { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {} }) } as any);
     // Iter-68 wrapped the dup-check + create in a Serializable
     // $transaction. The deep-mocked prisma's $transaction doesn't
     // forward the callback by default — wire it through so the inner

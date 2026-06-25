@@ -171,7 +171,14 @@
         "status": "Holat",
         "periodEnds": "Davr tugashi"
       },
-      "cancelAtPeriodEnd": "davr oxirida bekor qilinadi"
+      "cancelAtPeriodEnd": "davr oxirida bekor qilinadi",
+      "includedInPlan": "Tarifingizga kiritilgan",
+      "owned": "Sizda bor",
+      "active": "Faol",
+      "purchasing": "Sotib olinmoqda…",
+      "catalogEmpty": "Bu turkumda hozircha plagin yoʻq.",
+      "purchaseConfirm": "Bu plagin {{price}}{{suffix}}. Toʻlovni yakunlash uchun xavfsiz toʻlov sahifasiga yoʻnaltirilasiz. Davom etilsinmi?",
+      "cancelConfirm": "\"{{name}}\" plaginini bekor qilmoqchimisiz?"
     },
     "store": {
       "title": "Jihozlar do'koni",

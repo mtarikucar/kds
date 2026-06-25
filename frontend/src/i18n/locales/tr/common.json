@@ -171,7 +171,14 @@
         "status": "Durum",
         "periodEnds": "Dönem Bitişi"
       },
-      "cancelAtPeriodEnd": "dönem sonunda iptal edilecek"
+      "cancelAtPeriodEnd": "dönem sonunda iptal edilecek",
+      "includedInPlan": "Planınıza dahil",
+      "owned": "Sahip",
+      "active": "Etkin",
+      "purchasing": "Satın alınıyor…",
+      "catalogEmpty": "Bu kategoride şu an eklenti yok.",
+      "purchaseConfirm": "Bu eklenti {{price}}{{suffix}}. Ödemeyi tamamlamak için güvenli ödeme sayfasına yönlendirileceksiniz. Devam edilsin mi?",
+      "cancelConfirm": "\"{{name}}\" eklentisini iptal etmek istediğinize emin misiniz?"
     },
     "store": {
       "title": "Donanım Mağazası",

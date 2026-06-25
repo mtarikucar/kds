@@ -51,7 +51,7 @@ describe('useListAddOns', () => {
     const client = makeClient();
     renderHook(() => useListAddOns('integration'), { wrapper: wrap(client) });
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
-    expect(apiGet).toHaveBeenCalledWith('/v1/marketplace/addons', { params: { kind: 'integration' } });
+    expect(apiGet).toHaveBeenCalledWith('/v1/marketplace/addons/available', { params: { kind: 'integration' } });
   });
 
   it('sends an empty params object when no kind is given', async () => {
@@ -59,7 +59,7 @@ describe('useListAddOns', () => {
     const client = makeClient();
     renderHook(() => useListAddOns(undefined), { wrapper: wrap(client) });
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
-    expect(apiGet).toHaveBeenCalledWith('/v1/marketplace/addons', { params: {} });
+    expect(apiGet).toHaveBeenCalledWith('/v1/marketplace/addons/available', { params: {} });
   });
 
   it('keys the catalogue query by kind', () => {
