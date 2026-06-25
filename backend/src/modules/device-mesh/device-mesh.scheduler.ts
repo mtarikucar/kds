@@ -38,9 +38,11 @@ export class DeviceMeshScheduler {
           const a = await this.devices.sweepStale();
           const b = await this.bridges.sweepStale();
           const c = await this.commands.sweepStuck();
-          if (a + b + c > 0) {
+          // Delete never-paired slots whose pair code expired (phantom cleanup).
+          const d = await this.devices.pruneExpiredUnprovisioned();
+          if (a + b + c + d > 0) {
             this.logger.log(
-              `sweep: devicesOffline=${a} bridgesOffline=${b} commandsRequeued=${c}`,
+              `sweep: devicesOffline=${a} bridgesOffline=${b} commandsRequeued=${c} slotsPruned=${d}`,
             );
           }
         } catch (e) {

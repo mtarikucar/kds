@@ -4293,6 +4293,10 @@ model Branch {
   // double, embedded formats vary by country).
   address   Json?
   status    String   @default("active") // active|suspended|archived
+  // The tenant's "Merkez/HQ" branch — the home for central (şubesiz) devices.
+  // Exactly one per tenant (the seeded MAIN branch); purely a label + the
+  // central-device bucket, does NOT affect branch capacity counting.
+  isHeadquarters Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

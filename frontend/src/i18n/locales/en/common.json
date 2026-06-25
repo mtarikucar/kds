@@ -98,7 +98,7 @@
       "business": "Operations",
       "menuAndTables": "Menu & Tables",
       "operation": "Back Office",
-      "multiBranch": "Multi-Branch",
+      "multiBranch": "Branches & Devices",
       "marketplace": "Marketplace",
       "planAndAccess": "Settings & Access"
     },
@@ -138,6 +138,17 @@
         "caller_id": "Caller ID",
         "scanner": "Scanner",
         "local_bridge": "Local bridge"
+      },
+      "pending": "awaiting pairing",
+      "statusLabel": {
+        "unprovisioned": "unprovisioned",
+        "paired": "paired",
+        "online": "online",
+        "offline": "offline",
+        "error": "error",
+        "busy": "busy",
+        "maintenance": "maintenance",
+        "retired": "retired"
       }
     },
     "marketplace": {
@@ -200,7 +211,9 @@
       "timezone": "Timezone",
       "status": "Status",
       "created": "Created",
-      "add": "Add branch"
+      "add": "Add branch",
+      "hubSubtitle": "Open each branch to manage its devices and local network (bridge) in one place.",
+      "manage": "Manage"
     },
     "webhooks": {
       "title": "Webhooks",
@@ -357,6 +370,34 @@
           "create": "Create"
         }
       }
+    },
+    "branchDetail": {
+      "back": "Branches",
+      "hq": "HQ",
+      "edit": "Edit",
+      "editTitle": "Edit branch",
+      "saved": "Branch updated",
+      "saveFailed": "Update failed",
+      "healthTitle": "Branch health score",
+      "notFound": "Branch not found, or you don't have access.",
+      "tabs": {
+        "devices": "Devices",
+        "network": "Local network"
+      }
+    },
+    "network": {
+      "tokenTitle": "Bridge token (shown once)",
+      "tokenIntro": "Enter this token on the HummyBox at first boot. It won't be shown again after you close this page.",
+      "tokenCopied": "I've copied it",
+      "sku": "Hardware",
+      "byo": "My own hardware",
+      "hostname": "Hostname",
+      "addBridge": "Add bridge",
+      "empty": "No bridges or devices in this branch yet.",
+      "cloudDirect": "Connected directly to the cloud",
+      "noDevicesBehind": "No devices behind this bridge.",
+      "noCloudDirect": "No cloud-direct devices.",
+      "retireBridgeConfirm": "Retire this bridge?"
     }
   },
   "header": {

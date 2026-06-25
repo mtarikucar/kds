@@ -98,7 +98,7 @@
       "business": "Operatsiyalar",
       "menuAndTables": "Menyu va stollar",
       "operation": "Back-ofis",
-      "multiBranch": "Ko'p filial",
+      "multiBranch": "Filiallar va qurilmalar",
       "marketplace": "Bozor",
       "planAndAccess": "Sozlamalar va kirish"
     },
@@ -138,6 +138,17 @@
         "caller_id": "Caller ID",
         "scanner": "Skaner",
         "local_bridge": "Mahalliy ko'prik"
+      },
+      "pending": "ulanish kutilmoqda",
+      "statusLabel": {
+        "unprovisioned": "sozlanmagan",
+        "paired": "ulandi",
+        "online": "onlayn",
+        "offline": "oflayn",
+        "error": "xato",
+        "busy": "band",
+        "maintenance": "texnik xizmat",
+        "retired": "chiqarilgan"
       }
     },
     "marketplace": {
@@ -200,7 +211,9 @@
       "timezone": "Vaqt zonasi",
       "status": "Holat",
       "created": "Yaratilgan",
-      "add": "Filial qo'shish"
+      "add": "Filial qo'shish",
+      "hubSubtitle": "Har bir filialni ochib, uning qurilmalari va mahalliy tarmog‘ini (ko‘prik) bir joydan boshqaring.",
+      "manage": "Boshqarish"
     },
     "webhooks": {
       "title": "Veb-huklar",
@@ -357,6 +370,34 @@
           "create": "Yaratish"
         }
       }
+    },
+    "branchDetail": {
+      "back": "Filiallar",
+      "hq": "Markaz",
+      "edit": "Tahrirlash",
+      "editTitle": "Filialni tahrirlash",
+      "saved": "Filial yangilandi",
+      "saveFailed": "Yangilab bo‘lmadi",
+      "healthTitle": "Filial salomatlik bali",
+      "notFound": "Filial topilmadi yoki kirish huquqingiz yo‘q.",
+      "tabs": {
+        "devices": "Qurilmalar",
+        "network": "Mahalliy tarmoq"
+      }
+    },
+    "network": {
+      "tokenTitle": "Ko‘prik tokeni (bir marta ko‘rsatiladi)",
+      "tokenIntro": "Bu tokenni HummyBox’ga birinchi ishga tushirishda kiriting. Sahifani yopgach, qayta ko‘rsatilmaydi.",
+      "tokenCopied": "Nusxa oldim",
+      "sku": "Qurilma",
+      "byo": "O‘z qurilmam",
+      "hostname": "Xost nomi",
+      "addBridge": "Ko‘prik qo‘shish",
+      "empty": "Bu filialda hali ko‘prik yoki qurilma yo‘q.",
+      "cloudDirect": "Bevosita bulutga ulangan",
+      "noDevicesBehind": "Bu ko‘prik ortida qurilma yo‘q.",
+      "noCloudDirect": "Bevosita bulutga ulangan qurilma yo‘q.",
+      "retireBridgeConfirm": "Bu ko‘prik chiqarilsinmi?"
     }
   },
   "header": {

@@ -23,9 +23,7 @@ import {
   Receipt,
   LogOut,
   User,
-  Cpu,
   Stethoscope,
-  Network,
   PhoneIncoming,
   Download,
   FileWarning,
@@ -217,27 +215,16 @@ const SECTIONS: NavSection[] = [
   {
     id: 'multiBranch',
     labelKey: 'navigation.sections.multiBranch',
-    labelFallback: 'Çoklu Şube',
+    labelFallback: 'Şubeler ve Cihazlar',
     items: [
       {
+        // The branch hub manages each branch's devices + local network too, so
+        // it is NOT multiLocation-gated — single-location tenants provision
+        // their devices here. (Creating a 2nd branch is still server-gated.)
         to: '/admin/branches',
         icon: Building2,
         labelKey: 'navigation.branches',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'multiLocation' },
-      },
-      {
-        to: '/admin/devices',
-        icon: Cpu,
-        labelKey: 'navigation.devices',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/bridges',
-        icon: Network,
-        labelKey: 'navigation.bridges',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'multiLocation' },
       },
       {
         to: '/admin/health',

@@ -8,7 +8,7 @@ const h = vi.hoisted(() => ({
   create: { mutate: vi.fn(), isPending: false },
 }));
 vi.mock('./branchesApi', () => ({
-  useListBranches: () => h.branches,
+  useBranchOverview: () => h.branches,
   useCreateBranch: () => h.create,
 }));
 vi.mock('../plan/planApi', () => ({
@@ -43,7 +43,10 @@ describe('BranchesPage', () => {
         code: 'IST-01',
         timezone: 'Europe/Istanbul',
         status: 'active',
+        isHeadquarters: true,
         createdAt: '2024-01-01T00:00:00Z',
+        devices: { total: 2, online: 1, pending: 0 },
+        bridges: 1,
       },
     ];
     renderPage();

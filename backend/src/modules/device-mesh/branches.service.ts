@@ -4,6 +4,15 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { DeviceService } from "./device.service";
+import { BranchGuard } from "../auth/guards/branch.guard";
+
+/** The caller's branch-access context (role + allow-list) for hub scoping. */
+export interface BranchAccess {
+  role: string;
+  primaryBranchId: string | null;
+  allowedBranchIds: readonly string[];
+}
 
 /**
  * Branch CRUD. Each tenant is guaranteed (via migration backfill) to have
@@ -14,7 +23,10 @@ import { PrismaService } from "../../prisma/prisma.service";
  */
 @Injectable()
 export class BranchesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly devices: DeviceService,
+  ) {}
 
   list(tenantId: string) {
     return this.prisma.branch.findMany({
@@ -104,5 +116,105 @@ export class BranchesService {
   async archive(tenantId: string, id: string) {
     // Soft delete — preserves device/order history that references the branch.
     return this.update(tenantId, id, { status: "archived" });
+  }
+
+  /**
+   * Branch hub overview: every branch (HQ/Merkez first) with its live device
+   * tallies (real online/total + pending pairings) and bridge count, in ONE
+   * call (no N+1). Powers the branch cards on the consolidated hub.
+   */
+  async overview(tenantId: string, access: BranchAccess) {
+    const all = await this.prisma.branch.findMany({
+      where: { tenantId },
+      orderBy: [{ isHeadquarters: "desc" }, { createdAt: "asc" }],
+    });
+    // Branch-restricted MANAGERs only see their assigned branches' inventory
+    // (ADMIN with an empty allow-list = tenant-wide wildcard). Mirrors the
+    // /v1/branches/visible filter so the hub never leaks unassigned-branch
+    // device/bridge inventory.
+    const branches = all.filter((b) =>
+      BranchGuard.canAccessBranchStatic(
+        access.role,
+        b.id,
+        access.primaryBranchId,
+        access.allowedBranchIds,
+      ),
+    );
+    const counts = await this.devices.countsByBranch(tenantId);
+    const bridgeRows = await this.prisma.localBridgeAgent.groupBy({
+      by: ["branchId"],
+      where: { tenantId, status: { not: "retired" } },
+      _count: { _all: true },
+    });
+    const bridgesByBranch: Record<string, number> = {};
+    for (const r of bridgeRows) bridgesByBranch[r.branchId] = r._count._all;
+    return branches.map((b) => ({
+      id: b.id,
+      name: b.name,
+      code: b.code,
+      timezone: b.timezone,
+      status: b.status,
+      isHeadquarters: b.isHeadquarters,
+      createdAt: b.createdAt,
+      devices: counts[b.id] ?? { total: 0, online: 0, pending: 0 },
+      bridges: bridgesByBranch[b.id] ?? 0,
+    }));
+  }
+
+  /**
+   * A branch's local-network topology ("şube içi ağ"): its bridges with the
+   * devices behind each, plus the cloud-direct devices (no bridge). Retired
+   * rows excluded. The acting tenant must own the branch (findOrThrow → 404).
+   */
+  async network(tenantId: string, branchId: string, access: BranchAccess) {
+    // A branch-restricted MANAGER must not read an unassigned branch's network
+    // inventory (serials/hostnames/agent versions). 404 (not 403) so we don't
+    // leak which branch ids exist. ADMIN empty allow-list = wildcard.
+    if (
+      !BranchGuard.canAccessBranchStatic(
+        access.role,
+        branchId,
+        access.primaryBranchId,
+        access.allowedBranchIds,
+      )
+    ) {
+      throw new NotFoundException("Branch not found");
+    }
+    await this.findOrThrow(tenantId, branchId);
+    const bridges = await this.prisma.localBridgeAgent.findMany({
+      where: { tenantId, branchId, status: { not: "retired" } },
+      select: {
+        id: true,
+        hostname: true,
+        productSku: true,
+        status: true,
+        agentVersion: true,
+        lastSeenAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    const devices = await this.prisma.device.findMany({
+      where: { tenantId, branchId, status: { not: "retired" } },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        bridgeId: true,
+        serial: true,
+        model: true,
+        lastSeenAt: true,
+      },
+      orderBy: [{ bridgeId: "asc" }, { kind: "asc" }],
+    });
+    const behind: Record<string, typeof devices> = {};
+    const cloudDirect: typeof devices = [];
+    for (const d of devices) {
+      if (d.bridgeId) (behind[d.bridgeId] ??= []).push(d);
+      else cloudDirect.push(d);
+    }
+    return {
+      bridges: bridges.map((br) => ({ ...br, devices: behind[br.id] ?? [] })),
+      cloudDirect,
+    };
   }
 }

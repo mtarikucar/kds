@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -13,6 +14,7 @@ import { Throttle } from "@nestjs/throttler";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { BranchGuard } from "../auth/guards/branch.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 import { Public } from "../auth/decorators/public.decorator";
@@ -71,8 +73,25 @@ export class DevicesController {
     // devices.branchId is NOT NULL, so a slot must always land in a concrete
     // branch. Resolve it from the request's branch scope (BranchGuard
     // guarantees req.scope.branchId on this branch-scoped route), with the
-    // optional body branchId as an explicit override.
+    // optional body branchId as an explicit override (the hub creates a slot
+    // in the branch being viewed, which may differ from X-Branch-Id).
     const branchId = dto.branchId ?? req.scope?.branchId;
+    // H14 parity: the body branchId override must NOT escape the caller's
+    // branch allow-list. Without this a branch-restricted MANAGER could mint a
+    // slot + valid pair code in a branch they're not assigned to. (ADMIN with
+    // an empty allow-list = tenant-wide wildcard.) createSlot still enforces
+    // tenant ownership of the branch.
+    if (
+      branchId &&
+      !BranchGuard.canAccessBranchStatic(
+        req.user.role,
+        branchId,
+        req.user.primaryBranchId ?? null,
+        req.user.allowedBranchIds ?? [],
+      )
+    ) {
+      throw new ForbiddenException("You cannot manage devices for this branch");
+    }
     return this.devices.createSlot(req.user.tenantId, { ...dto, branchId });
   }
 

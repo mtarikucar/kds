@@ -15,7 +15,10 @@ describe("DevicesController", () => {
   // deep-review H14: branch-scoped surface — the global BranchGuard sets
   // req.scope.branchId, which the controller forwards so device commands stay
   // within the caller's validated branch.
-  const userReq = { user: { tenantId: "t1" }, scope: { branchId: "branch-a" } };
+  const userReq = {
+    user: { tenantId: "t1", role: "ADMIN", primaryBranchId: null, allowedBranchIds: [] },
+    scope: { branchId: "branch-a" },
+  };
   const deviceReq = { device: { id: "dev-1" } };
 
   beforeEach(() => {
@@ -58,13 +61,32 @@ describe("DevicesController", () => {
     });
   });
 
-  it("create lets an explicit body branchId override the scope", () => {
+  it("create lets an explicit body branchId override the scope (ADMIN wildcard)", () => {
     const dto = { kind: "kds_screen", branchId: "branch-z" } as any;
     ctrl.create(userReq, dto);
     expect(devices.createSlot).toHaveBeenCalledWith("t1", {
       kind: "kds_screen",
       branchId: "branch-z",
     });
+  });
+
+  it("create REFUSES a body branchId outside a restricted MANAGER allow-list (H14)", () => {
+    const mgrReq = {
+      user: { tenantId: "t1", role: "MANAGER", primaryBranchId: "branch-a", allowedBranchIds: ["branch-a"] },
+      scope: { branchId: "branch-a" },
+    };
+    const dto = { kind: "kds_screen", branchId: "branch-z" } as any;
+    expect(() => ctrl.create(mgrReq, dto)).toThrow(/cannot manage devices/i);
+    expect(devices.createSlot).not.toHaveBeenCalled();
+  });
+
+  it("create allows a MANAGER to provision in an allowed branch", () => {
+    const mgrReq = {
+      user: { tenantId: "t1", role: "MANAGER", primaryBranchId: "branch-a", allowedBranchIds: ["branch-a", "branch-z"] },
+      scope: { branchId: "branch-a" },
+    };
+    ctrl.create(mgrReq, { kind: "kds_screen", branchId: "branch-z" } as any);
+    expect(devices.createSlot).toHaveBeenCalledWith("t1", { kind: "kds_screen", branchId: "branch-z" });
   });
 
   it("enqueueCommand threads tenantId, device id and dto", () => {
