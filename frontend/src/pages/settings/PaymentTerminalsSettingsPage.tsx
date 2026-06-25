@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { CreditCard, Plus, Trash2, ShieldCheck, FlaskConical, Power } from 'lucide-react';
+import { CreditCard, Plus, Trash2, ShieldCheck, FlaskConical, Power, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -13,6 +13,7 @@ import {
   useRegisterTerminal,
   useSetTerminalActivation,
   useRemoveTerminal,
+  useTerminalReconciliation,
   type TerminalActivationState,
   type TerminalRecord,
 } from '../../features/payment-terminal/paymentTerminalApi';
@@ -31,6 +32,7 @@ const PaymentTerminalsSettingsPage = () => {
   const register = useRegisterTerminal();
   const setActivation = useSetTerminalActivation();
   const remove = useRemoveTerminal();
+  const { data: reconciliation } = useTerminalReconciliation();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState({ providerId: '', serial: '', model: '', deviceId: '' });
@@ -184,6 +186,38 @@ const PaymentTerminalsSettingsPage = () => {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Reconciliation — charges that took money but couldn't be recorded.
+          Only shown when there's something to act on. */}
+      {reconciliation && reconciliation.length > 0 && (
+        <div className="mt-8">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-red-700">
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+            {t('paymentTerminals.reconciliation.title')}
+          </h3>
+          <p className="mt-1 mb-3 text-xs text-slate-500">
+            {t('paymentTerminals.reconciliation.description')}
+          </p>
+          <ul className="space-y-2">
+            {reconciliation.map((c) => (
+              <li
+                key={c.chargeId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50/60 p-3 text-sm"
+              >
+                <span className="font-medium text-slate-800">
+                  #{c.orderId.slice(0, 8)} · {c.amount}
+                </span>
+                <span className="flex items-center gap-2">
+                  <Badge variant={c.status === 'NEEDS_REVIEW' ? 'danger' : 'warning'} size="sm">
+                    {t(`paymentTerminals.reconciliation.status.${c.status}`, c.status)}
+                  </Badge>
+                  {c.approvalCode && <span className="text-xs text-slate-500">{c.approvalCode}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <Modal

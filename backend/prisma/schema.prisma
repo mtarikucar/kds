@@ -4857,8 +4857,13 @@ model PaymentTerminalCharge {
   // device-mesh command id for bridge-routed providers (null for simulator/PSP).
   deviceCommandId  String?
   amountCents      Int
-  // PENDING | APPROVED | DECLINED | TIMEOUT | ERROR | CANCELLED | RECORDED
+  // PENDING | APPROVED | DECLINED | TIMEOUT | ERROR | CANCELLED | RECORDED |
+  // NEEDS_REVIEW (APPROVED but un-recordable after the recovery cap — parked
+  // for operator reconciliation so the sweep stops retrying forever).
   status           String   @default("PENDING")
+  // How many times the recovery sweep has tried (and failed) to record an
+  // APPROVED charge. Capped → NEEDS_REVIEW so it can't loop indefinitely.
+  recoveryAttempts Int      @default(0)
   // Bank/provider approval reference — also written to Payment.transactionId.
   approvalCode     String?
   rrn              String?

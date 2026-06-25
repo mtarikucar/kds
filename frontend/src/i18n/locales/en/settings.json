@@ -38,6 +38,14 @@
     "removed": "Terminal removed",
     "cancel": "Cancel",
     "save": "Save",
+    "reconciliation": {
+      "title": "Needs reconciliation",
+      "description": "A card was charged but the payment couldn't be recorded. Reconcile these against the bank/terminal report.",
+      "status": {
+        "NEEDS_REVIEW": "Needs review",
+        "APPROVED": "Approved, unrecorded"
+      }
+    },
     "state": {
       "CONFIGURED_NOT_ACTIVE": "Configured (inactive)",
       "ACTIVE": "Active",

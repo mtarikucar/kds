@@ -65,6 +65,16 @@ export class PaymentTerminalController {
     return this.terminal.listTerminals(scope);
   }
 
+  @Get("payment-terminal/reconciliation")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Charges needing operator reconciliation (approved-unrecorded / needs-review)",
+  })
+  reconciliation(@CurrentScope() scope: BranchScope) {
+    return this.terminal.listReconciliation(scope);
+  }
+
   @Post("payment-terminal/terminals")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
@@ -135,5 +145,18 @@ export class PaymentTerminalController {
     @CurrentScope() scope: BranchScope,
   ) {
     return this.terminal.cancel(scope, chargeId);
+  }
+
+  @Post("orders/:orderId/terminal-charge/:chargeId/void")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Void a card charge (pre-settlement). A RECORDED charge must be reversed via the order refund flow.",
+  })
+  void(
+    @Param("chargeId") chargeId: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.terminal.voidCharge(scope, chargeId);
   }
 }

@@ -30,26 +30,38 @@ pub struct CommandOutcome {
     pub error: Option<String>,
 }
 
+/// Money/fiscal substrings that mark a command kind as side-effecting. Shared
+/// by `is_side_effecting` (mark_failed) AND `side_effecting_sql`
+/// (recover()/pop_next()) so the three classifiers can NEVER diverge — a
+/// `charge_card` parked by one but auto-retried by another is exactly the
+/// double-charge this guards.
+const MONEY_TOKENS: &[&str] = &["payment", "charge", "refund", "void", "reversal", "fiscal"];
+
+/// SQL predicate (on column `kind`) equivalent to `is_side_effecting`, built
+/// from MONEY_TOKENS so recover()/pop_next() stay in lockstep with mark_failed.
+fn side_effecting_sql() -> String {
+    MONEY_TOKENS
+        .iter()
+        .map(|tok| format!("kind LIKE '%{tok}%'"))
+        .collect::<Vec<_>>()
+        .join(" OR ")
+}
+
 /// deep-review NH1/NH4/NH5/NM1: a side-effecting command (card charge, fiscal
 /// receipt, refund) must NEVER be auto-re-executed without an idempotency
 /// guarantee — re-running it double-charges the customer or double-prints a
 /// legally-binding fiscal receipt. Until the driver/acquirer layer carries an
 /// idempotency key end-to-end, these kinds are parked in `needs_review` instead
-/// of being requeued. Matched broadly (current cloud kind strings are not yet
-/// finalised; the driver scaffolds are stubs) so a new spelling of "charge"
-/// can't silently slip back onto the auto-retry path.
+/// of being requeued.
+///
+/// Matched by SUBSTRING on money/fiscal tokens, not exact strings: the cloud
+/// enqueues concrete kinds like `charge_card`, `void_card`, `fiscal_cancel`,
+/// `fiscal_report` (payment-terminal P1–P4), which an exact-match list silently
+/// let slip back onto the auto-retry path. Erring toward over-matching is the
+/// safe direction — a false positive only parks a benign command for review;
+/// a false negative double-charges a customer.
 fn is_side_effecting(kind: &str) -> bool {
-    const SIDE_EFFECTING: &[&str] = &[
-        "payment",
-        "pos_charge",
-        "charge",
-        "refund",
-        "void",
-        "reversal",
-        "fiscal",
-        "fiscal_receipt",
-    ];
-    SIDE_EFFECTING.contains(&kind)
+    MONEY_TOKENS.iter().any(|tok| kind.contains(tok))
 }
 
 /// Lease TTL for inflight rows. A dispatch that has held a command longer than
@@ -126,14 +138,20 @@ impl CommandQueue {
     fn recover(&self) -> Result<()> {
         let conn = self.conn.lock().expect("queue mutex poisoned");
         let now = chrono_unix_now();
-        // Money/fiscal kinds: park, do NOT auto-requeue.
+        // Money/fiscal kinds: park, do NOT auto-requeue. Uses the shared
+        // side_effecting_sql() so the concrete cloud kinds (charge_card,
+        // void_card, fiscal_cancel, fiscal_report) — which the old hardcoded
+        // IN-list silently let slip onto the requeue path — are parked too.
         let parked = conn.execute(
-            "UPDATE commands
-                SET status = 'needs_review',
-                    error = COALESCE(error, 'recovered from inflight after restart — needs reconciliation'),
-                    updated_at = ?1
-              WHERE status = 'inflight'
-                AND kind IN ('payment','pos_charge','charge','refund','void','reversal','fiscal','fiscal_receipt')",
+            &format!(
+                "UPDATE commands
+                    SET status = 'needs_review',
+                        error = COALESCE(error, 'recovered from inflight after restart — needs reconciliation'),
+                        updated_at = ?1
+                  WHERE status = 'inflight'
+                    AND ({})",
+                side_effecting_sql()
+            ),
             params![now],
         )?;
         // Safe-to-retry kinds: requeue, honouring the 5-attempt cap.
@@ -186,7 +204,7 @@ impl CommandQueue {
         // Side-effecting (money/fiscal) kinds are deliberately EXCLUDED from
         // lease reclaim — re-popping them could double-charge; they stay inflight
         // and are surfaced/parked at next startup recovery or via reconciliation.
-        let mut stmt = conn.prepare(
+        let reclaim_sql = format!(
             "UPDATE commands
                 SET status = 'inflight',
                     attempts = attempts + 1,
@@ -195,11 +213,13 @@ impl CommandQueue {
                            WHERE status = 'queued'
                               OR (status = 'inflight'
                                   AND updated_at < ?2
-                                  AND kind NOT IN ('payment','pos_charge','charge','refund','void','reversal','fiscal','fiscal_receipt'))
+                                  AND NOT ({}))
                            ORDER BY priority DESC, created_at
                            LIMIT 1)
             RETURNING id, kind, payload, priority, attempts",
-        )?;
+            side_effecting_sql()
+        );
+        let mut stmt = conn.prepare(&reclaim_sql)?;
         let mut rows = stmt.query(params![now, lease_cutoff])?;
         if let Some(row) = rows.next()? {
             let payload_s: String = row.get(2)?;
@@ -407,7 +427,8 @@ mod tests {
         {
             let q = CommandQueue::open(&path).unwrap();
             q.push(&cmd("safe", "print_receipt")).await.unwrap();
-            q.push(&cmd("money", "payment")).await.unwrap();
+            // Concrete cloud card kind — the old hardcoded IN-list omitted it.
+            q.push(&cmd("money", "charge_card")).await.unwrap();
             // Claim both → both go 'inflight'.
             q.pop_next().await.unwrap().unwrap();
             q.pop_next().await.unwrap().unwrap();
@@ -439,6 +460,53 @@ mod tests {
         assert!(
             q.pop_next().await.unwrap().is_none(),
             "failed money command must not be re-popped"
+        );
+        assert_eq!(q.needs_review_count().await.unwrap(), 1);
+    }
+
+    /// The concrete payment-terminal / fiscal command kinds the cloud actually
+    /// enqueues MUST classify as side-effecting (parked, never auto-retried).
+    /// An exact-match list silently let `charge_card`/`void_card`/`fiscal_*`
+    /// slip onto the retry path — a double-charge waiting for live hardware.
+    #[test]
+    fn payment_and_fiscal_command_kinds_are_side_effecting() {
+        for kind in [
+            "charge_card",
+            "void_card",
+            "fiscal_receipt",
+            "fiscal_cancel",
+            "fiscal_report",
+            "pos_charge",
+            "refund",
+            "reversal",
+        ] {
+            assert!(is_side_effecting(kind), "{kind} must be side-effecting");
+        }
+        for kind in [
+            "print_receipt",
+            "show_order",
+            "open_drawer",
+            "noop",
+            "capability_probe",
+        ] {
+            assert!(!is_side_effecting(kind), "{kind} must be auto-retryable");
+        }
+    }
+
+    /// A failed `charge_card` (the real card-terminal kind) is parked, not
+    /// requeued — the end-to-end double-charge guard once hardware is live.
+    #[tokio::test]
+    async fn failed_charge_card_is_parked_not_requeued() {
+        let dir = TempDir::new().unwrap();
+        let q = CommandQueue::open(dir.path().join("q.db")).unwrap();
+        q.push(&cmd("cc1", "charge_card")).await.unwrap();
+        let c = q.pop_next().await.unwrap().unwrap();
+        q.mark_failed(&c.id, "ack lost after card captured")
+            .await
+            .unwrap();
+        assert!(
+            q.pop_next().await.unwrap().is_none(),
+            "failed charge_card must not be re-popped"
         );
         assert_eq!(q.needs_review_count().await.unwrap(), 1);
     }

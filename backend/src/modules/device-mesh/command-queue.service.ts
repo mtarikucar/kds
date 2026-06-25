@@ -61,6 +61,7 @@ export class CommandQueueService {
    */
   private static readonly NON_RETRYABLE_KINDS = new Set<string>([
     "charge_card",
+    "void_card",
     "fiscal_receipt",
     "fiscal_cancel",
     "fiscal_report",

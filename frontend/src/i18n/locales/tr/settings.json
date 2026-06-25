@@ -38,6 +38,14 @@
     "removed": "Terminal kaldırıldı",
     "cancel": "Vazgeç",
     "save": "Kaydet",
+    "reconciliation": {
+      "title": "Mutabakat gerekiyor",
+      "description": "Karttan çekim yapıldı ama ödeme kaydedilemedi. Bunları banka/terminal raporuyla karşılaştırın.",
+      "status": {
+        "NEEDS_REVIEW": "İnceleme gerekiyor",
+        "APPROVED": "Onaylandı, kaydedilmedi"
+      }
+    },
     "state": {
       "CONFIGURED_NOT_ACTIVE": "Yapılandırıldı (pasif)",
       "ACTIVE": "Etkin",

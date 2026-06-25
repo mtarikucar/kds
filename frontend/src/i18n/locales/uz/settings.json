@@ -38,6 +38,14 @@
     "removed": "Terminal olib tashlandi",
     "cancel": "Bekor qilish",
     "save": "Saqlash",
+    "reconciliation": {
+      "title": "Solishtirish kerak",
+      "description": "Kartadan pul yechildi, lekin to‘lov yozib bo‘lmadi. Bularni bank/terminal hisoboti bilan solishtiring.",
+      "status": {
+        "NEEDS_REVIEW": "Ko‘rib chiqish kerak",
+        "APPROVED": "Tasdiqlandi, yozilmadi"
+      }
+    },
     "state": {
       "CONFIGURED_NOT_ACTIVE": "Sozlangan (nofaol)",
       "ACTIVE": "Faol",
