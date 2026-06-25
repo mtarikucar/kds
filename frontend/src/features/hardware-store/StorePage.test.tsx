@@ -14,7 +14,7 @@ import { useCartStore } from './cartStore';
 // opening checkout mounts the address form.
 
 const products: { data: HardwareProduct[]; isLoading: boolean } = { data: [], isLoading: false };
-const quote = { mutateAsync: vi.fn(), isPending: false, data: undefined as any };
+const quote = { mutateAsync: vi.fn(), reset: vi.fn(), isPending: false, data: undefined as any };
 const intent = { mutateAsync: vi.fn(), isPending: false };
 
 vi.mock('./storeApi', async (importOriginal) => {
