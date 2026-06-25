@@ -196,6 +196,11 @@ export class PaymentTerminalService {
           "The simulator can never be ACTIVE — use SIMULATOR",
         );
       }
+      if (provider.activatable === false) {
+        throw new BadRequestException(
+          `Provider ${rec.providerId} is not available yet (its integration is not wired)`,
+        );
+      }
       if (provider.kind === "bridge" && !rec.deviceId) {
         throw new BadRequestException(
           "Pair a device before activating this terminal",

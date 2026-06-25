@@ -4,6 +4,7 @@ import { PaymentTerminalService } from "./payment-terminal.service";
 import { PaymentTerminalProviderRegistry } from "./payment-terminal-provider.registry";
 import { SimulatorTerminalProvider } from "./providers/simulator-terminal.provider";
 import { Gmp3CardTerminalProvider } from "./providers/gmp3-card-terminal.provider";
+import { SoftPosTerminalProvider } from "./providers/softpos-terminal.provider";
 import { mockPrismaClient, MockPrismaClient } from "../../common/test/prisma-mock.service";
 
 /**
@@ -20,6 +21,7 @@ describe("PaymentTerminalService (provisioning + activation gate)", () => {
     const registry = new PaymentTerminalProviderRegistry();
     registry.register(new SimulatorTerminalProvider());
     registry.register(new Gmp3CardTerminalProvider(registry));
+    registry.register(new SoftPosTerminalProvider(registry));
     svc = new PaymentTerminalService(
       prisma as any,
       { enqueue: jest.fn() } as any,
@@ -147,6 +149,13 @@ describe("PaymentTerminalService (provisioning + activation gate)", () => {
       found({ providerId: "simulator", deviceId: null });
       const view = await svc.setActivation(scope as any, "term-x", "SIMULATOR");
       expect(view.activationState).toBe("SIMULATOR");
+    });
+
+    it("refuses ACTIVE on a non-activatable provider (SoftPOS — integration not wired)", async () => {
+      found({ providerId: "softpos", deviceId: null });
+      await expect(svc.setActivation(scope as any, "term-x", "ACTIVE")).rejects.toThrow(
+        /not available yet/i,
+      );
     });
   });
 
