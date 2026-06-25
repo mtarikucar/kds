@@ -54,7 +54,7 @@ export default function SetupChecklist() {
       key: 'fiscal',
       label: t('hummytummy.setupChecklist.items.fiscal'),
       done: (ents?.integrations['integration.fiscal'] ?? []).length > 0,
-      link: { to: '/admin/marketplace?kind=integration', label: t('navigation.marketplace') },
+      link: { to: '/admin/store?tab=addons&kind=integration', label: t('navigation.marketplace') },
     },
   ].filter((i) => !i.skip);
 

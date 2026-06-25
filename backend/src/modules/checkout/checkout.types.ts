@@ -100,6 +100,25 @@ export interface PricedLine {
   meta?: PricedLineMeta;
 }
 
+// A line silently dropped from the quote (unpublished / not directly
+// purchasable / unknown). Structured (code + ref) instead of a baked English
+// string so the client can render a localized, name-bearing message — a raw
+// "Hardware not purchasable: SKU-123" is useless to a Turkish operator.
+export type QuoteWarningCode =
+  | "addon_not_purchasable"
+  | "hardware_not_purchasable"
+  | "hardware_not_directly_purchasable"
+  | "service_not_purchasable"
+  | "service_not_directly_purchasable"
+  | "unknown_service";
+
+export interface QuoteWarning {
+  code: QuoteWarningCode;
+  // The dropped item's identifier — a hardware SKU or an add-on/service code.
+  // The client resolves it to a product name where it can.
+  ref: string;
+}
+
 export interface CartQuote {
   lines: PricedLine[];
   currency: string;
@@ -107,7 +126,7 @@ export interface CartQuote {
   taxCents: number;
   shippingCents: number;
   totalCents: number;
-  warnings: string[]; // soft warnings — e.g. "addon X requires PRO plan"
+  warnings: QuoteWarning[]; // soft warnings for silently-dropped cart lines
   // True if the cart is purely recurring software (no hardware/service):
   // simplifies the success-page UX.
   isPureRecurring: boolean;

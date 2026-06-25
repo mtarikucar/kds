@@ -50,7 +50,7 @@ describe('HardwareOrdersListPage', () => {
     expect(screen.getByText('ordersList.empty')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'ordersList.goToStore' }),
-    ).toHaveAttribute('href', '/admin/store');
+    ).toHaveAttribute('href', '/admin/store?tab=hardware');
   });
 
   it('renders order rows with a short id and a detail link', () => {

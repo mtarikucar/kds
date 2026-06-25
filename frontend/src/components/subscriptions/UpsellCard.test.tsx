@@ -33,7 +33,7 @@ describe('UpsellCard', () => {
     // The code is URL-encoded into ?focus=
     expect(addOnLink).toHaveAttribute(
       'href',
-      '/admin/marketplace?focus=fiscal%20pro',
+      '/admin/store?tab=addons&focus=fiscal%20pro',
     );
   });
 

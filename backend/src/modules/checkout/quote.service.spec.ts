@@ -128,7 +128,9 @@ describe('QuoteService', () => {
       } as any);
       const q = await svc.quote({ items: [{ type: 'hardware', sku: 'yazarkasa-x', qty: 1 }] });
       expect(q.lines).toHaveLength(0);
-      expect(q.warnings).toContainEqual(expect.stringContaining('yazarkasa-x'));
+      expect(q.warnings).toContainEqual(
+        expect.objectContaining({ ref: 'yazarkasa-x' }),
+      );
       expect(q.subtotalCents).toBe(0);
     },
   );
@@ -157,7 +159,9 @@ describe('QuoteService', () => {
     } as any);
     const q = await svc.quote({ items: [{ type: 'service', code: 'install-yazarkasa-gib' }] });
     expect(q.lines).toHaveLength(0);
-    expect(q.warnings).toContainEqual(expect.stringContaining('install-yazarkasa-gib'));
+    expect(q.warnings).toContainEqual(
+      expect.objectContaining({ ref: 'install-yazarkasa-gib' }),
+    );
     expect(q.subtotalCents).toBe(0);
   });
 

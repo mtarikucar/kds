@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ImageOff, AlertTriangle } from 'lucide-react';
 import {
   useListProducts,
   useCategories,
@@ -10,6 +11,7 @@ import {
   SALE_MODE_DISCLAIMER_TR,
   type HardwareProduct,
   type CartQuote,
+  type QuoteWarning,
   type ShippingAddress,
 } from './storeApi';
 import { useCartStore, toCartItems } from './cartStore';
@@ -34,7 +36,15 @@ function ProductImage({ src, alt }: { src: string; alt: string }) {
   useEffect(() => {
     setBroken(false);
   }, [src]);
-  if (broken) return null;
+  // A missing/404 image used to render nothing (the card looked half-broken).
+  // Show a neutral placeholder so every card has a consistent visual.
+  if (broken) {
+    return (
+      <div className="flex aspect-[4/3] w-full items-center justify-center bg-slate-100 text-slate-300">
+        <ImageOff className="h-8 w-8" aria-hidden="true" />
+      </div>
+    );
+  }
   return (
     <img
       src={src}
@@ -89,7 +99,7 @@ function saleModeOf(p: HardwareProduct): NonNullable<HardwareProduct['saleMode']
   return p.saleMode ?? 'DIRECT_SALE';
 }
 
-export default function StorePage() {
+export default function StorePage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation('hardware');
   const [searchParams, setSearchParams] = useSearchParams();
   const [category, setCategory] = useState<string>('all');
@@ -191,7 +201,7 @@ export default function StorePage() {
         phone: (user as any).phone ?? '',
         address: `${address.line1}${address.line2 ? ', ' + address.line2 : ''}, ${address.city}`,
       },
-      returnUrl: `${window.location.origin}/admin/hardware-orders`,
+      returnUrl: `${window.location.origin}/admin/store?tab=orders`,
       // v2.8.99.3 — top-level branchId so the backend stamps it onto
       // HardwareOrder.branchId. Address still in cart.shippingAddress
       // as the snapshot; branchId is the reference.
@@ -212,6 +222,32 @@ export default function StorePage() {
   }
 
   const currentQuote = (quote.data as CartQuote | undefined) ?? null;
+
+  // A fetched quote (totals + dropped-item warnings) goes stale the moment the
+  // cart changes — react-query keeps mutation .data until reset(). Clear it on
+  // any cart edit so the user re-quotes instead of seeing prices/warnings for a
+  // cart they've since changed. cartItems is memoised on `lines`, so this fires
+  // exactly when the cart content changes (not on unrelated re-renders).
+  useEffect(() => {
+    quote.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems]);
+
+  // Render a dropped-line warning as a localized, name-bearing message. The
+  // backend returns a structured { code, ref }; resolve ref→product name where
+  // we have it (hardware SKUs are in the loaded catalogue) so the user sees the
+  // product, not an internal SKU. Falls back to the ref when no name is known
+  // (add-on / service / unknown codes).
+  function warningText(w: QuoteWarning): string {
+    const name = allProducts.find((p) => p.sku === w.ref)?.name ?? w.ref;
+    return t(`store.warnings.${w.code}`, {
+      name,
+      defaultValue: t('store.warnings.generic', {
+        name,
+        defaultValue: '{{name}} bu siparişe eklenemiyor.',
+      }),
+    });
+  }
 
   return (
     <div className="space-y-4 p-6">
@@ -235,7 +271,7 @@ export default function StorePage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <header className="flex items-center justify-between gap-4 flex-wrap">
-            <h1 className="text-2xl font-semibold">{t('store.title')}</h1>
+            {!embedded && <h1 className="text-2xl font-semibold">{t('store.title')}</h1>}
             <select
               className="rounded border px-2 py-1 text-sm"
               value={category}
@@ -358,6 +394,27 @@ export default function StorePage() {
                   <Row label={t('store.total')} cents={currentQuote.totalCents} currency={currentQuote.currency} bold />
                 </div>
               )}
+              {/* Surface items the quote silently dropped (unpublished /
+                  not directly purchasable) instead of letting them vanish.
+                  These items aren't removed from the cart — they just can't be
+                  part of THIS order — so the copy says so honestly. */}
+              {currentQuote && currentQuote.warnings.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" aria-hidden="true" />
+                  <div>
+                    <p className="font-medium">
+                      {t('store.warningsTitle', {
+                        defaultValue: 'Bu ürünler siparişe eklenemiyor',
+                      })}
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {currentQuote.warnings.map((w, i) => (
+                        <li key={`${w.code}-${w.ref}-${i}`}>{warningText(w)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
               <button
                 className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setCheckoutOpen(true)}
@@ -366,7 +423,7 @@ export default function StorePage() {
                 {intent.isPending ? t('store.redirecting') : t('store.checkout')}
               </button>
               <Link
-                to="/admin/hardware-orders"
+                to="/admin/store?tab=orders"
                 className="block w-full text-center text-xs text-blue-600 hover:underline"
               >
                 {t('store.pastOrders')}

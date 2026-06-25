@@ -126,6 +126,16 @@
       "consultation": "Consultation",
       "hours": "{{count}} hours",
       "details": "Details"
+    },
+    "warningsTitle": "لا يمكن إضافة هذه المنتجات إلى هذا الطلب",
+    "warnings": {
+      "generic": "لا يمكن إضافة {{name}} إلى هذا الطلب.",
+      "addon_not_purchasable": "{{name}} غير متاح للشراء حاليًا.",
+      "hardware_not_purchasable": "{{name}} غير متاح للشراء حاليًا.",
+      "hardware_not_directly_purchasable": "لا يمكن شراء {{name}} مباشرة من هنا (يلزم عرض سعر/موزع معتمد).",
+      "service_not_purchasable": "لا يمكن شراء {{name}} كخدمة.",
+      "service_not_directly_purchasable": "لا يمكن شراء {{name}} مباشرة من هنا (يلزم عرض سعر).",
+      "unknown_service": "تعذّر العثور على {{name}}."
     }
   },
   "shippingForm": {

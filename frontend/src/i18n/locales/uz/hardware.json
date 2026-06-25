@@ -126,6 +126,16 @@
       "consultation": "Consultation",
       "hours": "{{count}} hours",
       "details": "Details"
+    },
+    "warningsTitle": "Bu mahsulotlar ushbu buyurtmaga qo‘shilmaydi",
+    "warnings": {
+      "generic": "{{name}} ushbu buyurtmaga qo‘shib bo‘lmaydi.",
+      "addon_not_purchasable": "{{name}} hozircha sotib olish uchun mavjud emas.",
+      "hardware_not_purchasable": "{{name}} hozircha sotib olish uchun mavjud emas.",
+      "hardware_not_directly_purchasable": "{{name}} bu yerdan to‘g‘ridan-to‘g‘ri sotib olinmaydi (narx so‘rovi/rasmiy diler kerak).",
+      "service_not_purchasable": "{{name}} xizmat sifatida sotib olinmaydi.",
+      "service_not_directly_purchasable": "{{name}} bu yerdan to‘g‘ridan-to‘g‘ri sotib olinmaydi (narx so‘rovi kerak).",
+      "unknown_service": "{{name}} topilmadi."
     }
   },
   "shippingForm": {

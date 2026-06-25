@@ -86,7 +86,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
     });
 
     expect(q.lines).toHaveLength(0);
-    expect(q.warnings.some((w) => w.includes('Not purchasable as service'))).toBe(true);
+    expect(q.warnings.some((w) => w.code === 'service_not_purchasable')).toBe(true);
   });
 
   it('falls back to the legacy in-memory map when the catalog lookup throws (spec stability for old fixtures)', async () => {
@@ -107,7 +107,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       items: [{ type: 'service', code: 'totally-not-a-service' } as any],
     });
     expect(q.lines).toHaveLength(0);
-    expect(q.warnings.some((w) => w.includes('Unknown service'))).toBe(true);
+    expect(q.warnings.some((w) => w.code === 'unknown_service')).toBe(true);
   });
 
   it('refuses a draft/archived service row (status !== published)', async () => {

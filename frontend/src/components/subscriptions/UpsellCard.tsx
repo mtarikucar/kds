@@ -5,7 +5,7 @@ import { Lock, CreditCard, Store } from 'lucide-react';
 interface UpsellCardProps {
   /**
    * The marketplace add-on code that would unlock this feature.
-   * The CTA includes a deep link to /admin/marketplace?focus=<code>
+   * The CTA includes a deep link to /admin/store?tab=addons&focus=<code>
    * so the buyer lands directly on the right card.
    */
   addOnCode?: string;
@@ -29,7 +29,7 @@ interface UpsellCardProps {
  *
  * Two CTAs:
  *   - "Pakete Geç" → /admin/plan (the new top-level Plan & Erişim page)
- *   - "Eklentiyi Al" → /admin/marketplace?focus=<addOnCode>
+ *   - "Eklentiyi Al" → /admin/store?tab=addons&focus=<addOnCode>
  */
 export default function UpsellCard({
   addOnCode,
@@ -73,7 +73,7 @@ export default function UpsellCard({
               </Link>
               {addOnCode && (
                 <Link
-                  to={`/admin/marketplace?focus=${encodeURIComponent(addOnCode)}`}
+                  to={`/admin/store?tab=addons&focus=${encodeURIComponent(addOnCode)}`}
                   className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <Store className="h-4 w-4" />

@@ -126,6 +126,16 @@
       "consultation": "Consultation",
       "hours": "{{count}} hours",
       "details": "Details"
+    },
+    "warningsTitle": "These items can't be added to this order",
+    "warnings": {
+      "generic": "{{name}} can't be added to this order.",
+      "addon_not_purchasable": "{{name}} isn't available for purchase right now.",
+      "hardware_not_purchasable": "{{name}} isn't available for purchase right now.",
+      "hardware_not_directly_purchasable": "{{name}} can't be bought directly here (quote / authorized dealer required).",
+      "service_not_purchasable": "{{name}} can't be purchased as a service.",
+      "service_not_directly_purchasable": "{{name}} can't be bought directly here (quote required).",
+      "unknown_service": "{{name}} could not be found."
     }
   },
   "shippingForm": {

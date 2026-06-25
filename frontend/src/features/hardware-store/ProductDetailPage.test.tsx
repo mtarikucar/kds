@@ -116,7 +116,7 @@ describe('ProductDetailPage', () => {
     expect(lines[0]).toMatchObject({ type: 'hardware', acquisition: 'sell', qty: 1 });
     expect(lines[0].product.sku).toBe('KDS-15');
     expect(toastSuccess).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith('/admin/store');
+    expect(navigate).toHaveBeenCalledWith('/admin/store?tab=hardware');
   });
 
   it('carts with acquisition=rent after toggling to Rent (rental product)', () => {
@@ -180,6 +180,6 @@ describe('ProductDetailPage', () => {
     const lines = useCartStore.getState().lines;
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ type: 'service', branchId: 'br-1' });
-    expect(navigate).toHaveBeenCalledWith('/admin/store');
+    expect(navigate).toHaveBeenCalledWith('/admin/store?tab=hardware');
   });
 });

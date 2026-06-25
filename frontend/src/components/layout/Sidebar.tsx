@@ -27,8 +27,6 @@ import {
   PhoneIncoming,
   Download,
   FileWarning,
-  Store,
-  ShoppingBag,
   Truck,
   CreditCard,
   Building2,
@@ -234,32 +232,8 @@ const SECTIONS: NavSection[] = [
       },
     ],
   },
-  {
-    id: 'marketplace',
-    labelKey: 'navigation.sections.marketplace',
-    labelFallback: 'Pazaryeri',
-    items: [
-      {
-        to: '/admin/marketplace',
-        icon: Store,
-        labelKey: 'navigation.marketplace',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/store',
-        icon: ShoppingBag,
-        labelKey: 'navigation.store',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/hardware-orders',
-        icon: Truck,
-        labelKey: 'navigation.hardwareOrders',
-        labelFallback: 'Donanım Siparişlerim',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-    ],
-  },
+  // 'Pazaryeri' moved out of the sidebar → top-bar "Mağaza" icon (Header.tsx)
+  // → consolidated /admin/store hub (add-ons + hardware + orders tabs).
   {
     id: 'planAndAccess',
     labelKey: 'navigation.sections.planAndAccess',

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Store,
@@ -49,13 +50,15 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'default'> = {
  * Deep-link: UpsellCard links here with ?focus=<code>. We scroll that card
  * into view and flash a highlight ring so the buyer lands on the right add-on.
  */
-export default function MarketplacePage() {
+export default function MarketplacePage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation('common');
-  const focusCode = useMemo(() => {
-    if (typeof window === 'undefined') return undefined;
-    return new URLSearchParams(window.location.search).get('focus') ?? undefined;
-  }, []);
-  const [kind, setKind] = useState<string | undefined>(undefined);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusCode = searchParams.get('focus') ?? undefined;
+  // Pre-select the category from `?kind=` (e.g. the onboarding checklist deep-
+  // links `?tab=addons&kind=integration`) so the linked add-on group is shown.
+  const [kind, setKind] = useState<string | undefined>(
+    () => searchParams.get('kind') ?? undefined,
+  );
   const { data: catalog = [], isLoading: catalogLoading } = useListAddOns(kind);
   const { data: mine = [], isLoading: mineLoading } = useListMyAddOns();
   const purchase = usePurchaseAddOnViaCheckout();
@@ -82,12 +85,29 @@ export default function MarketplacePage() {
   useEffect(() => {
     if (!focusCode || catalogLoading) return;
     const el = cardRefs.current[focusCode];
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setHighlightCode(focusCode);
-    const tid = setTimeout(() => setHighlightCode(null), 2500);
+    // Only the focused card present in the CURRENT (kind-filtered) catalogue
+    // can be scrolled to + highlighted. If it isn't here we still fall through
+    // to clear `?focus=` below — otherwise the param sticks forever (a stale
+    // deep-link that re-fires the no-op on every reload / tab-switch).
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightCode(focusCode);
+    }
+    // Always clear `?focus=` once the catalogue has loaded so the hub URL stays
+    // clean (keeps tab + kind) regardless of whether the card was found.
+    const tid = setTimeout(() => {
+      setHighlightCode(null);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('focus');
+          return next;
+        },
+        { replace: true },
+      );
+    }, 2500);
     return () => clearTimeout(tid);
-  }, [focusCode, catalogLoading, catalogCodes]);
+  }, [focusCode, catalogLoading, catalogCodes, setSearchParams]);
 
   useEffect(() => {
     if (!purchase.isPending) setPurchasingCode(null);
@@ -125,21 +145,23 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
-          <Store className="h-6 w-6" />
+    <div className={embedded ? 'space-y-6' : 'mx-auto max-w-6xl space-y-6 p-4 sm:p-6'}>
+      {/* Header — suppressed when embedded in the Mağaza hub (it owns the title) */}
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+            <Store className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">
+              {t('hummytummy.marketplace.title')}
+            </h1>
+            <p className="text-sm text-slate-500">
+              {t('hummytummy.marketplace.subtitle')}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            {t('hummytummy.marketplace.title')}
-          </h1>
-          <p className="text-sm text-slate-500">
-            {t('hummytummy.marketplace.subtitle')}
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">

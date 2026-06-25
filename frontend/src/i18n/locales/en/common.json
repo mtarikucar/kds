@@ -398,6 +398,15 @@
       "noDevicesBehind": "No devices behind this bridge.",
       "noCloudDirect": "No cloud-direct devices.",
       "retireBridgeConfirm": "Retire this bridge?"
+    },
+    "storeHub": {
+      "title": "Store",
+      "subtitle": "Add-ons, hardware and your orders in one place.",
+      "tabs": {
+        "addons": "Add-ons",
+        "hardware": "Hardware",
+        "orders": "My orders"
+      }
     }
   },
   "header": {

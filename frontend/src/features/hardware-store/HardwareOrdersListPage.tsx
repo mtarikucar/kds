@@ -37,7 +37,7 @@ const STATUS_BADGE: Record<string, string> = {
   refunded: 'bg-rose-100 text-rose-700',
 };
 
-export default function HardwareOrdersListPage() {
+export default function HardwareOrdersListPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation('hardware');
   const [status, setStatus] = useState<string>('');
   const { data: orders = [], isLoading, error } = useListHardwareOrders(status || undefined);
@@ -48,12 +48,16 @@ export default function HardwareOrdersListPage() {
   return (
     <div className="space-y-4 p-6">
       <header className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('ordersList.title')}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {t('ordersList.subtitle')}
-          </p>
-        </div>
+        {embedded ? (
+          <div />
+        ) : (
+          <div>
+            <h1 className="text-2xl font-semibold">{t('ordersList.title')}</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {t('ordersList.subtitle')}
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-600">{t('ordersList.statusLabel')}</label>
           <select
@@ -68,7 +72,7 @@ export default function HardwareOrdersListPage() {
             ))}
           </select>
           <Link
-            to="/admin/store"
+            to="/admin/store?tab=hardware"
             className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
           >
             {t('ordersList.newOrder')}
@@ -86,7 +90,7 @@ export default function HardwareOrdersListPage() {
         <div className="rounded border border-dashed p-8 text-center">
           <p className="text-sm text-gray-600">{t('ordersList.empty')}</p>
           <Link
-            to="/admin/store"
+            to="/admin/store?tab=hardware"
             className="mt-3 inline-block rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             {t('ordersList.goToStore')}

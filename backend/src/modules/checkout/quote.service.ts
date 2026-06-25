@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
-import { Cart, CartQuote, PricedLine } from "./checkout.types";
+import { Cart, CartQuote, PricedLine, QuoteWarning } from "./checkout.types";
 
 /**
  * Pure-ish pricing engine. Given a Cart, returns line-by-line pricing plus a
@@ -46,7 +46,7 @@ export class QuoteService {
     }
 
     const lines: PricedLine[] = [];
-    const warnings: string[] = [];
+    const warnings: QuoteWarning[] = [];
     let currency = "TRY";
 
     for (const item of cart.items) {
@@ -67,7 +67,7 @@ export class QuoteService {
       } else if (item.type === "addon") {
         const addOn = await this.addons.findByCodeOrThrow(item.code);
         if (addOn.status !== "published") {
-          warnings.push(`Add-on not purchasable: ${addOn.code}`);
+          warnings.push({ code: "addon_not_purchasable", ref: addOn.code });
           continue;
         }
         currency = addOn.currency;
@@ -88,7 +88,7 @@ export class QuoteService {
       } else if (item.type === "hardware") {
         const product = await this.catalog.findBySkuOrThrow(item.sku);
         if (product.status !== "published") {
-          warnings.push(`Hardware not purchasable: ${product.sku}`);
+          warnings.push({ code: "hardware_not_purchasable", ref: product.sku });
           continue;
         }
         // Regulatory tier guard (TR law) — the authoritative gate. Only
@@ -106,7 +106,10 @@ export class QuoteService {
         // a partial backfill, or a future DB shape change could silently
         // re-open the gap. Treat absent as not-direct = NOT buyable.
         if (product.saleMode !== "DIRECT_SALE") {
-          warnings.push(`Hardware not directly purchasable: ${product.sku}`);
+          warnings.push({
+            code: "hardware_not_directly_purchasable",
+            ref: product.sku,
+          });
           continue;
         }
         currency = product.currency;
@@ -158,7 +161,7 @@ export class QuoteService {
             product.category !== "service" ||
             product.status !== "published"
           ) {
-            warnings.push(`Not purchasable as service: ${item.code}`);
+            warnings.push({ code: "service_not_purchasable", ref: item.code });
             continue;
           }
           // Regulatory tier guard (TR law) — same fail-closed gate as the
@@ -169,7 +172,10 @@ export class QuoteService {
           // bypassing the QUOTE_ONLY control. Legacy in-memory service codes
           // (catch block below) have no row and stay DIRECT_SALE.
           if (product.saleMode !== "DIRECT_SALE") {
-            warnings.push(`Service not directly purchasable: ${item.code}`);
+            warnings.push({
+              code: "service_not_directly_purchasable",
+              ref: item.code,
+            });
             continue;
           }
           resolved = {
@@ -199,7 +205,7 @@ export class QuoteService {
           }
         }
         if (!resolved) {
-          warnings.push(`Unknown service: ${item.code}`);
+          warnings.push({ code: "unknown_service", ref: item.code });
           continue;
         }
         currency = resolved.currency;

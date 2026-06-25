@@ -99,6 +99,22 @@ export interface PricedLine {
   meta?: Record<string, unknown>;
 }
 
+// A cart line the quote silently dropped (not published / not directly
+// purchasable / unknown). Structured so the UI can render a localized,
+// name-bearing message instead of a raw English "Hardware not purchasable: SKU".
+export type QuoteWarningCode =
+  | 'addon_not_purchasable'
+  | 'hardware_not_purchasable'
+  | 'hardware_not_directly_purchasable'
+  | 'service_not_purchasable'
+  | 'service_not_directly_purchasable'
+  | 'unknown_service';
+
+export interface QuoteWarning {
+  code: QuoteWarningCode;
+  ref: string; // dropped item's hardware SKU or add-on/service code
+}
+
 export interface CartQuote {
   lines: PricedLine[];
   currency: string;
@@ -106,7 +122,7 @@ export interface CartQuote {
   taxCents: number;
   shippingCents: number;
   totalCents: number;
-  warnings: string[];
+  warnings: QuoteWarning[];
   isPureRecurring: boolean;
 }
 

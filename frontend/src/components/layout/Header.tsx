@@ -1,4 +1,4 @@
-import { LogOut, User, Menu } from 'lucide-react';
+import { LogOut, User, Menu, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
@@ -44,6 +44,19 @@ const Header = ({ onMenuClick }: HeaderProps) => {
 
           {/* Language Switcher */}
           <LanguageSwitcher />
+
+          {/* Mağaza (store hub) — add-ons + hardware + orders. ADMIN/MANAGER
+              only; moved here from the sidebar so it's reachable anywhere. */}
+          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+            <Link
+              to="/admin/store"
+              aria-label={t('hummytummy.storeHub.title', { defaultValue: 'Mağaza' })}
+              title={t('hummytummy.storeHub.title', { defaultValue: 'Mağaza' })}
+              className="flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-lg transition-all duration-150"
+            >
+              <Store className="h-5 w-5" />
+            </Link>
+          )}
 
           {/* Notification Center */}
           <div data-tour="notifications">

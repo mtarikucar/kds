@@ -149,7 +149,7 @@ export default function BranchesPage() {
                 </p>
               </div>
             </div>
-            <Link to="/admin/marketplace?focus=extra_branch" className="sm:flex-shrink-0">
+            <Link to="/admin/store?tab=addons&focus=extra_branch" className="sm:flex-shrink-0">
               <Button variant="primary" size="sm" className="w-full sm:w-auto">
                 {t('hummytummy.branches.goToMarketplace', { defaultValue: 'Pazaryerine git' })}
                 <ArrowUpRight className="ml-1.5 h-4 w-4" />

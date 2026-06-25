@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -71,7 +71,7 @@ export default function ProductDetailPage() {
         <div className="rounded border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
           {t('productDetail.notFound')}
         </div>
-        <Link to="/admin/store" className="text-sm text-blue-600 hover:underline">
+        <Link to="/admin/store?tab=hardware" className="text-sm text-blue-600 hover:underline">
           {t('productDetail.backToStore')}
         </Link>
       </div>
@@ -80,7 +80,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <Link to="/admin/store" className="inline-block text-sm text-blue-600 hover:underline">
+      <Link to="/admin/store?tab=hardware" className="inline-block text-sm text-blue-600 hover:underline">
         {t('productDetail.backToStore')}
       </Link>
 
@@ -141,7 +141,7 @@ function HardwareDetail({
     if (isOos) return;
     addHardware(product, { qty: 1, acquisition });
     toast.success(t('productDetail.addedToCart', { name: product.name }));
-    navigate('/admin/store');
+    navigate("/admin/store?tab=hardware");
   }
 
   const showGib = Boolean(
@@ -395,7 +395,7 @@ function ServiceDetail({
       notes: notes.trim() || undefined,
     });
     toast.success(t('productDetail.addedToCart', { name: product.name }));
-    navigate('/admin/store');
+    navigate("/admin/store?tab=hardware");
   }
 
   const serviceTypeLabel =
