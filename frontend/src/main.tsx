@@ -12,10 +12,18 @@ import App from './App';
 import i18n from './i18n/config';
 import { initSentry } from './sentry.config';
 import { detectSubdomain } from './utils/subdomain';
+import { installChunkErrorReload } from './utils/lazyWithReload';
 import './index.css';
 
 // Initialize Sentry as early as possible
 initSentry();
+
+// Recover from stale code-split chunks after a deploy: if Vite's module-preload
+// helper fails to fetch a route chunk (old hash 404s because the deploy replaced
+// the bundle), hard-reload once onto the fresh index.html instead of throwing.
+// The lazyWithReload route wrappers handle the import() rejection path; this
+// catches the preload-helper path. See utils/lazyWithReload.ts.
+installChunkErrorReload();
 
 // React's <ErrorBoundary> only catches errors thrown during render. Promise
 // rejections and async listener exceptions slip past it entirely. Forward

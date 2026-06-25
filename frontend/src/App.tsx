@@ -1,5 +1,10 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+// Code-split routes use lazyWithReload (not React.lazy) so an open tab
+// recovers from a deploy that replaced the hashed chunk files: a stale-chunk
+// import 404 triggers a one-shot reload onto the fresh index.html instead of
+// a white screen. See utils/lazyWithReload.ts.
+import { lazyWithReload } from './utils/lazyWithReload';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
@@ -7,18 +12,18 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 
 // SuperAdmin Pages (lazy-loaded)
-const SuperAdminLoginPage = lazy(() => import('./pages/superadmin/SuperAdminLoginPage'));
-const SuperAdmin2FAPage = lazy(() => import('./pages/superadmin/SuperAdmin2FAPage'));
-const SuperAdminDashboardPage = lazy(() => import('./pages/superadmin/SuperAdminDashboardPage'));
-const TenantsPage = lazy(() => import('./pages/superadmin/TenantsPage'));
-const TenantDetailPage = lazy(() => import('./pages/superadmin/TenantDetailPage'));
-const AllUsersPage = lazy(() => import('./pages/superadmin/AllUsersPage'));
-const PlansPage = lazy(() => import('./pages/superadmin/PlansPage'));
-const SubscriptionsPage = lazy(() => import('./pages/superadmin/SubscriptionsPage'));
-const BankTransferPage = lazy(() => import('./pages/superadmin/BankTransferPage'));
-const AuditLogsPage = lazy(() => import('./pages/superadmin/AuditLogsPage'));
-const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminSettingsPage'));
-const MarketplaceAdminPage = lazy(() => import('./pages/superadmin/MarketplaceAdminPage'));
+const SuperAdminLoginPage = lazyWithReload(() => import('./pages/superadmin/SuperAdminLoginPage'));
+const SuperAdmin2FAPage = lazyWithReload(() => import('./pages/superadmin/SuperAdmin2FAPage'));
+const SuperAdminDashboardPage = lazyWithReload(() => import('./pages/superadmin/SuperAdminDashboardPage'));
+const TenantsPage = lazyWithReload(() => import('./pages/superadmin/TenantsPage'));
+const TenantDetailPage = lazyWithReload(() => import('./pages/superadmin/TenantDetailPage'));
+const AllUsersPage = lazyWithReload(() => import('./pages/superadmin/AllUsersPage'));
+const PlansPage = lazyWithReload(() => import('./pages/superadmin/PlansPage'));
+const SubscriptionsPage = lazyWithReload(() => import('./pages/superadmin/SubscriptionsPage'));
+const BankTransferPage = lazyWithReload(() => import('./pages/superadmin/BankTransferPage'));
+const AuditLogsPage = lazyWithReload(() => import('./pages/superadmin/AuditLogsPage'));
+const SuperAdminSettingsPage = lazyWithReload(() => import('./pages/superadmin/SuperAdminSettingsPage'));
+const MarketplaceAdminPage = lazyWithReload(() => import('./pages/superadmin/MarketplaceAdminPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
 // (The marketing panel moved to the separate kds-marketing project.)
@@ -28,63 +33,63 @@ import CustomersPage from './pages/customers/CustomersPage';
 import CustomerDetailPage from './pages/customers/CustomerDetailPage';
 
 // QR Menu Pages (lazy-loaded - customer-facing)
-const QRMenuPage = lazy(() => import('./pages/qr-menu/QRMenuPage'));
-const CartPage = lazy(() => import('./pages/qr-menu/CartPage'));
-const OrderTrackingPage = lazy(() => import('./pages/qr-menu/OrderTrackingPage'));
-const QrPaymentResultPage = lazy(() => import('./pages/qr-menu/QrPaymentResultPage'));
-const LoyaltyPage = lazy(() => import('./pages/qr-menu/LoyaltyPage'));
-const SubdomainQRMenuPage = lazy(() => import('./pages/qr-menu/SubdomainQRMenuPage'));
-const SubdomainCartPage = lazy(() => import('./pages/qr-menu/SubdomainCartPage'));
-const SubdomainOrdersPage = lazy(() => import('./pages/qr-menu/SubdomainOrdersPage'));
-const SubdomainLoyaltyPage = lazy(() => import('./pages/qr-menu/SubdomainLoyaltyPage'));
+const QRMenuPage = lazyWithReload(() => import('./pages/qr-menu/QRMenuPage'));
+const CartPage = lazyWithReload(() => import('./pages/qr-menu/CartPage'));
+const OrderTrackingPage = lazyWithReload(() => import('./pages/qr-menu/OrderTrackingPage'));
+const QrPaymentResultPage = lazyWithReload(() => import('./pages/qr-menu/QrPaymentResultPage'));
+const LoyaltyPage = lazyWithReload(() => import('./pages/qr-menu/LoyaltyPage'));
+const SubdomainQRMenuPage = lazyWithReload(() => import('./pages/qr-menu/SubdomainQRMenuPage'));
+const SubdomainCartPage = lazyWithReload(() => import('./pages/qr-menu/SubdomainCartPage'));
+const SubdomainOrdersPage = lazyWithReload(() => import('./pages/qr-menu/SubdomainOrdersPage'));
+const SubdomainLoyaltyPage = lazyWithReload(() => import('./pages/qr-menu/SubdomainLoyaltyPage'));
 
-const LandingPage = lazy(() => import('./pages/LandingPage'));
-const PublicReservationPage = lazy(() => import('./pages/reservations/PublicReservationPage'));
-const ReservationLookupPage = lazy(() => import('./pages/reservations/ReservationLookupPage'));
-const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
-const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+const LandingPage = lazyWithReload(() => import('./pages/LandingPage'));
+const PublicReservationPage = lazyWithReload(() => import('./pages/reservations/PublicReservationPage'));
+const ReservationLookupPage = lazyWithReload(() => import('./pages/reservations/ReservationLookupPage'));
+const TermsOfServicePage = lazyWithReload(() => import('./pages/legal/TermsOfServicePage'));
+const PrivacyPolicyPage = lazyWithReload(() => import('./pages/legal/PrivacyPolicyPage'));
 // Subscription checkout consent links to these three; without
 // matching routes the new-tab open lands on the Next.js landing
 // app, gets a locale prefix from next-intl, and 404s.
-const KvkkPage = lazy(() => import('./pages/legal/KvkkPage'));
-const DistanceSalesPage = lazy(() => import('./pages/legal/DistanceSalesPage'));
-const RefundPolicyPage = lazy(() => import('./pages/legal/RefundPolicyPage'));
+const KvkkPage = lazyWithReload(() => import('./pages/legal/KvkkPage'));
+const DistanceSalesPage = lazyWithReload(() => import('./pages/legal/DistanceSalesPage'));
+const RefundPolicyPage = lazyWithReload(() => import('./pages/legal/RefundPolicyPage'));
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/pos/POSPage';
 import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
 // Admin Pages (lazy-loaded)
-const MenuManagementPage = lazy(() => import('./pages/admin/MenuManagementPage'));
-const TableManagementPage = lazy(() => import('./pages/admin/TableManagementPage'));
-const FloorPlanEditorPage = lazy(() => import('./pages/admin/FloorPlanEditorPage'));
-const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
-const QRManagementPage = lazy(() => import('./pages/admin/QRManagementPage'));
-const ReportsPage = lazy(() => import('./pages/admin/ReportsPage'));
-const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage'));
-const ReservationsPage = lazy(() => import('./pages/admin/ReservationsPage'));
-const PersonnelManagementPage = lazy(() => import('./pages/admin/PersonnelManagementPage'));
-const StockManagementPage = lazy(() => import('./pages/admin/StockManagementPage'));
-const InvoicesPage = lazy(() => import('./pages/admin/invoices/InvoicesPage'));
-const DeliveryOrdersPage = lazy(() => import('./pages/admin/DeliveryOrdersPage'));
+const MenuManagementPage = lazyWithReload(() => import('./pages/admin/MenuManagementPage'));
+const TableManagementPage = lazyWithReload(() => import('./pages/admin/TableManagementPage'));
+const FloorPlanEditorPage = lazyWithReload(() => import('./pages/admin/FloorPlanEditorPage'));
+const UserManagementPage = lazyWithReload(() => import('./pages/admin/UserManagementPage'));
+const QRManagementPage = lazyWithReload(() => import('./pages/admin/QRManagementPage'));
+const ReportsPage = lazyWithReload(() => import('./pages/admin/ReportsPage'));
+const AnalyticsPage = lazyWithReload(() => import('./pages/admin/AnalyticsPage'));
+const ReservationsPage = lazyWithReload(() => import('./pages/admin/ReservationsPage'));
+const PersonnelManagementPage = lazyWithReload(() => import('./pages/admin/PersonnelManagementPage'));
+const StockManagementPage = lazyWithReload(() => import('./pages/admin/StockManagementPage'));
+const InvoicesPage = lazyWithReload(() => import('./pages/admin/invoices/InvoicesPage'));
+const DeliveryOrdersPage = lazyWithReload(() => import('./pages/admin/DeliveryOrdersPage'));
 
 // Onboarding (lazy-loaded)
-const WelcomePage = lazy(() => import('./pages/onboarding/WelcomePage'));
+const WelcomePage = lazyWithReload(() => import('./pages/onboarding/WelcomePage'));
 
 // Subscription & Settings Pages (lazy-loaded)
-const SubscriptionPlansPage = lazy(() => import('./pages/subscription/SubscriptionPlansPage'));
-const ChangePlanPage = lazy(() => import('./pages/subscription/ChangePlanPage'));
-const CheckoutPage = lazy(() => import('./pages/subscription/CheckoutPage'));
-const PaymentResultPage = lazy(() => import('./pages/subscription/PaymentResultPage'));
-const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
-const POSSettingsPage = lazy(() => import('./pages/settings/POSSettingsPage'));
-const QRMenuSettingsPage = lazy(() => import('./pages/settings/QRMenuSettingsPage'));
-const ReportsSettingsPage = lazy(() => import('./pages/settings/ReportsSettingsPage'));
-const BrandingSettingsPage = lazy(() => import('./pages/settings/BrandingSettingsPage'));
-const IntegrationsSettingsPage = lazy(() => import('./pages/settings/IntegrationsSettingsPage'));
-const DesktopAppSettingsPage = lazy(() => import('./pages/settings/DesktopAppSettingsPage'));
-const ReservationSettingsPage = lazy(() => import('./pages/settings/ReservationSettingsPage'));
-const DeliveryPlatformsSettingsPage = lazy(() => import('./pages/settings/DeliveryPlatformsSettingsPage'));
-const SmsSettingsPage = lazy(() => import('./pages/settings/SmsSettingsPage'));
-const AccountingSettingsPage = lazy(() => import('./pages/settings/AccountingSettingsPage'));
+const SubscriptionPlansPage = lazyWithReload(() => import('./pages/subscription/SubscriptionPlansPage'));
+const ChangePlanPage = lazyWithReload(() => import('./pages/subscription/ChangePlanPage'));
+const CheckoutPage = lazyWithReload(() => import('./pages/subscription/CheckoutPage'));
+const PaymentResultPage = lazyWithReload(() => import('./pages/subscription/PaymentResultPage'));
+const SettingsLayout = lazyWithReload(() => import('./pages/settings/SettingsLayout'));
+const POSSettingsPage = lazyWithReload(() => import('./pages/settings/POSSettingsPage'));
+const QRMenuSettingsPage = lazyWithReload(() => import('./pages/settings/QRMenuSettingsPage'));
+const ReportsSettingsPage = lazyWithReload(() => import('./pages/settings/ReportsSettingsPage'));
+const BrandingSettingsPage = lazyWithReload(() => import('./pages/settings/BrandingSettingsPage'));
+const IntegrationsSettingsPage = lazyWithReload(() => import('./pages/settings/IntegrationsSettingsPage'));
+const DesktopAppSettingsPage = lazyWithReload(() => import('./pages/settings/DesktopAppSettingsPage'));
+const ReservationSettingsPage = lazyWithReload(() => import('./pages/settings/ReservationSettingsPage'));
+const DeliveryPlatformsSettingsPage = lazyWithReload(() => import('./pages/settings/DeliveryPlatformsSettingsPage'));
+const SmsSettingsPage = lazyWithReload(() => import('./pages/settings/SmsSettingsPage'));
+const AccountingSettingsPage = lazyWithReload(() => import('./pages/settings/AccountingSettingsPage'));
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 // HummyTummy Phase 3–12 admin screens.
