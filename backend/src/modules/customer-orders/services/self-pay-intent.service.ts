@@ -258,6 +258,24 @@ export class SelfPayIntentService {
       session.tenantId,
     );
 
+    // Reject duplicate orderItemIds BEFORE pricing. Each iteration below
+    // derives `remaining` from the same alreadyPaid/reserved snapshot, so two
+    // entries for the same item both pass the remaining check and DOUBLE the
+    // PayTR charge. Worse, the settlement webhook calls payByItems whose
+    // resolveItemsById rejects duplicate orderItemIds — so PayTR would charge
+    // the customer and then book ZERO payments (intent → FAILED, manual
+    // refund). Apply payByItems' dedup semantics here so the intent never
+    // mints a token for a payload settlement will reject.
+    const seenItemIds = new Set<string>();
+    for (const entry of dto.items) {
+      if (seenItemIds.has(entry.orderItemId)) {
+        throw new BadRequestException(
+          `Duplicate orderItemId ${entry.orderItemId} — combine the units into a single entry`,
+        );
+      }
+      seenItemIds.add(entry.orderItemId);
+    }
+
     // Compute total + per-order groupings (server-derived; client can't override).
     let totalAmount = new Prisma.Decimal(0);
     const itemsByOrder = new Map<string, ItemsByOrderShape>();
