@@ -119,27 +119,33 @@ export class ReservationsService {
     const prefix = `R-${dateStr}`;
 
     const client = tx ?? this.prisma;
-    const lastReservation = await client.reservation.findFirst({
+    // Take the max numeric suffix among this (tenant, date) prefix. We must
+    // NOT rely on `orderBy: { reservationNumber: 'desc' }` + take-first: that
+    // sorts LEXICOGRAPHICALLY, so once a day exceeds 999 reservations
+    // "...-1000" sorts BELOW "...-999" and the scan returns 999 → next=1000
+    // again → P2002 collision every retry → bookings fail. Scan the day's
+    // numbers and reduce to the true numeric max instead (set is bounded by
+    // the day's reservation count). Width is padded to 4 for headroom; the
+    // numeric reduce stays correct regardless of stored width.
+    const sameDay = await client.reservation.findMany({
       where: {
         tenantId,
         reservationNumber: { startsWith: prefix },
       },
-      orderBy: { reservationNumber: "desc" },
+      select: { reservationNumber: true },
     });
 
-    let nextNum = 1;
-    if (lastReservation) {
-      const lastNum = parseInt(
-        lastReservation.reservationNumber.split("-").pop() || "0",
-        10,
-      );
-      // Defensive: parseInt returns NaN for empty/garbled strings;
-      // `NaN + 1 === NaN` would pad to the literal "NaN" and collide
-      // forever. Treat an unparseable tail as "start a new sequence".
-      nextNum = Number.isFinite(lastNum) ? lastNum + 1 : 1;
+    let maxNum = 0;
+    for (const r of sameDay) {
+      const n = parseInt(r.reservationNumber.split("-").pop() || "0", 10);
+      // Defensive: parseInt returns NaN for empty/garbled tails; ignore those
+      // rather than letting NaN poison the max.
+      if (Number.isFinite(n) && n > maxNum) {
+        maxNum = n;
+      }
     }
 
-    return `${prefix}-${String(nextNum).padStart(3, "0")}`;
+    return `${prefix}-${String(maxNum + 1).padStart(4, "0")}`;
   }
 
   async createPublicReservation(tenantId: string, dto: CreateReservationDto) {
@@ -360,11 +366,16 @@ export class ReservationsService {
               }
             }
 
-            // Check slot availability inside transaction
+            // Check slot availability inside transaction. Branch-scope the
+            // count to match getAvailableSlots, which counts per resolved
+            // branch — without branchId here the cap was enforced TENANT-wide
+            // at booking while shown PER-BRANCH in availability, so a slot
+            // could read "available" yet the booking reject as "fully booked".
             if (settings.maxReservationsPerSlot) {
               const existingCount = await tx.reservation.count({
                 where: {
                   tenantId,
+                  branchId: resolvedBranchId,
                   date: new Date(dto.date),
                   startTime: dto.startTime,
                   status: {
@@ -567,13 +578,27 @@ export class ReservationsService {
   }
 
   async getStats(scope: BranchScope, date?: string) {
-    const targetDate = date ? new Date(date) : new Date();
-    // Normalize to date only
-    const startOfDay = new Date(
-      targetDate.getFullYear(),
-      targetDate.getMonth(),
-      targetDate.getDate(),
-    );
+    // Anchor the day key at UTC midnight to match how reservations are
+    // STORED — createPublicReservation/update/findAll all write/read the
+    // @db.Date column via `new Date(dateStr)` = UTC midnight. The previous
+    // `new Date(targetDate.getFullYear(), getMonth(), getDate())` used
+    // process-LOCAL midnight, which on a server east of UTC (e.g.
+    // Europe/Istanbul, the primary market) serialized to the PREVIOUS UTC
+    // calendar date — so getStats(date) returned the day-BEFORE's counts and
+    // disagreed with the reservation list. (personnel H6/M7 @db.Date class.)
+    let ymd: string;
+    if (date) {
+      ymd = date.slice(0, 10);
+    } else {
+      // Default "today" from the server's local calendar day (prior
+      // behavior), then key it at UTC midnight like storage does.
+      const n = new Date();
+      ymd = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+    }
+    const startOfDay = new Date(`${ymd}T00:00:00.000Z`);
+    if (Number.isNaN(startOfDay.getTime())) {
+      throw new BadRequestException("Invalid date");
+    }
 
     const reservations = await this.prisma.reservation.findMany({
       where: { ...branchScope(scope), date: startOfDay },
@@ -656,9 +681,10 @@ export class ReservationsService {
     // Retry on the 40001/P2034 serialization failure a conflict raises.
     const MAX_RETRIES = 5;
     let lastErr: unknown;
+    let result: any;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        return await this.prisma.$transaction(
+        result = await this.prisma.$transaction(
           async (tx) => {
             if (needsOverlapCheck) {
               const existingTableReservations = await tx.reservation.findMany({
@@ -703,6 +729,7 @@ export class ReservationsService {
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
+        break;
       } catch (err) {
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -714,7 +741,19 @@ export class ReservationsService {
         throw err;
       }
     }
-    throw lastErr;
+    if (!result) throw lastErr;
+
+    // If the table was REASSIGNED, the OLD table may still carry this
+    // reservation's auto-hold (status=RESERVED, reservationHoldId=this id) set
+    // by the scheduler in the pre-window — the row now points at the NEW table,
+    // so the release cron (which frees the table the hold points to) never
+    // touches the old one and it is stranded RESERVED. Release the OLD table's
+    // hold here and refresh the floor map.
+    if (dto.tableId !== undefined && dto.tableId !== reservation.tableId) {
+      await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
+    }
+    return result;
   }
 
   async confirm(scope: BranchScope, id: string, userId: string) {
@@ -726,13 +765,29 @@ export class ReservationsService {
       );
     }
 
-    const updated = await this.prisma.reservation.update({
-      where: { id: reservation.id },
+    // Status-guarded claim: a concurrent reject/cancel that already moved the
+    // row out of PENDING makes this a no-op (count 0) → 409, instead of a
+    // read-then-write that would silently resurrect a rejected booking as
+    // CONFIRMED.
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        ...branchScope(scope),
+        status: ReservationStatus.PENDING,
+      },
       data: {
         status: ReservationStatus.CONFIRMED,
         confirmedAt: new Date(),
         confirmedById: userId,
       },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
+    }
+    const updated = await this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, ...branchScope(scope) },
       include: { table: true },
     });
 
@@ -778,6 +833,24 @@ export class ReservationsService {
       throw new BadRequestException("This reservation cannot be rejected");
     }
 
+    // Status-guarded claim first, so a concurrent confirm/seat/cancel can't be
+    // clobbered (count 0 → 409). Only the winner then frees the table.
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        ...branchScope(scope),
+        status: {
+          in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED],
+        },
+      },
+      data: { status: ReservationStatus.REJECTED, rejectionReason },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
+    }
+
     // If the scheduler already auto-held the table for this reservation
     // (CONFIRMED rejections within the 30-min window), release it now
     // so a walk-in can use the table immediately.
@@ -786,12 +859,8 @@ export class ReservationsService {
       this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
-    const updated = await this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data: {
-        status: ReservationStatus.REJECTED,
-        rejectionReason,
-      },
+    const updated = await this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, ...branchScope(scope) },
       include: { table: true },
     });
 
@@ -836,28 +905,45 @@ export class ReservationsService {
       );
     }
 
-    const updateData: any = {
-      status: ReservationStatus.SEATED,
-      seatedAt: new Date(),
-    };
+    // Status-guarded claim FIRST: only the caller that still sees CONFIRMED
+    // wins (count 1); a concurrent cancel/seat makes this a no-op → 409. We
+    // claim before touching the table so a loser never flips it to OCCUPIED.
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        ...branchScope(scope),
+        status: ReservationStatus.CONFIRMED,
+      },
+      data: { status: ReservationStatus.SEATED, seatedAt: new Date() },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
+    }
 
-    // Update table status if assigned: clear any auto-hold this row
-    // owned (scheduler may have set status=RESERVED + reservationHoldId
-    // in the 30-min pre-window) and flip to OCCUPIED in the same write.
-    // Compound WHERE — IDOR guard (B41-B45 pattern). Branch-scope on
-    // the table write so a manager can't cross-flip a sister-branch
-    // table even via a coercion of tableId.
+    // Occupy the assigned table — but only if it is AVAILABLE or held for THIS
+    // reservation. The OR/status guard prevents stealing a table actively held
+    // or occupied by a DIFFERENT reservation (the prior unconditional flip
+    // stomped a sister hold). Branch-scope is the B41-B45 IDOR guard.
     if (reservation.tableId) {
       await this.prisma.table.updateMany({
-        where: { id: reservation.tableId, ...branchScope(scope) },
+        where: {
+          id: reservation.tableId,
+          ...branchScope(scope),
+          status: { in: ["AVAILABLE", "RESERVED"] },
+          OR: [
+            { reservationHoldId: null },
+            { reservationHoldId: reservation.id },
+          ],
+        },
         data: { status: "OCCUPIED", reservationHoldId: null },
       });
       this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
-    return this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data: updateData,
+    return this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, ...branchScope(scope) },
       include: { table: true },
     });
   }
@@ -900,6 +986,25 @@ export class ReservationsService {
       );
     }
 
+    // Status-guarded claim first (count 0 → 409 on a concurrent transition),
+    // then free the table — only the winner touches it.
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        ...branchScope(scope),
+        status: ReservationStatus.SEATED,
+      },
+      data: {
+        status: ReservationStatus.COMPLETED,
+        completedAt: new Date(),
+      },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
+    }
+
     // Free up the table. SEATED reservations already had any hold
     // cleared in seat(), so the explicit hold revert in releaseHoldIfOwned
     // would be a no-op here — we just flip the status directly.
@@ -912,12 +1017,8 @@ export class ReservationsService {
       this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
-    return this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data: {
-        status: ReservationStatus.COMPLETED,
-        completedAt: new Date(),
-      },
+    return this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, ...branchScope(scope) },
       include: { table: true },
     });
   }
@@ -935,6 +1036,24 @@ export class ReservationsService {
       );
     }
 
+    // Status-guarded claim first so a concurrent seat/cancel can't be
+    // clobbered (count 0 → 409); only the winner then releases the hold.
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        ...branchScope(scope),
+        status: {
+          in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING],
+        },
+      },
+      data: { status: ReservationStatus.NO_SHOW },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
+    }
+
     // Release any auto-hold so the table is back to AVAILABLE for the
     // next sitting / walk-in. release-holds cron would catch this too
     // but doing it inline keeps the staff-visible state in sync with
@@ -944,9 +1063,8 @@ export class ReservationsService {
       this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
-    return this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data: { status: ReservationStatus.NO_SHOW },
+    return this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, ...branchScope(scope) },
       include: { table: true },
     });
   }
@@ -962,6 +1080,33 @@ export class ReservationsService {
       ].includes(reservation.status as ReservationStatus)
     ) {
       throw new BadRequestException("This reservation cannot be cancelled");
+    }
+
+    // Status-guarded claim first (count 0 → 409 if a concurrent
+    // seat/complete/no-show/cancel already moved the row), so the cancel can't
+    // clobber another transition and only the winner frees the table.
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        ...branchScope(scope),
+        status: {
+          in: [
+            ReservationStatus.PENDING,
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.SEATED,
+          ],
+        },
+      },
+      data: {
+        status: ReservationStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledBy,
+      },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
     }
 
     // Free up the table if currently SEATED (explicit AVAILABLE flip)
@@ -986,13 +1131,8 @@ export class ReservationsService {
       this.emitFloorRefresh(scope.tenantId, scope.branchId);
     }
 
-    const cancelled = await this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data: {
-        status: ReservationStatus.CANCELLED,
-        cancelledAt: new Date(),
-        cancelledBy,
-      },
+    const cancelled = await this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, ...branchScope(scope) },
       include: { table: true },
     });
 
@@ -1069,6 +1209,30 @@ export class ReservationsService {
       throw new BadRequestException("Cancellation deadline has passed");
     }
 
+    // Status-guarded claim first (count 0 → 409) so a customer cancel racing a
+    // staff confirm/seat/cancel can't clobber it; only the winner frees the
+    // table. Scoped by tenantId (anonymous path — ownership already proven by
+    // the phone + reservationNumber match above).
+    const claim = await this.prisma.reservation.updateMany({
+      where: {
+        id: reservation.id,
+        tenantId,
+        status: {
+          in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED],
+        },
+      },
+      data: {
+        status: ReservationStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledBy: "CUSTOMER",
+      },
+    });
+    if (claim.count === 0) {
+      throw new ConflictException(
+        "Reservation was already updated; please refresh",
+      );
+    }
+
     // Release the table-hold if the scheduler already auto-RESERVED
     // this row's assigned table — staff/customers shouldn't have to
     // wait for the next cron tick for the table to free up.
@@ -1077,13 +1241,8 @@ export class ReservationsService {
       this.emitFloorRefresh(tenantId, reservation.branchId);
     }
 
-    const updated = await this.prisma.reservation.update({
-      where: { id: reservation.id },
-      data: {
-        status: ReservationStatus.CANCELLED,
-        cancelledAt: new Date(),
-        cancelledBy: "CUSTOMER",
-      },
+    const updated = await this.prisma.reservation.findFirstOrThrow({
+      where: { id: reservation.id, tenantId },
       include: { table: true },
     });
 
@@ -1120,6 +1279,18 @@ export class ReservationsService {
 
   async remove(scope: BranchScope, id: string) {
     const reservation = await this.findOne(scope, id);
+
+    // Release any auto-RESERVED hold this reservation owns BEFORE deleting.
+    // The Table.reservationHoldId FK is onDelete:SetNull, which nulls the
+    // pointer but leaves Table.status=RESERVED — and then NEITHER cron can
+    // reclaim it (release-holds filters reservationHoldId NOT NULL; auto-hold
+    // filters status=AVAILABLE), so the table is stranded RESERVED forever.
+    // Mirror the sibling terminal transitions (reject/cancel/noShow), which
+    // all release the hold first.
+    await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+    if (reservation.tableId) {
+      this.emitFloorRefresh(scope.tenantId, scope.branchId);
+    }
 
     return this.prisma.reservation.delete({
       where: { id: reservation.id },

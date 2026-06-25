@@ -335,7 +335,8 @@ describe("ReservationsService.createPublicReservation — no-table party too big
     });
     // Run the create transaction callback against the mock client directly.
     (prisma as any).$transaction = jest.fn(async (cb: any) => cb(prisma));
-    (prisma.reservation.findFirst as any).mockResolvedValue(null); // number alloc
+    (prisma.reservation.findFirst as any).mockResolvedValue(null); // duplicate check
+    (prisma.reservation.findMany as any).mockResolvedValue([]); // number alloc scan
     (prisma.reservation.count as any).mockResolvedValue(0);
     const created = {
       id: "r-1",

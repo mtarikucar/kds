@@ -93,9 +93,18 @@ export class ReservationSchedulerService {
     // and whose startTime falls inside [now, now+offset]. SQL can't
     // compare the composed timestamp directly without a join+cast, so
     // we pull a small candidate set per day and filter in memory.
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Key the candidate-date window at UTC midnight to match how reservations
+    // are STORED: createPublicReservation writes new Date(dto.date) (UTC
+    // midnight) into the @db.Date column. Building `today` via
+    // new Date(y, m, d) (process-LOCAL midnight) serialized to the PREVIOUS
+    // UTC date on a server east of UTC (e.g. Europe/Istanbul), shifting the
+    // {today, tomorrow} `in` set off by one and dropping the real next-day
+    // reservations this window is meant to cover. Take the server-local
+    // calendar day, then anchor it at UTC midnight like storage does.
+    const ymd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const today = new Date(`${ymd}T00:00:00.000Z`);
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     const candidates = await this.prisma.reservation.findMany({
       where: {
