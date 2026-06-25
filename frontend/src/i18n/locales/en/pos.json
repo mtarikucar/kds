@@ -305,5 +305,18 @@
     "body": "There is no booking record to seat — but you can override the lock and start taking an order. The table will be flipped to Available first.",
     "proceedButton": "Open and take order anyway",
     "cancelButton": "Cancel"
+  },
+  "terminalCharge": {
+    "title": "Card Payment",
+    "waiting": "Waiting for card — ask the customer to tap or insert",
+    "recording": "Approved, recording the payment…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "retry": "Try again",
+    "declined": "Card declined",
+    "timeout": "Timed out — the terminal did not respond",
+    "error": "Payment error",
+    "cancelled": "Charge cancelled",
+    "recorded": "Payment received"
   }
 }

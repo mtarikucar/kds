@@ -305,5 +305,18 @@
     "body": "Oturtulacak bir rezervasyon kaydı yok — ama kilidi geçip yine de sipariş alabilirsin. Masa önce Müsait duruma alınacak.",
     "proceedButton": "Aç ve sipariş al",
     "cancelButton": "Vazgeç"
+  },
+  "terminalCharge": {
+    "title": "Kart ile Ödeme",
+    "waiting": "Kart bekleniyor — müşteriden kartı okutmasını isteyin",
+    "recording": "Onaylandı, ödeme kaydediliyor…",
+    "cancel": "İptal et",
+    "close": "Kapat",
+    "retry": "Tekrar dene",
+    "declined": "Kart reddedildi",
+    "timeout": "Zaman aşımı — terminal yanıt vermedi",
+    "error": "Ödeme hatası",
+    "cancelled": "Çekim iptal edildi",
+    "recorded": "Ödeme alındı"
   }
 }
