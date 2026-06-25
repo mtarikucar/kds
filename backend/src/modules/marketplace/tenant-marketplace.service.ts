@@ -11,6 +11,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { EventTypes } from "../outbox/event-types";
 import { AddOnCatalogService } from "./addon-catalog.service";
+import { EntitlementService } from "../entitlements/entitlement.service";
+import { EntitlementSet } from "../entitlements/entitlement.types";
 
 /**
  * Tenant-facing operations: purchase, cancel, list-mine.
@@ -37,7 +39,89 @@ export class TenantMarketplaceService {
     private readonly prisma: PrismaService,
     private readonly catalog: AddOnCatalogService,
     private readonly outbox: OutboxService,
+    private readonly entitlements: EntitlementService,
   ) {}
+
+  /**
+   * Tenant-aware marketplace catalogue: the published add-ons, each annotated
+   * with `includedInPlan` — true when the add-on's grants are ALREADY satisfied
+   * by the tenant's effective entitlements (plan + existing add-ons + overrides),
+   * so the storefront can show "included in your plan" instead of trying to sell
+   * a feature the tenant already has.
+   *
+   * Grants stay server-side (the public projection deliberately omits them, see
+   * AddOnCatalogService.listPublic); we only emit the boolean.
+   */
+  async listAvailable(tenantId: string, kind?: string) {
+    const [rows, ent] = await Promise.all([
+      this.prisma.marketplaceAddOn.findMany({
+        where: { status: "published", ...(kind ? { kind } : {}) },
+        orderBy: [{ kind: "asc" }, { name: "asc" }],
+      }),
+      this.entitlements.getForTenant(tenantId),
+    ]);
+    return rows.map((r) => ({
+      code: r.code,
+      name: r.name,
+      description: r.description,
+      kind: r.kind,
+      billing: r.billing,
+      priceCents: r.priceCents,
+      currency: r.currency,
+      deps: r.deps,
+      includedInPlan: TenantMarketplaceService.isIncludedInEntitlements(
+        r.grants as Record<string, unknown> | null,
+        ent,
+      ),
+    }));
+  }
+
+  /**
+   * True when EVERY grant an add-on provides is already covered by the tenant's
+   * entitlement set — i.e. buying it would add nothing.
+   *
+   * Rules (keys are the same prefixed namespace on both sides, e.g.
+   * "feature.reservationSystem", "limit.kdsScreens", "integration.delivery"):
+   *  - A `limit.*` grant is ADDITIVE capacity (an extra branch/screen/tablet) —
+   *    you can always buy more, so an add-on carrying ANY limit grant is never
+   *    "included" (stays purchasable). This also covers mixed grants like
+   *    extra_branch ({ "limit.branches": 1, "feature.multiLocation": true }).
+   *  - A `feature.X: true` grant is covered iff features[X] is already true.
+   *  - An `integration.domain: [vendors]` grant is covered iff every vendor is
+   *    already present in integrations[domain].
+   *  - An add-on with NO grants (e.g. a one-time on-site service) is never
+   *    "included" — there's nothing for the plan to cover.
+   */
+  static isIncludedInEntitlements(
+    grants: Record<string, unknown> | null | undefined,
+    ent: EntitlementSet,
+  ): boolean {
+    const entries = Object.entries(grants ?? {});
+    if (entries.length === 0) return false;
+    for (const [key, value] of entries) {
+      if (key.startsWith("limit.")) {
+        // Additive capacity — never redundant.
+        return false;
+      }
+      if (key.startsWith("feature.")) {
+        // Only a granted (true) feature needs covering; a false grant is a
+        // no-op and doesn't block inclusion.
+        if (value === true && ent.features?.[key] !== true) return false;
+      } else if (key.startsWith("integration.")) {
+        const have = ent.integrations?.[key] ?? [];
+        // "*" is the engine's "all vendors permitted" wildcard (see
+        // entitlement-engine allowsIntegration) — if the tenant has it, every
+        // vendor this add-on grants is already covered.
+        if (have.includes("*")) continue;
+        const want = Array.isArray(value) ? (value as string[]) : [];
+        if (!want.every((v) => have.includes(v))) return false;
+      } else {
+        // Unknown grant namespace — can't prove coverage, treat as purchasable.
+        return false;
+      }
+    }
+    return true;
+  }
 
   async purchase(
     tenantId: string,

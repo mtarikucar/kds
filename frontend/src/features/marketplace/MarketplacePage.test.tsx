@@ -70,6 +70,29 @@ describe('MarketplacePage catalogue rendering', () => {
     expect(within(freeCard).queryByText('hummytummy.marketplace.requires')).not.toBeInTheDocument();
   });
 
+  it('marks a plan-included add-on as included and hides its purchase button', () => {
+    catalog = [
+      addon({ code: 'reservation', name: 'Reservation system', includedInPlan: true }),
+      addon({ code: 'buyable', name: 'Buyable Thing', includedInPlan: false }),
+    ];
+    render(<MemoryRouter><MarketplacePage /></MemoryRouter>);
+
+    const includedCard = screen.getByText('Reservation system').closest('article') as HTMLElement;
+    // Shows the "included in your plan" marker and offers NO purchase button.
+    expect(
+      within(includedCard).getAllByText('hummytummy.marketplace.includedInPlan').length,
+    ).toBeGreaterThan(0);
+    expect(
+      within(includedCard).queryByText('hummytummy.marketplace.purchase'),
+    ).not.toBeInTheDocument();
+
+    // A normal add-on still shows the purchase button.
+    const buyCard = screen.getByText('Buyable Thing').closest('article') as HTMLElement;
+    expect(
+      within(buyCard).getByText('hummytummy.marketplace.purchase'),
+    ).toBeInTheDocument();
+  });
+
   it('formats price in the add-on currency and appends "/ mo" only for recurring billing', () => {
     catalog = [
       addon({ code: 'once', name: 'One Time', priceCents: 9900, currency: 'TRY', billing: 'oneTime' }),

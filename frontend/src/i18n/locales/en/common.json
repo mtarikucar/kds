@@ -171,7 +171,14 @@
         "status": "Status",
         "periodEnds": "Period ends"
       },
-      "cancelAtPeriodEnd": "cancels at period end"
+      "cancelAtPeriodEnd": "cancels at period end",
+      "includedInPlan": "Included in your plan",
+      "owned": "Owned",
+      "active": "Active",
+      "purchasing": "Purchasing…",
+      "catalogEmpty": "No add-ons in this category yet.",
+      "purchaseConfirm": "This add-on is {{price}}{{suffix}}. You will be redirected to the secure payment page to complete checkout. Continue?",
+      "cancelConfirm": "Are you sure you want to cancel the \"{{name}}\" add-on?"
     },
     "store": {
       "title": "Hardware Store",

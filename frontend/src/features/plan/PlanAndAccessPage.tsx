@@ -49,7 +49,13 @@ export default function PlanAndAccessPage() {
     [myAddOns],
   );
   const suggested = useMemo(
-    () => catalog.filter((c) => !ownedCodes.has(c.code)).slice(0, 6),
+    // Don't suggest add-ons the tenant already owns OR whose feature their plan
+    // already grants (includedInPlan, from /addons/available) — suggesting a
+    // feature they already have is the same "selling what you own" bug.
+    () =>
+      catalog
+        .filter((c) => !ownedCodes.has(c.code) && !c.includedInPlan)
+        .slice(0, 6),
     [catalog, ownedCodes],
   );
 

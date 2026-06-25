@@ -25,7 +25,7 @@ describe('TenantMarketplaceService.cancel', () => {
     prisma = mockPrismaClient();
     catalog = { findByCodeOrThrow: jest.fn() } as any;
     outbox = { append: jest.fn().mockResolvedValue('ok') };
-    svc = new TenantMarketplaceService(prisma as any, catalog, outbox as any);
+    svc = new TenantMarketplaceService(prisma as any, catalog, outbox as any, { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {} }) } as any);
     (prisma.$transaction as any).mockImplementation(async (fn: any) =>
       fn(prisma),
     );
@@ -159,6 +159,7 @@ describe('TenantMarketplaceService.listMine', () => {
       prisma as any,
       { findByCodeOrThrow: jest.fn() } as any,
       { append: jest.fn() } as any,
+      { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {} }) } as any,
     );
   });
 

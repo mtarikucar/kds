@@ -15,6 +15,11 @@ export interface MarketplaceAddOn {
   priceCents: number;
   currency: string;
   deps: string[];
+  // True when the authenticated tenant's plan already grants everything this
+  // add-on would. Only present on the tenant-aware /addons/available endpoint
+  // (the public /addons catalogue omits it). Drives the "Planınıza dahil"
+  // treatment so we never try to sell a feature the tenant already has.
+  includedInPlan?: boolean;
 }
 
 export interface TenantAddOn {
@@ -39,7 +44,12 @@ export const useListAddOns = (kind?: string) =>
   useQuery({
     queryKey: marketplaceKeys.catalog(kind),
     queryFn: async (): Promise<MarketplaceAddOn[]> => {
-      const r = await api.get('/v1/marketplace/addons', { params: kind ? { kind } : {} });
+      // Tenant-aware catalogue: each row carries includedInPlan so the UI can
+      // mark add-ons the plan already grants instead of offering to sell them.
+      // (The public /addons endpoint is for the un-authenticated landing site.)
+      const r = await api.get('/v1/marketplace/addons/available', {
+        params: kind ? { kind } : {},
+      });
       return r.data;
     },
   });

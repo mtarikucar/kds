@@ -118,6 +118,12 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
     // add-on is granted by the webhook only after the payment settles — no
     // more free comps from the storefront button.
     const addon = catalog.find((a: MarketplaceAddOn) => a.code === code);
+    // Defence in depth: never start a checkout for something the tenant already
+    // has — whether it's included in their plan OR already purchased. `owned`
+    // comes from a separate query (/addons/mine) that may still be loading when
+    // the catalogue renders, so this guard backs up the hidden/disabled button
+    // and prevents a double-charge in that window.
+    if (addon?.includedInPlan || ownedCodes.has(code)) return;
     const price = addon
       ? (addon.priceCents / 100).toLocaleString('tr-TR', {
           style: 'currency',
@@ -217,6 +223,9 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
             const isBusy = purchase.isPending && purchasingCode === a.code;
             const isHighlighted = highlightCode === a.code;
             const owned = ownedCodes.has(a.code);
+            // Already provided by the tenant's plan (server-computed). Shown as
+            // "included", never sold — purchased add-ons (owned) take priority.
+            const includedInPlan = !owned && !!a.includedInPlan;
             const KindIcon = KIND_ICON[a.kind] ?? Package;
             return (
               <article
@@ -242,6 +251,13 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
                     <Badge variant="success" size="sm">
                       <CheckCircle2 className="mr-1 h-3 w-3" />
                       {t('hummytummy.marketplace.owned', { defaultValue: 'Sahip' })}
+                    </Badge>
+                  ) : includedInPlan ? (
+                    <Badge variant="success" size="sm">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      {t('hummytummy.marketplace.includedInPlan', {
+                        defaultValue: 'Planınıza dahil',
+                      })}
                     </Badge>
                   ) : (
                     <Badge variant="default" size="sm">
@@ -278,16 +294,29 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
                       <CheckCircle2 className="h-4 w-4" />
                       {t('hummytummy.marketplace.active', { defaultValue: 'Etkin' })}
                     </span>
+                  ) : includedInPlan ? (
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      {t('hummytummy.marketplace.includedInPlan', {
+                        defaultValue: 'Planınıza dahil',
+                      })}
+                    </span>
                   ) : (
                     <Button
                       variant="primary"
                       size="sm"
-                      disabled={purchase.isPending}
+                      // Disable until ownership is known (the /addons/mine query
+                      // may still be loading), so an already-owned add-on can't
+                      // be re-bought in the catalogue-rendered-but-mine-pending
+                      // window.
+                      disabled={purchase.isPending || mineLoading}
                       onClick={() => handlePurchase(a.code)}
                     >
                       <ShoppingCart className="mr-1.5 h-4 w-4" />
                       {isBusy
-                        ? t('hummytummy.marketplace.purchasing')
+                        ? t('hummytummy.marketplace.purchasing', {
+                            defaultValue: 'Satın alınıyor…',
+                          })
                         : t('hummytummy.marketplace.purchase')}
                     </Button>
                   )}
