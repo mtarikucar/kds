@@ -15,6 +15,8 @@
     "title": "Card Terminals",
     "description": "Connect a card terminal so \"Pay → Card\" charges the card on the device.",
     "gateNote": "Real terminals stay inactive until certified hardware is connected and you activate it here — no card is charged before then. Use the simulator to test the whole flow.",
+    "sectionTitle": "Registered terminals",
+    "sectionDescription": "Terminals available to this branch for card payments.",
     "register": "Add terminal",
     "registerTitle": "Add a card terminal",
     "empty": "No card terminals yet. Add one to charge cards on a device.",
