@@ -15,6 +15,8 @@
     "title": "Karta terminallari",
     "description": "Karta terminalini ulang, shunda \"To‘lov → Karta\" bosilganda karta qurilmada o‘qiladi.",
     "gateNote": "Haqiqiy terminallar sertifikatlangan qurilma ulanib, bu yerda faollashtirilmaguncha nofaol turadi — shu vaqtgacha hech qaysi kartadan pul yechilmaydi. Jarayonni boshidan-oxirigacha sinash uchun simulyatordan foydalaning.",
+    "sectionTitle": "Ro‘yxatdan o‘tgan terminallar",
+    "sectionDescription": "Bu filialda karta to‘lovlari uchun mavjud terminallar.",
     "register": "Terminal qo‘shish",
     "registerTitle": "Karta terminali qo‘shish",
     "empty": "Hozircha karta terminallari yo‘q. Qurilmada karta qabul qilish uchun bittasini qo‘shing.",
