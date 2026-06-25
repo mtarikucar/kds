@@ -6,6 +6,7 @@ import { PaymentTerminalProviderRegistry } from "./payment-terminal-provider.reg
 import { PaymentTerminalService } from "./payment-terminal.service";
 import { PaymentTerminalController } from "./payment-terminal.controller";
 import { SimulatorTerminalProvider } from "./providers/simulator-terminal.provider";
+import { Gmp3CardTerminalProvider } from "./providers/gmp3-card-terminal.provider";
 
 @Module({
   imports: [PrismaModule, DeviceMeshModule, OrdersModule],
@@ -14,8 +15,10 @@ import { SimulatorTerminalProvider } from "./providers/simulator-terminal.provid
     PaymentTerminalProviderRegistry,
     PaymentTerminalService,
     SimulatorTerminalProvider,
-    // P2/P3 register Gmp3CardTerminalProvider / BankEcrTerminalProvider /
-    // SoftPosTerminalProvider here.
+    // Self-registers via OnModuleInit (bridge, fiscal_coupled). Inert until a
+    // terminal record using it is activated (CONFIGURED_NOT_ACTIVE by default).
+    Gmp3CardTerminalProvider,
+    // P3 adds BankEcrTerminalProvider / SoftPosTerminalProvider here.
   ],
   exports: [PaymentTerminalService, PaymentTerminalProviderRegistry],
 })

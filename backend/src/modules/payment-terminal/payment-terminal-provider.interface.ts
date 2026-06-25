@@ -9,6 +9,29 @@ export type TerminalCapability =
   | "fiscal_coupled" // charges AND prints the mali fiş in one device op (GMP-3)
   | "query_last"; // can re-query the last transaction for reconciliation
 
+/** One mali-fiş line, identical in shape to the standalone yazarkasa rail. */
+export interface TerminalFiscalLine {
+  productCode: string;
+  name: string;
+  qty: number;
+  unitPriceCents: number;
+  vatRate: number;
+  discountCents: number;
+}
+
+/**
+ * Fiş context for fiscal_coupled providers (GMP-3): the device charges the card
+ * AND prints the mali fiş in one op, so the lines/KDV/tender ride along with the
+ * sale. Built by the service from the order (same builder as the standalone
+ * yazarkasa rail). Absent for charge-only providers.
+ */
+export interface TerminalFiscalContext {
+  kind: "cash_receipt" | "einvoice" | "earsiv";
+  lines: TerminalFiscalLine[];
+  payments: { method: "cash" | "card"; amountCents: number }[];
+  customer?: { taxId?: string; name?: string; addr?: string } | null;
+}
+
 export interface TerminalChargeRequest {
   tenantId: string;
   branchId?: string | null;
@@ -24,6 +47,8 @@ export interface TerminalChargeRequest {
   };
   /** Deterministic per attempt — also the device-command idempotency key. */
   idempotencyKey: string;
+  /** Set by the service only for fiscal_coupled providers. */
+  fiscalContext?: TerminalFiscalContext | null;
 }
 
 export interface TerminalChargeResult {

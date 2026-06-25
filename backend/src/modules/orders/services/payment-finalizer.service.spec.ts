@@ -683,6 +683,64 @@ describe('PaymentFinalizer', () => {
       expect(fiscal.issueReceipt).not.toHaveBeenCalled();
     });
 
+    it('COUPLED-FIŞ GUARD: skips issuance when a fiscal-coupled terminal already printed the fiş', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'dev-okc-1',
+        branchId: 'br-1',
+        providerId: 'hugin',
+        status: 'online',
+      });
+      // A GMP-3 card terminal recorded a fiscalNo for this order → the device
+      // printed the mali fiş atomically. A second standalone fiş would
+      // double-fiscalize, so issuance must be skipped.
+      (prisma.paymentTerminalCharge.findFirst as jest.Mock).mockResolvedValue({
+        id: 'chg-coupled-1',
+      });
+
+      await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
+
+      expect(prisma.paymentTerminalCharge.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { orderId: ORDER_ID, tenantId: TENANT_ID, fiscalNo: { not: null } },
+        }),
+      );
+      expect(prisma.order.findFirst).not.toHaveBeenCalled();
+      expect(fiscal.issueReceipt).not.toHaveBeenCalled();
+    });
+
+    it('COUPLED-FIŞ GUARD: proceeds to issue when NO coupled charge printed a fiş', async () => {
+      const f = makeFinalizerWithFiscal();
+      (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'dev-okc-1',
+        branchId: 'br-1',
+        providerId: 'hugin',
+        status: 'online',
+      });
+      (prisma.paymentTerminalCharge.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        id: ORDER_ID,
+        branchId: 'br-order',
+        status: 'PAID',
+        discount: new Prisma.Decimal('0'),
+        orderItems: [
+          {
+            productId: 'p1',
+            quantity: 1,
+            unitPrice: new Prisma.Decimal('10.00'),
+            modifierTotal: new Prisma.Decimal('0'),
+            taxRate: 10,
+            product: { name: 'Tea' },
+          },
+        ],
+        payments: [],
+      });
+
+      await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
+
+      expect(fiscal.issueReceipt).toHaveBeenCalledTimes(1);
+    });
+
     it('issues a yazarkasa receipt with a deterministic per-order idempotency key and lines built from the paid order', async () => {
       const f = makeFinalizerWithFiscal();
       (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({

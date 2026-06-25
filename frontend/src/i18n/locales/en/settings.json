@@ -8,7 +8,42 @@
     "sms": "SMS Notifications",
     "onlineOrders": "Online Orders",
     "accounting": "Accounting",
-    "partnerKeys": "Partner API Keys"
+    "partnerKeys": "Partner API Keys",
+    "paymentTerminals": "Card Terminals"
+  },
+  "paymentTerminals": {
+    "title": "Card Terminals",
+    "description": "Connect a card terminal so \"Pay → Card\" charges the card on the device.",
+    "gateNote": "Real terminals stay inactive until certified hardware is connected and you activate it here — no card is charged before then. Use the simulator to test the whole flow.",
+    "register": "Add terminal",
+    "registerTitle": "Add a card terminal",
+    "empty": "No card terminals yet. Add one to charge cards on a device.",
+    "provider": "Provider",
+    "choose": "Choose a provider…",
+    "serial": "Serial",
+    "model": "Model",
+    "device": "Paired device",
+    "deviceHint": "Device ID of the paired terminal (required for this provider)",
+    "fiscalCoupled": "Prints fiş",
+    "providerMissing": "Provider not installed",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "enableSimulator": "Enable simulator",
+    "remove": "Remove",
+    "removeConfirm": "Remove this terminal? It will stop being used for card payments.",
+    "registered": "Terminal added",
+    "registerFailed": "Could not add the terminal",
+    "stateChanged": "Terminal updated",
+    "stateFailed": "Could not update the terminal",
+    "removed": "Terminal removed",
+    "cancel": "Cancel",
+    "save": "Save",
+    "state": {
+      "CONFIGURED_NOT_ACTIVE": "Configured (inactive)",
+      "ACTIVE": "Active",
+      "SIMULATOR": "Simulator",
+      "DISABLED": "Disabled"
+    }
   },
   "sms": {
     "title": "SMS Notification Settings",

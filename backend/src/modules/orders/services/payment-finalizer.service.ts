@@ -22,6 +22,7 @@ import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
 import { KdsGateway } from "../../kds/kds.gateway";
 import { FiscalService } from "../../fiscal-core/fiscal.service";
 import { TableAnalyticsProducerService } from "../../analytics/services/table-analytics-producer.service";
+import { buildFiscalLines } from "./fiscal-line-builder";
 
 /**
  * PASS 2 of the payments.service refactor. The finalization cluster —
@@ -636,6 +637,22 @@ export class PaymentFinalizer {
         }
       }
 
+      // COUPLED-FIŞ GUARD: a fiscal_coupled card terminal (GMP-3 Yazarkasa-POS)
+      // charges the card AND prints the mali fiş atomically in one device op.
+      // If such a charge already recorded a fiscalNo for this order, the fiş
+      // exists on the device — issuing a second one here would double-fiscalize.
+      const coupledFiscal = await this.prisma.paymentTerminalCharge.findFirst({
+        where: { orderId, tenantId, fiscalNo: { not: null } },
+        select: { id: true },
+      });
+      if (coupledFiscal) {
+        this.logger.warn(
+          `Skipping yazarkasa receipt for order ${orderId}: a fiscal-coupled ` +
+            `card terminal already printed the fiş (charge ${coupledFiscal.id}).`,
+        );
+        return;
+      }
+
       const order = await this.prisma.order.findFirst({
         where: { id: orderId, tenantId, status: "PAID" },
         include: {
@@ -645,52 +662,21 @@ export class PaymentFinalizer {
       });
       if (!order || order.orderItems.length === 0) return;
 
-      // Build GMP-3 fiscal lines from the paid order. Money in integer kuruş
-      // (yazarkasa firmware is integer-only). productCode = productId; the
-      // GMP-3 adapter buckets lines into KDV departments from device config,
-      // not by a catalogue SKU lookup.
-      //
-      // RECONCILE: the order-level discount is apportioned across the lines by
-      // value (largest-remainder, so the per-line discountCents sum equals
-      // order.discount EXACTLY — no rounding drift on a legally-binding fiş),
-      // and the tender comes from the real COMPLETED Payment rows (cash/card
-      // split), not a lumped cash total. Both are required for a correct KDV
-      // breakdown + tender on the fiş before a physical ÖKC is activated.
-      //
-      // The line value MUST include paid modifiers. OrderItem stores the base
-      // price in `unitPrice` and the per-unit modifier cost in `modifierTotal`
-      // separately, with `subtotal = qty*(unitPrice+modifierTotal)` and
-      // `order.totalAmount = Σ subtotal`. Building the line from unitPrice
-      // ALONE understates the fiş goods total + KDV and (since Payment rows
-      // DO include modifiers) makes the tender never reconcile. The effective
-      // per-unit price (unitPrice + modifierTotal) makes netCents equal
-      // order.finalAmount exactly.
-      const effUnitCents = order.orderItems.map((it) =>
-        Math.round((Number(it.unitPrice) + Number(it.modifierTotal)) * 100),
-      );
-      const lineValuesCents = order.orderItems.map(
-        (it, i) => it.quantity * effUnitCents[i],
-      );
-      const orderDiscountCents = Math.round(Number(order.discount) * 100);
-      const perLineDiscount = this.apportionDiscount(
-        lineValuesCents,
-        orderDiscountCents,
-      );
-
-      const lines = order.orderItems.map((it, i) => ({
-        productCode: it.productId,
-        name: it.product?.name ?? "Ürün",
-        qty: it.quantity,
-        unitPriceCents: effUnitCents[i],
-        vatRate: it.taxRate ?? 10,
-        discountCents: perLineDiscount[i],
-      }));
-
-      // Net the fiş must balance to (line totals after the apportioned discount).
-      // Equals order.finalAmount in kuruş by construction.
-      const netCents = lineValuesCents.reduce(
-        (acc, v, i) => acc + v - perLineDiscount[i],
-        0,
+      // Build GMP-3 fiscal lines from the paid order (shared with the
+      // fiscal-coupled terminal so charge+fiş prints identical lines/KDV).
+      // Money in integer kuruş; the order-level discount is apportioned across
+      // lines by value (largest-remainder, no drift on a legally-binding fiş);
+      // line value includes paid modifiers so netCents == order.finalAmount.
+      const { lines, netCents } = buildFiscalLines(
+        order.orderItems.map((it) => ({
+          productId: it.productId,
+          productName: it.product?.name,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          modifierTotal: it.modifierTotal,
+          taxRate: it.taxRate,
+        })),
+        order.discount,
       );
 
       // Real per-method tender from the COMPLETED Payment rows.
@@ -758,36 +744,6 @@ export class PaymentFinalizer {
         extra: { orderId },
       });
     }
-  }
-
-  /**
-   * Apportion an order-level discount (kuruş) across line values using the
-   * largest-remainder method. Guarantees `sum(result) === min(discount, total)`
-   * exactly so the per-line discountCents never drift off the order discount on
-   * a legally-binding fiş. Returns all-zero when there is no discount or no
-   * value to split against.
-   */
-  private apportionDiscount(
-    lineValuesCents: number[],
-    discountCents: number,
-  ): number[] {
-    const total = lineValuesCents.reduce((a, b) => a + b, 0);
-    if (discountCents <= 0 || total <= 0) {
-      return lineValuesCents.map(() => 0);
-    }
-    // Never apportion more than the goods are worth.
-    const toSplit = Math.min(discountCents, total);
-    const raw = lineValuesCents.map((v) => (toSplit * v) / total);
-    const result = raw.map((r) => Math.floor(r));
-    let leftover = toSplit - result.reduce((a, b) => a + b, 0);
-    // Hand the leftover kuruş to the largest fractional parts first.
-    const byFrac = raw
-      .map((r, i) => ({ i, frac: r - Math.floor(r) }))
-      .sort((a, b) => b.frac - a.frac);
-    for (let k = 0; leftover > 0 && byFrac.length > 0; k++, leftover--) {
-      result[byFrac[k % byFrac.length].i] += 1;
-    }
-    return result;
   }
 
   /**

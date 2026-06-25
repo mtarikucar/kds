@@ -8,7 +8,42 @@
     "sms": "SMS Bildirimleri",
     "onlineOrders": "Online Siparişler",
     "accounting": "Muhasebe",
-    "partnerKeys": "Partner API Anahtarları"
+    "partnerKeys": "Partner API Anahtarları",
+    "paymentTerminals": "Kart Terminalleri"
+  },
+  "paymentTerminals": {
+    "title": "Kart Terminalleri",
+    "description": "Bir kart terminali bağlayın; \"Ödeme → Kart\" dediğinizde kart cihaz üzerinden çekilsin.",
+    "gateNote": "Gerçek terminaller, sertifikalı donanım bağlanıp burada etkinleştirilene kadar pasif kalır — o ana kadar hiçbir karttan çekim yapılmaz. Akışı baştan sona denemek için simülatörü kullanın.",
+    "register": "Terminal ekle",
+    "registerTitle": "Kart terminali ekle",
+    "empty": "Henüz kart terminali yok. Cihaz üzerinden kart çekmek için bir tane ekleyin.",
+    "provider": "Sağlayıcı",
+    "choose": "Bir sağlayıcı seçin…",
+    "serial": "Seri no",
+    "model": "Model",
+    "device": "Eşleşmiş cihaz",
+    "deviceHint": "Eşleşmiş terminalin cihaz kimliği (bu sağlayıcı için gerekli)",
+    "fiscalCoupled": "Fiş basar",
+    "providerMissing": "Sağlayıcı yüklü değil",
+    "activate": "Etkinleştir",
+    "deactivate": "Devre dışı bırak",
+    "enableSimulator": "Simülatörü aç",
+    "remove": "Kaldır",
+    "removeConfirm": "Bu terminali kaldırmak istiyor musunuz? Kart ödemelerinde artık kullanılmayacak.",
+    "registered": "Terminal eklendi",
+    "registerFailed": "Terminal eklenemedi",
+    "stateChanged": "Terminal güncellendi",
+    "stateFailed": "Terminal güncellenemedi",
+    "removed": "Terminal kaldırıldı",
+    "cancel": "Vazgeç",
+    "save": "Kaydet",
+    "state": {
+      "CONFIGURED_NOT_ACTIVE": "Yapılandırıldı (pasif)",
+      "ACTIVE": "Etkin",
+      "SIMULATOR": "Simülatör",
+      "DISABLED": "Devre dışı"
+    }
   },
   "sms": {
     "title": "SMS Bildirim Ayarları",
