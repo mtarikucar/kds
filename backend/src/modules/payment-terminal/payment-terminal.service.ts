@@ -196,6 +196,11 @@ export class PaymentTerminalService {
           "The simulator can never be ACTIVE — use SIMULATOR",
         );
       }
+      if (provider.activatable === false) {
+        throw new BadRequestException(
+          `Provider ${rec.providerId} is not available yet (its integration is not wired)`,
+        );
+      }
       if (provider.kind === "bridge" && !rec.deviceId) {
         throw new BadRequestException(
           "Pair a device before activating this terminal",
@@ -481,11 +486,116 @@ export class PaymentTerminalService {
     });
     if (!charge) throw new NotFoundException("Charge not found");
     if (charge.status !== "PENDING") return this.toView(charge);
-    const updated = await this.prisma.paymentTerminalCharge.update({
-      where: { id: charge.id },
+    // Guarded: only cancel if STILL pending. A concurrent poll/recovery may
+    // have recorded the Payment between the read and here — an unconditional
+    // update would clobber RECORDED→CANCELLED with a Payment on the books.
+    await this.prisma.paymentTerminalCharge.updateMany({
+      where: { id: charge.id, status: "PENDING" },
       data: { status: "CANCELLED" },
     });
-    return this.toView(updated);
+    const after = await this.prisma.paymentTerminalCharge.findFirst({
+      where: { id: charge.id, tenantId: scope.tenantId },
+    });
+    return this.toView(after ?? charge);
+  }
+
+  /**
+   * Void a charge BEFORE it became a recorded Payment (pre-settlement reversal):
+   *  - PENDING                       → same as cancel.
+   *  - APPROVED/NEEDS_REVIEW (no     → mark VOIDED; for a bridge terminal, send
+   *    Payment recorded yet)            a void_card to reverse the auth on-device.
+   *  - RECORDED (Payment exists)     → REFUSE — a settled card payment must be
+   *                                     reversed through the order refund flow
+   *                                     (single money-reversal rail), never by
+   *                                     a second terminal op that would desync
+   *                                     the recorded Payment.
+   *  - terminal states               → no-op (return current view).
+   */
+  async voidCharge(scope: BranchScope, chargeId: string) {
+    const charge = await this.prisma.paymentTerminalCharge.findFirst({
+      where: { id: chargeId, ...branchScope(scope) },
+    });
+    if (!charge) throw new NotFoundException("Charge not found");
+
+    if (charge.status === "PENDING") return this.cancel(scope, chargeId);
+
+    if (charge.status === "RECORDED" || charge.paymentId) {
+      throw new ConflictException(
+        "This charge is already recorded as a payment — reverse it through the order refund flow",
+      );
+    }
+
+    if (charge.status !== "APPROVED" && charge.status !== "NEEDS_REVIEW") {
+      // DECLINED / TIMEOUT / ERROR / CANCELLED / VOIDED — nothing to void.
+      return this.toView(charge);
+    }
+
+    // APPROVED/NEEDS_REVIEW with no Payment: reverse the auth. Guarded flip
+    // FIRST — only void while still un-recorded (no Payment). This wins the
+    // race against a concurrent poll / 5-min recovery cron that may record the
+    // Payment between the read above and here; without the guard an
+    // unconditional update would mark a RECORDED charge VOIDED, leaving money
+    // on the books but invisible to reconciliation.
+    const flip = await this.prisma.paymentTerminalCharge.updateMany({
+      where: {
+        id: charge.id,
+        status: { in: ["APPROVED", "NEEDS_REVIEW"] },
+        paymentId: null,
+      },
+      data: { status: "VOIDED" },
+    });
+    const after = await this.prisma.paymentTerminalCharge.findFirst({
+      where: { id: charge.id, tenantId: scope.tenantId },
+    });
+    if (flip.count === 0) {
+      // Lost the race (or state changed concurrently). If it recorded, the
+      // operator must use the order refund flow, not a terminal void.
+      if (after && (after.status === "RECORDED" || after.paymentId)) {
+        throw new ConflictException(
+          "This charge was just recorded as a payment — reverse it through the order refund flow",
+        );
+      }
+      return this.toView(after ?? charge);
+    }
+
+    // We won the flip → now reverse the auth on a bridge terminal. (Real
+    // reversal is hardware-side, P4; the simulator/in-process just stays VOIDED.)
+    const provider = this.registry.has(charge.providerId)
+      ? this.registry.get(charge.providerId)
+      : null;
+    if (provider?.kind === "bridge") {
+      const terminal = await this.prisma.paymentTerminalRecord.findFirst({
+        where: { id: charge.terminalRecordId, tenantId: scope.tenantId },
+        select: { deviceId: true },
+      });
+      if (terminal?.deviceId) {
+        await this.commandQueue
+          .enqueue(
+            scope.tenantId,
+            terminal.deviceId,
+            {
+              kind: "void_card",
+              payload: {
+                chargeId: charge.id,
+                orderId: charge.orderId,
+                approvalCode: charge.approvalCode ?? null,
+                rrn: charge.rrn ?? null,
+                originalCommandId: charge.deviceCommandId ?? null,
+              },
+              priority: 10,
+              idempotencyKey: `void:${charge.idempotencyKey}`,
+            },
+            scope.branchId ?? undefined,
+          )
+          .catch((err) =>
+            this.logger.error(
+              `void_card enqueue failed for charge ${charge.id}: ${err?.message}`,
+            ),
+          );
+      }
+    }
+
+    return this.toView(after ?? charge);
   }
 
   /**
@@ -596,23 +706,39 @@ export class PaymentTerminalService {
       .catch(() => undefined);
   }
 
+  /** Recovery attempts before an un-recordable APPROVED charge is parked. */
+  private static readonly MAX_RECOVERY_ATTEMPTS = 5;
+
   /**
    * Crash recovery: a charge that APPROVED but never reached RECORDED (process
    * died between the bank approval and the Payment write) gets reconciled here
    * — re-running the idempotent record. Never double-books (RECORDED short-
    * circuit + Payment idempotencyKey). Mirrors self-pay-recovery.
+   *
+   * Bounded (P4): a charge that is genuinely un-recordable (e.g. the order was
+   * settled by another tender, so create() always rejects) would otherwise be
+   * retried every 5 min forever. After MAX_RECOVERY_ATTEMPTS it is parked in
+   * NEEDS_REVIEW and drops out of the sweep, surfaced for operator
+   * reconciliation via listReconciliation().
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async recoverApprovedUnrecorded() {
     const stuck = await this.prisma.paymentTerminalCharge.findMany({
-      where: { status: "APPROVED", paymentId: null },
+      where: {
+        status: "APPROVED",
+        paymentId: null,
+        recoveryAttempts: {
+          lt: PaymentTerminalService.MAX_RECOVERY_ATTEMPTS,
+        },
+      },
       take: 50,
       orderBy: { createdAt: "asc" },
     });
     for (const c of stuck) {
+      let recorded = false;
       try {
         const provider = this.registry.get(c.providerId);
-        await this.applyResult(
+        const updated = await this.applyResult(
           c.id,
           c.tenantId,
           provider,
@@ -626,12 +752,70 @@ export class PaymentTerminalService {
           },
           null,
         );
+        recorded = updated.status === "RECORDED";
       } catch (err: any) {
         this.logger.warn(
           `recoverApprovedUnrecorded: charge ${c.id} still unrecordable: ${err?.message}`,
         );
       }
+      if (recorded) continue;
+      // Still not recorded — count the failed attempt and park once exhausted.
+      // Guarded (status APPROVED + paymentId null): if a concurrent poll
+      // recorded the Payment between applyResult and here, this no-ops rather
+      // than clobbering a RECORDED charge to NEEDS_REVIEW with money booked.
+      const attempts = (c.recoveryAttempts ?? 0) + 1;
+      const park = attempts >= PaymentTerminalService.MAX_RECOVERY_ATTEMPTS;
+      await this.prisma.paymentTerminalCharge
+        .updateMany({
+          where: { id: c.id, status: "APPROVED", paymentId: null },
+          data: {
+            recoveryAttempts: attempts,
+            ...(park ? { status: "NEEDS_REVIEW" } : {}),
+          },
+        })
+        .catch(() => undefined);
+      if (park) {
+        this.logger.error(
+          `Terminal charge ${c.id} parked NEEDS_REVIEW after ${attempts} recovery attempts — operator reconciliation required.`,
+        );
+      }
     }
+  }
+
+  /**
+   * Charges needing operator attention: APPROVED-but-unrecorded (a card was
+   * charged but the Payment didn't land) and NEEDS_REVIEW (recovery exhausted).
+   * The durable record for manual reconciliation of a real bank charge.
+   */
+  async listReconciliation(scope: BranchScope) {
+    const rows = await this.prisma.paymentTerminalCharge.findMany({
+      where: {
+        tenantId: scope.tenantId,
+        OR: [{ branchId: scope.branchId }, { branchId: null }],
+        AND: [
+          {
+            OR: [
+              { status: "NEEDS_REVIEW" },
+              { status: "APPROVED", paymentId: null },
+            ],
+          },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+      take: 200,
+    });
+    return rows.map((r) => ({
+      chargeId: r.id,
+      orderId: r.orderId,
+      providerId: r.providerId,
+      status: r.status,
+      amount: r.amountCents / 100,
+      approvalCode: r.approvalCode ?? null,
+      rrn: r.rrn ?? null,
+      recoveryAttempts: r.recoveryAttempts ?? 0,
+      error: r.error ?? null,
+      createdAt: r.createdAt,
+    }));
   }
 
   private toView(c: {

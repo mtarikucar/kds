@@ -85,6 +85,14 @@ export interface PaymentTerminalProvider {
    */
   readonly kind: "bridge" | "in_process";
 
+  /**
+   * Whether this provider may be flipped to ACTIVE (charge real money). Default
+   * (undefined) = activatable. A scaffolded provider whose real integration is
+   * not yet wired sets this false so the activation gate refuses ACTIVE — the
+   * honest CONFIGURED_NOT_ACTIVE boundary at the provider level.
+   */
+  readonly activatable?: boolean;
+
   /** bridge providers only. */
   buildSaleCommand?(req: TerminalChargeRequest): TerminalSaleCommand;
   mapAck?(ack: {

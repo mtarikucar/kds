@@ -36,6 +36,9 @@ export type CommandKind =
   // non-retryable side-effecting kind in CommandQueueService.
   | "fiscal_report"
   | "charge_card"
+  // Reverse/void a prior card auth before settlement (payment-terminal P4).
+  // Non-idempotent money op → non-retryable, like charge_card.
+  | "void_card"
   | "show_order"
   | "clear_order"
   | "reboot"

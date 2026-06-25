@@ -166,6 +166,31 @@ export const useSetTerminalActivation = () => {
   });
 };
 
+export interface ReconciliationCharge {
+  chargeId: string;
+  orderId: string;
+  providerId: string;
+  status: string;
+  amount: number;
+  approvalCode: string | null;
+  rrn: string | null;
+  recoveryAttempts: number;
+  error: string | null;
+  createdAt: string;
+}
+
+/** Charges needing operator attention (approved-unrecorded / needs-review). */
+export const useTerminalReconciliation = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['paymentTerminalReconciliation', branchId],
+    queryFn: async (): Promise<ReconciliationCharge[]> => {
+      const res = await api.get<ReconciliationCharge[]>('/payment-terminal/reconciliation');
+      return res.data;
+    },
+  });
+};
+
 export const useRemoveTerminal = () => {
   const invalidate = useInvalidateTerminals();
   return useMutation({
