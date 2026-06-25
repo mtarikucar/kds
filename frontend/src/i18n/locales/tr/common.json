@@ -398,6 +398,15 @@
       "noDevicesBehind": "Bu köprünün arkasında cihaz yok.",
       "noCloudDirect": "Buluta doğrudan bağlı cihaz yok.",
       "retireBridgeConfirm": "Köprü kaldırılsın mı?"
+    },
+    "storeHub": {
+      "title": "Mağaza",
+      "subtitle": "Eklentiler, donanım ve siparişlerin tek yerden.",
+      "tabs": {
+        "addons": "Eklentiler",
+        "hardware": "Donanım",
+        "orders": "Siparişlerim"
+      }
     }
   },
   "header": {

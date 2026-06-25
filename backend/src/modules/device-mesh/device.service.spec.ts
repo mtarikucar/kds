@@ -487,4 +487,200 @@ describe("DeviceService slot lifecycle + tallies (branch hub)", () => {
     const where = (prisma.device.groupBy as any).mock.calls[0][0].where;
     expect(where.status).toEqual({ not: "retired" });
   });
+
+  describe("provisionPurchasedDevices (hardware → device-mesh)", () => {
+    const HW_ORDER = "ho-1";
+
+    beforeEach(() => {
+      // The probe + create loop runs inside an advisory-locked tx; run the
+      // callback against the same mock client and stub the lock + key probe.
+      (prisma.$transaction as any).mockImplementation((arg: any) =>
+        typeof arg === "function" ? arg(prisma) : Promise.all(arg),
+      );
+      (prisma.$executeRaw as any).mockResolvedValue(0);
+      (prisma.device.findMany as any).mockResolvedValue([]); // no units yet
+    });
+
+    /** Common arrange: order not yet provisioned; explicit branch resolves. */
+    function notYetProvisioned() {
+      (prisma.device.findMany as any).mockResolvedValue([]);
+    }
+
+    it("creates one slot per unit for device-class lines and skips peripherals/services", async () => {
+      notYetProvisioned();
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockResolvedValue({ id: "x" } as any);
+
+      const created = await svc.provisionPurchasedDevices("t1", "b1", HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 2, category: "kds_screen" },
+        { productId: "p-prn", sku: "PRN-1", qty: 1, category: "printer" },
+        { productId: "p-cash", sku: "CASH-1", qty: 1, category: "cash_drawer" },
+        { productId: "p-svc", sku: "SVC-1", qty: 1, category: "service" },
+        { productId: "p-other", sku: "OTH-1", qty: 3, category: "other" },
+      ]);
+
+      // 2 KDS + 1 printer = 3; cash_drawer / service / other are skipped.
+      expect(created).toBe(3);
+      expect(create).toHaveBeenCalledTimes(3);
+      const kinds = create.mock.calls.map((c) => (c[1] as any).kind);
+      expect(kinds).toEqual(["kds_screen", "kds_screen", "receipt_printer"]);
+    });
+
+    it("passes skipPendingCap + ownership 'sold' + traceable config to createSlot", async () => {
+      notYetProvisioned();
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockResolvedValue({ id: "x" } as any);
+
+      await svc.provisionPurchasedDevices("t1", "b1", HW_ORDER, [
+        { productId: "p-pos", sku: "POS-1", qty: 1, category: "pos_terminal" },
+      ]);
+
+      const arg = create.mock.calls[0][1] as any;
+      expect(arg.skipPendingCap).toBe(true);
+      expect(arg.ownership).toBe("sold");
+      expect(arg.branchId).toBe("b1");
+      expect(arg.config.hardwareOrderId).toBe(HW_ORDER);
+      expect(arg.config.sku).toBe("POS-1");
+      expect(arg.config.productId).toBe("p-pos");
+      // Stable per-unit key (orderId:productId:unitIndex) for idempotent replay.
+      expect(arg.config.provisionKey).toBe(`${HW_ORDER}:p-pos:0`);
+    });
+
+    it("is idempotent: skips units whose provisionKey already exists", async () => {
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
+      // 2 of the 3 KDS units already provisioned by a prior run.
+      (prisma.device.findMany as any).mockResolvedValue([
+        { config: { provisionKey: `${HW_ORDER}:p-kds:0` } },
+        { config: { provisionKey: `${HW_ORDER}:p-kds:1` } },
+      ]);
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockResolvedValue({ id: "x" } as any);
+
+      const created = await svc.provisionPurchasedDevices(
+        "t1",
+        "b1",
+        HW_ORDER,
+        [{ productId: "p-kds", sku: "KDS-1", qty: 3, category: "kds_screen" }],
+      );
+
+      // Only the missing 3rd unit is created.
+      expect(created).toBe(1);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect((create.mock.calls[0][1] as any).config.provisionKey).toBe(
+        `${HW_ORDER}:p-kds:2`,
+      );
+      // The probe filters by the order id on the config JSON path.
+      const where = (prisma.device.findMany as any).mock.calls[0][0].where;
+      expect(where.config).toEqual({
+        path: ["hardwareOrderId"],
+        equals: HW_ORDER,
+      });
+    });
+
+    it("fully no-ops when every unit is already provisioned", async () => {
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
+      (prisma.device.findMany as any).mockResolvedValue([
+        { config: { provisionKey: `${HW_ORDER}:p-kds:0` } },
+        { config: { provisionKey: `${HW_ORDER}:p-kds:1` } },
+      ]);
+      const create = jest.spyOn(svc, "createSlot");
+      const created = await svc.provisionPurchasedDevices("t1", "b1", HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 2, category: "kds_screen" },
+      ]);
+      expect(created).toBe(0);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("returns 0 without opening a tx when nothing is provisionable", async () => {
+      const create = jest.spyOn(svc, "createSlot");
+      const created = await svc.provisionPurchasedDevices("t1", "b1", HW_ORDER, [
+        { productId: "p-svc", sku: "SVC-1", qty: 1, category: "service" },
+      ]);
+      expect(created).toBe(0);
+      expect(create).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("resolves branch: explicit active wins over HQ", async () => {
+      notYetProvisioned();
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockResolvedValue({ id: "x" } as any);
+      (prisma.branch.findFirst as any).mockImplementation(async ({ where }: any) => {
+        if (where.id === "explicit") return { id: "explicit" };
+        return { id: "should-not-be-used" };
+      });
+
+      await svc.provisionPurchasedDevices("t1", "explicit", HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 1, category: "kds_screen" },
+      ]);
+      expect((create.mock.calls[0][1] as any).branchId).toBe("explicit");
+    });
+
+    it("resolves branch: falls back to HQ when the explicit branch is gone", async () => {
+      notYetProvisioned();
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockResolvedValue({ id: "x" } as any);
+      (prisma.branch.findFirst as any).mockImplementation(async ({ where }: any) => {
+        if (where.id) return null; // explicit branch missing/inactive
+        if (where.isHeadquarters === true) return { id: "hq" };
+        return { id: "earliest" };
+      });
+
+      await svc.provisionPurchasedDevices("t1", "explicit", HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 1, category: "kds_screen" },
+      ]);
+      expect((create.mock.calls[0][1] as any).branchId).toBe("hq");
+    });
+
+    it("resolves branch: falls back to earliest active when no HQ and no explicit", async () => {
+      notYetProvisioned();
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockResolvedValue({ id: "x" } as any);
+      (prisma.branch.findFirst as any).mockImplementation(async ({ where }: any) => {
+        if (where.isHeadquarters === true) return null;
+        return { id: "earliest" };
+      });
+
+      await svc.provisionPurchasedDevices("t1", null, HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 1, category: "kds_screen" },
+      ]);
+      expect((create.mock.calls[0][1] as any).branchId).toBe("earliest");
+    });
+
+    it("returns 0 and creates nothing when the tenant has no active branch", async () => {
+      notYetProvisioned();
+      (prisma.branch.findFirst as any).mockResolvedValue(null);
+      const create = jest.spyOn(svc, "createSlot");
+
+      const created = await svc.provisionPurchasedDevices("t1", null, HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 1, category: "kds_screen" },
+      ]);
+      expect(created).toBe(0);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("keeps going when one unit fails (best-effort; order already paid)", async () => {
+      notYetProvisioned();
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
+      const create = jest
+        .spyOn(svc, "createSlot")
+        .mockRejectedValueOnce(new Error("pair-code exhaustion"))
+        .mockResolvedValue({ id: "ok" } as any);
+
+      const created = await svc.provisionPurchasedDevices("t1", "b1", HW_ORDER, [
+        { productId: "p-kds", sku: "KDS-1", qty: 3, category: "kds_screen" },
+      ]);
+      // First unit throws, other two succeed.
+      expect(created).toBe(2);
+      expect(create).toHaveBeenCalledTimes(3);
+    });
+  });
 });

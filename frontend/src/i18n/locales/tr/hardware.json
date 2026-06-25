@@ -126,6 +126,16 @@
       "consultation": "Danışmanlık",
       "hours": "{{count}} saat",
       "details": "Detaylar"
+    },
+    "warningsTitle": "Bu ürünler siparişe eklenemiyor",
+    "warnings": {
+      "generic": "{{name}} bu siparişe eklenemiyor.",
+      "addon_not_purchasable": "{{name}} şu anda satın alınamıyor.",
+      "hardware_not_purchasable": "{{name}} şu anda satın alınamıyor.",
+      "hardware_not_directly_purchasable": "{{name}} buradan doğrudan satın alınamıyor (teklif/yetkili satıcı gerekir).",
+      "service_not_purchasable": "{{name}} bir hizmet olarak satın alınamıyor.",
+      "service_not_directly_purchasable": "{{name}} buradan doğrudan satın alınamıyor (teklif gerekir).",
+      "unknown_service": "{{name}} bulunamadı."
     }
   },
   "shippingForm": {

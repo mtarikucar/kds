@@ -104,6 +104,12 @@ export class DeviceService {
       model?: string;
       serial?: string;
       ownership?: "sold" | "rented" | "byo";
+      // Free-form provisioning config (e.g. { hardwareOrderId, sku } when the
+      // slot is auto-created by a hardware purchase).
+      config?: Record<string, unknown>;
+      // Bypass the per-branch pending-slot cap. ONLY for trusted bulk
+      // provisioning (a paid hardware order), never the interactive button.
+      skipPendingCap?: boolean;
     },
   ) {
     // branchId is required: v3 branch-scope-strict made devices.branchId
@@ -126,13 +132,15 @@ export class DeviceService {
     // this, every "create slot" click persists an unprovisioned device that
     // lingers until the prune cron — spam-clicking floods the list. The cap
     // forces the operator to pair (or wait for the prune) before piling on.
-    const pending = await this.prisma.device.count({
-      where: { tenantId, branchId: input.branchId, status: "unprovisioned" },
-    });
-    if (pending >= DeviceService.MAX_PENDING_SLOTS_PER_BRANCH) {
-      throw new BadRequestException(
-        `Too many devices are waiting to be paired in this branch (${pending}). Pair or remove them before adding more.`,
-      );
+    if (!input.skipPendingCap) {
+      const pending = await this.prisma.device.count({
+        where: { tenantId, branchId: input.branchId, status: "unprovisioned" },
+      });
+      if (pending >= DeviceService.MAX_PENDING_SLOTS_PER_BRANCH) {
+        throw new BadRequestException(
+          `Too many devices are waiting to be paired in this branch (${pending}). Pair or remove them before adding more.`,
+        );
+      }
     }
     let pairCode = this.newPairCode();
     // Retry on collision — pairCode is globally unique. 36^6 makes
@@ -178,6 +186,7 @@ export class DeviceService {
         ownership: input.ownership ?? "byo",
         pairCode,
         pairCodeExpiresAt: new Date(Date.now() + this.pairCodeTtlMs),
+        config: (input.config ?? undefined) as any,
       },
     });
 
@@ -198,6 +207,183 @@ export class DeviceService {
     // secret per se, but it gates pairing for 10 minutes. UI shows it on
     // the screen the operator uses to pair the device.
     return { ...row, pairCode };
+  }
+
+  // Maps a HardwareProduct.category to the device-mesh `kind` we provision a
+  // slot for after a paid purchase. Categories with no entry (cash_drawer,
+  // other, service) are peripherals/labour that don't pair as their own
+  // mesh device — they're skipped. Keep the right-hand values inside the
+  // CreateDeviceSlotDto KINDS enum (dto/device.dto.ts) or pairing will reject.
+  private static readonly CATEGORY_TO_DEVICE_KIND: Record<string, string> = {
+    kds_screen: "kds_screen",
+    pos_terminal: "pos_terminal",
+    printer: "receipt_printer",
+    tablet: "tablet_waiter",
+    bridge: "local_bridge",
+    yazarkasa: "yazarkasa",
+    scanner: "scanner",
+    caller_id: "caller_id",
+  };
+
+  /**
+   * After a hardware order is paid, auto-create an unprovisioned device slot
+   * for each purchased device-class line (one per unit) so the operator can
+   * pair them straight away instead of hand-creating slots that mirror what
+   * they just bought.
+   *
+   * Contract / safety:
+   *  - Best-effort: the caller (CheckoutService) invokes this AFTER the order
+   *    is committed and wraps the call in try/catch. A failure here must never
+   *    surface to the buyer — the order is already paid. We log and move on.
+   *  - Idempotent + count-aware: each slot carries a deterministic
+   *    config.provisionKey (`${orderId}:${productId}:${unitIndex}`). A (re)run
+   *    creates only the units whose key isn't already present, so a replay
+   *    never duplicates AND a partially-failed run can be completed later
+   *    (no permanent under-provisioning). confirmAndProvision can call this
+   *    twice on the same paymentRef (webhook retry / self-heal replay).
+   *  - Concurrency-safe: the "which units exist?" check + creation run under a
+   *    tx-scoped Postgres advisory lock keyed on the order id, so two calls
+   *    racing for the same order (a PayTR retry overlapping the original) can't
+   *    both pass the check and double-create. The lock auto-releases at tx end
+   *    on its pinned connection (no pooled-connection leak).
+   *  - Peripherals (cash_drawer/other/service) and unmapped categories are
+   *    skipped — only true mesh devices get a slot.
+   *  - skipPendingCap: provisioning bypasses MAX_PENDING_SLOTS_PER_BRANCH —
+   *    this is a trusted, paid bulk action, not interactive spam.
+   *
+   * Returns the number of slots created (0 if nothing applicable / already done).
+   */
+  async provisionPurchasedDevices(
+    tenantId: string,
+    branchId: string | null,
+    hardwareOrderId: string,
+    items: { productId: string; sku: string; qty: number; category: string }[],
+  ): Promise<number> {
+    // Keep only lines that map to a real mesh device kind.
+    const provisionable = items
+      .map((it) => ({
+        ...it,
+        kind: DeviceService.CATEGORY_TO_DEVICE_KIND[it.category],
+      }))
+      .filter((it) => !!it.kind && it.qty > 0);
+    if (provisionable.length === 0) return 0;
+
+    const targetBranchId = await this.resolveProvisionBranch(
+      tenantId,
+      branchId,
+    );
+    if (!targetBranchId) {
+      this.logger.warn(
+        `Cannot provision devices for order ${hardwareOrderId}: no active branch for tenant ${tenantId}`,
+      );
+      return 0;
+    }
+
+    // Expand to one desired unit per qty, each with a stable identity so a
+    // retry/replay is idempotent and a partial run is completable.
+    const desired = provisionable.flatMap((line) =>
+      Array.from({ length: line.qty }, (_, unitIndex) => ({
+        kind: line.kind!,
+        sku: line.sku,
+        productId: line.productId,
+        provisionKey: `${hardwareOrderId}:${line.productId}:${unitIndex}`,
+      })),
+    );
+
+    let created = 0;
+    // Serialize concurrent provisioning of the SAME order under an advisory
+    // lock; createSlot runs on its own (autocommitting) connection so the rows
+    // it writes are visible to a waiter the instant this tx releases the lock.
+    // Generous timeout: a large multi-unit order may take a few seconds, and a
+    // timeout is harmless anyway — the provisionKey check makes a later retry
+    // complete only the missing units.
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('hw-device-provision'), hashtext(${hardwareOrderId}))`;
+        const existing = await tx.device.findMany({
+          where: {
+            tenantId,
+            config: { path: ["hardwareOrderId"], equals: hardwareOrderId },
+          },
+          select: { config: true },
+        });
+        const existingKeys = new Set(
+          existing
+            .map(
+              (d) =>
+                (d.config as { provisionKey?: string } | null)?.provisionKey,
+            )
+            .filter((k): k is string => !!k),
+        );
+        for (const unit of desired) {
+          if (existingKeys.has(unit.provisionKey)) continue;
+          try {
+            await this.createSlot(tenantId, {
+              kind: unit.kind,
+              branchId: targetBranchId,
+              ownership: "sold",
+              skipPendingCap: true,
+              config: {
+                hardwareOrderId,
+                sku: unit.sku,
+                productId: unit.productId,
+                provisionKey: unit.provisionKey,
+                provisionedAt: new Date().toISOString(),
+              },
+            });
+            created++;
+          } catch (err) {
+            // One bad slot must not abort the rest — log and continue. The
+            // order is already paid; partial provisioning beats none, and the
+            // provisionKey lets a retry fill the gap.
+            this.logger.error(
+              `Failed to provision slot (order=${hardwareOrderId}, sku=${unit.sku}, kind=${unit.kind}): ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+      },
+      { timeout: 30000, maxWait: 10000 },
+    );
+    if (created > 0) {
+      this.logger.log(
+        `Provisioned ${created} device slot(s) in branch ${targetBranchId} for hardware order ${hardwareOrderId}`,
+      );
+    }
+    return created;
+  }
+
+  /**
+   * Decide which branch a paid hardware order's device slots land in:
+   *   1. the explicit branchId on the order (the buyer's selected scope), if it
+   *      still exists and is active;
+   *   2. else the tenant's headquarters branch (isHeadquarters), if active;
+   *   3. else the earliest-created active branch.
+   * Returns null if the tenant has no active branch at all (caller no-ops).
+   */
+  private async resolveProvisionBranch(
+    tenantId: string,
+    branchId: string | null,
+  ): Promise<string | null> {
+    if (branchId) {
+      const explicit = await this.prisma.branch.findFirst({
+        where: { id: branchId, tenantId, status: "active" },
+        select: { id: true },
+      });
+      if (explicit) return explicit.id;
+    }
+    const hq = await this.prisma.branch.findFirst({
+      where: { tenantId, isHeadquarters: true, status: "active" },
+      select: { id: true },
+    });
+    if (hq) return hq.id;
+    const earliest = await this.prisma.branch.findFirst({
+      where: { tenantId, status: "active" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    return earliest?.id ?? null;
   }
 
   async list(

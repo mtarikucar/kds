@@ -126,6 +126,16 @@
       "consultation": "Consultation",
       "hours": "{{count}} hours",
       "details": "Details"
+    },
+    "warningsTitle": "Эти товары нельзя добавить в этот заказ",
+    "warnings": {
+      "generic": "{{name}} нельзя добавить в этот заказ.",
+      "addon_not_purchasable": "{{name}} сейчас недоступно для покупки.",
+      "hardware_not_purchasable": "{{name}} сейчас недоступно для покупки.",
+      "hardware_not_directly_purchasable": "{{name}} нельзя купить напрямую здесь (нужен запрос цены / авторизованный дилер).",
+      "service_not_purchasable": "{{name}} нельзя приобрести как услугу.",
+      "service_not_directly_purchasable": "{{name}} нельзя купить напрямую здесь (нужен запрос цены).",
+      "unknown_service": "{{name}} не найдено."
     }
   },
   "shippingForm": {

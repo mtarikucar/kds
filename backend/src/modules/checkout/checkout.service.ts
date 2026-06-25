@@ -12,6 +12,7 @@ import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
+import { DeviceService } from "../device-mesh/device.service";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 
@@ -47,6 +48,9 @@ export class CheckoutService {
     private readonly tenantMarketplace: TenantMarketplaceService,
     // Optional so unit tests constructing the service bare keep working.
     @Optional() private readonly metrics?: MetricsService,
+    // Optional: provisions device-mesh slots for purchased device-class
+    // hardware (best-effort, post-commit). Bare-constructed tests pass null.
+    @Optional() private readonly devices?: DeviceService,
   ) {}
 
   /**
@@ -176,6 +180,19 @@ export class CheckoutService {
         });
         this.logger.log(
           `Idempotent confirmAndProvision hit for paymentRef=${paymentRef}`,
+        );
+        // Self-heal device provisioning: if the original run committed the
+        // order but died before its post-commit provisioning hook, this replay
+        // (PayTR retries aggressively) re-runs it. No-ops once slots exist.
+        await this.provisionDevicesForOrder(
+          tenantId,
+          existing.branchId,
+          existing.id,
+          (existing.items ?? []).map((it) => ({
+            productId: it.productId,
+            sku: it.sku,
+            qty: it.qty,
+          })),
         );
         return {
           quote,
@@ -431,6 +448,68 @@ export class CheckoutService {
       { result: paymentRef ? "paid" : "comped" },
     );
 
+    // Close the loop: provision device-mesh slots for the device-class hardware
+    // just purchased, so a bought KDS/printer/terminal/HummyBox shows up in the
+    // branch hub ready to pair. POST-commit so it can NEVER roll back the
+    // committed (paid) order; idempotent on the order id.
+    if (hardwareOrderId) {
+      await this.provisionDevicesForOrder(
+        tenantId,
+        validatedBranchId,
+        hardwareOrderId,
+        hardwareLines
+          .filter((l) => l.type === "hardware")
+          .map((l) => ({
+            productId: l.meta?.productId as string,
+            sku: l.code,
+            qty: l.qty,
+          })),
+      );
+    }
+
     return { quote, hardwareOrderId, addOnIds };
+  }
+
+  /**
+   * Best-effort hardware→device-mesh provisioning. Looks up each line's
+   * category, then asks DeviceService to create one unprovisioned slot per
+   * device-class unit so the buyer can pair what they bought from the branch
+   * hub. ?.-guarded (DeviceService is @Optional) and fully swallowed: a failure
+   * here must NEVER surface to the buyer or roll back the paid order. Safe to
+   * call repeatedly — DeviceService.provisionPurchasedDevices is idempotent on
+   * hardwareOrderId, which also makes the idempotent-replay path self-healing
+   * if the first run crashed after commit but before this hook.
+   */
+  private async provisionDevicesForOrder(
+    tenantId: string,
+    branchId: string | null,
+    hardwareOrderId: string,
+    items: { productId: string; sku: string; qty: number }[],
+  ): Promise<void> {
+    if (!this.devices) return;
+    try {
+      const productIds = items.map((i) => i.productId).filter(Boolean);
+      if (productIds.length === 0) return;
+      const cats = await this.prisma.hardwareProduct.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, category: true },
+      });
+      const catById = new Map(cats.map((c) => [c.id, c.category]));
+      await this.devices.provisionPurchasedDevices(
+        tenantId,
+        branchId,
+        hardwareOrderId,
+        items.map((i) => ({
+          productId: i.productId,
+          sku: i.sku,
+          qty: i.qty,
+          category: catById.get(i.productId) ?? "",
+        })),
+      );
+    } catch (e) {
+      this.logger.warn(
+        `hardware→device provisioning failed for order ${hardwareOrderId}: ${(e as Error)?.message}`,
+      );
+    }
   }
 }

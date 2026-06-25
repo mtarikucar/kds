@@ -3,6 +3,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { CatalogModule } from "../catalog/catalog.module";
 import { MarketplaceModule } from "../marketplace/marketplace.module";
 import { OutboxModule } from "../outbox/outbox.module";
+import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
 import { QuoteService } from "./quote.service";
 import { CheckoutService } from "./checkout.service";
 import { CheckoutController } from "./checkout.controller";
@@ -13,7 +14,14 @@ import { CheckoutSettlementService } from "./checkout-settlement.service";
 import { CheckoutNotificationsService } from "./checkout-notifications.service";
 
 @Module({
-  imports: [PrismaModule, CatalogModule, MarketplaceModule, OutboxModule],
+  imports: [
+    PrismaModule,
+    CatalogModule,
+    MarketplaceModule,
+    OutboxModule,
+    // Provisions device-mesh slots for purchased device-class hardware.
+    DeviceMeshModule,
+  ],
   controllers: [CheckoutController, HardwareOrdersController],
   providers: [
     QuoteService,

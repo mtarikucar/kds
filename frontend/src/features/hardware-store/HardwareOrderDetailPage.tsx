@@ -28,7 +28,7 @@ export default function HardwareOrderDetailPage() {
           {t('orderDetail.notFound')}
         </div>
         <Link
-          to="/admin/hardware-orders"
+          to="/admin/store?tab=orders"
           className="mt-4 inline-block text-sm text-blue-600 hover:underline"
         >
           {t('orderDetail.backToList')}
@@ -44,7 +44,7 @@ export default function HardwareOrderDetailPage() {
   return (
     <div className="space-y-4 p-6">
       <Link
-        to="/admin/hardware-orders"
+        to="/admin/store?tab=orders"
         className="inline-block text-sm text-blue-600 hover:underline"
       >
         {t('orderDetail.backToList')}

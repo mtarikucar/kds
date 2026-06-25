@@ -94,9 +94,7 @@ const PaymentTerminalsSettingsPage = lazyWithReload(() => import('./pages/settin
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 // HummyTummy Phase 3–12 admin screens.
-import MarketplacePage from './features/marketplace/MarketplacePage';
-import StorePage from './features/hardware-store/StorePage';
-import HardwareOrdersListPage from './features/hardware-store/HardwareOrdersListPage';
+import StoreHubPage from './features/store/StoreHubPage';
 import HardwareOrderDetailPage from './features/hardware-store/HardwareOrderDetailPage';
 import ProductDetailPage from './features/hardware-store/ProductDetailPage';
 import BranchesPage from './features/branches/BranchesPage';
@@ -372,12 +370,15 @@ function App() {
             so the old flat pages redirect there. */}
         <Route path="/admin/devices" element={<Navigate to="/admin/branches" replace />} />
         <Route path="/admin/bridges" element={<Navigate to="/admin/branches" replace />} />
-        <Route path="/admin/marketplace" element={<MarketplacePage />} />
-        <Route path="/admin/store" element={<StorePage />} />
+        {/* Consolidated "Mağaza" hub (add-ons + hardware + orders) reached from
+            the top-bar store icon. The old flat routes redirect into its tabs. */}
+        <Route path="/admin/store" element={<StoreHubPage />} />
+        <Route path="/admin/marketplace" element={<Navigate to="/admin/store?tab=addons" replace />} />
         {/* v2.8.87: rich product/service detail page (real route, not modal). */}
         <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
-        {/* v2.8.84: tenant order history + detail. */}
-        <Route path="/admin/hardware-orders" element={<HardwareOrdersListPage />} />
+        {/* v2.8.84: tenant order history + detail. List lives in the hub's
+            Siparişlerim tab; the old list URL redirects, detail stays standalone. */}
+        <Route path="/admin/hardware-orders" element={<Navigate to="/admin/store?tab=orders" replace />} />
         <Route path="/admin/hardware-orders/:id" element={<HardwareOrderDetailPage />} />
         {/* The branch hub is the device/network management home for EVERY
             tenant (single-location included), so it is NOT multiLocation-gated.

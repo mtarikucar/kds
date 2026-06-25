@@ -160,6 +160,9 @@ export default function ShippingAddressForm({
 
   const selectedBranch = activeBranches.find((b) => b.id === selectedBranchId);
   const branchAddress = selectedBranch ? branchAddressToShipping(selectedBranch) : null;
+  // Branch mode can ship to an empty address if the branch has none on file.
+  // Block submit in that case (was: silently shipped to a blank address).
+  const [branchAddrError, setBranchAddrError] = useState<string | null>(null);
 
   const {
     register,
@@ -188,10 +191,31 @@ export default function ShippingAddressForm({
     setValue('mode', mode, { shouldValidate: false });
   }, [mode, setValue]);
 
+  // Clear the "this branch has no address" error whenever the user changes the
+  // input that produced it — switching to custom mode or picking a different
+  // branch. Otherwise a stale red error lingers after the user has already
+  // fixed the cause (e.g. moved to a branch that DOES have an address).
+  useEffect(() => {
+    setBranchAddrError(null);
+  }, [mode, selectedBranchId]);
+
   return (
     <form
       onSubmit={handleSubmit((v) => {
         if (mode === 'branch' && branchAddress) {
+          // Guard: a branch with no address on file would otherwise ship to a
+          // blank line1/city. Refuse and tell the buyer to add a branch
+          // address (or switch to custom).
+          if (!(branchAddress.line1 ?? '').trim() || !(branchAddress.city ?? '').trim()) {
+            setBranchAddrError(
+              t('shippingForm.errors.branchNoAddress', {
+                defaultValue:
+                  'Bu şubenin kayıtlı adresi yok. Şubeler sayfasından adres ekleyin ya da özel adres girin.',
+              }),
+            );
+            return;
+          }
+          setBranchAddrError(null);
           // Branch mode: address comes from the selected branch
           // snapshot; buyer-typed recipientName / phone overlay it.
           const cleaned: ShippingAddress = {
@@ -387,6 +411,12 @@ export default function ShippingAddressForm({
             </Field>
           </div>
         </>
+      )}
+
+      {branchAddrError && (
+        <p className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+          {branchAddrError}
+        </p>
       )}
 
       <button

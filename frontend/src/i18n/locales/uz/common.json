@@ -398,6 +398,15 @@
       "noDevicesBehind": "Bu ko‘prik ortida qurilma yo‘q.",
       "noCloudDirect": "Bevosita bulutga ulangan qurilma yo‘q.",
       "retireBridgeConfirm": "Bu ko‘prik chiqarilsinmi?"
+    },
+    "storeHub": {
+      "title": "Do‘kon",
+      "subtitle": "Plaginlar, qurilmalar va buyurtmalaringiz bir joyda.",
+      "tabs": {
+        "addons": "Plaginlar",
+        "hardware": "Qurilmalar",
+        "orders": "Buyurtmalarim"
+      }
     }
   },
   "header": {

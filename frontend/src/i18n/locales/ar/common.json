@@ -398,6 +398,15 @@
       "noDevicesBehind": "لا أجهزة خلف هذا الجسر.",
       "noCloudDirect": "لا توجد أجهزة متصلة بالسحابة مباشرة.",
       "retireBridgeConfirm": "هل تريد إيقاف هذا الجسر؟"
+    },
+    "storeHub": {
+      "title": "المتجر",
+      "subtitle": "الإضافات والأجهزة وطلباتك في مكان واحد.",
+      "tabs": {
+        "addons": "الإضافات",
+        "hardware": "الأجهزة",
+        "orders": "طلباتي"
+      }
     }
   },
   "header": {

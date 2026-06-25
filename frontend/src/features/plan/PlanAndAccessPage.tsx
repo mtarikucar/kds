@@ -204,7 +204,7 @@ export default function PlanAndAccessPage() {
               {t('suggested.title', { defaultValue: 'Önerilen eklentiler' })}
             </h2>
             <Link
-              to="/admin/marketplace"
+              to="/admin/store?tab=addons"
               className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
             >
               <Store className="h-3.5 w-3.5" />
@@ -304,7 +304,7 @@ function SuggestedCard({
 }) {
   return (
     <Link
-      to={`/admin/marketplace?focus=${encodeURIComponent(addon.code)}`}
+      to={`/admin/store?tab=addons&focus=${encodeURIComponent(addon.code)}`}
       className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-blue-300 hover:bg-blue-50/30"
     >
       <div className="flex items-center justify-between">
