@@ -98,7 +98,7 @@
       "business": "العمليات",
       "menuAndTables": "القائمة والطاولات",
       "operation": "المكتب الخلفي",
-      "multiBranch": "متعدد الفروع",
+      "multiBranch": "الفروع والأجهزة",
       "marketplace": "متجر الإضافات",
       "planAndAccess": "الإعدادات والوصول"
     },
@@ -138,6 +138,17 @@
         "caller_id": "هوية المتصل",
         "scanner": "ماسح ضوئي",
         "local_bridge": "جسر محلي"
+      },
+      "pending": "بانتظار الاقتران",
+      "statusLabel": {
+        "unprovisioned": "غير مُهيّأ",
+        "paired": "مقترن",
+        "online": "متصل",
+        "offline": "غير متصل",
+        "error": "خطأ",
+        "busy": "مشغول",
+        "maintenance": "صيانة",
+        "retired": "متقاعد"
       }
     },
     "marketplace": {
@@ -200,7 +211,9 @@
       "timezone": "المنطقة الزمنية",
       "status": "الحالة",
       "created": "تاريخ الإنشاء",
-      "add": "إضافة فرع"
+      "add": "إضافة فرع",
+      "hubSubtitle": "افتح كل فرع لإدارة أجهزته وشبكته المحلية (الجسر) من مكان واحد.",
+      "manage": "إدارة"
     },
     "webhooks": {
       "title": "ويب هوكس",
@@ -357,6 +370,34 @@
           "create": "إنشاء"
         }
       }
+    },
+    "branchDetail": {
+      "back": "الفروع",
+      "hq": "المركز",
+      "edit": "تعديل",
+      "editTitle": "تعديل الفرع",
+      "saved": "تم تحديث الفرع",
+      "saveFailed": "تعذّر التحديث",
+      "healthTitle": "درجة صحة الفرع",
+      "notFound": "الفرع غير موجود أو ليس لديك صلاحية الوصول.",
+      "tabs": {
+        "devices": "الأجهزة",
+        "network": "الشبكة المحلية"
+      }
+    },
+    "network": {
+      "tokenTitle": "رمز الجسر (يُعرض مرة واحدة)",
+      "tokenIntro": "أدخل هذا الرمز في HummyBox عند أول تشغيل. لن يُعرض مرة أخرى بعد إغلاق هذه الصفحة.",
+      "tokenCopied": "لقد نسخته",
+      "sku": "العتاد",
+      "byo": "عتادي الخاص",
+      "hostname": "اسم المضيف",
+      "addBridge": "إضافة جسر",
+      "empty": "لا توجد جسور أو أجهزة في هذا الفرع بعد.",
+      "cloudDirect": "متصل مباشرة بالسحابة",
+      "noDevicesBehind": "لا أجهزة خلف هذا الجسر.",
+      "noCloudDirect": "لا توجد أجهزة متصلة بالسحابة مباشرة.",
+      "retireBridgeConfirm": "هل تريد إيقاف هذا الجسر؟"
     }
   },
   "header": {

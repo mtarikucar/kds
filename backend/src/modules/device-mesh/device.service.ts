@@ -40,6 +40,12 @@ export class DeviceService {
   // is a sustained network drop — which is exactly what we want
   // surfaced.
   private static readonly HEARTBEAT_GRACE_MS = 45 * 1000;
+  // Max concurrent un-paired slots per branch — stops "create slot" from
+  // spawning unbounded phantom devices that never get paired. Expired ones
+  // are pruned by the sweep cron (pruneExpiredUnprovisioned).
+  private static readonly MAX_PENDING_SLOTS_PER_BRANCH = 10;
+  // Grace after a pairCode expires before the never-paired slot is deleted.
+  private static readonly UNPROVISIONED_PRUNE_GRACE_MS = 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -115,6 +121,18 @@ export class DeviceService {
     });
     if (!branch) {
       throw new BadRequestException("Branch not found for this tenant");
+    }
+    // Anti-phantom: cap concurrent un-paired slots in this branch. Without
+    // this, every "create slot" click persists an unprovisioned device that
+    // lingers until the prune cron — spam-clicking floods the list. The cap
+    // forces the operator to pair (or wait for the prune) before piling on.
+    const pending = await this.prisma.device.count({
+      where: { tenantId, branchId: input.branchId, status: "unprovisioned" },
+    });
+    if (pending >= DeviceService.MAX_PENDING_SLOTS_PER_BRANCH) {
+      throw new BadRequestException(
+        `Too many devices are waiting to be paired in this branch (${pending}). Pair or remove them before adding more.`,
+      );
     }
     let pairCode = this.newPairCode();
     // Retry on collision — pairCode is globally unique. 36^6 makes
@@ -394,6 +412,62 @@ export class DeviceService {
     });
     if (res.count > 0) this.logger.debug(`Marked ${res.count} devices offline`);
     return res.count;
+  }
+
+  /**
+   * Background prune: delete never-paired slots whose pairCode has expired
+   * (plus a grace). Fixes the "create slot → phantom device that lingers
+   * forever" problem — an unprovisioned device that nobody paired within the
+   * 10-min window is junk, so it is removed rather than cluttering the list.
+   * Only touches `unprovisioned` rows (a paired/online device is never pruned).
+   * Idempotent; safe to run every minute.
+   */
+  async pruneExpiredUnprovisioned(): Promise<number> {
+    const cutoff = new Date(
+      Date.now() - DeviceService.UNPROVISIONED_PRUNE_GRACE_MS,
+    );
+    const res = await this.prisma.device.deleteMany({
+      where: {
+        status: "unprovisioned",
+        pairCodeExpiresAt: { lt: cutoff },
+      },
+    });
+    if (res.count > 0) {
+      this.logger.debug(`Pruned ${res.count} never-paired (expired) slots`);
+    }
+    return res.count;
+  }
+
+  /**
+   * Per-branch device tallies for the branch hub cards. `total`/`online` count
+   * only REAL devices (paired/online/offline) — unprovisioned pending slots are
+   * reported separately so the hub shows a meaningful number, not phantom slots.
+   */
+  async countsByBranch(
+    tenantId: string,
+  ): Promise<
+    Record<string, { total: number; online: number; pending: number }>
+  > {
+    const rows = await this.prisma.device.groupBy({
+      by: ["branchId", "status"],
+      where: { tenantId, status: { not: "retired" } },
+      _count: { _all: true },
+    });
+    const out: Record<
+      string,
+      { total: number; online: number; pending: number }
+    > = {};
+    for (const r of rows) {
+      const b = (out[r.branchId] ??= { total: 0, online: 0, pending: 0 });
+      const n = r._count._all;
+      if (r.status === "unprovisioned") {
+        b.pending += n;
+      } else {
+        b.total += n;
+        if (r.status === "online") b.online += n;
+      }
+    }
+    return out;
   }
 
   async retire(tenantId: string, deviceId: string) {

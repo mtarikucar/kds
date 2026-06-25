@@ -102,10 +102,41 @@ export class BranchesController {
     return this.branches.list(req.user.tenantId);
   }
 
+  // Branch hub overview — every branch (Merkez/HQ first) with live device
+  // tallies + bridge counts in one call. NOT feature-gated: a single-location
+  // tenant manages its devices here too (this hub replaces the old flat
+  // Devices/Bridges pages, which had no plan gate). MUST be declared before
+  // the `:id` route so "overview" isn't captured as a branch id.
+  @Get("overview")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Branch hub: branches + device/bridge tallies" })
+  overview(@Req() req: any) {
+    return this.branches.overview(req.user.tenantId, {
+      role: req.user.role,
+      primaryBranchId: req.user.primaryBranchId ?? null,
+      allowedBranchIds: req.user.allowedBranchIds ?? [],
+    });
+  }
+
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   one(@Req() req: any, @Param("id") id: string) {
     return this.branches.findOrThrow(req.user.tenantId, id);
+  }
+
+  // A branch's local-network topology: bridges + devices behind each +
+  // cloud-direct devices ("şube içi ağ"). ADMIN/MANAGER, tenant-scoped.
+  @Get(":id/network")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Branch local-network topology (bridges + devices)",
+  })
+  network(@Req() req: any, @Param("id") id: string) {
+    return this.branches.network(req.user.tenantId, id, {
+      role: req.user.role,
+      primaryBranchId: req.user.primaryBranchId ?? null,
+      allowedBranchIds: req.user.allowedBranchIds ?? [],
+    });
   }
 
   // Create / update / archive are ADMIN-only AND require the

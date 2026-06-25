@@ -98,7 +98,7 @@
       "business": "İşletme",
       "menuAndTables": "Menü & Masa",
       "operation": "Operasyon",
-      "multiBranch": "Çoklu Şube",
+      "multiBranch": "Şubeler ve Cihazlar",
       "marketplace": "Pazaryeri",
       "planAndAccess": "Ayarlar & Erişim"
     },
@@ -138,6 +138,17 @@
         "caller_id": "Arayan ID",
         "scanner": "Barkod okuyucu",
         "local_bridge": "Yerel Köprü"
+      },
+      "pending": "eşleşme bekliyor",
+      "statusLabel": {
+        "unprovisioned": "kurulmadı",
+        "paired": "eşleşti",
+        "online": "çevrimiçi",
+        "offline": "çevrimdışı",
+        "error": "hata",
+        "busy": "meşgul",
+        "maintenance": "bakımda",
+        "retired": "emekli"
       }
     },
     "marketplace": {
@@ -200,7 +211,9 @@
       "timezone": "Zaman Dilimi",
       "status": "Durum",
       "created": "Oluşturuldu",
-      "add": "Şube Ekle"
+      "add": "Şube Ekle",
+      "hubSubtitle": "Her şubeyi açıp cihazlarını ve yerel ağını (köprü) tek yerden yönetin.",
+      "manage": "Yönet"
     },
     "webhooks": {
       "title": "Webhook'lar",
@@ -357,6 +370,34 @@
           "create": "Oluştur"
         }
       }
+    },
+    "branchDetail": {
+      "back": "Şubeler",
+      "hq": "Merkez",
+      "edit": "Düzenle",
+      "editTitle": "Şubeyi düzenle",
+      "saved": "Şube güncellendi",
+      "saveFailed": "Güncellenemedi",
+      "healthTitle": "Şube sağlık skoru",
+      "notFound": "Şube bulunamadı veya erişiminiz yok.",
+      "tabs": {
+        "devices": "Cihazlar",
+        "network": "Yerel ağ"
+      }
+    },
+    "network": {
+      "tokenTitle": "Köprü token’ı (bir kez gösterilir)",
+      "tokenIntro": "Bu token’ı HummyBox’a ilk açılışta girin. Sayfayı kapatınca tekrar gösterilmez.",
+      "tokenCopied": "Kopyaladım",
+      "sku": "Donanım",
+      "byo": "Kendi donanımım",
+      "hostname": "Ana bilgisayar adı",
+      "addBridge": "Köprü ekle",
+      "empty": "Bu şubede henüz köprü ya da cihaz yok.",
+      "cloudDirect": "Buluta doğrudan bağlı",
+      "noDevicesBehind": "Bu köprünün arkasında cihaz yok.",
+      "noCloudDirect": "Buluta doğrudan bağlı cihaz yok.",
+      "retireBridgeConfirm": "Köprü kaldırılsın mı?"
     }
   },
   "header": {

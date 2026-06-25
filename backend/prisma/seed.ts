@@ -300,13 +300,15 @@ async function main() {
   // row is created. Upsert keeps the seed idempotent against re-runs.
   const mainBranch = await prisma.branch.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: "MAIN" } },
-    update: {},
+    update: { isHeadquarters: true },
     create: {
       tenantId: tenant.id,
       name: "Main",
       code: "MAIN",
       timezone: "Europe/Istanbul",
       status: "active",
+      // The MAIN branch is the tenant's "Merkez/HQ" — home for central devices.
+      isHeadquarters: true,
     },
   });
 

@@ -22,7 +22,10 @@ describe("DeviceMeshScheduler.sweep", () => {
   }
 
   it("runs all three sweeps when the advisory lock is held", async () => {
-    const devices = { sweepStale: jest.fn().mockResolvedValue(1) } as unknown as DeviceService;
+    const devices = {
+      sweepStale: jest.fn().mockResolvedValue(1),
+      pruneExpiredUnprovisioned: jest.fn().mockResolvedValue(3),
+    } as unknown as DeviceService;
     const bridges = { sweepStale: jest.fn().mockResolvedValue(0) } as unknown as LocalBridgeService;
     const commands = { sweepStuck: jest.fn().mockResolvedValue(2) } as unknown as CommandQueueService;
     const sched = new DeviceMeshScheduler(
@@ -35,6 +38,7 @@ describe("DeviceMeshScheduler.sweep", () => {
     expect(devices.sweepStale).toHaveBeenCalled();
     expect(bridges.sweepStale).toHaveBeenCalled();
     expect(commands.sweepStuck).toHaveBeenCalled();
+    expect(devices.pruneExpiredUnprovisioned).toHaveBeenCalled();
   });
 
   it("swallows a sub-sweep error (cron must not crash)", async () => {

@@ -70,6 +70,8 @@ export const useCreateDeviceSlot = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: deviceKeys.all });
+      // Refresh the branch hub tallies + per-branch network topology.
+      qc.invalidateQueries({ queryKey: ['branches'] });
       toast.success(
         i18n.t('devices:slot.created', {
           defaultValue: 'Device slot created. Use the pair code on the device.',
@@ -95,6 +97,7 @@ export const useRetireDevice = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: deviceKeys.all });
+      qc.invalidateQueries({ queryKey: ['branches'] });
       toast.success(
         i18n.t('devices:retired', { defaultValue: 'Device retired' }),
       );

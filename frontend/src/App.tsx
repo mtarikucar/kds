@@ -94,17 +94,16 @@ const PaymentTerminalsSettingsPage = lazyWithReload(() => import('./pages/settin
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 // HummyTummy Phase 3–12 admin screens.
-import DevicesPage from './features/devices/DevicesPage';
 import MarketplacePage from './features/marketplace/MarketplacePage';
 import StorePage from './features/hardware-store/StorePage';
 import HardwareOrdersListPage from './features/hardware-store/HardwareOrdersListPage';
 import HardwareOrderDetailPage from './features/hardware-store/HardwareOrderDetailPage';
 import ProductDetailPage from './features/hardware-store/ProductDetailPage';
 import BranchesPage from './features/branches/BranchesPage';
+import BranchDetailPage from './features/branches/BranchDetailPage';
 import HealthPage from './features/health/HealthPage';
 import WebhooksPage from './features/webhooks/WebhooksPage';
 import PartnerKeysPage from './features/partner-keys/PartnerKeysPage';
-import BridgesPage from './features/bridges/BridgesPage';
 import FiscalRecoveryPage from './features/fiscal/FiscalRecoveryPage';
 import CallerFeedPage from './features/caller/CallerFeedPage';
 import PlanAndAccessPage from './features/plan/PlanAndAccessPage';
@@ -368,8 +367,11 @@ function App() {
         <Route path="/subscription/payment/success" element={<Navigate to="/subscription/success" replace />} />
         <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/fail" replace />} />
 
-        {/* HummyTummy Phase 3–12: devices, marketplace, hardware store, branches, health */}
-        <Route path="/admin/devices" element={<DevicesPage />} />
+        {/* HummyTummy Phase 3–12: marketplace, hardware store, branches, health.
+            Devices + Bridges are now managed INSIDE the branch hub (per-branch),
+            so the old flat pages redirect there. */}
+        <Route path="/admin/devices" element={<Navigate to="/admin/branches" replace />} />
+        <Route path="/admin/bridges" element={<Navigate to="/admin/branches" replace />} />
         <Route path="/admin/marketplace" element={<MarketplacePage />} />
         <Route path="/admin/store" element={<StorePage />} />
         {/* v2.8.87: rich product/service detail page (real route, not modal). */}
@@ -377,13 +379,12 @@ function App() {
         {/* v2.8.84: tenant order history + detail. */}
         <Route path="/admin/hardware-orders" element={<HardwareOrdersListPage />} />
         <Route path="/admin/hardware-orders/:id" element={<HardwareOrderDetailPage />} />
-        <Route path="/admin/branches" element={
-          <FeatureGate feature="multiLocation" fallback={<UpsellCard addOnCode="extra_branch" planName="PRO" />}>
-            <BranchesPage />
-          </FeatureGate>
-        } />
+        {/* The branch hub is the device/network management home for EVERY
+            tenant (single-location included), so it is NOT multiLocation-gated.
+            Creating a 2nd branch is still server-gated (@RequiresFeature). */}
+        <Route path="/admin/branches" element={<BranchesPage />} />
+        <Route path="/admin/branches/:id" element={<BranchDetailPage />} />
         <Route path="/admin/health" element={<HealthPage />} />
-        <Route path="/admin/bridges" element={<BridgesPage />} />
         {/* v3.0.6: webhooks now lives under Settings (/admin/settings/webhooks).
             Redirect the old top-level URL so existing links keep working. */}
         <Route path="/admin/webhooks" element={<Navigate to="/admin/settings/webhooks" replace />} />

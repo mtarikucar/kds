@@ -42,6 +42,7 @@ export const useCreateBridge = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: bridgeKeys.all });
+      qc.invalidateQueries({ queryKey: ['branches'] });
       toast.success('Bridge provisioned — copy the token before closing.');
     },
     onError: (e) => toast.error(getApiErrorMessage(e, 'Failed')),
@@ -54,6 +55,9 @@ export const useRetireBridge = () => {
     mutationFn: async (id: string): Promise<void> => {
       await api.delete(`/v1/bridges/${id}`);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: bridgeKeys.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: bridgeKeys.all });
+      qc.invalidateQueries({ queryKey: ['branches'] });
+    },
   });
 };

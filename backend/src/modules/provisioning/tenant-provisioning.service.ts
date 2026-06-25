@@ -182,6 +182,8 @@ export class TenantProvisioningService implements CoreProvisioningPort {
             name: "Main",
             status: "active",
             timezone: "UTC",
+            // The first branch is the tenant's Merkez/HQ (central-device home).
+            isHeadquarters: true,
           },
           select: { id: true },
         });

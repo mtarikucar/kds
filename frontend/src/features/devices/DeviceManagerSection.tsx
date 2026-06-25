@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'react-qr-code';
 import {
@@ -13,23 +13,22 @@ import {
   Router,
   Plus,
   Wifi,
-  AlertTriangle,
   Server,
   ChevronRight,
+  Clock,
 } from 'lucide-react';
-import { useCreateDeviceSlot, useListDevices, useRetireDevice, type DeviceKind, type Device } from './devicesApi';
+import {
+  useCreateDeviceSlot,
+  useListDevices,
+  useRetireDevice,
+  type DeviceKind,
+  type Device,
+} from './devicesApi';
 import DeviceCommandsDrawer from './DeviceCommandsDrawer';
 import { statusPillColor, visibleDevices } from './devicesView';
 import Card from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 
-/**
- * Tenant-facing devices page.
- *
- * Pairing happens on the device itself by typing the code shown in the new
- * row — no separate "pair" UI screen is needed today. Status pill colours map
- * onto the mesh state machine (online/offline/error/busy/maintenance/retired).
- */
 const KINDS: DeviceKind[] = [
   'kds_screen', 'tablet_waiter', 'tablet_customer', 'receipt_printer',
   'kitchen_printer', 'pos_terminal', 'yazarkasa', 'caller_id', 'scanner', 'local_bridge',
@@ -48,51 +47,52 @@ const KIND_ICON: Record<string, typeof Cpu> = {
   local_bridge: Router,
 };
 
-export default function DevicesPage() {
+/**
+ * Branch-scoped device management — the device table + provisioning extracted
+ * from the old flat DevicesPage so it can live INSIDE a branch on the hub. All
+ * reads/creates are pinned to `branchId`, so a device always lands in the
+ * branch you're managing (no stale X-Branch-Id surprises).
+ */
+export default function DeviceManagerSection({ branchId }: { branchId: string }) {
   const { t } = useTranslation('common');
   const [includeRetired, setIncludeRetired] = useState(false);
-  const [creating, setCreating] = useState<{ kind: DeviceKind }>({ kind: 'kds_screen' });
+  const [kind, setKind] = useState<DeviceKind>('kds_screen');
   const [openCommandsFor, setOpenCommandsFor] = useState<string | null>(null);
 
-  const { data: devices = [], isLoading } = useListDevices();
+  const { data: devices = [], isLoading } = useListDevices({ branchId });
   const createSlot = useCreateDeviceSlot();
   const retire = useRetireDevice();
 
   const visible = visibleDevices(devices, includeRetired);
-
-  // Stats computed on the live (non-retired) fleet.
-  const live = devices.filter((d) => d.status !== 'retired');
+  const live = devices.filter((d) => d.status !== 'retired' && d.status !== 'unprovisioned');
   const onlineCount = live.filter((d) => d.status === 'online').length;
-  const attentionCount = live.filter(
-    (d) => d.status === 'error' || d.status === 'offline',
-  ).length;
+  const pendingCount = devices.filter((d) => d.status === 'unprovisioned').length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
-            <Cpu className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              {t('hummytummy.devices.title')}
-            </h1>
-            <p className="text-sm text-slate-500">
-              {t('hummytummy.devices.pageSubtitle', {
-                defaultValue:
-                  'Tüm şubelerinizdeki ekran, yazıcı ve terminalleri buradan provizyonlayın ve izleyin.',
-              })}
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* Provision row */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <Server className="h-4 w-4 text-slate-400" />
+            {live.length} {t('hummytummy.devices.statTotal', { defaultValue: 'cihaz' })}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-emerald-600">
+            <Wifi className="h-4 w-4" />
+            {onlineCount} {t('hummytummy.devices.statOnline', { defaultValue: 'çevrimiçi' })}
+          </span>
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-amber-600">
+              <Clock className="h-4 w-4" />
+              {pendingCount} {t('hummytummy.devices.pending', { defaultValue: 'eşleşme bekliyor' })}
+            </span>
+          )}
         </div>
-        {/* Provision a new device slot (the single combobox on the page). */}
         <div className="flex items-center gap-2">
           <select
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-            value={creating.kind}
-            onChange={(e) => setCreating({ kind: e.target.value as DeviceKind })}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as DeviceKind)}
           >
             {KINDS.map((k) => (
               <option key={k} value={k}>
@@ -103,7 +103,7 @@ export default function DevicesPage() {
           <Button
             variant="primary"
             disabled={createSlot.isPending}
-            onClick={() => createSlot.mutate({ kind: creating.kind })}
+            onClick={() => createSlot.mutate({ kind, branchId })}
           >
             <Plus className="mr-1.5 h-4 w-4" />
             {t('hummytummy.devices.create')}
@@ -111,85 +111,31 @@ export default function DevicesPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card variant="bordered" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              <Server className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">
-                {t('hummytummy.devices.statTotal', { defaultValue: 'Toplam cihaz' })}
-              </p>
-              <p className="text-xl font-semibold text-slate-900">{live.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card variant="bordered" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-              <Wifi className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">
-                {t('hummytummy.devices.statOnline', { defaultValue: 'Çevrimiçi' })}
-              </p>
-              <p className="text-xl font-semibold text-slate-900">{onlineCount}</p>
-            </div>
-          </div>
-        </Card>
-        <Card variant="bordered" className="p-4">
-          <div className="flex items-center gap-3">
-            <div
-              className={
-                'flex h-10 w-10 items-center justify-center rounded-lg ' +
-                (attentionCount > 0
-                  ? 'bg-red-50 text-red-600'
-                  : 'bg-slate-100 text-slate-400')
-              }
-            >
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">
-                {t('hummytummy.devices.statAttention', {
-                  defaultValue: 'Dikkat gerekiyor',
-                })}
-              </p>
-              <p className="text-xl font-semibold text-slate-900">{attentionCount}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      {devices.length > 0 && (
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+            checked={includeRetired}
+            onChange={(e) => setIncludeRetired(e.target.checked)}
+          />
+          {t('hummytummy.devices.showRetired')}
+        </label>
+      )}
 
-      <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-slate-600">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-          checked={includeRetired}
-          onChange={(e) => setIncludeRetired(e.target.checked)}
-        />
-        {t('hummytummy.devices.showRetired')}
-      </label>
-
-      {/* Devices */}
       {isLoading ? (
         <div className="text-sm text-slate-500">{t('hummytummy.common.loading')}</div>
       ) : visible.length === 0 ? (
-        <Card
-          variant="bordered"
-          className="flex flex-col items-center gap-2 p-10 text-center"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-            <Cpu className="h-6 w-6" />
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-slate-200 p-8 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+            <Cpu className="h-5 w-5" />
           </div>
           <p className="text-sm text-slate-500">{t('hummytummy.devices.empty')}</p>
-        </Card>
+        </div>
       ) : (
         <Card variant="bordered" className="overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] divide-y divide-slate-100 text-sm">
+            <table className="w-full min-w-[720px] divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">{t('hummytummy.devices.col.kind')}</th>
@@ -217,8 +163,8 @@ export default function DevicesPage() {
                           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                             <KindIcon className="h-4 w-4" />
                           </span>
-                          <span className="font-mono text-xs text-primary-700 group-hover:underline">
-                            {d.kind}
+                          <span className="text-xs font-medium text-slate-700 group-hover:text-primary-700 group-hover:underline">
+                            {t(`hummytummy.devices.kind.${d.kind}`, { defaultValue: d.kind })}
                           </span>
                           <ChevronRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-400" />
                         </button>
@@ -271,13 +217,27 @@ export default function DevicesPage() {
   );
 }
 
-/**
- * Pair-code cell: the short alphanumeric code + a small QR encoding the same
- * string. Click toggles a larger 192px QR for venue-floor scanning across the
- * room (the small inline QR is hard to scan past ~30cm).
- */
+/** Live pair-code countdown so the operator knows how long the code is valid. */
+function pairCountdown(expiresAt?: string | null): string | null {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function PairCodeCell({ code, expiresAt }: { code: string; expiresAt?: string | null }) {
   const [expanded, setExpanded] = useState(false);
+  // Tick once a second so the countdown counts down live (the device list
+  // only refetches every 15s, which would make the timer jump).
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!expiresAt) return;
+    const h = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(h);
+  }, [expiresAt]);
+  const left = pairCountdown(expiresAt);
   return (
     <div className="flex items-center gap-2.5">
       <button
@@ -288,19 +248,21 @@ function PairCodeCell({ code, expiresAt }: { code: string; expiresAt?: string | 
       >
         <QRCode value={code} size={expanded ? 192 : 52} />
       </button>
-      <span className="font-mono text-base font-medium tracking-wider text-slate-900">
-        {code}
-      </span>
+      <div className="flex flex-col">
+        <span className="font-mono text-base font-medium tracking-wider text-slate-900">{code}</span>
+        {left && <span className="text-xs text-amber-600">{left}</span>}
+      </div>
     </div>
   );
 }
 
 function StatusPill({ status }: { status: string }) {
+  const { t } = useTranslation('common');
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusPillColor(status)}`}
     >
-      {status}
+      {t(`hummytummy.devices.statusLabel.${status}`, { defaultValue: status })}
     </span>
   );
 }

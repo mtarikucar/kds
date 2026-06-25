@@ -426,3 +426,65 @@ describe("DeviceService sweepStale", () => {
     expect(await svc.sweepStale()).toBe(0);
   });
 });
+
+describe("DeviceService slot lifecycle + tallies (branch hub)", () => {
+  let prisma: MockPrismaClient;
+  let outbox: { append: jest.Mock };
+  let svc: DeviceService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue("o") };
+    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
+  });
+
+  it("createSlot rejects when the branch already has the max pending (unpaired) slots", async () => {
+    (prisma.device.count as any).mockResolvedValue(10); // MAX_PENDING_SLOTS_PER_BRANCH
+    await expect(
+      svc.createSlot("t1", { kind: "kds_screen", branchId: "b1" }),
+    ).rejects.toThrow(/waiting to be paired/i);
+    expect(prisma.device.create).not.toHaveBeenCalled();
+  });
+
+  it("createSlot proceeds when under the pending cap", async () => {
+    (prisma.device.count as any).mockResolvedValue(3);
+    (prisma.device.findUnique as any).mockResolvedValue(null); // no pairCode collision
+    (prisma.device.create as any).mockImplementation(async ({ data }: any) => ({
+      id: "dev-1",
+      branchId: "b1",
+      kind: data.kind,
+      status: "unprovisioned",
+    }));
+    const res = await svc.createSlot("t1", { kind: "kds_screen", branchId: "b1" });
+    expect(res.id).toBe("dev-1");
+    expect(prisma.device.create).toHaveBeenCalled();
+  });
+
+  it("pruneExpiredUnprovisioned deletes only expired unprovisioned slots", async () => {
+    let whereArg: any;
+    (prisma.device.deleteMany as any).mockImplementation(async ({ where }: any) => {
+      whereArg = where;
+      return { count: 3 };
+    });
+    const n = await svc.pruneExpiredUnprovisioned();
+    expect(n).toBe(3);
+    expect(whereArg.status).toBe("unprovisioned");
+    expect(whereArg.pairCodeExpiresAt.lt).toBeInstanceOf(Date);
+  });
+
+  it("countsByBranch splits real (online/total) from pending and ignores retired", async () => {
+    (prisma.device.groupBy as any).mockResolvedValue([
+      { branchId: "b1", status: "online", _count: { _all: 2 } },
+      { branchId: "b1", status: "offline", _count: { _all: 1 } },
+      { branchId: "b1", status: "unprovisioned", _count: { _all: 4 } },
+      { branchId: "b2", status: "online", _count: { _all: 1 } },
+    ]);
+    const out = await svc.countsByBranch("t1");
+    expect(out["b1"]).toEqual({ total: 3, online: 2, pending: 4 });
+    expect(out["b2"]).toEqual({ total: 1, online: 1, pending: 0 });
+    // The query must exclude retired devices.
+    const where = (prisma.device.groupBy as any).mock.calls[0][0].where;
+    expect(where.status).toEqual({ not: "retired" });
+  });
+});

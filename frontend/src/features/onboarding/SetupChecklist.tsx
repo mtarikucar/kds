@@ -33,20 +33,20 @@ export default function SetupChecklist() {
       key: 'kds',
       label: t('hummytummy.setupChecklist.items.kds'),
       done: devices.some((d) => d.kind === 'kds_screen' && d.status !== 'unprovisioned'),
-      link: { to: '/admin/devices', label: t('navigation.devices') },
+      link: { to: '/admin/branches', label: t('navigation.branches') },
       skip: !(ents?.features['feature.kdsIntegration']),
     },
     {
       key: 'tablet',
       label: t('hummytummy.setupChecklist.items.tablet'),
       done: devices.some((d) => d.kind === 'tablet_waiter' && d.status !== 'unprovisioned'),
-      link: { to: '/admin/devices', label: t('navigation.devices') },
+      link: { to: '/admin/branches', label: t('navigation.branches') },
     },
     {
       key: 'bridge',
       label: t('hummytummy.setupChecklist.items.bridge'),
       done: bridges.some((b) => b.status === 'online'),
-      link: { to: '/admin/bridges', label: t('navigation.bridges') },
+      link: { to: '/admin/branches', label: t('navigation.branches') },
       skip:
         !devices.some((d) => ['yazarkasa', 'receipt_printer', 'kitchen_printer', 'pos_terminal'].includes(d.kind)),
     },
