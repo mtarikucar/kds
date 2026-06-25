@@ -4806,6 +4806,81 @@ model FiscalDeviceRecord {
   @@map("fiscal_devices")
 }
 
+// ========================================
+// PAYMENT TERMINAL (integrated card charging)
+// ========================================
+
+// A configured card-payment terminal for a branch — mirrors FiscalDeviceRecord.
+// providerId selects the adapter: 'simulator' (fail-closed test, never real
+// money), 'gmp3_card' (integrated Yazarkasa-POS, charge+fiş atomic),
+// 'bank_ecr' (external bank POS, charge-only), 'softpos' (PSP/SoftPOS API).
+// activationState gates real charging: only ACTIVE providers move money; a
+// SIMULATOR record is clearly test-mode.
+model PaymentTerminalRecord {
+  id              String    @id @default(uuid())
+  tenantId        String
+  branchId        String?
+  providerId      String
+  // Optional link to the device-mesh Device row (physical terminal / Yazarkasa-POS via bridge).
+  deviceId        String?
+  serial          String
+  model           String?
+  capabilities    String[]  @default([])
+  // online|offline|error|maintenance|retired
+  status          String    @default("offline")
+  // CONFIGURED_NOT_ACTIVE | ACTIVE | DISABLED | SIMULATOR
+  activationState String    @default("CONFIGURED_NOT_ACTIVE")
+  lastSeenAt      DateTime?
+  // Provider-specific config (merchantId, terminalId, host/port, sim outcome).
+  config          Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, providerId, serial])
+  @@index([tenantId, branchId, status])
+  @@map("payment_terminals")
+}
+
+// The charge-attempt ledger — one row per "send to terminal" attempt, for
+// BOTH bridge-routed async charges (deviceCommandId links the DeviceCommand)
+// and in-process providers (simulator/SoftPOS, no command). Backs polling +
+// crash recovery: an APPROVED row whose Payment didn't get written is
+// reconciled by approvalCode/rrn. Loose FKs (plain ids) match the
+// FiscalDeviceRecord convention; integrity enforced in the service.
+model PaymentTerminalCharge {
+  id               String   @id @default(uuid())
+  tenantId         String
+  branchId         String?
+  orderId          String
+  terminalRecordId String
+  providerId       String
+  // device-mesh command id for bridge-routed providers (null for simulator/PSP).
+  deviceCommandId  String?
+  amountCents      Int
+  // PENDING | APPROVED | DECLINED | TIMEOUT | ERROR | CANCELLED | RECORDED
+  status           String   @default("PENDING")
+  // Bank/provider approval reference — also written to Payment.transactionId.
+  approvalCode     String?
+  rrn              String?
+  cardBrand        String?
+  maskedPan        String?
+  // Set when a fiscal_coupled provider (GMP-3) printed the fiş in the same op.
+  fiscalNo         String?
+  // The recorded Payment id once APPROVED → RECORDED (idempotency anchor).
+  paymentId        String?
+  error            String?
+  // Dedup the START call so a double-click doesn't open two charges.
+  idempotencyKey   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([orderId, status])
+  @@index([tenantId, status, createdAt])
+  @@index([deviceCommandId])
+  @@map("payment_terminal_charges")
+}
+
 model FiscalReceipt {
   id             String              @id @default(uuid())
   tenantId       String
