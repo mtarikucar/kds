@@ -90,6 +90,7 @@ const ReservationSettingsPage = lazyWithReload(() => import('./pages/settings/Re
 const DeliveryPlatformsSettingsPage = lazyWithReload(() => import('./pages/settings/DeliveryPlatformsSettingsPage'));
 const SmsSettingsPage = lazyWithReload(() => import('./pages/settings/SmsSettingsPage'));
 const AccountingSettingsPage = lazyWithReload(() => import('./pages/settings/AccountingSettingsPage'));
+const PaymentTerminalsSettingsPage = lazyWithReload(() => import('./pages/settings/PaymentTerminalsSettingsPage'));
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 // HummyTummy Phase 3–12 admin screens.
@@ -344,6 +345,10 @@ function App() {
               <AccountingSettingsPage />
             </FeatureGate>
           } />
+          {/* Integrated card terminals — core POS hardware, no plan gate. The
+              rail is fail-closed: real adapters stay CONFIGURED_NOT_ACTIVE until
+              an operator activates certified hardware here. */}
+          <Route path="payment-terminals" element={<PaymentTerminalsSettingsPage />} />
         </Route>
 
         {/* Legacy redirects */}

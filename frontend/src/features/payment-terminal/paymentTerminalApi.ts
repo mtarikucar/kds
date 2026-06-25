@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 
@@ -69,3 +69,110 @@ export const cancelTerminalCharge = async (
 /** Terminal statuses that close the attempt (stop polling). */
 export const isTerminalDone = (s: TerminalChargeView['status']) =>
   s === 'RECORDED' || s === 'DECLINED' || s === 'TIMEOUT' || s === 'ERROR' || s === 'CANCELLED';
+
+// ── Provisioning (admin) ───────────────────────────────────────────────────
+
+export type TerminalActivationState =
+  | 'CONFIGURED_NOT_ACTIVE'
+  | 'ACTIVE'
+  | 'SIMULATOR'
+  | 'DISABLED';
+
+export interface TerminalProvider {
+  id: string;
+  kind: 'bridge' | 'in_process';
+  capabilities: string[];
+  fiscalCoupled: boolean;
+}
+
+export interface TerminalRecord {
+  id: string;
+  providerId: string;
+  providerKind: 'bridge' | 'in_process' | null;
+  providerRegistered: boolean;
+  capabilities: string[];
+  fiscalCoupled: boolean;
+  serial: string;
+  model: string | null;
+  branchId: string | null;
+  deviceId: string | null;
+  status: string;
+  activationState: TerminalActivationState;
+  lastSeenAt: string | null;
+}
+
+export interface RegisterTerminalInput {
+  providerId: string;
+  serial: string;
+  model?: string;
+  deviceId?: string;
+  config?: Record<string, unknown>;
+}
+
+export const useTerminalProviders = () =>
+  useQuery({
+    queryKey: ['terminalProviders'],
+    queryFn: async (): Promise<TerminalProvider[]> => {
+      const res = await api.get<TerminalProvider[]>('/payment-terminal/providers');
+      return res.data;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+export const useTerminals = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['paymentTerminals', branchId],
+    queryFn: async (): Promise<TerminalRecord[]> => {
+      const res = await api.get<TerminalRecord[]>('/payment-terminal/terminals');
+      return res.data;
+    },
+  });
+};
+
+const useInvalidateTerminals = () => {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['paymentTerminals'] });
+    void qc.invalidateQueries({ queryKey: ['paymentTerminalActive'] });
+  };
+};
+
+export const useRegisterTerminal = () => {
+  const invalidate = useInvalidateTerminals();
+  return useMutation({
+    mutationFn: async (input: RegisterTerminalInput): Promise<TerminalRecord> => {
+      const res = await api.post('/payment-terminal/terminals', input);
+      return res.data;
+    },
+    onSuccess: invalidate,
+  });
+};
+
+export const useSetTerminalActivation = () => {
+  const invalidate = useInvalidateTerminals();
+  return useMutation({
+    mutationFn: async (vars: {
+      id: string;
+      activationState: TerminalActivationState;
+    }): Promise<TerminalRecord> => {
+      const res = await api.patch(
+        `/payment-terminal/terminals/${vars.id}/activation`,
+        { activationState: vars.activationState },
+      );
+      return res.data;
+    },
+    onSuccess: invalidate,
+  });
+};
+
+export const useRemoveTerminal = () => {
+  const invalidate = useInvalidateTerminals();
+  return useMutation({
+    mutationFn: async (id: string): Promise<{ id: string; retired: boolean }> => {
+      const res = await api.delete(`/payment-terminal/terminals/${id}`);
+      return res.data;
+    },
+    onSuccess: invalidate,
+  });
+};

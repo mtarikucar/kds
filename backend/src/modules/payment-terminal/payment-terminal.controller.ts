@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
@@ -11,6 +20,8 @@ import { BranchScope } from "../../common/scoping/branch-scope";
 import { UserRole } from "../../common/constants/roles.enum";
 import { PaymentTerminalService } from "./payment-terminal.service";
 import { StartTerminalChargeDto } from "./dto/start-terminal-charge.dto";
+import { RegisterTerminalDto } from "./dto/register-terminal.dto";
+import { SetTerminalActivationDto } from "./dto/set-terminal-activation.dto";
 
 @ApiTags("payment-terminal")
 @ApiBearerAuth()
@@ -35,6 +46,58 @@ export class PaymentTerminalController {
       simulator: t.activationState === "SIMULATOR",
     };
   }
+
+  // ── Provisioning (ADMIN/MANAGER) ────────────────────────────────────────
+
+  @Get("payment-terminal/providers")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Registered terminal providers (for the register form)",
+  })
+  providers() {
+    return this.terminal.listProviders();
+  }
+
+  @Get("payment-terminal/terminals")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Terminals registered for this branch" })
+  terminals(@CurrentScope() scope: BranchScope) {
+    return this.terminal.listTerminals(scope);
+  }
+
+  @Post("payment-terminal/terminals")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Register a terminal (starts CONFIGURED_NOT_ACTIVE — fail-closed)",
+  })
+  register(
+    @Body() dto: RegisterTerminalDto,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.terminal.registerTerminal(scope, dto);
+  }
+
+  @Patch("payment-terminal/terminals/:id/activation")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Set a terminal's activation state (ACTIVE is gated)",
+  })
+  setActivation(
+    @Param("id") id: string,
+    @Body() dto: SetTerminalActivationDto,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.terminal.setActivation(scope, id, dto.activationState);
+  }
+
+  @Delete("payment-terminal/terminals/:id")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Retire a terminal (stops resolving)" })
+  remove(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.terminal.removeTerminal(scope, id);
+  }
+
+  // ── Charging (ADMIN/MANAGER/WAITER) ─────────────────────────────────────
 
   @Post("orders/:orderId/terminal-charge")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)

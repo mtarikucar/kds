@@ -8,7 +8,42 @@
     "sms": "SMS Bildirishmalar",
     "onlineOrders": "Onlayn buyurtmalar",
     "accounting": "Buxgalteriya",
-    "partnerKeys": "Hamkor API kalitlari"
+    "partnerKeys": "Hamkor API kalitlari",
+    "paymentTerminals": "Karta terminallari"
+  },
+  "paymentTerminals": {
+    "title": "Karta terminallari",
+    "description": "Karta terminalini ulang, shunda \"To‘lov → Karta\" bosilganda karta qurilmada o‘qiladi.",
+    "gateNote": "Haqiqiy terminallar sertifikatlangan qurilma ulanib, bu yerda faollashtirilmaguncha nofaol turadi — shu vaqtgacha hech qaysi kartadan pul yechilmaydi. Jarayonni boshidan-oxirigacha sinash uchun simulyatordan foydalaning.",
+    "register": "Terminal qo‘shish",
+    "registerTitle": "Karta terminali qo‘shish",
+    "empty": "Hozircha karta terminallari yo‘q. Qurilmada karta qabul qilish uchun bittasini qo‘shing.",
+    "provider": "Provayder",
+    "choose": "Provayderni tanlang…",
+    "serial": "Seriya raqami",
+    "model": "Model",
+    "device": "Bog‘langan qurilma",
+    "deviceHint": "Bog‘langan terminalning qurilma IDsi (bu provayder uchun majburiy)",
+    "fiscalCoupled": "Chek chiqaradi",
+    "providerMissing": "Provayder o‘rnatilmagan",
+    "activate": "Faollashtirish",
+    "deactivate": "O‘chirish",
+    "enableSimulator": "Simulyatorni yoqish",
+    "remove": "Olib tashlash",
+    "removeConfirm": "Bu terminal olib tashlansinmi? U endi karta to‘lovlarida ishlatilmaydi.",
+    "registered": "Terminal qo‘shildi",
+    "registerFailed": "Terminalni qo‘shib bo‘lmadi",
+    "stateChanged": "Terminal yangilandi",
+    "stateFailed": "Terminalni yangilab bo‘lmadi",
+    "removed": "Terminal olib tashlandi",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "state": {
+      "CONFIGURED_NOT_ACTIVE": "Sozlangan (nofaol)",
+      "ACTIVE": "Faol",
+      "SIMULATOR": "Simulyator",
+      "DISABLED": "O‘chirilgan"
+    }
   },
   "sms": {
     "title": "SMS Bildirish Sozlamalari",
