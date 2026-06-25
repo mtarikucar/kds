@@ -305,5 +305,18 @@
     "body": "O‘tirtirish uchun bron yozuvi yo‘q — lekin qulfni chetlab o‘tib buyurtma qabul qilishni boshlashingiz mumkin. Stol avval Mavjud holatiga o‘tkaziladi.",
     "proceedButton": "Ochish va buyurtma olish",
     "cancelButton": "Bekor qilish"
+  },
+  "terminalCharge": {
+    "title": "Karta orqali to‘lov",
+    "waiting": "Karta kutilmoqda — mijozdan kartani o‘qitishini so‘rang",
+    "recording": "Tasdiqlandi, to‘lov saqlanmoqda…",
+    "cancel": "Bekor qilish",
+    "close": "Yopish",
+    "retry": "Qayta urinish",
+    "declined": "Karta rad etildi",
+    "timeout": "Vaqt tugadi — terminal javob bermadi",
+    "error": "To‘lov xatosi",
+    "cancelled": "To‘lov bekor qilindi",
+    "recorded": "To‘lov qabul qilindi"
   }
 }

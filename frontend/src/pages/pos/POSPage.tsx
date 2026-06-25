@@ -45,6 +45,15 @@ import { runReceiptSideEffects } from './posReceipt';
 import { buildOrderData } from './buildOrderData';
 import { useTableSelection } from './useTableSelection';
 import type { POSView, CartItem } from './posTypes';
+import TerminalChargeModal from '../../components/pos/TerminalChargeModal';
+import {
+  useActiveTerminal,
+  startTerminalCharge,
+  pollTerminalCharge,
+  cancelTerminalCharge,
+  isTerminalDone,
+  type TerminalChargeView,
+} from '../../features/payment-terminal/paymentTerminalApi';
 
 const POSPage = () => {
   const { t } = useTranslation('pos');
@@ -85,6 +94,19 @@ const POSPage = () => {
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [isBillSplitModalOpen, setIsBillSplitModalOpen] = useState(false);
   const [isProgressiveModalOpen, setIsProgressiveModalOpen] = useState(false);
+
+  // Integrated card terminal: when this branch drives a terminal, a CARD
+  // payment is charged on-device (the manual-card flow is untouched otherwise).
+  // `terminalCharge` is the on-screen attempt — null when no charge is active.
+  // It carries the original `target` so Retry can re-run and Cancel knows the
+  // order. `chargeId` is set once the START has returned (needed for cancel).
+  const { data: activeTerminal } = useActiveTerminal();
+  const [terminalCharge, setTerminalCharge] = useState<{
+    status: TerminalChargeView['status'];
+    error: string | null;
+    chargeId: string | null;
+    target: { orderId: string; amount: number; wasExistingOrderPayment: boolean };
+  } | null>(null);
 
   // Responsive hook. `width` lets us pick the POS split threshold independently
   // of the shared `isDesktop` (>=1024) flag: landscape tablets (>=768/md) now
@@ -499,6 +521,97 @@ const POSPage = () => {
     setIsPaymentModalOpen(true);
   };
 
+  // ── Integrated card terminal (charge BEFORE record) ───────────────────
+  // On RECORDED the backend has ALREADY written the Payment via the money-safe
+  // rail (PaymentsService.create), so we only finalize the UI here — mirroring
+  // the manual onSuccess table-release race guard (refetch → re-check remaining
+  // → free table). DECLINED/ERROR/TIMEOUT keep the order open for retry.
+  const startCardTerminalCharge = async (target: {
+    orderId: string;
+    amount: number;
+    wasExistingOrderPayment: boolean;
+  }) => {
+    setTerminalCharge({ status: 'PENDING', error: null, chargeId: null, target });
+    try {
+      let view = await startTerminalCharge(
+        target.orderId,
+        target.amount,
+        crypto.randomUUID(),
+      );
+      // In-process providers (simulator) resolve on START; bridge providers
+      // return PENDING — poll up to ~90s while the cashier taps the card.
+      for (let i = 0; i < 45 && !isTerminalDone(view.status); i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        view = await pollTerminalCharge(target.orderId, view.chargeId);
+      }
+      if (view.status === 'RECORDED') {
+        setTerminalCharge(null);
+        const refreshed = await refetchOrders();
+        const freshOrders = refreshed.data ?? tableOrders ?? [];
+        setIsPaymentModalOpen(false);
+        setPayingOrderId(null);
+        setPayingOrderAmount(null);
+        const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders, target.orderId);
+        if (!hasRemainingOrders && selectedTable) {
+          updateTableStatus({ id: selectedTable.id, status: TableStatus.AVAILABLE });
+        }
+        if (!target.wasExistingOrderPayment) {
+          setCurrentOrderId(null);
+          setCurrentOrderAmount(null);
+          setSelectedTable(null);
+          setCartItems([]);
+          setDiscount(0);
+          setCustomerName('');
+          setOrderNotes('');
+          setCartDirtySinceOrder(false);
+        }
+        toast.success(t('orderCompletedSuccess'));
+      } else if (view.status !== 'CANCELLED') {
+        // Not approved/recorded — surface the bank reason; order stays open.
+        // CANCELLED is skipped: the operator already dismissed the modal via
+        // Cancel, so re-opening it to a cancelled state would just flicker.
+        // If the loop exhausted while still PENDING (a bridge terminal that
+        // never acked within ~90s), present it as TIMEOUT so the operator gets
+        // Retry/Close instead of a frozen spinner. The order stays open and the
+        // non-retryable command may still settle — the recovery sweep records
+        // it if it ultimately APPROVED.
+        const settled = isTerminalDone(view.status) ? view.status : 'TIMEOUT';
+        setTerminalCharge({
+          status: settled,
+          error: view.error,
+          chargeId: view.chargeId,
+          target,
+        });
+      }
+    } catch (e: any) {
+      setTerminalCharge({
+        status: 'ERROR',
+        error: e?.response?.data?.message ?? t('orderPaymentFailed', 'Ödeme başarısız'),
+        chargeId: null,
+        target,
+      });
+    }
+  };
+
+  // Abort a still-pending charge (bridge terminals). The poll loop sees the
+  // CANCELLED status on its next tick and stops; we also close the modal now.
+  const handleTerminalCancel = async () => {
+    if (terminalCharge?.chargeId) {
+      try {
+        await cancelTerminalCharge(terminalCharge.target.orderId, terminalCharge.chargeId);
+      } catch {
+        // Best-effort — if the cancel races a settle, the poll loop reflects it.
+      }
+    }
+    setTerminalCharge(null);
+  };
+
+  const handleTerminalRetry = () => {
+    if (terminalCharge) void startCardTerminalCharge(terminalCharge.target);
+  };
+
+  const handleTerminalClose = () => setTerminalCharge(null);
+
   const handlePaymentConfirm = (data: { method: string; transactionId?: string; customerPhone?: string }) => {
     // Determine which order to pay: SERVED order (payingOrderId) or cart order
     // (currentOrderId). Returns null (and we bail) when nothing is chargeable.
@@ -511,6 +624,13 @@ const POSPage = () => {
     if (!target) return;
     const orderIdToPay = target.orderId;
     const amountToPay = target.amount;
+
+    // Card + an active terminal → drive the terminal (charge before record).
+    // No active terminal → unchanged manual-card flow below (zero regression).
+    if (data.method === 'CARD' && activeTerminal?.active) {
+      void startCardTerminalCharge(target);
+      return;
+    }
 
     createPayment(
       {
@@ -1066,6 +1186,15 @@ const POSPage = () => {
         total={payingOrderAmount ?? currentOrderAmount ?? total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
+      />
+
+      {/* Integrated card-terminal status (only mounts when a charge is active) */}
+      <TerminalChargeModal
+        charge={terminalCharge}
+        amount={terminalCharge?.target.amount ?? 0}
+        onCancel={handleTerminalCancel}
+        onRetry={handleTerminalRetry}
+        onClose={handleTerminalClose}
       />
 
       {/* Product Options Modal */}

@@ -35,7 +35,9 @@ describe("PaymentTerminalService (simulator money-safety)", () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    payments = { create: jest.fn().mockResolvedValue({ payment: { id: "pay-1" } }) };
+    // PaymentsService.create resolves the raw Payment row (id at top level),
+    // same shape as production — applyResult reads `.payment?.id ?? .id`.
+    payments = { create: jest.fn().mockResolvedValue({ id: "pay-1" }) };
     commandQueue = { enqueue: jest.fn() };
     const registry = new PaymentTerminalProviderRegistry();
     registry.register(new SimulatorTerminalProvider());

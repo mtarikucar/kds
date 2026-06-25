@@ -30,10 +30,21 @@ vi.mock('../../components/pos/BillSplitModal', () => ({ default: () => null }));
 vi.mock('../../components/pos/ProgressiveSplitModal', () => ({ default: () => null }));
 vi.mock('../../components/pos/ReservationActionDialog', () => ({ default: () => null }));
 vi.mock('../../components/pos/ManualLockDialog', () => ({ default: () => null }));
+vi.mock('../../components/pos/TerminalChargeModal', () => ({ default: () => null }));
 vi.mock('../../components/ui/Spinner', () => ({ default: () => <div data-testid="spinner" /> }));
 // Heavy Konva live map — stub it (jsdom has no canvas, and its import chain
 // pulls i18n/config which this test's react-i18next mock doesn't initialize).
 vi.mock('../../features/floor-plan/components/LiveFloorMap', () => ({ default: () => <div data-testid="live-floor-map" /> }));
+
+// Payment terminal: inert (no active terminal → manual-card flow, no useQuery
+// so the test needs no QueryClientProvider).
+vi.mock('../../features/payment-terminal/paymentTerminalApi', () => ({
+  useActiveTerminal: () => ({ data: { active: false } }),
+  startTerminalCharge: vi.fn(),
+  pollTerminalCharge: vi.fn(),
+  cancelTerminalCharge: vi.fn(),
+  isTerminalDone: () => true,
+}));
 
 // --- i18n ----------------------------------------------------------------
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
