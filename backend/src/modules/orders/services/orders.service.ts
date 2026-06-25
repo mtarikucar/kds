@@ -926,7 +926,23 @@ export class OrdersService {
         ? totalAmountDec
         : rawDiscount;
       updateData.discount = cappedDiscount;
-      updateData.finalAmount = totalAmountDec.sub(cappedDiscount);
+      const newFinalAmount = totalAmountDec.sub(cappedDiscount);
+      updateData.finalAmount = newFinalAmount;
+      // Re-derive the (KDV-inclusive) tax proportionally — the other three
+      // money paths (createInner, items-rewrite at 905-908, removeItem) all
+      // recompute taxAmount after a discount; the discount-only branch used to
+      // leave order.taxAmount stale, so the printed fiş showed KDV for the
+      // pre-discount total. taxAmount scales linearly with the discounted
+      // total (taxAmount/finalAmount = grossTax/totalAmount is constant), so
+      // newTax = currentTax × newFinal/oldFinal — exact even when a discount
+      // already existed (a flat (1−ratio) on the stored tax would double-count).
+      const oldFinalAmount = new Prisma.Decimal(order.finalAmount);
+      updateData.taxAmount = oldFinalAmount.gt(0)
+        ? new Prisma.Decimal(order.taxAmount)
+            .mul(newFinalAmount)
+            .div(oldFinalAmount)
+            .toDecimalPlaces(2)
+        : new Prisma.Decimal(0);
     }
 
     // Atomic replace of the item set: a crash between the deleteMany
@@ -976,6 +992,27 @@ export class OrdersService {
         if (allocCount > 0) {
           throw new ConflictException(
             "Cannot change the order discount once any per-item payment has been collected. " +
+              "Refund the existing payment(s) first, then re-apply the discount.",
+          );
+        }
+        // A plain (non-per-item) Payment — e.g. a partial cash payment via
+        // create() — writes no OrderItemPayment row, so the allocCount guard
+        // above misses it. Without this, a discount that drops finalAmount
+        // below the amount already collected silently over-charges the
+        // customer (order.finalAmount < Σ COMPLETED payments) with no refund.
+        const paidAgg = await tx.payment.aggregate({
+          where: {
+            orderId: id,
+            tenantId: scope.tenantId,
+            status: "COMPLETED",
+          },
+          _sum: { amount: true },
+        });
+        const alreadyPaid = new Prisma.Decimal(paidAgg._sum.amount ?? 0);
+        const newFinal = new Prisma.Decimal(updateData.finalAmount as any);
+        if (alreadyPaid.gt(0) && newFinal.lt(alreadyPaid)) {
+          throw new ConflictException(
+            "Cannot lower the order total below the amount already paid. " +
               "Refund the existing payment(s) first, then re-apply the discount.",
           );
         }

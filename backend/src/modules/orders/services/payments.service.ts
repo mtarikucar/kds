@@ -540,7 +540,13 @@ export class PaymentsService {
             );
             const orderAmount = new Prisma.Decimal(order.finalAmount);
 
-            if (totalPaidAmount.gte(orderAmount)) {
+            // Close the order on a within-tolerance total. The overpayment
+            // guard above accepts a payment up to remaining+PAYMENT_TOLERANCE,
+            // so the PAID transition must grant the SAME ±tolerance — else a
+            // kuruş-short full payment (float-legacy caller) is booked yet the
+            // order is stranded SERVED forever (no invoice/loyalty/fiş, table
+            // never releases). Mirrors splitBill + payByItems (M13).
+            if (totalPaidAmount.gte(orderAmount.sub(PAYMENT_TOLERANCE))) {
               await this.finalizeFullyPaid(
                 tx,
                 order,
@@ -1019,7 +1025,14 @@ export class PaymentsService {
       // sibling check must also stay in Decimal or the >= will be on
       // mixed types and throw at runtime / typecheck.
       const totalPaidAmount = new Prisma.Decimal(totalPaid._sum.amount ?? 0);
-      const isFullyPaid = totalPaidAmount.gte(orderAmount);
+      // Use the SAME ±PAYMENT_TOLERANCE validateSplitTotal already grants when
+      // accepting the split: it tolerates a total a kuruş short of `remaining`,
+      // so the PAID transition must too — otherwise an accepted split takes the
+      // money but leaves the order stranded SERVED with ~0.01 "outstanding"
+      // (table held, no invoice/fiş/loyalty). Mirrors payByItems (M13).
+      const isFullyPaid = totalPaidAmount.gte(
+        orderAmount.sub(PAYMENT_TOLERANCE),
+      );
 
       if (isFullyPaid) {
         // Preserve pre-refactor splitBill semantics: customer stats
@@ -1215,7 +1228,13 @@ export class PaymentsService {
 
             const order = await tx.order.findFirst({
               where: { id: orderId, tenantId },
-              include: { orderItems: true },
+              include: {
+                orderItems: true,
+                // Prior COMPLETED payments — used to reconcile the closing
+                // payment to the exact order residual (loaded under the
+                // advisory lock acquired above, so it reflects current state).
+                payments: { where: { status: PaymentStatus.COMPLETED } },
+              },
             });
 
             if (!order) {
@@ -1347,6 +1366,45 @@ export class PaymentsService {
                 amount: entryAmount,
               });
               derivedTotal = derivedTotal.add(entryAmount);
+            }
+
+            // ORDER-LEVEL RECONCILIATION (audit fix). The per-item amounts
+            // above round the pro-rata discount INDEPENDENTLY, so when every
+            // item is paid in its own call the sum of those rounded item
+            // totals drifts from order.finalAmount (e.g. 60×round2(1.49×0.9954)
+            // = 88.80 vs finalAmount 88.99 → 0.19 lost; or the mirror case
+            // overcharges). When THIS call allocates the last outstanding
+            // unit(s) of the whole order, force the closing payment to the
+            // exact order residual (finalAmount − already-collected) so
+            // Σ(all completed payments) === finalAmount to the kuruş, and push
+            // the drift onto the closing allocation row so the per-item ledger
+            // stays consistent with the Payment row.
+            const postAllocated = new Map<string, number>(paidByItem);
+            for (const entry of dto.items) {
+              postAllocated.set(
+                entry.orderItemId,
+                (postAllocated.get(entry.orderItemId) ?? 0) + entry.quantity,
+              );
+            }
+            const closesOrder = order.orderItems.every(
+              (oi) => (postAllocated.get(oi.id) ?? 0) >= oi.quantity,
+            );
+            if (closesOrder) {
+              const priorPaid = (order.payments ?? []).reduce(
+                (s, p) => s.add(new Prisma.Decimal(p.amount)),
+                new Prisma.Decimal(0),
+              );
+              let target = new Prisma.Decimal(order.finalAmount).sub(priorPaid);
+              if (target.lt(0)) target = new Prisma.Decimal(0);
+              target = target.toDecimalPlaces(2);
+              const drift = target.sub(derivedTotal);
+              if (!drift.isZero() && allocationRows.length > 0) {
+                const last = allocationRows[allocationRows.length - 1];
+                let adjusted = last.amount.add(drift);
+                if (adjusted.lt(0)) adjusted = new Prisma.Decimal(0);
+                last.amount = adjusted;
+              }
+              derivedTotal = target;
             }
 
             // Build the per-payment receipt snapshot so this Payment

@@ -946,7 +946,21 @@ describe("PaymentsService — progressive per-item payments", () => {
             orderItemPayments: [],
           },
         ],
-        payments: [],
+        // Reflect the prior COMPLETED payments so the closing call's
+        // order-level reconciliation (finalAmount − priorPaid) matches the
+        // per-item residual exactly (production loads these fresh each call).
+        payments: priorSum.gt(0)
+          ? [
+              {
+                amount: priorSum,
+                status: PaymentStatus.COMPLETED,
+                method: "CASH",
+                notes: null,
+                paidAt: new Date(),
+                orderItemPayments: [],
+              },
+            ]
+          : [],
       });
       (prisma.order.findFirst as unknown as jest.Mock).mockImplementation(
         async () => stubPayableRead(),
