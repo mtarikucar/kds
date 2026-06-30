@@ -23,6 +23,25 @@ services:
       # the wall-clock business day. Application logic always normalises
       # via tenant.timezone, so this is purely for ops legibility.
       TZ: ${TZ:-Europe/Istanbul}
+    # Audit H8: ship Postgres with sane statement / transaction /
+    # lock timeouts so a single runaway query can't tie up a pool
+    # connection forever. Values chosen for the OLTP workload here:
+    #   * statement_timeout=60s    — anything longer is almost
+    #     certainly a bug (analytics use the dedicated read path).
+    #   * idle_in_transaction_session_timeout=30s — an open tx that
+    #     forgot to commit holds row-level locks; auto-abort.
+    #   * lock_timeout=10s         — refuse to wait forever on a
+    #     row lock; surfaces deadlocks as application errors.
+    # Override values per-statement when a job legitimately needs
+    # longer (admin reports, migrations).
+    command:
+      - postgres
+      - -c
+      - statement_timeout=60000
+      - -c
+      - idle_in_transaction_session_timeout=30000
+      - -c
+      - lock_timeout=10000
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
@@ -34,6 +53,18 @@ services:
       retries: 5
     networks:
       - kds_network
+    deploy:
+      resources:
+        # Audit H5: reserve floor + cap for postgres. Pre-fix the
+        # container had no limits — a runaway backend leak could
+        # OOM the shared DB. 2G suits the current dataset; bump
+        # when pg_database_size exceeds ~1.2G.
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 768M
 
   # Redis Cache
   redis:
@@ -57,6 +88,18 @@ services:
       start_period: 20s
     networks:
       - kds_network
+    deploy:
+      resources:
+        # Audit H5: small but explicit cap for redis. The current
+        # workload (throttler counters + outbox-claim metadata) sits
+        # well under 64MB; cap at 256MB so a runaway pub/sub fanout
+        # can't pressure postgres on the same host.
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
   # Backend API (NestJS)
   backend:
@@ -87,6 +130,11 @@ services:
       # and our SLA "we charge at 02:00 TR time" stays honest.
       TZ: ${TZ:-Europe/Istanbul}
       PORT: 3000
+      # Audit H5: cap V8 heap below the container mem_limit so Node
+      # exits with a clean OOMError rather than the kernel killing
+      # the process (which loses in-flight requests + corrupt logs).
+      # 1536M leaves ~512M headroom for native buffers + libuv.
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=1536}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
       JWT_SECRET: ${JWT_SECRET}
@@ -125,10 +173,29 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-hummytummy-backend}
     ports:
-      - '3000:3000'
+      # Audit B4: bind to 127.0.0.1 so the backend container is only
+      # reachable through nginx (which terminates TLS + applies
+      # WAF/edge rules). Pre-fix the container listened on every
+      # interface; an external attacker could hit `http://<vps-ip>:3000/api/*`
+      # in plaintext, bypassing TLS, HSTS, and any edge rate limiting.
+      - '127.0.0.1:3000:3000'
     volumes:
       - invoice_storage:/app/storage
       - uploads_storage:/app/uploads
+    deploy:
+      resources:
+        # Audit H5: cap backend memory so a leak in app code cannot
+        # OOM the shared postgres + redis (both colocated on the
+        # same host). 2G is comfortably above the steady-state heap
+        # (~600M) and lets a burst handle the trial-end newsletter
+        # blast. NODE_OPTIONS below caps the V8 heap so Node aborts
+        # cleanly instead of the kernel reaping the container.
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     healthcheck:
       # /api/health is the durable contract — exists in every image we've
       # ever shipped, so rollback to an older image is always probe-able.

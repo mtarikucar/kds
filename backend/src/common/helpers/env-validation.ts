@@ -91,6 +91,14 @@ const RULES: EnvRule[] = [
   { key: "EMAIL_PASSWORD", required: true, prodOnly: true },
   // EMAIL_PORT optional — defaults to 587 in the transporter; EMAIL_FROM
   // optional — falls back to noreply@hummytummy.com in callers.
+
+  // Audit H6: METRICS_TOKEN is mandatory in production. The Metrics
+  // controller now fails closed when it's unset in prod, but the
+  // failure mode (UnauthorizedException on every scrape) is silent
+  // unless an operator notices Prometheus losing the target.
+  // Validating here moves the failure to boot so the deploy
+  // pipeline surfaces the misconfiguration immediately.
+  { key: "METRICS_TOKEN", required: true, prodOnly: true, minLength: 24 },
 ];
 
 export function validateEnv(): void {

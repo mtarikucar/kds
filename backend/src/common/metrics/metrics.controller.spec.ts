@@ -11,18 +11,36 @@ function makeRequest(authorization?: string): Request {
   } as unknown as Request;
 }
 
-function makeController(metricsToken?: string): MetricsController {
+function makeController(
+  metricsToken?: string,
+  nodeEnv?: string,
+): MetricsController {
   const config = {
-    get: (key: string) => (key === "METRICS_TOKEN" ? metricsToken : undefined),
+    get: (key: string) => {
+      if (key === "METRICS_TOKEN") return metricsToken;
+      if (key === "NODE_ENV") return nodeEnv;
+      return undefined;
+    },
   } as unknown as ConfigService;
   return new MetricsController(new MetricsService(), config);
 }
 
 describe("MetricsController", () => {
-  it("serves metrics openly when METRICS_TOKEN is not configured", async () => {
-    const controller = makeController(undefined);
+  it("serves metrics openly when METRICS_TOKEN is not configured (non-prod)", async () => {
+    const controller = makeController(undefined, "development");
     const body = await controller.metrics(makeRequest());
     expect(body).toContain("http_request_duration_seconds");
+  });
+
+  // Audit H6: production must fail closed when METRICS_TOKEN is
+  // missing. Pre-fix the controller short-circuited with `return`
+  // and prod metrics stayed public any time the operator forgot to
+  // set the token.
+  it("refuses every request in production when METRICS_TOKEN is unset", async () => {
+    const controller = makeController(undefined, "production");
+    await expect(controller.metrics(makeRequest())).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it("rejects requests without a token when METRICS_TOKEN is set", async () => {

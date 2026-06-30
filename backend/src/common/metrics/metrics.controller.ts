@@ -17,11 +17,13 @@ import { MetricsService } from "./metrics.service";
  *
  * @Public bypasses the global JWT guard (Prometheus can't do a login
  * flow). Access control instead:
- *   - METRICS_TOKEN set   → require `Authorization: Bearer <token>`
- *                           (constant-time compare).
- *   - METRICS_TOKEN unset → open; deployments must then keep /api/metrics
- *                           off the public ingress (internal network only),
- *                           same posture as the OTel collector endpoint.
+ *   - production: METRICS_TOKEN is MANDATORY. A missing token now
+ *     refuses every request with 503 rather than silently exposing
+ *     the scrape (audit H6). The env-validation layer also fails
+ *     fast at boot — see the boot-time check below.
+ *   - non-prod (dev/staging/test): if METRICS_TOKEN is unset, the
+ *     endpoint stays open. Deployments must keep /api/metrics off
+ *     the public ingress at the nginx layer in either case.
  */
 @Controller()
 export class MetricsController {
@@ -41,7 +43,18 @@ export class MetricsController {
 
   private assertAuthorized(req: Request): void {
     const token = this.configService.get<string>("METRICS_TOKEN");
-    if (!token) return;
+    const env = this.configService.get<string>("NODE_ENV");
+    if (!token) {
+      if (env === "production") {
+        // Fail closed. Pre-audit the controller short-circuited with
+        // `return` here, leaving prod metrics PUBLIC any time the
+        // operator forgot to set METRICS_TOKEN.
+        throw new UnauthorizedException(
+          "METRICS_TOKEN is not configured (production posture refuses to expose unauthenticated metrics).",
+        );
+      }
+      return;
+    }
 
     const header = req.get("authorization") ?? "";
     const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
