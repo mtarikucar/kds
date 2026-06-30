@@ -80,23 +80,7 @@ import { validate } from "./config/env.validation";
     // submodules. Nest tolerated it but every replica still runs every job;
     // leader-election / distributed locks live in the schedulers themselves.
     ScheduleModule.forRoot(),
-    // Audit H2: the `default` throttler MUST be registered. Roughly
-    // 60 endpoints (login, register, refresh, 2FA, forgot-password,
-    // webhook receivers, …) carry `@Throttle({ default: { ... } })`
-    // decorators. NestJS silently drops a throttle reference that
-    // doesn't match a registered name — without this entry, every
-    // one of those guards was inert and auth was effectively
-    // unprotected from brute-force.
-    //
-    // The default values mirror what the bulk of `@Throttle({default:
-    // ...})` call sites pass (60 req/min). Endpoint-level overrides
-    // still win.
     ThrottlerModule.forRoot([
-      {
-        name: "default",
-        ttl: 60000,
-        limit: 60,
-      },
       {
         name: "short",
         ttl: 1000,

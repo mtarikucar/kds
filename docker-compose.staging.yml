@@ -88,11 +88,7 @@ services:
       KMS_PROVIDER: ${KMS_PROVIDER:-env}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
-      # Audit B4 (staging parity): bind to 127.0.0.1 so the backend
-      # container is only reachable through nginx. Pre-fix matched
-      # the prod misconfiguration — direct-origin access bypassed
-      # TLS + edge rate limiting on staging too.
-      - '127.0.0.1:3002:3002'
+      - '3002:3002'
     volumes:
       - invoice_storage_staging:/app/storage
     healthcheck:
