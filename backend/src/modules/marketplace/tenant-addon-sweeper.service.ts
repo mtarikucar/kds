@@ -4,7 +4,6 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { OutboxService } from "../outbox/outbox.service";
 import { EventTypes } from "../outbox/event-types";
-import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
 import { NotificationService } from "../subscriptions/services/notification.service";
 import { ADDON_GRACE_DAYS } from "./marketplace.types";
 
@@ -99,37 +98,39 @@ export class TenantAddOnSweeperService {
             waiting++;
             continue;
           }
+          // Expire-claim AND the revoke event in ONE transaction (tx-aware
+          // append). AddOnCancelled is the event the projector listens for to
+          // REVOKE the grant; a swallowed .catch() previously left an expired
+          // add-on still GRANTED until the ~24h nightly reconcile (paid-for
+          // capacity persisting after non-payment). If the enqueue fails the
+          // expire-claim rolls back and the next sweep retries the row.
           // Compound WHERE on status='past_due' so a concurrent re-payment
           // (which flips the row back to 'active') makes this a no-op rather
           // than clobbering the freshly-renewed row to 'expired'.
-          const claim = await this.prisma.tenantAddOn.updateMany({
-            where: { id: row.id, status: "past_due" },
-            data: { status: "expired", endedAt: now },
+          const expiredOk = await this.prisma.$transaction(async (tx) => {
+            const claim = await tx.tenantAddOn.updateMany({
+              where: { id: row.id, status: "past_due" },
+              data: { status: "expired", endedAt: now },
+            });
+            if (claim.count === 0) return false;
+            await this.outbox.append(
+              {
+                type: EventTypes.AddOnCancelled,
+                tenantId: row.tenantId,
+                payload: {
+                  tenantId: row.tenantId,
+                  addOnId: row.id,
+                  addOnCode: row.addOn.code,
+                },
+              },
+              tx,
+            );
+            return true;
           });
-          if (claim.count === 0) {
+          if (!expiredOk) {
             waiting++;
             continue;
           }
-          // AddOnCancelled is the event the projector already listens for to
-          // REVOKE the grant — reuse it (downgrade semantics match
-          // grace-expiry, same as the subscription past-due cron reuses
-          // SubscriptionCancelled).
-          await this.outbox
-            .append({
-              type: EventTypes.AddOnCancelled,
-              tenantId: row.tenantId,
-              payload: {
-                tenantId: row.tenantId,
-                addOnId: row.id,
-                addOnCode: row.addOn.code,
-              },
-            })
-            .catch(
-              captureSwallowedEmit(this.logger, {
-                module: "marketplace",
-                op: "addonSweeper.expire",
-              }),
-            );
           await this.notifyOperator(row.tenantId, row.addOn.code, "expired");
           expired++;
           continue;
@@ -137,26 +138,27 @@ export class TenantAddOnSweeperService {
 
         // status === 'active' below.
         if (row.cancelAtPeriodEnd || row.addOn.billing === "oneTime") {
-          await this.prisma.tenantAddOn.update({
-            where: { id: row.id },
-            data: { status: "cancelled", endedAt: now },
-          });
-          await this.outbox
-            .append({
-              type: EventTypes.AddOnCancelled,
-              tenantId: row.tenantId,
-              payload: {
+          // Close-out + revoke event atomically (tx-aware append): a swallowed
+          // enqueue previously left a cancelled add-on still granted until the
+          // nightly reconcile.
+          await this.prisma.$transaction(async (tx) => {
+            await tx.tenantAddOn.update({
+              where: { id: row.id },
+              data: { status: "cancelled", endedAt: now },
+            });
+            await this.outbox.append(
+              {
+                type: EventTypes.AddOnCancelled,
                 tenantId: row.tenantId,
-                addOnId: row.id,
-                addOnCode: row.addOn.code,
+                payload: {
+                  tenantId: row.tenantId,
+                  addOnId: row.id,
+                  addOnCode: row.addOn.code,
+                },
               },
-            })
-            .catch(
-              captureSwallowedEmit(this.logger, {
-                module: "marketplace",
-                op: "addonSweeper.cancel",
-              }),
+              tx,
             );
+          });
           closed++;
         } else {
           // Recurring + not cancelled: the paid period ended and there is NO
@@ -165,32 +167,32 @@ export class TenantAddOnSweeperService {
           // through the grace window; the operator must re-pay via checkout.
           // Compound WHERE on status='active' so this is a safe no-op if a
           // concurrent action already moved the row.
-          const claim = await this.prisma.tenantAddOn.updateMany({
-            where: { id: row.id, status: "active" },
-            data: { status: "past_due" },
+          const graceEnd = this.graceDeadline(row.currentPeriodEnd!);
+          const pastDueOk = await this.prisma.$transaction(async (tx) => {
+            const claim = await tx.tenantAddOn.updateMany({
+              where: { id: row.id, status: "active" },
+              data: { status: "past_due" },
+            });
+            if (claim.count === 0) return false;
+            await this.outbox.append(
+              {
+                type: EventTypes.AddOnPastDue,
+                tenantId: row.tenantId,
+                payload: {
+                  tenantId: row.tenantId,
+                  addOnId: row.id,
+                  addOnCode: row.addOn.code,
+                  graceEndsAt: graceEnd.toISOString(),
+                },
+              },
+              tx,
+            );
+            return true;
           });
-          if (claim.count === 0) {
+          if (!pastDueOk) {
             waiting++;
             continue;
           }
-          const graceEnd = this.graceDeadline(row.currentPeriodEnd!);
-          await this.outbox
-            .append({
-              type: EventTypes.AddOnPastDue,
-              tenantId: row.tenantId,
-              payload: {
-                tenantId: row.tenantId,
-                addOnId: row.id,
-                addOnCode: row.addOn.code,
-                graceEndsAt: graceEnd.toISOString(),
-              },
-            })
-            .catch(
-              captureSwallowedEmit(this.logger, {
-                module: "marketplace",
-                op: "addonSweeper.pastDue",
-              }),
-            );
           await this.notifyOperator(row.tenantId, row.addOn.code, "past_due");
           pastDue++;
         }

@@ -29,6 +29,9 @@ describe('TenantAddOnSweeperService.runOnce', () => {
     (prisma.tenant.findUnique as any).mockResolvedValue({ name: 'Acme' });
     (prisma.user.findFirst as any).mockResolvedValue({ email: 'admin@acme.test' });
     (prisma.tenantAddOn.updateMany as any).mockResolvedValue({ count: 1 });
+    // Each status transition + its outbox event now run in one $transaction
+    // (tx-aware append). Drive the callback with the prisma mock as the tx.
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(prisma));
   });
 
   const DAY = 24 * 60 * 60 * 1000;
@@ -59,9 +62,11 @@ describe('TenantAddOnSweeperService.runOnce', () => {
 
     expect(updated.status).toBe('cancelled');
     expect(updated.endedAt).toBeInstanceOf(Date);
-    expect(outbox.append).toHaveBeenCalledWith(
-      expect.objectContaining({ type: EventTypes.AddOnCancelled }),
-    );
+    // Appended inside the status-transition transaction (tx-aware append), so
+    // assert the event payload (first arg) rather than an exact arg list.
+    expect(
+      outbox.append.mock.calls.some((c: any[]) => c[0]?.type === EventTypes.AddOnCancelled),
+    ).toBe(true);
   });
 
   it('closes recurring add-ons when cancelAtPeriodEnd=true', async () => {
@@ -76,9 +81,11 @@ describe('TenantAddOnSweeperService.runOnce', () => {
 
     expect(updated.status).toBe('cancelled');
     expect(updated.endedAt).toBeInstanceOf(Date);
-    expect(outbox.append).toHaveBeenCalledWith(
-      expect.objectContaining({ type: EventTypes.AddOnCancelled }),
-    );
+    // Appended inside the status-transition transaction (tx-aware append), so
+    // assert the event payload (first arg) rather than an exact arg list.
+    expect(
+      outbox.append.mock.calls.some((c: any[]) => c[0]?.type === EventTypes.AddOnCancelled),
+    ).toBe(true);
   });
 
   it('transitions an active recurring add-on to PAST_DUE at period end — NOT a free +30d extension', async () => {
@@ -143,6 +150,23 @@ describe('TenantAddOnSweeperService.runOnce', () => {
       'kds_extra_screen',
       'expired',
     );
+  });
+
+  it('does NOT finalize an expiry when the revoke enqueue fails (append in-tx, self-heals on re-sweep)', async () => {
+    (prisma.tenantAddOn.findMany as any).mockResolvedValue([
+      row({
+        status: 'past_due',
+        currentPeriodEnd: new Date(Date.now() - (ADDON_GRACE_DAYS + 1) * DAY),
+      }),
+    ]);
+    // The AddOnCancelled enqueue is now INSIDE the expire transaction — a
+    // failure must roll the claim back (real DB) and, here, prevent the
+    // operator notification / expired-count from firing for this row.
+    outbox.append.mockRejectedValueOnce(new Error('outbox down'));
+
+    await svc.runOnce();
+
+    expect(notifications.sendAddOnPastDue).not.toHaveBeenCalled();
   });
 
   it('past_due claim losing the race (count 0) does not emit', async () => {
