@@ -94,7 +94,13 @@ export class HealthDashboardService {
       score,
       pill,
       breakdown: {
-        devicesOnlinePct: Math.round(onlinePct * 100),
+        // null (not 100) when the branch has NO active devices — mirrors the
+        // fiscal/order "null when no data" convention below. onlinePct is 1 for
+        // SCORING (a device-less branch isn't penalised), but surfacing "100%
+        // online" in the breakdown reads as "all devices up" when there are
+        // none; the UI should render N/A, not a full green bar.
+        devicesOnlinePct:
+          devices.length === 0 ? null : Math.round(onlinePct * 100),
         fiscalAgeMinutes: Number.isFinite(fiscalAge)
           ? Math.round(fiscalAge)
           : null,

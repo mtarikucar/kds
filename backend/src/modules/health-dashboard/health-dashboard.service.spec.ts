@@ -55,6 +55,11 @@ describe('HealthDashboardService.branchScore', () => {
     const out = await svc.branchScore('t1', 'b1');
     expect(out.breakdown.fiscalAgeMinutes).toBeNull();
     expect(out.breakdown.orderAgeMinutes).toBeNull();
+    // A branch with ZERO active devices reports null, NOT 100% — otherwise the
+    // dashboard shows a full-green "100% online" bar for a branch that has no
+    // devices at all. (The score still treats it as un-penalised internally.)
+    expect(out.breakdown.devicesOnlinePct).toBeNull();
+    expect(out.countedDevices).toBe(0);
   });
 
   /**
