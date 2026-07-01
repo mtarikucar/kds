@@ -15,7 +15,6 @@ import { EmailService } from "../../../common/services/email.service";
 import { reserveSubdomain } from "../../../common/helpers/subdomain.helper";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
-import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 
 type PlanFeatureKey =
   | "advancedReports"
@@ -676,14 +675,32 @@ export class SuperAdminTenantsService {
       newLimitOverrides = null;
     }
 
-    await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        featureOverrides: newFeatureOverrides ?? Prisma.JsonNull,
-        limitOverrides: newLimitOverrides ?? Prisma.JsonNull,
-      },
+    // Persist the override AND queue the entitlement-reprojection event in ONE
+    // transaction (tx-aware append). If the enqueue fails the override write
+    // rolls back — otherwise the row would persist while the engine never
+    // reprojects, so the grant/revoke wouldn't take effect until the ~24h
+    // nightly reconcile (a swallowed .append().catch() lost the event). The
+    // payload is minimal — the projector re-reads canonical state from Postgres.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          featureOverrides: newFeatureOverrides ?? Prisma.JsonNull,
+          limitOverrides: newLimitOverrides ?? Prisma.JsonNull,
+        },
+      });
+      await this.outbox.append(
+        {
+          type: EventTypes.TenantOverridesChanged,
+          tenantId,
+          payload: { tenantId },
+        },
+        tx,
+      );
     });
 
+    // Audit AFTER commit — forensic, must not roll the override back on a
+    // logging hiccup.
     await this.auditService.log({
       action: AuditAction.UPDATE,
       entityType: EntityType.TENANT,
@@ -701,23 +718,6 @@ export class SuperAdminTenantsService {
       targetTenantId: tenantId,
       targetTenantName: tenant.name,
     });
-
-    // Signal the entitlement engine to reproject. The event payload is
-    // deliberately minimal — the projector re-reads the canonical state
-    // from Postgres, sidestepping any race between the event payload and
-    // the row it describes.
-    await this.outbox
-      .append({
-        type: EventTypes.TenantOverridesChanged,
-        tenantId,
-        payload: { tenantId },
-      })
-      .catch(
-        captureSwallowedEmit(this.logger, {
-          module: "superadmin",
-          op: "tenantOverridesChanged",
-        }),
-      );
 
     return {
       featureOverrides: newFeatureOverrides,
@@ -737,12 +737,26 @@ export class SuperAdminTenantsService {
     const previousFeatureOverrides = tenant.featureOverrides;
     const previousLimitOverrides = tenant.limitOverrides;
 
-    await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        featureOverrides: Prisma.JsonNull,
-        limitOverrides: Prisma.JsonNull,
-      },
+    // Same atomicity as updateOverrides: clear the overrides AND queue the
+    // reprojection event in one transaction so a failed enqueue can't leave
+    // the tenant with stale (now-removed) overrides still projected until the
+    // nightly reconcile.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          featureOverrides: Prisma.JsonNull,
+          limitOverrides: Prisma.JsonNull,
+        },
+      });
+      await this.outbox.append(
+        {
+          type: EventTypes.TenantOverridesChanged,
+          tenantId,
+          payload: { tenantId },
+        },
+        tx,
+      );
     });
 
     await this.auditService.log({
@@ -762,19 +776,6 @@ export class SuperAdminTenantsService {
       targetTenantId: tenantId,
       targetTenantName: tenant.name,
     });
-
-    await this.outbox
-      .append({
-        type: EventTypes.TenantOverridesChanged,
-        tenantId,
-        payload: { tenantId },
-      })
-      .catch(
-        captureSwallowedEmit(this.logger, {
-          module: "superadmin",
-          op: "tenantOverridesChanged",
-        }),
-      );
 
     return { featureOverrides: null, limitOverrides: null };
   }

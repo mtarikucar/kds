@@ -302,12 +302,17 @@ describe("SuperAdminTenantsService", () => {
       // advancedReports null → removed; apiAccess true → added.
       expect(res.featureOverrides).toEqual({ apiAccess: true });
       expect(res.limitOverrides).toEqual({ maxUsers: 75 });
-      expect(outbox.append).toHaveBeenCalledWith(
+      // Appended INSIDE the tenant-update transaction (tx-aware append) so the
+      // override write + reprojection event commit atomically.
+      expect(outbox.append).toHaveBeenCalledTimes(1);
+      expect(outbox.append.mock.calls[0][0]).toEqual(
         expect.objectContaining({
           type: EventTypes.TenantOverridesChanged,
           tenantId: TENANT_ID,
         }),
       );
+      // Second positional arg is the transaction client (tx-aware append).
+      expect(outbox.append.mock.calls[0].length).toBe(2);
     });
 
     it("collapses an emptied override map to null (JsonNull persisted)", async () => {
@@ -326,6 +331,29 @@ describe("SuperAdminTenantsService", () => {
         ACTOR_EMAIL,
       );
       expect(res.featureOverrides).toBeNull();
+    });
+
+    it("propagates a failed reprojection enqueue (no longer swallowed) so the override write rolls back", async () => {
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: TENANT_ID,
+        name: "Acme",
+        featureOverrides: {},
+        limitOverrides: {},
+      } as any);
+      prisma.tenant.update.mockResolvedValue({} as any);
+      outbox.append.mockRejectedValueOnce(new Error("outbox down"));
+
+      await expect(
+        svc.updateOverrides(
+          TENANT_ID,
+          { featureOverrides: { apiAccess: true } as any } as any,
+          ACTOR_ID,
+          ACTOR_EMAIL,
+        ),
+      ).rejects.toThrow(/outbox down/);
+      // Audit runs only AFTER the transaction commits, so a failed enqueue
+      // must not have written an audit row either.
+      expect(audit.log).not.toHaveBeenCalled();
     });
   });
 });
