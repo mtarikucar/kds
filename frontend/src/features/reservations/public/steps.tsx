@@ -135,9 +135,16 @@ export const Step2TimeSlots: React.FC<Step2Props> = ({
   const visible = (slots ?? []).filter((s) => {
     if (!s.available) return false;
     if (!date) return true;
-    const slotDateTime = new Date(date);
+    // Build the slot's LOCAL datetime from calendar parts. `new Date(date)`
+    // parses a date-only string ("2026-03-01") as UTC midnight, which lands on
+    // the PREVIOUS calendar day for negative-UTC-offset visitors — setHours
+    // would then stamp the slot onto the wrong day and the past-guard would
+    // compare against it. Splitting Y-M-D into the numeric Date constructor
+    // keeps it unambiguously local. `.slice(0, 10)` also tolerates a full ISO
+    // (Prisma @db.Date) if the caller ever passes one instead of date-only.
     const [h, m] = s.time.split(':').map(Number);
-    slotDateTime.setHours(h, m, 0, 0);
+    const [y, mo, d] = date.slice(0, 10).split('-').map(Number);
+    const slotDateTime = new Date(y, mo - 1, d, h, m, 0, 0);
     return slotDateTime.getTime() >= Date.now();
   });
 

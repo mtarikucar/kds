@@ -185,6 +185,23 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
     vi.useRealTimers();
   });
 
+  it('tolerates a full-ISO date (Prisma @db.Date) via slice, keeping future slots', () => {
+    // The past-guard slices the date to its Y-M-D. Without that slice,
+    // splitting a full ISO on "-" yields a NaN day -> Invalid Date -> the
+    // slot would be wrongly dropped to the empty state on a far-future date.
+    render(
+      <Harness>
+        <Step2TimeSlots
+          slots={[{ time: '20:00', available: true }] as AvailableSlot[]}
+          isLoading={false}
+          defaultDuration={60}
+          date="2999-01-01T00:00:00.000Z"
+        />
+      </Harness>,
+    );
+    expect(screen.getByRole('button', { name: '8:00 PM' })).toBeInTheDocument();
+  });
+
   it('selecting a slot sets startTime and endTime = start + defaultDuration', () => {
     render(
       <Harness>
