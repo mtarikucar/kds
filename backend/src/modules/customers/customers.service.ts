@@ -168,6 +168,22 @@ export class CustomersService {
     });
     if (existing) return existing;
 
+    // Backfill phoneVerified from the PhoneVerification source of truth. The
+    // customer-facing OTP flow (sendOTP → verifyOTP) verifies a (phone,
+    // tenant) BEFORE any Customer row necessarily exists — verifyOTP's
+    // controller only calls markPhoneVerified `if (customer)`, so a phone
+    // verified before its Customer is created would otherwise land here with
+    // phoneVerified=false forever. Consumers gate on the Customer.phoneVerified
+    // COLUMN (referral.applyReferralCode, self-pay), so that stale-false cache
+    // would silently reject an already-verified phone. Any existing verified
+    // PhoneVerification row means the phone is genuinely OTP-verified,
+    // regardless of who creates the Customer row (QR self-serve or POS
+    // admission), so the flag reflects reality.
+    const priorVerification = await this.prisma.phoneVerification.findFirst({
+      where: { phone: canonical, tenantId, verified: true },
+      select: { id: true },
+    });
+
     try {
       return await this.prisma.customer.create({
         data: {
@@ -175,6 +191,7 @@ export class CustomersService {
           name: additional?.name || `Customer ${canonical}`,
           email: additional?.email,
           tenantId,
+          phoneVerified: !!priorVerification,
         },
       });
     } catch (err) {

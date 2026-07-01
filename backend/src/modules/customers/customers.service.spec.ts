@@ -71,3 +71,56 @@ describe('CustomersService.findAll search cap (iter-78)', () => {
     expect(capturedWhere).toEqual({ tenantId: 't1' });
   });
 });
+
+describe('CustomersService.findOrCreateByPhone — phoneVerified backfill', () => {
+  let prisma: MockPrismaClient;
+  let svc: CustomersService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new CustomersService(prisma as any);
+  });
+
+  it('creates a NEW customer with phoneVerified=true when the phone already has a verified PhoneVerification row', async () => {
+    (prisma.customer.findFirst as any).mockResolvedValue(null); // no existing customer
+    (prisma.phoneVerification.findFirst as any).mockResolvedValue({ id: 'pv-1' }); // phone WAS verified
+    let created: any = null;
+    (prisma.customer.create as any).mockImplementation(async ({ data }: any) => {
+      created = data;
+      return { id: 'c-1', ...data };
+    });
+
+    await svc.findOrCreateByPhone('+905551112233', 't1');
+
+    // The source-of-truth lookup is tenant-scoped and only counts verified rows.
+    const pvWhere = (prisma.phoneVerification.findFirst as any).mock.calls[0][0].where;
+    expect(pvWhere.tenantId).toBe('t1');
+    expect(pvWhere.verified).toBe(true);
+    // The new Customer carries the verified flag.
+    expect(created.phoneVerified).toBe(true);
+  });
+
+  it('creates a NEW customer with phoneVerified=false when no verified PhoneVerification row exists (POS staff-entered phone)', async () => {
+    (prisma.customer.findFirst as any).mockResolvedValue(null);
+    (prisma.phoneVerification.findFirst as any).mockResolvedValue(null); // never verified
+    let created: any = null;
+    (prisma.customer.create as any).mockImplementation(async ({ data }: any) => {
+      created = data;
+      return { id: 'c-1', ...data };
+    });
+
+    await svc.findOrCreateByPhone('+905551112233', 't1');
+
+    expect(created.phoneVerified).toBe(false);
+  });
+
+  it('returns an existing customer untouched (no create, no verification lookup)', async () => {
+    (prisma.customer.findFirst as any).mockResolvedValue({ id: 'c-existing', phoneVerified: true });
+
+    const res = await svc.findOrCreateByPhone('+905551112233', 't1');
+
+    expect(res.id).toBe('c-existing');
+    expect(prisma.customer.create).not.toHaveBeenCalled();
+    expect(prisma.phoneVerification.findFirst).not.toHaveBeenCalled();
+  });
+});
