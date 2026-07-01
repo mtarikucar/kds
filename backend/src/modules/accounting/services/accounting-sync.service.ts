@@ -68,6 +68,7 @@ export class AccountingSyncService {
       return;
     }
 
+    let result: { externalId: string };
     try {
       const adapter = this.getAdapter(settings.provider);
       if (!adapter) return;
@@ -113,8 +114,29 @@ export class AccountingSyncService {
         })),
       };
 
-      const result = await adapter.pushInvoice(token, companyId, invoiceData);
+      result = await adapter.pushInvoice(token, companyId, invoiceData);
+    } catch (err) {
+      // The push (or the auth/setup preceding it) FAILED — the remote does
+      // NOT have this invoice, so marking FAILED is safe: a later re-claim
+      // (FAILED is in the claim allow-list) re-pushes without duplicating.
+      this.logger.error(`Sync failed for invoice ${invoiceId}: ${err.message}`);
+      await this.prisma.salesInvoice.updateMany({
+        where: { id: invoiceId, tenantId },
+        data: { syncError: err.message, externalStatus: "FAILED" },
+      });
+      return;
+    }
 
+    // Push SUCCEEDED — the remote provider now holds this legal invoice.
+    // Recording externalId + SYNCED is a SEPARATE try: if THIS local write
+    // fails we must NOT flip the row to FAILED, because FAILED is re-claimable
+    // and a retry would push a DUPLICATE e-fatura to the tax authority (a
+    // compliance violation). Leave the row in its SYNCING marker state — the
+    // exact F-Acc-7 recovery path documented above — and log the externalId so
+    // an operator/reconcile can confirm it. (The previous single try/catch
+    // caught a post-push DB hiccup straight to FAILED, silently defeating that
+    // protection.)
+    try {
       // Defence-in-depth: tenantId in the WHERE so a regression of the
       // SYNCING claim can't write cross-tenant.
       await this.prisma.salesInvoice.updateMany({
@@ -127,16 +149,16 @@ export class AccountingSyncService {
           syncError: null,
         },
       });
-
       this.logger.log(
         `Invoice ${invoice.invoiceNumber} synced to ${settings.provider}`,
       );
-    } catch (err) {
-      this.logger.error(`Sync failed for invoice ${invoiceId}: ${err.message}`);
-      await this.prisma.salesInvoice.updateMany({
-        where: { id: invoiceId, tenantId },
-        data: { syncError: err.message, externalStatus: "FAILED" },
-      });
+    } catch (recordErr: any) {
+      this.logger.error(
+        `Invoice ${invoice.invoiceNumber} was PUSHED to ${settings.provider} ` +
+          `(externalId=${result.externalId}) but the local SYNCED write failed; ` +
+          `leaving the row SYNCING to avoid a duplicate push — recover/confirm ` +
+          `the externalId from the provider. ${recordErr?.message ?? recordErr}`,
+      );
     }
   }
 

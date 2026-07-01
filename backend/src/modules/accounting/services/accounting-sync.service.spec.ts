@@ -283,6 +283,30 @@ describe('AccountingSyncService.syncInvoice', () => {
     expect(failCall.data.syncError).toBe('foriba 503');
   });
 
+  it('does NOT flip to FAILED when the push SUCCEEDED but the local SYNCED write fails (avoids a duplicate e-fatura)', async () => {
+    settings.findByTenant.mockResolvedValue(foribaSettings);
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    // 1st updateMany = the claim (→ SYNCING) succeeds; 2nd = the post-push
+    // SYNCED write fails (DB hiccup). The remote provider already holds the
+    // invoice, so a FAILED (reclaimable) status would let a retry duplicate it.
+    (prisma.salesInvoice.updateMany as any)
+      .mockResolvedValueOnce({ count: 1 })
+      .mockRejectedValueOnce(new Error('db hiccup'));
+    const adapter = fakeAdapter(); // pushInvoice resolves { externalId: 'EXT-999' }
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT); // must not throw
+
+    // Pushed exactly once, and NO write ever flips the row to FAILED — it
+    // stays in its SYNCING marker state for manual/reconcile recovery.
+    expect(adapter.pushInvoice).toHaveBeenCalledTimes(1);
+    expect(prisma.salesInvoice.updateMany as any).toHaveBeenCalledTimes(2);
+    const anyFailedWrite = (
+      prisma.salesInvoice.updateMany as any
+    ).mock.calls.some((c: any[]) => c[0]?.data?.externalStatus === 'FAILED');
+    expect(anyFailedWrite).toBe(false);
+  });
+
   it('aborts after claiming when no adapter resolves for the provider', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
     (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
