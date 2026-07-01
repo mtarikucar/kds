@@ -59,6 +59,32 @@ describe('PosSettingsService.update (iter-60 + v3.0.1 findFirst pattern)', () =>
     expect(createArgs.data.tenantId).toBe('t1');
   });
 
+  it('first-update (create path) persists ALL provided settings, not just the 4-flag core', async () => {
+    // Regression: the create branch hardcoded only enableTablelessMode /
+    // TwoStepCheckout / CustomerOrdering / CustomerSelfPay, silently DROPPING
+    // showProductImages / defaultMapView / requireServedForDineInPayment on a
+    // tenant's first-ever settings change (the UPDATE path spread the whole dto,
+    // so only brand-new tenants lost these).
+    (prisma.posSettings.findFirst as any).mockResolvedValue(null);
+    (prisma.posSettings.create as any).mockResolvedValue({ tenantId: 't1' });
+
+    await svc.update('t1', {
+      requireServedForDineInPayment: true,
+      defaultMapView: '3d',
+      showProductImages: false,
+    } as any);
+
+    const data = (prisma.posSettings.create as any).mock.calls[0][0].data;
+    expect(data.requireServedForDineInPayment).toBe(true);
+    expect(data.defaultMapView).toBe('3d');
+    expect(data.showProductImages).toBe(false);
+    // The four core flags still carry their fresh-row defaults.
+    expect(data.enableTwoStepCheckout).toBe(true);
+    expect(data.enableCustomerOrdering).toBe(true);
+    expect(data.enableCustomerSelfPay).toBe(false);
+    expect(data.enableTablelessMode).toBe(false);
+  });
+
   it('updates run inside a single $transaction (atomicity envelope)', async () => {
     (prisma.posSettings.findFirst as any).mockResolvedValue({
       tenantId: 't1',

@@ -144,6 +144,17 @@ export class PosSettingsService {
         return await tx.posSettings.create({
           data: {
             tenantId,
+            // Persist EVERY provided setting. The prior 4-field allowlist
+            // silently DROPPED showProductImages / defaultMapView /
+            // requireServedForDineInPayment on the first-ever update (this
+            // create path), so a tenant whose first change set any of them had
+            // it discarded — the row was created with the schema-column default
+            // instead. The UPDATE path already spreads the whole dto; mirror it.
+            // Prisma treats an undefined value as "use the schema default", so
+            // absent optionals stay safe; the four explicit ?? defaults below
+            // only pin the flags the product wants at a specific state on a
+            // fresh row (and must come AFTER the spread to win over an undefined).
+            ...updateDto,
             enableTablelessMode: updateDto.enableTablelessMode ?? false,
             enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? true,
             enableCustomerOrdering: updateDto.enableCustomerOrdering ?? true,
