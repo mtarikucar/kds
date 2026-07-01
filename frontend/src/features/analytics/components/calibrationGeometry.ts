@@ -35,6 +35,14 @@ export function scalePointerToCanvas(
   targetWidth: number,
   targetHeight: number
 ): Point2D {
+  // A zero- (or negative-) sized rect means the element isn't laid out yet
+  // (display:none, pre-mount, a race between click and resize). Without this
+  // guard scaleX/scaleY become Infinity and the mapped point comes back
+  // Infinity — or NaN when the click lands exactly on the rect edge
+  // (0 * Infinity). A calibration point at NaN silently corrupts the whole
+  // camera→floor homography, so fail safe to the origin instead.
+  if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+
   const scaleX = targetWidth / rect.width;
   const scaleY = targetHeight / rect.height;
 

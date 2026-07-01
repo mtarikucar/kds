@@ -30,4 +30,15 @@ describe('scalePointerToCanvas', () => {
     // click at the far corner of the rendered element
     expect(scalePointerToCanvas(110, 110, rect, 400, 400)).toEqual({ x: 400, y: 400 });
   });
+
+  it('fails safe to the origin (not NaN/Infinity) when the rect has no size', () => {
+    // A not-yet-laid-out element (display:none / pre-mount) reports width/height 0.
+    // Unguarded this divides by zero -> Infinity, and a click on the edge -> NaN,
+    // which would poison the saved calibration homography.
+    const degenerate = { left: 0, top: 0, width: 0, height: 0 };
+    const out = scalePointerToCanvas(0, 0, degenerate, 640, 480);
+    expect(out).toEqual({ x: 0, y: 0 });
+    expect(Number.isFinite(out.x)).toBe(true);
+    expect(Number.isFinite(out.y)).toBe(true);
+  });
 });
