@@ -31,6 +31,20 @@ describe("AttendanceService date-only handling (deep-review H6/M7)", () => {
       day: "2-digit",
     }).format(new Date());
 
+  // Pin the clock to a fixed mid-day instant (12:00 Istanbul = 09:00 UTC) so
+  // the clockIn lateness test is deterministic. The "any clock-in after a 00:00
+  // shift is late" assumption otherwise breaks in the ~21:00-21:59 UTC window,
+  // where a UTC+3 tenant's local time is 00:00-00:59 — the clock-in lands ON
+  // (or within a rounding-minute of) the shift start and is CORRECTLY not late,
+  // so isLate/lateMinutes flip and the suite fails purely on the wall clock.
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-06-24T09:00:00Z"));
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     prisma = mockPrismaClient();
     kdsGateway = { emitAttendanceUpdate: jest.fn() };
