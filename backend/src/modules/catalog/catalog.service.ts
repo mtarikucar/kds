@@ -543,14 +543,33 @@ export class CatalogService {
     return { serials: popped };
   }
 
-  /** When a shipment leaves: allocated → shipped. */
+  /**
+   * When a shipment leaves: allocated → shipped. Floor-guarded (allocated >=
+   * qty) exactly like allocate() guards available >= qty — the sibling was
+   * missing it, so a bad caller (a double markShipped, or qty > allocated)
+   * silently drove `allocated` NEGATIVE and broke the
+   * available + allocated + shipped = received invariant. Now it fails loud.
+   */
   async markShipped(productId: string, qty: number) {
-    return this.prisma.hardwareInventory.update({
-      where: { productId },
+    const claim = await this.prisma.hardwareInventory.updateMany({
+      where: { productId, allocated: { gte: qty } },
       data: {
         allocated: { decrement: qty },
         shipped: { increment: qty },
       },
+    });
+    if (claim.count === 0) {
+      const inv = await this.prisma.hardwareInventory.findUnique({
+        where: { productId },
+      });
+      if (!inv) throw new NotFoundException("No inventory row for product");
+      throw new BadRequestException(
+        `Cannot mark ${qty} shipped: only ${inv.allocated} unit(s) allocated for this product.`,
+      );
+    }
+    // Row is guaranteed present (the claim matched it); return the fresh state.
+    return this.prisma.hardwareInventory.findUnique({
+      where: { productId },
     });
   }
 }

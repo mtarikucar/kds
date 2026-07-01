@@ -137,17 +137,27 @@ describe("CatalogService — inventory transitions", () => {
   });
 
   describe("markShipped", () => {
-    it("moves allocated → shipped by qty", async () => {
-      prisma.hardwareInventory.update.mockResolvedValue({ id: "i-1" });
+    it("moves allocated → shipped by qty via a floor-guarded (allocated >= qty) claim", async () => {
+      prisma.hardwareInventory.updateMany.mockResolvedValue({ count: 1 });
+      prisma.hardwareInventory.findUnique.mockResolvedValue({ id: "i-1" });
 
       await svc.markShipped("p-1", 4);
 
-      const arg = prisma.hardwareInventory.update.mock.calls[0][0];
-      expect(arg.where).toEqual({ productId: "p-1" });
+      const arg = prisma.hardwareInventory.updateMany.mock.calls[0][0];
+      expect(arg.where).toEqual({ productId: "p-1", allocated: { gte: 4 } });
       expect(arg.data).toEqual({
         allocated: { decrement: 4 },
         shipped: { increment: 4 },
       });
+    });
+
+    it("rejects shipping more than is allocated (would drive allocated negative)", async () => {
+      // Floor guard: no row has allocated >= qty → count 0 → 400 rather than a
+      // negative allocated that breaks available+allocated+shipped=received.
+      prisma.hardwareInventory.updateMany.mockResolvedValue({ count: 0 });
+      prisma.hardwareInventory.findUnique.mockResolvedValue({ allocated: 1 });
+
+      await expect(svc.markShipped("p-1", 4)).rejects.toThrow(/only 1 unit/i);
     });
   });
 });
