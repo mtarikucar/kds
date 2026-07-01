@@ -19,7 +19,32 @@ export class ModifiersService {
   // MODIFIER GROUPS
   // ========================================
 
+  /**
+   * A group's minSelections must not exceed its maxSelections. Both are
+   * DTO-validated independently (min@Min(0), max@Min(1)), so nothing stopped
+   * an admin creating an IMPOSSIBLE group (e.g. min=3, max=2): the order-build
+   * validators then require ">= 3 and <= 2" selections, which no cart can
+   * satisfy, so EVERY product using that group becomes unorderable on both the
+   * QR and POS paths. Reject the impossible config at the source instead.
+   * maxSelections null / <= 0 means "no upper bound", so it never conflicts.
+   */
+  private assertSelectionBounds(
+    minSelections: number,
+    maxSelections: number | null | undefined,
+  ): void {
+    if (
+      maxSelections != null &&
+      maxSelections > 0 &&
+      minSelections > maxSelections
+    ) {
+      throw new BadRequestException(
+        `minSelections (${minSelections}) cannot exceed maxSelections (${maxSelections}) — the group would be impossible to satisfy and would block ordering every product that uses it.`,
+      );
+    }
+  }
+
   async createGroup(dto: CreateModifierGroupDto, tenantId: string) {
+    this.assertSelectionBounds(dto.minSelections ?? 0, dto.maxSelections);
     return this.prisma.modifierGroup.create({
       data: {
         ...dto,
@@ -93,7 +118,14 @@ export class ModifiersService {
   }
 
   async updateGroup(id: string, dto: UpdateModifierGroupDto, tenantId: string) {
-    await this.findOneGroup(id, tenantId);
+    const existing = await this.findOneGroup(id, tenantId);
+
+    // A PATCH may touch only one of min/max, so validate the EFFECTIVE
+    // post-merge pair against the impossible-config guard.
+    this.assertSelectionBounds(
+      dto.minSelections ?? existing.minSelections,
+      dto.maxSelections ?? existing.maxSelections,
+    );
 
     // Compound WHERE IDOR guard (B41-B45 pattern).
     const claim = await this.prisma.modifierGroup.updateMany({

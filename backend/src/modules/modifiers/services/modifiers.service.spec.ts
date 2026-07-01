@@ -22,10 +22,10 @@ import {
  *    tenant-verified; the replace is an atomic deleteMany+createMany tx;
  *    an unknown/cross-tenant group id is rejected.
  *
- *  NOTE (audit follow-up): the service performs NO min/max cross-field
- *  validation (e.g. minSelections <= maxSelections). Caps live only on the
- *  DTOs. These specs therefore lock the relation/scoping/filtering behaviour
- *  that actually exists and do not assert validation the service never does.
+ *  - Selection bounds: createGroup/updateGroup reject an impossible
+ *    minSelections > maxSelections config at the source (it would make every
+ *    product using the group unorderable on both the QR and POS paths);
+ *    maxSelections null/<=0 means unbounded and never conflicts.
  */
 describe('ModifiersService', () => {
   let prisma: MockPrismaClient;
@@ -53,6 +53,44 @@ describe('ModifiersService', () => {
     const data = (prisma.modifierGroup.create as any).mock.calls[0][0].data;
     expect(data.tenantId).toBe(TENANT);
     expect(data.name).toBe('sauces');
+  });
+
+  // ----------------------------------------------------------------
+  // Groups: impossible-config guard (minSelections <= maxSelections)
+  // ----------------------------------------------------------------
+
+  it('createGroup rejects minSelections > maxSelections (impossible config)', async () => {
+    await expect(
+      svc.createGroup(
+        { name: 'sauces', displayName: 'Soslar', minSelections: 3, maxSelections: 2 } as any,
+        TENANT,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect((prisma.modifierGroup.create as any).mock.calls.length).toBe(0);
+  });
+
+  it('createGroup allows minSelections <= maxSelections and an unbounded (null) max', async () => {
+    (prisma.modifierGroup.create as any).mockImplementation(async ({ data }: any) => ({ id: 'g-1', ...data }));
+    await expect(
+      svc.createGroup({ name: 'a', displayName: 'A', minSelections: 2, maxSelections: 3 } as any, TENANT),
+    ).resolves.toBeDefined();
+    await expect(
+      svc.createGroup({ name: 'b', displayName: 'B', minSelections: 5 } as any, TENANT),
+    ).resolves.toBeDefined(); // maxSelections undefined => unbounded
+  });
+
+  it('updateGroup rejects an effective (post-merge) min > max even when only one side is PATCHed', async () => {
+    // Existing group has max=2; a PATCH that only raises min to 5 is impossible.
+    (prisma.modifierGroup.findFirst as any).mockResolvedValue({
+      id: 'g-1',
+      tenantId: TENANT,
+      minSelections: 1,
+      maxSelections: 2,
+    });
+    await expect(
+      svc.updateGroup('g-1', { minSelections: 5 } as any, TENANT),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect((prisma.modifierGroup.updateMany as any).mock.calls.length).toBe(0);
   });
 
   // ----------------------------------------------------------------
