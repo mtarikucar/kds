@@ -282,21 +282,30 @@ export class PaymentFinalizer {
         where: { id: customerId, tenantId: order.tenantId },
       });
       if (customer) {
-        const newTotalOrders = customer.totalOrders + 1;
-        const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(
-          closingAmount,
-        );
-        const newAverageOrder = newTotalSpent.div(newTotalOrders);
-        // updateMany propagates the tenantId filter through the write.
-        // Belt-and-suspenders with the findFirst above.
-        await tx.customer.updateMany({
-          where: { id: customerId, tenantId: order.tenantId },
+        // Atomic increments — NOT a read-compute-absolute-write (same
+        // lost-update class as linkCustomerForPayment: two full-order payments
+        // for the SAME customer settling concurrently would each read
+        // totalSpent=N and both write an absolute N+own, losing one). Prisma
+        // { increment } compiles to `SET x = x + $n`, lost-update-safe at any
+        // isolation. Tenant ownership was just verified by the findFirst above,
+        // so keying the write by id alone is safe.
+        const updated = await tx.customer.update({
+          where: { id: customerId },
           data: {
-            totalOrders: newTotalOrders,
-            totalSpent: newTotalSpent,
-            averageOrder: newAverageOrder,
+            totalOrders: { increment: 1 },
+            totalSpent: { increment: new Prisma.Decimal(closingAmount) },
             lastVisit: new Date(),
           },
+        });
+        // averageOrder derived from the AUTHORITATIVE post-increment totals
+        // (second same-row/same-tx write, can't itself race).
+        const newAverageOrder =
+          updated && updated.totalOrders > 0
+            ? new Prisma.Decimal(updated.totalSpent).div(updated.totalOrders)
+            : new Prisma.Decimal(0);
+        await tx.customer.update({
+          where: { id: customerId },
+          data: { averageOrder: newAverageOrder },
         });
       }
     }
@@ -480,22 +489,35 @@ export class PaymentFinalizer {
     });
 
     const amount = new Prisma.Decimal(payment.amount);
-    const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(amount);
-    const newTotalOrders =
-      priorOnThisOrder === 0 ? customer.totalOrders + 1 : customer.totalOrders;
-    const newAverage =
-      newTotalOrders > 0
-        ? newTotalSpent.div(newTotalOrders)
-        : new Prisma.Decimal(0);
 
-    await tx.customer.update({
+    // Atomic increments — NOT a read-compute-absolute-write. This runs in the
+    // caller's (READ COMMITTED) payment transaction, so two payments settling
+    // for the SAME customer concurrently — e.g. one regular's phone linked on
+    // two tables closed at once — would each read totalSpent=N and both write
+    // an absolute N+own, losing one payment's spend (under-counted lifetime
+    // value → wrong loyalty tier / CRM analytics). Prisma's { increment }
+    // compiles to `SET totalSpent = totalSpent + $x`, lost-update-safe at any
+    // isolation level. totalOrders is bumped only the first time this customer
+    // appears on this order (idempotency preserved).
+    const updated = await tx.customer.update({
       where: { id: customer.id },
       data: {
-        totalSpent: newTotalSpent,
-        totalOrders: newTotalOrders,
-        averageOrder: newAverage,
+        totalSpent: { increment: amount },
+        ...(priorOnThisOrder === 0 ? { totalOrders: { increment: 1 } } : {}),
         lastVisit: new Date(),
       },
+    });
+
+    // averageOrder is derived; recompute it from the AUTHORITATIVE post-
+    // increment totals the DB just returned (this second write is same-row/
+    // same-tx, so it can't itself race) rather than from the pre-read snapshot.
+    const newAverage =
+      updated && updated.totalOrders > 0
+        ? new Prisma.Decimal(updated.totalSpent).div(updated.totalOrders)
+        : new Prisma.Decimal(0);
+    await tx.customer.update({
+      where: { id: customer.id },
+      data: { averageOrder: newAverage },
     });
   }
 

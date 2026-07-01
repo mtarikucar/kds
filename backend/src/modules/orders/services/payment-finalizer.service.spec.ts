@@ -171,7 +171,14 @@ describe('PaymentFinalizer', () => {
         totalOrders: 2,
         totalSpent: new Prisma.Decimal('50.00'),
       });
-      (tx.customer.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      // Atomic-increment path: 1st update returns the post-increment row (feeds
+      // the derived averageOrder), 2nd persists averageOrder.
+      (tx.customer.update as jest.Mock)
+        .mockResolvedValueOnce({
+          totalOrders: 3,
+          totalSpent: new Prisma.Decimal('150.00'),
+        })
+        .mockResolvedValueOnce({});
 
       await finalizer.finalizeFullyPaid(
         tx,
@@ -195,19 +202,17 @@ describe('PaymentFinalizer', () => {
         where: { id: TABLE_ID, tenantId: TENANT_ID },
         data: { status: TableStatus.AVAILABLE },
       });
-      // Customer stats: totalOrders 2→3, totalSpent 50→150, average 150/3=50.
-      expect(tx.customer.updateMany).toHaveBeenCalledWith({
-        where: { id: 'cust-1', tenantId: TENANT_ID },
-        data: expect.objectContaining({
-          totalOrders: 3,
-          totalSpent: expect.objectContaining({}),
-          lastVisit: expect.any(Date),
-        }),
-      });
-      const updateData = (tx.customer.updateMany as jest.Mock).mock.calls[0][0]
-        .data;
-      expect(updateData.totalSpent.toFixed(2)).toBe('150.00');
-      expect(updateData.averageOrder.toFixed(2)).toBe('50.00');
+      // Customer stats via ATOMIC increments: totalOrders +1, totalSpent +100
+      // (closingAmount), then averageOrder derived from the returned totals
+      // (150/3 = 50). Two update() calls, no updateMany.
+      const first = (tx.customer.update as jest.Mock).mock.calls[0][0];
+      expect(first.where).toEqual({ id: 'cust-1' });
+      expect(first.data.totalOrders).toEqual({ increment: 1 });
+      expect(first.data.totalSpent.increment.toFixed(2)).toBe('100.00');
+      expect(first.data.lastVisit).toBeInstanceOf(Date);
+      const second = (tx.customer.update as jest.Mock).mock.calls[1][0].data;
+      expect(second.averageOrder.toFixed(2)).toBe('50.00');
+      expect(tx.customer.updateMany).not.toHaveBeenCalled();
     });
 
     it('does NOT release the table while other active orders remain on it', async () => {
@@ -342,7 +347,7 @@ describe('PaymentFinalizer', () => {
       amount: new Prisma.Decimal('40.00'),
     };
 
-    it('bumps totalOrders on the FIRST payment of this customer on the order', async () => {
+    it('bumps totalOrders (atomic increment) on the FIRST payment and grows totalSpent atomically', async () => {
       (tx.customer.findFirst as jest.Mock).mockResolvedValue({
         id: 'cust-1',
         totalOrders: 5,
@@ -351,7 +356,14 @@ describe('PaymentFinalizer', () => {
       (tx.payment.update as jest.Mock).mockResolvedValue({});
       // No prior completed payment by this customer on this order.
       (tx.payment.count as jest.Mock).mockResolvedValue(0);
-      (tx.customer.update as jest.Mock).mockResolvedValue({});
+      // 1st update returns the AUTHORITATIVE post-increment row (drives the
+      // derived averageOrder); 2nd update persists averageOrder.
+      (tx.customer.update as jest.Mock)
+        .mockResolvedValueOnce({
+          totalOrders: 6,
+          totalSpent: new Prisma.Decimal('240.00'),
+        })
+        .mockResolvedValueOnce({});
 
       await finalizer.linkCustomerForPayment(tx, payment, '5551234567');
 
@@ -369,10 +381,14 @@ describe('PaymentFinalizer', () => {
           id: { not: 'pay-1' },
         },
       });
-      const data = (tx.customer.update as jest.Mock).mock.calls[0][0].data;
-      expect(data.totalOrders).toBe(6); // 5 → 6
-      expect(data.totalSpent.toFixed(2)).toBe('240.00'); // 200 + 40
-      expect(data.averageOrder.toFixed(2)).toBe('40.00'); // 240 / 6
+      // Atomic increments — NOT absolute writes (lost-update-safe under the
+      // caller's READ COMMITTED tx).
+      const first = (tx.customer.update as jest.Mock).mock.calls[0][0].data;
+      expect(first.totalSpent.increment.toFixed(2)).toBe('40.00');
+      expect(first.totalOrders).toEqual({ increment: 1 });
+      // averageOrder derived from the returned post-increment totals: 240 / 6.
+      const second = (tx.customer.update as jest.Mock).mock.calls[1][0].data;
+      expect(second.averageOrder.toFixed(2)).toBe('40.00');
     });
 
     it('does NOT increment totalOrders when the customer already paid on this order (only totalSpent grows)', async () => {
@@ -383,14 +399,20 @@ describe('PaymentFinalizer', () => {
       });
       (tx.payment.update as jest.Mock).mockResolvedValue({});
       (tx.payment.count as jest.Mock).mockResolvedValue(1); // a prior swipe exists
-      (tx.customer.update as jest.Mock).mockResolvedValue({});
+      (tx.customer.update as jest.Mock)
+        .mockResolvedValueOnce({
+          totalOrders: 5,
+          totalSpent: new Prisma.Decimal('240.00'),
+        })
+        .mockResolvedValueOnce({});
 
       await finalizer.linkCustomerForPayment(tx, payment, '5551234567');
 
-      const data = (tx.customer.update as jest.Mock).mock.calls[0][0].data;
-      expect(data.totalOrders).toBe(5); // unchanged
-      expect(data.totalSpent.toFixed(2)).toBe('240.00');
-      expect(data.averageOrder.toFixed(2)).toBe('48.00'); // 240 / 5
+      const first = (tx.customer.update as jest.Mock).mock.calls[0][0].data;
+      expect(first.totalSpent.increment.toFixed(2)).toBe('40.00');
+      expect(first.totalOrders).toBeUndefined(); // omitted → no increment
+      const second = (tx.customer.update as jest.Mock).mock.calls[1][0].data;
+      expect(second.averageOrder.toFixed(2)).toBe('48.00'); // 240 / 5
     });
 
     it('creates the customer when the phone is unseen for the tenant', async () => {

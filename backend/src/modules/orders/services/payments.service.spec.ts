@@ -1277,6 +1277,15 @@ describe("PaymentsService — progressive per-item payments", () => {
         totalSpent: new Prisma.Decimal("0"),
       });
       (prisma.payment.count as unknown as jest.Mock).mockResolvedValue(0);
+      // customer.update now runs twice (atomic increment, then derived
+      // averageOrder). The first returns the authoritative post-increment row.
+      (prisma.customer.update as unknown as jest.Mock)
+        .mockResolvedValueOnce({
+          id: "cust-A",
+          totalOrders: 1,
+          totalSpent: new Prisma.Decimal("25.00"),
+        })
+        .mockResolvedValue({});
       (prisma.payment.aggregate as unknown as jest.Mock).mockResolvedValue({
         _sum: { amount: new Prisma.Decimal("25.00") },
       });
@@ -1311,14 +1320,16 @@ describe("PaymentsService — progressive per-item payments", () => {
         TENANT_ID,
       );
 
-      // Stats bump = payment.amount (25), not order.finalAmount (100).
+      // Stats bump = payment.amount (25), not order.finalAmount (100). The
+      // bump is now an ATOMIC increment (lost-update-safe), not an absolute
+      // write, so assert the increment operand.
       const updateCalls = (prisma.customer.update as unknown as jest.Mock).mock
         .calls;
       const bumpCall = updateCalls.find((c) => c[0]?.data?.totalSpent);
       expect(bumpCall).toBeDefined();
-      expect(new Prisma.Decimal(bumpCall[0].data.totalSpent).toFixed(2)).toBe(
-        "25.00",
-      );
+      expect(
+        new Prisma.Decimal(bumpCall[0].data.totalSpent.increment).toFixed(2),
+      ).toBe("25.00");
     });
 
     it("itemTotal applies discount pro-rata", async () => {
