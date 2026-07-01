@@ -101,6 +101,16 @@ const BillSplitModal = ({
 
   const remaining = totalAmount - totalSplit;
 
+  // Block confirm whenever a non-EQUAL split doesn't reconcile to the bill in
+  // EITHER direction. The old gate (`Math.abs(remaining) > 0.01 && remaining > 0`)
+  // only caught UNDER-splits, so a CUSTOM split whose entered amounts summed
+  // ABOVE the bill total (remaining < 0) stayed confirmable — recording payments
+  // in EXCESS of the order (an over-charge). |remaining| <= 0.01 still absorbs
+  // kuruş rounding. EQUAL is always exact; BY_ITEMS assigns each item once so it
+  // can only be under/exact — so this new symmetry only tightens the CUSTOM path.
+  const splitDoesNotReconcile =
+    splitType !== 'EQUAL' && Math.abs(remaining) > 0.01;
+
   const addEntry = () => {
     setEntries(prev => [
       ...prev,
@@ -418,7 +428,11 @@ const BillSplitModal = ({
             Math.abs(remaining) < 0.01 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
           }`}>
             <span className="text-sm font-medium">{t('billSplit.remaining')}</span>
-            <span className="font-bold">{formatCurrency(Math.max(0, remaining))}</span>
+            {/* Signed, NOT Math.max(0,…): an over-split (entries sum ABOVE the
+                bill) is negative here — clamping it to 0 hid the overage and
+                misleadingly read "remaining: 0" while the amounts didn't
+                reconcile. Show the real figure so the cashier can correct it. */}
+            <span className="font-bold">{formatCurrency(remaining)}</span>
           </div>
         )}
 
@@ -430,7 +444,7 @@ const BillSplitModal = ({
           <Button
             variant="primary"
             onClick={handleConfirm}
-            disabled={isLoading || (splitType !== 'EQUAL' && Math.abs(remaining) > 0.01 && remaining > 0)}
+            disabled={isLoading || splitDoesNotReconcile}
           >
             {isLoading ? (
               <Spinner size="sm" color="white" />
