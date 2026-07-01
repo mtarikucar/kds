@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useCartStore, toCartItems } from './cartStore';
+import { useCartStore, toCartItems, cartLineKey } from './cartStore';
 import type { HardwareProduct } from './storeApi';
 
 /**
@@ -81,8 +81,34 @@ describe('cartStore (v2.8.87)', () => {
     it('setQty floors at 1 (can\'t accidentally enter negative or 0 via the cart preview)', () => {
       const p = makeHardware();
       useCartStore.getState().addHardware(p, { qty: 5, acquisition: 'sell' });
-      useCartStore.getState().setQty(p.id, -3);
+      const key = cartLineKey(useCartStore.getState().lines[0]);
+      useCartStore.getState().setQty(key, -3);
       expect(useCartStore.getState().lines[0].qty).toBe(1);
+    });
+
+    it('remove/setQty target ONE line — a sell + rent of the same product are independent', () => {
+      const p = makeHardware({ rentalMonthlyCents: 19900 });
+      const store = useCartStore.getState();
+      store.addHardware(p, { qty: 2, acquisition: 'sell' });
+      store.addHardware(p, { qty: 3, acquisition: 'rent' });
+      expect(useCartStore.getState().lines).toHaveLength(2);
+
+      // Bump ONLY the rent line's qty.
+      const rentLine = useCartStore
+        .getState()
+        .lines.find((l) => l.type === 'hardware' && l.acquisition === 'rent')!;
+      store.setQty(cartLineKey(rentLine), 10);
+      const afterSet = useCartStore.getState().lines;
+      expect(afterSet.find((l) => l.type === 'hardware' && l.acquisition === 'sell')!.qty).toBe(2);
+      expect(afterSet.find((l) => l.type === 'hardware' && l.acquisition === 'rent')!.qty).toBe(10);
+
+      // Remove ONLY the sell line; the rent line survives (pre-fix, keying on
+      // productId removed BOTH).
+      const sellLine = afterSet.find((l) => l.type === 'hardware' && l.acquisition === 'sell')!;
+      store.remove(cartLineKey(sellLine));
+      const afterRemove = useCartStore.getState().lines;
+      expect(afterRemove).toHaveLength(1);
+      expect(afterRemove[0].type === 'hardware' && afterRemove[0].acquisition).toBe('rent');
     });
   });
 
@@ -144,12 +170,15 @@ describe('cartStore (v2.8.87)', () => {
     });
   });
 
-  it('remove deletes the matching product line(s) regardless of type', () => {
+  it('remove deletes the targeted line, leaving other-product lines intact', () => {
     const h = makeHardware();
     const s = makeService();
     useCartStore.getState().addHardware(h, { acquisition: 'sell' });
     useCartStore.getState().addService(s, { branchId: 'br-1' });
-    useCartStore.getState().remove(h.id);
+    const hwKey = cartLineKey(
+      useCartStore.getState().lines.find((l) => l.type === 'hardware')!,
+    );
+    useCartStore.getState().remove(hwKey);
     expect(useCartStore.getState().lines).toHaveLength(1);
     expect(useCartStore.getState().lines[0].product.id).toBe('svc-1');
   });

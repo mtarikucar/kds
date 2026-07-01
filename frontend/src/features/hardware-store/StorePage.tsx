@@ -14,7 +14,7 @@ import {
   type QuoteWarning,
   type ShippingAddress,
 } from './storeApi';
-import { useCartStore, toCartItems } from './cartStore';
+import { useCartStore, toCartItems, cartLineKey } from './cartStore';
 import ShippingAddressForm from './ShippingAddressForm';
 import Modal from '../../components/ui/Modal';
 import { useAuthStore } from '../../store/authStore';
@@ -370,7 +370,7 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
                         </span>
                         <button
                           className="text-xs text-red-600 hover:underline"
-                          onClick={() => removeFromCart(l.product.id)}
+                          onClick={() => removeFromCart(cartLineKey(l))}
                         >
                           {t('store.remove')}
                         </button>

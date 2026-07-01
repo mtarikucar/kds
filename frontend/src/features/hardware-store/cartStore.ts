@@ -47,9 +47,26 @@ interface CartState {
     product: HardwareProduct,
     opts: { branchId?: string; preferredDates?: string[]; notes?: string },
   ) => void;
-  setQty: (productId: string, qty: number) => void;
-  remove: (productId: string) => void;
+  // Operate on the LINE key (see cartLineKey), NOT the bare productId: the
+  // same product can legitimately sit in the cart as two lines (sell + rent,
+  // or a service scheduled for two branches). Keying setQty/remove on
+  // productId alone silently mutated/removed BOTH lines — breaking the very
+  // distinct-line contract addHardware/addService establish.
+  setQty: (lineKey: string, qty: number) => void;
+  remove: (lineKey: string) => void;
   clear: () => void;
+}
+
+/**
+ * Stable unique identity for a cart line — mirrors the dedup keys used by
+ * addHardware (productId + acquisition) and addService (productId + branchId).
+ * setQty/remove target THIS, so a sell line and a rent line of the same product
+ * (or the same service at two branches) can be managed independently.
+ */
+export function cartLineKey(l: CartLine): string {
+  return l.type === 'hardware'
+    ? `hw:${l.product.id}:${l.acquisition}`
+    : `sv:${l.product.id}:${(l as ServiceCartLine).branchId ?? ''}`;
 }
 
 export const useCartStore = create<CartState>((set) => ({
@@ -114,20 +131,21 @@ export const useCartStore = create<CartState>((set) => ({
       };
     }),
 
-  setQty: (productId, qty) =>
+  setQty: (lineKey, qty) =>
     set((state) => ({
-      lines: state.lines
-        .map((l) =>
-          l.product.id === productId
-            ? l.type === 'service'
-              ? l // services don't compose
-              : { ...l, qty: Math.max(1, qty) }
-            : l,
-        ),
+      lines: state.lines.map((l) =>
+        cartLineKey(l) === lineKey
+          ? l.type === 'service'
+            ? l // services don't compose
+            : { ...l, qty: Math.max(1, qty) }
+          : l,
+      ),
     })),
 
-  remove: (productId) =>
-    set((state) => ({ lines: state.lines.filter((l) => l.product.id !== productId) })),
+  remove: (lineKey) =>
+    set((state) => ({
+      lines: state.lines.filter((l) => cartLineKey(l) !== lineKey),
+    })),
 
   clear: () => set({ lines: [] }),
 }));
