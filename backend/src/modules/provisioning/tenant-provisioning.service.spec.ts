@@ -109,6 +109,38 @@ describe("TenantProvisioningService", () => {
     );
   });
 
+  it("seeds featureOverrides from the plan flags so PlanFeatureGuard's warm-up fallback resolves (parity with register/social)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+      monthlyPrice: new Prisma.Decimal(1299),
+      currency: "TRY",
+      trialDays: 14,
+      commissionRate: new Prisma.Decimal(0.15),
+      posAccess: true,
+      advancedReports: true,
+      reservationSystem: true,
+      apiAccess: false,
+    } as any);
+
+    await svc.provisionTenantForLead(command);
+
+    const data = (prisma.tenant.create as any).mock.calls[0][0].data;
+    expect(data.currentPlanId).toBe("plan-pro");
+    // Without this seed a marketing-converted tenant had NO features until the
+    // projector produced grants from currentPlan. posAccess is the v3.0.7-class
+    // field — it MUST be present and reflect the plan.
+    expect(data.featureOverrides).toEqual(
+      expect.objectContaining({
+        posAccess: true,
+        advancedReports: true,
+        reservationSystem: true,
+        apiAccess: false, // a flag the plan does NOT grant stays false
+      }),
+    );
+  });
+
   it("is idempotent: a prior ledger row returns the same tenant without writing", async () => {
     prisma.tenantProvisioningLog.findUnique.mockResolvedValue({
       leadId: "lead-1",

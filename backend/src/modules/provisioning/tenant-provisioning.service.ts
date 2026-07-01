@@ -157,7 +157,36 @@ export class TenantProvisioningService implements CoreProvisioningPort {
           data: {
             name: command.tenantName,
             subdomain,
-            ...(planRow ? { currentPlanId: planRow.id } : {}),
+            ...(planRow
+              ? {
+                  currentPlanId: planRow.id,
+                  // new-tenant provisioning parity: seed featureOverrides so
+                  // PlanFeatureGuard's fallback path resolves the plan's
+                  // features during the ~30s entitlement-projector warm-up
+                  // window. AuthProvisioningService (register/social) already
+                  // does this; without it a marketing-converted tenant had NO
+                  // features until the projector produced featureEntitlement
+                  // rows from currentPlan. Folds identically to the projected
+                  // `plan` grant (features OR), so it can only ADD warm-up
+                  // coverage — never over-grant. Keep this flag set in lockstep
+                  // with AuthProvisioningService.buildPlanFeatureOverrides
+                  // (the v3.0.7 bug was a posAccess omission there).
+                  featureOverrides: {
+                    advancedReports: !!planRow.advancedReports,
+                    multiLocation: !!planRow.multiLocation,
+                    customBranding: !!planRow.customBranding,
+                    apiAccess: !!planRow.apiAccess,
+                    externalDisplay: !!planRow.externalDisplay,
+                    prioritySupport: !!planRow.prioritySupport,
+                    inventoryTracking: !!planRow.inventoryTracking,
+                    kdsIntegration: !!planRow.kdsIntegration,
+                    reservationSystem: !!planRow.reservationSystem,
+                    personnelManagement: !!planRow.personnelManagement,
+                    deliveryIntegration: !!planRow.deliveryIntegration,
+                    posAccess: !!planRow.posAccess,
+                  },
+                }
+              : {}),
             ...(canTrial && planRow
               ? {
                   trialUsed: true,
