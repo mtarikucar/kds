@@ -103,6 +103,46 @@ describe("PublicStatsService core logic", () => {
       expect(data.sessionId).toBe("s1");
     });
 
+    it("classifies Chromium-derivatives by their distinctive token (Edg/OPR), not as Chrome", async () => {
+      const cases: Array<[string, string]> = [
+        // Modern Edge uses "Edg/" (not "Edge/") — was mislabelled Chrome.
+        [
+          "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36 Edg/120.0",
+          "Edge",
+        ],
+        // Modern Opera uses "OPR/" (not "Opera") — was mislabelled Chrome.
+        [
+          "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/119 Safari/537.36 OPR/105.0",
+          "Opera",
+        ],
+        // Plain Chrome stays Chrome.
+        [
+          "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+          "Chrome",
+        ],
+        [
+          "Mozilla/5.0 (Windows NT 10.0; rv:121.0) Gecko/20100101 Firefox/121.0",
+          "Firefox",
+        ],
+        // Desktop Safari (no chrome token).
+        [
+          "Mozilla/5.0 (Macintosh) AppleWebKit/605.1 Version/17.0 Safari/605.1",
+          "Safari",
+        ],
+        // Legacy EdgeHTML "Edge/" still maps to Edge.
+        [
+          "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Edge/18.0",
+          "Edge",
+        ],
+      ];
+      for (const [ua, expected] of cases) {
+        const { svc, prisma } = build();
+        await svc.trackPageView({ page: "l", path: "/" } as any, "8.8.8.8", ua);
+        const data = prisma.pageView.create.mock.calls[0][0].data;
+        expect(data.browser).toBe(expected);
+      }
+    });
+
     it("swallows DB errors (best-effort telemetry never throws)", async () => {
       const { svc, prisma } = build();
       prisma.pageView.create.mockRejectedValue(new Error("db down"));

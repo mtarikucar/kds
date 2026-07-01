@@ -66,11 +66,17 @@ export class PublicStatsService {
   private parseBrowser(userAgent: string): string {
     if (!userAgent) return "unknown";
     const ua = userAgent.toLowerCase();
-    if (ua.includes("chrome") && !ua.includes("edge")) return "Chrome";
+    // Order matters: Edge and Opera are Chromium-based, so their UA ALSO
+    // contains "chrome" (and "safari"). Match their distinctive tokens FIRST.
+    // Modern Edge uses "Edg/" (NOT "Edge/") and modern Opera "OPR/" (NOT
+    // "Opera") — the previous "edge"/"opera" substrings matched neither current
+    // release, so every modern Edge/Opera visitor was mislabelled as Chrome
+    // (they slipped past `chrome && !edge`). Distinctive-token-first fixes it.
     if (ua.includes("firefox")) return "Firefox";
-    if (ua.includes("safari") && !ua.includes("chrome")) return "Safari";
-    if (ua.includes("edge")) return "Edge";
-    if (ua.includes("opera")) return "Opera";
+    if (ua.includes("edg")) return "Edge";
+    if (ua.includes("opr") || ua.includes("opera")) return "Opera";
+    if (ua.includes("chrome")) return "Chrome";
+    if (ua.includes("safari")) return "Safari";
     return "Other";
   }
 
