@@ -154,10 +154,13 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   };
 
   const calculateTotal = (): number => {
-    let total = product.price;
+    // Number() coercion: price/priceAdjustment are typed `number` but may
+    // arrive as Prisma-Decimal strings; `total += …` on a string CONCATENATES
+    // and corrupts the shown price. Same defence as cartStore.calculateItemTotal.
+    let total = Number(product.price);
     selectedModifiers.forEach(modifiers => {
       modifiers.forEach(mod => {
-        total += mod.priceAdjustment * mod.quantity;
+        total += Number(mod.priceAdjustment) * mod.quantity;
       });
     });
     return total * quantity;

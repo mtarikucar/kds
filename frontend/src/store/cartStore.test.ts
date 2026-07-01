@@ -87,6 +87,25 @@ describe('cartStore', () => {
       expect(useCartStore.getState().items[0].itemTotal).toBeCloseTo(0.9, 10);
     });
 
+    it('coerces a string price + string priceAdjustment (Prisma Decimal) instead of concatenating', () => {
+      // price and priceAdjustment are TYPED number but the API serialises Prisma
+      // Decimal as a STRING. Without Number() coercion, ("10" + 3) * 2 would
+      // string-concatenate to "103" * 2 = 206 — a silent 8× overcharge shown to
+      // the customer. Correct: (10 + 3) * 2 = 26.
+      const mods = [makeModifier({ priceAdjustment: '3' as any, quantity: 1 })];
+      useCartStore
+        .getState()
+        .addItem(makeProduct({ price: '10' as any }), 2, mods);
+      expect(useCartStore.getState().items[0].itemTotal).toBe(26);
+    });
+
+    it('coerces a string price with NO modifiers (bare 0-append guard)', () => {
+      // The nastiest case: "10" + 0 concatenates to "100" → * 3 = 300, a 10×
+      // error, with no modifier needed to trigger it. Correct: 10 * 3 = 30.
+      useCartStore.getState().addItem(makeProduct({ price: '10' as any }), 3, []);
+      expect(useCartStore.getState().items[0].itemTotal).toBe(30);
+    });
+
     it('stores notes on the new line', () => {
       useCartStore.getState().addItem(makeProduct(), 1, [], 'no onions');
       expect(useCartStore.getState().items[0].notes).toBe('no onions');

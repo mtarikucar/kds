@@ -48,11 +48,19 @@ const calculateItemTotal = (
   modifiers: CartModifier[],
   quantity: number
 ): number => {
+  // Coerce through Number() before any `+`. product.price and priceAdjustment
+  // are TYPED `number` but arrive from the API as Prisma Decimal, which
+  // serializes to a STRING. menu-query.service already coerces the customer-menu
+  // path, but a string reaching here from any other product source (partner
+  // display API, a persisted pre-coercion cart) would make `productPrice + …`
+  // CONCATENATE ("50" + 0 → "500") and silently 10× the line total. This
+  // mirrors the POS posCart.ts `Number(item.price)` defence so the two carts
+  // can never drift on price arithmetic.
   const modifierTotal = modifiers.reduce(
-    (sum, mod) => sum + (mod.priceAdjustment * mod.quantity),
+    (sum, mod) => sum + Number(mod.priceAdjustment) * mod.quantity,
     0
   );
-  return (productPrice + modifierTotal) * quantity;
+  return (Number(productPrice) + modifierTotal) * quantity;
 };
 
 export const useCartStore = create<CartState>()(
