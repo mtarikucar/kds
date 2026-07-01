@@ -174,6 +174,20 @@ describe("ReservationAvailabilityService — availability logic", () => {
   });
 
   describe("getAvailableSlots — window generation", () => {
+    // Pin "now" to a Wednesday BEFORE the hardcoded 2026-07-01 test date so the
+    // 09:00–10:00 morning slots are always in the FUTURE (bookable). Without
+    // this the suite passed only while 2026-07-01 was itself a future date;
+    // once the wall clock reached that afternoon the morning slots fell into
+    // the past and the availability logic (correctly) greyed them out, failing
+    // the tests. The dynamic-"today" test below reads this pinned clock too.
+    beforeAll(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-06-24T00:00:00Z"));
+    });
+    afterAll(() => {
+      jest.useRealTimers();
+    });
+
     it("returns [] when reservations are disabled", async () => {
       settingsService.getOrCreate.mockResolvedValue(makeSettings({ isEnabled: false }));
       const out = await svc.getAvailableSlots("t-1", "2026-07-01");

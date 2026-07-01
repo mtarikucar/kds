@@ -186,10 +186,13 @@ describe("PublicStatsService core logic", () => {
       expect(today.getMinutes()).toBe(0);
       // week boundary is a Monday (ISO week start).
       expect(week.getDay()).toBe(1);
-      // week start is on/before today's midnight; month start on/before week.
+      // week start is on/before today's midnight; month start on/before today.
       expect(week.getTime()).toBeLessThanOrEqual(today.getTime());
       expect(month.getDate()).toBe(1); // first of the month
-      expect(month.getTime()).toBeLessThanOrEqual(week.getTime());
+      // NB: month-start is NOT necessarily <= week-start — when the 1st falls
+      // mid-week (e.g. a Wednesday), start-of-month is AFTER the week's Monday.
+      // The stable invariant is month-start on/before today.
+      expect(month.getTime()).toBeLessThanOrEqual(today.getTime());
     });
 
     it("builds top-country / top-city breakdowns from groupBy results", async () => {

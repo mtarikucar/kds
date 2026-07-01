@@ -136,6 +136,18 @@ describe("ReservationAvailabilityService.getAvailableSlots — party-size capaci
 
   const enabledEngine = () => engineWith({ "feature.reservationSystem": true });
 
+  // Pin "now" to a Wednesday BEFORE the hardcoded 2026-07-01 test date so the
+  // generated morning slots stay in the FUTURE (bookable). Otherwise these
+  // pass only until the wall clock passes 2026-07-01's morning, after which
+  // the availability logic correctly greys the past slots out.
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-06-24T00:00:00Z"));
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     prisma = mockPrismaClient();
     (prisma.tenant.findUnique as any).mockResolvedValue({
