@@ -156,6 +156,8 @@ describe('WebhookDeliveryWorkerService.tick', () => {
       updated = data;
       return { id: 'd-1' };
     });
+    // The network path now also records a subscription failure (auto-pause feed).
+    (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1', consecutiveFailures: 1 });
     (global as any).fetch = jest.fn().mockRejectedValue(new Error('ECONNRESET'));
 
     await svc.tickOnce();
@@ -211,6 +213,9 @@ describe('WebhookDeliveryWorkerService.tick', () => {
       (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
       (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: {} });
       (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      // A network throw now ALSO bumps the subscription's failure counter
+      // (endpoint-health failure) — mock the write the way the HTTP-error test does.
+      (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1', consecutiveFailures: 1 });
       (global as any).fetch = jest.fn().mockRejectedValue(new Error('ECONNRESET'));
 
       await svc.tickOnce();
@@ -219,6 +224,29 @@ describe('WebhookDeliveryWorkerService.tick', () => {
         'webhook_delivery_total',
         expect.any(String),
         { result: 'failure' },
+      );
+    });
+
+    it('a NETWORK throw counts toward auto-pause (dead endpoint), not just HTTP errors', async () => {
+      (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
+      (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: {} });
+      (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
+      // The increment lands us AT the pause threshold this attempt.
+      (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1', consecutiveFailures: 20 });
+      (prisma.tenantWebhookSubscription.updateMany as any).mockResolvedValue({ count: 1 });
+      (global as any).fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await svc.tickOnce();
+
+      // consecutiveFailures incremented on the subscription…
+      const bump = (prisma.tenantWebhookSubscription.update as any).mock.calls[0][0];
+      expect(bump.data.consecutiveFailures).toEqual({ increment: 1 });
+      // …and the status-guarded auto-pause fired.
+      expect(prisma.tenantWebhookSubscription.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 's-1', status: 'active' },
+          data: { status: 'paused' },
+        }),
       );
     });
 

@@ -49,6 +49,52 @@ export class WebhookDeliveryWorkerService {
     );
   }
 
+  /**
+   * Record a failed delivery against the SUBSCRIPTION: bump consecutiveFailures
+   * atomically and auto-pause once AUTO_PAUSE_AFTER is crossed. Shared by EVERY
+   * endpoint-health failure branch (HTTP non-2xx, thrown network error, and the
+   * SSRF re-check rejection). Previously only the HTTP non-2xx branch did this,
+   * so a persistently UNREACHABLE endpoint — connection refused / timeout / DNS
+   * failure, which throw a network error rather than returning an HTTP response,
+   * the MOST common dead-endpoint case — never advanced consecutiveFailures and
+   * was NEVER auto-paused. The SSRF branch's own comment already claimed the
+   * threshold would "catch a misconfigured-or-malicious endpoint quickly", but
+   * it didn't feed the counter either.
+   *
+   * NOT called for payload-purged (a retention issue, not endpoint health) or
+   * unseal-secret (a legacy-migration config error) terminal failures.
+   */
+  private async recordSubscriptionFailure(
+    subscriptionId: string,
+    lastDeliveryCode: number,
+  ): Promise<void> {
+    const updated = await this.prisma.tenantWebhookSubscription.update({
+      where: { id: subscriptionId },
+      data: {
+        lastDeliveryAt: new Date(),
+        lastDeliveryCode,
+        consecutiveFailures: { increment: 1 },
+      },
+      select: { id: true, consecutiveFailures: true },
+    });
+    if (
+      updated.consecutiveFailures >=
+      WebhookDeliveryWorkerService.AUTO_PAUSE_AFTER
+    ) {
+      // Status-guarded so a concurrent worker that already paused us doesn't
+      // trip a no-op log line.
+      const r = await this.prisma.tenantWebhookSubscription.updateMany({
+        where: { id: subscriptionId, status: "active" },
+        data: { status: "paused" },
+      });
+      if (r.count > 0) {
+        this.logger.warn(
+          `Auto-paused subscription ${subscriptionId} after ${updated.consecutiveFailures} failures`,
+        );
+      }
+    }
+  }
+
   @Cron(CronExpression.EVERY_30_SECONDS)
   async tick(): Promise<void> {
     // Without the lock, two replicas would each `findMany` the same 50 due
@@ -168,6 +214,10 @@ export class WebhookDeliveryWorkerService {
           lastResponseSnippet: `URL rejected by SSRF guard: ${msg}`,
         },
       });
+      // Feed the auto-pause threshold (this branch's whole purpose per the
+      // comment above) — a URL that keeps failing the SSRF re-check is an
+      // endpoint-health failure.
+      await this.recordSubscriptionFailure(d.subscriptionId, 0);
       this.recordDelivery("failure");
       return;
     }
@@ -229,31 +279,7 @@ export class WebhookDeliveryWorkerService {
           },
         });
       } else {
-        const updated = await this.prisma.tenantWebhookSubscription.update({
-          where: { id: d.subscriptionId },
-          data: {
-            lastDeliveryAt: new Date(),
-            lastDeliveryCode: res.status,
-            consecutiveFailures: { increment: 1 },
-          },
-          select: { id: true, consecutiveFailures: true },
-        });
-        if (
-          updated.consecutiveFailures >=
-          WebhookDeliveryWorkerService.AUTO_PAUSE_AFTER
-        ) {
-          // Use updateMany with the status guard so a concurrent worker
-          // that already paused us doesn't trip a no-op log line race.
-          const r = await this.prisma.tenantWebhookSubscription.updateMany({
-            where: { id: d.subscriptionId, status: "active" },
-            data: { status: "paused" },
-          });
-          if (r.count > 0) {
-            this.logger.warn(
-              `Auto-paused subscription ${d.subscriptionId} after ${updated.consecutiveFailures} failures`,
-            );
-          }
-        }
+        await this.recordSubscriptionFailure(d.subscriptionId, res.status);
       }
     } catch (e) {
       // Network error — no status code, treat like 599.
@@ -275,6 +301,10 @@ export class WebhookDeliveryWorkerService {
           ),
         },
       });
+      // A thrown network error (connection refused / timeout / DNS failure) is
+      // an endpoint-health failure too — count it toward auto-pause, otherwise
+      // an endpoint that's simply DOWN never trips the threshold.
+      await this.recordSubscriptionFailure(d.subscriptionId, 0);
       this.recordDelivery("failure");
     }
   }
