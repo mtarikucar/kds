@@ -131,11 +131,14 @@ export class ReferralService {
 
         const referredCustomer = await tx.customer.findFirst({
           where: { id: referredCustomerId, tenantId },
+          // The referral reward is gated on phone verification + the daily
+          // tenant cap (see checks below), NOT on order completion — so we
+          // don't read totalOrders. (It used to be selected but never used;
+          // dropped to keep this hot, per-apply transactional read minimal.)
           select: {
             id: true,
             referredBy: true,
             phoneVerified: true,
-            totalOrders: true,
           },
         });
         if (!referredCustomer)
