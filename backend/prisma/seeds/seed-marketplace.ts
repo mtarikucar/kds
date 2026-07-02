@@ -29,8 +29,13 @@ const SEED_DEFAULT_COMPLIANCE = {
 };
 
 // ---- Add-on catalog ---------------------------------------------------
+//
+// Exported so tests can assert catalog invariants (e.g. every
+// `kind:'integration'` add-on must grant an `integration.*` key) without
+// executing the seed. The `main()` invocation at the bottom is guarded by
+// `require.main === module` so importing this file has no side effects.
 
-const ADDONS = [
+export const ADDONS = [
   // Capacity
   {
     code: "kds_extra_screen",
@@ -133,7 +138,14 @@ const ADDONS = [
     kind: "integration",
     billing: "recurring",
     priceCents: 14900,
-    grants: { "feature.callerIntegration": true },
+    // The caller feed is gated as an INTEGRATION on every surface: the
+    // frontend route + sidebar use FeatureGate integration={{domain:'caller'}}
+    // and the backend endpoint uses @RequiresIntegration('caller') — all three
+    // resolve the engine key `integration.caller`. A `feature.*` grant here
+    // satisfied none of them, so buying the add-on unlocked nothing (feed
+    // stayed 403 + nav hidden behind the upsell). Grant the integration vendor
+    // list instead, mirroring the delivery add-ons (`integration.delivery`).
+    grants: { "integration.caller": ["generic"] },
     deps: [],
   },
   // Software / features
@@ -1206,11 +1218,15 @@ async function main() {
   console.log("[seed-marketplace] done");
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Only run the seed when invoked directly (ts-node prisma/seeds/seed-marketplace.ts).
+// Guard keeps the module import-safe for unit tests that assert catalog invariants.
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
