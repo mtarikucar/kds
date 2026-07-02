@@ -17,7 +17,7 @@ KDS (Kitchen Display System / Mutfak Ekran Sistemi), kasadan/QR menuden/self-pay
 - Siparisleri istasyon bazinda (sicak mutfak, soguk mutfak, bar, pizza, izgara vb.) **anlik** gostermek.
 - Hazirlik durumunu yonetmek: `NEW → PREPARING → READY → SERVED` (bump/geri al).
 - Hazirlik surelerini ve gecikmeleri renk/sayaç ile gostermek.
-- "Hazir" bilgisini gercek zamanli olarak POS'a/garson tabletine/caller-id'ye geri bildirmek.
+- "Hazir" bilgisini gercek zamanli olarak POS'a/garson tabletine geri bildirmek.
 
 **Bar ekrani (`bar_screen`)** islevsel olarak KDS ile aynidir; farki, yalnizca bar/icecek kategorilerine yonlendirilen siparisleri gostermesidir (kategori → istasyon eslemesi ile).
 
@@ -97,7 +97,7 @@ KDS (Kitchen Display System / Mutfak Ekran Sistemi), kasadan/QR menuden/self-pay
 **Servis sirasinda**
 4. Yeni siparis kartlari ekranin ust/sol tarafina duser; sesli/renkli uyari verir. Kart; masa/siparis no, kalemler, modifiye/notlar, adet ve gecen sureyi gosterir.
 5. Hazirlamaya baslarken karti **"Hazirlaniyor" (PREPARING)** yap. Sayaç ilerledikce kart rengi degisir (yesil → sari → kirmizi = SLA asimi).
-6. Kalem/urun bittikce isaretle; tum kalemler bitince karti **"Hazir" (READY)** yap (bump). Bu, POS'a/garson tabletine/caller-id'ye gercek zamanli geri bildirim gonderir.
+6. Kalem/urun bittikce isaretle; tum kalemler bitince karti **"Hazir" (READY)** yap (bump). Bu, POS'a/garson tabletine gercek zamanli geri bildirim gonderir (WebSocket ile yalnizca `kitchen-*`/`pos-*` odalarina; siparise bagli bir `sessionId` varsa musteri-oturumu "hazir" bildirimi ayrica `emitOrderStatusChangeWithCustomer` yoluyla gider).
 7. Gerekirse geri al (yanlis bump), sesi kis, siparisi buyut, notu goster.
 8. Cok istasyonlu urun (yemek + icecek) ilgili KDS ve bar ekranina ayni anda fan-out edilir; her ekran kendi kalemini yonetir.
 
@@ -292,7 +292,7 @@ KDS (Kitchen Display System / Mutfak Ekran Sistemi), kasadan/QR menuden/self-pay
 
 **Dogrulama**
 - [ ] Test siparisi dogru istasyona dustu; renk/sayaç calisiyor.
-- [ ] Bump → POS/garson/caller-id geri bildirimi dondu.
+- [ ] Bump → POS/garson geri bildirimi dondu.
 - [ ] Baglanti kes/ac → cihaz yeniden baglandi; 24 saatten uzun kesintide token yenileme/yeniden eslestirme gerektigi not edildi.
 - [ ] (Onerilir) Internet kesintisi senaryosu icin yedek kitchen_printer planlandi.
 

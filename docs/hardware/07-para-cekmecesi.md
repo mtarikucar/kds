@@ -3,7 +3,7 @@
 > **Belge tipi:** Cihaz (çevre birim) yönergesi — HummyTummy restoran KDS/POS platformu
 > **Kapsam:** AFANDA LB-405K mekanik çelik para çekmecesi
 > **Hedef kitle:** Restoran operatörü + BAYİ / satıcı
-> **Önemli:** Para çekmecesinin kendine ait bir `Device.kind` değeri **yoktur**. Sistemde bağımsız bir cihaz olarak eşleştirilmez; **fiş yazıcısına (receipt_printer) bağlı** çalışan bir çevre birimidir ve yazıcının `capabilities[]` etiketine `'cash_drawer'` eklenerek modellenir.
+> **Önemli:** Para çekmecesinin kendine ait bir `Device.kind` değeri **yoktur**. Sistemde bağımsız bir cihaz olarak eşleştirilmez; **fiş yazıcısına (receipt_printer) bağlı** çalışan bir çevre birimidir. Sistemde çekmeceyi süren şey şubenin **varsayılan fiş yazıcısıdır** (`defaultReceiptPrinterId`); yazıcının `capabilities[]` etiketine `'cash_drawer'` eklemek yalnızca açıklayıcı metadatadır ve işlevsel bir etkisi yoktur.
 
 ---
 
@@ -17,10 +17,10 @@ HummyTummy tarafında para çekmecesinin iki ayrı yüzü vardır — bunları k
 
 | Kavram | Ne | Nerede yaşar |
 |---|---|---|
-| **Fiziksel çekmece açma (drawer-kick)** | Yazıcıya bağlı solenoidin darbeyle açılması | Yazıcının `cash_drawer` capability'si üzerinden; Tauri POS `open_cash_drawer_via_printer` komutu veya HummyBox köprüsünün `open_drawer` komutu |
+| **Fiziksel çekmece açma (drawer-kick)** | Yazıcıya bağlı solenoidin darbeyle açılması | Varsayılan fiş yazıcısı (`defaultReceiptPrinterId`) üzerinden; Tauri POS `open_cash_drawer_via_printer` komutu veya HummyBox köprüsünün `open_drawer` komutu |
 | **Nakit hareket / muhasebe kaydı** | Kasa açılış/kapanış, para giriş/çıkışı, sayım | `CashDrawerService` (backend) — `OPENING / CLOSING / CASH_IN / CASH_OUT / ADJUSTMENT` |
 
-**Fiziksel taraf:** Çekmece, bir `receipt_printer` cihazının çevre birimi olarak modellenir. Yazıcının `capabilities[]` dizisine `'cash_drawer'` eklendiğinde (örn. `['print_80mm','cash_drawer']`) POS/masaüstü uygulaması "Çekmeceyi Aç" aksiyonunu etkinleştirir. Nakit ödeme kaydedildiğinde POS'a otomatik "yazdır + çekmeceyi aç" sinyali gider (`payments.service.ts` — "Tell the POS to auto-print + open cash drawer").
+**Fiziksel taraf:** Çekmece, bir `receipt_printer` cihazının çevre birimi olarak modellenir. POS/masaüstü uygulamasının "Çekmeceyi Aç" aksiyonunu ve nakit ödemede otomatik açılmayı etkinleştiren şey, POS ayarlarında **varsayılan fiş yazıcısının tanımlı olması** (`defaultReceiptPrinterId`) ve ödeme yönteminin **NAKİT** olmasıdır (`frontend/src/pages/pos/posReceipt.ts` — `printerId && method === 'CASH'`). Yazıcının `capabilities[]` dizisine `'cash_drawer'` eklemek yalnızca belge/envanter amaçlı açıklayıcı bir etikettir; çalışma zamanında hiçbir kod bunu okuyup çekmeceyi etkinleştirmez veya kısıtlamaz (dizi yalnız listelenir), üstelik masaüstü yazıcının kendi bildirdiği yetenek dizesi `cash_drawer` değil `cash_drawer_control`'dür ve her ESC/POS yazıcıda zaten mevcuttur. Nakit ödeme kaydedildiğinde POS'a otomatik "yazdır + çekmeceyi aç" sinyali gider (`payments.service.ts` — "Tell the POS to auto-print + open cash drawer").
 
 **Bağlantı yolu (drawer-kick):**
 - **Cloud-direct:** POS tableti USB fiş yazıcısını doğrudan sürüyorsa → Tauri komutu `open_cash_drawer_via_printer` → `HardwareManager::open_cash_drawer` → `EscPosPrinter` → gerçek ESC/POS darbesi `ESC p m t1 t2` = baytlar `1B 70 00 19 FA`.
@@ -30,7 +30,7 @@ HummyTummy tarafında para çekmecesinin iki ayrı yüzü vardır — bunları k
 
 ### Neden `Device.kind` yok
 
-Para çekmecesi Mağaza'da (`/admin/store`) **satılabilir bir katalog SKU'sudur, ancak ayrı bir `Device.kind` değildir.** Kategori→cihaz eşlemesinde `cash_drawer` **provizyon edilmez** (`other`, `service` gibi). Mağazadan çekmece satın alındığında PayTR ödemesi sonrası **cihaz slotu AÇILMAZ.** Çünkü çekmecenin ağ kimliği, IP'si, token'ı yoktur — kendi başına buluta bağlanmaz; yazıcıya RJ11/RJ12 ile bağlanan bir **yazıcı yeteneğidir** (printer capability). **Kurulumcu, çekmece için ayrı bir cihaz slotu AÇMAMALIDIR** — çekmeceyi sisteme tanıtmak, bağlı olduğu yazıcının `capabilities[]` dizisine `'cash_drawer'` eklemekten ibarettir.
+Para çekmecesi Mağaza'da (`/admin/store`) **satılabilir bir katalog SKU'sudur, ancak ayrı bir `Device.kind` değildir.** Kategori→cihaz eşlemesinde `cash_drawer` **provizyon edilmez** (`other`, `service` gibi). Mağazadan çekmece satın alındığında PayTR ödemesi sonrası **cihaz slotu AÇILMAZ.** Çünkü çekmecenin ağ kimliği, IP'si, token'ı yoktur — kendi başına buluta bağlanmaz; yazıcıya RJ11/RJ12 ile bağlanan bir **yazıcı çevre birimidir**. **Kurulumcu, çekmece için ayrı bir cihaz slotu AÇMAMALIDIR** — çekmeceyi devreye almak için gereken tek şey, POS ayarlarında şubenin **varsayılan fiş yazıcısını** tanımlamaktır; bağlı yazıcının `capabilities[]` dizisine `'cash_drawer'` eklemek isteğe bağlı, yalnızca açıklayıcı bir envanter etiketidir ve işlevsel bir etkisi yoktur.
 
 ---
 
@@ -115,11 +115,11 @@ ESC/POS "drawer-kick" darbesi RJ11/RJ12 kablo üzerinden gönderilir. Para çekm
 
 Para çekmecesi buluta bağlanmaz, **pairCode almaz, `POST /v1/devices/pair` çağırmaz, provizyon edilmez, kendi cihaz slotu açılmaz.** Çekmeceyi HummyTummy'ye "tanıtmak", **bağlı olduğu yazıcıyı** doğru capability ile yapılandırmaktan ibarettir:
 
-1. **Yazıcı zaten sistemdeyse:** o `receipt_printer` cihazının `capabilities[]` dizisine `'cash_drawer'` etiketini ekleyin (örn. `['print_80mm','cash_drawer']`). Bu, POS/masaüstünde "Çekmeceyi Aç" yeteneğini açar.
+1. **Yazıcı zaten sistemdeyse:** POS ayarlarında şubenin **varsayılan fiş yazıcısını** (bu yazıcıyı) seçin — "Çekmeceyi Aç" aksiyonunu ve nakit ödemede otomatik açılmayı sağlayan gerçek koşul budur. İsteğe bağlı olarak o `receipt_printer` cihazının `capabilities[]` dizisine `'cash_drawer'` etiketini ekleyebilirsiniz (örn. `['print_80mm','cash_drawer']`); bu yalnızca açıklayıcı/envanter amaçlı bir etikettir, çalışma zamanında çekmeceyi açan/kısıtlayan bir kod bunu okumaz.
 2. **Yazıcı henüz sistemde değilse — yazıcının eşleştirilmesi (gerçek akış):**
    - Admin panelde (`/admin/branches/:id` → Cihazlar) **fiş yazıcısı için** bir cihaz slotu oluşturulur → 6 karakterli alfanumerik ([A-Z0-9]) **pairCode** üretilir (**10 dk geçerli**, şube başına en çok **10 bekleyen** slot).
    - Yazıcı/köprü uygulaması bu pairCode ile `POST /v1/devices/pair` çağırır → **tek-kullanımlık atomik claim** → sha256-hash'li **bearer token** döner (varsayılan **24 saat TTL** — `DEVICE_TOKEN_TTL_MS`; token YALNIZCA pair anında verilir). `heartbeat()` yalnız `status` ve `lastSeenAt` günceller, `tokenExpiresAt`'e **dokunmaz** — yani TTL kaymaz/uzamaz (kayan TTL değildir); token pair'den 24 saat sonra dolar ve süresi dolan token `authenticateToken` tarafından reddedilir. Main/prod dalında token yenileme (refresh) **yoktur**; bu yüzden cihaz devam edebilmek için **yeniden pair** olmalıdır (yeni 6 karakterli pairCode). Ham token yalnız bir kez döner; at-rest hash'lenir.
-   - Yazıcı yapılandırmasında `cash_drawer` capability'sini işaretleyin.
+   - POS ayarlarında bu yazıcıyı şubenin **varsayılan fiş yazıcısı** olarak seçin (çekmeceyi etkinleştiren gerçek koşul budur). İsteğe bağlı: yazıcı yapılandırmasında `cash_drawer` capability etiketini işaretleyin — yalnızca açıklayıcı metadata, işlevsel etkisi yoktur.
 
 ### 4.3 Köprü mü, cloud-direct mi?
 
@@ -179,7 +179,7 @@ Para çekmecesi Mağaza'da (`/admin/store`) satılabilir bir katalog SKU'sudur. 
 |---|---|---|
 | Çekmece **hiç açılmıyor** | Kablo DK portuna takılı değil / LAN portuna takılı | Kabloyu doğru **DK (drawer-kick)** portuna tak; RJ45'ten ayırt et |
 | Çekmece açılmıyor, yazıcı çalışıyor | **Gerilim uyuşmazlığı** (yazıcı DK çıkışı ile çekmece solenoidi farklı — örn. 12V/24V) | Yazıcı DK çıkış gerilimi ile çekmece solenoid gerilimini eşleştir (Bölüm 2) |
-| Açılmıyor + POS "başarılı" diyor | POS/köprü yazıcının `cash_drawer` capability'sini görmüyor | Yazıcının `capabilities[]` içine `'cash_drawer'` ekle |
+| Açılmıyor + POS "başarılı" diyor | POS ayarlarında **varsayılan fiş yazıcısı tanımlı değil** ya da ödeme yöntemi NAKİT değil (çekmece açma yalnız `printerId && method === 'CASH'` ile tetiklenir) | POS ayarlarında şubenin varsayılan fiş yazıcısını tanımla; ödemenin NAKİT olduğunu doğrula |
 | Çift çekmeceli yazıcıda yanlış çekmece açılıyor | `pin` (0/1) yanlış | Köprü komutunda doğru `pin` değerini ayarla |
 | Anahtarla açılıyor, darbeyle açılmıyor | Anahtar "kilitli" modda | Anahtarı "çalışır/açık" moda al |
 | Kilit takılıyor / çekmece sürtüyor | Ray tozu, aşırı dolu, yay zayıflaması | Temizle-yağla; aşırı doldurma; yay/ray hasarında servis |
@@ -251,7 +251,7 @@ Para çekmecesi Mağaza'da (`/admin/store`) satılabilir bir katalog SKU'sudur. 
 
 **Sistem yapılandırması:**
 - [ ] Bağlı fiş yazıcısı sistemde mevcut; değilse **yazıcı için** slot açıldı → pairCode (10 dk) → `POST /v1/devices/pair` → token alındı.
-- [ ] Yazıcının `capabilities[]` içine `'cash_drawer'` eklendi.
+- [ ] POS ayarlarında şubenin **varsayılan fiş yazıcısı** tanımlandı (çekmeceyi etkinleştiren gerçek koşul; `defaultReceiptPrinterId`). İsteğe bağlı: yazıcının `capabilities[]` etiketine `'cash_drawer'` eklendi (yalnızca açıklayıcı metadata).
 - [ ] Topoloji netleştirildi: **cloud-direct** (Tauri) mi, **HummyBox köprüsü** arkası mı (`bridgeId`).
 - [ ] Çekmece için **ayrı cihaz slotu/provizyon açılmadığı** teyit edildi (çekmece satılabilir bir katalog SKU'sudur ama ayrı bir `Device.kind` değildir; provizyon edilmez).
 

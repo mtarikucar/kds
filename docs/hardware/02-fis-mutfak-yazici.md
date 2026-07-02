@@ -143,15 +143,15 @@ Konum: **Kablo çekilemeyen / mobil** noktalar için (adaya taşınan kasa, geç
 - **Mutfak yazıcısı rolü:** Slot `receipt_printer` doğar; mutfak rolü isteniyorsa `Device.kind` panelden `kitchen_printer` yapılır *(kesin admin panel akışı panelde/koddan teyit edilmeli — tek `printer` kategorisi rol ayrımını sipariş anında taşımadığından bu elle dönüştürme adımı operasyonel bir boşluktur)*.
 
 **B) Köprünün eşleştirilmesi (asıl pairing burada)**
-Bir yerel termal yazıcı **HummyTummy uygulamasını çalıştırmaz**; kendisi `POST /v1/devices/pair` çağırmaz. Eşleştirme, yazıcının bağlı olduğu **HummyBox köprüsü (`local_bridge`)** için yapılır:
-1. Panelde köprü slotu için **6 karakterli alfanumerik ([A-Z0-9]) pairCode** üretilir (**10 dk geçerli**).
-2. HummyBox köprü uygulaması bu pairCode ile `POST /v1/devices/pair` çağırır.
-3. **Tek kullanımlık atomik claim** → köprüye **sha256-hash'li bearer token** döner (**24 saat TTL** — `DEVICE_TOKEN_TTL_MS`; bu süre **yalnızca pair anında** verilir). `heartbeat()` yalnızca `status` ve `lastSeenAt` günceller; `tokenExpiresAt`'e **dokunmaz**, yani token süresini **uzatmaz** (kayan/rotating TTL **değildir**). Token pair'den 24 saat sonra dolar ve süresi dolan token `authenticateToken` tarafından reddedilir; main/prod dalında token yenileme (refresh) yoktur, cihaz devam edebilmek için **yeniden pair** olmalıdır (yeni pairCode). Ham token **yalnızca bir kez** görünür; sunucuda **hash'lenmiş** saklanır.
+Bir yerel termal yazıcı **HummyTummy uygulamasını çalıştırmaz**; kendisi `POST /v1/devices/pair` çağırmaz. Eşleştirme, yazıcının bağlı olduğu **HummyBox köprüsü (`local_bridge`)** için yapılır (köprü, cihaz-mesh'in `pairCode`'lu `/v1/devices/pair` akışını değil, kendi provizyon/claim akışını kullanır):
+1. Admin panelde köprü slotu `POST /v1/bridges` ile provizyonlanır ve **yalnızca bir kez gösterilen tek-kullanımlık bir PROVİZYON TOKEN'ı** döner. Bu token bir daha geri alınamaz; sunucuda **sha256-hash'li** olarak (`provisioningTokenHash`) saklanır.
+2. HummyBox köprü uygulaması bu provizyon token'ını `POST /v1/bridges/claim` ile takas eder.
+3. **Tek kullanımlık atomik claim** → köprüye **sha256-hash'li uzun-ömürlü bearer token** döner (**varsayılan 30 gün TTL** — `LOCAL_BRIDGE_TOKEN_TTL_MS` ile ezilebilir; bu süre **claim anında** verilir). `heartbeat()` yalnızca `status`/`lastSeenAt` (ve `hostname`/`os`/`agentVersion`) günceller; `tokenExpiresAt`'e **dokunmaz**, yani token süresini **uzatmaz** (kayan/rotating TTL **değildir** — heartbeat'te-uzatma özelliği yalnızca henüz merge edilmemiş bir fix branch'te öneriliyor). `tokenExpiresAt` geçince süresi dolan token `authenticateToken` tarafından reddedilir; main/prod dalında token yenileme (refresh) yoktur, köprü devam edebilmek için **yeniden provizyonlanmalıdır** (yeni provizyon token'ı). Ham token **yalnızca bir kez** görünür; sunucuda **hash'lenmiş** saklanır. *(Not: 24 saat TTL — `DEVICE_TOKEN_TTL_MS` — yalnızca bulut-direkt cihaz-mesh cihazları (tablet/KDS) için geçerlidir, köprü için değil.)*
 4. Köprü artık WSS heartbeat + SQLite offline kuyruk + yazıcı sürücüsüyle çalışır.
 
 **C) Yazıcının köprüye bağlanması**
 1. Yazıcı cihaz kaydına `bridgeId` = ilgili HummyBox köprüsü atanır (LAN çevre birimi köprü arkasında çalışır).
-2. Köprünün yazıcıya erişebilmesi için yazıcının **adresi** girilir: LAN modellerinde **IP:port**, BT modelinde **Bluetooth adresi/MAC** *(alan adları panelde teyit edilmeli)*.
+2. **Bulut/panel yazıcının IP/MAC adresini saklamaz veya kabul etmez;** yazıcıya yalnızca mantıksal bir kimlikle (komuttaki `printerId`, varsayılan `"default"`) referans verir. Asıl **transport (aktarım)** köprünün veri dizinindeki `printers.toml` içinde **on-prem** yapılandırılır: bir `[[printer]]` tablosu olarak `transport = "tcp"` + `host`/`port` (raw-TCP, `port` varsayılanı **9100**) **veya** `transport = "device"`/`"serial"` + `path` (seri/USB aygıt dosyası); tablonun `id`'si yerel yazıcının kimliğiyle eşleşmelidir. *(Bluetooth adresi/MAC girilmez: köprünün ESC/POS sürücüsünde Bluetooth transport'u yoktur — yalnızca `tcp` ve `device`/`serial` desteklenir; BT bugün köprü için desteklenen bir transport değildir — bkz. Bölüm 2.3.)*
 3. `capabilities[]` ayarlanır (`print_80mm`, gerekiyorsa `cash_drawer`).
 4. Panelden **test fişi** gönderilerek uçtan uca doğrulanır.
 
@@ -285,7 +285,7 @@ Bu yazıcı bir **çıktı ucudur** ve kalıcı bir hafızada belge saklamaz (te
 - [ ] Slot kaynağı doğru: mağaza siparişi PayTR ile ödendiyse **otomatik** `receipt_printer` slotu oluştu (idempotent); değilse manuel slot (şube başına ≤10 bekleyen) açıldı.
 
 **Fiziksel + köprü**
-- [ ] HummyBox köprüsü kuruldu ve **eşleştirildi** (6 karakterli alfanumerik ([A-Z0-9]) pairCode → `POST /v1/devices/pair` → tek-kullanımlık claim → 24 saat TTL bearer token, yalnızca pair anında verilir; heartbeat süreyi uzatmaz; ham token bir kez alındı).
+- [ ] HummyBox köprüsü kuruldu ve **eşleştirildi** (`POST /v1/bridges` → tek-kullanımlık provizyon token'ı, yalnızca bir kez gösterilir → köprü `POST /v1/bridges/claim` ile takas eder → tek-kullanımlık claim → **varsayılan 30 gün TTL** bearer token (`LOCAL_BRIDGE_TOKEN_TTL_MS`), claim anında verilir; heartbeat süreyi uzatmaz; ham token bir kez alındı).
 - [ ] Yazıcı köprü arkasına bağlandı: `bridgeId` set; LAN modelde sabit **IP:port**, BT modelde **eşleştirme** yapıldı (köprü BT + Star Line Mode desteği teyitli).
 - [ ] `capabilities[]` doğru: `print_80mm` (+ çekmece varsa `cash_drawer`).
 - [ ] Kağıt **BPA'sız/fenolsüz**, 80 mm, doğru yönde takıldı; yedek rulo bırakıldı.

@@ -50,6 +50,6 @@ Aşağıdaki başlıklar cihaza özgü değildir; tek ve yetkili kaynak **[00-ge
 - **KVKK / PCI-DSS:** Veri sorumlusu/işleyen ayrımı, DPA, VERBİS eşikleri, PCI kapsamı → 00-genel-cerceve, KVKK bölümü.
 - **Eşleştirme standardı:** 6 karakterli alfanümerik pairCode (`[A-Z0-9]`, 36⁶), sha256 token, sabit 24 saat cihaz token TTL'i (heartbeat uzatmaz) ve provizyon idempotency → 00-genel-cerceve, ortak kurulum/pairing bölümü.
 
-> **Not:** Bu set provizyonlu tüm cihaz sınıflarını kapsar; kapsama girmeyen "önerilen ekipman" (ör. tartı/metroloji cihazları, RECOMMENDED_ONLY tier) ayrıca belgelenmemiştir.
+> **Not:** Bu set provizyonlu tüm cihaz sınıflarını kapsar; kapsama girmeyen "önerilen ekipman" (ör. tartı/metroloji cihazları, restoran çağrı cihazı/pager `RESTAURANT_PAGER`, müşteri ekranı `CUSTOMER_DISPLAY` ve benzeri kodda referanslı ama henüz satılmayan/provizyonlanmayan cihaz tipleri, RECOMMENDED_ONLY tier) ayrıca belgelenmemiştir.
 
 *Son güncelleme: 2026-07-02.*

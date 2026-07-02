@@ -16,7 +16,7 @@
 
 - HummyTummy KDS/POS'ta sipariş kapanınca (ödeme alınınca) mali belgenin (fişin) kesilmesinden bu cihaz sorumludur. Yazılım tarafında bu, `payment-finalizer` ve `payments` servislerindeki **post-commit fiş kesme (fiscal receipt)** adımıdır: ödeme kalıcılaştıktan sonra, şubede aktif bir fiziksel yazarkasa `FiscalDeviceRecord` varsa **GMP-3 komutu** cihaza **kuyruklanır**. (Not: komutun köprü üzerinden cihaza iletilip fişin fiziksel olarak basılması, o markanın köprü sürücüsünün gerçek implementasyonuna bağlıdır — bkz. üstteki entegrasyon uyarısı.)
 - Cihaz, HummyTummy'nin **device-mesh** envanterinde bir cihaz kaydı (slot) olarak tutulur: `Device.kind = yazarkasa`, `ownership = sold | rented | byo`, `warrantyUntil`, `capabilities[]` (ör. `['print_80mm','cash_drawer','fiscal']`).
-- **Bağlantı topolojisi:** Yazarkasa bir **LAN çevre birimidir** — doğrudan buluta bağlanmaz. **HummyBox köprüsü** (`local_bridge`) arkasında çalışır (`bridgeId` set). Köprü; WSS heartbeat + SQLite offline kuyruk + **yazarkasa/ESC-POS/POS sürücülerini** taşır ve GMP-3 komutlarını cihaza iletmeyi hedefler.
+- **Bağlantı topolojisi (tasarım):** Yazarkasa bir **LAN çevre birimidir** — doğrudan buluta bağlanmaz; tasarım gereği **HummyBox köprüsü** (`local_bridge`) arkasında çalışması öngörülür. Köprü; WSS heartbeat + SQLite offline kuyruk + **yazarkasa/ESC-POS/POS sürücülerini** taşır ve GMP-3 komutlarını cihaza iletmeyi hedefler. **Not:** `Device.bridgeId` alanı şemada mevcuttur ancak bugün hiçbir provizyon API'si/arayüzü onu doldurmaz (`createSlot` bridgeId almaz, yazan bir kod yolu yoktur — bkz. §4.3); değer okunur ama her zaman `null`'dır, yani cihazlar topolojide bulut-doğrudan görünür. Köprü-arkası bağın gerçekleşmesi için backend'e yazma yolu eklenmelidir.
 
 **İki mali entegrasyon modeli (HummyTummy'de — hedeflenen tasarım):**
 
@@ -73,9 +73,9 @@ Temassız (NFC) YN ÖKC; GİB onaylı. "Android tabanlı" tanımı ürün künye
 
 ### 2.3 Ingenico Move/5000F — **19.000 TL** (KDV dahil, *resmi kaynaktan teyit edilmeli*) · 24 ay garanti (*üretici belgesinden teyit edilmeli*)
 
-Taşınabilir **bankalı ÖKC/POS** (EFT-POS özellikli YN ÖKC — fiscal + kart bir arada). **Yetkili banka/servis modeli:** cihaz çoğunlukla banka/PSP kanalı üzerinden tahsis/kira ile devreye alınır; HummyTummy'de bu, mağaza tarafında **banka/PSP'ye yönlendirme (PARTNER_REDIRECT)** olarak modellenir. Model varyantının (fiscal "F") Türkiye'de GİB onaylı YN ÖKC künyesi olarak birebir mevcudiyeti *resmi kaynaktan teyit edilmeli*.
+Taşınabilir **bankalı ÖKC/POS** (EFT-POS özellikli YN ÖKC — fiscal + kart bir arada). **Yetkili banka/servis modeli:** cihaz çoğunlukla banka/PSP kanalı üzerinden tahsis/kira ile devreye alınır; ancak HummyTummy mağazasında bu ürün `category = yazarkasa` olarak tohumlanır ve satır bazında saleMode override'ı bulunmadığından **`QUOTE_ONLY` ("Teklif Al")** olarak listelenir — Hugin/Beko ile aynı, `PARTNER_REDIRECT` **değil**. Model varyantının (fiscal "F") Türkiye'de GİB onaylı YN ÖKC künyesi olarak birebir mevcudiyeti *resmi kaynaktan teyit edilmeli*.
 
-> **Önemli düzeltme:** Kod tabanındaki tek Ingenico sürücüsü **iWL ailesi (iWL2xx)** içindir — bu belgede satılan **Move/5000F değildir** ve farklı bir terminal ailesidir. Ayrıca bu sürücü de **iskelettir** ve **kart-ödeme (acquirer) protokolü** için tasarlanmıştır, **fiscal/GMP-3 fiş basımı için değildir.** Dolayısıyla "Move/5000F HummyTummy adaptörüyle mali fiş basar" ifadesi hem model hem işlevsellik açısından geçerli değildir. Move/5000F bu belgede zaten doğru şekilde **PARTNER_REDIRECT** (banka/PSP kanalı) olarak konumlandırılmıştır; mali fiş cihazın kendi banka/PSP entegrasyonuyla basılır, HummyTummy adaptörüyle değil.
+> **Önemli düzeltme:** Kod tabanındaki tek Ingenico sürücüsü **iWL ailesi (iWL2xx)** içindir — bu belgede satılan **Move/5000F değildir** ve farklı bir terminal ailesidir. Ayrıca bu sürücü de **iskelettir** ve **kart-ödeme (acquirer) protokolü** için tasarlanmıştır, **fiscal/GMP-3 fiş basımı için değildir.** Dolayısıyla "Move/5000F HummyTummy adaptörüyle mali fiş basar" ifadesi hem model hem işlevsellik açısından geçerli değildir. Move/5000F mağazada `category = yazarkasa` olarak tohumlandığından ve satır bazında saleMode override'ı bulunmadığından **`QUOTE_ONLY` ("Teklif Al")** olarak listelenir (Hugin/Beko ile aynı; `PARTNER_REDIRECT` **değil** — bu tier yalnızca `pos_terminal` kategorisine uygulanır); mali fiş cihazın kendi banka/PSP entegrasyonuyla basılır, HummyTummy adaptörüyle değil.
 
 | Özellik | Değer |
 |---|---|
@@ -90,7 +90,7 @@ Taşınabilir **bankalı ÖKC/POS** (EFT-POS özellikli YN ÖKC — fiscal + kar
 | Boyut / Ağırlık | 194.4 × 91.1 × 65.85 mm · ~420 g |
 | Dayanıklılık | 1.2 m düşmeye dayanıklı · -10 … +45 °C |
 | Onay | TÜBİTAK + GİB onaylı *(resmi kaynaktan teyit edilmeli)* |
-| **HummyTummy sürücü durumu** | Mağazada **PARTNER_REDIRECT** — fiş, banka/PSP entegrasyonuyla basılır. Koddaki iWL sürücüsü bu modelle eşleşmez ve fiscal değildir |
+| **HummyTummy sürücü durumu** | Mağazada **`QUOTE_ONLY` (Teklif Al)** — `yazarkasa` kategorisinde tohumlanır (Hugin/Beko ile aynı, `PARTNER_REDIRECT` değil); fiş, banka/PSP entegrasyonuyla basılır. Koddaki iWL sürücüsü bu modelle eşleşmez ve fiscal değildir |
 
 ---
 
@@ -127,17 +127,17 @@ Taşınabilir **bankalı ÖKC/POS** (EFT-POS özellikli YN ÖKC — fiscal + kar
 
 ### 4.2 HummyTummy mağaza akışı ve satış tier'ı
 - Yazarkasa/YN ÖKC, mağazada (`/admin/store`) **`QUOTE_ONLY` (Tier 1 — mali)** olarak listelenir: doğrudan PayTR ile satın alınmaz; **"Teklif Al"** ile ilerlenir, tedarik + GİB aktivasyonu bayi/yetkili servis üzerinden yürür.
-- Bankalı Ingenico gibi cihazlar mağazada **`PARTNER_REDIRECT` (Tier 2)** olarak lisanslı banka/PSP'ye yönlendirilir.
+- Bankalı Ingenico Move/5000F de mağazada `category = yazarkasa` olarak tohumlandığından **`QUOTE_ONLY` (Tier 1)** olarak listelenir (Hugin/Beko ile aynı — "Teklif Al"); banka/PSP tahsis/kira süreci teklif sonrası yürür. **`PARTNER_REDIRECT` (Tier 2)** yalnızca `pos_terminal` kategorisindeki bankalı terminaller için geçerlidir; bu belgedeki hiçbir ÖKC bu tier'da değildir.
 - Karşılaştırma: Normal donanım (KDS ekranı, yazıcı, tablet) `DIRECT_SALE`'dir — sepet → **PayTR** ödemesi → **sipariş ödenince device-mesh slotu otomatik açılır** (deterministik `provisionKey` + pg advisory-lock, idempotent). **Yazarkasa bu otomatik akışa girmez;** cihaz slotu, teklif/kurulum tamamlandıktan sonra manuel olarak açılır.
 
 ### 4.3 Provizyon ve eşleştirme (pairing) — gerçek akış
-1. **Slot oluşturma:** Admin panelde ilgili şubenin cihaz hub'ında (`/admin/branches/:id`) `kind = yazarkasa` bir cihaz slotu oluşturulur. Slot **HummyBox köprüsünün arkasına** bağlanır (`bridgeId` set — yazarkasa LAN çevre birimidir).
+1. **Slot oluşturma:** Admin panelde ilgili şubenin cihaz hub'ında (`/admin/branches/:id`) `kind = yazarkasa` bir cihaz slotu oluşturulur. Tasarım gereği yazarkasa köprü arkasında bir LAN çevre birimidir; ancak **köprü-arkası bağ (`Device.bridgeId`) şu an bir kurulum adımı değildir:** alan şemada mevcut olsa da `createSlot` bir bridgeId almaz ve backend'de onu yazan hiçbir kod yolu yoktur (`CreateDeviceSlotDto`/`UpdateDeviceDto` bridgeId içermez — bkz. `device.dto.ts`, `device.service.ts`). Slot bugün bridgeId olmadan (`null`) oluşturulur; köprü-arkası eşleme yalnızca ileride bir yazma yolu eklendiğinde gerçekleşir.
 2. **pairCode:** Sistem **alfanümerik 6 karakterli** bir pairCode üretir (**[A-Z0-9]** alfabesi, ~36⁶ ≈ 2.2 milyar uzay, rejection-sampling ile) — **10 dk geçerli**, **şube başına en çok 10 bekleyen slot**. (Not: kod yalnız rakam değildir; harf de içerebilir.)
 3. **Claim:** Cihaz uygulaması pairCode ile `POST /v1/devices/pair` çağırır → **tek-kullanımlık atomik claim** → **sha256-hash'li rotating bearer token** döner (**24 saat TTL**, `DEVICE_TOKEN_TTL_MS`; **yalnızca pair anında verilir**, heartbeat'te uzamaz). **Ham token yalnızca bir kez döner; sunucuda at-rest hash'lenir.** **Uyarı — nadiren etkileşimli cihaz:** device-mesh bearer token varsayılan TTL'i (`DEVICE_TOKEN_TTL_MS`) **24 saattir** ve `caller_id`/`scanner` dahil **her** `Device.kind` gibi **yazarkasa** için de geçerlidir. **`heartbeat()` yalnızca `status` ve `lastSeenAt`'i günceller; `tokenExpiresAt`'e dokunmaz — yani token süresini UZATMAZ (kayan/rotating TTL değildir).** Token pair'den **24 saat sonra dolar**; süresi dolan token `authenticateToken` tarafından reddedilir ve main/prod dalında token yenileme (refresh) yoktur. Bu nedenle yazarkasa günlük olarak açık/çevrimiçi tutulmazsa — ör. kapalı işletmede uzun süre çevrimdışı kalırsa — token dolar ve cihaz artık kimlik doğrulayamaz → **yeniden pair** gerekir (slottan **yeni pairCode** üretip `POST /v1/devices/pair`). Bu yüzden köprü/cihazın açık tutulması önerilir.
 4. **Köprü tarafı:** HummyBox, yazarkasa sürücüsü üzerinden GMP-3 komutlarını cihaza iletmeyi hedefler; internet kesintisinde komutlar **SQLite offline kuyruğa** alınır. **Önemli:** ilgili markanın köprü sürücüsü gerçek implementasyona sahip değilse (Hugin iskelet, Beko yok) komut köprüde başarısız olur ve **fiş fiziksel olarak basılmaz.**
 5. **Doğrulama:** `FiscalDeviceRecord` aktif ve şubeye bağlı görünmelidir. **Uyarı:** "Test siparişiyle deneme fişi kesilir" adımı, ancak ilgili markanın gerçek köprü sürücüsü mevcut olduğunda uçtan uca geçerlidir; mevcut iskelet sürücülerle deneme fişi **basılmaz** (*sürücü implementasyonu gerekir*).
 
-> **Cloud-direct değil, köprü arkası:** Tablet/KDS ekranı doğrudan buluta bağlanır (`bridgeId = null`). Yazarkasa, ESC/POS yazıcı ve kart POS terminali **her zaman HummyBox köprüsü arkasındadır.**
+> **Köprü arkası (tasarım hedefi):** Tasarımda yazarkasa, ESC/POS yazıcı ve kart POS terminali HummyBox köprüsü arkasında, tablet/KDS ekranı ise doğrudan bulutta konumlandırılır. **Ancak bugün `Device.bridgeId`'yi dolduran bir yazma yolu olmadığından tüm cihazlar `bridgeId = null` ile bulut-doğrudan görünür;** köprü-arkası gruplama yalnızca (henüz oluşmayan) bir bridgeId değeri üzerinden render edilir.
 
 ---
 
@@ -230,7 +230,7 @@ Taşınabilir **bankalı ÖKC/POS** (EFT-POS özellikli YN ÖKC — fiscal + kar
 
 **Satış öncesi (bayi):**
 - [ ] Müşterinin mükellefiyet/işletme türü ÖKC zorunluluğuna uygun mu, hangi YN ÖKC türü gerekiyor (EFT-POS özellikli mi, basit/bilgisayar bağlantılı mı)? Muafiyet ihtimali (tüm satış e-Fatura/e-Arşiv) mali müşavirle değerlendirildi mi?
-- [ ] Mağazada doğru tier: yazarkasa = **`QUOTE_ONLY` (Teklif Al)**, bankalı POS = **`PARTNER_REDIRECT`** (banka/PSP).
+- [ ] Mağazada doğru tier: yazarkasa (Hugin / Beko / **Ingenico Move/5000F** dahil) = **`QUOTE_ONLY` (Teklif Al)**. **`PARTNER_REDIRECT`** yalnızca `pos_terminal` kategorisindeki bankalı terminaller içindir — bu belgedeki hiçbir ÖKC bu tier'da değildir.
 - [ ] **Entegrasyon durumu doğrulandı mı?** Satılacak markanın HummyTummy köprü sürücüsü **gerçek mi yoksa iskelet/eksik mi?** (Hugin iskelet, Beko yok, Ingenico(iWL) iskelet ve fiscal değil) → uçtan uca fiş basımı gerektiren müşteride entegrasyon geliştirmesi tamamlanmadan taahhüt verilmemeli.
 - [ ] Güncel fiyat, garanti (üretici belgesinden) ve **mali abonelik/TSM servis bedeli** müşteriye net bildirildi mi?
 
@@ -241,7 +241,7 @@ Taşınabilir **bankalı ÖKC/POS** (EFT-POS özellikli YN ÖKC — fiscal + kar
 
 **HummyTummy entegrasyonu:**
 - [ ] Şube **HummyBox köprüsü** kurulu ve online (heartbeat yeşil).
-- [ ] `kind = yazarkasa` cihaz slotu **köprü arkasında** (`bridgeId` set) oluşturuldu.
+- [ ] `kind = yazarkasa` cihaz slotu oluşturuldu. *(Not: köprü-arkası bağ `Device.bridgeId` şu an provizyon API'si/arayüzü tarafından **doldurulmuyor** — bu madde bugün karşılanamaz; `createSlot` bridgeId almaz. Backend'e yazma yolu eklenene kadar slot `bridgeId = null` ile açılır.)*
 - [ ] pairCode üretildi (alfanümerik 6 karakter, 10 dk); cihaz `POST /v1/devices/pair` ile eşleşti; token alındı.
 - [ ] `FiscalDeviceRecord` aktif/şubeye bağlı. **Test siparişinde mali fiş fiziksel olarak kesildi mi?** (İskelet sürücüde basılmaz — gerçek sürücü şart.)
 - [ ] `fiscal_coupled` (bankalı EFT-POS) senaryosunda **çift fiş kesilmediği** doğrulandı (guard backend'de gerçek).
