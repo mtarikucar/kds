@@ -147,6 +147,58 @@ describe('ShiftSwapService branch-scope (track-1)', () => {
     expect(where.tenantId).toBe('t-1');
   });
 
+  it('branch-scopes the different-date double-booking check (multi-branch employee not falsely blocked)', async () => {
+    (prisma.shiftSwapRequest.findFirst as any).mockResolvedValue({
+      id: 'sw-1',
+      tenantId: 't-1',
+      branchId: 'b-1',
+      requesterId: 'r-1',
+      targetId: 't-2',
+      requesterAssignmentId: 'ra-1',
+      targetAssignmentId: 'ta-1',
+      status: 'TARGET_ACCEPTED',
+    });
+    const conflictWheres: any[] = [];
+    (prisma.$transaction as any).mockImplementation(async (fn: any) => {
+      const findFirst = jest
+        .fn()
+        // 1: targetAssignment ; 2: reqAssignment (DIFFERENT date → conflict check runs)
+        .mockResolvedValueOnce({
+          id: 'ta-1',
+          date: new Date('2026-01-02'),
+          shiftTemplateId: 'st-t',
+        })
+        .mockResolvedValueOnce({
+          id: 'ra-1',
+          date: new Date('2026-01-01'),
+          shiftTemplateId: 'st-r',
+        })
+        // 3 + 4: the double-booking lookups — capture WHERE, report no conflict
+        .mockImplementation(async ({ where }: any) => {
+          conflictWheres.push(where);
+          return null;
+        });
+      const tx = {
+        shiftAssignment: { findFirst, update: jest.fn().mockResolvedValue({}) },
+        shiftSwapRequest: {
+          update: jest.fn().mockResolvedValue({ id: 'sw-1', branchId: 'b-1' }),
+        },
+      };
+      return fn(tx);
+    });
+
+    await svc.approve('sw-1', scope, 'mgr-1');
+
+    // Both double-booking lookups must be scoped to the swap's branch, not
+    // tenant-wide: otherwise a shift the user holds on that date in ANOTHER
+    // branch is a false conflict that blocks a legitimate swap.
+    expect(conflictWheres).toHaveLength(2);
+    for (const w of conflictWheres) {
+      expect(w.branchId).toBe('b-1');
+      expect(w.tenantId).toBe('t-1');
+    }
+  });
+
   it('reject scopes the request find + claim by branchId', async () => {
     (prisma.shiftSwapRequest.findFirst as any).mockResolvedValue({
       id: 'sw-1',

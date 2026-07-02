@@ -170,7 +170,6 @@ export class ShiftSwapService {
   }
 
   async approve(id: string, scope: BranchScope, approvedById: string) {
-    const { tenantId } = scope;
     const request = await this.prisma.shiftSwapRequest.findFirst({
       where: {
         id,
@@ -224,19 +223,25 @@ export class ShiftSwapService {
 
         // For different-date swaps, validate no double-booking (inside transaction for consistency)
         if (!isSameDate) {
+          // Branch-scope the double-booking check to the swap's branch.
+          // ShiftAssignment is @@unique([userId, date, branchId]) and the
+          // swap is single-branch (createRequest enforces both sides share a
+          // branch). A tenant-wide check flagged a false conflict for a
+          // multi-branch employee who happens to have a shift on the same
+          // date in ANOTHER branch, blocking a legitimate swap.
           const [reqUserOnTargetDate, targetUserOnReqDate] = await Promise.all([
             tx.shiftAssignment.findFirst({
               where: {
                 userId: request.requesterId,
                 date: targetAssignment.date,
-                tenantId,
+                ...branchScope(scope),
               },
             }),
             tx.shiftAssignment.findFirst({
               where: {
                 userId: request.targetId,
                 date: reqAssignment.date,
-                tenantId,
+                ...branchScope(scope),
               },
             }),
           ]);
