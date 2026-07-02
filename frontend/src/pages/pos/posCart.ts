@@ -86,9 +86,16 @@ export function computeChangeDue(total: number, tendered: number): number {
  * Whether the tendered cash covers the order total. A separate predicate from
  * `computeChangeDue` so the confirm-button gate and the change display can't
  * drift. Equal amounts (exact payment) are sufficient.
+ *
+ * Compared in integer cents: `total` is a client-summed float (see
+ * calculateSubtotal), so a raw `tendered >= total` would REJECT an exact
+ * payment when the sum carries float noise (e.g. 0.1 + 0.2 = 0.30000000000000004
+ * vs a tendered 0.30) — even though computeChangeDue, which rounds, treats the
+ * same pair as fully covered (change 0). Rounding both sides to cents keeps the
+ * gate and the change display consistent.
  */
 export function isTenderSufficient(total: number, tendered: number): boolean {
-  return tendered >= total;
+  return Math.round(tendered * 100) >= Math.round(total * 100);
 }
 
 /**

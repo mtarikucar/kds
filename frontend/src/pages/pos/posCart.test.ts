@@ -121,6 +121,17 @@ describe('posCart money math', () => {
     it('is true at zero total with zero tender', () => {
       expect(isTenderSufficient(0, 0)).toBe(true);
     });
+
+    it('treats an exact payment as sufficient even when the total carries float noise', () => {
+      // The order total is a client-summed float, so 0.1 + 0.2 lands on
+      // 0.30000000000000004. Tendering exactly 0.30 must NOT be rejected —
+      // computeChangeDue already treats this pair as fully covered (change 0),
+      // and a raw `tendered >= total` would drift from that and block confirm.
+      const noisyTotal = 0.1 + 0.2;
+      expect(noisyTotal).not.toBe(0.3); // sanity: the noise is real
+      expect(isTenderSufficient(noisyTotal, 0.3)).toBe(true);
+      expect(computeChangeDue(noisyTotal, 0.3)).toBe(0);
+    });
   });
 });
 
