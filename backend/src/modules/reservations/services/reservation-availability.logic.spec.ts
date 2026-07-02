@@ -269,4 +269,30 @@ describe("ReservationAvailabilityService — availability logic", () => {
       expect(out.every((s) => s.available === false)).toBe(true);
     });
   });
+
+  // A non-positive timeSlotInterval would make `currentMinutes += interval`
+  // never advance the generator loop → the request hangs the worker (DoS).
+  // The service clamps a bad interval to a safe default; if that regresses
+  // these tests HANG (the loop never returns) rather than fail — a loud signal.
+  describe("getAvailableSlots — non-positive interval guard", () => {
+    it("clamps a 0 interval instead of looping forever", async () => {
+      settingsService.getOrCreate.mockResolvedValue(
+        makeSettings({ timeSlotInterval: 0 }),
+      );
+      (prisma.reservation.findMany as any).mockResolvedValue([]);
+      const out = await svc.getAvailableSlots("t-1", "2026-07-01");
+      expect(Array.isArray(out)).toBe(true);
+      expect(out.length).toBeGreaterThan(0); // 30-min fallback filled the grid
+    });
+
+    it("clamps a negative interval instead of running backwards forever", async () => {
+      settingsService.getOrCreate.mockResolvedValue(
+        makeSettings({ timeSlotInterval: -30 }),
+      );
+      (prisma.reservation.findMany as any).mockResolvedValue([]);
+      const out = await svc.getAvailableSlots("t-1", "2026-07-01");
+      expect(Array.isArray(out)).toBe(true);
+      expect(out.length).toBeGreaterThan(0);
+    });
+  });
 });

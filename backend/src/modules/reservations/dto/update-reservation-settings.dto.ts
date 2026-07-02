@@ -30,6 +30,11 @@ export class UpdateReservationSettingsDto {
   @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
+  // Must be positive: the slot generator does `currentMinutes += interval`, so
+  // 0/negative never advances the loop → the availability request hangs (DoS).
+  // 5-minute floor, 4-hour ceiling keeps it a sane reservation granularity.
+  @Min(5)
+  @Max(240)
   timeSlotInterval?: number;
 
   @ApiPropertyOptional()
@@ -76,6 +81,9 @@ export class UpdateReservationSettingsDto {
   @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
+  // 0 means "unlimited" (the availability check is skipped when falsy); a
+  // NEGATIVE value would make `length >= max` always true and block every slot.
+  @Min(0)
   maxReservationsPerSlot?: number;
 
   @ApiPropertyOptional()

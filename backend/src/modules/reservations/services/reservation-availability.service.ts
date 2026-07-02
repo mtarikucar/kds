@@ -196,7 +196,15 @@ export class ReservationAvailabilityService {
 
     // Generate time slots
     const slots: { time: string; available: boolean }[] = [];
-    const interval = settings.timeSlotInterval;
+    // Defend the loop below against a non-positive interval: the generator does
+    // `currentMinutes += interval`, so interval <= 0 (or NaN) never advances —
+    // the `while` never terminates and the availability request HANGS the
+    // worker (a DoS reachable via a mis-set timeSlotInterval). The DTO now
+    // enforces @Min at the write boundary; this clamp additionally covers any
+    // legacy row already persisted with a bad value, falling back to 30 min.
+    const rawInterval = settings.timeSlotInterval;
+    const interval =
+      Number.isInteger(rawInterval) && rawInterval > 0 ? rawInterval : 30;
     const [openH, openM] = openTime.split(":").map(Number);
     const [closeH, closeM] = closeTime.split(":").map(Number);
 
