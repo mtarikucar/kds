@@ -136,9 +136,12 @@ describe("TenantProvisioningService", () => {
         posAccess: true,
         advancedReports: true,
         reservationSystem: true,
-        apiAccess: false, // a flag the plan does NOT grant stays false
       }),
     );
+    // A flag the plan does NOT grant is OMITTED, never seeded as `false`: a
+    // false override becomes an override:admin {__replace:false} grant that
+    // would later suppress a legitimately-purchased add-on for that feature.
+    expect(data.featureOverrides).not.toHaveProperty("apiAccess");
   });
 
   it("is idempotent: a prior ledger row returns the same tenant without writing", async () => {

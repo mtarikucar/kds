@@ -90,7 +90,7 @@ describe("AuthProvisioningService.loadTrialPlanOrThrow", () => {
 describe("AuthProvisioningService.buildPlanFeatureOverrides", () => {
   const svc = new AuthProvisioningService(makePrisma() as any);
 
-  it("coerces truthy flags to true and null/undefined to false", () => {
+  it("emits truthy flags as true and OMITS falsy ones (so no __replace:false suppresses a purchased add-on)", () => {
     const overrides = svc.buildPlanFeatureOverrides({
       advancedReports: true,
       multiLocation: false,
@@ -99,21 +99,22 @@ describe("AuthProvisioningService.buildPlanFeatureOverrides", () => {
       inventoryTracking: true,
     });
     expect(overrides.advancedReports).toBe(true);
-    expect(overrides.multiLocation).toBe(false);
-    expect(overrides.customBranding).toBe(false);
-    expect(overrides.apiAccess).toBe(false);
     expect(overrides.inventoryTracking).toBe(true);
+    // Falsy plan features are ABSENT — NOT seeded as `false`. A false override
+    // becomes an override:admin {__replace:false} grant that would later
+    // suppress a legitimately-purchased marketplace add-on for that feature.
+    expect(overrides).not.toHaveProperty("multiLocation");
+    expect(overrides).not.toHaveProperty("customBranding");
+    expect(overrides).not.toHaveProperty("apiAccess");
   });
 
-  it("always returns the full set of twelve feature flags as booleans (incl. posAccess)", () => {
-    const overrides = svc.buildPlanFeatureOverrides({});
-    const keys = Object.keys(overrides);
-    // posAccess was historically omitted (v3.0.7 bug); it MUST be present so a
-    // fresh BUSINESS tenant's override fallback never hides POS during warm-up.
-    expect(keys).toContain("posAccess");
-    expect(keys).toHaveLength(12);
-    for (const v of Object.values(overrides)) {
-      expect(typeof v).toBe("boolean");
-    }
+  it("returns an empty map when the plan grants no features (nothing to over-grant)", () => {
+    expect(svc.buildPlanFeatureOverrides({})).toEqual({});
+  });
+
+  it("includes posAccess=true when the plan grants POS (v3.0.7: never hide POS during warm-up)", () => {
+    const overrides = svc.buildPlanFeatureOverrides({ posAccess: true });
+    expect(overrides.posAccess).toBe(true);
+    expect(Object.values(overrides).every((v) => v === true)).toBe(true);
   });
 });

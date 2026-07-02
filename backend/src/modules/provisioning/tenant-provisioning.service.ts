@@ -163,28 +163,39 @@ export class TenantProvisioningService implements CoreProvisioningPort {
                   // new-tenant provisioning parity: seed featureOverrides so
                   // PlanFeatureGuard's fallback path resolves the plan's
                   // features during the ~30s entitlement-projector warm-up
-                  // window. AuthProvisioningService (register/social) already
-                  // does this; without it a marketing-converted tenant had NO
+                  // window. AuthProvisioningService (register/social) does the
+                  // same; without it a marketing-converted tenant had NO
                   // features until the projector produced featureEntitlement
-                  // rows from currentPlan. Folds identically to the projected
-                  // `plan` grant (features OR), so it can only ADD warm-up
-                  // coverage — never over-grant. Keep this flag set in lockstep
-                  // with AuthProvisioningService.buildPlanFeatureOverrides
-                  // (the v3.0.7 bug was a posAccess omission there).
-                  featureOverrides: {
-                    advancedReports: !!planRow.advancedReports,
-                    multiLocation: !!planRow.multiLocation,
-                    customBranding: !!planRow.customBranding,
-                    apiAccess: !!planRow.apiAccess,
-                    externalDisplay: !!planRow.externalDisplay,
-                    prioritySupport: !!planRow.prioritySupport,
-                    inventoryTracking: !!planRow.inventoryTracking,
-                    kdsIntegration: !!planRow.kdsIntegration,
-                    reservationSystem: !!planRow.reservationSystem,
-                    personnelManagement: !!planRow.personnelManagement,
-                    deliveryIntegration: !!planRow.deliveryIntegration,
-                    posAccess: !!planRow.posAccess,
-                  },
+                  // rows from currentPlan.
+                  //
+                  // Seed ONLY the plan's TRUE features. A `false` here is NOT
+                  // harmless additive warm-up: the projector turns EVERY
+                  // featureOverrides key — including false — into an
+                  // `override:admin {__replace:false}` grant, and the engine
+                  // applies __replace AFTER the additive OR pass, so a false
+                  // override permanently SUPPRESSES a legitimately-purchased
+                  // marketplace add-on for that feature (tenant pays but the
+                  // guard still 403s). Omitting the false keys keeps this pure
+                  // additive: a plan-lacking feature stays absent (denied)
+                  // until an add-on or plan change grants it. (Kept in lockstep
+                  // with AuthProvisioningService.buildPlanFeatureOverrides,
+                  // fixed the same way.)
+                  featureOverrides: Object.fromEntries(
+                    Object.entries({
+                      advancedReports: !!planRow.advancedReports,
+                      multiLocation: !!planRow.multiLocation,
+                      customBranding: !!planRow.customBranding,
+                      apiAccess: !!planRow.apiAccess,
+                      externalDisplay: !!planRow.externalDisplay,
+                      prioritySupport: !!planRow.prioritySupport,
+                      inventoryTracking: !!planRow.inventoryTracking,
+                      kdsIntegration: !!planRow.kdsIntegration,
+                      reservationSystem: !!planRow.reservationSystem,
+                      personnelManagement: !!planRow.personnelManagement,
+                      deliveryIntegration: !!planRow.deliveryIntegration,
+                      posAccess: !!planRow.posAccess,
+                    }).filter(([, v]) => v),
+                  ),
                 }
               : {}),
             ...(canTrial && planRow

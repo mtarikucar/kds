@@ -105,9 +105,19 @@ export class AuthProvisioningService {
   }
 
   /**
-   * Seed `featureOverrides` with the BUSINESS plan's flag set so
-   * PlanFeatureGuard's fallback path resolves correctly during the first
-   * ~30 seconds while the entitlement engine projector is still warming up.
+   * Seed `featureOverrides` with the plan's TRUE features so PlanFeatureGuard's
+   * fallback path resolves correctly during the first ~30 seconds while the
+   * entitlement engine projector is still warming up.
+   *
+   * Emit ONLY truthy features. The projector turns EVERY featureOverrides key
+   * — including `false` — into an `override:admin {__replace:false}` grant, and
+   * the engine applies __replace AFTER the additive OR pass; a `false` override
+   * therefore permanently SUPPRESSES a later-purchased marketplace add-on for
+   * that feature (the tenant pays but the guard still 403s). Omitting the false
+   * keys keeps this pure additive warm-up: a plan-lacking feature stays absent
+   * (denied) until an add-on or plan change grants it. (v3.0.7 note: posAccess
+   * used to be omitted entirely, briefly hiding POS on a fresh BUSINESS tenant
+   * — a truthy posAccess is now included via the map below.)
    */
   buildPlanFeatureOverrides(businessPlan: {
     advancedReports?: boolean | null;
@@ -122,23 +132,23 @@ export class AuthProvisioningService {
     personnelManagement?: boolean | null;
     deliveryIntegration?: boolean | null;
     posAccess?: boolean | null;
-  }) {
-    return {
-      advancedReports: !!businessPlan.advancedReports,
-      multiLocation: !!businessPlan.multiLocation,
-      customBranding: !!businessPlan.customBranding,
-      apiAccess: !!businessPlan.apiAccess,
-      externalDisplay: !!businessPlan.externalDisplay,
-      prioritySupport: !!businessPlan.prioritySupport,
-      inventoryTracking: !!businessPlan.inventoryTracking,
-      kdsIntegration: !!businessPlan.kdsIntegration,
-      reservationSystem: !!businessPlan.reservationSystem,
-      personnelManagement: !!businessPlan.personnelManagement,
-      deliveryIntegration: !!businessPlan.deliveryIntegration,
-      // posAccess was historically omitted here (the v3.0.7 bug), which
-      // briefly hid POS on a fresh BUSINESS tenant during projector warm-up.
-      posAccess: !!businessPlan.posAccess,
-    };
+  }): Record<string, boolean> {
+    return Object.fromEntries(
+      Object.entries({
+        advancedReports: !!businessPlan.advancedReports,
+        multiLocation: !!businessPlan.multiLocation,
+        customBranding: !!businessPlan.customBranding,
+        apiAccess: !!businessPlan.apiAccess,
+        externalDisplay: !!businessPlan.externalDisplay,
+        prioritySupport: !!businessPlan.prioritySupport,
+        inventoryTracking: !!businessPlan.inventoryTracking,
+        kdsIntegration: !!businessPlan.kdsIntegration,
+        reservationSystem: !!businessPlan.reservationSystem,
+        personnelManagement: !!businessPlan.personnelManagement,
+        deliveryIntegration: !!businessPlan.deliveryIntegration,
+        posAccess: !!businessPlan.posAccess,
+      }).filter(([, v]) => v),
+    );
   }
 
   /**
