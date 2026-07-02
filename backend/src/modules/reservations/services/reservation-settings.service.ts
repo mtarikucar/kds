@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -58,7 +59,57 @@ export class ReservationSettingsService {
     }
   }
 
+  /**
+   * Validate per-day operating hours BEFORE persisting. The availability
+   * slot generator (reservation-availability.service) computes
+   * `openMinutes = openH*60+openM` / `closeMinutes = closeH*60+closeM` and
+   * loops `while (currentMinutes + duration <= closeMinutes)`. Two silent
+   * failure modes the operator would never diagnose (an empty calendar, no
+   * error) if we accepted the config:
+   *   - a malformed "HH:mm" → openH/closeH is NaN → the loop never runs;
+   *   - an overnight window (close <= open, e.g. 18:00–02:00) → the loop
+   *     condition is immediately false. Reservations are same-day (the
+   *     overlap math works in minutes-of-day), so overnight windows aren't
+   *     representable — reject rather than silently produce zero slots.
+   */
+  private assertValidOperatingHours(operatingHours: unknown): void {
+    if (operatingHours == null) return;
+    if (typeof operatingHours !== "object") {
+      throw new BadRequestException("operatingHours must be an object");
+    }
+    const HHMM = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    const toMin = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m;
+    };
+    for (const [day, raw] of Object.entries(
+      operatingHours as Record<string, unknown>,
+    )) {
+      if (!raw || typeof raw !== "object") continue;
+      const h = raw as { open?: unknown; close?: unknown; closed?: unknown };
+      if (h.closed) continue;
+      if (
+        typeof h.open !== "string" ||
+        typeof h.close !== "string" ||
+        !HHMM.test(h.open) ||
+        !HHMM.test(h.close)
+      ) {
+        throw new BadRequestException(
+          `${day}: open/close must be valid "HH:mm" times`,
+        );
+      }
+      if (toMin(h.close) <= toMin(h.open)) {
+        throw new BadRequestException(
+          `${day}: close time (${h.close}) must be after open time (${h.open}); overnight windows are not supported`,
+        );
+      }
+    }
+  }
+
   async update(tenantId: string, dto: UpdateReservationSettingsDto) {
+    this.assertValidOperatingHours(
+      (dto as { operatingHours?: unknown }).operatingHours,
+    );
     // Read-then-update with race fallback. See getOrCreate note.
     const existing = await this.prisma.reservationSettings.findFirst({
       where: { tenantId, branchId: null },

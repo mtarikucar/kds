@@ -95,6 +95,57 @@ describe('ReservationSettingsService.update', () => {
   });
 });
 
+describe('ReservationSettingsService.update — operatingHours validation', () => {
+  it('rejects an overnight window (close <= open) with NO DB write', async () => {
+    const prisma = makePrisma();
+    const svc = new ReservationSettingsService(prisma as any);
+    await expect(
+      svc.update('t1', {
+        operatingHours: { monday: { open: '18:00', close: '02:00', closed: false } },
+      } as any),
+    ).rejects.toThrow(/close time .* must be after open time/i);
+    // Reject BEFORE persisting — the slot generator would otherwise silently
+    // produce zero bookable slots for that day.
+    expect(prisma.reservationSettings.updateMany).not.toHaveBeenCalled();
+    expect(prisma.reservationSettings.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed HH:mm time', async () => {
+    const prisma = makePrisma();
+    const svc = new ReservationSettingsService(prisma as any);
+    await expect(
+      svc.update('t1', {
+        operatingHours: { tuesday: { open: '9', close: '25:00', closed: false } },
+      } as any),
+    ).rejects.toThrow(/valid "HH:mm"/i);
+    expect(prisma.reservationSettings.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('skips the open/close check for a closed day', async () => {
+    const prisma = makePrisma();
+    prisma.reservationSettings.findFirst.mockResolvedValue({ id: 's1' });
+    prisma.reservationSettings.updateMany.mockResolvedValue({ count: 1 });
+    prisma.reservationSettings.findFirstOrThrow.mockResolvedValue({ id: 's1' });
+    const svc = new ReservationSettingsService(prisma as any);
+    await expect(
+      svc.update('t1', { operatingHours: { sunday: { closed: true } } } as any),
+    ).resolves.toEqual({ id: 's1' });
+  });
+
+  it('accepts a normal same-day window', async () => {
+    const prisma = makePrisma();
+    prisma.reservationSettings.findFirst.mockResolvedValue({ id: 's1' });
+    prisma.reservationSettings.updateMany.mockResolvedValue({ count: 1 });
+    prisma.reservationSettings.findFirstOrThrow.mockResolvedValue({ id: 's1' });
+    const svc = new ReservationSettingsService(prisma as any);
+    await expect(
+      svc.update('t1', {
+        operatingHours: { monday: { open: '09:00', close: '22:00', closed: false } },
+      } as any),
+    ).resolves.toEqual({ id: 's1' });
+  });
+});
+
 describe('ReservationSettingsService.getPublicSettings', () => {
   it('throws NotFound when the tenant does not exist', async () => {
     const prisma = makePrisma();
