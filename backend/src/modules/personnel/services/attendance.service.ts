@@ -542,7 +542,13 @@ export class AttendanceService {
     ];
 
     const escape = (value: unknown): string => {
-      const s = value === null || value === undefined ? "" : String(value);
+      let s = value === null || value === undefined ? "" : String(value);
+      // CSV/formula-injection defence: a cell whose first character is = + - @
+      // (or a leading tab/CR) is executed as a FORMULA by Excel/Sheets. Staff
+      // names (firstName/lastName) are user-controlled, so a name like
+      // `=HYPERLINK("http://evil","click")` runs on a manager's machine the
+      // moment they open this export. Prefix a single quote to force text.
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
       // RFC-4180 quoting: wrap in double quotes and double any embedded quote
       // when the field contains a comma, quote, or newline.
       return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

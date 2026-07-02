@@ -229,6 +229,28 @@ describe("AttendanceService branch-scope reads (track-1)", () => {
     expect(lines[1]).toBe("Ada Lovelace,WAITER,1,480,60,30,1,15");
   });
 
+  it("neutralizes CSV/formula injection in a user-controlled staff name", async () => {
+    // A staff member can set their own firstName/lastName; a name that starts
+    // with = + - @ is executed as a FORMULA when a manager opens the export
+    // in Excel/Sheets. It must be prefixed with a single quote (text guard).
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      {
+        userId: "u-evil",
+        user: { id: "u-evil", firstName: "=1+1", lastName: "", role: "WAITER" },
+        totalWorkedMinutes: 1,
+        totalBreakMinutes: 0,
+        overtimeMinutes: 0,
+        isLate: false,
+        lateMinutes: 0,
+      },
+    ]);
+
+    const csv = await svc.getAttendanceSummaryCsv(scope, {} as any);
+    const dataRow = csv.split("\n")[1];
+    expect(dataRow.startsWith("'=1+1,")).toBe(true);
+    expect(dataRow.startsWith("=")).toBe(false);
+  });
+
   it("getMyStatus self-scopes by tenant+user+date WITHOUT pinning the active branch (deep-review M8)", async () => {
     (prisma.attendance.findFirst as any).mockResolvedValue(null);
 
