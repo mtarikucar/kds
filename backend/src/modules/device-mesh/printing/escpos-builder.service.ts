@@ -327,6 +327,14 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
    */
   private qr(b: ByteWriter, data: string, size: number): void {
     const bytes = Array.from(Buffer.from(data, "utf8"));
+    // GS ( k store-data length is a 16-bit field (pL/pH). Guard so an oversized
+    // payload can't overflow it and desync the printer. 0xfffc leaves room for
+    // the +3 protocol header bytes (len stays <= 0xffff).
+    if (bytes.length > 0xfffc) {
+      throw new Error(
+        `QR payload too large: ${bytes.length} bytes (max ${0xfffc})`,
+      );
+    }
     const len = bytes.length + 3;
     const pL = len & 0xff;
     const pH = (len >> 8) & 0xff;

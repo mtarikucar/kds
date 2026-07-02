@@ -166,6 +166,21 @@ describe("EscPosBuilderService", () => {
       expect(has(job.bytes, [GS, 0x28, 0x6b])).toBe(true);
     });
 
+    it("rejects an oversized QR payload instead of overflowing the 16-bit length field", () => {
+      // > 0xfffc bytes would overflow the GS ( k pL/pH length field and desync
+      // the printer; the builder must throw rather than emit a corrupt stream.
+      const huge = "x".repeat(0xfffc + 1);
+      expect(() =>
+        makeService().buildReceipt(receipt, { qr: { data: huge } }),
+      ).toThrow(/QR payload too large/);
+      // A payload at the boundary still builds.
+      expect(() =>
+        makeService().buildReceipt(receipt, {
+          qr: { data: "x".repeat(0xfffc) },
+        }),
+      ).not.toThrow();
+    });
+
     it("base64 exactly round-trips the bytes and reports byteLength", () => {
       const job = makeService().buildReceipt(receipt);
       expect(job.base64).toBe(Buffer.from(job.bytes).toString("base64"));
