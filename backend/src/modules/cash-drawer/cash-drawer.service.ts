@@ -150,9 +150,15 @@ export class CashDrawerService {
           `denominationBreakdown has an invalid face value: "${face}"`,
         );
       }
-      if (typeof count !== "number" || !Number.isFinite(count) || count < 0) {
+      // Counts are physical note/coin quantities — they must be whole
+      // numbers. A fractional count (e.g. "2.5") is a data-entry error that
+      // can still sum to the amount by coincidence (2.5 × 100 = 250), so the
+      // sum invariant alone won't catch it; reject non-integers here.
+      // `Number.isInteger` is false for NaN/Infinity too, so it subsumes the
+      // finiteness check.
+      if (typeof count !== "number" || !Number.isInteger(count) || count < 0) {
         throw new BadRequestException(
-          `denominationBreakdown count for "${face}" must be a non-negative number`,
+          `denominationBreakdown count for "${face}" must be a non-negative whole number`,
         );
       }
       total += faceValue * count;

@@ -97,6 +97,18 @@ describe('CashDrawerService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it('rejects a fractional count even when it happens to sum to the amount', async () => {
+      // 2.5 × 100 = 250 sums correctly, but "2.5 notes" is physically
+      // impossible — a fat-fingered "2.5" for "25" must not slip through.
+      await expect(
+        svc.create('t-1', 'b-1', 'u-1', {
+          type: 'CLOSING' as any,
+          amount: 250,
+          denominationBreakdown: { '100': 2.5 } as any,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('rejects a non-numeric face value', async () => {
       await expect(
         svc.create('t-1', 'b-1', 'u-1', {
