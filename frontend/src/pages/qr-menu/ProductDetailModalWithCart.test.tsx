@@ -323,6 +323,57 @@ describe('ProductDetailModalWithCart — required-modifier gate', () => {
     expect(screen.getByRole('button', { name: /Add to Cart/ })).not.toBeDisabled();
     expect(screen.queryByText(/Please select required options/i)).not.toBeInTheDocument();
   });
+
+  it('blocks add-to-cart when minSelections>0 even if isRequired is false (server-parity)', () => {
+    // A group with minSelections>0 is mandatory by the SERVER's own gate
+    // (customer-orders.service) and is auto-expanded here for attention — but
+    // canAddToCart used to gate only on isRequired, letting the item into the
+    // cart for the server to reject the whole order at checkout.
+    const product = makeProduct({
+      modifierGroups: [
+        makeGroup({
+          id: 'minonly',
+          displayName: 'Base',
+          selectionType: SelectionType.SINGLE,
+          isRequired: false,
+          minSelections: 1,
+          modifiers: [
+            { id: 'thin', name: 'thin', displayName: 'Thin', priceAdjustment: 0, isAvailable: true, displayOrder: 0, groupId: 'minonly', tenantId: 't1', createdAt: '', updatedAt: '' },
+          ],
+        }),
+      ],
+    });
+    render(<ProductDetailModalWithCart {...baseProps} product={product} />);
+    expect(screen.getByRole('button', { name: /Add to Cart/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Thin/ }));
+    expect(screen.getByRole('button', { name: /Add to Cart/ })).not.toBeDisabled();
+  });
+
+  it('blocks add-to-cart for an isRequired group even when minSelections is 0', () => {
+    // isRequired means "must pick at least one" — the effective minimum is 1
+    // regardless of minSelections. The old `length < minSelections` (0) check
+    // was never true, so a required-but-min-0 group was silently unenforced.
+    const product = makeProduct({
+      modifierGroups: [
+        makeGroup({
+          id: 'reqzero',
+          displayName: 'Pick',
+          selectionType: SelectionType.SINGLE,
+          isRequired: true,
+          minSelections: 0,
+          modifiers: [
+            { id: 'o', name: 'o', displayName: 'Option', priceAdjustment: 0, isAvailable: true, displayOrder: 0, groupId: 'reqzero', tenantId: 't1', createdAt: '', updatedAt: '' },
+          ],
+        }),
+      ],
+    });
+    render(<ProductDetailModalWithCart {...baseProps} product={product} />);
+    expect(screen.getByRole('button', { name: /Add to Cart/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Option/ }));
+    expect(screen.getByRole('button', { name: /Add to Cart/ })).not.toBeDisabled();
+  });
 });
 
 describe('ProductDetailModalWithCart — addItem payload', () => {

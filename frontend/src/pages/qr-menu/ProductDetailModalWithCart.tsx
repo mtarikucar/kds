@@ -143,9 +143,21 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     if (!product.modifierGroups) return true;
 
     for (const group of product.modifierGroups) {
-      if (group.isRequired) {
+      // Mirror the server-side gate (customer-orders.service /
+      // validateModifierSelections): a group is mandatory when isRequired
+      // OR minSelections > 0, and the effective minimum is max(1,
+      // minSelections) when required, else minSelections. The old check
+      // gated only on `isRequired`, so a group with minSelections > 0 but
+      // isRequired=false (or isRequired with minSelections=0) let the item
+      // into the cart — the same expand-attention logic above already
+      // treats it as required — only for the server to reject the WHOLE
+      // order at checkout with a confusing error. Enforce it here for
+      // immediate, per-group feedback.
+      const minSel = group.minSelections ?? 0;
+      if (group.isRequired || minSel > 0) {
+        const minRequired = group.isRequired ? Math.max(1, minSel) : minSel;
         const groupModifiers = selectedModifiers.get(group.id) || [];
-        if (groupModifiers.length < group.minSelections) {
+        if (groupModifiers.length < minRequired) {
           return false;
         }
       }
