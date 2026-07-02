@@ -12,8 +12,13 @@ import { z } from 'zod';
  */
 
 const HHMM = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-// E.164-ish: optional +, 8-15 digits. Mirrors the backend regex so a
-// frontend-passable string is always backend-passable too.
+// E.164-ish sanity check for the value the <PhoneInput> already emits —
+// it only ever hands us a canonical E.164 string ("+905551234567") or '',
+// so this never sees raw user typing. This is NOT a mirror of the backend
+// rule: the server normalizes free-typed input to E.164 via libphonenumber
+// (@NormalizePhone) and then checks /^\+[1-9]\d{6,14}$/. Do NOT reuse this
+// regex to validate un-normalized input (a no-"+" or leading-0 number fails
+// here but the backend accepts it after normalization).
 const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
 export const step1Schema = z.object({
