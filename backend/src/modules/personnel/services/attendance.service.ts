@@ -198,22 +198,29 @@ export class AttendanceService {
   }
 
   async clockOut(tenantId: string, userId: string) {
-    const today = this.tenantDateOnly(
-      new Date(),
-      await this.tenantTimezone(tenantId),
-    );
-
+    // Find the user's OPEN attendance record by STATUS, newest first — NOT
+    // by today's date. An overnight shift clocked in before midnight has
+    // `date = yesterday` (tenant-local, @db.Date), so the old `date: today`
+    // lookup found nothing and the worker could NEVER clock out: their row
+    // stayed CLOCKED_IN forever, so totalWorkedMinutes/overtime were never
+    // computed (payroll silently lost the whole shift). At most one record
+    // per user is open at a time, so status is the correct key. clockIn is
+    // an instant (not date-truncated), so the worked-minutes math below is
+    // already cross-midnight-correct once the right row is found.
     const attendance = await this.prisma.attendance.findFirst({
-      where: { userId, date: today, tenantId },
+      where: {
+        userId,
+        tenantId,
+        status: {
+          in: [AttendanceStatus.CLOCKED_IN, AttendanceStatus.ON_BREAK],
+        },
+      },
+      orderBy: { clockIn: "desc" },
       include: { shiftAssignment: { include: { shiftTemplate: true } } },
     });
 
     if (!attendance) {
-      throw new NotFoundException("No attendance record for today");
-    }
-
-    if (attendance.status === AttendanceStatus.CLOCKED_OUT) {
-      throw new BadRequestException("Already clocked out");
+      throw new NotFoundException("No open attendance record to clock out");
     }
 
     if (attendance.status === AttendanceStatus.ON_BREAK) {

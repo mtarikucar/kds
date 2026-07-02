@@ -265,3 +265,76 @@ describe("AttendanceService branch-scope reads (track-1)", () => {
     expect(where.userId).toBe("u-1");
   });
 });
+
+/**
+ * Overnight clock-out: the row for a shift clocked in before midnight has
+ * `date = yesterday` (tenant-local @db.Date), so the old `date: today`
+ * lookup found nothing and the worker could never clock out. The lookup is
+ * now keyed on OPEN status, so a cross-midnight shift closes correctly.
+ */
+describe("AttendanceService clockOut (status-keyed, overnight-safe)", () => {
+  let prisma: MockPrismaClient;
+  let kdsGateway: any;
+  let svc: AttendanceService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    kdsGateway = { emitAttendanceUpdate: jest.fn() };
+    svc = new AttendanceService(prisma as any, kdsGateway);
+  });
+
+  it("closes an overnight shift found by status (NOT by today's date)", async () => {
+    const clockInInstant = new Date(Date.now() - 8 * 60 * 60 * 1000); // 8h ago
+    let lookupWhere: any;
+    (prisma.attendance.findFirst as any).mockImplementation(
+      async ({ where }: any) => {
+        lookupWhere = where;
+        return {
+          id: "a-night",
+          clockIn: clockInInstant,
+          totalBreakMinutes: 0,
+          status: "CLOCKED_IN",
+          shiftAssignment: null,
+        };
+      },
+    );
+    (prisma.attendance.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.attendance.findUniqueOrThrow as any).mockResolvedValue({
+      id: "a-night",
+      branchId: "b-1",
+      user: {},
+    });
+
+    const res = await svc.clockOut("t-1", "u-1");
+
+    // Lookup keys on OPEN status, never on a `date` field.
+    expect(lookupWhere.status).toEqual({ in: ["CLOCKED_IN", "ON_BREAK"] });
+    expect(lookupWhere.date).toBeUndefined();
+    // Worked minutes derive from the clockIn INSTANT → ~480 across midnight.
+    const writeData = (prisma.attendance.updateMany as any).mock.calls[0][0]
+      .data;
+    expect(writeData.status).toBe("CLOCKED_OUT");
+    expect(writeData.totalWorkedMinutes).toBeGreaterThanOrEqual(479);
+    expect(res.id).toBe("a-night");
+    expect(kdsGateway.emitAttendanceUpdate).toHaveBeenCalled();
+  });
+
+  it("refuses to clock out while ON_BREAK (must end break first)", async () => {
+    (prisma.attendance.findFirst as any).mockResolvedValue({
+      id: "a-1",
+      clockIn: new Date(),
+      totalBreakMinutes: 0,
+      status: "ON_BREAK",
+      shiftAssignment: null,
+    });
+    await expect(svc.clockOut("t-1", "u-1")).rejects.toThrow(/break/i);
+    expect(prisma.attendance.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("throws when the user has no open attendance record", async () => {
+    (prisma.attendance.findFirst as any).mockResolvedValue(null);
+    await expect(svc.clockOut("t-1", "u-1")).rejects.toThrow(
+      /no open attendance/i,
+    );
+  });
+});
