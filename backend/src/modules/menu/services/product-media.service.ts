@@ -10,6 +10,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { promises as fs } from "fs";
 import * as path from "path";
 import axios from "axios";
+import sharp from "sharp";
 import { PrismaService } from "../../../prisma/prisma.service";
 
 const FAL_SYNC = "https://fal.run";
@@ -172,9 +173,11 @@ export class ProductMediaService {
   }
 
   // ── ingredients video, step 1: the LAST FRAME ──────────────────────────────
-  // Generate (only) the "ingredients laid out on a table" still so the operator
-  // can review it BEFORE committing to a video. The ingredients are placed side
-  // by side in a row and LABELLED in the prompt (not overlaid afterwards).
+  // Generate the "ingredients laid out on a table" still so the operator can
+  // review it BEFORE committing to a video. The AI produces the raw ingredients
+  // WITHOUT any text (image models render text as garbled gibberish); the
+  // ingredient names are then composited on top programmatically (accurate,
+  // correct Turkish) with sharp.
   async generateIngredientsFrame(productId: string, tenantId: string) {
     this.assertConfigured();
     const product = await this.prisma.product.findFirst({
@@ -189,34 +192,103 @@ export class ProductMediaService {
         "Add the ingredients (İçindekiler) first — the video reveals them.",
       );
     }
-    const ingredientNames = names.join(", ");
-    const ingredientsPrompt = `The raw ingredients (${ingredientNames}) arranged in a single horizontal row, side by side, evenly spaced on a clean neutral table; each ingredient labelled directly above it with its name in an elegant serif font and a small straight downward arrow pointing to it; top-down studio food photography, natural soft light, high detail`;
+    const labelled = names.slice(0, 6);
+    // NO text in the prompt — just the ingredients, clearly identifiable.
+    const ingredientsPrompt = `A clean, photorealistic top-down flat-lay of exactly these raw food ingredients laid out in a single horizontal row, evenly spaced and clearly separated on a plain light neutral surface, each ingredient distinct and recognisable, studio food photography, soft natural light, high detail, absolutely NO text, NO labels, NO writing, NO letters: ${labelled.join(", ")}`;
 
-    let ingredientsImageUrl: string;
+    let baseBuffer: Buffer;
     if (!this.key && this.simulator) {
-      ingredientsImageUrl = this.sample("image");
+      baseBuffer = await this.fetchBuffer(this.sample("image"));
     } else {
       const out = await this.falSync(this.imageModel, {
         prompt: ingredientsPrompt,
         image_size: "square_hd",
         num_images: 1,
       });
-      ingredientsImageUrl = out?.images?.[0]?.url;
-      if (!ingredientsImageUrl) {
+      const url = out?.images?.[0]?.url;
+      if (!url) {
         throw new ServiceUnavailableException(
           "Ingredients image generation failed",
         );
       }
+      baseBuffer = await this.fetchBuffer(url);
     }
-    const stored = await this.download(
-      ingredientsImageUrl,
-      `${productId}-ingredients.png`,
-    );
+
+    // Composite accurate labels + downward arrows over the ingredients.
+    const composited = await this.composeLabelledStill(baseBuffer, labelled);
+    const filename = `${productId}-ingredients-${Date.now()}.png`;
+    await this.writeBuffer(filename, composited);
     const updated = await this.prisma.product.update({
       where: { id: product.id },
-      data: { ingredientsImageUrl: `${this.baseUrl}/uploads/media/${stored}` },
+      data: {
+        ingredientsImageUrl: `${this.baseUrl}/uploads/media/${filename}`,
+      },
     });
     return this.videoView(updated);
+  }
+
+  /** Overlay each ingredient's name (accurate, correct Turkish) above it in a
+      row, with a small downward arrow — done programmatically because the image
+      model cannot render legible text. */
+  private async composeLabelledStill(
+    baseBuffer: Buffer,
+    names: string[],
+  ): Promise<Buffer> {
+    const W = 1024;
+    const H = 1024;
+    const n = Math.max(names.length, 1);
+    const cellW = W / n;
+    const fontSize = n <= 3 ? 30 : n <= 4 ? 25 : 20;
+    const esc = (s: string) =>
+      s.replace(
+        /[<>&'"]/g,
+        (c) =>
+          ({
+            "<": "&lt;",
+            ">": "&gt;",
+            "&": "&amp;",
+            "'": "&#39;",
+            '"': "&quot;",
+          })[c] as string,
+      );
+    const groups = names
+      .map((name, i) => {
+        const cx = (i + 0.5) * cellW;
+        const maxChars = Math.floor(cellW / (fontSize * 0.52));
+        const shown =
+          name.length > maxChars ? name.slice(0, maxChars - 1) + "…" : name;
+        const labelW = Math.min(cellW - 10, W);
+        const top = 22;
+        const boxH = fontSize + 16;
+        const arrowTop = top + boxH + 4;
+        return `
+      <g>
+        <rect x="${cx - labelW / 2}" y="${top}" width="${labelW}" height="${boxH}" rx="9" fill="#ffffff" opacity="0.93"/>
+        <text x="${cx}" y="${top + fontSize + 1}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" font-style="italic" fill="#0f172a" text-anchor="middle">${esc(shown)}</text>
+        <line x1="${cx}" y1="${arrowTop}" x2="${cx}" y2="${arrowTop + 30}" stroke="#ffffff" stroke-width="3"/>
+        <polygon points="${cx - 7},${arrowTop + 26} ${cx + 7},${arrowTop + 26} ${cx},${arrowTop + 40}" fill="#ffffff"/>
+      </g>`;
+      })
+      .join("");
+    const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${groups}</svg>`;
+    return sharp(baseBuffer)
+      .resize(W, H, { fit: "cover" })
+      .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+      .png()
+      .toBuffer();
+  }
+
+  private async fetchBuffer(url: string): Promise<Buffer> {
+    const res = await axios.get(url, {
+      responseType: "arraybuffer",
+      timeout: 180_000,
+    });
+    return Buffer.from(res.data);
+  }
+
+  private async writeBuffer(filename: string, buf: Buffer): Promise<void> {
+    await fs.mkdir(this.mediaDir, { recursive: true });
+    await fs.writeFile(path.join(this.mediaDir, filename), buf);
   }
 
   // ── ingredients video, step 2: the VIDEO ───────────────────────────────────
@@ -251,10 +323,9 @@ export class ProductMediaService {
         "Generate the ingredients last frame first, then create the video.",
       );
     }
-    const ingredientNames = this.parseIngredientNames(product.ingredients).join(
-      ", ",
-    );
-    const videoPrompt = `Smooth cinematic transition from the finished plated dish to its raw ingredients. The video ends with the ingredients laid out side by side in a row on the table, each labelled directly above it with its name (${ingredientNames}) in an elegant serif font with a small straight downward arrow pointing to it.`;
+    // No text in the prompt — the reviewed end frame already carries the
+    // (accurately composited) labels; asking the model for text just garbles it.
+    const videoPrompt = `Smooth cinematic transition from the finished plated dish to its raw ingredients laid out side by side in a row on a clean table. Photorealistic appetising food video, soft light, no text, no letters.`;
 
     if (!this.key && this.simulator) {
       const updated = await this.prisma.product.update({

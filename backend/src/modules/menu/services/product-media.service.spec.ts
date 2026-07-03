@@ -7,6 +7,16 @@ import {
 jest.mock("axios");
 import axios from "axios";
 
+jest.mock("sharp", () => {
+  const chain = {
+    resize: jest.fn().mockReturnThis(),
+    composite: jest.fn().mockReturnThis(),
+    png: jest.fn().mockReturnThis(),
+    toBuffer: jest.fn().mockResolvedValue(Buffer.from("composited")),
+  };
+  return jest.fn(() => chain);
+});
+
 jest.mock("fs", () => {
   const actual = jest.requireActual("fs");
   return {
@@ -106,9 +116,7 @@ describe("ProductMediaService", () => {
         }),
       );
       expect(out.imageUrl).toContain("/uploads/media/p1-photo-");
-      expect(out.image).toEqual(
-        expect.objectContaining({ id: "img1" }),
-      );
+      expect(out.image).toEqual(expect.objectContaining({ id: "img1" }));
     });
 
     it("simulator generates a sample photo without calling fal", async () => {
@@ -156,13 +164,14 @@ describe("ProductMediaService", () => {
       expect(prisma.product.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            ingredientsImageUrl:
-              "https://api.test/uploads/media/p1-ingredients.png",
+            ingredientsImageUrl: expect.stringContaining(
+              "/uploads/media/p1-ingredients-",
+            ),
           }),
         }),
       );
-      expect(out.ingredientsImageUrl).toBe(
-        "https://api.test/uploads/media/p1-ingredients.png",
+      expect(out.ingredientsImageUrl).toContain(
+        "/uploads/media/p1-ingredients-",
       );
     });
 

@@ -47,6 +47,9 @@ RUN apt-get update && apt-get install -y \
     libgif7 \
     librsvg2-2 \
     libpixman-1-0 \
+    fontconfig \
+    fonts-dejavu-core \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
