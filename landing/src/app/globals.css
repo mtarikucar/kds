@@ -381,6 +381,16 @@ body {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+
+  /* Neutralise Tailwind backdrop-blur utilities on mobile too (the glass CTA
+     buttons + cards). backdrop-filter repaints its blur as content scrolls
+     behind it — a real cost on mobile Safari — and at these low background
+     opacities the blur is barely perceptible, so we drop it for smooth
+     scrolling (parity with the .glass rule above). */
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }
 
 /* Subtle shadow */
