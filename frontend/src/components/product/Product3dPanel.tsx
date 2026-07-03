@@ -12,6 +12,7 @@ import {
   useProduct3dStatus,
   useGenerate3d,
 } from "../../features/menu/product3dApi";
+import AiLockedTeaser from "./AiLockedTeaser";
 
 interface Props {
   productId?: string;
@@ -30,7 +31,12 @@ export default function Product3dPanel({ productId, hasImage }: Props) {
   const { data: state } = useProduct3dStatus(productId, !!productId);
   const generate = useGenerate3d();
 
-  if (!config?.configured || !productId) return null;
+  // Only truly hide when the feature isn't wired. When it IS configured but
+  // we're adding a new (unsaved) product, show a locked teaser instead of
+  // nothing — the generator keys on a saved productId.
+  if (!config?.configured) return null;
+  if (!productId)
+    return <AiLockedTeaser tools={[t("menu:threeD.chip", "3D / AR")]} />;
 
   const status = state?.status ?? null;
   const busy = status === "PENDING" || generate.isPending;

@@ -14,6 +14,7 @@ import {
   useGenerateProductPhoto,
   useGenerateIngredientsVideo,
 } from "../../features/menu/productMediaApi";
+import AiLockedTeaser from "./AiLockedTeaser";
 
 interface Props {
   productId?: string;
@@ -38,7 +39,16 @@ export default function ProductMediaPanel({
   const genPhoto = useGenerateProductPhoto();
   const genVideo = useGenerateIngredientsVideo();
 
-  if (!config?.configured || !productId) return null;
+  if (!config?.configured) return null;
+  if (!productId)
+    return (
+      <AiLockedTeaser
+        tools={[
+          t("menu:media.genPhoto", "Otomatik fotoğraf"),
+          t("menu:media.genVideo", "İçindekiler videosu"),
+        ]}
+      />
+    );
 
   const videoStatus = state?.videoStatus ?? null;
   const videoBusy = videoStatus === "PENDING" || genVideo.isPending;
