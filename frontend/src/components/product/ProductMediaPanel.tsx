@@ -91,6 +91,23 @@ export default function ProductMediaPanel({
           )}
         </span>
       </div>
+      {/* Preview of the current/generated product photo so the operator sees
+          the result immediately (it's saved as the product image). */}
+      {state?.imageUrl && (
+        <div className="flex items-center gap-2">
+          <img
+            src={state.imageUrl}
+            alt=""
+            className="h-20 w-20 rounded-lg border border-gray-200 object-cover"
+          />
+          <span className="text-xs text-gray-400">
+            {t(
+              "menu:media.photoIsProductImage",
+              "Ürün fotoğrafı olarak kaydedildi",
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Ingredients video */}
       <div className="space-y-2 border-t border-gray-200 pt-3">

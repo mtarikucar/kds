@@ -41,8 +41,21 @@ import * as path from "path";
  * allowlist — see {@link UploadsCategoryRule}.
  */
 
-/** First path segment under `/uploads/` that is public-by-design. */
-export const PUBLIC_UPLOAD_CATEGORIES = ["products", "logos"] as const;
+/**
+ * First path segment under `/uploads/` that is public-by-design.
+ *  - products / logos: product images + restaurant logo (public QR menu).
+ *  - media: fal.ai-generated dish photos + ingredients videos (shown as the
+ *    product image / on the public QR menu product detail).
+ *  - models: Meshy-generated GLB/USDZ 3D models (public QR-menu AR viewer).
+ * All four are rendered by plain <img>/<video>/<model-viewer> tags that carry
+ * no JWT, so they MUST be reachable unauthenticated.
+ */
+export const PUBLIC_UPLOAD_CATEGORIES = [
+  "products",
+  "logos",
+  "media",
+  "models",
+] as const;
 
 export interface UploadsAclOptions {
   /**
