@@ -15,6 +15,7 @@ jest.mock("fs", () => {
       ...actual.promises,
       mkdir: jest.fn().mockResolvedValue(undefined),
       writeFile: jest.fn().mockResolvedValue(undefined),
+      stat: jest.fn().mockResolvedValue({ size: 1234 }),
     },
   };
 });
@@ -66,10 +67,18 @@ describe("ProductMediaService", () => {
         id: "p1",
         name: "Adana",
         description: "acılı",
+        ingredients: "dana kıyma, soğan",
       });
+      (prisma as any).$transaction = jest.fn(async (cb: any) => cb(prisma));
+      (prisma.productImage.create as any).mockResolvedValue({
+        id: "img1",
+        url: "https://api.test/uploads/media/p1-photo-1.png",
+      });
+      (prisma.productToImage.count as any).mockResolvedValue(0);
+      (prisma.productToImage.create as any).mockResolvedValue({});
     });
 
-    it("calls fal text-to-image, downloads, and sets product.image", async () => {
+    it("generates the photo, adds it to the library, and links it", async () => {
       svc = make({ FAL_KEY: "k" });
       (axios.post as any).mockResolvedValue({
         data: { images: [{ url: "https://fal.media/x.png" }] },
@@ -78,20 +87,37 @@ describe("ProductMediaService", () => {
 
       const out = await svc.generatePhoto("p1", TENANT);
 
+      // Prompt reflects name + ingredients.
       expect(axios.post).toHaveBeenCalledWith(
         expect.stringContaining("fal.run/fal-ai/flux/dev"),
-        expect.objectContaining({ prompt: expect.stringContaining("Adana") }),
+        expect.objectContaining({
+          prompt: expect.stringContaining("Adana"),
+        }),
         expect.objectContaining({ headers: { Authorization: "Key k" } }),
       );
-      expect(out.imageUrl).toBe("https://api.test/uploads/media/p1-photo.png");
+      expect((axios.post as any).mock.calls[0][1].prompt).toContain(
+        "dana kıyma",
+      );
+      // Added to the ProductImage library + linked to the product.
+      expect(prisma.productImage.create).toHaveBeenCalled();
+      expect(prisma.productToImage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ productId: "p1", imageId: "img1" }),
+        }),
+      );
+      expect(out.imageUrl).toContain("/uploads/media/p1-photo-");
+      expect(out.image).toEqual(
+        expect.objectContaining({ id: "img1" }),
+      );
     });
 
-    it("simulator sets a sample photo without calling fal", async () => {
+    it("simulator generates a sample photo without calling fal", async () => {
       svc = make({ FAL_SIMULATOR: "true" });
       (axios.get as any).mockResolvedValue({ data: Buffer.from("img") });
       const out = await svc.generatePhoto("p1", TENANT);
       expect(axios.post).not.toHaveBeenCalled();
-      expect(out.imageUrl).toContain("/uploads/media/p1-photo.png");
+      expect(prisma.productImage.create).toHaveBeenCalled();
+      expect(out.imageUrl).toContain("/uploads/media/p1-photo-");
     });
   });
 

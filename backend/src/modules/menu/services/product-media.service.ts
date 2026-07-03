@@ -88,15 +88,22 @@ export class ProductMediaService {
     this.assertConfigured();
     const product = await this.prisma.product.findFirst({
       where: { id: productId, tenantId },
-      select: { id: true, name: true, description: true },
+      select: { id: true, name: true, description: true, ingredients: true },
     });
     if (!product) throw new NotFoundException("Product not found");
 
+    // Build an accurate prompt from the dish name + description + ingredients so
+    // the photo reflects the actual product (a caller-supplied prompt wins).
+    const ingredientNames = this.parseIngredientNames(product.ingredients).join(
+      ", ",
+    );
     const finalPrompt =
       prompt?.trim() ||
-      `Professional food photography of "${product.name}"${
+      `A realistic, appetising photograph of the dish "${product.name}"${
         product.description ? `, ${product.description}` : ""
-      }, plated beautifully on a clean table, natural light, high detail, appetising, top restaurant menu style`;
+      }${
+        ingredientNames ? `, made with ${ingredientNames}` : ""
+      }, professionally plated on a clean plate, restaurant menu food photography, natural soft light, 45-degree angle, high detail, no text, no watermark`;
 
     let imageUrl: string;
     if (!this.key && this.simulator) {
@@ -114,13 +121,44 @@ export class ProductMediaService {
         );
       }
     }
-    const stored = await this.download(imageUrl, `${productId}-photo.png`);
-    const updated = await this.prisma.product.update({
-      where: { id: product.id },
-      data: { image: `${this.baseUrl}/uploads/media/${stored}` },
-      select: { id: true, image: true },
+    // A unique filename per generation so re-generating adds a distinct library
+    // image instead of silently pointing multiple rows at the same file.
+    const filename = `${productId}-photo-${Date.now()}.png`;
+    const stored = await this.download(imageUrl, filename);
+    const hosted = `${this.baseUrl}/uploads/media/${stored}`;
+    const size = (await fs.stat(path.join(this.mediaDir, stored))).size;
+
+    // Add it to the ProductImage LIBRARY (+ link it to the product) AND keep the
+    // legacy product.image in sync — so it shows in the editor grid, not just as
+    // the scalar primary image.
+    const result = await this.prisma.$transaction(async (tx) => {
+      const img = await tx.productImage.create({
+        data: {
+          url: hosted,
+          filename: `${product.name} (AI).png`,
+          size,
+          mimeType: "image/png",
+          tenantId,
+        },
+      });
+      const count = await tx.productToImage.count({
+        where: { productId: product.id },
+      });
+      await tx.productToImage.create({
+        data: { productId: product.id, imageId: img.id, order: count },
+      });
+      const updated = await tx.product.update({
+        where: { id: product.id },
+        data: { image: hosted },
+        select: { id: true, image: true },
+      });
+      return { updated, img };
     });
-    return { productId: updated.id, imageUrl: updated.image };
+    return {
+      productId: result.updated.id,
+      imageUrl: result.updated.image,
+      image: result.img,
+    };
   }
 
   /** Parse İçindekiler into up to 12 clean ingredient names (separator-only

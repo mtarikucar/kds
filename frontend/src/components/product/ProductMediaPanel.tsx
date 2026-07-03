@@ -17,6 +17,7 @@ import {
   useGenerateIngredientsVideo,
 } from "../../features/menu/productMediaApi";
 import AiLockedTeaser from "./AiLockedTeaser";
+import type { ProductImage } from "../../types";
 
 interface Props {
   productId?: string;
@@ -25,9 +26,9 @@ interface Props {
   /** Resolve/create a productId on demand so the AI tools run without an
       explicit save (returns null if the draft couldn't be created). */
   ensureProductId?: () => Promise<string | null>;
-  /** Called with the new image URL after an auto-photo is generated, so the
-      editor can reflect it in its main image area immediately. */
-  onPhotoGenerated?: (imageUrl: string) => void;
+  /** Called with the generated photo (a library image) so the editor can add it
+      to its image grid immediately. */
+  onPhotoGenerated?: (image: ProductImage) => void;
 }
 
 /**
@@ -64,16 +65,17 @@ export default function ProductMediaPanel({
   const videoStatus = state?.videoStatus ?? null;
   const videoBusy = videoStatus === "PENDING" || genVideo.isPending;
 
-  // Resolve the id (creating a draft if needed) before any generation.
+  // Always flush the current form (create OR update) before generating so the
+  // backend AI reads fresh name/ingredients/images — not a stale DB row.
   const resolveId = async () =>
-    productId ?? (await ensureProductId?.()) ?? null;
+    (ensureProductId ? await ensureProductId() : productId) ?? null;
 
   const onPhoto = async () => {
     const id = await resolveId();
     if (!id) return;
     try {
       const res = await genPhoto.mutateAsync({ productId: id });
-      if (res?.imageUrl) onPhotoGenerated?.(res.imageUrl);
+      if (res?.image) onPhotoGenerated?.(res.image);
       toast.success(t("menu:media.photoDone", "Fotoğraf oluşturuldu"));
     } catch {
       /* toast in hook */
@@ -102,6 +104,7 @@ export default function ProductMediaPanel({
       {/* Auto photo */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
+          type="button"
           size="sm"
           variant="outline"
           onClick={onPhoto}
@@ -150,6 +153,7 @@ export default function ProductMediaPanel({
           /* Step 1 — the last frame must be generated + reviewed first. */
           <div className="space-y-1">
             <Button
+              type="button"
               size="sm"
               variant="outline"
               onClick={onFrame}
@@ -192,6 +196,7 @@ export default function ProductMediaPanel({
             )}
             <div className="flex flex-wrap gap-2">
               <Button
+                type="button"
                 size="sm"
                 variant="outline"
                 onClick={onFrame}
@@ -206,6 +211,7 @@ export default function ProductMediaPanel({
               </Button>
               {videoStatus !== "PENDING" && (
                 <Button
+                  type="button"
                   size="sm"
                   onClick={onVideo}
                   disabled={!hasImage || videoBusy}

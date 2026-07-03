@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -72,7 +72,8 @@ export default function ProductEditorPage() {
     useCreateProduct();
   const { mutateAsync: updateProduct, isPending: isUpdating } =
     useUpdateProduct();
-  const { mutate: assignModifiers } = useAssignModifiersToProduct();
+  const { mutateAsync: assignModifiers } = useAssignModifiersToProduct();
+  const draftRef = useRef<Promise<string | null> | null>(null);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
@@ -120,13 +121,18 @@ export default function ProductEditorPage() {
     });
   }, [fetchedProduct, product, productForm, t]);
 
-  const buildSubmitData = (data: ProductFormData) => ({
-    ...data,
-    price: Number(data.price),
-    currentStock: data.currentStock ? Number(data.currentStock) : 0,
-    taxRate: data.taxRate != null ? Number(data.taxRate) : 10,
-    imageIds: productImages.map((img) => img.id),
-  });
+  const buildSubmitData = (data: ProductFormData) => {
+    const { image, ...rest } = data;
+    return {
+      ...rest,
+      price: Number(data.price),
+      currentStock: data.currentStock ? Number(data.currentStock) : 0,
+      taxRate: data.taxRate != null ? Number(data.taxRate) : 10,
+      imageIds: productImages.map((img) => img.id),
+      // Only send a legacy image when it's a real value — "" 400s the DTO.
+      ...(image && image.trim() ? { image: image.trim() } : {}),
+    };
+  };
 
   const persistModifiers = (id: string) =>
     assignModifiers({
@@ -140,11 +146,12 @@ export default function ProductEditorPage() {
     });
 
   /**
-   * Return a saved productId, creating a draft from the current form if needed.
-   * This is what lets the AI tools run "without saving" on a new product.
+   * Return a saved productId with the CURRENT form persisted — so the AI tools
+   * (which read the product from the DB) see fresh name/ingredients/images and
+   * run "without an explicit save". Creates a draft for a new product (guarded
+   * against double-click) or updates the existing one.
    */
   const ensureProductId = async (): Promise<string | null> => {
-    if (product?.id) return product.id;
     const valid = await productForm.trigger();
     if (!valid) {
       toast.error(
@@ -152,18 +159,38 @@ export default function ProductEditorPage() {
       );
       return null;
     }
-    try {
-      const created = (await createProduct(
-        buildSubmitData(productForm.getValues()),
-      )) as Product;
-      if (!created?.id) return null;
-      setProduct(created);
-      persistModifiers(created.id);
-      navigate(`/admin/menu/products/${created.id}/edit`, { replace: true });
-      return created.id;
-    } catch {
-      return null; // toast surfaced by the mutation
+    if (product?.id) {
+      try {
+        await updateProduct({
+          id: product.id,
+          data: buildSubmitData(productForm.getValues()),
+        });
+        await persistModifiers(product.id);
+        return product.id;
+      } catch {
+        return null;
+      }
     }
+    // New product: create the draft ONCE (concurrent AI clicks share the promise).
+    if (draftRef.current) return draftRef.current;
+    const pending = (async (): Promise<string | null> => {
+      try {
+        const created = (await createProduct(
+          buildSubmitData(productForm.getValues()),
+        )) as Product;
+        if (!created?.id) return null;
+        setProduct(created);
+        await persistModifiers(created.id);
+        navigate(`/admin/menu/products/${created.id}/edit`, { replace: true });
+        return created.id;
+      } catch {
+        return null;
+      }
+    })();
+    draftRef.current = pending;
+    const id = await pending;
+    if (!id) draftRef.current = null; // allow a retry after a failed create
+    return id;
   };
 
   const onSubmit = async (data: ProductFormData) => {
@@ -171,10 +198,10 @@ export default function ProductEditorPage() {
     try {
       if (product?.id) {
         await updateProduct({ id: product.id, data: submitData });
-        persistModifiers(product.id);
+        await persistModifiers(product.id);
       } else {
         const created = (await createProduct(submitData)) as Product;
-        if (created?.id) persistModifiers(created.id);
+        if (created?.id) await persistModifiers(created.id);
       }
       toast.success(t("menu.itemSaved", "Ürün kaydedildi"));
       navigate("/admin/menu");
@@ -364,9 +391,13 @@ export default function ProductEditorPage() {
                 ensureProductId={ensureProductId}
                 hasImage={hasImage}
                 hasIngredients={!!liveIngredients.trim()}
-                onPhotoGenerated={(url) =>
-                  setProduct((p) => (p ? { ...p, image: url } : p))
-                }
+                onPhotoGenerated={(img) => {
+                  setProductImages((prev) =>
+                    prev.some((p) => p.id === img.id) ? prev : [...prev, img],
+                  );
+                  setProduct((p) => (p ? { ...p, image: img.url } : p));
+                  productForm.setValue("image", img.url);
+                }}
               />
               <Product3dPanel
                 productId={product?.id}

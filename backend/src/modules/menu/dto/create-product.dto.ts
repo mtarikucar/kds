@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+import { Transform } from "class-transformer";
 
 // http(s):// for vendor images, or `/` for self-hosted (landing/public assets).
 // Blocks `javascript:` / `data:` / `vbscript:` — the legacy `image` column lands
@@ -61,6 +62,12 @@ export class CreateProductDto {
   price: number;
 
   @ApiProperty({ example: "https://example.com/image.jpg", required: false })
+  // Treat "" / whitespace as "no image" — @IsOptional only skips null/undefined,
+  // so without this an empty string (routinely sent by the editor form on a
+  // product that has no legacy image) would hit @Matches and 400.
+  @Transform(({ value }) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  )
   @IsString()
   @IsOptional()
   @MaxLength(2048)

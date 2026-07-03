@@ -47,9 +47,10 @@ export default function Product3dPanel({
   const status = state?.status ?? null;
   const busy = status === "PENDING" || generate.isPending;
 
-  // Resolve the id (creating a draft if needed) before generating.
+  // Flush the current form (create/update) before generating so the backend
+  // reads a fresh row (image, etc.), not stale DB state.
   const handleGenerate = async () => {
-    const id = productId ?? (await ensureProductId?.());
+    const id = ensureProductId ? await ensureProductId() : productId;
     if (id) generate.mutate(id);
   };
 
@@ -71,6 +72,7 @@ export default function Product3dPanel({
           <CheckCircle2 className="h-4 w-4" />
           {t("menu:threeD.ready", "3D model hazır — QR menüde AR aktif")}
           <Button
+            type="button"
             variant="outline"
             size="sm"
             className="ml-auto"
@@ -98,6 +100,7 @@ export default function Product3dPanel({
             </div>
           )}
           <Button
+            type="button"
             size="sm"
             onClick={handleGenerate}
             disabled={!hasImage || busy}

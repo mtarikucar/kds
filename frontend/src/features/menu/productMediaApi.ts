@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import i18n from "../../i18n/config";
 import api from "../../lib/api";
 import { getApiErrorMessage } from "../../lib/api-error";
+import type { ProductImage } from "../../types";
 
 export interface ProductMediaState {
   productId: string;
@@ -11,6 +12,8 @@ export interface ProductMediaState {
   videoStatus: "PENDING" | "READY" | "FAILED" | null;
   videoError?: string | null;
   ingredientsImageUrl?: string | null;
+  /** The generated photo as a library image (returned by generate-photo). */
+  image?: ProductImage | null;
 }
 
 /** Whether fal.ai media generation is wired on the backend (gates the UI). */
