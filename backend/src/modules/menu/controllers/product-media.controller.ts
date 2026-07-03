@@ -49,11 +49,21 @@ export class ProductMediaController {
     return this.media.generatePhoto(id, req.tenantId, body?.prompt);
   }
 
+  @Post(":id/generate-frame")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Generate the ingredients last frame (step 1 — reviewed before the video)",
+  })
+  generateFrame(@Param("id") id: string, @Request() req) {
+    return this.media.generateIngredientsFrame(id, req.tenantId);
+  }
+
   @Post(":id/generate-video")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary:
-      "Generate an ingredients video (dish photo → ingredients-on-table transition)",
+      "Generate the ingredients video (step 2 — uses the reviewed last frame)",
   })
   generateVideo(@Param("id") id: string, @Request() req) {
     return this.media.generateIngredientsVideo(id, req.tenantId);

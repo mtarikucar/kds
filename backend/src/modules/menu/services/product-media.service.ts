@@ -123,7 +123,67 @@ export class ProductMediaService {
     return { productId: updated.id, imageUrl: updated.image };
   }
 
-  // ── ingredients video ─────────────────────────────────────────────────────
+  /** Parse İçindekiler into up to 12 clean ingredient names (separator-only
+      input yields an empty list). */
+  private parseIngredientNames(ingredients: string | null): string[] {
+    return (ingredients ?? "")
+      .split(/[,\n;•·]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+  }
+
+  // ── ingredients video, step 1: the LAST FRAME ──────────────────────────────
+  // Generate (only) the "ingredients laid out on a table" still so the operator
+  // can review it BEFORE committing to a video. The ingredients are placed side
+  // by side in a row and LABELLED in the prompt (not overlaid afterwards).
+  async generateIngredientsFrame(productId: string, tenantId: string) {
+    this.assertConfigured();
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { id: true, ingredients: true },
+    });
+    if (!product) throw new NotFoundException("Product not found");
+
+    const names = this.parseIngredientNames(product.ingredients);
+    if (names.length === 0) {
+      throw new BadRequestException(
+        "Add the ingredients (İçindekiler) first — the video reveals them.",
+      );
+    }
+    const ingredientNames = names.join(", ");
+    const ingredientsPrompt = `The raw ingredients (${ingredientNames}) arranged in a single horizontal row, side by side, evenly spaced on a clean neutral table; each ingredient labelled directly above it with its name in an elegant serif font and a small straight downward arrow pointing to it; top-down studio food photography, natural soft light, high detail`;
+
+    let ingredientsImageUrl: string;
+    if (!this.key && this.simulator) {
+      ingredientsImageUrl = this.sample("image");
+    } else {
+      const out = await this.falSync(this.imageModel, {
+        prompt: ingredientsPrompt,
+        image_size: "square_hd",
+        num_images: 1,
+      });
+      ingredientsImageUrl = out?.images?.[0]?.url;
+      if (!ingredientsImageUrl) {
+        throw new ServiceUnavailableException(
+          "Ingredients image generation failed",
+        );
+      }
+    }
+    const stored = await this.download(
+      ingredientsImageUrl,
+      `${productId}-ingredients.png`,
+    );
+    const updated = await this.prisma.product.update({
+      where: { id: product.id },
+      data: { ingredientsImageUrl: `${this.baseUrl}/uploads/media/${stored}` },
+    });
+    return this.videoView(updated);
+  }
+
+  // ── ingredients video, step 2: the VIDEO ───────────────────────────────────
+  // Only runs once the last frame has been generated + reviewed — we never
+  // generate a video "blind". Uses the reviewed still as the video's end frame.
   async generateIngredientsVideo(productId: string, tenantId: string) {
     this.assertConfigured();
     const product = await this.prisma.product.findFirst({
@@ -146,58 +206,22 @@ export class ProductMediaService {
         "Add a dish photo first — the video starts from the product's photo.",
       );
     }
-    // Parse the ingredient names first — guard on the PARSED result (a value of
-    // only separators like ",,," passes .trim() but yields nothing) and cap the
-    // count so the prompt stays sane. These names are used to label them, side
-    // by side, in the prompt.
-    const ingredientParts = (product.ingredients ?? "")
-      .split(/[,\n;•·]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (ingredientParts.length === 0) {
+    // The reviewed last frame must already exist (step 1).
+    const endFrame = product.ingredientsImageUrl;
+    if (!endFrame) {
       throw new BadRequestException(
-        "Add the ingredients (İçindekiler) first — the video reveals them.",
+        "Generate the ingredients last frame first, then create the video.",
       );
     }
-    const ingredientNames = ingredientParts.slice(0, 12).join(", ");
-
-    // 1) Generate the "ingredients laid out on a table" still (video end frame).
-    // The ingredients are placed side by side in a row and LABELLED (in the
-    // generation prompt, not overlaid afterwards) so the video's final moment
-    // shows what each one is.
-    const ingredientsPrompt = `The raw ingredients (${ingredientNames}) arranged in a single horizontal row, side by side, evenly spaced on a clean neutral table; each ingredient labelled directly above it with its name in an elegant serif font and a small straight downward arrow pointing to it; top-down studio food photography, natural soft light, high detail`;
-    let ingredientsImageUrl: string;
-    if (!this.key && this.simulator) {
-      ingredientsImageUrl = this.sample("image");
-    } else {
-      const out = await this.falSync(this.imageModel, {
-        prompt: ingredientsPrompt,
-        image_size: "square_hd",
-        num_images: 1,
-      });
-      ingredientsImageUrl = out?.images?.[0]?.url;
-      if (!ingredientsImageUrl) {
-        throw new ServiceUnavailableException(
-          "Ingredients image generation failed",
-        );
-      }
-    }
-    const storedIngredients = await this.download(
-      ingredientsImageUrl,
-      `${productId}-ingredients.png`,
+    const ingredientNames = this.parseIngredientNames(product.ingredients).join(
+      ", ",
     );
-    const ingredientsHosted = `${this.baseUrl}/uploads/media/${storedIngredients}`;
-
-    // 2) Submit the dual-keyframe transition video (dish → ingredients). The
-    // video ENDS on the ingredients laid out side by side, each labelled with
-    // its name — the labelling is described here (given to the model as a
-    // prompt) rather than overlaid on the still afterwards.
     const videoPrompt = `Smooth cinematic transition from the finished plated dish to its raw ingredients. The video ends with the ingredients laid out side by side in a row on the table, each labelled directly above it with its name (${ingredientNames}) in an elegant serif font with a small straight downward arrow pointing to it.`;
+
     if (!this.key && this.simulator) {
       const updated = await this.prisma.product.update({
         where: { id: product.id },
         data: {
-          ingredientsImageUrl: ingredientsHosted,
           videoStatus: "READY",
           videoUrl: this.sample("video"),
           videoTaskId: "SIMULATED",
@@ -214,7 +238,7 @@ export class ProductMediaService {
         {
           prompt: videoPrompt,
           start_image_url: dishPhoto,
-          end_image_url: ingredientsHosted,
+          end_image_url: endFrame,
         },
         { headers: { Authorization: `Key ${this.key}` }, timeout: 30_000 },
       );
@@ -231,7 +255,6 @@ export class ProductMediaService {
     const updated = await this.prisma.product.update({
       where: { id: product.id },
       data: {
-        ingredientsImageUrl: ingredientsHosted,
         videoStatus: "PENDING",
         videoTaskId: requestId,
         videoError: null,

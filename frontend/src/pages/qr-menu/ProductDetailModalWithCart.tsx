@@ -1,12 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, UtensilsCrossed, Plus, Minus, ShoppingCart, Check, ChevronDown } from 'lucide-react';
-import { Product, ModifierGroup, Modifier, CartModifier, SelectionType } from '../../types';
-import { formatCurrency, cn } from '../../lib/utils';
-import { useCartStore } from '../../store/cartStore';
-import ProductImageGallery from '../../components/qr-menu/ProductImageGallery';
-import BottomSheet from '../../components/qr-menu/BottomSheet';
+import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  UtensilsCrossed,
+  Plus,
+  Minus,
+  ShoppingCart,
+  Check,
+  ChevronDown,
+} from "lucide-react";
+import {
+  Product,
+  ModifierGroup,
+  Modifier,
+  CartModifier,
+  SelectionType,
+} from "../../types";
+import { formatCurrency, cn } from "../../lib/utils";
+import { useCartStore } from "../../store/cartStore";
+import ProductImageGallery from "../../components/qr-menu/ProductImageGallery";
+import BottomSheet from "../../components/qr-menu/BottomSheet";
 
 interface ProductDetailModalWithCartProps {
   isOpen: boolean;
@@ -31,27 +45,29 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   showDescription,
   showPrices,
   enableCustomerOrdering,
-  currency = 'TRY',
+  currency = "TRY",
 }) => {
-  const { t } = useTranslation('common');
-  const addItem = useCartStore(state => state.addItem);
+  const { t } = useTranslation("common");
+  const addItem = useCartStore((state) => state.addItem);
 
   const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState('');
-  const [selectedModifiers, setSelectedModifiers] = useState<Map<string, CartModifier[]>>(new Map());
+  const [notes, setNotes] = useState("");
+  const [selectedModifiers, setSelectedModifiers] = useState<
+    Map<string, CartModifier[]>
+  >(new Map());
   const [showSuccess, setShowSuccess] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen && product) {
       setQuantity(1);
-      setNotes('');
+      setNotes("");
       setSelectedModifiers(new Map());
       setShowSuccess(false);
       const requiredGroups = new Set(
         product.modifierGroups
-          ?.filter(g => g.isRequired || g.minSelections > 0)
-          .map(g => g.id) || []
+          ?.filter((g) => g.isRequired || g.minSelections > 0)
+          .map((g) => g.id) || [],
       );
       setExpandedGroups(requiredGroups);
     }
@@ -61,24 +77,29 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
 
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
-    const normalizedPath = url.replace(/\\/g, '/');
-    if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) {
+    const normalizedPath = url.replace(/\\/g, "/");
+    if (
+      normalizedPath.startsWith("http://") ||
+      normalizedPath.startsWith("https://")
+    ) {
       return normalizedPath;
     }
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-    const BASE_URL = API_URL.replace(/\/api$/, '');
-    const path = normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath;
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+    const BASE_URL = API_URL.replace(/\/api$/, "");
+    const path = normalizedPath.startsWith("/")
+      ? normalizedPath.substring(1)
+      : normalizedPath;
     return `${BASE_URL}/${path}`;
   };
 
   const productImages = product.images?.length
-    ? product.images.map(img => ({ url: img.url, alt: product.name }))
+    ? product.images.map((img) => ({ url: img.url, alt: product.name }))
     : product.image
       ? [{ url: product.image, alt: product.name }]
       : [];
 
   const toggleGroupExpanded = (groupId: string) => {
-    setExpandedGroups(prev => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) {
         next.delete(groupId);
@@ -92,26 +113,31 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
     const newSelectedModifiers = new Map(selectedModifiers);
     const groupModifiers = newSelectedModifiers.get(group.id) || [];
-    const existingIndex = groupModifiers.findIndex(m => m.id === modifier.id);
+    const existingIndex = groupModifiers.findIndex((m) => m.id === modifier.id);
 
     if (group.selectionType === SelectionType.SINGLE) {
       if (existingIndex !== -1) {
         newSelectedModifiers.set(group.id, []);
       } else {
-        newSelectedModifiers.set(group.id, [{
-          id: modifier.id,
-          name: modifier.name,
-          displayName: modifier.displayName,
-          priceAdjustment: modifier.priceAdjustment,
-          quantity: 1,
-        }]);
+        newSelectedModifiers.set(group.id, [
+          {
+            id: modifier.id,
+            name: modifier.name,
+            displayName: modifier.displayName,
+            priceAdjustment: modifier.priceAdjustment,
+            quantity: 1,
+          },
+        ]);
       }
     } else {
       if (existingIndex !== -1) {
-        const updated = groupModifiers.filter(m => m.id !== modifier.id);
+        const updated = groupModifiers.filter((m) => m.id !== modifier.id);
         newSelectedModifiers.set(group.id, updated);
       } else {
-        if (group.maxSelections && groupModifiers.length >= group.maxSelections) {
+        if (
+          group.maxSelections &&
+          groupModifiers.length >= group.maxSelections
+        ) {
           return;
         }
         newSelectedModifiers.set(group.id, [
@@ -132,7 +158,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
 
   const isModifierSelected = (groupId: string, modifierId: string): boolean => {
     const groupModifiers = selectedModifiers.get(groupId) || [];
-    return groupModifiers.some(m => m.id === modifierId);
+    return groupModifiers.some((m) => m.id === modifierId);
   };
 
   const getGroupSelectionCount = (groupId: string): number => {
@@ -170,8 +196,8 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     // arrive as Prisma-Decimal strings; `total += …` on a string CONCATENATES
     // and corrupts the shown price. Same defence as cartStore.calculateItemTotal.
     let total = Number(product.price);
-    selectedModifiers.forEach(modifiers => {
-      modifiers.forEach(mod => {
+    selectedModifiers.forEach((modifiers) => {
+      modifiers.forEach((mod) => {
         total += Number(mod.priceAdjustment) * mod.quantity;
       });
     });
@@ -182,7 +208,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     if (!canAddToCart()) return;
 
     const allModifiers: CartModifier[] = [];
-    selectedModifiers.forEach(modifiers => {
+    selectedModifiers.forEach((modifiers) => {
       allModifiers.push(...modifiers);
     });
 
@@ -248,10 +274,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
           </h2>
 
           {showPrices && (
-            <p
-              className="text-2xl font-black"
-              style={{ color: primaryColor }}
-            >
+            <p className="text-2xl font-black" style={{ color: primaryColor }}>
               {formatCurrency(product.price, currency)}
             </p>
           )}
@@ -268,7 +291,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         {product.ingredients && (
           <div className="mb-5 rounded-lg bg-slate-50 p-3">
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t('menu.ingredients', 'İçindekiler')}
+              {t("menu.ingredients", "İçindekiler")}
             </div>
             <p className="text-sm leading-relaxed text-slate-700">
               {product.ingredients}
@@ -284,6 +307,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
             playsInline
             loop
             muted
+            autoPlay
             className="mb-5 w-full rounded-xl bg-black"
           />
         )}
@@ -291,7 +315,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         {/* Modifier Groups - Accordion Style */}
         {product.modifierGroups && product.modifierGroups.length > 0 && (
           <div className="space-y-3 mb-5">
-            {product.modifierGroups.map(group => {
+            {product.modifierGroups.map((group) => {
               const isExpanded = expandedGroups.has(group.id);
               const selectionCount = getGroupSelectionCount(group.id);
 
@@ -312,7 +336,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                         </h3>
                         {group.isRequired && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
-                            {t('qrMenu.required', 'Required')}
+                            {t("qrMenu.required", "Required")}
                           </span>
                         )}
                         {selectionCount > 0 && (
@@ -326,10 +350,14 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {group.selectionType === SelectionType.SINGLE
-                          ? t('qrMenu.selectOne', 'Select one')
+                          ? t("qrMenu.selectOne", "Select one")
                           : group.maxSelections
-                            ? t('qrMenu.selectUpTo', `Select up to ${group.maxSelections}`, { max: group.maxSelections })
-                            : t('qrMenu.selectMultiple', 'Select multiple')}
+                            ? t(
+                                "qrMenu.selectUpTo",
+                                `Select up to ${group.maxSelections}`,
+                                { max: group.maxSelections },
+                              )
+                            : t("qrMenu.selectMultiple", "Select multiple")}
                       </p>
                     </div>
                     <motion.div
@@ -345,38 +373,55 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                     {isExpanded && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
+                        animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
                         <div className="p-4 pt-2 flex flex-wrap gap-2">
-                          {group.modifiers.map(modifier => {
-                            const selected = isModifierSelected(group.id, modifier.id);
+                          {group.modifiers.map((modifier) => {
+                            const selected = isModifierSelected(
+                              group.id,
+                              modifier.id,
+                            );
                             return (
                               <motion.button
                                 key={modifier.id}
-                                onClick={() => handleModifierToggle(group, modifier)}
+                                onClick={() =>
+                                  handleModifierToggle(group, modifier)
+                                }
                                 className={cn(
-                                  'px-4 py-2 rounded-full text-sm font-medium transition-all border-2',
+                                  "px-4 py-2 rounded-full text-sm font-medium transition-all border-2",
                                   selected
-                                    ? 'border-transparent text-white'
-                                    : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
+                                    ? "border-transparent text-white"
+                                    : "border-slate-200 text-slate-700 hover:border-slate-300 bg-white",
                                 )}
                                 style={{
-                                  backgroundColor: selected ? primaryColor : undefined,
+                                  backgroundColor: selected
+                                    ? primaryColor
+                                    : undefined,
                                 }}
                                 whileTap={{ scale: 0.95 }}
                               >
                                 <span className="flex items-center gap-2">
-                                  {selected && <Check className="h-3.5 w-3.5" />}
+                                  {selected && (
+                                    <Check className="h-3.5 w-3.5" />
+                                  )}
                                   {modifier.displayName}
                                   {modifier.priceAdjustment > 0 && (
-                                    <span className={cn(
-                                      'text-xs',
-                                      selected ? 'text-white/80' : 'text-green-600'
-                                    )}>
-                                      +{formatCurrency(modifier.priceAdjustment, currency)}
+                                    <span
+                                      className={cn(
+                                        "text-xs",
+                                        selected
+                                          ? "text-white/80"
+                                          : "text-green-600",
+                                      )}
+                                    >
+                                      +
+                                      {formatCurrency(
+                                        modifier.priceAdjustment,
+                                        currency,
+                                      )}
                                     </span>
                                   )}
                                 </span>
@@ -397,14 +442,17 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         {enableCustomerOrdering && (
           <div className="mb-5">
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              {t('qrMenu.specialInstructions', 'Special Instructions')}
+              {t("qrMenu.specialInstructions", "Special Instructions")}
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={t('qrMenu.notesPlaceholder', 'E.g., No onions, extra sauce...')}
+              placeholder={t(
+                "qrMenu.notesPlaceholder",
+                "E.g., No onions, extra sauce...",
+              )}
               className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 focus:border-transparent resize-none text-sm transition-all"
-              style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
+              style={{ "--tw-ring-color": primaryColor } as React.CSSProperties}
               rows={2}
             />
           </div>
@@ -416,7 +464,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         <div
           className="sticky bottom-0 bg-white border-t border-slate-100 p-4"
           style={{
-            paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+            paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
           }}
         >
           <div className="flex items-center gap-3">
@@ -430,7 +478,9 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
               >
                 <Minus className="w-4 h-4 text-slate-600" />
               </motion.button>
-              <span className="w-8 text-center font-bold text-slate-900">{quantity}</span>
+              <span className="w-8 text-center font-bold text-slate-900">
+                {quantity}
+              </span>
               <motion.button
                 onClick={() => setQuantity(quantity + 1)}
                 className="p-3"
@@ -445,11 +495,18 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
               onClick={handleAddToCart}
               disabled={!canAddToCart() || showSuccess}
               className={cn(
-                'flex-1 py-3.5 px-6 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2'
+                "flex-1 py-3.5 px-6 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2",
               )}
               style={{
-                backgroundColor: showSuccess ? '#10b981' : (canAddToCart() ? primaryColor : '#9ca3af'),
-                boxShadow: canAddToCart() && !showSuccess ? `0 4px 15px ${primaryColor}40` : 'none',
+                backgroundColor: showSuccess
+                  ? "#10b981"
+                  : canAddToCart()
+                    ? primaryColor
+                    : "#9ca3af",
+                boxShadow:
+                  canAddToCart() && !showSuccess
+                    ? `0 4px 15px ${primaryColor}40`
+                    : "none",
               }}
               whileTap={{ scale: 0.98 }}
             >
@@ -463,7 +520,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                     className="flex items-center gap-2"
                   >
                     <Check className="w-5 h-5" />
-                    <span>{t('qrMenu.added', 'Added!')}</span>
+                    <span>{t("qrMenu.added", "Added!")}</span>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -474,7 +531,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                     className="flex items-center gap-2"
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    <span>{t('qrMenu.addToCart', 'Add')}</span>
+                    <span>{t("qrMenu.addToCart", "Add")}</span>
                     <span className="opacity-80">•</span>
                     <span>{formatCurrency(calculateTotal(), currency)}</span>
                   </motion.div>
@@ -489,7 +546,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
               animate={{ opacity: 1, y: 0 }}
               className="text-xs text-red-500 text-center mt-2"
             >
-              {t('qrMenu.requiredModifiers', 'Please select required options')}
+              {t("qrMenu.requiredModifiers", "Please select required options")}
             </motion.p>
           )}
         </div>
@@ -499,7 +556,10 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
       {!enableCustomerOrdering && (
         <div className="p-4 bg-amber-50 border-t border-amber-100">
           <p className="text-sm text-amber-700 text-center">
-            {t('qrMenu.viewOnlyMode', 'Menu viewing only - please order with staff assistance')}
+            {t(
+              "qrMenu.viewOnlyMode",
+              "Menu viewing only - please order with staff assistance",
+            )}
           </p>
         </div>
       )}

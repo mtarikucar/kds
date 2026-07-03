@@ -95,11 +95,70 @@ describe("ProductMediaService", () => {
     });
   });
 
-  describe("generateIngredientsVideo", () => {
+  describe("generateIngredientsFrame (step 1 — the last frame)", () => {
+    it("requires ingredients", async () => {
+      svc = make({ FAL_KEY: "k" });
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        ingredients: "",
+      });
+      await expect(svc.generateIngredientsFrame("p1", TENANT)).rejects.toThrow(
+        /ingredients/i,
+      );
+    });
+
+    it("generates the labelled still and stores it as the end frame", async () => {
+      svc = make({ FAL_KEY: "k" });
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        ingredients: "dana kıyma, soğan",
+      });
+      (axios.post as any).mockResolvedValue({
+        data: { images: [{ url: "https://fal/ing.png" }] },
+      });
+      (axios.get as any).mockResolvedValue({ data: Buffer.from("img") });
+
+      const out = await svc.generateIngredientsFrame("p1", TENANT);
+
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining("fal.run/fal-ai/flux/dev"),
+        expect.objectContaining({
+          prompt: expect.stringContaining("dana kıyma"),
+        }),
+        expect.anything(),
+      );
+      expect(prisma.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            ingredientsImageUrl:
+              "https://api.test/uploads/media/p1-ingredients.png",
+          }),
+        }),
+      );
+      expect(out.ingredientsImageUrl).toBe(
+        "https://api.test/uploads/media/p1-ingredients.png",
+      );
+    });
+
+    it("simulator sets a sample frame without calling fal", async () => {
+      svc = make({ FAL_SIMULATOR: "true" });
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        ingredients: "x",
+      });
+      (axios.get as any).mockResolvedValue({ data: Buffer.from("img") });
+      const out = await svc.generateIngredientsFrame("p1", TENANT);
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(out.ingredientsImageUrl).toBeTruthy();
+    });
+  });
+
+  describe("generateIngredientsVideo (step 2 — the video)", () => {
     const product = {
       id: "p1",
       image: "/uploads/products/dish.jpg",
       ingredients: "dana kıyma, soğan",
+      ingredientsImageUrl: "https://api.test/uploads/media/p1-ingredients.png",
       productImages: [],
       videoStatus: null,
     };
@@ -115,32 +174,25 @@ describe("ProductMediaService", () => {
       );
     });
 
-    it("requires ingredients", async () => {
+    it("requires the last frame to be generated first", async () => {
       svc = make({ FAL_KEY: "k" });
       (prisma.product.findFirst as any).mockResolvedValue({
         ...product,
-        ingredients: "",
+        ingredientsImageUrl: null,
       });
       await expect(svc.generateIngredientsVideo("p1", TENANT)).rejects.toThrow(
-        /ingredients/i,
+        /last frame/i,
       );
     });
 
-    it("generates the ingredients still then submits a dual-keyframe video → PENDING", async () => {
+    it("submits a dual-keyframe video from the reviewed frame → PENDING", async () => {
       svc = make({ FAL_KEY: "k" });
       (prisma.product.findFirst as any).mockResolvedValue(product);
-      // 1st axios.post = fal image (sync); 2nd = fal video queue submit.
-      (axios.post as any)
-        .mockResolvedValueOnce({
-          data: { images: [{ url: "https://fal/ing.png" }] },
-        })
-        .mockResolvedValueOnce({ data: { request_id: "req-9" } });
-      (axios.get as any).mockResolvedValue({ data: Buffer.from("img") });
+      (axios.post as any).mockResolvedValue({ data: { request_id: "req-9" } });
 
       const out = await svc.generateIngredientsVideo("p1", TENANT);
 
-      // The video submit carries start (dish, absolute) + end (ingredients) frames.
-      expect(axios.post).toHaveBeenLastCalledWith(
+      expect(axios.post).toHaveBeenCalledWith(
         expect.stringContaining("queue.fal.run/"),
         expect.objectContaining({
           start_image_url: "https://api.test/uploads/products/dish.jpg",
@@ -162,7 +214,6 @@ describe("ProductMediaService", () => {
     it("simulator marks READY with a sample video inline", async () => {
       svc = make({ FAL_SIMULATOR: "true" });
       (prisma.product.findFirst as any).mockResolvedValue(product);
-      (axios.get as any).mockResolvedValue({ data: Buffer.from("img") });
       const out = await svc.generateIngredientsVideo("p1", TENANT);
       expect(axios.post).not.toHaveBeenCalled();
       expect(out.videoStatus).toBe("READY");

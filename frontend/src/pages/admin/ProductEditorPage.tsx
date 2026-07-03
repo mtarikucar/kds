@@ -205,226 +205,234 @@ export default function ProductEditorPage() {
         </h1>
       </div>
 
-      <form
-        onSubmit={productForm.handleSubmit(onSubmit)}
-        className="space-y-4 pb-24"
-      >
-        {/* Temel bilgiler */}
-        <Section title={t("menu.basicInfo", "Temel bilgiler")}>
-          <div className="space-y-3">
-            <Input
-              label={t("menu.itemName")}
-              error={productForm.formState.errors.name?.message}
-              {...productForm.register("name")}
-            />
-            <Input
-              label={t("menu.description")}
-              error={productForm.formState.errors.description?.message}
-              {...productForm.register("description")}
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                label={t("menu.price")}
-                type="number"
-                step="0.01"
-                error={productForm.formState.errors.price?.message}
-                {...productForm.register("price", { valueAsNumber: true })}
-              />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  {t("menu.category")}
-                </label>
-                <select
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  {...productForm.register("categoryId")}
-                >
-                  <option value="">{t("menu.selectCategory")}</option>
-                  {categories?.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                {productForm.formState.errors.categoryId?.message && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {productForm.formState.errors.categoryId.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </Section>
-
-        {/* Müşteriye görünen içerik: içindekiler + görseller */}
-        <Section title={t("menu.customerContent", "Müşteriye görünen içerik")}>
+      <form onSubmit={productForm.handleSubmit(onSubmit)} className="pb-24">
+        {/* Two columns on desktop so the editor isn't one very tall scroll. */}
+        <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
           <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t("menu.ingredients", "İçindekiler")}
-              </label>
-              <textarea
-                rows={2}
-                placeholder={
-                  t(
-                    "menu.ingredientsPlaceholder",
-                    "Örn: Dana kıyma, soğan, domates, biber, baharatlar",
-                  ) as string
-                }
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                {...productForm.register("ingredients")}
-              />
-            </div>
+            {/* Temel bilgiler */}
+            <Section title={t("menu.basicInfo", "Temel bilgiler")}>
+              <div className="space-y-3">
+                <Input
+                  label={t("menu.itemName")}
+                  error={productForm.formState.errors.name?.message}
+                  {...productForm.register("name")}
+                />
+                <Input
+                  label={t("menu.description")}
+                  error={productForm.formState.errors.description?.message}
+                  {...productForm.register("description")}
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label={t("menu.price")}
+                    type="number"
+                    step="0.01"
+                    error={productForm.formState.errors.price?.message}
+                    {...productForm.register("price", { valueAsNumber: true })}
+                  />
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      {t("menu.category")}
+                    </label>
+                    <select
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      {...productForm.register("categoryId")}
+                    >
+                      <option value="">{t("menu.selectCategory")}</option>
+                      {categories?.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {productForm.formState.errors.categoryId?.message && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {productForm.formState.errors.categoryId.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Section>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                {t("menu.productImages")}
-              </label>
-              {productImages.length > 0 ? (
-                <div className="mb-3 grid grid-cols-4 gap-2">
-                  {productImages.map((image, index) => (
-                    <div key={image.id} className="group relative">
-                      <div className="aspect-square overflow-hidden rounded-lg border-2 border-slate-200">
+            {/* Müşteriye görünen içerik: içindekiler + görseller */}
+            <Section
+              title={t("menu.customerContent", "Müşteriye görünen içerik")}
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    {t("menu.ingredients", "İçindekiler")}
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder={
+                      t(
+                        "menu.ingredientsPlaceholder",
+                        "Örn: Dana kıyma, soğan, domates, biber, baharatlar",
+                      ) as string
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    {...productForm.register("ingredients")}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    {t("menu.productImages")}
+                  </label>
+                  {productImages.length > 0 ? (
+                    <div className="mb-3 grid grid-cols-4 gap-2">
+                      {productImages.map((image, index) => (
+                        <div key={image.id} className="group relative">
+                          <div className="aspect-square overflow-hidden rounded-lg border-2 border-slate-200">
+                            <img
+                              src={getImageUrl(image.url)}
+                              alt={image.filename}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          {index === 0 && (
+                            <div className="absolute left-1 top-1 rounded bg-yellow-500 px-2 py-0.5 text-xs text-white">
+                              {t("menu.primary")}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setProductImages((imgs) =>
+                                imgs.filter((img) => img.id !== image.id),
+                              )
+                            }
+                            className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : product?.image ? (
+                    <div className="mb-3">
+                      <div className="relative aspect-square w-32 overflow-hidden rounded-lg border-2 border-slate-200">
                         <img
-                          src={getImageUrl(image.url)}
-                          alt={image.filename}
+                          src={getImageUrl(product.image)}
+                          alt=""
                           className="h-full w-full object-cover"
                         />
-                      </div>
-                      {index === 0 && (
                         <div className="absolute left-1 top-1 rounded bg-yellow-500 px-2 py-0.5 text-xs text-white">
                           {t("menu.primary")}
                         </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setProductImages((imgs) =>
-                            imgs.filter((img) => img.id !== image.id),
-                          )
-                        }
-                        className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="mb-4 rounded-xl border-2 border-dashed border-slate-300 py-8 text-center">
+                      <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
+                      <p className="mt-2 text-sm text-slate-600">
+                        {t("menu.noImagesSelected")}
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setImageLibraryOpen(true)}
+                    className="w-full"
+                  >
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    {t("menu.chooseImagesFromLibrary")}
+                  </Button>
                 </div>
-              ) : product?.image ? (
-                <div className="mb-3">
-                  <div className="relative aspect-square w-32 overflow-hidden rounded-lg border-2 border-slate-200">
-                    <img
-                      src={getImageUrl(product.image)}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                    <div className="absolute left-1 top-1 rounded bg-yellow-500 px-2 py-0.5 text-xs text-white">
-                      {t("menu.primary")}
-                    </div>
+              </div>
+            </Section>
+          </div>
+
+          <div className="space-y-4">
+            {/* AI Stüdyo */}
+            <Section
+              id="ai-studio"
+              title={t("menu.aiStudio", "AI Stüdyo")}
+              icon={<Sparkles className="h-4 w-4 text-primary-600" />}
+            >
+              <p className="mb-3 -mt-1 text-xs text-slate-500">
+                {t(
+                  "menu.aiStudioHint",
+                  "Fotoğraf, içindekiler videosu ve 3D/AR modelini otomatik üretin — kaydetmeniz gerekmez.",
+                )}
+              </p>
+              <ProductMediaPanel
+                productId={product?.id}
+                ensureProductId={ensureProductId}
+                hasImage={hasImage}
+                hasIngredients={!!liveIngredients.trim()}
+                onPhotoGenerated={(url) =>
+                  setProduct((p) => (p ? { ...p, image: url } : p))
+                }
+              />
+              <Product3dPanel
+                productId={product?.id}
+                ensureProductId={ensureProductId}
+                hasImage={hasImage}
+              />
+            </Section>
+
+            {/* Seçenekler */}
+            <Section title={t("menu.modifierGroups", "Seçenekler")}>
+              <ProductModifierSelector
+                productId={product?.id}
+                selectedGroupIds={selectedModifierGroupIds}
+                onSelectionChange={setSelectedModifierGroupIds}
+              />
+            </Section>
+
+            {/* Operasyon / POS */}
+            <Section title={t("menu.operations", "Operasyon / POS")}>
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label={t("menu.currentStock")}
+                    type="number"
+                    error={productForm.formState.errors.currentStock?.message}
+                    {...productForm.register("currentStock", {
+                      valueAsNumber: true,
+                    })}
+                  />
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      {t("menu.taxRate")}
+                    </label>
+                    <select
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      {...productForm.register("taxRate", {
+                        valueAsNumber: true,
+                      })}
+                    >
+                      <option value={0}>%0</option>
+                      <option value={1}>%1</option>
+                      <option value={10}>%10</option>
+                      <option value={20}>%20</option>
+                    </select>
                   </div>
                 </div>
-              ) : (
-                <div className="mb-4 rounded-xl border-2 border-dashed border-slate-300 py-8 text-center">
-                  <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
-                  <p className="mt-2 text-sm text-slate-600">
-                    {t("menu.noImagesSelected")}
-                  </p>
-                </div>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setImageLibraryOpen(true)}
-                className="w-full"
-              >
-                <ImageIcon className="mr-2 h-4 w-4" />
-                {t("menu.chooseImagesFromLibrary")}
-              </Button>
-            </div>
-          </div>
-        </Section>
-
-        {/* AI Stüdyo */}
-        <Section
-          id="ai-studio"
-          title={t("menu.aiStudio", "AI Stüdyo")}
-          icon={<Sparkles className="h-4 w-4 text-primary-600" />}
-        >
-          <p className="mb-3 -mt-1 text-xs text-slate-500">
-            {t(
-              "menu.aiStudioHint",
-              "Fotoğraf, içindekiler videosu ve 3D/AR modelini otomatik üretin — kaydetmeniz gerekmez.",
-            )}
-          </p>
-          <ProductMediaPanel
-            productId={product?.id}
-            ensureProductId={ensureProductId}
-            hasImage={hasImage}
-            hasIngredients={!!liveIngredients.trim()}
-            onPhotoGenerated={(url) =>
-              setProduct((p) => (p ? { ...p, image: url } : p))
-            }
-          />
-          <Product3dPanel
-            productId={product?.id}
-            ensureProductId={ensureProductId}
-            hasImage={hasImage}
-          />
-        </Section>
-
-        {/* Seçenekler */}
-        <Section title={t("menu.modifierGroups", "Seçenekler")}>
-          <ProductModifierSelector
-            productId={product?.id}
-            selectedGroupIds={selectedModifierGroupIds}
-            onSelectionChange={setSelectedModifierGroupIds}
-          />
-        </Section>
-
-        {/* Operasyon / POS */}
-        <Section title={t("menu.operations", "Operasyon / POS")}>
-          <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                label={t("menu.currentStock")}
-                type="number"
-                error={productForm.formState.errors.currentStock?.message}
-                {...productForm.register("currentStock", {
-                  valueAsNumber: true,
-                })}
-              />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  {t("menu.taxRate")}
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    {...productForm.register("isAvailable")}
+                  />
+                  {t("menu.available")}
                 </label>
-                <select
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  {...productForm.register("taxRate", { valueAsNumber: true })}
-                >
-                  <option value={0}>%0</option>
-                  <option value={1}>%1</option>
-                  <option value={10}>%10</option>
-                  <option value={20}>%20</option>
-                </select>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    {...productForm.register("stockTracked")}
+                  />
+                  {t("menu.stockTracked")}
+                </label>
               </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input
-                type="checkbox"
-                className="rounded"
-                {...productForm.register("isAvailable")}
-              />
-              {t("menu.available")}
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input
-                type="checkbox"
-                className="rounded"
-                {...productForm.register("stockTracked")}
-              />
-              {t("menu.stockTracked")}
-            </label>
+            </Section>
           </div>
-        </Section>
+        </div>
       </form>
 
       {/* Sticky action bar */}

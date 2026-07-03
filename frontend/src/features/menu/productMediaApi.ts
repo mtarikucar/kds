@@ -72,7 +72,31 @@ export const useGenerateProductPhoto = () => {
   });
 };
 
-/** Generate the ingredients video (dish photo → ingredients-on-table transition). */
+/** Step 1: generate the ingredients "last frame" (reviewed before the video). */
+export const useGenerateIngredientsFrame = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId: string) => {
+      const response = await api.post<ProductMediaState>(
+        `/menu/product-media/${productId}/generate-frame`,
+      );
+      return response.data;
+    },
+    onSuccess: (_data, productId) => {
+      queryClient.invalidateQueries({ queryKey: ["product-media", productId] });
+    },
+    onError: (error: any) => {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          i18n.t("common:notifications.operationFailed"),
+        ),
+      );
+    },
+  });
+};
+
+/** Step 2: generate the ingredients video (uses the reviewed last frame). */
 export const useGenerateIngredientsVideo = () => {
   const queryClient = useQueryClient();
   return useMutation({
