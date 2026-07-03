@@ -120,7 +120,11 @@ export class HardwareService {
     }
 
     try {
-      return await invoke<string>('connect_device', { deviceId });
+      // The shipped Tauri app registers `reconnect_device` (disconnect+connect),
+      // not a bare `connect_device` — invoking the latter made every Connect
+      // action reject before reaching a handler. reconnect_device connects a
+      // registered-but-disconnected device, which is exactly this action.
+      return await invoke<string>('reconnect_device', { deviceId });
     } catch (error) {
       console.error('Failed to connect device:', error);
       throw error;

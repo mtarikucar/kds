@@ -204,6 +204,12 @@ impl HardwareDevice for EscPosPrinter {
             "max_line_width": 48
         })
     }
+
+    /// This IS a printer — hand the manager a `&mut dyn PrinterDevice` so
+    /// print/drawer dispatch works (replaces the broken as_any transmute).
+    fn as_printer_mut(&mut self) -> Option<&mut dyn PrinterDevice> {
+        Some(self)
+    }
 }
 
 #[async_trait]

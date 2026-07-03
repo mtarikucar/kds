@@ -1,3 +1,4 @@
+use super::printer::PrinterDevice;
 use crate::hardware::errors::HardwareResult;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -74,4 +75,16 @@ pub trait HardwareDevice: Send + Sync {
 
     /// Get device capabilities as JSON
     fn capabilities(&self) -> serde_json::Value;
+
+    /// Downcast hook for the manager's print / cash-drawer dispatch. Printer
+    /// devices override this to return themselves; every other device stays
+    /// `None`. This replaces an earlier `as_any_mut()` that `transmute`d the
+    /// trait object to `dyn Any` (keeping the HardwareDevice vtable → UB) and
+    /// then tried to `downcast_mut::<Box<dyn PrinterDevice>>()` — a type the
+    /// registry never stores (it stores a concrete `EscPosPrinter`), so every
+    /// `print_receipt` / `print_kitchen_order` / `open_cash_drawer` silently
+    /// failed with "not a printer" and nothing ever printed.
+    fn as_printer_mut(&mut self) -> Option<&mut dyn PrinterDevice> {
+        None
+    }
 }

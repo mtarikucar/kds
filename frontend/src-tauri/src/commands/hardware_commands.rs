@@ -12,6 +12,12 @@ pub async fn initialize_hardware(
 ) -> Result<String, String> {
     let mut mgr = manager.lock().await;
 
+    // Tear the previous manager down FIRST: disconnect its devices and stop its
+    // health-check loop. Without this, re-initialising leaked an open printer
+    // connection/socket and a forever-running background task on every call
+    // (the old manager was simply overwritten, never shut down).
+    let _ = mgr.shutdown().await;
+
     // Set backend client
     *mgr = HardwareManager::new(mgr.event_emitter().clone()).with_backend_client(backend_url);
 

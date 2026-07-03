@@ -172,8 +172,7 @@ impl HardwareManager {
 
         // Downcast to PrinterDevice
         let printer = device
-            .as_any_mut()
-            .downcast_mut::<Box<dyn PrinterDevice>>()
+            .as_printer_mut()
             .ok_or_else(|| {
                 HardwareError::UnsupportedOperation(format!(
                     "Device {} is not a printer",
@@ -200,8 +199,7 @@ impl HardwareManager {
 
         // Downcast to PrinterDevice
         let printer = device
-            .as_any_mut()
-            .downcast_mut::<Box<dyn PrinterDevice>>()
+            .as_printer_mut()
             .ok_or_else(|| {
                 HardwareError::UnsupportedOperation(format!(
                     "Device {} is not a printer",
@@ -229,8 +227,7 @@ impl HardwareManager {
         // Downcast to PrinterDevice — the drawer kicks off the printer's
         // RJ-11/RJ-12 port via the ESC/POS pulse command.
         let printer = device
-            .as_any_mut()
-            .downcast_mut::<Box<dyn PrinterDevice>>()
+            .as_printer_mut()
             .ok_or_else(|| {
                 HardwareError::UnsupportedOperation(format!(
                     "Device {} is not a printer",
@@ -263,6 +260,11 @@ impl HardwareManager {
     /// Disconnect all devices and cleanup
     pub async fn shutdown(&self) -> HardwareResult<()> {
         tracing::info!("Shutting down hardware manager...");
+        // Signal the spawned health-check loop to exit on its next tick. It
+        // holds a clone of this settings Arc and breaks when
+        // enable_health_checks is false; without this a re-init (which replaces
+        // the manager) would leak a forever-running background task per call.
+        self.global_settings.write().await.enable_health_checks = false;
         self.registry.clear().await?;
         tracing::info!("Hardware manager shutdown complete");
         Ok(())
@@ -300,10 +302,6 @@ impl HardwareManager {
     }
 }
 
-// Add as_any methods to HardwareDevice trait
-// This is a workaround for trait object downcasting
-impl dyn HardwareDevice {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        unsafe { std::mem::transmute::<&mut dyn HardwareDevice, &mut dyn std::any::Any>(self) }
-    }
-}
+// Printer dispatch now goes through HardwareDevice::as_printer_mut (a safe
+// trait hook overridden by EscPosPrinter) — the previous unsafe transmute to
+// dyn Any relied on the wrong vtable and always failed the downcast.
