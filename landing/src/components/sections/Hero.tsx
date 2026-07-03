@@ -10,7 +10,7 @@ import { useScrollFade } from '@/hooks/useScrollFade';
 export default function Hero() {
   const t = useTranslations('hero');
 
-  const { ref: sectionRef, style: fadeStyle } = useScrollFade<HTMLElement>({
+  const { sectionRef, contentRef } = useScrollFade<HTMLDivElement>({
     fadeEnd: 0.5,
     scale: true,
     translateY: true,
@@ -79,7 +79,7 @@ export default function Hero() {
         />
       </div>
 
-      <div style={fadeStyle}>
+      <div ref={contentRef}>
         <Container className="relative">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left Content */}
