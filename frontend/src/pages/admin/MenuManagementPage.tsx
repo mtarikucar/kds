@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Plus, Settings2, Lock, Sparkles } from "lucide-react";
+import { Plus, Settings2, Lock, Sparkles, Layers } from "lucide-react";
 import {
   useCategories,
   useProducts,
@@ -36,6 +36,7 @@ import {
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
+import BulkAddModal from "../../components/product/BulkAddModal";
 import { useSubscription } from "../../contexts/SubscriptionContext";
 import {
   createCategorySchema,
@@ -61,6 +62,7 @@ const MenuManagementPage = () => {
   // AI photo-import: promoted from a conditional tab to a persistent header
   // action + full-screen modal so it's always discoverable.
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const { data: menuImportStatus } = useMenuImportStatus();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -319,6 +321,27 @@ const MenuManagementPage = () => {
               {t("menu.importAction", "Fotoğraftan menü")}
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkAddOpen(true)}
+              disabled={!canAddProduct}
+              title={
+                canAddProduct
+                  ? undefined
+                  : (t(
+                      "menu.productLimitReached",
+                      "Ürün limitine ulaşıldı",
+                    ) as string)
+              }
+            >
+              {canAddProduct ? (
+                <Layers className="h-4 w-4 mr-1 md:mr-2" />
+              ) : (
+                <Lock className="h-4 w-4 mr-1 md:mr-2" />
+              )}
+              {t("menu.bulkAdd", "Toplu ekle")}
+            </Button>
+            <Button
               onClick={() => handleOpenCategoryModal()}
               disabled={!canAddCategory}
               data-tour="add-category"
@@ -377,6 +400,12 @@ const MenuManagementPage = () => {
       >
         <MenuImportTab />
       </Modal>
+
+      {/* Bulk product add */}
+      <BulkAddModal
+        isOpen={bulkAddOpen}
+        onClose={() => setBulkAddOpen(false)}
+      />
 
       {/* Modifiers Tab */}
       {activeTab === "modifiers" && (

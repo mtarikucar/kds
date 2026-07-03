@@ -146,14 +146,26 @@ export class ProductMediaService {
         "Add a dish photo first — the video starts from the product's photo.",
       );
     }
-    if (!product.ingredients?.trim()) {
+    // Parse the ingredient names first — guard on the PARSED result (a value of
+    // only separators like ",,," passes .trim() but yields nothing) and cap the
+    // count so the prompt stays sane. These names are used to label them, side
+    // by side, in the prompt.
+    const ingredientParts = (product.ingredients ?? "")
+      .split(/[,\n;•·]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ingredientParts.length === 0) {
       throw new BadRequestException(
         "Add the ingredients (İçindekiler) first — the video reveals them.",
       );
     }
+    const ingredientNames = ingredientParts.slice(0, 12).join(", ");
 
     // 1) Generate the "ingredients laid out on a table" still (video end frame).
-    const ingredientsPrompt = `${product.ingredients}, the fresh raw ingredients each separately and beautifully arranged on a rustic wooden table, top-down flat lay, professional food photography, natural soft light, high detail`;
+    // The ingredients are placed side by side in a row and LABELLED (in the
+    // generation prompt, not overlaid afterwards) so the video's final moment
+    // shows what each one is.
+    const ingredientsPrompt = `The raw ingredients (${ingredientNames}) arranged in a single horizontal row, side by side, evenly spaced on a clean neutral table; each ingredient labelled directly above it with its name in an elegant serif font and a small straight downward arrow pointing to it; top-down studio food photography, natural soft light, high detail`;
     let ingredientsImageUrl: string;
     if (!this.key && this.simulator) {
       ingredientsImageUrl = this.sample("image");
@@ -176,9 +188,11 @@ export class ProductMediaService {
     );
     const ingredientsHosted = `${this.baseUrl}/uploads/media/${storedIngredients}`;
 
-    // 2) Submit the dual-keyframe transition video (dish → ingredients).
-    const videoPrompt =
-      "smooth cinematic transition from the finished plated dish to its fresh ingredients beautifully arranged on the table, appetising food video";
+    // 2) Submit the dual-keyframe transition video (dish → ingredients). The
+    // video ENDS on the ingredients laid out side by side, each labelled with
+    // its name — the labelling is described here (given to the model as a
+    // prompt) rather than overlaid on the still afterwards.
+    const videoPrompt = `Smooth cinematic transition from the finished plated dish to its raw ingredients. The video ends with the ingredients laid out side by side in a row on the table, each labelled directly above it with its name (${ingredientNames}) in an elegant serif font with a small straight downward arrow pointing to it.`;
     if (!this.key && this.simulator) {
       const updated = await this.prisma.product.update({
         where: { id: product.id },

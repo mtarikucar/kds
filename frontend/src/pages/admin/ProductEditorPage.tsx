@@ -360,7 +360,6 @@ export default function ProductEditorPage() {
             ensureProductId={ensureProductId}
             hasImage={hasImage}
             hasIngredients={!!liveIngredients.trim()}
-            ingredients={liveIngredients}
             onPhotoGenerated={(url) =>
               setProduct((p) => (p ? { ...p, image: url } : p))
             }
