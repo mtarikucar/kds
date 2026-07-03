@@ -193,29 +193,35 @@ export class ProductMediaService {
       );
     }
     const labelled = names.slice(0, 6);
-    // NO text in the prompt — just the ingredients, clearly identifiable.
-    const ingredientsPrompt = `A clean, photorealistic top-down flat-lay of exactly these raw food ingredients laid out in a single horizontal row, evenly spaced and clearly separated on a plain light neutral surface, each ingredient distinct and recognisable, studio food photography, soft natural light, high detail, absolutely NO text, NO labels, NO writing, NO letters: ${labelled.join(", ")}`;
+    // Generate each ingredient SEPARATELY — a single isolated item is reliable,
+    // whereas one prompt for "all N in a row" drops some and invents extras
+    // (the user's exact complaint). Translate to English first (the model is far
+    // more accurate in English); the LABELS keep the original Turkish names.
+    const englishNames = await this.translateIngredients(labelled);
 
-    let baseBuffer: Buffer;
-    if (!this.key && this.simulator) {
-      baseBuffer = await this.fetchBuffer(this.sample("image"));
-    } else {
-      const out = await this.falSync(this.imageModel, {
-        prompt: ingredientsPrompt,
-        image_size: "square_hd",
-        num_images: 1,
-      });
-      const url = out?.images?.[0]?.url;
-      if (!url) {
-        throw new ServiceUnavailableException(
-          "Ingredients image generation failed",
-        );
-      }
-      baseBuffer = await this.fetchBuffer(url);
-    }
+    const buffers = await Promise.all(
+      labelled.map(async (_name, i) => {
+        if (!this.key && this.simulator) {
+          return this.fetchBuffer(this.sample("image"));
+        }
+        const en = englishNames[i] || labelled[i];
+        const out = await this.falSync(this.imageModel, {
+          prompt: `A single ${en}, one item only, isolated and centered on a plain white background, professional studio food photography, sharp focus, high detail, no text, no other objects, no props, no garnish`,
+          image_size: "square_hd",
+          num_images: 1,
+        });
+        const url = out?.images?.[0]?.url;
+        if (!url) {
+          throw new ServiceUnavailableException(
+            "Ingredients image generation failed",
+          );
+        }
+        return this.fetchBuffer(url);
+      }),
+    );
 
-    // Composite accurate labels + downward arrows over the ingredients.
-    const composited = await this.composeLabelledStill(baseBuffer, labelled);
+    // Lay the ingredients out side by side + label each (accurate Turkish).
+    const composited = await this.composeIngredientsRow(buffers, labelled);
     const filename = `${productId}-ingredients-${Date.now()}.png`;
     await this.writeBuffer(filename, composited);
     const updated = await this.prisma.product.update({
@@ -227,18 +233,74 @@ export class ProductMediaService {
     return this.videoView(updated);
   }
 
-  /** Overlay each ingredient's name (accurate, correct Turkish) above it in a
-      row, with a small downward arrow — done programmatically because the image
-      model cannot render legible text. */
-  private async composeLabelledStill(
-    baseBuffer: Buffer,
+  /** Translate Turkish ingredient names to concrete English food terms (better
+      image accuracy). Falls back to the originals if Anthropic isn't configured
+      or the call fails. */
+  private async translateIngredients(names: string[]): Promise<string[]> {
+    const key = this.config.get<string>("ANTHROPIC_API_KEY");
+    if (!key) return names;
+    try {
+      const model =
+        this.config.get<string>("MENU_IMPORT_MODEL") ||
+        "claude-haiku-4-5-20251001";
+      const res = await axios.post(
+        "https://api.anthropic.com/v1/messages",
+        {
+          model,
+          max_tokens: 500,
+          messages: [
+            {
+              role: "user",
+              content: `Translate each Turkish food ingredient to a short, concrete English food term good for an image generator (e.g. "közlenmiş patlıcan" → "roasted eggplant", "süzme yoğurt" → "strained yogurt", "pul biber" → "red pepper flakes"). Reply with ONLY a JSON array of strings, same order and same length, nothing else. Ingredients: ${JSON.stringify(names)}`,
+            },
+          ],
+        },
+        {
+          headers: {
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          timeout: 30_000,
+        },
+      );
+      const text: string = res.data?.content?.[0]?.text ?? "";
+      const match = text.match(/\[[\s\S]*\]/);
+      const arr = JSON.parse(match ? match[0] : text);
+      if (Array.isArray(arr) && arr.length === names.length) {
+        return arr.map((x) => String(x));
+      }
+    } catch (e) {
+      this.logger.warn(`ingredient translate failed: ${(e as Error).message}`);
+    }
+    return names;
+  }
+
+  /** Lay N individually-generated ingredient images side by side on a white
+      canvas, each with its (accurate, Turkish) name in a label + a downward
+      arrow — so the still shows EXACTLY the listed ingredients, all present,
+      nothing extra. */
+  private async composeIngredientsRow(
+    buffers: Buffer[],
     names: string[],
   ): Promise<Buffer> {
     const W = 1024;
     const H = 1024;
-    const n = Math.max(names.length, 1);
-    const cellW = W / n;
-    const fontSize = n <= 3 ? 30 : n <= 4 ? 25 : 20;
+    const n = Math.max(buffers.length, 1);
+    const cellW = Math.floor(W / n);
+    const labelH = 108;
+    const imgH = H - labelH;
+    const cells = await Promise.all(
+      buffers.slice(0, n).map(async (buf, i) => ({
+        input: await sharp(buf)
+          .resize(cellW - 10, imgH - 20, { fit: "cover" })
+          .png()
+          .toBuffer(),
+        top: labelH + 10,
+        left: i * cellW + 5,
+      })),
+    );
+    const fontSize = n <= 3 ? 26 : n <= 4 ? 22 : 18;
     const esc = (s: string) =>
       s.replace(
         /[<>&'"]/g,
@@ -252,28 +314,30 @@ export class ProductMediaService {
           })[c] as string,
       );
     const groups = names
+      .slice(0, n)
       .map((name, i) => {
         const cx = (i + 0.5) * cellW;
-        const maxChars = Math.floor(cellW / (fontSize * 0.52));
+        const maxChars = Math.floor(cellW / (fontSize * 0.5));
         const shown =
           name.length > maxChars ? name.slice(0, maxChars - 1) + "…" : name;
-        const labelW = Math.min(cellW - 10, W);
+        const boxW = cellW - 8;
         const top = 22;
-        const boxH = fontSize + 16;
-        const arrowTop = top + boxH + 4;
+        const boxH = fontSize + 18;
+        const arrowTop = top + boxH + 2;
         return `
       <g>
-        <rect x="${cx - labelW / 2}" y="${top}" width="${labelW}" height="${boxH}" rx="9" fill="#ffffff" opacity="0.93"/>
-        <text x="${cx}" y="${top + fontSize + 1}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" font-style="italic" fill="#0f172a" text-anchor="middle">${esc(shown)}</text>
-        <line x1="${cx}" y1="${arrowTop}" x2="${cx}" y2="${arrowTop + 30}" stroke="#ffffff" stroke-width="3"/>
-        <polygon points="${cx - 7},${arrowTop + 26} ${cx + 7},${arrowTop + 26} ${cx},${arrowTop + 40}" fill="#ffffff"/>
+        <rect x="${cx - boxW / 2}" y="${top}" width="${boxW}" height="${boxH}" rx="9" fill="#0f172a" opacity="0.9"/>
+        <text x="${cx}" y="${top + fontSize + 3}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" font-weight="bold" fill="#ffffff" text-anchor="middle">${esc(shown)}</text>
+        <line x1="${cx}" y1="${arrowTop}" x2="${cx}" y2="${arrowTop + 16}" stroke="#0f172a" stroke-width="3"/>
+        <polygon points="${cx - 7},${arrowTop + 12} ${cx + 7},${arrowTop + 12} ${cx},${arrowTop + 26}" fill="#0f172a"/>
       </g>`;
       })
       .join("");
     const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${groups}</svg>`;
-    return sharp(baseBuffer)
-      .resize(W, H, { fit: "cover" })
-      .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+    return sharp({
+      create: { width: W, height: H, channels: 3, background: "#ffffff" },
+    })
+      .composite([...cells, { input: Buffer.from(svg), top: 0, left: 0 }])
       .png()
       .toBuffer();
   }
