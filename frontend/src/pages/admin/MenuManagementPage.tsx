@@ -54,6 +54,7 @@ import MenuTab from './menuManagement/MenuTab';
 import MenuImportTab from './menuManagement/MenuImportTab';
 import { useMenuImportStatus } from '../../features/menu/menuApi';
 import Product3dPanel from '../../components/product/Product3dPanel';
+import ProductMediaPanel from '../../components/product/ProductMediaPanel';
 
 const MenuManagementPage = () => {
   const { t } = useTranslation(['menu', 'common', 'subscriptions']);
@@ -657,6 +658,13 @@ const MenuManagementPage = () => {
           <Product3dPanel
             productId={editingProduct?.id}
             hasImage={productImages.length > 0 || !!editingProduct?.image}
+          />
+
+          {/* fal.ai photo + ingredients-video generation */}
+          <ProductMediaPanel
+            productId={editingProduct?.id}
+            hasImage={productImages.length > 0 || !!editingProduct?.image}
+            hasIngredients={!!editingProduct?.ingredients}
           />
 
           <div className="flex items-center gap-2">

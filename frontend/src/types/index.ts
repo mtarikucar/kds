@@ -150,6 +150,7 @@ export interface Product {
   // READY; the admin product editor also reads model3dStatus via its own hook.
   model3dUrl?: string | null; // GLB (Android Scene Viewer / WebXR)
   model3dUsdzUrl?: string | null; // USDZ (iOS AR Quick Look)
+  videoUrl?: string | null; // fal.ai ingredients video (dish → ingredients)
   modifierGroups?: ModifierGroup[]; // Available modifiers for this product
   categoryId: string;
   category?: Category;

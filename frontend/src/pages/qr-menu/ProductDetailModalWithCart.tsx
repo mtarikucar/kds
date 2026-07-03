@@ -276,6 +276,18 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
           </div>
         )}
 
+        {/* İçindekiler videosu (fal.ai) — dish → ingredients transition */}
+        {product.videoUrl && (
+          <video
+            src={product.videoUrl}
+            controls
+            playsInline
+            loop
+            muted
+            className="mb-5 w-full rounded-xl bg-black"
+          />
+        )}
+
         {/* Modifier Groups - Accordion Style */}
         {product.modifierGroups && product.modifierGroups.length > 0 && (
           <div className="space-y-3 mb-5">

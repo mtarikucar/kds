@@ -76,6 +76,7 @@ export class MenuQueryService {
             model3dUrl: true,
             model3dUsdzUrl: true,
             model3dStatus: true,
+            videoUrl: true,
             productImages: {
               select: {
                 order: true,
@@ -151,6 +152,8 @@ export class MenuQueryService {
           product.model3dStatus === "READY" ? product.model3dUrl : null,
         model3dUsdzUrl:
           product.model3dStatus === "READY" ? product.model3dUsdzUrl : null,
+        // The ingredients video (videoUrl is only set once the fal task is READY).
+        videoUrl: product.videoUrl ?? null,
         images: product.productImages.map((pi) => ({
           id: pi.image.id,
           url: pi.image.url,

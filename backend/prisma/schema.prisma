@@ -391,6 +391,16 @@ model Product {
   model3dTaskId  String? // Meshy task id (poll / recovery)
   model3dError   String? // last failure reason for the ops panel
 
+  // fal.ai generated media (menu AI media feature). The ingredients video is a
+  // dish-photo → ingredients-on-a-table transition that shows what's inside;
+  // ingredientsImageUrl is the generated "ingredients laid out" end-frame. All
+  // nullable — a product without generated media just shows nothing extra.
+  videoUrl            String? // the ingredients video (re-hosted mp4)
+  videoStatus         String? // null | PENDING | READY | FAILED
+  videoTaskId         String? // fal.ai queue request id (poll / recovery)
+  videoError          String? // last failure reason
+  ingredientsImageUrl String? // generated "ingredients on a table" still
+
   isAvailable  Boolean @default(true)
   stockTracked Boolean @default(false)
   // v2.8.98 — was Int @default(0). Int couldn't model fractional units
