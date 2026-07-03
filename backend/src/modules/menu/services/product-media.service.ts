@@ -244,7 +244,13 @@ export class ProductMediaService {
 
   private async pollOne(productId: string, requestId: string): Promise<void> {
     if (requestId === "SIMULATED") return;
-    const base = `${FAL_QUEUE}/${this.videoModel}/requests/${requestId}`;
+    // fal's queue status/result endpoints live under the APP namespace
+    // (e.g. fal-ai/kling-video) — the first two path segments — NOT the full
+    // model path. Verified against the live API: the full path 405s, the app
+    // path returns the task status. Reconstructing from videoModel keeps this
+    // correct if the model is swapped via FAL_VIDEO_MODEL.
+    const appId = this.videoModel.split("/").slice(0, 2).join("/");
+    const base = `${FAL_QUEUE}/${appId}/requests/${requestId}`;
     const status = await axios.get(`${base}/status`, {
       headers: { Authorization: `Key ${this.key}` },
       timeout: 30_000,
