@@ -376,6 +376,9 @@ model Product {
   id          String  @id @default(uuid())
   name        String
   description String?
+  // Customer-facing "içindekiler" (contents/ingredients) shown on the QR menu.
+  // Distinct from the internal Recipe (stock-item deduction, not customer-facing).
+  ingredients String?
   price       Decimal @db.Decimal(10, 2)
   image       String? // Legacy field, kept for backwards compatibility
 

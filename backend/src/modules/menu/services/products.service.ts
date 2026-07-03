@@ -80,6 +80,7 @@ export class ProductsService {
       data: {
         name: createProductDto.name,
         description: createProductDto.description,
+        ingredients: createProductDto.ingredients,
         price: createProductDto.price,
         image: createProductDto.image,
         isAvailable: createProductDto.isAvailable ?? true,

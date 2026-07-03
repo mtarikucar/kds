@@ -142,6 +142,7 @@ export interface Product {
   id: string;
   name: string;
   description: string | null;
+  ingredients?: string | null; // customer-facing "içindekiler" (contents)
   price: number;
   image: string | null; // Legacy field, kept for backwards compatibility
   images?: ProductImage[]; // New multi-image support
@@ -165,6 +166,7 @@ export interface Product {
 export interface CreateProductDto {
   name: string;
   description?: string;
+  ingredients?: string; // customer-facing "içindekiler" (contents)
   price: number;
   image?: string; // Legacy field
   imageIds?: string[]; // New multi-image support

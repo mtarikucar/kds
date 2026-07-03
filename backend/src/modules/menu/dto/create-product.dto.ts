@@ -41,6 +41,16 @@ export class CreateProductDto {
   @MaxLength(5000)
   description?: string;
 
+  @ApiProperty({
+    description: 'Customer-facing "içindekiler" (contents/ingredients)',
+    example: "Dana kıyma, soğan, domates, biber, baharatlar",
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(5000)
+  ingredients?: string;
+
   // Schema is Decimal(10, 2) — anything above 99,999,999.99 surfaces as a 500
   // from Postgres. 10,000,000 mirrors the payment-amount cap (iter-42); any
   // realistic menu item is several orders below.

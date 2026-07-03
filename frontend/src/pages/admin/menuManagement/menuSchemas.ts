@@ -16,6 +16,8 @@ export const createProductSchema = (t: (key: string) => string) =>
   z.object({
     name: z.string().min(1, t('menu.validation.nameRequired')),
     description: z.string().optional(),
+    // Customer-facing "içindekiler" (contents), shown on the QR menu.
+    ingredients: z.string().optional(),
     price: z.number().min(0, t('menu.validation.pricePositive')),
     categoryId: z.string().min(1, t('menu.validation.categoryRequired')),
     currentStock: z.number().min(0, t('menu.validation.stockPositive')).optional(),

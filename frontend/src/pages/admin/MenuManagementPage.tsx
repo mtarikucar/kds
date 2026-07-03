@@ -155,6 +155,7 @@ const MenuManagementPage = () => {
       productForm.reset({
         name: product.name,
         description: product.description || '',
+        ingredients: product.ingredients || '',
         price: product.price,
         categoryId: product.categoryId,
         currentStock: product.currentStock,
@@ -521,6 +522,17 @@ const MenuManagementPage = () => {
             error={productForm.formState.errors.description?.message}
             {...productForm.register('description')}
           />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('menu.ingredients', 'İçindekiler')}
+            </label>
+            <textarea
+              rows={2}
+              placeholder={t('menu.ingredientsPlaceholder', 'Örn: Dana kıyma, soğan, domates, biber, baharatlar') as string}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              {...productForm.register('ingredients')}
+            />
+          </div>
           <Input
             label={t('menu.price')}
             type="number"

@@ -264,6 +264,18 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
           </p>
         )}
 
+        {/* İçindekiler / ingredients */}
+        {product.ingredients && (
+          <div className="mb-5 rounded-lg bg-slate-50 p-3">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t('menu.ingredients', 'İçindekiler')}
+            </div>
+            <p className="text-sm leading-relaxed text-slate-700">
+              {product.ingredients}
+            </p>
+          </div>
+        )}
+
         {/* Modifier Groups - Accordion Style */}
         {product.modifierGroups && product.modifierGroups.length > 0 && (
           <div className="space-y-3 mb-5">
