@@ -379,6 +379,15 @@ model Product {
   price       Decimal @db.Decimal(10, 2)
   image       String? // Legacy field, kept for backwards compatibility
 
+  // 3D / AR (menu AI-AR feature, Phase 2). A dish photo can be turned into a
+  // 3D model via Meshy; the QR menu then offers "view in AR on your table".
+  // All nullable — a product without a model simply shows no AR button.
+  model3dUrl     String? // textured GLB (Android Scene Viewer / WebXR)
+  model3dUsdzUrl String? // USDZ (iOS AR Quick Look)
+  model3dStatus  String? // null | PENDING | READY | FAILED
+  model3dTaskId  String? // Meshy task id (poll / recovery)
+  model3dError   String? // last failure reason for the ops panel
+
   isAvailable  Boolean @default(true)
   stockTracked Boolean @default(false)
   // v2.8.98 — was Int @default(0). Int couldn't model fractional units

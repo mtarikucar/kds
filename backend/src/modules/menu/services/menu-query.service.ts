@@ -72,6 +72,9 @@ export class MenuQueryService {
             price: true,
             image: true,
             categoryId: true,
+            model3dUrl: true,
+            model3dUsdzUrl: true,
+            model3dStatus: true,
             productImages: {
               select: {
                 order: true,
@@ -140,6 +143,12 @@ export class MenuQueryService {
         price: Number(product.price),
         image: product.image,
         categoryId: product.categoryId,
+        // Only surface a 3D model to customers once it is READY (a PENDING or
+        // FAILED model must not render an AR button in the QR menu).
+        model3dUrl:
+          product.model3dStatus === "READY" ? product.model3dUrl : null,
+        model3dUsdzUrl:
+          product.model3dStatus === "READY" ? product.model3dUsdzUrl : null,
         images: product.productImages.map((pi) => ({
           id: pi.image.id,
           url: pi.image.url,
