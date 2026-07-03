@@ -176,6 +176,12 @@ export class LocalBridgeService {
         hostname: payload.hostname,
         os: payload.os,
         agentVersion: payload.agentVersion,
+        // Slide the bearer-token expiry on every heartbeat. claim() is the only
+        // other writer of tokenExpiresAt (now + tokenTtlMs, default 30d);
+        // without this an actively-heartbeating bridge would still hard-fail
+        // auth at the fixed TTL, so every claimed HummyBox would stop
+        // authenticating 30 days after claim with no self-recovery.
+        tokenExpiresAt: new Date(Date.now() + this.tokenTtlMs),
       },
     });
     return { ok: true };
@@ -190,9 +196,37 @@ export class LocalBridgeService {
     return res.count;
   }
 
-  list(tenantId: string, branchId?: string) {
+  list(
+    tenantId: string,
+    filters?: { branchId?: string; branchIds?: string[] },
+  ) {
     return this.prisma.localBridgeAgent.findMany({
-      where: { tenantId, ...(branchId ? { branchId } : {}) },
+      where: {
+        tenantId,
+        ...(filters?.branchId
+          ? { branchId: filters.branchId }
+          : filters?.branchIds
+            ? { branchId: { in: filters.branchIds } }
+            : {}),
+      },
+      // Explicit select: never ship tokenHash / provisioningTokenHash to the
+      // bridge-list UI (parity with DeviceService.list). The default findMany
+      // returned the full row incl. both secret hashes. Operators only need
+      // identity + status; the auth path reads the hashes separately.
+      select: {
+        id: true,
+        tenantId: true,
+        branchId: true,
+        hostname: true,
+        os: true,
+        agentVersion: true,
+        status: true,
+        lastSeenAt: true,
+        provisionedAt: true,
+        productSku: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: { createdAt: "desc" },
     });
   }

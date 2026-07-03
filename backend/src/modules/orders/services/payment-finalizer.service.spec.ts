@@ -687,6 +687,11 @@ describe('PaymentFinalizer', () => {
 
     it('GATE: looks up a non-retired, non-efatura physical device and no-ops when none exists (dormant)', async () => {
       const f = makeFinalizerWithFiscal();
+      // The device selection is scoped to the ORDER's branch, so ingest first
+      // resolves the order's branchId.
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        branchId: 'br-order',
+      });
       (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue(null);
 
       await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
@@ -707,6 +712,11 @@ describe('PaymentFinalizer', () => {
 
     it('COUPLED-FIŞ GUARD: skips issuance when a fiscal-coupled terminal already printed the fiş', async () => {
       const f = makeFinalizerWithFiscal();
+      // Only the cheap branchId lookup runs before the coupled-fiş guard
+      // short-circuits; the full order load (with items) is never reached.
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        branchId: 'br-order',
+      });
       (prisma.fiscalDeviceRecord.findFirst as jest.Mock).mockResolvedValue({
         id: 'dev-okc-1',
         branchId: 'br-1',
@@ -727,7 +737,9 @@ describe('PaymentFinalizer', () => {
           where: { orderId: ORDER_ID, tenantId: TENANT_ID, fiscalNo: { not: null } },
         }),
       );
-      expect(prisma.order.findFirst).not.toHaveBeenCalled();
+      // Only the branchId lookup ran — the expensive full order load (with
+      // orderItems) was skipped once the coupled guard fired.
+      expect(prisma.order.findFirst).toHaveBeenCalledTimes(1);
       expect(fiscal.issueReceipt).not.toHaveBeenCalled();
     });
 
@@ -923,6 +935,9 @@ describe('PaymentFinalizer', () => {
         providerId: 'hugin',
         status: 'online',
       });
+      (prisma.order.findFirst as jest.Mock).mockResolvedValue({
+        branchId: 'br-order',
+      });
       accountingSettings.findByTenant.mockResolvedValue({
         autoGenerateInvoice: true,
         autoSync: true,
@@ -931,10 +946,11 @@ describe('PaymentFinalizer', () => {
 
       await f.maybeIssueYazarkasaReceipt(ORDER_ID, TENANT_ID);
 
-      // The e-Fatura rail owns fiscalization → no physical fiş, and we never
-      // even reach the order lookup.
+      // The e-Fatura rail owns fiscalization → no physical fiş. Only the cheap
+      // branchId lookup ran (to scope the device); the full order load with
+      // items was never reached once the double-fiscalization guard fired.
       expect(fiscal.issueReceipt).not.toHaveBeenCalled();
-      expect(prisma.order.findFirst).not.toHaveBeenCalled();
+      expect(prisma.order.findFirst).toHaveBeenCalledTimes(1);
     });
 
     it('no-ops when the order is not (PAID) found or has no items', async () => {

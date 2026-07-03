@@ -64,21 +64,64 @@ export class CallerService {
     // We treat that as an idempotent no-op — the first delivery already
     // created the row and emitted the outbox event, so re-emitting would
     // double-fire downstream consumers (UI popup, customer matcher).
+    // Coerce + validate the provider-supplied timestamp before it reaches
+    // Prisma. A malformed occurredAt would make `new Date(...)` an Invalid Date
+    // and the create throw a NON-P2002 error → 500 → the caller-webhook's
+    // at-least-once retry storms and wedges the rest of the batch. Fall back to
+    // "now" (the call is arriving ~now) so one bad field can't poison ingest.
+    const parsedOccurredAt = new Date(event.occurredAt);
+    const occurredAt = Number.isNaN(parsedOccurredAt.getTime())
+      ? new Date()
+      : parsedOccurredAt;
+
+    const eventType =
+      event.kind === "incoming"
+        ? "caller.incoming.v1"
+        : event.kind === "answered"
+          ? "caller.answered.v1"
+          : event.kind === "ended"
+            ? "caller.ended.v1"
+            : "caller.missed.v1";
+
     let row;
     try {
-      row = await this.prisma.callerEvent.create({
-        data: {
-          id: uuidv7(),
-          tenantId,
-          providerId: event.providerId,
-          callId: event.callId,
-          kind: event.kind,
-          e164: event.e164,
-          customerId,
-          durationMs: event.durationMs,
-          meta: event.meta as any,
-          occurredAt: new Date(event.occurredAt),
-        },
+      // Create the row AND append the outbox event in ONE transaction (tx-aware
+      // append). Pre-fix the append ran as a separate `.append().catch()` after
+      // the create committed, so an append failure LOST the real-time call
+      // popup forever: the row persisted, and the provider's at-least-once retry
+      // hit the P2002 dedup below → returned null → never re-emitted. Emitting
+      // inside the tx means an append failure rolls the row back too, so the
+      // retry re-creates BOTH and the popup is delivered.
+      row = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.callerEvent.create({
+          data: {
+            id: uuidv7(),
+            tenantId,
+            providerId: event.providerId,
+            callId: event.callId,
+            kind: event.kind,
+            e164: event.e164,
+            customerId,
+            durationMs: event.durationMs,
+            meta: event.meta as any,
+            occurredAt,
+          },
+        });
+        await this.outbox.append(
+          {
+            type: eventType,
+            tenantId,
+            payload: {
+              callerEventId: created.id,
+              providerId: event.providerId,
+              callId: event.callId,
+              e164: event.e164,
+              customerId,
+            },
+          },
+          tx,
+        );
+        return created;
       });
     } catch (err) {
       if (
@@ -92,29 +135,6 @@ export class CallerService {
       }
       throw err;
     }
-
-    await this.outbox
-      .append({
-        type:
-          event.kind === "incoming"
-            ? "caller.incoming.v1"
-            : event.kind === "answered"
-              ? "caller.answered.v1"
-              : event.kind === "ended"
-                ? "caller.ended.v1"
-                : "caller.missed.v1",
-        tenantId,
-        payload: {
-          callerEventId: row.id,
-          providerId: event.providerId,
-          callId: event.callId,
-          e164: event.e164,
-          customerId,
-        },
-      })
-      .catch((e) =>
-        this.logger.warn(`caller outbox emit failed: ${(e as Error).message}`),
-      );
 
     return row;
   }

@@ -619,6 +619,16 @@ export class PaymentTerminalService {
     if (charge.status === "RECORDED" || charge.paymentId) {
       return this.toView(charge);
     }
+    if (charge.status === "VOIDED") {
+      // An operator voided this APPROVED charge (auth reversed on-device) while
+      // the terminal result / recovery sweep was in flight. It must NEVER be
+      // recorded as a Payment — doing so would resurrect a voided charge and
+      // put money back on the books that was explicitly reversed. Return the
+      // current (VOIDED) view without recording. (CANCELLED, by contrast, is
+      // the PENDING-cancel path and may still legitimately record if the card
+      // actually approved — see the guarded final update below.)
+      return this.toView(charge);
+    }
 
     if (result.status !== "APPROVED") {
       const updated = await this.prisma.paymentTerminalCharge.update({
@@ -673,8 +683,19 @@ export class PaymentTerminalService {
       return this.toView(updated);
     }
 
-    const updated = await this.prisma.paymentTerminalCharge.update({
-      where: { id: charge.id },
+    // Guarded write: only flip to RECORDED while the charge has NOT been voided
+    // (or already recorded) since the read above. Pre-fix an unconditional
+    // update({where:{id}}) would clobber a VOIDED status set by a concurrent
+    // voidCharge() — resurrecting a voided charge with a Payment on the books.
+    // If the guard matches 0 rows the void won the race: the just-created
+    // Payment is left for reconciliation instead of silently overwriting the
+    // void. (CANCELLED is intentionally still recordable — the card approved.)
+    const recorded = await this.prisma.paymentTerminalCharge.updateMany({
+      where: {
+        id: charge.id,
+        status: { notIn: ["VOIDED", "RECORDED"] },
+        paymentId: null,
+      },
       data: {
         status: "RECORDED",
         approvalCode: result.approvalCode ?? null,
@@ -686,10 +707,18 @@ export class PaymentTerminalService {
         error: null,
       },
     });
+    if (recorded.count === 0) {
+      this.logger.error(
+        `Terminal charge ${charge.id}: Payment ${paymentId} created but the charge left the recordable state concurrently (likely a void) — flagged for reconciliation, not clobbering.`,
+      );
+    }
+    const updated = await this.prisma.paymentTerminalCharge.findFirst({
+      where: { id: charge.id, tenantId },
+    });
     // Note: fiscal_coupled providers (GMP-3) already printed the fiş in the
     // sale op — the double-fiş skip is wired in P2. (Simulator is not coupled.)
     void FISCAL_COUPLED;
-    return this.toView(updated);
+    return this.toView(updated ?? charge);
   }
 
   private async markCharge(

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -9,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { BranchGuard } from "../auth/guards/branch.guard";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -44,7 +46,31 @@ export class LocalBridgeController {
   @ApiBearerAuth()
   @Get()
   list(@Req() req: any, @Query("branchId") branchId?: string) {
-    return this.bridges.list(req.user.tenantId, branchId);
+    // Branch-scope the bridge inventory (bridges hold a long-lived token to the
+    // tenant's POS/yazarkasa, so cross-branch enumeration is high-impact). An
+    // explicit ?branchId must be in the caller's allow-list; without one,
+    // non-wildcard callers are confined to their allowed branches (wildcard
+    // owner ADMIN — empty allow-list — still sees the whole tenant).
+    const { role, primaryBranchId, allowedBranchIds } = req.user;
+    const allowed: string[] = allowedBranchIds ?? [];
+    const isWildcard = role === UserRole.ADMIN && allowed.length === 0;
+    let branchFilter: { branchId?: string; branchIds?: string[] };
+    if (branchId) {
+      if (
+        !BranchGuard.canAccessBranchStatic(
+          role,
+          branchId,
+          primaryBranchId ?? null,
+          allowed,
+        )
+      ) {
+        throw new ForbiddenException("You do not have access to that branch");
+      }
+      branchFilter = { branchId };
+    } else {
+      branchFilter = isWildcard ? {} : { branchIds: allowed };
+    }
+    return this.bridges.list(req.user.tenantId, branchFilter);
   }
 
   // v2.8.90 — provisioning a bridge implies multi-branch ops (the sidebar

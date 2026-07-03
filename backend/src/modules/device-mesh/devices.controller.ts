@@ -58,7 +58,35 @@ export class DevicesController {
     @Query("kind") kind?: string,
     @Query("status") status?: string,
   ) {
-    return this.devices.list(req.user.tenantId, { branchId, kind, status });
+    // Branch-scope the inventory read: a branch-restricted MANAGER (or an ADMIN
+    // with a non-empty allow-list) must not enumerate other branches' devices.
+    // An explicit ?branchId must be inside the caller's allow-list; without one,
+    // non-wildcard callers are confined to their allowed branches (wildcard
+    // owner ADMIN — empty allow-list — still sees the whole tenant).
+    const { role, primaryBranchId, allowedBranchIds } = req.user;
+    const allowed: string[] = allowedBranchIds ?? [];
+    const isWildcard = role === UserRole.ADMIN && allowed.length === 0;
+    let branchFilter: { branchId?: string; branchIds?: string[] };
+    if (branchId) {
+      if (
+        !BranchGuard.canAccessBranchStatic(
+          role,
+          branchId,
+          primaryBranchId ?? null,
+          allowed,
+        )
+      ) {
+        throw new ForbiddenException("You do not have access to that branch");
+      }
+      branchFilter = { branchId };
+    } else {
+      branchFilter = isWildcard ? {} : { branchIds: allowed };
+    }
+    return this.devices.list(req.user.tenantId, {
+      ...branchFilter,
+      kind,
+      status,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

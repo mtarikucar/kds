@@ -388,7 +388,12 @@ export class DeviceService {
 
   async list(
     tenantId: string,
-    filters?: { branchId?: string; kind?: string; status?: string },
+    filters?: {
+      branchId?: string;
+      branchIds?: string[];
+      kind?: string;
+      status?: string;
+    },
   ) {
     // v2.8.97 — explicit select. Pre-fix the list returned every column
     // including pairCode (still-active if pre-pair), pairCodeExpiresAt,
@@ -401,7 +406,11 @@ export class DeviceService {
     return this.prisma.device.findMany({
       where: {
         tenantId,
-        ...(filters?.branchId ? { branchId: filters.branchId } : {}),
+        ...(filters?.branchId
+          ? { branchId: filters.branchId }
+          : filters?.branchIds
+            ? { branchId: { in: filters.branchIds } }
+            : {}),
         ...(filters?.kind ? { kind: filters.kind } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
       },
@@ -483,6 +492,10 @@ export class DeviceService {
         id: row.id,
         pairCode: input.pairCode,
         pairCodeExpiresAt: { gt: now },
+        // A retired slot must never be re-paired even if a stale pair code
+        // lingered (retire() now also nulls the code, but this guard is the
+        // authoritative stop against resurrection).
+        status: { not: "retired" },
       },
       data: {
         status: "paired",
@@ -560,6 +573,14 @@ export class DeviceService {
       data: {
         status: "online",
         lastSeenAt: now,
+        // Slide the bearer-token expiry forward on every heartbeat. pair() is
+        // the only other writer of tokenExpiresAt (now + tokenTtlMs); without
+        // this slide an actively-heartbeating device would still hard-fail
+        // authenticateToken() at the fixed TTL (default 24h), so the whole
+        // paired fleet (KDS/POS/printer/drawer) would stop authenticating a day
+        // after pairing with no self-recovery. A heartbeating device is
+        // already authenticated, so extending its TTL is safe.
+        tokenExpiresAt: new Date(now.getTime() + this.tokenTtlMs),
       },
     });
     if (payload && Object.keys(payload).length > 0) {
@@ -665,7 +686,16 @@ export class DeviceService {
     // null someone else's tokenHash and lock their device out.
     const claim = await this.prisma.device.updateMany({
       where: { id: row.id, tenantId },
-      data: { status: "retired", tokenHash: null },
+      // Also void any live pair code: a slot retired while it still carries an
+      // unclaimed pairCode/pairCodeExpiresAt could otherwise be resurrected by
+      // pair() (which matches on pairCode + expiry). Clearing it here, plus the
+      // status guard on pair()'s claim WHERE, closes the resurrection path.
+      data: {
+        status: "retired",
+        tokenHash: null,
+        pairCode: null,
+        pairCodeExpiresAt: null,
+      },
     });
     if (claim.count === 0) throw new NotFoundException("Device not found");
     return this.prisma.device.findFirstOrThrow({

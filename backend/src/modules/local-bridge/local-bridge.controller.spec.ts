@@ -22,9 +22,29 @@ describe("LocalBridgeController", () => {
     ctrl = new LocalBridgeController(svc as unknown as LocalBridgeService);
   });
 
-  it("list forwards tenantId + optional branch filter", () => {
-    ctrl.list({ user: { tenantId: "t1" } }, "b1");
-    expect(svc.list).toHaveBeenCalledWith("t1", "b1");
+  it("forwards a single-branch filter when the caller can access that branch", () => {
+    // Wildcard owner ADMIN (empty allow-list) may target any branch.
+    ctrl.list(
+      { user: { tenantId: "t1", role: "ADMIN", allowedBranchIds: [] } },
+      "b1",
+    );
+    expect(svc.list).toHaveBeenCalledWith("t1", { branchId: "b1" });
+  });
+
+  it("confines a branch-restricted caller to their allowed branches when no branchId is given", () => {
+    ctrl.list({
+      user: { tenantId: "t1", role: "MANAGER", allowedBranchIds: ["b1", "b2"] },
+    });
+    expect(svc.list).toHaveBeenCalledWith("t1", { branchIds: ["b1", "b2"] });
+  });
+
+  it("rejects a branchId outside the caller's allow-list", () => {
+    expect(() =>
+      ctrl.list(
+        { user: { tenantId: "t1", role: "MANAGER", allowedBranchIds: ["b1"] } },
+        "b2",
+      ),
+    ).toThrow();
   });
 
   it("createSlot is tenant-scoped", () => {

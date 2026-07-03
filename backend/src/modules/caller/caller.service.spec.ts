@@ -12,6 +12,10 @@ describe('CallerService.ingest', () => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('ok') };
     svc = new CallerService(prisma as any, outbox as any);
+    // ingest() now creates the row AND appends the outbox event in one
+    // $transaction (tx-aware append); the mock runs the callback with the
+    // prisma mock itself so tx.callerEvent.create === prisma.callerEvent.create.
+    (prisma as any).$transaction = jest.fn(async (cb: any) => cb(prisma));
     (prisma.callerEvent.create as any).mockImplementation(async ({ data }: any) => ({ ...data }));
     // Default — tenant exists. Iter-55 NotFound case overrides this.
     prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
@@ -44,7 +48,11 @@ describe('CallerService.ingest', () => {
       providerId: 'mock', callId: 'call-3', kind: 'missed',
       e164: '+905551112233', occurredAt: new Date().toISOString(),
     });
-    expect(outbox.append).toHaveBeenCalledWith(
+    // Assert on the event payload (first arg). The second arg is the tx client
+    // threaded through by $transaction — a real Prisma tx in production; under
+    // the deep mock its exact value is an implementation detail we don't pin.
+    expect(outbox.append).toHaveBeenCalledTimes(1);
+    expect(outbox.append.mock.calls[0][0]).toEqual(
       expect.objectContaining({ type: 'caller.missed.v1' }),
     );
   });

@@ -627,20 +627,47 @@ export class PaymentFinalizer {
   ): Promise<void> {
     if (!this.fiscalService) return;
     try {
+      // Resolve the order's branch so we fiscalize on THAT branch's yazarkasa.
+      // A multi-branch tenant runs one GMP-3 ÖKC per branch (each reports its
+      // own turnover to GİB under its own fiscal serial); the previous
+      // tenant-wide "oldest device" selection cross-fiscalized every branch's
+      // sales onto a single unit — a real fiscal/legal defect.
+      const orderBranch = await this.prisma.order.findFirst({
+        where: { id: orderId, tenantId },
+        select: { branchId: true },
+      });
+      if (!orderBranch) return;
+
       // GATE: only a tenant with a real physical yazarkasa gets a paper
       // fiscal receipt. Exclude the cloud `efatura` pseudo-device (e-document
       // path owned by accounting) to avoid double-fiscalization, and skip
       // retired units. providerId in ('hugin','beko','profilo',…) = a GMP-3
       // ÖKC routed through the local bridge.
-      const device = await this.prisma.fiscalDeviceRecord.findFirst({
-        where: {
-          tenantId,
-          status: { not: "retired" },
-          providerId: { not: "efatura" },
-        },
-        orderBy: { createdAt: "asc" },
-      });
-      if (!device) return; // dormant: no physical ÖKC configured for this tenant
+      //
+      // Prefer the order's own branch device; fall back to a tenant-wide/HQ
+      // device (branchId null) only when the branch has no dedicated ÖKC. A
+      // branch with neither is dormant — its sales are simply not fiscalized on
+      // some other branch's device.
+      const device =
+        (await this.prisma.fiscalDeviceRecord.findFirst({
+          where: {
+            tenantId,
+            branchId: orderBranch.branchId,
+            status: { not: "retired" },
+            providerId: { not: "efatura" },
+          },
+          orderBy: { createdAt: "asc" },
+        })) ??
+        (await this.prisma.fiscalDeviceRecord.findFirst({
+          where: {
+            tenantId,
+            branchId: null,
+            status: { not: "retired" },
+            providerId: { not: "efatura" },
+          },
+          orderBy: { createdAt: "asc" },
+        }));
+      if (!device) return; // dormant: no physical ÖKC configured for this branch
 
       // DOUBLE-FISCALIZATION GUARD: a sale is fiscalized ONCE. If this tenant
       // already reports turnover to GİB via the e-Fatura/e-Arşiv accounting

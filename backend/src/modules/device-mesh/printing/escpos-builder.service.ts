@@ -222,10 +222,12 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     // Items — large qty, no prices.
     for (const item of snapshot.items) {
       b.push(boldOn(), sizeDoubleHeight());
-      b.line(
-        this.enc(`${item.quantity} x ${item.name}`),
-        this.doubleWidthCols(cols),
-      );
+      // sizeDoubleHeight() doubles HEIGHT only — glyphs stay normal WIDTH, so
+      // the wrap/truncate width is the full `cols`. Passing doubleWidthCols(cols)
+      // (half) here clipped every kitchen-ticket item name at ~half the paper
+      // width, so the line cooks read was cut off. doubleWidthCols is only
+      // correct for sizeDoubleBoth() text (double width).
+      b.line(this.enc(`${item.quantity} x ${item.name}`), cols);
       b.push(sizeNormal(), boldOff());
       for (const mod of item.modifiers) {
         b.line(this.enc(`   + ${mod}`), cols);

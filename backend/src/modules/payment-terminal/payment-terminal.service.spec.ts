@@ -60,6 +60,24 @@ describe("PaymentTerminalService (simulator money-safety)", () => {
       chargeRow = { ...chargeRow, ...data };
       return chargeRow;
     });
+    // applyResult's final RECORD write is a guarded updateMany (so a concurrent
+    // void can't be clobbered), followed by a re-read. Honour the status guard
+    // so the void-race behaviour is exercised: only mutate while the charge is
+    // still recordable (not VOIDED/RECORDED, no paymentId yet).
+    (prisma.paymentTerminalCharge.updateMany as any).mockImplementation(async ({ where, data }: any) => {
+      if (!chargeRow || (where?.id && chargeRow.id !== where.id)) {
+        return { count: 0 };
+      }
+      if (where?.status?.notIn?.includes(chargeRow.status)) return { count: 0 };
+      if (where?.status?.in && !where.status.in.includes(chargeRow.status)) {
+        return { count: 0 };
+      }
+      if (where?.paymentId === null && chargeRow.paymentId != null) {
+        return { count: 0 };
+      }
+      chargeRow = { ...chargeRow, ...data };
+      return { count: 1 };
+    });
     // applyResult re-reads the charge by id
     (prisma.paymentTerminalCharge.findFirst as any).mockImplementation(async ({ where }: any) => {
       if (where?.idempotencyKey) return null; // idempotent-start lookup: none yet
