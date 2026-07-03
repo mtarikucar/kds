@@ -145,6 +145,10 @@ export interface Product {
   price: number;
   image: string | null; // Legacy field, kept for backwards compatibility
   images?: ProductImage[]; // New multi-image support
+  // 3D / AR (menu AI-AR feature). Present in the QR menu only when a model is
+  // READY; the admin product editor also reads model3dStatus via its own hook.
+  model3dUrl?: string | null; // GLB (Android Scene Viewer / WebXR)
+  model3dUsdzUrl?: string | null; // USDZ (iOS AR Quick Look)
   modifierGroups?: ModifierGroup[]; // Available modifiers for this product
   categoryId: string;
   category?: Category;

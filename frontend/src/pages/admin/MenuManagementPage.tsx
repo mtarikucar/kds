@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Settings2,
   Lock,
+  Sparkles,
 } from 'lucide-react';
 import {
   useCategories,
@@ -50,6 +51,9 @@ import { getImageUrl } from './menuManagement/imageUrl';
 import ModifiersTab from './menuManagement/ModifiersTab';
 import ImagesTab from './menuManagement/ImagesTab';
 import MenuTab from './menuManagement/MenuTab';
+import MenuImportTab from './menuManagement/MenuImportTab';
+import { useMenuImportStatus } from '../../features/menu/menuApi';
+import Product3dPanel from '../../components/product/Product3dPanel';
 
 const MenuManagementPage = () => {
   const { t } = useTranslation(['menu', 'common', 'subscriptions']);
@@ -59,7 +63,9 @@ const MenuManagementPage = () => {
   const categorySchema = createCategorySchema(t);
   const productSchema = createProductSchema(t);
 
-  const [activeTab, setActiveTab] = useState<'menu' | 'images' | 'modifiers'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'images' | 'modifiers' | 'import'>('menu');
+  // AI menu-import tab is shown only when the backend has an AI key wired.
+  const { data: menuImportStatus } = useMenuImportStatus();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [imageLibraryModalOpen, setImageLibraryModalOpen] = useState(false);
@@ -381,6 +387,17 @@ const MenuManagementPage = () => {
             <Settings2 className="h-4 w-4 mr-1 md:mr-2" />
             {t('menu.modifiers')}
           </Button>
+          {menuImportStatus?.configured && (
+            <Button
+              variant={activeTab === 'import' ? 'primary' : 'outline'}
+              onClick={() => setActiveTab('import')}
+              size="sm"
+              className="md:text-base"
+            >
+              <Sparkles className="h-4 w-4 mr-1 md:mr-2" />
+              {t('menu.importTab', 'Fotoğraftan')}
+            </Button>
+          )}
         </div>
 
         {/* Add Category button (only on menu tab) */}
@@ -425,6 +442,9 @@ const MenuManagementPage = () => {
 
       {/* Image Library Tab - Minimal Design */}
       {activeTab === 'images' && <ImagesTab />}
+
+      {/* AI menu import (photo → digitized menu) */}
+      {activeTab === 'import' && <MenuImportTab />}
 
       {/* Modifiers Tab */}
       {activeTab === 'modifiers' && (
@@ -620,6 +640,12 @@ const MenuManagementPage = () => {
               onSelectionChange={setSelectedModifierGroupIds}
             />
           </div>
+
+          {/* 3D / AR model generation (Meshy) — only for saved products */}
+          <Product3dPanel
+            productId={editingProduct?.id}
+            hasImage={productImages.length > 0 || !!editingProduct?.image}
+          />
 
           <div className="flex items-center gap-2">
             <input

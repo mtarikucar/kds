@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Check, UtensilsCrossed, Plus } from 'lucide-react';
+import { Check, UtensilsCrossed, Plus, Box, X } from 'lucide-react';
 import { Product } from '../../types';
 import { formatCurrency, cn } from '../../lib/utils';
 import ProgressiveImage from './ui/ProgressiveImage';
+import ModelViewerAR from './ModelViewerAR';
 
 interface ProductCardProps {
   product: Product;
@@ -36,6 +37,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   isAdded = false,
 }) => {
   const { t } = useTranslation('common');
+  const [arOpen, setArOpen] = useState(false);
+  const has3d = !!product.model3dUrl;
 
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
@@ -60,6 +63,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   return (
+    <>
     <motion.article
       onClick={onClick}
       className={cn(
@@ -88,6 +92,22 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
               <UtensilsCrossed className="h-10 w-10 text-slate-300" />
             </div>
+          )}
+
+          {/* AR badge — a dish with a READY 3D model can be viewed in AR */}
+          {has3d && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setArOpen(true);
+              }}
+              className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+              aria-label={t('ar.view', '3D / AR') as string}
+            >
+              <Box className="h-3.5 w-3.5" />
+              3D
+            </button>
           )}
 
           {/* Unavailable Overlay */}
@@ -219,6 +239,40 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </motion.button>
       )}
     </motion.article>
+
+    {/* Full-screen AR / 3D viewer */}
+    {arOpen && has3d && (
+      <div
+        className="fixed inset-0 z-[100] flex flex-col bg-black/90"
+        onClick={(e) => {
+          e.stopPropagation();
+          setArOpen(false);
+        }}
+      >
+        <div
+          className="flex items-center justify-between p-4 text-white"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="font-semibold">{product.name}</span>
+          <button
+            type="button"
+            onClick={() => setArOpen(false)}
+            aria-label={t('common.close', 'Kapat') as string}
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+          <ModelViewerAR
+            glbUrl={product.model3dUrl as string}
+            usdzUrl={product.model3dUsdzUrl}
+            poster={imageUrl}
+            alt={product.name}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

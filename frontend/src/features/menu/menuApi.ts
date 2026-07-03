@@ -268,3 +268,69 @@ export const useReorderProducts = () => {
     },
   });
 };
+
+// ── Menu import (AI photo → menu digitization, Phase 1) ────────────────────
+export interface MenuImportProductDraft {
+  name: string;
+  description?: string;
+  price: number;
+  taxRate?: number;
+}
+export interface MenuImportCategoryDraft {
+  name: string;
+  products: MenuImportProductDraft[];
+}
+export interface MenuImportDraft {
+  categories: MenuImportCategoryDraft[];
+}
+export interface MenuImportCommitSummary {
+  categoriesCreated: number;
+  categoriesMatched: number;
+  productsCreated: number;
+  failures: { category: string; product: string; reason: string }[];
+}
+
+/** Whether the backend has an AI key wired — gates the Import tab visibility. */
+export const useMenuImportStatus = () =>
+  useQuery({
+    queryKey: ['menu-import-status'],
+    queryFn: async () => {
+      const response = await api.get<{ configured: boolean }>('/menu/import/status');
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+/** Send menu photo(s) → editable draft. Persists nothing. */
+export const useParseMenuPhotos = () =>
+  useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('photos', f));
+      const response = await api.post<MenuImportDraft>('/menu/import/parse', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    },
+    onError: (error: any) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
+    },
+  });
+
+/** Commit the reviewed draft → creates categories + products. */
+export const useCommitMenuImport = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (draft: MenuImportDraft) => {
+      const response = await api.post<MenuImportCommitSummary>('/menu/import/commit', draft);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+    onError: (error: any) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
+    },
+  });
+};
