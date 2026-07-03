@@ -173,16 +173,16 @@ export class ProductMediaService {
   }
 
   // ── ingredients video, step 1: the LAST FRAME ──────────────────────────────
-  // Generate the "ingredients laid out on a table" still so the operator can
-  // review it BEFORE committing to a video. The AI produces the raw ingredients
-  // WITHOUT any text (image models render text as garbled gibberish); the
-  // ingredient names are then composited on top programmatically (accurate,
-  // correct Turkish) with sharp.
+  // Generate the "exploded view" still — the plated dish with its raw
+  // ingredients separating and rising up above the plate (a machine-parts style
+  // exploded diagram) — for the operator to review before the video. Text is
+  // never asked of the model (it garbles it); the ingredient names are added
+  // as an accurate Turkish caption afterwards with sharp.
   async generateIngredientsFrame(productId: string, tenantId: string) {
     this.assertConfigured();
     const product = await this.prisma.product.findFirst({
       where: { id: productId, tenantId },
-      select: { id: true, ingredients: true },
+      select: { id: true, name: true, description: true, ingredients: true },
     });
     if (!product) throw new NotFoundException("Product not found");
 
@@ -192,36 +192,38 @@ export class ProductMediaService {
         "Add the ingredients (İçindekiler) first — the video reveals them.",
       );
     }
-    const labelled = names.slice(0, 6);
-    // Generate each ingredient SEPARATELY — a single isolated item is reliable,
-    // whereas one prompt for "all N in a row" drops some and invents extras
-    // (the user's exact complaint). Translate to English first (the model is far
-    // more accurate in English); the LABELS keep the original Turkish names.
+    const labelled = names.slice(0, 8);
+    // EXPLODED VIEW: the plated dish with its raw ingredients separating and
+    // rising up above the plate, like a machine's exploded-parts diagram. One
+    // cohesive scene (not a grid). Translate names to English for accuracy.
     const englishNames = await this.translateIngredients(labelled);
+    const explodedPrompt = `An exploded-view deconstruction of the dish "${product.name}"${
+      product.description ? ` (${product.description})` : ""
+    }: the finished plated dish rests on a plate, and its raw ingredients — ${englishNames.join(", ")} — separate out and float upward above the plate, suspended in mid-air, neatly spaced apart in an orderly exploded-parts arrangement like a technical exploded diagram of a machine's components; food levitation photography, clean soft neutral background, dramatic studio light, sharp focus, photorealistic, high detail, absolutely no text, no labels, no writing`;
 
-    const buffers = await Promise.all(
-      labelled.map(async (_name, i) => {
-        if (!this.key && this.simulator) {
-          return this.fetchBuffer(this.sample("image"));
-        }
-        const en = englishNames[i] || labelled[i];
-        const out = await this.falSync(this.imageModel, {
-          prompt: `A single ${en}, one item only, isolated and centered on a plain white background, professional studio food photography, sharp focus, high detail, no text, no other objects, no props, no garnish`,
-          image_size: "square_hd",
-          num_images: 1,
-        });
-        const url = out?.images?.[0]?.url;
-        if (!url) {
-          throw new ServiceUnavailableException(
-            "Ingredients image generation failed",
-          );
-        }
-        return this.fetchBuffer(url);
-      }),
+    let baseBuffer: Buffer;
+    if (!this.key && this.simulator) {
+      baseBuffer = await this.fetchBuffer(this.sample("image"));
+    } else {
+      const out = await this.falSync(this.imageModel, {
+        prompt: explodedPrompt,
+        image_size: "square_hd",
+        num_images: 1,
+      });
+      const url = out?.images?.[0]?.url;
+      if (!url) {
+        throw new ServiceUnavailableException(
+          "Ingredients image generation failed",
+        );
+      }
+      baseBuffer = await this.fetchBuffer(url);
+    }
+
+    // A subtle caption listing the (accurate Turkish) ingredient names.
+    const composited = await this.composeIngredientsCaption(
+      baseBuffer,
+      labelled,
     );
-
-    // Lay the ingredients out side by side + label each (accurate Turkish).
-    const composited = await this.composeIngredientsRow(buffers, labelled);
     const filename = `${productId}-ingredients-${Date.now()}.png`;
     await this.writeBuffer(filename, composited);
     const updated = await this.prisma.product.update({
@@ -276,31 +278,15 @@ export class ProductMediaService {
     return names;
   }
 
-  /** Lay N individually-generated ingredient images side by side on a white
-      canvas, each with its (accurate, Turkish) name in a label + a downward
-      arrow — so the still shows EXACTLY the listed ingredients, all present,
-      nothing extra. */
-  private async composeIngredientsRow(
-    buffers: Buffer[],
+  /** Overlay a subtle bottom caption listing the (accurate, Turkish) ingredient
+      names on the exploded-view still — the visual reveal is the scene itself,
+      the caption just names them (image models can't render text). */
+  private async composeIngredientsCaption(
+    baseBuffer: Buffer,
     names: string[],
   ): Promise<Buffer> {
     const W = 1024;
     const H = 1024;
-    const n = Math.max(buffers.length, 1);
-    const cellW = Math.floor(W / n);
-    const labelH = 108;
-    const imgH = H - labelH;
-    const cells = await Promise.all(
-      buffers.slice(0, n).map(async (buf, i) => ({
-        input: await sharp(buf)
-          .resize(cellW - 10, imgH - 20, { fit: "cover" })
-          .png()
-          .toBuffer(),
-        top: labelH + 10,
-        left: i * cellW + 5,
-      })),
-    );
-    const fontSize = n <= 3 ? 26 : n <= 4 ? 22 : 18;
     const esc = (s: string) =>
       s.replace(
         /[<>&'"]/g,
@@ -313,31 +299,17 @@ export class ProductMediaService {
             '"': "&quot;",
           })[c] as string,
       );
-    const groups = names
-      .slice(0, n)
-      .map((name, i) => {
-        const cx = (i + 0.5) * cellW;
-        const maxChars = Math.floor(cellW / (fontSize * 0.5));
-        const shown =
-          name.length > maxChars ? name.slice(0, maxChars - 1) + "…" : name;
-        const boxW = cellW - 8;
-        const top = 22;
-        const boxH = fontSize + 18;
-        const arrowTop = top + boxH + 2;
-        return `
-      <g>
-        <rect x="${cx - boxW / 2}" y="${top}" width="${boxW}" height="${boxH}" rx="9" fill="#0f172a" opacity="0.9"/>
-        <text x="${cx}" y="${top + fontSize + 3}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" font-weight="bold" fill="#ffffff" text-anchor="middle">${esc(shown)}</text>
-        <line x1="${cx}" y1="${arrowTop}" x2="${cx}" y2="${arrowTop + 16}" stroke="#0f172a" stroke-width="3"/>
-        <polygon points="${cx - 7},${arrowTop + 12} ${cx + 7},${arrowTop + 12} ${cx},${arrowTop + 26}" fill="#0f172a"/>
-      </g>`;
-      })
-      .join("");
-    const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${groups}</svg>`;
-    return sharp({
-      create: { width: W, height: H, channels: 3, background: "#ffffff" },
-    })
-      .composite([...cells, { input: Buffer.from(svg), top: 0, left: 0 }])
+    const joined = names.join("   •   ");
+    const shown = joined.length > 92 ? joined.slice(0, 91) + "…" : joined;
+    const barH = 62;
+    const fontSize = 22;
+    const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="${H - barH}" width="${W}" height="${barH}" fill="#0f172a" opacity="0.72"/>
+      <text x="${W / 2}" y="${H - barH / 2 + fontSize / 2 - 3}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" fill="#ffffff" text-anchor="middle">${esc(shown)}</text>
+    </svg>`;
+    return sharp(baseBuffer)
+      .resize(W, H, { fit: "cover" })
+      .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
       .png()
       .toBuffer();
   }
@@ -387,9 +359,9 @@ export class ProductMediaService {
         "Generate the ingredients last frame first, then create the video.",
       );
     }
-    // No text in the prompt — the reviewed end frame already carries the
-    // (accurately composited) labels; asking the model for text just garbles it.
-    const videoPrompt = `Smooth cinematic transition from the finished plated dish to its raw ingredients laid out side by side in a row on a clean table. Photorealistic appetising food video, soft light, no text, no letters.`;
+    // Exploded-view animation: the dish deconstructs, its ingredients separating
+    // and rising up above the plate (matches the composited end frame). No text.
+    const videoPrompt = `The plated dish deconstructing into its raw ingredients: the ingredients separate out and float upward above the plate, spreading apart in mid-air like a machine's parts separating in an exploded-view animation. Smooth cinematic food levitation motion, soft studio light, photorealistic, no text, no letters.`;
 
     if (!this.key && this.simulator) {
       const updated = await this.prisma.product.update({
