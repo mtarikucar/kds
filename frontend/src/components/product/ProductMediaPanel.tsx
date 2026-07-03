@@ -6,6 +6,7 @@ import {
   Loader2,
   Sparkles,
   AlertTriangle,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import {
@@ -20,6 +21,11 @@ interface Props {
   productId?: string;
   hasImage: boolean;
   hasIngredients: boolean;
+  /** The live İçindekiler text — used to label the ingredients in the result. */
+  ingredients?: string;
+  /** Resolve/create a productId on demand so the AI tools run without an
+      explicit save (returns null if the draft couldn't be created). */
+  ensureProductId?: () => Promise<string | null>;
   /** Called with the new image URL after an auto-photo is generated, so the
       editor can reflect it in its main image area immediately. */
   onPhotoGenerated?: (imageUrl: string) => void;
@@ -35,6 +41,8 @@ export default function ProductMediaPanel({
   productId,
   hasImage,
   hasIngredients,
+  ingredients,
+  ensureProductId,
   onPhotoGenerated,
 }: Props) {
   const { t } = useTranslation(["menu", "common"]);
@@ -44,7 +52,7 @@ export default function ProductMediaPanel({
   const genVideo = useGenerateIngredientsVideo();
 
   if (!config?.configured) return null;
-  if (!productId)
+  if (!productId && !ensureProductId)
     return (
       <AiLockedTeaser
         tools={[
@@ -57,14 +65,25 @@ export default function ProductMediaPanel({
   const videoStatus = state?.videoStatus ?? null;
   const videoBusy = videoStatus === "PENDING" || genVideo.isPending;
 
+  // Resolve the id (creating a draft if needed) before any generation.
+  const resolveId = async () =>
+    productId ?? (await ensureProductId?.()) ?? null;
+
   const onPhoto = async () => {
+    const id = await resolveId();
+    if (!id) return;
     try {
-      const res = await genPhoto.mutateAsync({ productId });
+      const res = await genPhoto.mutateAsync({ productId: id });
       if (res?.imageUrl) onPhotoGenerated?.(res.imageUrl);
       toast.success(t("menu:media.photoDone", "Fotoğraf oluşturuldu"));
     } catch {
       /* toast in hook */
     }
+  };
+
+  const onVideo = async () => {
+    const id = await resolveId();
+    if (id) genVideo.mutate(id);
   };
 
   return (
@@ -127,7 +146,7 @@ export default function ProductMediaPanel({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => genVideo.mutate(productId)}
+              onClick={onVideo}
               disabled={videoBusy}
             >
               <Clapperboard className="mr-2 h-4 w-4" />
@@ -153,7 +172,7 @@ export default function ProductMediaPanel({
             )}
             <Button
               size="sm"
-              onClick={() => genVideo.mutate(productId)}
+              onClick={onVideo}
               disabled={!hasImage || !hasIngredients || videoBusy}
             >
               {genVideo.isPending ? (
@@ -181,7 +200,62 @@ export default function ProductMediaPanel({
             </p>
           </>
         )}
+
+        {/* Result: the raw ingredients laid out side by side, each labelled. */}
+        {state?.ingredientsImageUrl && (
+          <div className="pt-2">
+            <p className="mb-1 text-xs font-medium text-gray-500">
+              {t("menu:media.ingredientsResult", "İçindekiler")}
+            </p>
+            <LabeledIngredients
+              imageUrl={state.ingredientsImageUrl}
+              ingredients={ingredients}
+            />
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The generated "ingredients laid out on a table" still, with each ingredient
+ * labelled above it in an elegant serif font with a straight downward arrow —
+ * the raw ürünler yan yana, ne oldukları yazılı. Labels are evenly spaced from
+ * the İçindekiler text (the same text the image was generated from).
+ */
+function LabeledIngredients({
+  imageUrl,
+  ingredients,
+}: {
+  imageUrl: string;
+  ingredients?: string;
+}) {
+  const items = (ingredients || "")
+    .split(/[,\n;•·]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  return (
+    <div className="relative w-full max-w-sm overflow-hidden rounded-lg border border-gray-200 bg-black">
+      <img src={imageUrl} alt="" className="w-full" />
+      {items.length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex">
+          {items.map((it, i) => (
+            <div
+              key={i}
+              className="flex flex-1 flex-col items-center px-0.5 pt-2"
+            >
+              <span className="max-w-full truncate rounded bg-white/85 px-1.5 py-0.5 font-serif text-[11px] italic leading-tight text-slate-900 shadow-sm">
+                {it}
+              </span>
+              <span className="mt-0.5 block h-4 w-px bg-white/90" />
+              <ArrowDown className="-mt-1.5 h-3 w-3 text-white/90 drop-shadow" />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

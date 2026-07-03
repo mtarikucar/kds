@@ -18,6 +18,9 @@ interface Props {
   productId?: string;
   /** Whether the product currently has a dish photo (Meshy needs one). */
   hasImage: boolean;
+  /** Resolve/create a productId on demand so 3D can run without an explicit
+      save (returns null if the draft couldn't be created). */
+  ensureProductId?: () => Promise<string | null>;
 }
 
 /**
@@ -25,21 +28,30 @@ interface Props {
  * "view in AR on your table". Renders nothing unless the backend is configured
  * (MESHY_API_KEY / simulator) and we're editing a saved product.
  */
-export default function Product3dPanel({ productId, hasImage }: Props) {
+export default function Product3dPanel({
+  productId,
+  hasImage,
+  ensureProductId,
+}: Props) {
   const { t } = useTranslation(["menu", "common"]);
   const { data: config } = useProduct3dConfig();
   const { data: state } = useProduct3dStatus(productId, !!productId);
   const generate = useGenerate3d();
 
-  // Only truly hide when the feature isn't wired. When it IS configured but
-  // we're adding a new (unsaved) product, show a locked teaser instead of
-  // nothing — the generator keys on a saved productId.
+  // Only truly hide when the feature isn't wired. When configured but there's
+  // no productId AND no way to create one, show a locked teaser.
   if (!config?.configured) return null;
-  if (!productId)
+  if (!productId && !ensureProductId)
     return <AiLockedTeaser tools={[t("menu:threeD.chip", "3D / AR")]} />;
 
   const status = state?.status ?? null;
   const busy = status === "PENDING" || generate.isPending;
+
+  // Resolve the id (creating a draft if needed) before generating.
+  const handleGenerate = async () => {
+    const id = productId ?? (await ensureProductId?.());
+    if (id) generate.mutate(id);
+  };
 
   return (
     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -62,7 +74,7 @@ export default function Product3dPanel({ productId, hasImage }: Props) {
             variant="outline"
             size="sm"
             className="ml-auto"
-            onClick={() => generate.mutate(productId)}
+            onClick={handleGenerate}
             disabled={busy}
           >
             {t("menu:threeD.regenerate", "Yeniden oluştur")}
@@ -87,7 +99,7 @@ export default function Product3dPanel({ productId, hasImage }: Props) {
           )}
           <Button
             size="sm"
-            onClick={() => generate.mutate(productId)}
+            onClick={handleGenerate}
             disabled={!hasImage || busy}
           >
             {generate.isPending ? (
