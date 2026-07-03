@@ -719,6 +719,22 @@ const MenuManagementPage = () => {
                   ))}
                 </div>
               </div>
+            ) : editingProduct?.image ? (
+              // No library images, but the product has a primary image (e.g. an
+              // AI-generated photo, which is saved to product.image not the
+              // ProductImage library) — show it so the result is visible here.
+              <div className="mb-3">
+                <div className="relative aspect-square w-32 rounded-lg overflow-hidden border-2 border-slate-200">
+                  <img
+                    src={getImageUrl(editingProduct.image)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded">
+                    {t("menu.primary")}
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="mb-4 text-center py-8 border-2 border-dashed border-slate-300 rounded-xl">
                 <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
@@ -772,6 +788,9 @@ const MenuManagementPage = () => {
               productId={editingProduct?.id}
               hasImage={productImages.length > 0 || !!editingProduct?.image}
               hasIngredients={!!productForm.watch("ingredients")?.trim()}
+              onPhotoGenerated={(url) =>
+                setEditingProduct((p) => (p ? { ...p, image: url } : p))
+              }
             />
             {/* 3D / AR model generation (Meshy) */}
             <Product3dPanel

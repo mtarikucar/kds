@@ -20,6 +20,9 @@ interface Props {
   productId?: string;
   hasImage: boolean;
   hasIngredients: boolean;
+  /** Called with the new image URL after an auto-photo is generated, so the
+      editor can reflect it in its main image area immediately. */
+  onPhotoGenerated?: (imageUrl: string) => void;
 }
 
 /**
@@ -32,6 +35,7 @@ export default function ProductMediaPanel({
   productId,
   hasImage,
   hasIngredients,
+  onPhotoGenerated,
 }: Props) {
   const { t } = useTranslation(["menu", "common"]);
   const { data: config } = useProductMediaConfig();
@@ -55,7 +59,8 @@ export default function ProductMediaPanel({
 
   const onPhoto = async () => {
     try {
-      await genPhoto.mutateAsync({ productId });
+      const res = await genPhoto.mutateAsync({ productId });
+      if (res?.imageUrl) onPhotoGenerated?.(res.imageUrl);
       toast.success(t("menu:media.photoDone", "Fotoğraf oluşturuldu"));
     } catch {
       /* toast in hook */
