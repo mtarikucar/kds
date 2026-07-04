@@ -127,5 +127,39 @@
       "noUnusedImages": "Kullanılmayan görsel yok",
       "noUnusedHint": "Her görsel en az bir ürüne ekli."
     }
+  },
+  "media": {
+    "title": "Yapay zeka stüdyo",
+    "tab": {
+      "photo": "Fotoğraf",
+      "video": "İçindekiler videosu"
+    },
+    "direction": "Yön verin (opsiyonel)",
+    "photoHint": "Boş bırakırsanız ürün adı + açıklamasından üretir",
+    "variations": "Varyasyon",
+    "genPhoto": "Fotoğraf oluştur",
+    "regenPhoto": "Yeniden oluştur",
+    "pickPrimary": "Birincil fotoğrafı seçin:",
+    "setPrimary": "Birincil yap",
+    "inQueue": "Sıraya alındı",
+    "generating": "Üretiliyor…",
+    "failed": "Son deneme başarısız oldu",
+    "primary": "Seçili",
+    "usePrimary": "Bunu kullan",
+    "stage": {
+      "start": "Başlangıç karesi",
+      "frame": "Son kare (içindekiler)",
+      "video": "Video"
+    },
+    "needPhotoForVideo": "Önce Fotoğraf sekmesinden bir tabak fotoğrafı oluşturun.",
+    "needsIngredients": "Önce İçindekiler alanını doldurun.",
+    "frameHint2": "Son kareyi yönlendirin (opsiyonel) — boşsa içindekilerden üretir",
+    "genFrame": "Son kareyi oluştur",
+    "regenFrame": "Kareyi yeniden oluştur",
+    "videoHint2": "Videoyu yönlendirin — geçişi tarif edin (opsiyonel)",
+    "genVideo": "Videoyu oluştur",
+    "regenVideo": "Videoyu yeniden oluştur",
+    "videoNeeds": "Video için başlangıç fotoğrafı ve son kare gerekli.",
+    "finalizing": "İndiriliyor / kaydediliyor…"
   }
 }

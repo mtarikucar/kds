@@ -127,5 +127,39 @@
       "noUnusedImages": "No unused images",
       "noUnusedHint": "Every image is attached to at least one product."
     }
+  },
+  "media": {
+    "title": "AI Studio",
+    "tab": {
+      "photo": "Photo",
+      "video": "Ingredients video"
+    },
+    "direction": "Give direction (optional)",
+    "photoHint": "Leave blank to generate from the name + description",
+    "variations": "Variations",
+    "genPhoto": "Generate photo",
+    "regenPhoto": "Regenerate",
+    "pickPrimary": "Pick the primary photo:",
+    "setPrimary": "Make primary",
+    "inQueue": "Queued",
+    "generating": "Generating…",
+    "failed": "The last attempt failed",
+    "primary": "Selected",
+    "usePrimary": "Use this",
+    "stage": {
+      "start": "Start frame",
+      "frame": "Last frame (ingredients)",
+      "video": "Video"
+    },
+    "needPhotoForVideo": "First generate a dish photo in the Photo tab.",
+    "needsIngredients": "Fill in the ingredients first.",
+    "frameHint2": "Steer the last frame (optional) — blank generates from ingredients",
+    "genFrame": "Generate last frame",
+    "regenFrame": "Regenerate frame",
+    "videoHint2": "Steer the video — describe the transition (optional)",
+    "genVideo": "Generate video",
+    "regenVideo": "Regenerate video",
+    "videoNeeds": "The video needs a start photo and a last frame.",
+    "finalizing": "Downloading / saving…"
   }
 }

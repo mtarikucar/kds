@@ -433,10 +433,45 @@ model Product {
   // one-to-many back-relation. Branch-scoped reads must filter by branchId
   // to get the single recipe for a given branch.
   recipes          Recipe[] // Ingredient-level recipe(s) for stock deduction
+  mediaJobs        ProductMediaJob[] // AI media generation jobs (photo/frame/video)
 
   @@index([tenantId])
   @@index([categoryId])
   @@map("products")
+}
+
+// An async AI media-generation job (fal.ai queue): a dish PHOTO, an ingredients
+// FRAME (video end-frame), or the ingredients VIDEO. Backs real progress +
+// photo/frame variations. The committed outputs still land on Product.image /
+// ingredientsImageUrl / videoUrl + the ProductImage library; this row is the
+// in-flight/progress + candidate record.
+model ProductMediaJob {
+  id        String @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenantId  String
+
+  kind   String // PHOTO | FRAME | VIDEO
+  status String // IN_QUEUE | IN_PROGRESS | COMPLETED | FAILED | CANCELED
+
+  falRequestId String? // fal.ai queue request id (for polling)
+  prompt       String? // operator's steer prompt (null → service default)
+  count        Int     @default(1) // variations requested (photo/frame)
+
+  percent       Int? // best-effort progress % parsed from fal logs
+  queuePosition Int? // fal queue position while IN_QUEUE
+  lastLog       String? // latest fal log line (for the progress caption)
+
+  resultUrls Json? // candidate result URLs (re-hosted) once COMPLETED
+  error      String?
+
+  attempts  Int      @default(0) // poll attempts (for timeout → FAILED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, kind])
+  @@index([status])
+  @@map("product_media_jobs")
 }
 
 model ProductImage {

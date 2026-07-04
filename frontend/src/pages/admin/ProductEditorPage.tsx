@@ -389,14 +389,10 @@ export default function ProductEditorPage() {
               <ProductMediaPanel
                 productId={product?.id}
                 ensureProductId={ensureProductId}
-                hasImage={hasImage}
                 hasIngredients={!!liveIngredients.trim()}
-                onPhotoGenerated={(img) => {
-                  setProductImages((prev) =>
-                    prev.some((p) => p.id === img.id) ? prev : [...prev, img],
-                  );
-                  setProduct((p) => (p ? { ...p, image: img.url } : p));
-                  productForm.setValue("image", img.url);
+                onPrimaryChanged={(url) => {
+                  setProduct((p) => (p ? { ...p, image: url } : p));
+                  productForm.setValue("image", url);
                 }}
               />
               <Product3dPanel

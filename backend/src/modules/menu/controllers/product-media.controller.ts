@@ -15,6 +15,12 @@ import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
+import {
+  GenerateFrameDto,
+  GeneratePhotoDto,
+  GenerateVideoDto,
+  SetPrimaryImageDto,
+} from "../dto/product-media.dto";
 
 @ApiTags("product-media")
 @Controller("menu/product-media")
@@ -31,41 +37,54 @@ export class ProductMediaController {
 
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: "Generated-media status for a product (read-only)" })
+  @ApiOperation({ summary: "Media + in-flight job status for a product" })
   get(@Param("id") id: string, @Request() req) {
     return this.media.getStatus(id, req.tenantId);
   }
 
   @Post(":id/generate-photo")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({
-    summary: "Auto-generate a product photo (fal.ai text-to-image)",
-  })
+  @ApiOperation({ summary: "Generate dish photo variations (async job)" })
   generatePhoto(
     @Param("id") id: string,
-    @Body() body: { prompt?: string },
+    @Body() body: GeneratePhotoDto,
     @Request() req,
   ) {
-    return this.media.generatePhoto(id, req.tenantId, body?.prompt);
+    return this.media.generatePhoto(id, req.tenantId, body);
   }
 
   @Post(":id/generate-frame")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
-    summary:
-      "Generate the ingredients last frame (step 1 — reviewed before the video)",
+    summary: "Generate ingredients last-frame variations (async job)",
   })
-  generateFrame(@Param("id") id: string, @Request() req) {
-    return this.media.generateIngredientsFrame(id, req.tenantId);
+  generateFrame(
+    @Param("id") id: string,
+    @Body() body: GenerateFrameDto,
+    @Request() req,
+  ) {
+    return this.media.generateIngredientsFrame(id, req.tenantId, body);
   }
 
   @Post(":id/generate-video")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({
-    summary:
-      "Generate the ingredients video (step 2 — uses the reviewed last frame)",
-  })
-  generateVideo(@Param("id") id: string, @Request() req) {
-    return this.media.generateIngredientsVideo(id, req.tenantId);
+  @ApiOperation({ summary: "Generate the ingredients video (async job)" })
+  generateVideo(
+    @Param("id") id: string,
+    @Body() body: GenerateVideoDto,
+    @Request() req,
+  ) {
+    return this.media.generateIngredientsVideo(id, req.tenantId, body);
+  }
+
+  @Post(":id/set-primary-image")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Make a library image the product's primary photo" })
+  setPrimary(
+    @Param("id") id: string,
+    @Body() body: SetPrimaryImageDto,
+    @Request() req,
+  ) {
+    return this.media.setPrimaryImage(id, req.tenantId, body.imageUrl);
   }
 }
