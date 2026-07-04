@@ -63,6 +63,7 @@ export const useGenerateProductPhoto = () => {
         queryKey: ["product-media", vars.productId],
       });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["product-images"] });
     },
     onError: (error: any) => {
       toast.error(
@@ -87,6 +88,7 @@ export const useGenerateIngredientsFrame = () => {
     },
     onSuccess: (_data, productId) => {
       queryClient.invalidateQueries({ queryKey: ["product-media", productId] });
+      queryClient.invalidateQueries({ queryKey: ["product-images"] });
     },
     onError: (error: any) => {
       toast.error(
@@ -111,6 +113,7 @@ export const useGenerateIngredientsVideo = () => {
     },
     onSuccess: (_data, productId) => {
       queryClient.invalidateQueries({ queryKey: ["product-media", productId] });
+      queryClient.invalidateQueries({ queryKey: ["product-images"] });
     },
     onError: (error: any) => {
       toast.error(

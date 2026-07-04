@@ -50,6 +50,15 @@ describe("ProductMediaService", () => {
         ...data,
       }),
     );
+    // Media-library attach ($transaction + ProductImage) — used by photo,
+    // ingredients frame, and the video poll.
+    (prisma as any).$transaction = jest.fn(async (cb: any) => cb(prisma));
+    (prisma.productImage.create as any).mockResolvedValue({
+      id: "img1",
+      url: "https://api.test/uploads/media/p1-photo-1.png",
+    });
+    (prisma.productToImage.count as any).mockResolvedValue(0);
+    (prisma.productToImage.create as any).mockResolvedValue({});
   });
 
   const make = (over: Record<string, string> = {}) =>
@@ -271,7 +280,7 @@ describe("ProductMediaService", () => {
     it("COMPLETED → downloads the video and marks READY", async () => {
       svc = make({ FAL_KEY: "k" });
       (prisma.product.findMany as any).mockResolvedValue([
-        { id: "p1", videoTaskId: "req-9" },
+        { id: "p1", videoTaskId: "req-9", tenantId: "t1" },
       ]);
       (axios.get as any).mockImplementation(async (url: string, opts: any) => {
         if (opts?.responseType === "arraybuffer")

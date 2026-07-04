@@ -1,11 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Check, Trash2, Image as ImageIcon, Loader2, Search } from 'lucide-react';
-import Modal from '../ui/Modal';
-import Button from '../ui/Button';
-import { ProductImage } from '../../types';
-import { useProductImages, useDeleteProductImage } from '../../features/upload/uploadApi';
-import { cn } from '../../lib/utils';
+import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  Check,
+  Trash2,
+  Image as ImageIcon,
+  Loader2,
+  Search,
+} from "lucide-react";
+import Modal from "../ui/Modal";
+import Button from "../ui/Button";
+import { ProductImage } from "../../types";
+import {
+  useProductImages,
+  useDeleteProductImage,
+} from "../../features/upload/uploadApi";
+import { cn } from "../../lib/utils";
 
 interface ImageLibraryModalProps {
   isOpen: boolean;
@@ -22,17 +31,17 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
   selectedImageIds = [],
   maxSelection,
 }) => {
-  const { t } = useTranslation('menu');
+  const { t } = useTranslation("menu");
   const [localSelection, setLocalSelection] = useState<Set<string>>(
-    new Set(selectedImageIds)
+    new Set(selectedImageIds),
   );
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Update local selection when modal opens or selectedImageIds changes
   useEffect(() => {
     if (isOpen) {
       setLocalSelection(new Set(selectedImageIds));
-      setSearchTerm('');
+      setSearchTerm("");
     }
   }, [isOpen, selectedImageIds]);
 
@@ -40,8 +49,8 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
   const deleteMutation = useDeleteProductImage();
 
   const getImageUrl = (url: string) => {
-    if (url.startsWith('http')) return url;
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${url}`;
+    if (url.startsWith("http")) return url;
+    return `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}${url}`;
   };
 
   const toggleSelection = (imageId: string) => {
@@ -65,7 +74,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
 
   const handleDelete = async (imageId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm(t('menu.confirmDeleteImage'))) {
+    if (window.confirm(t("menu.confirmDeleteImage"))) {
       await deleteMutation.mutateAsync(imageId);
       // Remove from local selection if it was selected
       const newSelection = new Set(localSelection);
@@ -76,22 +85,27 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
 
   const handleReset = () => {
     setLocalSelection(new Set());
-    setSearchTerm('');
+    setSearchTerm("");
   };
 
   const filteredImages = images.filter((img) =>
-    img.filename.toLowerCase().includes(searchTerm.toLowerCase())
+    img.filename.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('menu.imageLibraryTitle')} size="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={t("menu.imageLibraryTitle")}
+      size="lg"
+    >
       <div className="space-y-4">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input
             type="text"
-            placeholder={t('menu.searchImages')}
+            placeholder={t("menu.searchImages")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -101,15 +115,15 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
         {/* Selection Counter */}
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-600">
-            {localSelection.size} {t('menu.selected')}
-            {maxSelection && ` (${t('menu.max')} ${maxSelection})`}
+            {localSelection.size} {t("menu.selected")}
+            {maxSelection && ` (${t("menu.max")} ${maxSelection})`}
           </span>
           {localSelection.size > 0 && (
             <button
               onClick={handleReset}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              {t('menu.clearSelection')}
+              {t("menu.clearSelection")}
             </button>
           )}
         </div>
@@ -119,18 +133,22 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-12 w-12 text-slate-400 animate-spin" />
-              <p className="mt-4 text-sm text-slate-500">{t('menu.loadingImages')}</p>
+              <p className="mt-4 text-sm text-slate-500">
+                {t("menu.loadingImages")}
+              </p>
             </div>
           ) : filteredImages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <ImageIcon className="h-12 w-12 text-slate-400" />
               <p className="mt-4 text-sm font-medium text-slate-900">
-                {searchTerm ? t('menu.noImagesFoundSearch') : t('menu.noImagesInLibrary')}
+                {searchTerm
+                  ? t("menu.noImagesFoundSearch")
+                  : t("menu.noImagesInLibrary")}
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 {searchTerm
-                  ? t('menu.tryDifferentSearch')
-                  : t('menu.uploadSomeImages')}
+                  ? t("menu.tryDifferentSearch")
+                  : t("menu.uploadSomeImages")}
               </p>
             </div>
           ) : (
@@ -142,19 +160,19 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                     key={image.id}
                     onClick={() => toggleSelection(image.id)}
                     className={cn(
-                      'relative group rounded-lg border-2 overflow-hidden cursor-pointer transition-all',
+                      "relative group rounded-lg border-2 overflow-hidden cursor-pointer transition-all",
                       isSelected
-                        ? 'border-blue-500 ring-2 ring-blue-500'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? "border-blue-500 ring-2 ring-blue-500"
+                        : "border-slate-200 hover:border-slate-300",
                     )}
                   >
                     {/* Selection Checkbox */}
                     <div
                       className={cn(
-                        'absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                        "absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all",
                         isSelected
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-white bg-opacity-80 border-2 border-slate-300 group-hover:bg-opacity-100'
+                          ? "bg-blue-500 text-white"
+                          : "bg-white bg-opacity-80 border-2 border-slate-300 group-hover:bg-opacity-100",
                       )}
                     >
                       {isSelected && <Check className="h-4 w-4" />}
@@ -169,13 +187,23 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                       <Trash2 className="h-3 w-3" />
                     </button>
 
-                    {/* Image */}
+                    {/* Image or video */}
                     <div className="aspect-square flex items-center justify-center bg-slate-100">
-                      <img
-                        src={getImageUrl(image.url)}
-                        alt={image.filename}
-                        className="w-full h-full object-cover"
-                      />
+                      {image.mimeType?.startsWith("video") ? (
+                        <video
+                          src={getImageUrl(image.url)}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={getImageUrl(image.url)}
+                          alt={image.filename}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
 
                     {/* Info */}
@@ -197,7 +225,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
           <Button type="button" variant="secondary" onClick={onClose}>
-            {t('menu.cancel')}
+            {t("menu.cancel")}
           </Button>
           <Button
             type="button"
@@ -205,7 +233,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
             onClick={handleConfirm}
             disabled={localSelection.size === 0}
           >
-            {t('menu.addSelected')} ({localSelection.size})
+            {t("menu.addSelected")} ({localSelection.size})
           </Button>
         </div>
       </div>

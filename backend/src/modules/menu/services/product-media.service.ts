@@ -10,7 +10,6 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { promises as fs } from "fs";
 import * as path from "path";
 import axios from "axios";
-import sharp from "sharp";
 import { PrismaService } from "../../../prisma/prisma.service";
 
 const FAL_SYNC = "https://fal.run";
@@ -173,10 +172,9 @@ export class ProductMediaService {
   }
 
   // ── ingredients video, step 1: the LAST FRAME ──────────────────────────────
-  // Generate each ingredient on its own, then lay them out elegantly with the
-  // (accurate Turkish) name gently beside each one. Text is never asked of the
-  // image model (it garbles it) and per-ingredient generation lets us position
-  // each item, so a label can sit right next to it.
+  // One exploded / food-levitation scene: the dish + ALL its raw ingredients
+  // flying up above the plate, every one visible. No labels, no compositing, no
+  // vision — just the scene (kept cheap).
   async generateIngredientsFrame(productId: string, tenantId: string) {
     this.assertConfigured();
     const product = await this.prisma.product.findFirst({
@@ -191,41 +189,48 @@ export class ProductMediaService {
         "Add the ingredients (İçindekiler) first — the video reveals them.",
       );
     }
-    const labelled = names.slice(0, 6);
-    // Generate each ingredient on its OWN (a single isolated item is reliable
-    // and lets US control its position, so the label can sit right beside it —
-    // impossible on a free-form AI scene). Translate to English for accuracy.
+    const labelled = names.slice(0, 8);
     const englishNames = await this.translateIngredients(labelled);
-    const buffers = await Promise.all(
-      labelled.map(async (_name, i) => {
-        if (!this.key && this.simulator) {
-          return this.fetchBuffer(this.sample("image"));
-        }
-        const en = englishNames[i] || labelled[i];
-        const out = await this.falSync(this.imageModel, {
-          prompt: `A single ${en}, one item only, isolated and centered on a plain soft white background, professional studio food photography, sharp focus, high detail, no text, no other objects, no props`,
-          image_size: "square_hd",
-          num_images: 1,
-        });
-        const url = out?.images?.[0]?.url;
-        if (!url) {
-          throw new ServiceUnavailableException(
-            "Ingredients image generation failed",
-          );
-        }
-        return this.fetchBuffer(url);
-      }),
-    );
 
-    // Lay the ingredients out elegantly with each name gently beside it.
-    const composited = await this.composeIngredientsElegant(buffers, labelled);
+    // Exploded / food-levitation scene: the dish + ALL its raw ingredients
+    // flying up above the plate, every one clearly visible. No text (the model
+    // garbles it) and no post-processing — just the scene.
+    const explodedPrompt = `A dramatic food levitation photograph of the dish "${product.name}"${
+      product.description ? ` (${product.description})` : ""
+    }: the finished dish rests on a rustic plate at the bottom, and ALL of its raw ingredients — ${englishNames.join(", ")} — fly and float UP in the air above and around the plate; EVERY one of these ingredients is clearly visible and present, well separated and spread apart across the frame, with dynamic sauce splashes; dark moody background, dramatic side light, professional food photography, sharp focus, high detail, absolutely no text, no labels, no writing`;
+
+    let url: string;
+    if (!this.key && this.simulator) {
+      url = this.sample("image");
+    } else {
+      const out = await this.falSync(this.imageModel, {
+        prompt: explodedPrompt,
+        image_size: "square_hd",
+        num_images: 1,
+      });
+      url = out?.images?.[0]?.url;
+      if (!url) {
+        throw new ServiceUnavailableException(
+          "Ingredients image generation failed",
+        );
+      }
+    }
+
     const filename = `${productId}-ingredients-${Date.now()}.png`;
-    await this.writeBuffer(filename, composited);
+    const stored = await this.download(url, filename);
+    const hosted = `${this.baseUrl}/uploads/media/${stored}`;
+    const size = (await fs.stat(path.join(this.mediaDir, stored))).size;
+    await this.attachMediaToLibrary(
+      product.id,
+      tenantId,
+      hosted,
+      "İçindekiler (AI).png",
+      "image/png",
+      size,
+    );
     const updated = await this.prisma.product.update({
       where: { id: product.id },
-      data: {
-        ingredientsImageUrl: `${this.baseUrl}/uploads/media/${filename}`,
-      },
+      data: { ingredientsImageUrl: hosted },
     });
     return this.videoView(updated);
   }
@@ -273,74 +278,26 @@ export class ProductMediaService {
     return names;
   }
 
-  /** Lay the individually-generated ingredients out on a soft background,
-      staggered, with each name gently beside it (a thin gold leader + an
-      elegant italic serif label) — accurate names, one per ingredient. */
-  private async composeIngredientsElegant(
-    buffers: Buffer[],
-    names: string[],
-  ): Promise<Buffer> {
-    const W = 1024;
-    const H = 1024;
-    const n = Math.max(buffers.length, 1);
-    const rowH = Math.floor(H / n);
-    const thumb = Math.min(rowH - 30, 200);
-    const esc = (s: string) =>
-      s.replace(
-        /[<>&'"]/g,
-        (c) =>
-          ({
-            "<": "&lt;",
-            ">": "&gt;",
-            "&": "&amp;",
-            "'": "&#39;",
-            '"': "&quot;",
-          })[c] as string,
-      );
-    const radius = Math.round(thumb * 0.18);
-    const mask = Buffer.from(
-      `<svg width="${thumb}" height="${thumb}"><rect width="${thumb}" height="${thumb}" rx="${radius}" ry="${radius}" fill="#fff"/></svg>`,
-    );
-    const fontSize = n <= 4 ? 30 : 26;
-    const cells: sharp.OverlayOptions[] = [];
-    const decos: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const cy = i * rowH + Math.floor(rowH / 2);
-      const thumbX = 84 + (i % 2) * 34; // gentle stagger
-      const thumbY = cy - Math.floor(thumb / 2);
-      const rounded = await sharp(buffers[i])
-        .resize(thumb, thumb, { fit: "cover" })
-        .composite([{ input: mask, blend: "dest-in" }])
-        .png()
-        .toBuffer();
-      cells.push({ input: rounded, top: thumbY, left: thumbX });
-      const dotX = thumbX + thumb + 12;
-      const lineX2 = dotX + 34;
-      const textX = lineX2 + 12;
-      decos.push(`
-        <circle cx="${dotX}" cy="${cy}" r="4.5" fill="#c9a26b"/>
-        <line x1="${dotX}" y1="${cy}" x2="${lineX2}" y2="${cy}" stroke="#c9a26b" stroke-width="2"/>
-        <text x="${textX}" y="${cy + fontSize / 3}" font-family="DejaVu Serif, serif" font-style="italic" font-size="${fontSize}" fill="#3a2f25">${esc(names[i])}</text>`);
-    }
-    const bg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#faf8f4"/><stop offset="100%" stop-color="#efe9e0"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#g)"/></svg>`;
-    const deco = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${decos.join("")}</svg>`;
-    return sharp(Buffer.from(bg))
-      .composite([...cells, { input: Buffer.from(deco), top: 0, left: 0 }])
-      .png()
-      .toBuffer();
-  }
-
-  private async fetchBuffer(url: string): Promise<Buffer> {
-    const res = await axios.get(url, {
-      responseType: "arraybuffer",
-      timeout: 180_000,
+  /** Create a tenant ProductImage (image OR video) for a generated asset + link
+      it to the product, so every generated photo/video shows in the media
+      library. */
+  private async attachMediaToLibrary(
+    productId: string,
+    tenantId: string,
+    url: string,
+    filename: string,
+    mimeType: string,
+    size: number,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const img = await tx.productImage.create({
+        data: { url, filename, size, mimeType, tenantId },
+      });
+      const count = await tx.productToImage.count({ where: { productId } });
+      await tx.productToImage.create({
+        data: { productId, imageId: img.id, order: count },
+      });
     });
-    return Buffer.from(res.data);
-  }
-
-  private async writeBuffer(filename: string, buf: Buffer): Promise<void> {
-    await fs.mkdir(this.mediaDir, { recursive: true });
-    await fs.writeFile(path.join(this.mediaDir, filename), buf);
   }
 
   // ── ingredients video, step 2: the VIDEO ───────────────────────────────────
@@ -429,17 +386,21 @@ export class ProductMediaService {
     if (!this.key) return; // real polling only; simulator finishes inline
     const pending = await this.prisma.product.findMany({
       where: { videoStatus: "PENDING", videoTaskId: { not: null } },
-      select: { id: true, videoTaskId: true },
+      select: { id: true, videoTaskId: true, tenantId: true },
       take: 20,
     });
     for (const p of pending) {
-      await this.pollOne(p.id, p.videoTaskId as string).catch((e) =>
+      await this.pollOne(p.id, p.videoTaskId as string, p.tenantId).catch((e) =>
         this.logger.warn(`video poll ${p.id} failed: ${(e as Error).message}`),
       );
     }
   }
 
-  private async pollOne(productId: string, requestId: string): Promise<void> {
+  private async pollOne(
+    productId: string,
+    requestId: string,
+    tenantId: string,
+  ): Promise<void> {
     if (requestId === "SIMULATED") return;
     // fal's queue status/result endpoints live under the APP namespace
     // (e.g. fal-ai/kling-video) — the first two path segments — NOT the full
@@ -470,14 +431,25 @@ export class ProductMediaService {
         videoUrl,
         `${productId}-${requestId}.mp4`,
       );
+      const hosted = `${this.baseUrl}/uploads/media/${stored}`;
       await this.prisma.product.update({
         where: { id: productId },
-        data: {
-          videoStatus: "READY",
-          videoUrl: `${this.baseUrl}/uploads/media/${stored}`,
-          videoError: null,
-        },
+        data: { videoStatus: "READY", videoUrl: hosted, videoError: null },
       });
+      // Also surface the video in the media library.
+      const size = (await fs.stat(path.join(this.mediaDir, stored))).size;
+      await this.attachMediaToLibrary(
+        productId,
+        tenantId,
+        hosted,
+        "İçindekiler videosu.mp4",
+        "video/mp4",
+        size,
+      ).catch((e) =>
+        this.logger.warn(
+          `video library attach failed: ${(e as Error).message}`,
+        ),
+      );
       this.logger.log(`ingredients video ready for product ${productId}`);
     }
     // IN_QUEUE / IN_PROGRESS: leave for the next tick. (fal has no FAILED here;
