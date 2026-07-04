@@ -127,5 +127,39 @@
       "noUnusedImages": "Ishlatilmagan rasmlar yo'q",
       "noUnusedHint": "Har bir rasm kamida bitta mahsulotga biriktirilgan."
     }
+  },
+  "media": {
+    "title": "AI-studiya",
+    "tab": {
+      "photo": "Rasm",
+      "video": "Tarkib videosi"
+    },
+    "direction": "Yo'nalish bering (ixtiyoriy)",
+    "photoHint": "Bo'sh qoldirsangiz nomi va tavsifidan yaratamiz",
+    "variations": "Variantlar",
+    "genPhoto": "Rasm yaratish",
+    "regenPhoto": "Qayta yaratish",
+    "pickPrimary": "Asosiy rasmni tanlang:",
+    "setPrimary": "Asosiy qilish",
+    "inQueue": "Navbatda",
+    "generating": "Yaratilmoqda…",
+    "finalizing": "Yuklab olinmoqda / saqlanmoqda…",
+    "failed": "Oxirgi urinish muvaffaqiyatsiz tugadi",
+    "primary": "Tanlangan",
+    "usePrimary": "Buni ishlatish",
+    "stage": {
+      "start": "Boshlang'ich kadr",
+      "frame": "Oxirgi kadr (tarkib)",
+      "video": "Video"
+    },
+    "needPhotoForVideo": "Avval «Rasm» bo'limida taom rasmini yarating.",
+    "needsIngredients": "Avval «Tarkibi» maydonini to'ldiring.",
+    "frameHint2": "Oxirgi kadrga yo'nalish bering (ixtiyoriy) — bo'sh bo'lsa tarkibdan",
+    "genFrame": "Oxirgi kadrni yaratish",
+    "regenFrame": "Kadrni qayta yaratish",
+    "videoHint2": "Videoga yo'nalish bering — o'tishni tasvirlang (ixtiyoriy)",
+    "genVideo": "Video yaratish",
+    "regenVideo": "Videoni qayta yaratish",
+    "videoNeeds": "Video uchun boshlang'ich rasm va oxirgi kadr kerak."
   }
 }

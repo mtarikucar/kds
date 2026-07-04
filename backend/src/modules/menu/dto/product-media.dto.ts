@@ -37,7 +37,9 @@ export class GenerateVideoDto {
 }
 
 export class SetPrimaryImageDto {
-  @ApiProperty({ description: "The library image URL to make the primary photo" })
+  @ApiProperty({
+    description: "The library image URL to make the primary photo",
+  })
   @IsString()
   @MaxLength(2048)
   imageUrl!: string;
