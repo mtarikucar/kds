@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, UtensilsCrossed, Plus, Box, X } from "lucide-react";
@@ -40,6 +40,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [arOpen, setArOpen] = useState(false);
   const [playingVideo, setPlayingVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
   const hasVideo = !!product.videoUrl;
 
   // Show the photo first; play the ingredients video on hover / focus.
@@ -57,6 +58,30 @@ const ProductCard: React.FC<ProductCardProps> = ({
       v.currentTime = 0;
     }
   };
+
+  // On touch devices (no hover) play the card whose video is in view — like
+  // Instagram: whichever card is on screen plays, pauses when scrolled away.
+  useEffect(() => {
+    if (!hasVideo) return;
+    if (
+      typeof window === "undefined" ||
+      !window.matchMedia("(hover: none)").matches
+    )
+      return; // desktop uses hover/focus instead
+    const el = cardRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6)
+          startVideo();
+        else stopVideo();
+      },
+      { threshold: [0, 0.6, 1] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasVideo]);
   const has3d = !!product.model3dUrl;
 
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
@@ -89,6 +114,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <>
       <motion.article
+        ref={cardRef}
         onClick={onClick}
         onMouseEnter={startVideo}
         onMouseLeave={stopVideo}
