@@ -129,7 +129,6 @@ const ImagesTab = () => {
       if (fileArray.length === 0) return;
       const filesToUpload = await processWithBgRemoval(fileArray);
       uploadImagesMutation.mutate(filesToUpload);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [bgRemovalEnabled, bgRemovalSupported, uploadImagesMutation],
   );
