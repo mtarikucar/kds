@@ -253,6 +253,7 @@ export default function ProductMediaPanel({
             )}
             {videoStatus === "READY" && state?.videoUrl && (
               <video
+                key={state.videoUrl}
                 src={state.videoUrl}
                 controls
                 playsInline

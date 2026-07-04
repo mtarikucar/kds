@@ -287,7 +287,7 @@ describe("ProductMediaService", () => {
           where: { id: "p1" },
           data: expect.objectContaining({
             videoStatus: "READY",
-            videoUrl: "https://api.test/uploads/media/p1.mp4",
+            videoUrl: "https://api.test/uploads/media/p1-req-9.mp4",
           }),
         }),
       );
