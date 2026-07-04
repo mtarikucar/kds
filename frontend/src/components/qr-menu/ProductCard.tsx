@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, UtensilsCrossed, Plus, Box, X } from "lucide-react";
@@ -38,6 +38,25 @@ const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { t } = useTranslation("common");
   const [arOpen, setArOpen] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hasVideo = !!product.videoUrl;
+
+  // Show the photo first; play the ingredients video on hover / focus.
+  const startVideo = () => {
+    if (!hasVideo) return;
+    setPlayingVideo(true);
+    videoRef.current?.play().catch(() => {});
+  };
+  const stopVideo = () => {
+    if (!hasVideo) return;
+    setPlayingVideo(false);
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.currentTime = 0;
+    }
+  };
   const has3d = !!product.model3dUrl;
 
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
@@ -71,8 +90,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
     <>
       <motion.article
         onClick={onClick}
+        onMouseEnter={startVideo}
+        onMouseLeave={stopVideo}
+        onFocus={startVideo}
+        onBlur={stopVideo}
+        tabIndex={hasVideo ? 0 : undefined}
         className={cn(
-          "relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer group",
+          "relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer group outline-none",
           layoutStyle === "LIST" ? "flex flex-row h-28" : "flex flex-col",
           isUnavailable && "opacity-75",
         )}
@@ -86,20 +110,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
               layoutStyle === "LIST" ? "w-28 h-28" : "w-full aspect-[4/3]",
             )}
           >
-            {product.videoUrl ? (
-              /* If the dish has an ingredients video, play it right on the card. */
-              <video
-                src={product.videoUrl}
-                autoPlay
-                muted
-                loop
-                playsInline
-                className={cn(
-                  "absolute inset-0 h-full w-full object-cover",
-                  isUnavailable && "grayscale",
-                )}
-              />
-            ) : imageUrl ? (
+            {/* Photo first (shown by default) */}
+            {imageUrl ? (
               <ProgressiveImage
                 src={imageUrl}
                 alt={product.name}
@@ -112,6 +124,22 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
                 <UtensilsCrossed className="h-10 w-10 text-slate-300" />
               </div>
+            )}
+            {/* Ingredients video — fades in + plays only on hover / focus */}
+            {hasVideo && (
+              <video
+                ref={videoRef}
+                src={product.videoUrl as string}
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className={cn(
+                  "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+                  playingVideo ? "opacity-100" : "opacity-0",
+                  isUnavailable && "grayscale",
+                )}
+              />
             )}
 
             {/* AR badge — a dish with a READY 3D model can be viewed in AR */}
