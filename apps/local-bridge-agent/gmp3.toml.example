@@ -1,0 +1,29 @@
+# GMP-3 ÖKC transport config for the local bridge agent.
+#
+# Copy to `gmp3.toml` in the bridge data dir (the same `data_dir` that holds
+# `printers.toml` and `command_queue.db`). One `[[device]]` per Turkish
+# Yeni Nesil ÖKC (Paygo SP630, …) on the LAN. The cloud never learns these LAN
+# addresses (they sit behind NAT), so the transport is resolved here on-prem.
+#
+# Each entry is matched to a command by `serial` (== the command's fiscalSerial,
+# which is the terminal/fiscal-device record's serial in the cloud).
+
+# --- Test / bring-up: a fully-simulated device (moves NO real money) ----------
+[[device]]
+serial      = "5B0024050735"   # the SP630 serial (see the sticker on the back)
+mode        = "simulator"      # "simulator" | "real"
+sim_outcome = "approve"        # simulator only: approve (default) | decline | error
+# host/port are ignored in simulator mode.
+
+# --- Production (Phase 1, once the certified handshake ships) ------------------
+# A device with mode = "real" FAILS CLOSED until the vendor's GMP-3 handshake is
+# implemented and its profile flips `real_impl_ready` — the bridge refuses to
+# move money on an uncertified handshake. Uncomment + fill in for Phase 1:
+#
+# [[device]]
+# serial = "5B0024050736"
+# mode   = "real"
+# host   = "192.168.1.60"      # the ÖKC's LAN IP (its GMP-3 server)
+# port   = 59000               # optional; the vendor profile default otherwise
+# # Phase 1 also needs the PÖKC cert material (paths added when the real
+# # handshake lands) — see docs/integrations/paygo-token-gmp3-onboarding.md.

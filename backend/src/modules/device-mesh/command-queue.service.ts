@@ -199,6 +199,77 @@ export class CommandQueueService {
     return rows[0] ?? null;
   }
 
+  /**
+   * Atomically claim the next queued command across ALL devices fronted by a
+   * given bridge (`Device.bridgeId = bridgeId`). Used by the on-prem
+   * `local_bridge` agent, which — unlike a self-polling KDS tablet — cannot
+   * authenticate as an individual Device: a closed fiscal box (Paygo SP630) or a
+   * dumb ESC/POS printer has no agent of its own, so the bridge pulls and
+   * dispatches on their behalf.
+   *
+   * Same `FOR UPDATE SKIP LOCKED` claim shape as {@link claimNext}, so it is
+   * safe under a bridge that opens two connections, and it interleaves fairly
+   * with any per-device claimers on the same rows. Returns null when the bridge
+   * has no queued work.
+   */
+  async claimNextForBridge(bridgeId: string) {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        tenantId: string;
+        deviceId: string;
+        kind: string;
+        payload: any;
+        priority: number;
+        attempts: number;
+        idempotencyKey: string;
+      }>
+    >`
+      UPDATE "device_commands"
+         SET "status" = 'inflight', "attempts" = "attempts" + 1
+       WHERE "id" IN (
+         SELECT "id" FROM "device_commands"
+          WHERE "deviceId" IN (
+                  SELECT "id" FROM "devices" WHERE "bridgeId" = ${bridgeId}
+                )
+            AND "status" = 'queued'
+            AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+          ORDER BY "priority" DESC, "createdAt" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT 1
+       )
+       RETURNING "id", "tenantId", "deviceId", "kind", "payload", "priority", "attempts", "idempotencyKey";
+    `;
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Ack a command on behalf of a bridge. The bridge principal may only ack a
+   * command whose device it fronts — the relation filter (`device: { bridgeId }`)
+   * enforces that at the query layer, so a compromised/buggy bridge cannot ack
+   * (or clobber) another bridge's — or a cloud-direct device's — command. Once
+   * ownership is proven we defer to the device-scoped {@link ack}, reusing its
+   * NON_RETRYABLE / TOCTOU guards unchanged.
+   */
+  async ackForBridge(
+    bridgeId: string,
+    commandId: string,
+    input: {
+      status: "done" | "failed";
+      result?: Record<string, unknown>;
+      error?: string;
+    },
+  ) {
+    const cmd = await this.prisma.deviceCommand.findFirst({
+      where: { id: commandId, device: { bridgeId } },
+      select: { deviceId: true },
+    });
+    if (!cmd) {
+      throw new NotFoundException("Command not found for this bridge");
+    }
+    return this.ack(cmd.deviceId, commandId, input);
+  }
+
   async ack(
     deviceId: string,
     commandId: string,

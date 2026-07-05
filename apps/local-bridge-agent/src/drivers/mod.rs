@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 pub mod escpos;
+pub mod gmp3;
 pub mod ingenico_iwl;
 pub mod yazarkasa_hugin;
 
@@ -42,6 +43,12 @@ impl Registry {
         if let Some(d) = escpos::EscPosDriver::try_init(data_dir).await? {
             drivers.insert(d.kind().to_string(), Box::new(d));
         }
+        // Vendor-neutral GMP-3 ÖKC driver (Paygo SP630 + future Turkish ÖKC
+        // brands). Registers even without gmp3.toml (fails honestly at command
+        // time), mirroring the ESC/POS driver.
+        if let Some(d) = gmp3::Gmp3Driver::try_init(data_dir).await? {
+            drivers.insert(d.kind().to_string(), Box::new(d));
+        }
         if let Some(d) = yazarkasa_hugin::HuginDriver::try_init().await? {
             drivers.insert(d.kind().to_string(), Box::new(d));
         }
@@ -56,18 +63,33 @@ impl Registry {
     }
 
     pub async fn dispatch(&self, cmd: &PendingCommand) -> Result<CommandOutcome> {
-        // Convention: commands carry `target` in the payload root to identify
-        // the driver class ("escpos", "hugin", "ingenico-iwl").
+        // Routing precedence:
+        //   1. An explicit `target` in the payload root wins — ESC/POS (and any
+        //      command the mesh tags) identify their driver class this way
+        //      ("escpos", "hugin", "ingenico-iwl").
+        //   2. Otherwise a GMP-3 command (`protocol == "GMP3"`) routes to the
+        //      vendor-neutral `gmp3` driver. The payment-terminal / fiscal-core
+        //      GMP-3 adapters emit `protocol`+`vendorProfile` and NO `target`;
+        //      the `gmp3` driver then selects the vendor by `vendorProfile`.
         let target = cmd
             .payload
             .get("target")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        match self.drivers.get(target) {
+        let protocol = cmd.payload.get("protocol").and_then(|v| v.as_str());
+        let driver_kind: &str = if !target.is_empty() {
+            target
+        } else if protocol == Some("GMP3") {
+            "gmp3"
+        } else {
+            ""
+        };
+        match self.drivers.get(driver_kind) {
             Some(driver) => driver.execute(cmd).await,
             None => anyhow::bail!(
-                "no driver installed for target='{}' (kind={})",
+                "no driver installed for target='{}' protocol='{}' (kind={})",
                 target,
+                protocol.unwrap_or(""),
                 cmd.kind
             ),
         }
@@ -199,6 +221,61 @@ mod tests {
         })]);
         let res = reg.dispatch(&cmd_with_target("c-4", None)).await;
         assert!(res.is_err(), "no target -> no driver -> error");
+    }
+
+    fn cmd_with_payload(id: &str, payload: serde_json::Value) -> PendingCommand {
+        PendingCommand {
+            id: id.to_string(),
+            kind: "charge_card".to_string(),
+            payload,
+            priority: 0,
+            attempts: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn dispatch_routes_gmp3_protocol_without_target_to_gmp3_driver() {
+        // The payment-terminal / fiscal-core GMP-3 adapters emit protocol+
+        // vendorProfile and NO target; those must reach the `gmp3` driver.
+        let calls = StdArc::new(AtomicUsize::new(0));
+        let reg = registry_with(vec![Box::new(FakeDriver {
+            kind: "gmp3",
+            calls: calls.clone(),
+        })]);
+        let outcome = reg
+            .dispatch(&cmd_with_payload(
+                "c-g1",
+                json!({ "protocol": "GMP3", "vendorProfile": "paygo.sp630" }),
+            ))
+            .await
+            .expect("GMP3 protocol routes to the gmp3 driver");
+        assert_eq!(outcome.result["handled_by"], "gmp3");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn explicit_target_wins_over_protocol() {
+        let escpos_calls = StdArc::new(AtomicUsize::new(0));
+        let gmp3_calls = StdArc::new(AtomicUsize::new(0));
+        let reg = registry_with(vec![
+            Box::new(FakeDriver {
+                kind: "escpos",
+                calls: escpos_calls.clone(),
+            }),
+            Box::new(FakeDriver {
+                kind: "gmp3",
+                calls: gmp3_calls.clone(),
+            }),
+        ]);
+        // Both an explicit target AND protocol=GMP3 → target wins.
+        reg.dispatch(&cmd_with_payload(
+            "c-g2",
+            json!({ "target": "escpos", "protocol": "GMP3" }),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(escpos_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(gmp3_calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]

@@ -30,12 +30,29 @@ The bridge is HummyTummy's only authorised speaker on that LAN. It:
 
 ```
 agent ── command_queue ──┬── escpos.rs       (Epson TM/Star TSP)
+                         ├── gmp3/            (Turkish YN ÖKC over GMP-3 — Paygo SP630, …)
                          ├── yazarkasa_*.rs  (Hugin, Beko, Profilo, …)
                          ├── ingenico_iwl.rs (card-present terminal)
                          └── (...)
 ```
 
 Each driver implements a tiny trait `LocalDriver { execute(&self, cmd) -> Result<Outcome> }` so the rest of the agent never branches on brand. Adding a new driver is one file + one entry in the registry.
+
+### GMP-3 ÖKC driver (`drivers/gmp3/`)
+
+One vendor-neutral driver serves every certified Turkish *Yeni Nesil ÖKC* (they
+all speak the GİB GMP-3 message family); per-vendor quirks live in
+`gmp3/profiles.rs` (Paygo `paygo.sp630` is the first). It handles BOTH command
+families a single ECR box exposes — coupled card sale (`charge_card`/`void_card`)
+and standalone fiş (`fiscal_receipt`/`fiscal_cancel`/`fiscal_report`) — plus
+`capability_probe`. Commands route here by `protocol == "GMP3"` (no `target`).
+
+Transport is configured on-prem in `gmp3.toml` in the data dir (see
+`gmp3.toml.example`), keyed by device serial (== the command's `fiscalSerial`).
+`mode = "simulator"` exercises the whole rail without hardware; `mode = "real"`
+**fails closed** until a vendor profile's certified GMP-3 handshake ships
+(`VendorProfile::real_impl_ready`, Phase 1) — the driver never fabricates an
+approval or a fiş.
 
 ## Build
 

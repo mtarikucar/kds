@@ -23,6 +23,8 @@ import { BridgeTokenGuard } from "./bridge-token.guard";
 import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../common/constants/subscription.enum";
+import { CommandQueueService } from "../device-mesh/command-queue.service";
+import { AckCommandDto } from "../device-mesh/dto/device.dto";
 import {
   BridgeHeartbeatDto,
   ClaimBridgeDto,
@@ -32,7 +34,10 @@ import {
 @ApiTags("Local Bridge")
 @Controller("v1/bridges")
 export class LocalBridgeController {
-  constructor(private readonly bridges: LocalBridgeService) {}
+  constructor(
+    private readonly bridges: LocalBridgeService,
+    private readonly queue: CommandQueueService,
+  ) {}
 
   // -- Admin (user-auth) endpoints -----------------------------------------
   //
@@ -123,5 +128,49 @@ export class LocalBridgeController {
   })
   heartbeat(@Req() req: any, @Body() body: BridgeHeartbeatDto) {
     return this.bridges.heartbeat(req.bridge.id, body);
+  }
+
+  // -- Bridge command fan-in loop -----------------------------------------
+  //
+  // A bridge fronts multiple LAN devices that cannot self-poll (a closed Paygo
+  // SP630 fiscal box, a dumb ESC/POS printer), so it pulls + acks commands on
+  // their behalf. The queue is per-device; these two routes fan in across the
+  // devices attached to THIS bridge (Device.bridgeId), scoped by the bridge
+  // token so a bridge can only touch its own devices' commands. The pre-existing
+  // per-device loop (/v1/devices/next-command + ack, DeviceTokenGuard) is
+  // untouched — self-polling devices keep working exactly as before.
+  //
+  // Throttles mirror the device-mesh next-command/ack budget (~6× the agent's
+  // 5s poll cadence) so a legitimate bridge sees daylight and a runaway agent
+  // fails fast.
+
+  @UseGuards(BridgeTokenGuard)
+  // Override the registered `long` throttler (100/60s → 120/60s); a bare
+  // `default` key matches no registered throttler and would be silently inert.
+  @Throttle({ long: { limit: 120, ttl: 60_000 } })
+  @Get("commands/next")
+  @ApiOperation({
+    summary:
+      "Bridge claims the next queued command across its devices (returns [] if none). Auth: Authorization: Bridge <token>",
+  })
+  async nextCommand(@Req() req: any) {
+    // Return an array (0 or 1 element) so the Rust agent's Vec<PendingCommand>
+    // decoder is satisfied — a bare null would fail its decode and back off.
+    const cmd = await this.queue.claimNextForBridge(req.bridge.id);
+    return cmd ? [cmd] : [];
+  }
+
+  @UseGuards(BridgeTokenGuard)
+  @Throttle({ long: { limit: 120, ttl: 60_000 } })
+  @Post("commands/:commandId/ack")
+  @ApiOperation({
+    summary: "Bridge acks a command outcome for one of its devices",
+  })
+  ackCommand(
+    @Req() req: any,
+    @Param("commandId") commandId: string,
+    @Body() dto: AckCommandDto,
+  ) {
+    return this.queue.ackForBridge(req.bridge.id, commandId, dto);
   }
 }

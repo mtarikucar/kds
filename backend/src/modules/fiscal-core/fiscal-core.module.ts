@@ -6,6 +6,7 @@ import { MockFiscalProvider } from "./adapters/mock-fiscal-provider";
 import { EfaturaFiscalProvider } from "./adapters/efatura-fiscal-provider";
 import { HuginFiscalProvider } from "./adapters/hugin-fiscal-provider";
 import { BekoFiscalProvider } from "./adapters/beko-fiscal-provider";
+import { PaygoFiscalProvider } from "./adapters/paygo-fiscal-provider";
 import { FiscalController } from "./fiscal.controller";
 // v2.8.88: FiscalController gates on `@RequiresIntegration('fiscal')`
 // via PlanFeatureGuard.
@@ -30,6 +31,7 @@ import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
     EfaturaFiscalProvider,
     HuginFiscalProvider,
     BekoFiscalProvider,
+    PaygoFiscalProvider,
   ],
   exports: [FiscalProviderRegistry, FiscalService],
 })

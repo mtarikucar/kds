@@ -544,4 +544,50 @@ describe("CommandQueueService", () => {
       });
     });
   });
+
+  describe("bridge command fan-in", () => {
+    it("claimNextForBridge returns the single claimed row or null", async () => {
+      (prisma.$queryRaw as any).mockResolvedValueOnce([
+        { id: "c-1", deviceId: "d-1", kind: "charge_card", payload: {} },
+      ]);
+      const claimed = await svc.claimNextForBridge("bridge-1");
+      expect(claimed).toMatchObject({ id: "c-1", deviceId: "d-1" });
+
+      (prisma.$queryRaw as any).mockResolvedValueOnce([]);
+      expect(await svc.claimNextForBridge("bridge-1")).toBeNull();
+    });
+
+    it("ackForBridge only acks a command whose device the bridge fronts", async () => {
+      // The command belongs to a device on this bridge → delegates to the
+      // device-scoped ack with the resolved deviceId.
+      (prisma.deviceCommand.findFirst as any).mockResolvedValue({
+        deviceId: "d-1",
+      });
+      const ackSpy = jest
+        .spyOn(svc, "ack")
+        .mockResolvedValue({ id: "c-1" } as any);
+
+      await svc.ackForBridge("bridge-1", "c-1", { status: "done" });
+
+      // The scope predicate must constrain by the bridge relation, not trust
+      // the caller — a bridge can't ack another bridge's / a cloud-direct
+      // device's command.
+      const where = (prisma.deviceCommand.findFirst as any).mock.calls[0][0]
+        .where;
+      expect(where).toMatchObject({
+        id: "c-1",
+        device: { bridgeId: "bridge-1" },
+      });
+      expect(ackSpy).toHaveBeenCalledWith("d-1", "c-1", { status: "done" });
+    });
+
+    it("ackForBridge rejects a command not fronted by the bridge", async () => {
+      (prisma.deviceCommand.findFirst as any).mockResolvedValue(null);
+      const ackSpy = jest.spyOn(svc, "ack");
+      await expect(
+        svc.ackForBridge("bridge-1", "c-x", { status: "done" }),
+      ).rejects.toThrow("Command not found for this bridge");
+      expect(ackSpy).not.toHaveBeenCalled();
+    });
+  });
 });

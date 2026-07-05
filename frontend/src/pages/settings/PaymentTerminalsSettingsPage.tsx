@@ -34,6 +34,7 @@ const STATE_VARIANT: Record<TerminalActivationState, 'default' | 'success' | 'wa
 const PROVIDER_LABELS: Record<string, string> = {
   simulator: 'Simulator',
   gmp3_card: 'GMP-3 Yazarkasa-POS',
+  paygo_ecr: 'Paygo Yazarkasa-POS (SP630)',
   bank_ecr: 'Bank POS (ECR)',
   softpos: 'SoftPOS / PSP',
 };

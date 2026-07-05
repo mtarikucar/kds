@@ -150,6 +150,7 @@ function FiscalDevicesPanel() {
           >
             <option value="fiscal_hugin">Hugin</option>
             <option value="fiscal_beko">Beko</option>
+            <option value="fiscal_paygo">Paygo (SP630)</option>
           </select>
         </label>
         <label className="flex flex-col text-xs">
