@@ -1,10 +1,13 @@
 //! Cloud transport for the bridge.
 //!
 //! Primary channel is WSS to `/ws/bridge`. The cloud pushes commands; the
-//! bridge sends acks back on the same socket. REST fallback at
-//! `/v1/bridges/:id/commands/next` is used when the WSS is down — slower,
-//! but resilient against captive portals or weird LAN proxies that drop
-//! upgrade headers.
+//! bridge sends acks back on the same socket. REST fallback via the
+//! bridge-scoped fan-in loop (`GET /v1/bridges/commands/next` +
+//! `POST /v1/bridges/commands/:id/ack`, `Authorization: Bridge`) is used when
+//! the WSS is down — slower, but resilient against captive portals or weird LAN
+//! proxies that drop upgrade headers. The backend claims/acks across the devices
+//! attached to this bridge (Device.bridgeId); the pre-existing per-device loop
+//! (`/v1/devices/*`, `Authorization: Device`) is unaffected.
 //!
 //! ## The transport seam
 //!
@@ -115,11 +118,12 @@ pub trait CloudTransport: Send + Sync {
     /// GET `/healthz`. Returns the HTTP status code.
     async fn get_healthz(&self) -> Result<u16>;
 
-    /// GET `/v1/bridges/:id/commands/next`, decoded into a [`FetchResponse`].
+    /// GET `/v1/bridges/commands/next` (bridge-scoped fan-in), decoded into a
+    /// [`FetchResponse`].
     async fn get_next_commands(&self) -> Result<FetchResponse>;
 
-    /// POST an outcome to `/v1/devices/commands/:id/ack`. Errors on a
-    /// non-success HTTP status so the caller can retry/fail uniformly.
+    /// POST an outcome to `/v1/bridges/commands/:id/ack` (bridge-scoped). Errors
+    /// on a non-success HTTP status so the caller can retry/fail uniformly.
     async fn post_ack(&self, cmd_id: &str, outcome: &CommandOutcome) -> Result<()>;
 
     /// POST `/v1/bridges/heartbeat` with the bridge bearer token + identity.
@@ -274,10 +278,12 @@ impl CloudTransport for ReqwestTransport {
     }
 
     async fn get_next_commands(&self) -> Result<FetchResponse> {
-        let url = format!(
-            "{}/v1/bridges/{}/commands/next",
-            self.cfg.cloud_url, self.cfg.bridge_id
-        );
+        // Bridge command fan-in: the backend claims the next queued command
+        // across all devices attached to this bridge (Device.bridgeId), scoping
+        // by the bridge bearer token — so the bridge id is NOT in the path. The
+        // route returns a JSON array (0 or 1 command) so the Vec decode below is
+        // satisfied; a 204 means nothing queued.
+        let url = format!("{}/v1/bridges/commands/next", self.cfg.cloud_url);
         let token = crate::config::resolve_bearer_token().unwrap_or_default();
         let resp = self
             .http
@@ -308,7 +314,9 @@ impl CloudTransport for ReqwestTransport {
     }
 
     async fn post_ack(&self, cmd_id: &str, outcome: &CommandOutcome) -> Result<()> {
-        let url = format!("{}/v1/devices/commands/{}/ack", self.cfg.cloud_url, cmd_id);
+        // Ack via the bridge-scoped route (Authorization: Bridge). The backend
+        // verifies the command's device belongs to THIS bridge before acking.
+        let url = format!("{}/v1/bridges/commands/{}/ack", self.cfg.cloud_url, cmd_id);
         let token = crate::config::resolve_bearer_token().unwrap_or_default();
         self.http
             .post(url)
