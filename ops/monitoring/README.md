@@ -1,114 +1,80 @@
-# kds Monitoring & Alerting (opt-in)
+# KDS observability stack (self-hosted)
 
-A self-contained, **opt-in** Prometheus + Alertmanager stack that scrapes the
-kds backend's metrics endpoint and fires alerts on the "Monitoring & Alerting"
-quality attribute. It does **not** touch the production/staging app stacks — it
-lives entirely in this directory plus `docker-compose.monitoring.yml` at the
-repo root.
+Metrics + dashboards + logs + email alerting for the KDS platform. Runs as its
+own Docker Compose project (`kds-monitoring`) — **separate from the app** so the
+two lifecycles never interfere (`scripts/deploy.sh`'s prod swap uses
+`--remove-orphans`, which would reap monitoring services if they lived in the
+prod compose).
 
-## What it watches
+## Components
 
-The backend exposes Prometheus metrics at `GET /api/metrics`
-(`backend/src/common/metrics/`). The alert rules in
-[`alert.rules.yml`](./alert.rules.yml) reference only metrics that are actually
-produced there:
+| Service | Purpose | Exposure |
+|---|---|---|
+| prometheus | scrapes metrics, evaluates alert rules | `127.0.0.1:9090` (loopback) |
+| alertmanager | routes alerts → **email** (`ADMIN_EMAIL`) | `127.0.0.1:9093` (loopback) |
+| grafana | dashboards | `grafana.hummytummy.com` (nginx + Grafana login) |
+| loki + promtail | central log search (7-day retention) | internal only |
+| node-exporter | host CPU/RAM/disk/load | internal only |
+| cadvisor | per-container CPU/mem/restarts | internal only |
+| postgres-exporter | DB connections/locks/`pg_up` | internal only |
+| redis-exporter | Redis memory/hit-rate/`redis_up` | internal only |
+| blackbox-exporter | external HTTPS uptime + TLS expiry | internal only |
 
-| Alert | Expression (summary) | For | Severity |
-|-------|----------------------|-----|----------|
-| `OutboxDLQNonEmpty` | `outbox_dlq_depth > 0` | 5m | critical |
-| `DeliveryDLQNonEmpty` | `delivery_dlq_depth > 0` | 10m | warning |
-| `HighHttp5xxRate` | 5xx ratio from `http_request_duration_seconds_count{status_code=~"5.."}` > 5% | 10m | critical |
-| `BackendDown` | `up{job="kds-backend"} == 0` | 2m | critical |
-| `PaytrPaymentFailures` | `rate(payment_intents_total{result="paytr_failed"}[15m]) > 0` | 15m | critical |
-| `WebhookDeliveryFailures` | `rate(webhook_delivery_total{result="failure"}[15m]) > 0` | 15m | warning |
+Everything except Grafana is loopback-bound or has no host port; all containers
+are resource-capped (`mem_limit`/`cpus`).
 
-> Note: the HTTP duration histogram labels requests with **`status_code`**
-> (not `status`) — see `MetricsService.observeHttpRequest`. The 5xx rule
-> matches on `status_code=~"5.."`.
+## Config layout
 
-## Files
+- `../../docker-compose.monitoring.yml` — the stack (project `kds-monitoring`).
+- `prometheus.yml` — scrape jobs (TEMPLATE: `__METRICS_TOKEN__` rendered by the
+  entrypoint). `rules/*.yml` — alert rules (app + infra + watchdog).
+- `alertmanager.yml` — email receiver + watchdog route (TEMPLATE: SMTP from env).
+- `loki/`, `promtail/`, `blackbox/` — component configs.
+- `grafana/provisioning/**` — datasources + dashboard provider.
+- `grafana/dashboards/*.json` — `KDS · RED (HTTP)`, `KDS · Business & queues`,
+  `KDS · System overview`.
+- `up.sh` — idempotent, degrade-only bring-up (called by `scripts/deploy.sh`).
 
-- [`prometheus.yml`](./prometheus.yml) — scrape config. Job `kds-backend`
-  scrapes `metrics_path: /api/metrics` at 15s, sending
-  `Authorization: Bearer <METRICS_TOKEN>`. Loads `alert.rules.yml` and points
-  Prometheus at the `alertmanager` service.
-- [`alert.rules.yml`](./alert.rules.yml) — the alerting rules above, each with
-  `labels` (severity/component) and `annotations` (summary/description).
-- [`alertmanager.yml`](./alertmanager.yml) — minimal route grouped by
-  `alertname` + `severity`, a critical-only fast-page sub-route, an inhibit
-  rule, and a **placeholder** webhook receiver (email template commented out).
-- [`../../docker-compose.monitoring.yml`](../../docker-compose.monitoring.yml)
-  — the `prom/prometheus` + `prom/alertmanager` services that mount the above.
+Metric source: the backend's `GET /api/metrics` (`backend/src/common/metrics/*`),
+Bearer-gated by `METRICS_TOKEN`.
 
-`prometheus.yml` and `alertmanager.yml` are **templates**: they contain
-`__PLACEHOLDER__` tokens (e.g. `__METRICS_TOKEN__`, `__ALERT_WEBHOOK_URL__`).
-Prometheus/Alertmanager do not expand env vars inside their own config files,
-so each service's entrypoint runs a tiny `sed` to render the tokens from the
-environment into a writable copy before launching the binary. The `__VAR__`
-form is used so substitution can never collide with compose `${...}`
-interpolation, shell expansion, or Prometheus' own `$labels`/`$value` rule
-templating.
+## Go-live (operator, one-time)
 
-## The receiver endpoint and secrets are the operator's to set
+1. **GitHub repo secrets:** add `METRICS_TOKEN` (32+ random) and
+   `GRAFANA_ADMIN_PASSWORD`. The next tagged deploy renders both into
+   `/root/kds/.env.production`.
+2. **Cloudflare DNS:** `grafana` A record → `38.242.233.166` (proxied).
+3. **On the VPS:**
+   ```sh
+   certbot certonly --webroot -w /var/www/certbot -d grafana.hummytummy.com
+   sudo /root/kds/ops/nginx/apply.sh grafana.hummytummy.com.conf
+   bash /root/kds/ops/monitoring/up.sh   # subsequent deploys auto-run this
+   ```
+4. **Verify:** log into `https://grafana.hummytummy.com`, confirm the KDS
+   dashboards populate; check `http://127.0.0.1:9090/api/v1/targets` shows all
+   targets `up`; fire a test alert:
+   `docker exec kds_alertmanager amtool alert add TestFire severity=critical`
+   and confirm the email at `ADMIN_EMAIL`.
 
-This repo ships **no** real notification target or credentials. Before relying
-on alerting you **must** set at least `ALERT_WEBHOOK_URL` to a destination you
-own (a Slack Incoming-Webhook proxy, a PagerDuty/Opsgenie Events-API relay, or
-a small internal handler). The email path is provided as a commented-out
-template; uncomment it in `alertmanager.yml` and set the SMTP vars to use it.
+Until `GRAFANA_ADMIN_PASSWORD` is set, `up.sh` skips cleanly (degrade-only) — the
+app deploy is never affected.
 
-## Run it
+## Deeper dashboards (import by ID)
 
-```bash
-# 1) Point at a running backend and (optionally) its metrics token.
-export KDS_BACKEND_TARGET=kds_backend_prod:3000   # container:port or host:port
-export METRICS_TOKEN=...        # MUST match the backend's METRICS_TOKEN; empty = unauthenticated
-export ALERT_WEBHOOK_URL=https://your-bridge.example/hook   # YOUR receiver
+The three shipped dashboards are the app-specific ones (RED / business /
+system-overview). For exhaustive host/DB/Redis views, import the community
+dashboards in Grafana (Dashboards → Import → by ID), all backed by the same
+Prometheus datasource:
 
-# 2) Join the app's docker network so the backend container name resolves.
-docker network ls                                 # find the real network name
-export KDS_NETWORK=kds-prod_kds_network           # e.g. <project>_<network>
+- **1860** — Node Exporter Full (host)
+- **893** — Docker / cAdvisor (containers)
+- **9628** — PostgreSQL (postgres-exporter)
+- **763** — Redis (redis-exporter)
 
-# 3) Bring up the stack.
-docker compose -f docker-compose.monitoring.yml up -d
+## Remove / roll back
+
+```sh
+docker compose -p kds-monitoring down        # keep data volumes
+docker compose -p kds-monitoring down -v     # also drop TSDB/Loki/Grafana data
 ```
-
-- Prometheus UI: <http://localhost:9090> (Status → Targets should show
-  `kds-backend` UP; Alerts shows the rules above).
-- Alertmanager UI: <http://localhost:9093>.
-
-To scrape a backend that is **not** on a docker network (e.g. a host port),
-set `KDS_BACKEND_TARGET=host.docker.internal:3000` (or the host IP) and you can
-drop the external `kds_app` network from the compose file.
-
-## Validate the config locally
-
-The bundled config is validated with the upstream tooling (no app code needed):
-
-```bash
-# Prometheus config + rules
-docker run --rm -v "$PWD/ops/monitoring:/c" --entrypoint promtool \
-  prom/prometheus:v2.53.0 check rules /c/alert.rules.yml
-
-# Alertmanager config — render the placeholders first (amtool validates the
-# smarthost as a real host:port, so the raw __TOKEN__ template is rejected on
-# purpose). The compose entrypoint does this same sed at container start.
-sed -e 's#__ALERT_WEBHOOK_URL__#http://localhost:5001/#' \
-    -e 's#__ALERT_EMAIL_FROM__#alerts@example.invalid#' \
-    -e 's#__ALERT_EMAIL_TO__#ops@example.invalid#' \
-    -e 's#__ALERT_SMTP_SMARTHOST__#localhost:25#' \
-    -e 's#__ALERT_SMTP_USERNAME__##' \
-    -e 's#__ALERT_SMTP_PASSWORD__##' \
-    ops/monitoring/alertmanager.yml > /tmp/alertmanager.rendered.yml
-docker run --rm -v /tmp:/c --entrypoint amtool \
-  prom/alertmanager:v0.27.0 check-config /c/alertmanager.rendered.yml
-```
-
-## Scope / non-goals
-
-- Adds nothing to and edits nothing in `docker-compose.prod.yml` /
-  `docker-compose.staging.yml`. It is a parallel, optional stack.
-- No Grafana dashboards here — the RED data is exposed; dashboards can be added
-  later against the same Prometheus.
-- Long-term storage / HA Prometheus is out of scope; this is a single-node,
-  operator-bootstrapped baseline.
+Zero impact on the app (`kds-prod` is a different project).
