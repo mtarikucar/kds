@@ -145,7 +145,9 @@ export class LocalBridgeController {
   // fails fast.
 
   @UseGuards(BridgeTokenGuard)
-  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  // Override the registered `long` throttler (100/60s → 120/60s); a bare
+  // `default` key matches no registered throttler and would be silently inert.
+  @Throttle({ long: { limit: 120, ttl: 60_000 } })
   @Get("commands/next")
   @ApiOperation({
     summary:
@@ -159,7 +161,7 @@ export class LocalBridgeController {
   }
 
   @UseGuards(BridgeTokenGuard)
-  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @Throttle({ long: { limit: 120, ttl: 60_000 } })
   @Post("commands/:commandId/ack")
   @ApiOperation({
     summary: "Bridge acks a command outcome for one of its devices",

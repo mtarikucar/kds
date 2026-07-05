@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { LocalBridgeModule } from "../local-bridge/local-bridge.module";
 import { DeviceService } from "./device.service";
-import { CommandQueueService } from "./command-queue.service";
+import { CommandQueueModule } from "./command-queue.module";
 import { BranchesService } from "./branches.service";
 import { DevicesController } from "./devices.controller";
 import { BranchesController } from "./branches.controller";
@@ -23,11 +23,19 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
  * fiscal/payment modules' adapter routing (Phase 6/7).
  */
 @Module({
-  imports: [PrismaModule, LocalBridgeModule, SubscriptionsModule],
+  // CommandQueueModule is a leaf providing CommandQueueService; importing +
+  // re-exporting it (instead of declaring the service here) lets LocalBridgeModule
+  // consume the queue without importing DeviceMeshModule back (which would form a
+  // bootstrap-crashing cycle, since we import LocalBridgeModule for the scheduler).
+  imports: [
+    PrismaModule,
+    CommandQueueModule,
+    LocalBridgeModule,
+    SubscriptionsModule,
+  ],
   controllers: [DevicesController, BranchesController],
   providers: [
     DeviceService,
-    CommandQueueService,
     BranchesService,
     DeviceTokenGuard,
     DeviceMeshScheduler,
@@ -36,7 +44,9 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
   ],
   exports: [
     DeviceService,
-    CommandQueueService,
+    // Re-export the queue module so the 6 existing consumers that import
+    // DeviceMeshModule for CommandQueueService keep resolving it unchanged.
+    CommandQueueModule,
     BranchesService,
     DeviceTokenGuard,
     EscPosBuilderRegistry,

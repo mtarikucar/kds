@@ -281,8 +281,9 @@ impl CloudTransport for ReqwestTransport {
         // Bridge command fan-in: the backend claims the next queued command
         // across all devices attached to this bridge (Device.bridgeId), scoping
         // by the bridge bearer token — so the bridge id is NOT in the path. The
-        // route returns a JSON array (0 or 1 command) so the Vec decode below is
-        // satisfied; a 204 means nothing queued.
+        // route returns HTTP 200 with a JSON array (0 or 1 command); an empty
+        // batch is `[]` (decodes to zero commands), not 204. The 204 branch below
+        // is retained defensively for other/legacy endpoints.
         let url = format!("{}/v1/bridges/commands/next", self.cfg.cloud_url);
         let token = crate::config::resolve_bearer_token().unwrap_or_default();
         let resp = self
