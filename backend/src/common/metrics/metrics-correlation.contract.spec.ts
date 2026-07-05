@@ -36,7 +36,11 @@ describe("metrics + correlation-id HTTP contract", () => {
     "webhook_delivery_total",
     "self_pay_settled_total",
   ];
-  const EXPECTED_GAUGE_NAMES = ["outbox_dlq_depth", "delivery_dlq_depth"];
+  const EXPECTED_GAUGE_NAMES = [
+    "outbox_dlq_depth",
+    "delivery_dlq_depth",
+    "outbox_oldest_queued_age_seconds",
+  ];
 
   beforeEach(() => {
     metrics = new MetricsService();

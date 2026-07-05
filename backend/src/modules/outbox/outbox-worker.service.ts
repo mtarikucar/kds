@@ -151,6 +151,19 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
           where: { status: "failed" },
         });
         this.metrics.setOutboxDlqDepth(failed);
+        // Worker-liveness: the age of the oldest still-queued event. If the
+        // drain loop stalls, rows pile up in 'queued' (the DLQ stays 0), so
+        // this is the signal that actually catches a stopped worker. 0 when
+        // the queue is fully drained.
+        const oldest = await this.prisma.outboxEvent.findFirst({
+          where: { status: "queued" },
+          orderBy: { createdAt: "asc" },
+          select: { createdAt: true },
+        });
+        const ageSeconds = oldest
+          ? Math.max(0, (Date.now() - oldest.createdAt.getTime()) / 1000)
+          : 0;
+        this.metrics.setOutboxOldestQueuedAge(ageSeconds);
       }
     } finally {
       this.pruning = false;
