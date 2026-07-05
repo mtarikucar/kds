@@ -126,6 +126,7 @@ jobs:
             GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
             DESKTOP_RELEASE_API_KEY
             NETGSM_USERCODE NETGSM_PASSWORD NETGSM_MSGHEADER
+            METRICS_TOKEN GRAFANA_ADMIN_PASSWORD
           )
 
           missing=()
@@ -353,6 +354,11 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
+          # Observability: /api/metrics bearer + Grafana admin pw. Degrade-only —
+          # monitoring stays inert if unset; the backend fails metrics scraping
+          # closed in prod without METRICS_TOKEN.
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           # Menu AI media — all optional; each feature stays inert until its key
           # is set (Anthropic vision menu-OCR, fal.ai photo+ingredients-video,
           # Meshy image-to-3D). No boot dependency.
@@ -414,6 +420,12 @@ jobs:
           EMAIL_PASSWORD=${EMAIL_PASSWORD}
           EMAIL_FROM=${EMAIL_FROM}
           ADMIN_EMAIL=contact@hummytummy.com
+
+          # Observability: Prometheus bearer for /api/metrics + Grafana admin pw.
+          # Both degrade-only — the monitoring stack (up.sh) stays inert until
+          # GRAFANA_ADMIN_PASSWORD is set as a repo secret.
+          METRICS_TOKEN=${METRICS_TOKEN}
+          GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
 
           # Customer OTP SMS (NetGSM). PLACEHOLDER: creds not ready, so SMS is
           # bypassed for launch — ALLOW_MOCK_SMS_IN_PROD=true lets the backend

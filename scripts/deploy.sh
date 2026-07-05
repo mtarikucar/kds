@@ -577,6 +577,25 @@ reproject_entitlements() {
   return 0
 }
 
+# Reconcile the self-hosted monitoring stack (kds-monitoring compose project:
+# Prometheus, Grafana, Alertmanager, exporters, Loki). A SEPARATE compose
+# project → independent lifecycle from the app; the prod swap's --remove-orphans
+# never touches it and this bring-up never touches the app. NON-FATAL by design
+# (runs OUTSIDE `step`, always returns 0) so a monitoring hiccup can never trip
+# the ERR trap and roll back an otherwise-good deploy. up.sh is itself
+# degrade-only (skips cleanly until GRAFANA_ADMIN_PASSWORD is provisioned).
+# Prod-only: the monitoring compose joins the prod app network by default.
+bring_up_monitoring() {
+  [ "$ENV" = "prod" ] || return 0
+  log "▶ Reconcile monitoring stack (kds-monitoring, non-fatal)"
+  if REPO_DIR="$PROJECT_ROOT" ENV_FILE="$ENV_FILE" bash "$PROJECT_ROOT/ops/monitoring/up.sh"; then
+    ok "✓ Monitoring stack reconciled"
+  else
+    warn "Monitoring bring-up FAILED (non-fatal) — the app deploy is unaffected."
+  fi
+  return 0
+}
+
 restore_image_ids() {
   if [ ! -f "$STATE_FILE" ]; then
     err "No snapshot at $STATE_FILE — cannot auto-rollback"
@@ -664,6 +683,9 @@ run_deploy() {
   # in `step` — it's non-fatal (returns 0 even on failure) so a reproject hiccup
   # can never trip the ERR trap and roll back an otherwise-good deploy.
   reproject_entitlements
+  # Reconcile the self-hosted monitoring stack (separate compose project,
+  # non-fatal, independent lifecycle → never rolls back the app).
+  bring_up_monitoring
   ok "=== Deploy SUCCESS: $ENV @ $VERSION ==="
 }
 
