@@ -61,6 +61,21 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * Age (seconds) of the oldest still-queued outbox event — a worker-LIVENESS
+   * signal. `outbox_dlq_depth` only catches events that exhausted retries; if
+   * the worker process fully STOPS, rows pile up in `queued` (never reaching
+   * `failed`), the DLQ stays 0, and nothing fires. A rising oldest-queued age
+   * means the drain loop is stalled/behind, so an alert can fire on
+   * `outbox_oldest_queued_age_seconds > 300`. Re-set to an authoritative value
+   * on each prune tick (0 when the queue is empty).
+   */
+  private readonly outboxOldestQueuedAgeGauge = new Gauge({
+    name: "outbox_oldest_queued_age_seconds",
+    help: "Age in seconds of the oldest queued (undispatched) outbox event; rises when the worker is stalled or behind",
+    registers: [this.registry],
+  });
+
   constructor() {
     collectDefaultMetrics({ register: this.registry });
   }
@@ -83,6 +98,15 @@ export class MetricsService {
   /** Increment the delivery DLQ depth by one as a single log row gives up. */
   incDeliveryDlqDepth(): void {
     this.deliveryDlqDepthGauge.inc();
+  }
+
+  /**
+   * Set the oldest-queued-age gauge (seconds). 0 means the queue is empty /
+   * fully drained. A sustained high value is the worker-liveness alarm — the
+   * drain loop has stopped and events are piling up unhandled.
+   */
+  setOutboxOldestQueuedAge(ageSeconds: number): void {
+    this.outboxOldestQueuedAgeGauge.set(ageSeconds);
   }
 
   /**

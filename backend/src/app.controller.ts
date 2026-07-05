@@ -5,6 +5,7 @@ import {
   Inject,
   Optional,
   Query,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { AppService } from "./app.service";
@@ -80,8 +81,13 @@ export class AppController {
     // also enumerate every payment + fiscal provider before saying "no".
     const checks: Record<string, { ok: boolean; details?: unknown }> = {};
 
+    // A failing readiness probe MUST return 503 (not 200 with ok:false) so a
+    // blackbox/uptime probe, a load balancer, and Prometheus all see the true
+    // state and stop routing / fire an alert. /healthz/live stays 200 (process
+    // is alive); /api/health is deliberately left untouched (the Docker
+    // healthcheck + deploy gate + CI probe key on it — see plan Phase 6).
     if ((base as any).status !== "ok") {
-      return { ok: false, base, checks };
+      throw new ServiceUnavailableException({ ok: false, base, checks });
     }
 
     if (this.kms) {
@@ -104,7 +110,8 @@ export class AppController {
       } catch (e) {
         checks.kms = { ok: false, details: { error: (e as Error).message } };
       }
-      if (!checks.kms.ok) return { ok: false, base, checks };
+      if (!checks.kms.ok)
+        throw new ServiceUnavailableException({ ok: false, base, checks });
     }
 
     if (this.payments) {
@@ -113,7 +120,8 @@ export class AppController {
         ok: true,
         details: { installed: providers.map((p) => p.id) },
       };
-      if (!checks.payments.ok) return { ok: false, base, checks };
+      if (!checks.payments.ok)
+        throw new ServiceUnavailableException({ ok: false, base, checks });
     }
 
     if (this.fiscal) {
@@ -122,7 +130,8 @@ export class AppController {
         ok: true,
         details: { installed: providers.map((p) => p.id) },
       };
-      if (!checks.fiscal.ok) return { ok: false, base, checks };
+      if (!checks.fiscal.ok)
+        throw new ServiceUnavailableException({ ok: false, base, checks });
     }
 
     return { ok: true, base, checks };
