@@ -1,0 +1,138 @@
+# Infrastructure alert rules — host (node-exporter), containers (cAdvisor),
+# postgres/redis exporters, and external uptime/TLS (blackbox).
+groups:
+  - name: host
+    rules:
+      - alert: HostHighCPU
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "Host CPU > 90% for 10m"
+          description: "CPU on {{ $labels.instance }} at {{ $value | humanizePercentage }} for 10m."
+
+      - alert: HostHighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "Host memory > 90% for 10m"
+          description: "Memory on {{ $labels.instance }} at {{ $value | humanizePercentage }} — OOM risk (postgres/redis share this host)."
+
+      - alert: HostDiskCritical
+        expr: >-
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 0.10
+        for: 5m
+        labels:
+          severity: critical
+          component: host
+        annotations:
+          summary: "Disk < 10% free on {{ $labels.mountpoint }}"
+          description: >-
+            {{ $labels.mountpoint }} on {{ $labels.instance }} is
+            {{ $value | humanizePercentage }} free. DB WAL + Prometheus TSDB +
+            Loki + backups share this disk — a full disk takes Postgres down.
+
+      - alert: HostDiskWillFillSoon
+        expr: >-
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 24 * 3600) < 0
+        for: 30m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} projected to fill within 24h"
+          description: "Based on the last 6h trend, {{ $labels.mountpoint }} on {{ $labels.instance }} will fill within 24h."
+
+  - name: exporters-and-containers
+    rules:
+      - alert: MonitoringTargetDown
+        expr: up{job=~"node|cadvisor|postgres|redis|blackbox-http"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Monitoring target {{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }}) for 5m — this dashboard/alert dimension is blind."
+
+      - alert: ContainerRestarting
+        expr: changes(container_start_time_seconds{name=~"kds_.+"}[15m]) > 2
+        for: 0m
+        labels:
+          severity: warning
+          component: containers
+        annotations:
+          summary: "Container {{ $labels.name }} is restart-looping"
+          description: "{{ $labels.name }} restarted > 2 times in 15m — crash loop (check logs / OOM)."
+
+  - name: datastores
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: postgres
+        annotations:
+          summary: "PostgreSQL is unreachable"
+          description: "postgres-exporter reports pg_up=0 for 2m — the database is down or unreachable."
+
+      - alert: PostgresTooManyConnections
+        expr: >-
+          sum(pg_stat_database_numbackends) by (instance)
+          / on (instance) pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL connections > 80% of max"
+          description: "Backends are at {{ $value | humanizePercentage }} of max_connections on {{ $labels.instance }} — connection exhaustion risk."
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis is unreachable"
+          description: "redis-exporter reports redis_up=0 for 2m — Socket.IO/queue coordination degraded."
+
+      - alert: RedisRejectingConnections
+        expr: increase(redis_rejected_connections_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis is rejecting connections"
+          description: "Redis rejected {{ $value }} connections in 5m — at maxclients or memory limit."
+
+  - name: uptime-tls
+    rules:
+      - alert: BlackboxProbeFailed
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+          component: uptime
+        annotations:
+          summary: "External probe failing: {{ $labels.instance }}"
+          description: "The public HTTPS probe of {{ $labels.instance }} has failed for 3m — the site/endpoint is down from the outside."
+
+      - alert: BlackboxSslExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 14 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+          component: tls
+        annotations:
+          summary: "TLS certificate expiring soon: {{ $labels.instance }}"
+          description: "The certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }} — renew (certbot)."

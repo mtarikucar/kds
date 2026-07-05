@@ -1,0 +1,109 @@
+# Application-level alert rules — every expr references a metric actually
+# produced by backend/src/common/metrics/metrics.service.ts (+ scrape `up`).
+#   outbox_dlq_depth / delivery_dlq_depth / outbox_oldest_queued_age_seconds  Gauges
+#   http_request_duration_seconds_count  Histogram (labels method/route/status_code)
+#   payment_intents_total / webhook_delivery_total  Counters
+groups:
+  - name: kds-backend-reliability
+    rules:
+      - alert: OutboxDLQNonEmpty
+        expr: outbox_dlq_depth > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: outbox
+        annotations:
+          summary: "Outbox dead-letter queue is non-empty"
+          description: >-
+            outbox_dlq_depth has been {{ $value }} (> 0) for 5m. Events exhausted
+            all retries and will not be delivered without operator action.
+            Inspect outbox rows with status=failed (Superadmin → Outbox) and
+            requeue or discard them.
+
+      # Worker-LIVENESS: outbox_dlq_depth only catches events that gave up. If
+      # the worker process fully stops, rows pile up in `queued` (DLQ stays 0),
+      # so the oldest-queued age is the signal that actually catches a stopped
+      # worker. 5m of a 5-minute-old head means the drain loop is stalled.
+      - alert: OutboxBacklogAge
+        expr: outbox_oldest_queued_age_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+          component: outbox
+        annotations:
+          summary: "Outbox worker appears stalled (oldest queued event is old)"
+          description: >-
+            The oldest queued outbox event has been unprocessed for
+            {{ $value | humanizeDuration }}. The outbox worker may be stopped or
+            wedged — events (payments, entitlements, webhooks) are not draining.
+
+      - alert: DeliveryDLQNonEmpty
+        expr: delivery_dlq_depth > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: delivery
+        annotations:
+          summary: "Delivery-platform dead-letter queue is non-empty"
+          description: >-
+            delivery_dlq_depth has been {{ $value }} (> 0) for 10m. Delivery log
+            rows exhausted their retry budget; operator requeue/delete required.
+
+      - alert: HighHttp5xxRate
+        expr: >-
+          (
+            sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[5m]))
+            or vector(0)
+          )
+          /
+          sum(rate(http_request_duration_seconds_count[5m]))
+          > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          component: http
+        annotations:
+          summary: "Backend 5xx error rate above 5%"
+          description: >-
+            More than 5% of HTTP requests returned 5xx for 10m (current ratio
+            {{ $value | humanizePercentage }}). Check backend logs / Sentry.
+
+      - alert: BackendDown
+        expr: up{job="kds-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: backend
+        annotations:
+          summary: "kds backend is unreachable from Prometheus"
+          description: >-
+            Prometheus could not scrape {{ $labels.instance }} (job kds-backend)
+            for 2m. The backend may be down, /api/metrics misconfigured, or the
+            METRICS_TOKEN wrong.
+
+  - name: kds-money-paths
+    rules:
+      - alert: PaytrPaymentFailures
+        expr: sum(rate(payment_intents_total{result="paytr_failed"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: critical
+          component: payments
+        annotations:
+          summary: "PayTR subscription payment failures detected"
+          description: >-
+            payment_intents_total{result="paytr_failed"} is incrementing (rate
+            {{ $value }}/s over 15m). Verify PayTR credentials/connectivity.
+
+      - alert: WebhookDeliveryFailures
+        expr: sum(rate(webhook_delivery_total{result="failure"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+          component: webhooks
+        annotations:
+          summary: "Outbound webhook delivery failures detected"
+          description: >-
+            webhook_delivery_total{result="failure"} is incrementing (rate
+            {{ $value }}/s over 15m). Tenant webhook endpoints are failing;
+            affected subscriptions may auto-pause.

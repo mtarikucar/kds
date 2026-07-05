@@ -1,39 +1,22 @@
-# Prometheus scrape configuration for the kds backend.
+# Prometheus scrape configuration for the KDS observability stack.
 #
-# This is an OPT-IN monitoring stack (see docker-compose.monitoring.yml and
-# README.md in this directory). It scrapes the NestJS backend's Prometheus
-# endpoint exposed at GET /api/metrics (backend/src/common/metrics/*), which
-# serves the prom-client registry: outbox_dlq_depth, delivery_dlq_depth,
-# http_request_duration_seconds, and the domain counters
-# (payment_intents_total, payment_intents_outcome_total, webhook_delivery_total,
-# subscription_billing_total, cash_drawer_ops_total, auth_login_failures_total,
-# fiscal_receipts_issued_total, stock_movements_total, ...).
-#
-# The /api/metrics endpoint is @Public but, when METRICS_TOKEN is set on the
-# backend, requires `Authorization: Bearer <METRICS_TOKEN>` (constant-time
-# compare in metrics.controller.ts). We pass that here as a bearer token so the
-# same secret guards scraping. If METRICS_TOKEN is unset on the backend the
-# endpoint is open and the bearer is simply ignored.
-#
-# This file is a TEMPLATE: the __METRICS_TOKEN__ and __KDS_BACKEND_TARGET__
-# placeholders are rendered from the matching env vars by the prometheus
-# service's entrypoint in docker-compose.monitoring.yml (a simple `sed`).
-# Prometheus does not expand env vars inside its own config, hence the render
-# step. Edit those values directly if you run Prometheus outside compose.
+# TEMPLATE: __METRICS_TOKEN__ and __KDS_BACKEND_TARGET__ are rendered from env
+# by the prometheus service entrypoint (sed) in docker-compose.monitoring.yml
+# (Prometheus does not expand env vars inside its own config). Every other
+# target is a static container:port on the docker networks, no secret.
 
 global:
-  scrape_interval: 15s
+  scrape_interval: 30s
   scrape_timeout: 10s
-  evaluation_interval: 15s
+  evaluation_interval: 30s
   external_labels:
     monitor: kds-monitor
 
-# Alerting + recording rules. alert.rules.yml lives next to this file and is
-# mounted into the container at the same path (see docker-compose.monitoring.yml).
+# All rule files (app / infra / watchdog) live in ops/monitoring/rules and are
+# mounted at /etc/prometheus/rules (see docker-compose.monitoring.yml).
 rule_files:
-  - /etc/prometheus/alert.rules.yml
+  - /etc/prometheus/rules/*.yml
 
-# Wire Prometheus to the Alertmanager service from the same compose stack.
 alerting:
   alertmanagers:
     - static_configs:
@@ -41,34 +24,77 @@ alerting:
             - alertmanager:9093
 
 scrape_configs:
-  # The kds NestJS backend. `metrics_path` points at the app's exposition
-  # endpoint (/api/metrics, NOT the Prometheus default /metrics). The bearer
-  # token is read from the METRICS_TOKEN env var of the prometheus container;
-  # docker-compose.monitoring.yml passes it through. Use an empty string to
-  # leave the endpoint unauthenticated.
+  # The KDS NestJS backend — the app-level RED + business metrics. Bearer token
+  # (METRICS_TOKEN) rendered by the entrypoint; scraped tighter (15s) than infra.
   - job_name: kds-backend
     metrics_path: /api/metrics
     scheme: http
     scrape_interval: 15s
     authorization:
       type: Bearer
-      # Placeholder rendered by the compose entrypoint (sed) from the
-      # METRICS_TOKEN env var. Distinct __TOKEN__ form so it never collides
-      # with compose ${...} interpolation or shell expansion.
       credentials: __METRICS_TOKEN__
     static_configs:
-      # Resolves to the backend container on the shared docker network. The
-      # backend listens on container port 3000 (PORT=3000 in the compose
-      # service). Override KDS_BACKEND_TARGET to point at another host:port.
       - targets:
           - __KDS_BACKEND_TARGET__
         labels:
           service: kds-backend
 
-  # Prometheus scraping itself — gives an `up{job="prometheus"}` series and
-  # cheap self-observability. Optional but conventional.
+  # Prometheus self-scrape.
   - job_name: prometheus
     metrics_path: /metrics
     static_configs:
       - targets:
           - localhost:9090
+
+  # Host CPU / RAM / disk / load / filesystem.
+  - job_name: node
+    static_configs:
+      - targets:
+          - node-exporter:9100
+        labels:
+          service: host
+
+  # Per-container CPU / mem / net / fs / restarts.
+  - job_name: cadvisor
+    static_configs:
+      - targets:
+          - cadvisor:8080
+        labels:
+          service: containers
+
+  # PostgreSQL (connections, tx, locks, size, pg_up).
+  - job_name: postgres
+    static_configs:
+      - targets:
+          - postgres-exporter:9187
+        labels:
+          service: postgres
+
+  # Redis (memory, hit-rate, connected clients, redis_up).
+  - job_name: redis
+    static_configs:
+      - targets:
+          - redis-exporter:9121
+        labels:
+          service: redis
+
+  # External uptime + TLS-expiry probes via the blackbox exporter.
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://hummytummy.com
+          - https://hummytummy.com/api/health
+          - https://developer.hummytummy.com
+          - https://help.hummytummy.com
+    relabel_configs:
+      # The classic blackbox indirection: the probed URL is passed as ?target=,
+      # and the actual scrape hits the blackbox exporter.
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

@@ -1,0 +1,21 @@
+# Dead-man's-switch. An ALWAYS-firing alert — routed to a dedicated Watchdog
+# receiver in alertmanager.yml. If you STOP receiving the periodic Watchdog
+# heartbeat, then the alerting pipeline itself (Prometheus down, Alertmanager
+# down, SMTP broken, the whole box offline) has failed — which is exactly the
+# failure a normal alert can never tell you about. Pair with an external
+# dead-man monitor (healthchecks.io/Cloudflare worker) via ALERT_WATCHDOG_URL,
+# or rely on the 24h email digest fallback.
+groups:
+  - name: watchdog
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          component: watchdog
+        annotations:
+          summary: "Alerting pipeline heartbeat"
+          description: >-
+            This alert is always firing. Its purpose is to ensure the entire
+            alerting pipeline is functional — if it STOPS arriving, the
+            monitoring stack itself is down and other alerts cannot be trusted.

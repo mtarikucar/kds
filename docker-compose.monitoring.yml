@@ -1,41 +1,38 @@
-# Opt-in monitoring stack for the kds backend: Prometheus + Alertmanager.
+# Self-hosted observability stack for the KDS platform.
 #
-# This file is intentionally SEPARATE from docker-compose.prod.yml /
-# docker-compose.staging.yml — it adds NOTHING to and changes NOTHING in the
-# existing service definitions. Run it on its own (or alongside the app stack)
-# only when you want metric scraping + alerting:
+# SEPARATE compose project (`name: kds-monitoring`) — intentionally NOT part of
+# docker-compose.prod.yml. scripts/deploy.sh runs the prod project with
+# `--remove-orphans`, which would reap any monitoring service living in the prod
+# compose; keeping this a distinct project makes the two lifecycles independent
+# (a monitoring redeploy never touches the app, and the app swap never reaps
+# monitoring). Brought up idempotently by ops/monitoring/up.sh (called as a
+# best-effort, non-fatal final step of scripts/deploy.sh).
 #
-#   # 1) point it at a running backend and (optionally) its metrics token:
-#   export KDS_BACKEND_TARGET=kds_backend_prod:3000     # container:port, or host:port
-#   export METRICS_TOKEN=...            # must match the backend's METRICS_TOKEN, or leave empty
-#   export ALERT_WEBHOOK_URL=https://example.invalid/hook   # operator-owned receiver
-#   # 2) join the app's docker network so 'kds_backend_prod' resolves:
-#   export KDS_NETWORK=kds-prod_kds_network             # `docker network ls` to find it
-#   # 3) run:
-#   docker compose -f docker-compose.monitoring.yml up -d
+# Fed from the single CI-rendered /root/kds/.env.production (via up.sh
+# `--env-file`), so METRICS_TOKEN / SMTP / DB / Redis creds never drift between
+# the backend and Prometheus/Alertmanager.
 #
-# Config files in ops/monitoring/ are TEMPLATES containing ${ENV} placeholders;
-# the entrypoints below run `envsubst` to render them into a writable path
-# before launching the binary (Prometheus/Alertmanager do not expand env vars
-# inside their own config files). See ops/monitoring/README.md.
+# Security: only Grafana is exposed (via an authenticated grafana.hummytummy.com
+# nginx vhost). Every other UI is loopback-bound (127.0.0.1) or has no host
+# port. All containers are resource-capped (compose-native mem_limit/cpus, since
+# staging's deploy.resources.limits is inert under `docker compose up`).
+#
+# Config files in ops/monitoring/ that carry SECRETS (prometheus bearer,
+# alertmanager SMTP) are TEMPLATES with __PLACEHOLDER__ tokens rendered by the
+# service entrypoint via `sed`; secret-free configs (loki/promtail/blackbox/
+# grafana provisioning) are mounted directly.
 
 name: kds-monitoring
 
 services:
+  # ─────────────────────────── Metrics + alerting ───────────────────────────
   prometheus:
     image: prom/prometheus:v2.53.0
     container_name: kds_prometheus
     restart: unless-stopped
     user: root
-    # Render the env placeholders in the mounted template, then hand off to the
-    # stock prometheus binary with the standard flags. The template is mounted
-    # read-only; the rendered copy lives in the container's writable /tmp.
-    # Render the __PLACEHOLDER__ tokens in the mounted template from the env
-    # vars (set via `environment:` below), then hand off to the stock
-    # prometheus binary. The template is mounted read-only; the rendered copy
-    # lives in the container's writable /tmp. The tokens use a __VAR__ form so
-    # `sed` substitution can never collide with compose ${...} interpolation,
-    # shell expansion, or Prometheus' own $labels/$value rule templating.
+    mem_limit: 600m
+    cpus: 0.75
     entrypoint:
       - /bin/sh
       - -c
@@ -44,22 +41,22 @@ services:
         sed -e "s#__METRICS_TOKEN__#$${METRICS_TOKEN}#g" \
             -e "s#__KDS_BACKEND_TARGET__#$${KDS_BACKEND_TARGET}#g" \
             /etc/prometheus/prometheus.template.yml > /tmp/prometheus.yml
-        # rule_files in the rendered config points at the mounted, unmodified
-        # /etc/prometheus/alert.rules.yml.
         exec /bin/prometheus \
           --config.file=/tmp/prometheus.yml \
           --storage.tsdb.path=/prometheus \
+          --storage.tsdb.retention.time=15d \
+          --storage.tsdb.retention.size=4GB \
           --web.console.libraries=/usr/share/prometheus/console_libraries \
           --web.console.templates=/usr/share/prometheus/consoles
     volumes:
       - ./ops/monitoring/prometheus.yml:/etc/prometheus/prometheus.template.yml:ro
-      - ./ops/monitoring/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - ./ops/monitoring/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     environment:
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       KDS_BACKEND_TARGET: ${KDS_BACKEND_TARGET:-kds_backend_prod:3000}
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - monitoring
       - kds_app
@@ -71,21 +68,22 @@ services:
     container_name: kds_alertmanager
     restart: unless-stopped
     user: root
-    # Same render-then-exec pattern: substitute the operator's receiver/SMTP
-    # secrets (from the env vars below) into a writable copy, then start the
-    # stock alertmanager binary. __VAR__ tokens, sed with a # delimiter so URLs
-    # containing / are safe.
+    mem_limit: 128m
+    cpus: 0.25
+    # Render the SMTP secrets (from the canonical EMAIL_*/ADMIN_EMAIL env, mapped
+    # below) into a writable copy, then start alertmanager. # delimiter so values
+    # with / are safe.
     entrypoint:
       - /bin/sh
       - -c
       - |
         set -eu
-        sed -e "s#__ALERT_WEBHOOK_URL__#$${ALERT_WEBHOOK_URL}#g" \
-            -e "s#__ALERT_EMAIL_FROM__#$${ALERT_EMAIL_FROM}#g" \
+        sed -e "s#__ALERT_EMAIL_FROM__#$${ALERT_EMAIL_FROM}#g" \
             -e "s#__ALERT_EMAIL_TO__#$${ALERT_EMAIL_TO}#g" \
             -e "s#__ALERT_SMTP_SMARTHOST__#$${ALERT_SMTP_SMARTHOST}#g" \
             -e "s#__ALERT_SMTP_USERNAME__#$${ALERT_SMTP_USERNAME}#g" \
             -e "s#__ALERT_SMTP_PASSWORD__#$${ALERT_SMTP_PASSWORD}#g" \
+            -e "s#__ALERT_WATCHDOG_URL__#$${ALERT_WATCHDOG_URL}#g" \
             /etc/alertmanager/alertmanager.template.yml > /tmp/alertmanager.yml
         exec /bin/alertmanager \
           --config.file=/tmp/alertmanager.yml \
@@ -94,30 +92,171 @@ services:
       - ./ops/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.template.yml:ro
       - alertmanager_data:/alertmanager
     environment:
-      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-http://localhost:5001/}
-      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-alerts@example.invalid}
-      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-ops@example.invalid}
-      ALERT_SMTP_SMARTHOST: ${ALERT_SMTP_SMARTHOST:-localhost:25}
-      ALERT_SMTP_USERNAME: ${ALERT_SMTP_USERNAME:-}
-      ALERT_SMTP_PASSWORD: ${ALERT_SMTP_PASSWORD:-}
+      # Mapped from the canonical .env.production SMTP names so there is ONE
+      # source of truth (the backend uses the same EMAIL_* creds).
+      ALERT_EMAIL_FROM: ${EMAIL_FROM:-alerts@hummytummy.com}
+      ALERT_EMAIL_TO: ${ADMIN_EMAIL:-contact@hummytummy.com}
+      ALERT_SMTP_SMARTHOST: ${EMAIL_HOST:-smtpout.secureserver.net}:${EMAIL_PORT:-587}
+      ALERT_SMTP_USERNAME: ${EMAIL_USER:-}
+      ALERT_SMTP_PASSWORD: ${EMAIL_PASSWORD:-}
+      # Optional external dead-man's-switch ping (healthchecks.io etc). Empty =
+      # the Watchdog route falls back to a 24h email digest (see alertmanager.yml).
+      ALERT_WATCHDOG_URL: ${ALERT_WATCHDOG_URL:-}
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
+    networks:
+      - monitoring
+
+  # ─────────────────────────── Dashboards + logs ────────────────────────────
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    container_name: kds_grafana
+    restart: unless-stopped
+    mem_limit: 300m
+    cpus: 0.5
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: https://grafana.hummytummy.com
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./ops/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: kds_loki
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./ops/monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: kds_promtail
+    restart: unless-stopped
+    mem_limit: 200m
+    cpus: 0.25
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./ops/monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail_positions:/tmp/promtail
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+
+  # ─────────────────────────────── Exporters ────────────────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: kds_node_exporter
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: kds_cadvisor
+    restart: unless-stopped
+    # cAdvisor is the heaviest component — cap it hardest + slow housekeeping.
+    mem_limit: 320m
+    cpus: 0.5
+    command:
+      - --housekeeping_interval=30s
+      - --docker_only=true
+      - --store_container_labels=false
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: kds_postgres_exporter
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@kds_postgres_prod:5432/${POSTGRES_DB:-restaurant_pos_prod}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    networks:
+      - monitoring
+      - kds_app
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    container_name: kds_redis_exporter
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    environment:
+      REDIS_ADDR: "redis://kds_redis_prod:6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    networks:
+      - monitoring
+      - kds_app
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: kds_blackbox_exporter
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./ops/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
     networks:
       - monitoring
 
 volumes:
   prometheus_data:
   alertmanager_data:
+  grafana_data:
+  loki_data:
+  promtail_positions:
 
 networks:
-  # Internal network shared by prometheus <-> alertmanager.
+  # Internal network shared by the monitoring components.
   monitoring:
     driver: bridge
-  # The app's network, joined as EXTERNAL so this stack can reach the backend
-  # container by name (e.g. kds_backend_prod) without redefining it. Set
-  # KDS_NETWORK to the real network name (`docker network ls`). When running
-  # standalone without the app, set KDS_BACKEND_TARGET to a host:port instead
-  # and this external network can be removed.
+  # The app's network, joined as EXTERNAL so prometheus + the pg/redis exporters
+  # resolve kds_backend_prod / kds_postgres_prod / kds_redis_prod by name. Set
+  # KDS_NETWORK to the real network name (`docker network ls`).
   kds_app:
     external: true
     name: ${KDS_NETWORK:-kds-prod_kds_network}
