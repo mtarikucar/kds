@@ -11,6 +11,7 @@ import { promises as fs } from "fs";
 import * as path from "path";
 import axios from "axios";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 const MESHY_BASE = "https://api.meshy.ai/openapi/v1/image-to-3d";
 
@@ -164,11 +165,23 @@ export class Product3dService {
   /**
    * Poll all PENDING (real, non-simulated) tasks every 30s: on SUCCEEDED,
    * download the GLB + USDZ and re-host them; on FAILED, record the reason.
-   * Advisory-lock-free + tenant-agnostic — the taskId is globally unique.
+   * Advisory-locked so only one replica polls (and re-downloads) per tick;
+   * tenant-agnostic — the taskId is globally unique.
    */
   @Cron(CronExpression.EVERY_30_SECONDS)
   async pollPendingModels(): Promise<void> {
     if (!this.apiKey) return; // real polling only; simulator finishes inline
+    // Multi-replica guard: one replica per tick polls the Meshy task queue,
+    // so N replicas don't re-poll (and re-download) the same tasks.
+    await withAdvisoryLock(
+      this.prisma,
+      "product3d.pollPendingModels",
+      () => this.pollPendingModelsInner(),
+      this.logger,
+    );
+  }
+
+  private async pollPendingModelsInner(): Promise<void> {
     const pending = await this.prisma.product.findMany({
       where: {
         model3dStatus: "PENDING",

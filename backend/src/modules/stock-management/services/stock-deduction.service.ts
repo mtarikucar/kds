@@ -164,11 +164,13 @@ export class StockDeductionService {
     });
     if (!stockItem) return;
 
+    // FIFO batch drawdown — a COST sub-ledger only. The authoritative on-hand
+    // total (stockItem.currentStock) is decremented by the FULL quantity below
+    // regardless of batches; this loop exists purely to compute the
+    // weighted-average cost of the units actually shipped (oldest batches
+    // first). Deployments without batches simply skip it and fall back to
+    // stockItem.costPerUnit.
     let remaining = deduction.quantity;
-    // FIFO batch drawdown: consume the oldest (by expiryDate, then
-    // receivedAt) batches first. If we run out of batches before the
-    // full quantity is consumed, fall through to the bare stockItem
-    // path below so legacy deployments without batches still work.
     //
     // v2.8.93 — explicit `nulls: 'last'` on expiryDate. Without it, the
     // sort order for NULL expiry depends on the underlying DB's ASC
@@ -221,30 +223,35 @@ export class StockDeductionService {
         ? weightedCostAccumulator.div(consumedFromBatches)
         : (stockItem.costPerUnit ?? null);
 
-    // After batch drawdown `remaining` is what the bare stockItem row
-    // needs to absorb. Do this as a conditional UPDATE: if
-    // allowNegativeStock=false we require currentStock >= remaining,
-    // otherwise we allow the decrement unconditionally. `updateMany`
-    // returns `count: 0` when the guard fails (no race window).
-    if (remaining.gt(0)) {
-      const update = allowNegativeStock
-        ? await tx.stockItem.updateMany({
-            where: { id: deduction.stockItemId, tenantId },
-            data: { currentStock: { decrement: remaining as any } },
-          })
-        : await tx.stockItem.updateMany({
-            where: {
-              id: deduction.stockItemId,
-              tenantId,
-              currentStock: { gte: remaining as any },
-            },
-            data: { currentStock: { decrement: remaining as any } },
-          });
-      if (update.count === 0) {
-        throw new ConflictException(
-          `Insufficient stock for ${deduction.stockItemName}`,
-        );
-      }
+    // currentStock is the AUTHORITATIVE on-hand total and already INCLUDES
+    // batch quantities: purchase-orders.receive() increments currentStock by
+    // the received qty AND creates a StockBatch of the same qty; waste-logs
+    // decrements currentStock by the FULL waste qty and draws batches down only
+    // for costing. So the on-hand decrement must be the FULL deduction
+    // quantity, NOT the post-batch leftover. Decrementing only the leftover (the
+    // old behaviour) left currentStock inflated on every batch-covered sale,
+    // which silently corrupted the ledger, defeated the oversell guard, and
+    // suppressed low-stock alerts. Conditional UPDATE: when
+    // allowNegativeStock=false we require currentStock >= quantity, so a
+    // `count: 0` (guard failure) is the race-free "insufficient stock" signal.
+    const qty = deduction.quantity;
+    const update = allowNegativeStock
+      ? await tx.stockItem.updateMany({
+          where: { id: deduction.stockItemId, tenantId },
+          data: { currentStock: { decrement: qty as any } },
+        })
+      : await tx.stockItem.updateMany({
+          where: {
+            id: deduction.stockItemId,
+            tenantId,
+            currentStock: { gte: qty as any },
+          },
+          data: { currentStock: { decrement: qty as any } },
+        });
+    if (update.count === 0) {
+      throw new ConflictException(
+        `Insufficient stock for ${deduction.stockItemName}`,
+      );
     }
 
     const totalDeducted = deduction.quantity;
@@ -344,8 +351,16 @@ export class StockDeductionService {
           });
           if (!stockItem) continue;
 
-          // Defence-in-depth: tenantId in the WHERE so a regression of
-          // the pre-check can't expose cross-tenant stock writes.
+          // Restore the FULL deducted quantity to the authoritative on-hand
+          // total. This is symmetric with deductForOrder, which now decrements
+          // currentStock by the full quantity — so a deduct+reverse nets zero
+          // and no phantom stock is minted. Batches are a consume-only FIFO
+          // COST sub-ledger (like waste-logs) and are deliberately NOT restored
+          // here; the per-batch breakdown isn't recorded on the movement, and
+          // currentStock — not the batch sum — is what every consumer
+          // (counts / dashboards / oversell / alerts) treats as authoritative.
+          // Defence-in-depth: tenantId in the WHERE so a regression of the
+          // pre-check can't expose cross-tenant stock writes.
           await tx.stockItem.updateMany({
             where: { id: movement.stockItemId, tenantId },
             data: { currentStock: { increment: reverseQty as any } },

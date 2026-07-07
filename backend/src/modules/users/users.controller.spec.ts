@@ -75,9 +75,9 @@ describe('UsersController', () => {
     expect(usersService.update).toHaveBeenCalledWith('u1', dto, 't1', actor);
   });
 
-  it('remove forwards id, tenantId and the actor id only', () => {
-    ctrl.remove('u1', req as any, 'admin-1');
-    expect(usersService.remove).toHaveBeenCalledWith('u1', 't1', 'admin-1');
+  it('remove forwards id, tenantId and the current actor', () => {
+    ctrl.remove('u1', req as any, actor);
+    expect(usersService.remove).toHaveBeenCalledWith('u1', 't1', actor);
   });
 
   it('getMyProfile reads the current user id', () => {

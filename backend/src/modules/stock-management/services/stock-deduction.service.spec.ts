@@ -211,3 +211,116 @@ describe('StockDeductionService.deductForOrder (v3 per-branch recipe selection)'
     expect((prisma.$transaction as any).mock.calls.length).toBe(0);
   });
 });
+
+/**
+ * Security/data-integrity audit (2026-07). currentStock is the AUTHORITATIVE
+ * on-hand total and INCLUDES batch quantities: purchase-orders.receive()
+ * increments currentStock by the received qty AND creates a StockBatch of the
+ * same qty; waste-logs decrements currentStock by the FULL waste qty and draws
+ * batches down only for costing. The old applyDeduction() decremented
+ * currentStock only by the leftover AFTER batches were exhausted, so every
+ * batch-covered sale left currentStock inflated — silently corrupting the
+ * authoritative ledger, defeating the oversell guard, and never firing
+ * low-stock alerts. Fix: decrement currentStock by the FULL quantity; batches
+ * are a FIFO COST sub-ledger only (mirrors waste-logs).
+ */
+describe('StockDeductionService.deductForOrder — currentStock is the authoritative ledger (audit 2026-07)', () => {
+  let prisma: MockPrismaClient;
+  let svc: StockDeductionService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      get: jest.fn().mockResolvedValue({
+        enableAutoDeduction: true,
+        deductOnStatus: null,
+        allowNegativeStock: false,
+      }),
+    };
+    svc = new StockDeductionService(prisma as any, settings);
+  });
+
+  function orderNeeding(qtyPerServing: string, servings: number) {
+    return {
+      id: 'ord-1',
+      orderNumber: 'ORD-1',
+      tenantId: 't1',
+      branchId: 'b1',
+      stockDeducted: false,
+      orderItems: [
+        {
+          quantity: servings,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1',
+                yield: 1,
+                ingredients: [
+                  { stockItemId: 'sugar', quantity: qtyPerServing, stockItem: { name: 'Sugar' } },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any;
+  }
+
+  it('decrements currentStock by the FULL quantity even when a batch fully covers it', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue(orderNeeding('1', 10)); // needs 10 sugar
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'sugar', tenantId: 't1', currentStock: '100', costPerUnit: '2', minStock: '0' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // A single batch of 100 fully covers the 10 needed — the exact case the
+      // old code mishandled (batch drawn down, currentStock left untouched).
+      stockBatch: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'batch-1', quantity: '100', costPerUnit: '2' }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    await svc.deductForOrder('ord-1', 't1', undefined, 'user-1');
+
+    // The batch is still drawn down for FIFO costing.
+    expect(txMock.stockBatch.updateMany).toHaveBeenCalled();
+    // currentStock MUST be decremented by the full 10 (the bug left it untouched).
+    expect(txMock.stockItem.updateMany).toHaveBeenCalledTimes(1);
+    const call = txMock.stockItem.updateMany.mock.calls[0][0];
+    expect(call.data.currentStock.decrement.toString()).toBe('10');
+    // The oversell guard is on the FULL quantity, not the post-batch leftover.
+    expect(call.where.currentStock.gte.toString()).toBe('10');
+  });
+
+  it('throws Insufficient stock when currentStock < full quantity even if a batch could cover it', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue(orderNeeding('1', 10)); // needs 10
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'sugar', tenantId: 't1', currentStock: '4', costPerUnit: '2', minStock: '0' }),
+        // gte:10 guard fails against currentStock=4 → count 0.
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      stockBatch: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'batch-1', quantity: '100', costPerUnit: '2' }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    await expect(svc.deductForOrder('ord-1', 't1', undefined, 'user-1')).rejects.toThrow(
+      /Insufficient stock/,
+    );
+  });
+});

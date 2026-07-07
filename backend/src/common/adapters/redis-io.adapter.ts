@@ -35,10 +35,19 @@ export class RedisIoAdapter extends IoAdapter {
         : undefined);
 
     if (!url) {
-      this.logger.warn(
+      const msg =
         "REDIS_URL not set — Socket.IO will use the in-memory adapter. " +
-          "Multi-replica deployments will LOSE realtime events across replicas.",
-      );
+        "Multi-replica deployments will LOSE realtime events across replicas.";
+      // Fail-closed opt-in: an operator running >1 replica sets
+      // SOCKET_ADAPTER_REQUIRE_REDIS=true so the app refuses to boot without a
+      // working cross-replica adapter, rather than silently serving a broken
+      // broadcast path. Default keeps single-node degrade-only behaviour.
+      if (this.requireRedis()) {
+        throw new Error(
+          `${msg} SOCKET_ADAPTER_REQUIRE_REDIS=true refuses to boot without a Redis adapter.`,
+        );
+      }
+      this.logger.warn(msg);
       return;
     }
 
@@ -81,16 +90,33 @@ export class RedisIoAdapter extends IoAdapter {
       this.subClient = subClient;
       this.logger.log("Socket.IO Redis adapter connected");
     } catch (err: any) {
-      this.logger.error(
-        `Redis connection failed (${err.message}). Falling back to in-memory Socket.IO adapter — multi-replica broadcasts will be silently broken until Redis is reachable.`,
-      );
+      // Tear the clients down first so a fail-closed throw doesn't leak them.
       try {
         await pubClient.disconnect();
       } catch {}
       try {
         await subClient.disconnect();
       } catch {}
+      if (this.requireRedis()) {
+        throw new Error(
+          `Socket.IO Redis adapter connection failed and SOCKET_ADAPTER_REQUIRE_REDIS=true — refusing to boot with a broken multi-replica broadcast path: ${err.message}`,
+        );
+      }
+      this.logger.error(
+        `Redis connection failed (${err.message}). Falling back to in-memory Socket.IO adapter — multi-replica broadcasts will be silently broken until Redis is reachable.`,
+      );
     }
+  }
+
+  /**
+   * Opt-in fail-closed flag. Operators running more than one backend replica
+   * set SOCKET_ADAPTER_REQUIRE_REDIS=true so a missing/unreachable Redis adapter
+   * crashes boot (restart: unless-stopped retries) instead of degrading to the
+   * in-memory adapter — which would drop cross-replica realtime events for
+   * every client not pinned to the emitting replica.
+   */
+  private requireRedis(): boolean {
+    return process.env.SOCKET_ADAPTER_REQUIRE_REDIS === "true";
   }
 
   async disconnectRedis(): Promise<void> {
