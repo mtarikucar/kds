@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChefHat, ChevronDown, Menu, X, ArrowRight } from "lucide-react";
 import { display } from "../theme";
-import { MODULES } from "../data/modules";
-import { SECTORS } from "../data/sectors";
+import { CATEGORIES, modulesByCategory } from "../data/modules";
+import { SECTORS } from "../data/sectorContent";
 
 function DesktopDropdown({
   label,
@@ -46,31 +46,29 @@ export default function MarketingNav() {
         {/* Desktop nav */}
         <div className="hidden items-center gap-1 lg:flex">
           <DesktopDropdown label="Özellikler">
-            <div className="w-[34rem] rounded-2xl border border-[#ece2d4] bg-white p-3 shadow-xl shadow-stone-900/10">
-              <div className="grid grid-cols-2 gap-1">
-                {MODULES.map((m) => (
-                  <Link
-                    key={m.slug}
-                    to={`/ozellikler/${m.slug}`}
-                    className="flex items-start gap-3 rounded-xl p-2.5 transition hover:bg-[#faf6f0]"
-                  >
-                    <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#fff3e8] text-[#f97316]">
-                      <m.icon className="h-5 w-5" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-semibold text-[#1c1917]">
+            <div className="w-[54rem] rounded-2xl border border-[#ece2d4] bg-white p-4 shadow-xl shadow-stone-900/10">
+              <div className="grid grid-cols-4 gap-x-4 gap-y-1">
+                {CATEGORIES.map((cat) => (
+                  <div key={cat}>
+                    <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#a8a29e]">
+                      {cat}
+                    </p>
+                    {modulesByCategory(cat).map((m) => (
+                      <Link
+                        key={m.slug}
+                        to={`/ozellikler/${m.slug}`}
+                        className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-[#44403c] transition hover:bg-[#faf6f0]"
+                      >
+                        <m.icon className="h-4 w-4 shrink-0 text-[#f97316]" />
                         {m.title}
-                      </span>
-                      <span className="block text-xs leading-snug text-[#78716c]">
-                        {m.tagline}
-                      </span>
-                    </span>
-                  </Link>
+                      </Link>
+                    ))}
+                  </div>
                 ))}
               </div>
               <Link
                 to="/ozellikler"
-                className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-sm font-semibold text-[#1c1917] transition hover:bg-[#f1e8db]"
+                className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-sm font-semibold text-[#1c1917] transition hover:bg-[#f1e8db]"
               >
                 Tüm özellikleri gör <ArrowRight className="h-4 w-4" />
               </Link>
@@ -78,17 +76,25 @@ export default function MarketingNav() {
           </DesktopDropdown>
 
           <DesktopDropdown label="Çözümler">
-            <div className="grid w-72 grid-cols-2 gap-1 rounded-2xl border border-[#ece2d4] bg-white p-3 shadow-xl shadow-stone-900/10">
-              {SECTORS.map((s) => (
-                <a
-                  key={s.title}
-                  href={`/${s.anchor}`}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#44403c] transition hover:bg-[#faf6f0]"
-                >
-                  <span aria-hidden>{s.emoji}</span>
-                  {s.title}
-                </a>
-              ))}
+            <div className="w-80 rounded-2xl border border-[#ece2d4] bg-white p-3 shadow-xl shadow-stone-900/10">
+              <div className="grid grid-cols-2 gap-1">
+                {SECTORS.map((s) => (
+                  <Link
+                    key={s.slug}
+                    to={`/cozumler/${s.slug}`}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#44403c] transition hover:bg-[#faf6f0]"
+                  >
+                    <span aria-hidden>{s.emoji}</span>
+                    {s.title}
+                  </Link>
+                ))}
+              </div>
+              <Link
+                to="/cozumler"
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-sm font-semibold text-[#1c1917] transition hover:bg-[#f1e8db]"
+              >
+                Tüm çözümler <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </DesktopDropdown>
 
@@ -134,20 +140,40 @@ export default function MarketingNav() {
 
       {/* Mobile panel */}
       {open && (
-        <div className="max-h-[70vh] overflow-y-auto border-t border-[#efe6da] bg-[#faf6f0] px-5 py-4 lg:hidden">
+        <div className="max-h-[75vh] overflow-y-auto border-t border-[#efe6da] bg-[#faf6f0] px-5 py-4 lg:hidden">
+          {CATEGORIES.map((cat) => (
+            <div key={cat} className="mb-3">
+              <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wider text-[#a8a29e]">
+                {cat}
+              </p>
+              <div className="grid grid-cols-1 gap-0.5">
+                {modulesByCategory(cat).map((m) => (
+                  <Link
+                    key={m.slug}
+                    to={`/ozellikler/${m.slug}`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-[#44403c] hover:bg-[#f1e8db]"
+                  >
+                    <m.icon className="h-4 w-4 text-[#f97316]" />
+                    {m.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
           <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wider text-[#a8a29e]">
-            Özellikler
+            Çözümler
           </p>
-          <div className="grid grid-cols-1 gap-0.5">
-            {MODULES.map((m) => (
+          <div className="grid grid-cols-2 gap-0.5">
+            {SECTORS.map((s) => (
               <Link
-                key={m.slug}
-                to={`/ozellikler/${m.slug}`}
+                key={s.slug}
+                to={`/cozumler/${s.slug}`}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium text-[#44403c] hover:bg-[#f1e8db]"
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-[#44403c] hover:bg-[#f1e8db]"
               >
-                <m.icon className="h-4 w-4 text-[#f97316]" />
-                {m.title}
+                <span aria-hidden>{s.emoji}</span>
+                {s.title}
               </Link>
             ))}
           </div>
