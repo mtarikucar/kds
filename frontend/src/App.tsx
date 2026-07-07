@@ -81,6 +81,15 @@ const SubdomainLoyaltyPage = lazyWithReload(
 );
 
 const LandingPage = lazyWithReload(() => import("./pages/LandingPage"));
+const PricingPage = lazyWithReload(
+  () => import("./pages/marketing/PricingPage"),
+);
+const ModulesIndexPage = lazyWithReload(
+  () => import("./pages/marketing/ModulesIndexPage"),
+);
+const ModulePage = lazyWithReload(
+  () => import("./pages/marketing/ModulePage"),
+);
 const PublicReservationPage = lazyWithReload(
   () => import("./pages/reservations/PublicReservationPage"),
 );
@@ -316,6 +325,9 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/fiyatlandirma" element={<PricingPage />} />
+          <Route path="/ozellikler" element={<ModulesIndexPage />} />
+          <Route path="/ozellikler/:slug" element={<ModulePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
