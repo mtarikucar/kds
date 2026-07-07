@@ -25,6 +25,11 @@ describe('DemoService', () => {
     }).compile();
     service = module.get(DemoService);
     jest.spyOn(service['logger'], 'log').mockImplementation(() => undefined);
+    jest.spyOn(service['logger'], 'debug').mockImplementation(() => undefined);
+    // resetDemoData now runs under a Postgres advisory lock (multi-replica
+    // guard). Grant it by default so the body runs; a dedicated test overrides
+    // this to assert the lock actually gates the destructive wipe.
+    (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ locked: true }]);
   });
 
   it('short-circuits to the existing demo admin without re-seeding', async () => {
@@ -142,5 +147,14 @@ describe('DemoService', () => {
     await service.resetDemoData();
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.order.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('resetDemoData skips the destructive wipe when the advisory lock is held by another replica', async () => {
+    // Another replica already holds the lock this tick.
+    (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ locked: false }]);
+    await service.resetDemoData();
+    // The body never ran: no tenant lookup, no wipe.
+    expect(prisma.tenant.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

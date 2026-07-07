@@ -36,6 +36,9 @@ describe("Product3dService", () => {
     prisma = mockPrismaClient();
     config = makeConfig();
     svc = new Product3dService(prisma as any, config as any);
+    // pollPendingModels now runs under a Postgres advisory lock (multi-replica
+    // guard). Grant it by default so the poll body runs.
+    (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
     (prisma.product.update as any).mockImplementation(
       async ({ data }: any) => ({
         id: "p1",
@@ -160,6 +163,16 @@ describe("Product3dService", () => {
   });
 
   describe("pollPendingModels → SUCCEEDED downloads + re-hosts", () => {
+    it("skips polling when the advisory lock is held by another replica", async () => {
+      svc = new Product3dService(
+        prisma as any,
+        makeConfig({ MESHY_API_KEY: "k" }) as any,
+      );
+      (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: false }]);
+      await svc.pollPendingModels();
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+    });
+
     it("downloads GLB+USDZ and marks READY with local URLs", async () => {
       svc = new Product3dService(
         prisma as any,
