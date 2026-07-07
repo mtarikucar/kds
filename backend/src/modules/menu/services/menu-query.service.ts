@@ -36,15 +36,12 @@ export class MenuQueryService {
         where: { id: tableId, tenantId },
       });
     }
-    const tablePayload = table
-      ? { id: table.id, number: table.number }
-      : null;
+    const tablePayload = table ? { id: table.id, number: table.number } : null;
 
     // Serve the cached tenant-level menu when present; only the table changes
     // per request, so one cache entry serves every table + the no-table scan.
-    const cached = await this.menuCache.getMenu<Record<string, unknown>>(
-      tenantId,
-    );
+    const cached =
+      await this.menuCache.getMenu<Record<string, unknown>>(tenantId);
     if (cached) {
       return { ...cached, table: tablePayload };
     }
