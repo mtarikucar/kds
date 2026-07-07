@@ -102,6 +102,11 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
+          # Observability pair: listed in `recommended` below — every name the
+          # loops dereference MUST be mapped here, or `${!name}` trips nounset
+          # and kills the gate (exactly what blocked v3.2.94).
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           # backend env-validation.ts aborts boot on missing/short
@@ -131,7 +136,9 @@ jobs:
 
           missing=()
           for name in "${required[@]}"; do
-            [ -z "${!name}" ] && missing+=("$name")
+            # ${!name:-} (not ${!name}) — an env-mapping gap must read as
+            # "missing secret", not crash the whole gate under set -u.
+            [ -z "${!name:-}" ] && missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Refusing to deploy — required secrets unset or empty:"
@@ -141,7 +148,7 @@ jobs:
 
           degraded=()
           for name in "${recommended[@]}"; do
-            [ -z "${!name}" ] && degraded+=("$name")
+            [ -z "${!name:-}" ] && degraded+=("$name")
           done
           if [ ${#degraded[@]} -gt 0 ]; then
             echo "::warning::Deploying with degraded functionality:"
