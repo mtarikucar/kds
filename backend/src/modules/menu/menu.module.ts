@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { CategoriesService } from "./services/categories.service";
 import { ProductsService } from "./services/products.service";
 import { MenuQueryService } from "./services/menu-query.service";
+import { MenuCacheService } from "./services/menu-cache.service";
 import { MenuImportService } from "./services/menu-import.service";
 import { Product3dService } from "./services/product-3d.service";
 import { ProductMediaService } from "./services/product-media.service";
@@ -33,6 +34,7 @@ import { UploadModule } from "../upload/upload.module";
     CategoriesService,
     ProductsService,
     MenuQueryService,
+    MenuCacheService,
     MenuImportService,
     Product3dService,
     ProductMediaService,
