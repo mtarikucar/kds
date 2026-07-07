@@ -41,7 +41,7 @@ export default function FramedShot({
           img={img}
           sizes={sizes}
           priority={priority}
-          className="w-full rounded-xl object-cover"
+          className="w-full rounded-xl bg-[#f4ede1] object-cover"
         />
       </div>
     </div>
