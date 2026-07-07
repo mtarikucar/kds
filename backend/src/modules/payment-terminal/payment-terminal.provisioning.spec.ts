@@ -20,6 +20,9 @@ describe("PaymentTerminalService (provisioning + activation gate)", () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
+    // recoverApprovedUnrecorded now runs under a Postgres advisory lock
+    // (multi-replica guard). Grant it so the recovery body runs.
+    (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
     const registry = new PaymentTerminalProviderRegistry();
     registry.register(new SimulatorTerminalProvider());
     registry.register(new Gmp3CardTerminalProvider(registry));
