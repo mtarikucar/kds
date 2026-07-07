@@ -44,6 +44,7 @@ describe("RedisIoAdapter", () => {
     delete process.env.REDIS_URL;
     delete process.env.REDIS_HOST;
     delete process.env.REDIS_PORT;
+    delete process.env.SOCKET_ADAPTER_REQUIRE_REDIS;
     server = { adapter: jest.fn() };
     // Stub the parent IoAdapter.createIOServer so we don't spin a real
     // socket.io server; we only assert whether the Redis adapter gets wired.
@@ -107,5 +108,36 @@ describe("RedisIoAdapter", () => {
     expect(server.adapter).not.toHaveBeenCalled();
     // both pub + sub clients get torn down on failure
     expect(client.disconnect).toHaveBeenCalled();
+  });
+
+  // Multi-replica opt-in (audit 2026-07): when an operator runs >1 replica they
+  // set SOCKET_ADAPTER_REQUIRE_REDIS=true so a missing/broken Redis adapter
+  // FAILS BOOT (crash-loop → restart retries) instead of silently latching to
+  // the in-memory adapter, which would drop cross-replica events for half the
+  // clients. Default (flag unset) keeps the degrade-only single-node behaviour.
+  it("refuses to boot when SOCKET_ADAPTER_REQUIRE_REDIS=true but no Redis is configured", async () => {
+    process.env.SOCKET_ADAPTER_REQUIRE_REDIS = "true";
+
+    const adapter = new RedisIoAdapter(app);
+
+    await expect(adapter.connectToRedis()).rejects.toThrow(
+      /SOCKET_ADAPTER_REQUIRE_REDIS/,
+    );
+  });
+
+  it("refuses to boot when SOCKET_ADAPTER_REQUIRE_REDIS=true and Redis connection fails (after cleanup)", async () => {
+    process.env.SOCKET_ADAPTER_REQUIRE_REDIS = "true";
+    process.env.REDIS_URL = "redis://localhost:6379";
+    const client = fakeRedisClient(
+      jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+    );
+    createClientMock.mockReturnValue(client);
+
+    const adapter = new RedisIoAdapter(app);
+
+    await expect(adapter.connectToRedis()).rejects.toThrow(/ECONNREFUSED/);
+    // clients are still torn down before the throw
+    expect(client.disconnect).toHaveBeenCalled();
+    expect(createAdapterMock).not.toHaveBeenCalled();
   });
 });
