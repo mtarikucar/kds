@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
@@ -148,5 +148,86 @@ describe('UsersService.create — front-line branch pinning (sweep-3 B2)', () =>
     await svc.create({ ...dto, role: 'ADMIN' }, 't1', admin);
     expect((prisma.user.create as any).mock.calls[0][0].data.primaryBranchId).toBeNull();
     expect(prisma.userBranchAssignment.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Security audit (2026-07): PATCH /users/:id and DELETE /users/:id are open to
+ * both ADMIN and MANAGER. update() gated only the ROLE field on the actor's
+ * role — credential fields (password/email) and account state were ungated by
+ * the TARGET's privilege. So a MANAGER could `PATCH /users/{adminId}` with a new
+ * password, revoke the admin's sessions, and log in as that admin: full account
+ * takeover / privilege escalation. remove() had the same gap (deactivate any
+ * non-last admin). Fix: a lower-privileged actor may not mutate an ADMIN target.
+ */
+describe('UsersService.update/remove — target-privilege authorization (audit: MANAGER cannot take over ADMIN)', () => {
+  let prisma: MockPrismaClient;
+  let svc: UsersService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new UsersService(
+      prisma as any,
+      { get: () => undefined } as any,
+      {} as any,
+      { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {}, computedAt: '' }) } as any,
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(prisma));
+    (prisma.user.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.user.findUnique as any).mockResolvedValue({ id: 'target', role: 'ADMIN', status: 'ACTIVE' });
+    (prisma.refreshToken.updateMany as any).mockResolvedValue({ count: 0 });
+    (prisma.userActivity.create as any).mockResolvedValue({});
+    (prisma.user.count as any).mockResolvedValue(2); // other admins exist → last-admin guard passes
+  });
+
+  const manager = { id: 'mgr-1', role: 'MANAGER' };
+  const admin = { id: 'adm-1', role: 'ADMIN' };
+  const adminTarget = { id: 'adm-2', role: 'ADMIN', email: 'a@x.y', status: 'ACTIVE' };
+  const waiterTarget = { id: 'w-1', role: 'WAITER', email: 'w@x.y', status: 'ACTIVE' };
+
+  it('forbids a MANAGER from changing an ADMIN password (the account-takeover vector)', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue(adminTarget);
+    await expect(
+      svc.update('adm-2', { password: 'Hijacked1' } as any, 't1', manager),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('forbids a MANAGER from changing an ADMIN email', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue(adminTarget);
+    await expect(
+      svc.update('adm-2', { email: 'attacker@x.y' } as any, 't1', manager),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('lets a MANAGER update a non-admin (WAITER)', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue(waiterTarget);
+    await expect(
+      svc.update('w-1', { firstName: 'New' } as any, 't1', manager),
+    ).resolves.toBeDefined();
+    expect(prisma.user.updateMany).toHaveBeenCalled();
+  });
+
+  it('lets an ADMIN reset another ADMIN password', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue(adminTarget);
+    await expect(
+      svc.update('adm-2', { password: 'Reset123' } as any, 't1', admin),
+    ).resolves.toBeDefined();
+    expect(prisma.user.updateMany).toHaveBeenCalled();
+  });
+
+  it('forbids a MANAGER from removing (deactivating) an ADMIN', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue(adminTarget);
+    await expect(svc.remove('adm-2', 't1', manager)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('lets an ADMIN remove another ADMIN (subject to the last-admin guard)', async () => {
+    (prisma.user.findFirst as any).mockResolvedValue(adminTarget);
+    await expect(svc.remove('adm-2', 't1', admin)).resolves.toBeDefined();
+    expect(prisma.user.updateMany).toHaveBeenCalled();
   });
 });
