@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AccountingSettingsService } from "./accounting-settings.service";
+import { resolveEDocumentType } from "../e-document-routing";
 import {
   AccountingAdapter,
   AccountingInvoiceData,
@@ -91,6 +92,15 @@ export class AccountingSyncService {
         customerName: invoice.customerName || undefined,
         customerTaxId: invoice.customerTaxId || undefined,
         customerTaxOffice: invoice.customerTaxOffice || undefined,
+        // Route e-Fatura (B2B) vs e-Arşiv (B2C). isRegisteredEFaturaUser comes
+        // from a GİB mükellef query (needs integrator credentials); unset here
+        // → e-Arşiv, the safe final-consumer default. Wire the query result in
+        // to enable automatic B2B e-Fatura routing.
+        eDocumentType: resolveEDocumentType({
+          taxId: invoice.customerTaxId,
+          taxOffice: invoice.customerTaxOffice,
+          isRegisteredEFaturaUser: undefined,
+        }),
         // Issuer/seller identity snapshotted on the invoice at build time
         // (fake-working sweep #3). Falls back to the tenant's current
         // Company Info for legacy rows written before the seller columns

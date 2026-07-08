@@ -5,6 +5,10 @@ export interface AccountingInvoiceData {
   customerName?: string;
   customerTaxId?: string;
   customerTaxOffice?: string;
+  // Resolved e-document type (e-document-routing.resolveEDocumentType). Selects
+  // the UBL-TR ProfileID: EFATURA → TICARIFATURA (B2B), EARSIVFATURA → e-Arşiv
+  // (B2C). Defaults to EARSIVFATURA when unset — the safe final-consumer path.
+  eDocumentType?: "EFATURA" | "EARSIVFATURA";
   // Issuer / seller (satıcı) identity — snapshotted onto the SalesInvoice
   // from the tenant's AccountingSettings "Company Info". A valid UBL-TR
   // document needs an AccountingSupplierParty; these feed that block.

@@ -181,6 +181,42 @@ describe("ForibaEfaturaAdapter", () => {
     expect(xml).not.toContain("<cac:PartyTaxScheme>");
   });
 
+  it("routes an e-Fatura buyer to the TICARIFATURA profile with a buyer VKN party", async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: "fb-uuid-4" } });
+    (adapter as any).httpClient = http;
+    await adapter.pushInvoice("tok", "co-1", {
+      ...invoice,
+      eDocumentType: "EFATURA",
+      customerName: "Alıcı Ltd.",
+      customerTaxId: "9876543210",
+      customerTaxOffice: "Şişli",
+    });
+    const xml = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(xml).toContain("<cbc:ProfileID>TICARIFATURA</cbc:ProfileID>");
+    expect(xml).toContain("<cac:AccountingCustomerParty>");
+    expect(xml).toContain("<cbc:CompanyID>9876543210</cbc:CompanyID>"); // buyer VKN
+    expect(xml).toContain("Şişli"); // buyer tax office
+  });
+
+  it("defaults to the EARSIVFATURA profile for a final consumer", async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: "fb-uuid-5" } });
+    (adapter as any).httpClient = http;
+    await adapter.pushInvoice("tok", "co-1", invoice); // no eDocumentType
+    const xml = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(xml).toContain("<cbc:ProfileID>EARSIVFATURA</cbc:ProfileID>");
+    expect(xml).toContain("<cac:AccountingCustomerParty>");
+  });
+
   it("testConnection returns false when authenticate throws", async () => {
     const adapter = new ForibaEfaturaAdapter();
     const http = fakeHttp();

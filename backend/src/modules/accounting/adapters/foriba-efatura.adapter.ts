@@ -84,6 +84,11 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
 
   private generateUblTrXml(invoice: AccountingInvoiceData): string {
     const uuid = crypto.randomUUID();
+    // Profile selection: e-Fatura (B2B) → TICARIFATURA, e-Arşiv (B2C) →
+    // EARSIVFATURA. Was hardcoded to TICARIFATURA, which GİB rejects for a
+    // final-consumer sale. Defaults to e-Arşiv when the type wasn't resolved.
+    const profileId =
+      invoice.eDocumentType === "EFATURA" ? "TICARIFATURA" : "EARSIVFATURA";
 
     // UBL-TR rejects XML where header totals don't match the line items
     // bit-for-bit. JS Number was accumulating rounding error across the
@@ -141,18 +146,14 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
   <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
   <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
-  <cbc:ProfileID>TICARIFATURA</cbc:ProfileID>
+  <cbc:ProfileID>${profileId}</cbc:ProfileID>
   <cbc:ID>${invoice.invoiceNumber}</cbc:ID>
   <cbc:UUID>${uuid}</cbc:UUID>
   <cbc:IssueDate>${invoice.issueDate}</cbc:IssueDate>
   <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
 ${this.supplierPartyXml(invoice)}
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyName><cbc:Name>${this.escapeXml(invoice.customerName || "Musteri")}</cbc:Name></cac:PartyName>
-    </cac:Party>
-  </cac:AccountingCustomerParty>
+${this.customerPartyXml(invoice)}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="${invoice.currency}">${totalTax.toFixed(2)}</cbc:TaxAmount>
   </cac:TaxTotal>
@@ -164,6 +165,31 @@ ${this.supplierPartyXml(invoice)}
   </cac:LegalMonetaryTotal>
   ${lineItems}
 </Invoice>`;
+  }
+
+  /**
+   * cac:AccountingCustomerParty — the buyer (alıcı) block. e-Fatura (B2B)
+   * REQUIRES a PartyTaxScheme carrying the buyer VKN/TCKN + tax office; the
+   * pre-fix code emitted only a "Musteri" placeholder name, so GİB rejected
+   * every B2B invoice. e-Arşiv (B2C, final consumer) can carry just the name.
+   * The tax scheme is emitted only when a tax id is present.
+   */
+  private customerPartyXml(invoice: AccountingInvoiceData): string {
+    const name = invoice.customerName?.trim() || "Musteri";
+    const taxId = invoice.customerTaxId?.trim();
+    const taxOffice = invoice.customerTaxOffice?.trim();
+    const taxSchemeXml = taxId
+      ? `
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>${this.escapeXml(taxId)}</cbc:CompanyID>
+        <cac:TaxScheme><cbc:Name>${this.escapeXml(taxOffice || "")}</cbc:Name></cac:TaxScheme>
+      </cac:PartyTaxScheme>`
+      : "";
+    return `  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>${this.escapeXml(name)}</cbc:Name></cac:PartyName>${taxSchemeXml}
+    </cac:Party>
+  </cac:AccountingCustomerParty>`;
   }
 
   /**
