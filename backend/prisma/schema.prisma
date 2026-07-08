@@ -248,6 +248,8 @@ model User {
   // Profile
   avatar    String?
   phone     String?
+  // Hourly pay rate for labor-cost / prime-cost reporting. Null = not set.
+  hourlyRate Decimal? @db.Decimal(10, 2)
   // Preferred UI language (e.g. "tr", "en") — set on the onboarding page so a
   // user's language follows them across devices. Falls back to the SPA's
   // client-side i18n when null.

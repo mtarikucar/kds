@@ -608,6 +608,125 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Labor cost + prime cost. Labor is Σ (attendance worked-hours × the staff's
+   * hourlyRate); prime cost = COGS + labor (the two biggest controllable costs
+   * in a restaurant). Reports labor %, sales-per-labor-hour and per-staff cost.
+   * Staff with no hourlyRate contribute 0 and are counted so the gap shows.
+   */
+  async getLaborReport(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const attendances = await this.prisma.attendance.findMany({
+      where: {
+        tenantId,
+        ...branchScope,
+        date: { gte: dateRange.start, lte: dateRange.end },
+      },
+      select: {
+        totalWorkedMinutes: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            hourlyRate: true,
+          },
+        },
+      },
+    });
+
+    const perStaff = new Map<
+      string,
+      {
+        userId: string;
+        staffName: string;
+        role: string | null;
+        minutes: number;
+        costCents: number;
+        hasRate: boolean;
+      }
+    >();
+    let totalCostCents = 0;
+    let totalMinutes = 0;
+    let staffWithoutRate = 0;
+    const seenNoRate = new Set<string>();
+    for (const a of attendances) {
+      const u = a.user;
+      const hasRate = u?.hourlyRate != null;
+      const key = u?.id ?? "unknown";
+      if (!hasRate && !seenNoRate.has(key)) {
+        seenNoRate.add(key);
+        staffWithoutRate += 1;
+      }
+      const rate = hasRate
+        ? new Prisma.Decimal(u!.hourlyRate as any)
+        : new Prisma.Decimal(0);
+      const costCents = decimalToCents(
+        new Prisma.Decimal(a.totalWorkedMinutes).div(60).mul(rate),
+      );
+      totalCostCents += costCents;
+      totalMinutes += a.totalWorkedMinutes;
+      const e = perStaff.get(key) ?? {
+        userId: key,
+        staffName: u ? `${u.firstName} ${u.lastName}` : "Unknown",
+        role: u?.role ?? null,
+        minutes: 0,
+        costCents: 0,
+        hasRate,
+      };
+      e.minutes += a.totalWorkedMinutes;
+      e.costCents += costCents;
+      perStaff.set(key, e);
+    }
+
+    const [sales, cogsReport] = await Promise.all([
+      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId),
+      this.getCogsReport(tenantId, dateRange.start, dateRange.end, branchId),
+    ]);
+    const revenueCents = decimalToCents(sales.totalSales);
+    const cogsCents = decimalToCents(cogsReport.cogs);
+    const primeCostCents = cogsCents + totalCostCents;
+    const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+
+    const pct = (part: number) =>
+      revenueCents > 0 ? Math.round((part / revenueCents) * 1000) / 10 : null;
+
+    return {
+      laborCost: centsToCurrency(totalCostCents),
+      laborPct: pct(totalCostCents),
+      totalHours,
+      salesPerLaborHour:
+        totalHours > 0
+          ? centsToCurrency(Math.round(revenueCents / totalHours))
+          : null,
+      staffWithoutRate,
+      byStaff: [...perStaff.values()]
+        .map((e) => ({
+          userId: e.userId,
+          staffName: e.staffName,
+          role: e.role,
+          hours: Math.round((e.minutes / 60) * 100) / 100,
+          laborCost: centsToCurrency(e.costCents),
+          hasRate: e.hasRate,
+        }))
+        .sort((a, b) => b.laborCost - a.laborCost),
+      primeCost: centsToCurrency(primeCostCents),
+      primeCostPct: pct(primeCostCents),
+      cogs: cogsReport.cogs,
+      revenue: sales.totalSales,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
   async getTopProducts(
     tenantId: string,
     startDate?: Date,

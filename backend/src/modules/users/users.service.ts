@@ -228,6 +228,7 @@ export class UsersService {
           firstName: createUserDto.firstName,
           lastName: createUserDto.lastName,
           role: createUserDto.role,
+          hourlyRate: createUserDto.hourlyRate ?? null,
           // Admin/Manager-created accounts are already vetted — skip the
           // PENDING_APPROVAL flow used by public self-registration.
           status: "ACTIVE",
@@ -412,6 +413,7 @@ export class UsersService {
     if (dto.firstName !== undefined) data.firstName = dto.firstName;
     if (dto.lastName !== undefined) data.lastName = dto.lastName;
     if (dto.role !== undefined) data.role = dto.role;
+    if (dto.hourlyRate !== undefined) data.hourlyRate = dto.hourlyRate;
     if (dto.password !== undefined) {
       data.password = await bcrypt.hash(dto.password, this.bcryptCost());
     }

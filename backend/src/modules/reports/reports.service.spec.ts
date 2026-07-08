@@ -287,3 +287,48 @@ describe('ReportsService.getProfitAndLoss', () => {
     expect(res.expensesByCategory[0]).toMatchObject({ category: 'SALARY', amount: 3000 });
   });
 });
+
+/**
+ * Labor + prime cost. Labor = Σ worked-hours × hourlyRate; prime = COGS + labor.
+ */
+describe('ReportsService.getLaborReport', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('sums labor from worked-hours × rate and derives prime cost + labor %', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      { totalWorkedMinutes: 600, user: { id: 'u1', firstName: 'A', lastName: 'B', role: 'WAITER', hourlyRate: 20 } }, // 10h×20=200
+      { totalWorkedMinutes: 480, user: { id: 'u2', firstName: 'C', lastName: 'D', role: 'KITCHEN', hourlyRate: 25 } }, // 8h×25=200
+    ]);
+    jest.spyOn(svc, 'getSalesSummary').mockResolvedValue({ totalSales: 2000 } as any);
+    jest.spyOn(svc, 'getCogsReport').mockResolvedValue({ cogs: 600, startDate: start, endDate: end } as any);
+
+    const res = await svc.getLaborReport('t1', start, end);
+
+    expect(res.laborCost).toBe(400);
+    expect(res.laborPct).toBe(20); // 400/2000
+    expect(res.totalHours).toBe(18);
+    expect(res.primeCost).toBe(1000); // 600 cogs + 400 labor
+    expect(res.primeCostPct).toBe(50);
+    expect(res.byStaff).toHaveLength(2);
+  });
+
+  it('counts staff without an hourly rate (they contribute 0)', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      { totalWorkedMinutes: 600, user: { id: 'u1', firstName: 'A', lastName: 'B', role: 'WAITER', hourlyRate: null } },
+    ]);
+    jest.spyOn(svc, 'getSalesSummary').mockResolvedValue({ totalSales: 1000 } as any);
+    jest.spyOn(svc, 'getCogsReport').mockResolvedValue({ cogs: 0, startDate: start, endDate: end } as any);
+
+    const res = await svc.getLaborReport('t1', start, end);
+    expect(res.laborCost).toBe(0);
+    expect(res.staffWithoutRate).toBe(1);
+  });
+});
