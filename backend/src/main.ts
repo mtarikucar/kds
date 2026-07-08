@@ -140,9 +140,23 @@ async function bootstrap() {
 
   app.setGlobalPrefix("api");
 
-  const allowedOrigins = process.env.CORS_ORIGIN
+  const baseOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",")
     : ["http://localhost:5173", "http://localhost:5179"];
+  // Belt & braces for the canonical-host redirect: the SPA is also reachable
+  // on the www vhost, and a cached bundle there may still fire API calls from
+  // the www origin. Auto-allow the `www.` twin of every configured origin so
+  // those requests don't die in CORS (login used to fail silently on www).
+  const allowedOrigins = baseOrigins.flatMap((o) => {
+    try {
+      const u = new URL(o.trim());
+      if (u.hostname.startsWith("www.") || u.hostname === "localhost")
+        return [o.trim()];
+      return [o.trim(), `${u.protocol}//www.${u.host}`];
+    } catch {
+      return [o.trim()];
+    }
+  });
 
   // v2.8.94 — explicit tenant-subdomain regex with structural caps and
   // a reserved-name deny-list. Pre-fix `[a-z0-9-]+` matched any length
