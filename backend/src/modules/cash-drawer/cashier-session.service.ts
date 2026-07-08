@@ -137,7 +137,15 @@ export class CashierSessionService {
         where: {
           ...branchScope(scope),
           approvalStatus: "APPROVED",
-          type: { in: ["CASH_IN", "CASH_OUT"] },
+          type: {
+            in: [
+              "CASH_IN",
+              "CASH_OUT",
+              "SAFE_DROP",
+              "BANK_DEPOSIT",
+              "PETTY_CASH",
+            ],
+          },
           createdAt: window,
         },
         _sum: { amount: true },
@@ -149,7 +157,12 @@ export class CashierSessionService {
       );
     const cashSales = new Prisma.Decimal(cashSalesAgg._sum.amount ?? 0);
     const cashIn = drawerSum("CASH_IN");
-    const cashOut = drawerSum("CASH_OUT");
+    // Safe drops / bank deposits / petty-cash withdrawals all remove cash from
+    // the drawer, so they roll into cash-out for the expected-cash calc.
+    const cashOut = drawerSum("CASH_OUT")
+      .add(drawerSum("SAFE_DROP"))
+      .add(drawerSum("BANK_DEPOSIT"))
+      .add(drawerSum("PETTY_CASH"));
     const expected = new Prisma.Decimal(session.openingFloat)
       .add(cashSales)
       .add(cashIn)

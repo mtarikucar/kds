@@ -14,10 +14,29 @@ import {
 
 export class CreateCashDrawerMovementDto {
   @ApiProperty({
-    description: "Movement type",
-    enum: ["OPENING", "CLOSING", "CASH_IN", "CASH_OUT", "ADJUSTMENT"],
+    description:
+      "Movement type. SAFE_DROP / BANK_DEPOSIT / PETTY_CASH remove cash from the drawer (counted as cash-out at reconciliation).",
+    enum: [
+      "OPENING",
+      "CLOSING",
+      "CASH_IN",
+      "CASH_OUT",
+      "ADJUSTMENT",
+      "SAFE_DROP",
+      "BANK_DEPOSIT",
+      "PETTY_CASH",
+    ],
   })
-  @IsIn(["OPENING", "CLOSING", "CASH_IN", "CASH_OUT", "ADJUSTMENT"])
+  @IsIn([
+    "OPENING",
+    "CLOSING",
+    "CASH_IN",
+    "CASH_OUT",
+    "ADJUSTMENT",
+    "SAFE_DROP",
+    "BANK_DEPOSIT",
+    "PETTY_CASH",
+  ])
   type: string;
 
   @ApiProperty({

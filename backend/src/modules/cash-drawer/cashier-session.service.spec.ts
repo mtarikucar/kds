@@ -100,3 +100,32 @@ describe('CashierSessionService', () => {
     await expect(svc.getXReport(SCOPE, 'sess-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('CashierSessionService — safe drops / petty cash reduce expected cash', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: CashierSessionService;
+  beforeEach(() => {
+    prisma = {
+      cashierSession: { findFirst: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUnique: jest.fn() },
+      payment: { aggregate: jest.fn() },
+      cashDrawerMovement: { groupBy: jest.fn() },
+    };
+    svc = new CashierSessionService(prisma);
+  });
+
+  it('counts SAFE_DROP + BANK_DEPOSIT + PETTY_CASH as cash-out in the X-report', async () => {
+    prisma.cashierSession.findFirst.mockResolvedValue({ id: 's1', status: 'OPEN', openingFloat: 500, openedAt: new Date('2026-06-01T08:00:00Z') });
+    prisma.payment.aggregate.mockResolvedValue({ _sum: { amount: 1000 } });
+    prisma.cashDrawerMovement.groupBy.mockResolvedValue([
+      { type: 'CASH_OUT', _sum: { amount: 30 } },
+      { type: 'SAFE_DROP', _sum: { amount: 200 } },
+      { type: 'BANK_DEPOSIT', _sum: { amount: 100 } },
+      { type: 'PETTY_CASH', _sum: { amount: 20 } },
+    ]);
+    const x = await svc.getXReport(SCOPE, 's1');
+    // expected = 500 + 1000 − (30 + 200 + 100 + 20) = 1150
+    expect(x.expectedCash).toBe(1150);
+    expect(x.cashOut).toBe(350);
+  });
+});
