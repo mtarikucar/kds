@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OrderStatus } from "../../common/constants/order-status.enum";
 import { getTenantMidnight } from "../../common/helpers/timezone.helper";
+import { toCsv } from "../../common/utils/csv.util";
 
 /**
  * Hard cap on the explicit date window a single report call can request.
@@ -211,6 +212,80 @@ export class ReportsService {
       startDate: dateRange.start,
       endDate: dateRange.end,
     };
+  }
+
+  /**
+   * Period-over-period comparison — the current window vs the immediately
+   * preceding window of equal length (last-7-days vs the 7 days before, this
+   * month vs last month, etc.). Returns each headline metric with its absolute
+   * change and % change so trends are visible, not just point-in-time totals.
+   */
+  async getSalesComparison(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const spanMs = dateRange.end.getTime() - dateRange.start.getTime();
+    const prevStart = new Date(dateRange.start.getTime() - spanMs);
+    const prevEnd = new Date(dateRange.start.getTime());
+
+    const [cur, prev, curCogs, prevCogs] = await Promise.all([
+      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId),
+      this.getSalesSummary(tenantId, prevStart, prevEnd, branchId),
+      this.getCogsReport(tenantId, dateRange.start, dateRange.end, branchId),
+      this.getCogsReport(tenantId, prevStart, prevEnd, branchId),
+    ]);
+
+    const pctChange = (c: number, p: number) =>
+      p > 0 ? Math.round(((c - p) / p) * 1000) / 10 : null;
+    const metric = (name: string, c: number, p: number) => ({
+      metric: name,
+      current: c,
+      previous: p,
+      change: Math.round((c - p) * 100) / 100,
+      changePct: pctChange(c, p),
+    });
+
+    return {
+      current: { startDate: dateRange.start, endDate: dateRange.end },
+      previous: { startDate: prevStart, endDate: prevEnd },
+      metrics: [
+        metric("totalSales", cur.totalSales, prev.totalSales),
+        metric("totalOrders", cur.totalOrders, prev.totalOrders),
+        metric(
+          "averageOrderValue",
+          cur.averageOrderValue,
+          prev.averageOrderValue,
+        ),
+        metric("cogs", curCogs.cogs, prevCogs.cogs),
+        metric("grossProfit", curCogs.grossProfit, prevCogs.grossProfit),
+      ],
+      foodCostPct: {
+        current: curCogs.foodCostPct,
+        previous: prevCogs.foodCostPct,
+      },
+    };
+  }
+
+  /** Daily sales breakdown as a CSV string for accountant/spreadsheet export. */
+  async getSalesSummaryCsv(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ): Promise<string> {
+    const summary = await this.getSalesSummary(
+      tenantId,
+      startDate,
+      endDate,
+      branchId,
+    );
+    return toCsv(
+      ["date", "orders", "sales"],
+      summary.dailySales.map((d) => [d.date, d.orders, d.sales]),
+    );
   }
 
   /**

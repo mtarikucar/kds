@@ -214,3 +214,41 @@ describe('ReportsService.getTipsReport', () => {
     expect(res.byMethod[1]).toMatchObject({ method: 'CASH', tips: 20 });
   });
 });
+
+/**
+ * Period-over-period comparison — current window vs the immediately preceding
+ * equal-length window, with absolute + % change per metric.
+ */
+describe('ReportsService.getSalesComparison', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('computes deltas vs the previous equal-length window', async () => {
+    jest.spyOn(svc, 'getSalesSummary')
+      .mockResolvedValueOnce({ totalSales: 1200, totalOrders: 100, averageOrderValue: 12 } as any)
+      .mockResolvedValueOnce({ totalSales: 1000, totalOrders: 80, averageOrderValue: 12.5 } as any);
+    jest.spyOn(svc, 'getCogsReport')
+      .mockResolvedValueOnce({ cogs: 360, grossProfit: 840, foodCostPct: 30 } as any)
+      .mockResolvedValueOnce({ cogs: 320, grossProfit: 680, foodCostPct: 32 } as any);
+
+    const res = await svc.getSalesComparison(
+      't1',
+      new Date('2026-06-16T00:00:00Z'),
+      new Date('2026-06-30T00:00:00Z'),
+    );
+
+    const sales = res.metrics.find((m: any) => m.metric === 'totalSales');
+    expect(sales.current).toBe(1200);
+    expect(sales.previous).toBe(1000);
+    expect(sales.change).toBe(200);
+    expect(sales.changePct).toBe(20);
+    expect(res.foodCostPct).toEqual({ current: 30, previous: 32 });
+    // The previous window is the 14 days immediately before the current start.
+    expect(res.previous.endDate.getTime()).toBe(new Date('2026-06-16T00:00:00Z').getTime());
+  });
+});

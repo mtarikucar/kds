@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Request, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Header,
+  Query,
+  Request,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -38,6 +45,40 @@ export class ReportsController {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
     return this.reportsService.getSalesSummary(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+    );
+  }
+
+  @Get("sales-comparison")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({
+    summary: "Sales vs the previous equal-length window (MoM/period-over-period)",
+  })
+  async getSalesComparison(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getSalesComparison(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+    );
+  }
+
+  @Get("sales.csv")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @Header("Content-Type", "text/csv; charset=utf-8")
+  @Header("Content-Disposition", 'attachment; filename="sales.csv"')
+  @ApiOperation({ summary: "Daily sales breakdown as CSV (accountant export)" })
+  async getSalesCsv(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getSalesSummaryCsv(
       req.tenantId,
       start,
       end,
