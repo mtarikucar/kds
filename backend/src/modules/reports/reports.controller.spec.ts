@@ -105,3 +105,54 @@ describe('ReportsController — branch authorization (audit fix)', () => {
     expect(branchId).toBe('branch-X');
   });
 });
+
+describe('ReportsController — branchFor edge cases (2nd-pass fixes)', () => {
+  const mk = () => {
+    const svc: any = {
+      getTipDistribution: jest.fn().mockResolvedValue({}),
+      getProfitAndLoss: jest.fn().mockResolvedValue({}),
+    };
+    return { svc, ctrl: new (require('./reports.controller').ReportsController)(svc) };
+  };
+
+  it('narrowed ADMIN cannot read a branch outside allowedBranchIds', async () => {
+    const { svc, ctrl } = mk();
+    const req = {
+      tenantId: 't1',
+      scope: { role: 'ADMIN', tenantId: 't1', branchId: 'A', userId: 'u1' },
+      user: { allowedBranchIds: ['A'] }, // narrowed admin
+    };
+    await ctrl.getProfitAndLoss(req, { branchId: 'B' });
+    expect(svc.getProfitAndLoss.mock.calls[0][3]).toBe('A'); // locked, not 'B'
+  });
+
+  it('narrowed ADMIN CAN read a branch inside allowedBranchIds', async () => {
+    const { svc, ctrl } = mk();
+    const req = {
+      tenantId: 't1',
+      scope: { role: 'ADMIN', tenantId: 't1', branchId: 'A', userId: 'u1' },
+      user: { allowedBranchIds: ['A', 'B'] },
+    };
+    await ctrl.getProfitAndLoss(req, { branchId: 'B' });
+    expect(svc.getProfitAndLoss.mock.calls[0][3]).toBe('B');
+  });
+
+  it('tip-distribution is branch-authorized (MANAGER locked to scope branch)', async () => {
+    const { svc, ctrl } = mk();
+    const req = {
+      tenantId: 't1',
+      scope: { role: 'MANAGER', tenantId: 't1', branchId: 'my', userId: 'u1' },
+      user: { allowedBranchIds: ['my'] },
+    };
+    await ctrl.getTipDistribution(req, { branchId: 'sibling' });
+    expect(svc.getTipDistribution.mock.calls[0][3]).toBe('my'); // not 'sibling'
+  });
+
+  it('consolidated-pnl rejects a narrowed ADMIN', async () => {
+    const svc: any = { getConsolidatedPnl: jest.fn().mockResolvedValue({}) };
+    const ctrl = new (require('./reports.controller').ReportsController)(svc);
+    const req = { tenantId: 't1', user: { allowedBranchIds: ['A'] } };
+    await expect(ctrl.getConsolidatedPnl(req, {})).rejects.toThrow();
+    expect(svc.getConsolidatedPnl).not.toHaveBeenCalled();
+  });
+});

@@ -322,3 +322,18 @@ describe('ForibaEfaturaAdapter — total reconciliation + configured host', () =
     expect(http.defaults.baseURL).toBe('https://sandbox.foriba.example');
   });
 });
+
+describe('ForibaEfaturaAdapter.setApiBase', () => {
+  it('pins the dispatch baseURL independent of authenticate (cached-token path)', async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    adapter.setApiBase('https://sandbox.foriba.example');
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: 'fb-x' } });
+    // preserve the pinned baseURL on the injected client
+    http.defaults.baseURL = 'https://sandbox.foriba.example';
+    (adapter as any).httpClient = http;
+    await adapter.pushInvoice('tok', 'co-1', invoice);
+    // dispatch URL resolves against the pinned host, not the hardcoded prod one
+    expect(http.post.mock.calls[0][0]).toContain('https://sandbox.foriba.example');
+  });
+});

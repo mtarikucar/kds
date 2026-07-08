@@ -424,6 +424,9 @@ export class PurchaseOrdersService {
             where: { id: si.id, ...branchScope(scope) },
             data: { costPerUnit: newCost as any },
           });
+          // Accumulate in the map so a stock item appearing on >1 line adds up
+          // instead of the last write clobbering earlier allocations.
+          si.costPerUnit = newCost as any;
           await tx.ingredientMovement.create({
             data: {
               type: "LANDED_COST",

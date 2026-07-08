@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Header,
   Query,
@@ -37,17 +38,26 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   /**
-   * Resolve which branch a report may read. ADMINs manage the whole tenant, so
-   * they may target any branch in it (or tenant-wide when branchId is omitted).
-   * A non-admin is locked to the branch BranchGuard authorized on req.scope — a
-   * caller-supplied query.branchId can NOT widen access to a sibling branch.
+   * Resolve which branch a report may read.
+   * - Wildcard ADMIN (empty allowedBranchIds = full tenant access): any branch,
+   *   or tenant-wide when branchId is omitted.
+   * - Everyone else (MANAGER, or an ADMIN narrowed to specific branches): an
+   *   explicitly-requested branchId is honored ONLY if it's in their allow-list;
+   *   otherwise they're locked to the branch BranchGuard validated (req.scope).
+   * A caller-supplied query.branchId can never widen access beyond the allow-list.
    */
   private branchFor(
     req: any,
     query: { branchId?: string },
   ): string | undefined {
     const scope = req.scope;
-    if (scope?.role === UserRole.ADMIN) return query.branchId;
+    const allowed: string[] = req.user?.allowedBranchIds ?? [];
+    const isWildcardAdmin =
+      scope?.role === UserRole.ADMIN && allowed.length === 0;
+    if (isWildcardAdmin) return query.branchId;
+    if (query.branchId && allowed.includes(query.branchId)) {
+      return query.branchId;
+    }
     return scope?.branchId;
   }
 
@@ -213,7 +223,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
       pool,
     );
   }
@@ -250,12 +260,20 @@ export class ReportsController {
   }
 
   @Get("consolidated-pnl")
-  // Tenant-wide (every branch) — ADMIN only. A branch-restricted MANAGER must
-  // not read sibling branches' financials via the consolidated view.
+  // Tenant-wide (every branch) — WILDCARD ADMIN only. A branch-restricted
+  // MANAGER or a narrowed ADMIN (non-empty allowedBranchIds) must not read
+  // sibling branches' financials via the consolidated view.
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
-  @ApiOperation({ summary: "Consolidated P&L across all branches (ADMIN)" })
+  @ApiOperation({
+    summary: "Consolidated P&L across all branches (full-access ADMIN)",
+  })
   async getConsolidatedPnl(@Request() req, @Query() query: DateRangeQueryDto) {
+    if ((req.user?.allowedBranchIds ?? []).length > 0) {
+      throw new ForbiddenException(
+        "Consolidated P&L is available only to full-tenant admins",
+      );
+    }
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
     return this.reportsService.getConsolidatedPnl(req.tenantId, start, end);

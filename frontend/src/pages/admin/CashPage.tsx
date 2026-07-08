@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { Wallet, Coins, Printer, Landmark } from 'lucide-react';
@@ -65,7 +66,16 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
   return (
     <div className="space-y-4">
     <div className="flex justify-end">
-      <button onClick={() => downloadSessionsCsv()} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+      <button
+        onClick={async () => {
+          try {
+            await downloadSessionsCsv();
+          } catch {
+            toast.error('CSV indirilemedi — tekrar deneyin.');
+          }
+        }}
+        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
+      >
         Z geçmişi CSV indir
       </button>
     </div>

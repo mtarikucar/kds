@@ -135,6 +135,13 @@ export class AccountingSyncService {
       // apiUrl) pass through unchanged.
       const creds =
         await this.settingsService.getDecryptedCredentials(tenantId);
+      // Pin Foriba's dispatch host to the configured apiUrl on EVERY sync — the
+      // adapter is freshly constructed per call and getToken() may skip
+      // authenticate() on a cached token, so the baseURL set inside authenticate
+      // wouldn't be applied to this instance (would fall back to prod).
+      if (adapter instanceof ForibaEfaturaAdapter) {
+        adapter.setApiBase(((creds ?? settings) as any).foribaApiUrl || "");
+      }
       const token = await this.getToken(tenantId, creds ?? settings, adapter);
       const companyId = this.getCompanyId(creds ?? settings);
 

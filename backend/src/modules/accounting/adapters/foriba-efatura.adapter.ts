@@ -24,6 +24,17 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
     return this;
   }
 
+  /**
+   * Pin the dispatch host to the tenant-configured apiUrl. Must be called on
+   * EVERY sync (the service builds a fresh adapter per call and may skip
+   * authenticate() on a cached token), otherwise pushInvoice's fallback would
+   * dispatch to the hardcoded production endpoint even for a sandbox tenant.
+   */
+  setApiBase(url: string): this {
+    if (url) this.httpClient.defaults.baseURL = url;
+    return this;
+  }
+
   async authenticate(
     credentials: Record<string, string>,
   ): Promise<{ accessToken: string; expiresAt?: Date }> {
