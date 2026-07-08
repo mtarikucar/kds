@@ -3214,6 +3214,10 @@ model PurchaseOrder {
   updatedAt   DateTime  @updatedAt
   submittedAt DateTime?
   receivedAt  DateTime?
+  // Manager approval audit — set by approve() when a PENDING_APPROVAL PO clears
+  // the threshold gate. Null on POs that never needed approval.
+  approvedById String?
+  approvedAt   DateTime?
 
   // Relations
   items    PurchaseOrderItem[]
@@ -3486,6 +3490,9 @@ model StockSettings {
   // below zero are refused. When true, negative stock is allowed and
   // the shortfall is recorded for investigation.
   allowNegativeStock  Boolean @default(false)
+  // When set, a submitted PO whose total ≥ this needs a manager approve()
+  // before it can be received. Null = no approval gate (submit → SUBMITTED).
+  poApprovalThreshold Decimal? @db.Decimal(12, 2)
   // Monotonic per-tenant PO counter; used by purchase-orders.service
   // to mint collision-free order numbers in a transaction.
   poSequence          Int     @default(0)

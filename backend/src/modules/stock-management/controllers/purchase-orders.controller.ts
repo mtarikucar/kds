@@ -78,6 +78,15 @@ export class PurchaseOrdersController {
     return this.service.submit(id, scope);
   }
 
+  @Post(":id/approve")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Approve a purchase order awaiting approval (over threshold)",
+  })
+  approve(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.approve(id, scope, scope.userId);
+  }
+
   @Post(":id/receive")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Receive items against a purchase order" })

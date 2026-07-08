@@ -411,3 +411,53 @@ describe('PurchaseOrdersService.receive — purchase-unit (UOM) conversion', () 
     expect(txMock.purchaseOrderItem.update.mock.calls[0][0].data.quantityReceived.toString()).toBe('2');
   });
 });
+
+describe('PurchaseOrdersService — approval gate (submit + approve)', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+  const draftPo = { id: 'po1', status: 'DRAFT', items: [{ quantityOrdered: 10, unitPrice: 100 }] }; // total 1000
+
+  beforeEach(() => {
+    prisma = {
+      purchaseOrder: {
+        findFirst: jest.fn().mockResolvedValue(draftPo),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'po1' }),
+      },
+      stockSettings: { findFirst: jest.fn() },
+    };
+    svc = new PurchaseOrdersService(prisma);
+  });
+
+  it('routes submit to PENDING_APPROVAL when total ≥ threshold', async () => {
+    prisma.stockSettings.findFirst.mockResolvedValue({ poApprovalThreshold: 500 });
+    await svc.submit('po1', SCOPE);
+    expect(prisma.purchaseOrder.updateMany.mock.calls[0][0].data.status).toBe('PENDING_APPROVAL');
+  });
+
+  it('routes submit straight to SUBMITTED below threshold', async () => {
+    prisma.stockSettings.findFirst.mockResolvedValue({ poApprovalThreshold: 5000 });
+    await svc.submit('po1', SCOPE);
+    expect(prisma.purchaseOrder.updateMany.mock.calls[0][0].data.status).toBe('SUBMITTED');
+  });
+
+  it('routes submit to SUBMITTED when no threshold is configured', async () => {
+    prisma.stockSettings.findFirst.mockResolvedValue(null);
+    await svc.submit('po1', SCOPE);
+    expect(prisma.purchaseOrder.updateMany.mock.calls[0][0].data.status).toBe('SUBMITTED');
+  });
+
+  it('approve() moves PENDING_APPROVAL → SUBMITTED with approver audit', async () => {
+    await svc.approve('po1', SCOPE, 'mgr1');
+    const call = prisma.purchaseOrder.updateMany.mock.calls[0][0];
+    expect(call.where.status).toBe('PENDING_APPROVAL');
+    expect(call.data.status).toBe('SUBMITTED');
+    expect(call.data.approvedById).toBe('mgr1');
+  });
+
+  it('approve() rejects a PO that is not awaiting approval', async () => {
+    prisma.purchaseOrder.updateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.approve('po1', SCOPE, 'mgr1')).rejects.toThrow();
+  });
+});

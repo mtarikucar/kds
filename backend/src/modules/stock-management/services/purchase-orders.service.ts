@@ -186,6 +186,25 @@ export class PurchaseOrdersService {
       );
     }
 
+    // Approval gate: when a threshold is configured and this PO's total meets
+    // it, submit lands in PENDING_APPROVAL (a manager must approve() before it
+    // can be received). No threshold → straight to SUBMITTED, unchanged.
+    const settings = await this.prisma.stockSettings.findFirst({
+      where: { tenantId: scope.tenantId },
+      select: { poApprovalThreshold: true },
+    });
+    const total = (po.items ?? []).reduce(
+      (s: Prisma.Decimal, i: any) =>
+        s.add(new Prisma.Decimal(i.quantityOrdered).mul(i.unitPrice)),
+      new Prisma.Decimal(0),
+    );
+    const needsApproval =
+      settings?.poApprovalThreshold != null &&
+      total.gte(new Prisma.Decimal(settings.poApprovalThreshold));
+    const nextStatus = needsApproval
+      ? PurchaseOrderStatus.PENDING_APPROVAL
+      : PurchaseOrderStatus.SUBMITTED;
+
     // Atomic claim with branch + status predicate — if a parallel call
     // already submitted this PO (or it slipped to another state), the
     // updateMany returns 0 and we abort instead of clobbering a more
@@ -193,10 +212,47 @@ export class PurchaseOrdersService {
     // branchId) filter).
     const result = await this.prisma.purchaseOrder.updateMany({
       where: { id, ...branchScope(scope), status: PurchaseOrderStatus.DRAFT },
-      data: { status: PurchaseOrderStatus.SUBMITTED, submittedAt: new Date() },
+      data: { status: nextStatus, submittedAt: new Date() },
     });
     if (result.count === 0) {
       throw new BadRequestException("Purchase order is no longer in DRAFT");
+    }
+    return this.prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        items: {
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, branchId: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Manager approval of a PENDING_APPROVAL PO — moves it to SUBMITTED (so it
+   * can be received) and records who approved and when. Claim-first on the
+   * PENDING_APPROVAL status so a double-approve or a cancelled PO can't slip
+   * through. Controller-gated to ADMIN/MANAGER.
+   */
+  async approve(id: string, scope: BranchScope, userId: string) {
+    const result = await this.prisma.purchaseOrder.updateMany({
+      where: {
+        id,
+        ...branchScope(scope),
+        status: PurchaseOrderStatus.PENDING_APPROVAL,
+      },
+      data: {
+        status: PurchaseOrderStatus.SUBMITTED,
+        approvedById: userId,
+        approvedAt: new Date(),
+      },
+    });
+    if (result.count === 0) {
+      throw new BadRequestException("Purchase order is not awaiting approval");
     }
     return this.prisma.purchaseOrder.findUnique({
       where: { id },

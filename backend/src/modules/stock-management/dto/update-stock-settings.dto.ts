@@ -51,4 +51,13 @@ export class UpdateStockSettingsDto {
   @IsBoolean()
   @IsOptional()
   allowNegativeStock?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "PO total at/above which a submitted PO needs manager approval before receiving. Omit/null to disable the approval gate.",
+  })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  poApprovalThreshold?: number;
 }
