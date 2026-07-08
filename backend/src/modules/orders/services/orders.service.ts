@@ -988,6 +988,20 @@ export class OrdersService {
 
     // If items are provided, update the order items
     if (updateOrderDto.items && updateOrderDto.items.length > 0) {
+      // Combos can't be edited in place (v1): this rewrite path prices flat
+      // lines and would strip a combo's children + per-line KDV, minting a
+      // wrong bill. Force a remove-&-re-add instead (money-safety guard).
+      const orderHasCombo = ((order as any).orderItems ?? []).some(
+        (oi: any) =>
+          oi.parentOrderItemId != null ||
+          oi.product?.productType === "COMBO",
+      );
+      if (orderHasCombo) {
+        throw new BadRequestException(
+          "Kombo içeren sipariş kalem bazında düzenlenemez — komboyu kaldırıp yeniden ekleyin",
+        );
+      }
+
       // Validate all products exist and belong to tenant
       // (Product/Modifier are tenant-scoped catalog rows, not branch-scoped.)
       // Eager-load modifier groups so update() enforces the SAME
@@ -1026,6 +1040,14 @@ export class OrdersService {
       if (unavailableProducts.length > 0) {
         throw new BadRequestException(
           `Products not available: ${unavailableProducts.map((p) => p.name).join(", ")}`,
+        );
+      }
+
+      // A COMBO can't be introduced via PATCH — combos are chosen at order
+      // creation (POS/QR) where the slot selections are collected.
+      if (products.some((p) => (p as any).productType === "COMBO")) {
+        throw new BadRequestException(
+          "Kombo ürün bu ekrandan eklenemez — kombolar sipariş oluştururken seçilir",
         );
       }
 
