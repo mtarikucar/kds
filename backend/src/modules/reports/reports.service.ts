@@ -94,6 +94,24 @@ export class ReportsService {
     const end =
       endDate ??
       getTenantMidnight(new Date(now.getTime() + MILLIS_PER_DAY), tz);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new BadRequestException("startDate / endDate must be valid dates");
+    }
+    if (start > end) {
+      throw new BadRequestException(
+        "startDate must be before or equal to endDate",
+      );
+    }
+    // Apply the window cap on the RESOLVED pair too — otherwise passing only
+    // startDate (end defaults to now) bypasses the cap and unbounds the query.
+    if (
+      (end.getTime() - start.getTime()) / MILLIS_PER_DAY >
+      REPORT_MAX_WINDOW_DAYS
+    ) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${REPORT_MAX_WINDOW_DAYS} days. Split the report into smaller windows.`,
+      );
+    }
     return { start, end };
   }
 

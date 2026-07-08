@@ -200,6 +200,23 @@ describe("StockItemsService", () => {
       expect("sku" in arg.data).toBe(false);
     });
 
+    it("strips currentStock + costPerUnit from a metadata update (ledger fields are movement/count-only)", async () => {
+      (prisma.stockItem.findFirst as any).mockResolvedValue({ id: "si-1" });
+      (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.stockItem.findUnique as any).mockResolvedValue({ id: "si-1" });
+
+      await svc.update(
+        "si-1",
+        { name: "New", currentStock: 9999, costPerUnit: 42 } as any,
+        SCOPE,
+      );
+
+      const arg = (prisma.stockItem.updateMany as any).mock.calls[0][0];
+      expect("currentStock" in arg.data).toBe(false);
+      expect("costPerUnit" in arg.data).toBe(false);
+      expect(arg.data.name).toBe("New");
+    });
+
     it("throws NotFound when the update matched 0 rows (deleted mid-flight)", async () => {
       (prisma.stockItem.findFirst as any).mockResolvedValue({ id: "si-1" });
       (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 0 });

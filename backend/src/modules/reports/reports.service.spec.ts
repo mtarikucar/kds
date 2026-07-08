@@ -54,6 +54,15 @@ describe('ReportsService.getDateRange (iter-64)', () => {
     );
   });
 
+  it('rejects a far-past startDate with NO endDate (cap applied to the resolved window)', async () => {
+    // pass-5 M4: the cap used to live only inside `if (start && end)`, so
+    // omitting endDate (end defaults to now) bypassed it and unbounded the query.
+    const start = new Date('2020-01-01T00:00:00Z');
+    await expect(
+      svc.getSalesSummary('t1', start, undefined as any),
+    ).rejects.toThrow(/366 days/);
+  });
+
   it('rejects inverted ranges (endDate before startDate)', async () => {
     const start = new Date('2026-06-30T00:00:00Z');
     const end = new Date('2026-01-01T00:00:00Z');

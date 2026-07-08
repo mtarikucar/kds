@@ -48,7 +48,7 @@ interface ExpenseForm {
 export default function FinanceTab({ dateRange }: Props) {
   const fmt = useFormatCurrency();
   const { data: pnl, isLoading: pnlLoading } = useProfitAndLoss(dateRange);
-  const { data: labor } = useLaborReport(dateRange);
+  const { data: labor, isLoading: laborLoading } = useLaborReport(dateRange);
   const { data: summary } = useExpenseSummary(dateRange);
   const { data: expenses } = useExpenses(dateRange);
   const createExpense = useCreateExpense();
@@ -99,6 +99,7 @@ export default function FinanceTab({ dateRange }: Props) {
           sub={pct(labor?.primeCostPct)}
           icon={Users}
           tone="indigo"
+          loading={laborLoading}
         />
       </div>
 

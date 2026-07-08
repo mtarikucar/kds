@@ -13,6 +13,7 @@ import {
   IngredientMovementType,
 } from "../../../common/constants/stock-management.enum";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { drawDownBatchesFifo } from "../../../common/stock/batch-drawdown";
 
 @Injectable()
 export class StockCountsService {
@@ -239,6 +240,32 @@ export class StockCountsService {
           where: { id: item.stockItemId, ...branchScope(scope) },
           data: { currentStock: { increment: adjustment as any } },
         });
+
+        // Keep the FIFO batch ledger in sync with the count adjustment so
+        // batch-valuation + FIFO-COGS don't drift: shrinkage draws batches
+        // down oldest-first; a positive count adds a batch at the item's
+        // moving-average cost.
+        if (adjustment.isNegative()) {
+          await drawDownBatchesFifo(
+            tx,
+            {
+              stockItemId: item.stockItemId,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+            },
+            adjustment.abs(),
+          );
+        } else {
+          await tx.stockBatch.create({
+            data: {
+              quantity: adjustment as any,
+              costPerUnit: current.costPerUnit as any,
+              stockItemId: item.stockItemId,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+            },
+          });
+        }
 
         await tx.ingredientMovement.create({
           data: {

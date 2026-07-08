@@ -149,7 +149,15 @@ function MoreTab({ fmt }: { fmt: Fmt }) {
             <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm">
               <p className="font-semibold">{found.name}</p>
               <p className="text-slate-600">Stok: {found.currentStock} {found.unit} · Maliyet: {fmt(Number(found.costPerUnit ?? 0))} · Barkod: {found.barcode}</p>
-              <SupplierReturnForm stockItemId={found.id} stockItemName={found.name} />
+              <SupplierReturnForm
+                stockItemId={found.id}
+                stockItemName={found.name}
+                onReturned={(q) =>
+                  setFound((f: any) =>
+                    f ? { ...f, currentStock: Number(f.currentStock) - q } : f
+                  )
+                }
+              />
             </div>
           )}
           {notFound && <p className="mt-3 text-sm text-rose-600">Bu barkodla eşleşen stok kalemi bulunamadı.</p>}
@@ -159,7 +167,7 @@ function MoreTab({ fmt }: { fmt: Fmt }) {
   );
 }
 
-function SupplierReturnForm({ stockItemId, stockItemName }: { stockItemId: string; stockItemName: string }) {
+function SupplierReturnForm({ stockItemId, stockItemName, onReturned }: { stockItemId: string; stockItemName: string; onReturned?: (qty: number) => void }) {
   const { data: suppliers } = useSuppliers();
   const ret = useSupplierReturn();
   const [supplierId, setSupplierId] = useState('');
@@ -168,16 +176,19 @@ function SupplierReturnForm({ stockItemId, stockItemName }: { stockItemId: strin
 
   const submit = () => {
     if (!supplierId || !Number(qty)) return;
+    const returnedQty = Number(qty);
     ret.mutate(
       {
         supplierId,
         reason: reason || undefined,
-        items: [{ stockItemId, quantity: Number(qty) }],
+        items: [{ stockItemId, quantity: returnedQty }],
       },
       {
         // Reset after a successful return so a second click can't re-submit the
-        // same decrement against a stale form.
+        // same decrement against a stale form, and refresh the parent's stock
+        // card so the displayed on-hand reflects the return.
         onSuccess: () => {
+          onReturned?.(returnedQty);
           setSupplierId('');
           setQty('');
           setReason('');

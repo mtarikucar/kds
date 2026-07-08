@@ -176,10 +176,15 @@ export class StockTransferService {
           const destData: Record<string, any> = {
             currentStock: { increment: qtyDec as any },
           };
+          // Cost carried on the transfer line, or the dest item's current cost
+          // when the line omitted it — so a batch layer ALWAYS exists for the
+          // incremented units (Σ dest batch stays == dest currentStock).
+          const batchCost =
+            item.unitCost != null
+              ? new Prisma.Decimal(item.unitCost)
+              : new Prisma.Decimal(destItem.costPerUnit);
           if (item.unitCost != null) {
-            // Weighted-average the incoming cost into the dest item AND put it on
-            // a FIFO batch, so a later sale records the real cost in COGS
-            // (deduction reads batch cost, falling back to costPerUnit).
+            // Weighted-average the incoming cost into the dest moving-average.
             // Clamp negative on-hand to 0 (allowNegativeStock) so the weighted
             // average can't skew outside [existingCost, unitCost] — mirrors the
             // receive() fix (v2.8.94).
@@ -188,26 +193,25 @@ export class StockTransferService {
               0,
             );
             const existingCost = new Prisma.Decimal(destItem.costPerUnit);
-            const unitCost = new Prisma.Decimal(item.unitCost);
             const total = existing.add(qtyDec);
             destData.costPerUnit = (
               total.gt(0)
                 ? existing
                     .mul(existingCost)
-                    .add(qtyDec.mul(unitCost))
+                    .add(qtyDec.mul(batchCost))
                     .div(total)
-                : unitCost
+                : batchCost
             ) as any;
-            await tx.stockBatch.create({
-              data: {
-                quantity: qtyDec as any,
-                costPerUnit: unitCost as any,
-                stockItemId: item.destStockItemId,
-                tenantId: scope.tenantId,
-                branchId: transfer.toBranchId,
-              },
-            });
           }
+          await tx.stockBatch.create({
+            data: {
+              quantity: qtyDec as any,
+              costPerUnit: batchCost as any,
+              stockItemId: item.destStockItemId,
+              tenantId: scope.tenantId,
+              branchId: transfer.toBranchId,
+            },
+          });
           await tx.stockItem.updateMany({
             where: {
               id: item.destStockItemId,

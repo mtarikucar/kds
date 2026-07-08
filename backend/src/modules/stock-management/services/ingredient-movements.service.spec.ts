@@ -130,6 +130,11 @@ describe("IngredientMovementsService", () => {
           findFirst: jest.fn(),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
+        stockBatch: {
+          findMany: jest.fn().mockResolvedValue([]),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          create: jest.fn().mockResolvedValue({}),
+        },
         ingredientMovement: {
           create: jest.fn().mockResolvedValue({ id: "mov-1" }),
         },

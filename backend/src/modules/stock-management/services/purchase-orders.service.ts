@@ -417,24 +417,39 @@ export class PurchaseOrdersService {
           const allocated = extra.mul(lineValue).div(totalValue);
           const si = itemMap.get(line.stockItemId)!;
           const currentStock = new Prisma.Decimal(si.currentStock);
-          const perUnitUplift = allocated.div(currentStock);
-          const newCost = new Prisma.Decimal(si.costPerUnit).add(perUnitUplift);
+          // Moving-average uplift is per authoritative on-hand unit.
+          const newCost = new Prisma.Decimal(si.costPerUnit).add(
+            allocated.div(currentStock),
+          );
           await tx.stockItem.updateMany({
             where: { id: si.id, ...branchScope(scope) },
             data: { costPerUnit: newCost as any },
           });
-          // Capitalize the freight onto the FIFO cost ledger too: the deduction
-          // path (and COGS) reads StockBatch.costPerUnit, not the moving-average
-          // stockItem.costPerUnit. Bumping every on-hand batch by the per-unit
-          // uplift makes the landed cost actually reach COGS + batch valuation.
-          await tx.stockBatch.updateMany({
+          // Capitalize the freight onto the FIFO cost ledger too (deduction/COGS
+          // read StockBatch.costPerUnit). Divide by the ACTUAL on-hand batch sum
+          // — not currentStock — so Σ(batch.qty × increment) == allocated even
+          // when the batch ledger has drifted from currentStock.
+          const batchAgg = await tx.stockBatch.aggregate({
             where: {
               stockItemId: si.id,
               ...branchScope(scope),
               quantity: { gt: 0 },
             },
-            data: { costPerUnit: { increment: perUnitUplift as any } },
+            _sum: { quantity: true },
           });
+          const batchQty = new Prisma.Decimal(batchAgg._sum.quantity ?? 0);
+          if (batchQty.gt(0)) {
+            await tx.stockBatch.updateMany({
+              where: {
+                stockItemId: si.id,
+                ...branchScope(scope),
+                quantity: { gt: 0 },
+              },
+              data: {
+                costPerUnit: { increment: allocated.div(batchQty) as any },
+              },
+            });
+          }
           // Accumulate in the map so a stock item appearing on >1 line adds up
           // instead of the last write clobbering earlier allocations.
           si.costPerUnit = newCost as any;

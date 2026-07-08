@@ -490,7 +490,10 @@ describe('PurchaseOrdersService.applyLandedCost', () => {
         ]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      stockBatch: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockBatch: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 10 } }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
     };
     prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
