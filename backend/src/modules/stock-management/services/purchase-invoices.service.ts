@@ -247,6 +247,70 @@ export class PurchaseInvoicesService {
     };
   }
 
+  /**
+   * Supplier return (RMA) — send received stock back to a supplier. Decrements
+   * each item's on-hand (guarded so it can't drive stock negative) and records
+   * a SUPPLIER_RETURN movement. Serializable so a concurrent deduction can't
+   * race the shortfall guard.
+   */
+  async createSupplierReturn(
+    scope: BranchScope,
+    userId: string,
+    dto: {
+      supplierId: string;
+      reason?: string;
+      items: Array<{
+        stockItemId: string;
+        quantity: number;
+        unitCost?: number;
+      }>;
+    },
+  ) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const returnedItems: Array<{ stockItemId: string; quantity: number }> =
+          [];
+        for (const item of dto.items) {
+          const qty = D(item.quantity);
+          const dec = await tx.stockItem.updateMany({
+            where: {
+              id: item.stockItemId,
+              ...branchScope(scope),
+              currentStock: { gte: qty as any },
+            },
+            data: { currentStock: { decrement: qty as any } },
+          });
+          if (dec.count === 0) {
+            throw new ConflictException(
+              "Insufficient stock to return this item",
+            );
+          }
+          await tx.ingredientMovement.create({
+            data: {
+              type: "SUPPLIER_RETURN",
+              quantity: qty.neg() as any,
+              costPerUnit:
+                item.unitCost != null ? (D(item.unitCost) as any) : undefined,
+              notes: dto.reason ?? "Supplier return",
+              referenceType: "SUPPLIER",
+              referenceId: dto.supplierId,
+              stockItemId: item.stockItemId,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+              createdById: userId,
+            },
+          });
+          returnedItems.push({
+            stockItemId: item.stockItemId,
+            quantity: qty.toNumber(),
+          });
+        }
+        return { supplierId: dto.supplierId, returnedItems };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
   async markPaid(scope: BranchScope, invoiceId: string) {
     const claim = await this.prisma.purchaseInvoice.updateMany({
       where: { id: invoiceId, ...branchScope(scope), status: "APPROVED" },

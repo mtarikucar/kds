@@ -20,6 +20,7 @@ import { RequiresFeature } from "../../subscriptions/decorators/requires-feature
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { PurchaseInvoicesService } from "../services/purchase-invoices.service";
 import { CreatePurchaseInvoiceDto } from "../dto/create-purchase-invoice.dto";
+import { SupplierReturnDto } from "../dto/supplier-return.dto";
 import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../../common/scoping/branch-scope";
 
@@ -41,6 +42,16 @@ export class PurchaseInvoicesController {
     @Body() dto: CreatePurchaseInvoiceDto,
   ) {
     return this.service.create(scope, scope.userId, dto);
+  }
+
+  @Post("supplier-return")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Return received stock to a supplier (RMA)" })
+  supplierReturn(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: SupplierReturnDto,
+  ) {
+    return this.service.createSupplierReturn(scope, scope.userId, dto);
   }
 
   @Get()

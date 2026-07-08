@@ -116,3 +116,43 @@ describe('PurchaseInvoicesService.getApAging', () => {
     expect(prisma.purchaseInvoice.findMany.mock.calls[0][0].where.status).toEqual({ not: 'PAID' });
   });
 });
+
+describe('PurchaseInvoicesService.createSupplierReturn', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseInvoicesService;
+
+  beforeEach(() => {
+    prisma = { $transaction: jest.fn() };
+    svc = new PurchaseInvoicesService(prisma);
+  });
+
+  it('decrements stock and records a SUPPLIER_RETURN movement', async () => {
+    const txMock: any = {
+      stockItem: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+
+    const res = await svc.createSupplierReturn(SCOPE, 'u1', {
+      supplierId: 'S1', reason: 'Damaged', items: [{ stockItemId: 'sA', quantity: 3, unitCost: 5 }],
+    });
+    expect(res.returnedItems).toEqual([{ stockItemId: 'sA', quantity: 3 }]);
+    const dec = txMock.stockItem.updateMany.mock.calls[0][0];
+    expect(dec.data.currentStock.decrement.toString()).toBe('3');
+    const mv = txMock.ingredientMovement.create.mock.calls[0][0].data;
+    expect(mv.type).toBe('SUPPLIER_RETURN');
+    expect(mv.quantity.toString()).toBe('-3');
+  });
+
+  it('aborts when stock is insufficient to return', async () => {
+    const txMock: any = {
+      stockItem: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ingredientMovement: { create: jest.fn() },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+    await expect(
+      svc.createSupplierReturn(SCOPE, 'u1', { supplierId: 'S1', items: [{ stockItemId: 'sA', quantity: 99 }] }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
