@@ -35,6 +35,16 @@ export class OrderItemModifierDto {
   quantity: number;
 }
 
+export class ComboSelectionDto {
+  @ApiProperty({ description: "ComboGroup (slot) ID" })
+  @IsString()
+  groupId: string;
+
+  @ApiProperty({ description: "Chosen component product ID for this slot" })
+  @IsString()
+  componentProductId: string;
+}
+
 export class CreateOrderItemDto {
   @ApiProperty({ description: "Product ID" })
   @IsString()
@@ -62,6 +72,18 @@ export class CreateOrderItemDto {
   @Type(() => OrderItemModifierDto)
   @IsOptional()
   modifiers?: OrderItemModifierDto[];
+
+  @ApiPropertyOptional({
+    type: [ComboSelectionDto],
+    description:
+      "For a COMBO product: the chosen component per slot. Omitted slots fall back to their default items.",
+  })
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => ComboSelectionDto)
+  @IsOptional()
+  comboSelections?: ComboSelectionDto[];
 }
 
 export class CreateOrderDto {

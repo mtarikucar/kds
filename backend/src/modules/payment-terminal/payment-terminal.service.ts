@@ -410,15 +410,23 @@ export class PaymentTerminalService {
       include: { orderItems: { include: { product: true } } },
     });
     if (!order || order.orderItems.length === 0) return null;
+    // Exclude combo parents (0₺ grouping rows) — money + KDV are on children.
+    const comboParentIds = new Set(
+      order.orderItems
+        .filter((it) => it.parentOrderItemId)
+        .map((it) => it.parentOrderItemId),
+    );
     const { lines, netCents } = buildFiscalLines(
-      order.orderItems.map((it) => ({
-        productId: it.productId,
-        productName: it.product?.name,
-        quantity: it.quantity,
-        unitPrice: it.unitPrice,
-        modifierTotal: it.modifierTotal,
-        taxRate: it.taxRate,
-      })),
+      order.orderItems
+        .filter((it) => !comboParentIds.has(it.id))
+        .map((it) => ({
+          productId: it.productId,
+          productName: it.product?.name,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          modifierTotal: it.modifierTotal,
+          taxRate: it.taxRate,
+        })),
       order.discount,
     );
     return {

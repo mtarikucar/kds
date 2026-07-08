@@ -29,6 +29,11 @@ export interface AggregatorPayment {
 }
 
 export interface AggregatorOrderItem {
+  id?: string;
+  // Combo children reference their 0₺ parent grouping row via this id; a
+  // parent is any item referenced here. Reports exclude parents so the combo
+  // package doesn't show as a 0-revenue product (money lives on children).
+  parentOrderItemId?: string | null;
   productId: string;
   quantity: number;
   subtotal: Money;
@@ -148,6 +153,19 @@ export class ZReportAggregator {
       cashDrawerClosing,
     } = input;
 
+    // Combo 0₺ parent grouping rows — excluded from product-level breakdowns
+    // and the per-line KDV tally so a combo doesn't surface as a 0-revenue
+    // product and no spurious 0%/0₺ bucket is created. Order/KDV TOTALS are
+    // unaffected either way (parents carry 0), so this only cleans breakdowns.
+    const comboParentIds = new Set(
+      orders
+        .flatMap((o) => o.orderItems)
+        .filter((it) => it.parentOrderItemId)
+        .map((it) => it.parentOrderItemId),
+    );
+    const isComboParent = (it: AggregatorOrderItem) =>
+      it.id != null && comboParentIds.has(it.id);
+
     // v2.8.97 — all money math now goes through Prisma.Decimal so
     // IEEE-754 drift can't accumulate over high-volume tenants
     // (~1000+ orders/day) where Number additions silently round.
@@ -224,6 +242,7 @@ export class ZReportAggregator {
     >();
     orders.forEach((order) => {
       order.orderItems.forEach((item) => {
+        if (isComboParent(item)) return; // skip 0₺ combo grouping rows
         let existing = productDecSales.get(item.productId);
         if (!existing) {
           existing = {
@@ -251,7 +270,9 @@ export class ZReportAggregator {
 
     // Tax breakdown from order items (Decimal arithmetic — same
     // accumulation-precision reason as the sale totals above).
-    const allOrderItems = orders.flatMap((o) => o.orderItems);
+    const allOrderItems = orders
+      .flatMap((o) => o.orderItems)
+      .filter((it) => !isComboParent(it));
     const taxBreakdownDecMap = new Map<
       number,
       { taxableAmount: Prisma.Decimal; taxAmount: Prisma.Decimal }
@@ -354,6 +375,7 @@ export class ZReportAggregator {
     >();
     for (const order of orders) {
       for (const item of order.orderItems) {
+        if (isComboParent(item)) continue; // combo revenue lives on children
         const catId = item.product.categoryId;
         const catName = item.product.category?.name || "Uncategorized";
         let existing = categoryDecMap.get(catId);

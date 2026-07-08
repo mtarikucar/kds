@@ -29,6 +29,11 @@ import { TaxCalculationService } from "../../accounting/services/tax-calculation
 import { withTransaction, addBreadcrumb } from "../../../common/utils/tracing";
 import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
 import { OrderPricingCalculator } from "./order-pricing.calculator";
+import {
+  explodeComboLine,
+  ComboCatalog,
+  ComboValidationError,
+} from "./combo-pricing";
 import { ReservationStatus } from "../../reservations/constants/reservation-status.enum";
 import { OutboxService } from "../../outbox/outbox.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
@@ -222,6 +227,139 @@ export class OrdersService {
     return created;
   }
 
+  /**
+   * Explode COMBO order lines into a 0₺ parent grouping row + qty-1 children
+   * that carry the money (spec §2/§4). Pure money math lives in combo-pricing;
+   * this method resolves the server-side catalog, enforces availability, and
+   * shapes the Prisma create rows. Children carry `parentOrderItemId` (the
+   * parent's explicit uuid) but NOT `orderId` — the caller stamps that inside
+   * the atomic $transaction once the order row exists.
+   */
+  private buildComboOrderItems(
+    comboItems: Array<{
+      productId: string;
+      quantity: number;
+      notes?: string;
+      comboSelections?: Array<{ groupId: string; componentProductId: string }>;
+    }>,
+    productMap: Map<string, any>,
+    now: Date,
+  ): {
+    parents: any[];
+    children: any[];
+    totalAmount: number;
+    totalTaxAmount: number;
+  } {
+    const parents: any[] = [];
+    const children: any[] = [];
+    let totalAmount = 0;
+    let totalTaxAmount = 0;
+
+    for (const item of comboItems) {
+      const product = productMap.get(item.productId);
+      const groups = product?.comboGroups ?? [];
+      if (groups.length === 0) {
+        throw new BadRequestException(
+          `"${product?.name ?? item.productId}" bir kombo ama içeriği tanımlı değil`,
+        );
+      }
+
+      // Availability of the chosen components is enforced against the catalog.
+      const availabilityById = new Map<string, boolean>();
+      const catalog: ComboCatalog = {
+        combo: {
+          id: product.id,
+          price: product.price,
+          campaignPrice: product.campaignPrice,
+          campaignStartAt: product.campaignStartAt,
+          campaignEndAt: product.campaignEndAt,
+        },
+        groups: groups.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          minSelect: g.minSelect,
+          maxSelect: g.maxSelect,
+          items: g.items.map((it: any) => {
+            availabilityById.set(
+              it.componentProduct.id,
+              it.componentProduct.isAvailable !== false,
+            );
+            return {
+              componentProductId: it.componentProductId,
+              quantity: it.quantity,
+              priceDelta: it.priceDelta,
+              isDefault: it.isDefault,
+              component: {
+                id: it.componentProduct.id,
+                price: it.componentProduct.price,
+                taxRate: it.componentProduct.taxRate,
+                campaignPrice: it.componentProduct.campaignPrice,
+                campaignStartAt: it.componentProduct.campaignStartAt,
+                campaignEndAt: it.componentProduct.campaignEndAt,
+              },
+            };
+          }),
+        })),
+      };
+
+      let exploded;
+      try {
+        exploded = explodeComboLine(
+          catalog,
+          item.comboSelections ?? [],
+          item.quantity,
+          now,
+        );
+      } catch (err) {
+        if (err instanceof ComboValidationError) {
+          throw new BadRequestException(err.message);
+        }
+        throw err;
+      }
+
+      // Reject a combo whose chosen component is out of stock / unavailable.
+      const unavailable = exploded.children.find(
+        (c) => availabilityById.get(c.productId) === false,
+      );
+      if (unavailable) {
+        throw new BadRequestException(
+          "Seçilen kombo bileşenlerinden biri şu an mevcut değil",
+        );
+      }
+
+      const parentId = randomUUID();
+      parents.push({
+        id: parentId,
+        productId: exploded.parent.productId,
+        quantity: exploded.parent.quantity,
+        unitPrice: 0,
+        subtotal: 0,
+        modifierTotal: 0,
+        taxRate: 0,
+        taxAmount: 0,
+        listUnitPrice: exploded.parent.listUnitPrice,
+        notes: item.notes,
+      });
+      for (const child of exploded.children) {
+        children.push({
+          parentOrderItemId: parentId,
+          productId: child.productId,
+          quantity: child.quantity,
+          unitPrice: child.unitPrice,
+          subtotal: child.subtotal,
+          modifierTotal: 0,
+          taxRate: child.taxRate,
+          taxAmount: child.taxAmount,
+          listUnitPrice: child.listUnitPrice,
+        });
+      }
+      totalAmount += exploded.lineTotal;
+      totalTaxAmount += exploded.lineTax;
+    }
+
+    return { parents, children, totalAmount, totalTaxAmount };
+  }
+
   private async createInner(
     scope: BranchScope,
     createOrderDto: CreateOrderDto,
@@ -378,6 +516,30 @@ export class OrdersService {
                 },
               },
             },
+            // Combo slots + their selectable components (spec §5). Only
+            // populated for COMBO products; a STANDARD product carries none.
+            comboGroups: {
+              orderBy: { displayOrder: "asc" },
+              include: {
+                items: {
+                  orderBy: { displayOrder: "asc" },
+                  include: {
+                    componentProduct: {
+                      select: {
+                        id: true,
+                        name: true,
+                        price: true,
+                        taxRate: true,
+                        isAvailable: true,
+                        campaignPrice: true,
+                        campaignStartAt: true,
+                        campaignEndAt: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         });
 
@@ -483,17 +645,39 @@ export class OrdersService {
         // Build product price map from DB (never trust client-supplied prices)
         const productMap = new Map(products.map((p) => [p.id, p]));
 
-        // Calculate totals with tax — pure line-item pricing math extracted
-        // VERBATIM into OrderPricingCalculator (wave-d2 split). Identical
-        // server-side price + modifier + KDV-inclusive tax computation; the
-        // discount POLICY (throw-on-over-discount) stays inline below.
-        const { orderItems, totalAmount, totalTaxAmount } =
-          this.pricingCalculator.priceItems(
-            createOrderDto.items,
-            productMap,
-            modifierMap,
-            this.taxCalculationService,
-          );
+        // Calculate totals with tax. STANDARD items go through the pure
+        // OrderPricingCalculator (verbatim math, now campaign-aware). COMBO
+        // items explode into a 0₺ parent + qty-1 children carrying the money
+        // (spec §2/§4) — priced by buildComboOrderItems below. Children are
+        // written in a second, atomic step (they need orderId).
+        const now = new Date();
+        const standardDtoItems = createOrderDto.items.filter(
+          (i) => productMap.get(i.productId)?.productType !== "COMBO",
+        );
+        const comboDtoItems = createOrderDto.items.filter(
+          (i) => productMap.get(i.productId)?.productType === "COMBO",
+        );
+        const standard = this.pricingCalculator.priceItems(
+          standardDtoItems,
+          productMap,
+          modifierMap,
+          this.taxCalculationService,
+          now,
+        );
+        const combo = this.buildComboOrderItems(
+          comboDtoItems,
+          productMap as any,
+          now,
+        );
+        // Top-level create rows = standard rows + combo parent rows. Combo
+        // children are held back for the atomic second write.
+        const orderItems = [...standard.orderItems, ...combo.parents];
+        const comboChildren = combo.children;
+        const round2 = (n: number) => Math.round(n * 100) / 100;
+        const totalAmount = round2(standard.totalAmount + combo.totalAmount);
+        const totalTaxAmount = round2(
+          standard.totalTaxAmount + combo.totalTaxAmount,
+        );
 
         // Cap the discount at the order total — discount > total would mint a
         // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
@@ -513,10 +697,31 @@ export class OrdersService {
         const adjustedTaxAmount =
           Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
 
+        // Shared read shape for the created order (both the plain and the
+        // combo-atomic write branches return exactly this).
+        const orderCreateInclude = {
+          orderItems: {
+            include: {
+              product: {
+                select: { id: true, name: true, price: true, image: true },
+              },
+              modifiers: {
+                include: {
+                  modifier: {
+                    select: { id: true, name: true, priceAdjustment: true },
+                  },
+                },
+              },
+            },
+          },
+          table: { select: { id: true, number: true, section: true } },
+          user: { select: { id: true, firstName: true, lastName: true } },
+        } satisfies Prisma.OrderInclude;
+
         // Create order with items — wrapped in a retry so two near-simultaneous
         // POSTs that happen to mint the same orderNumber don't both 500 out.
         const createdOrder = await this.createWithOrderNumberRetry(
-          (orderNumber) => {
+          async (orderNumber) => {
             const createData: any = {
               orderNumber,
               type: createOrderDto.type,
@@ -559,47 +764,33 @@ export class OrdersService {
             // first, the scope-tier fallback second.
             createData.branchId = tableBranchId ?? scope.branchId;
 
-            return this.prisma.order.create({
-              data: createData,
-              include: {
-                orderItems: {
-                  include: {
-                    product: {
-                      select: {
-                        id: true,
-                        name: true,
-                        price: true,
-                        image: true,
-                      },
-                    },
-                    modifiers: {
-                      include: {
-                        modifier: {
-                          select: {
-                            id: true,
-                            name: true,
-                            priceAdjustment: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                table: {
-                  select: {
-                    id: true,
-                    number: true,
-                    section: true,
-                  },
-                },
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                  },
-                },
-              },
+            // No combos → single atomic nested create (unchanged path).
+            if (comboChildren.length === 0) {
+              return this.prisma.order.create({
+                data: createData,
+                include: orderCreateInclude,
+              });
+            }
+
+            // Combos present → the qty-1 children need the order's id AND their
+            // parent's id, which a single nested create can't wire (orderId is
+            // NOT NULL, siblings can't connect to siblings-being-created). Do
+            // it atomically: create the order + top-level rows (combo parents
+            // carry an explicit id), then createMany the children with both
+            // FKs, then re-read the full shape. A P2002 on orderNumber bubbles
+            // out of the $transaction and is retried by the wrapper.
+            return this.prisma.$transaction(async (tx) => {
+              const order = await tx.order.create({ data: createData });
+              await tx.orderItem.createMany({
+                data: comboChildren.map((c) => ({
+                  ...c,
+                  orderId: order.id,
+                })),
+              });
+              return tx.order.findUniqueOrThrow({
+                where: { id: order.id },
+                include: orderCreateInclude,
+              });
             });
           },
         );
@@ -1492,15 +1683,28 @@ export class OrdersService {
     const deductReason = OrdersService.productDeductReason(order.orderNumber);
 
     return this.prisma.$transaction(async (tx) => {
+      // Aggregate quantity per product FIRST. The idempotency marker is keyed
+      // (order, product), so an order with two lines of the same product — the
+      // combo's cola child + a standalone cola, say — must be summed into one
+      // deduction. Iterating per-item skipped the second line entirely (its
+      // OUT marker already existed), silently undercounting stock. Summing
+      // keeps the (order,product) key AND deducts the true total.
+      const qtyByProduct = new Map<string, number>();
       for (const item of order.orderItems) {
+        qtyByProduct.set(
+          item.productId,
+          (qtyByProduct.get(item.productId) ?? 0) + Number(item.quantity),
+        );
+      }
+
+      for (const [productId, totalQty] of qtyByProduct) {
         const product = await tx.product.findUnique({
-          where: { id: item.productId },
+          where: { id: productId },
         });
         if (!product || !product.stockTracked) continue;
 
-        // Idempotency: never deduct the same order's product twice (a
-        // re-finalize, an approve-after-create edge, a retry). One OUT marker
-        // per (order, product) — if it exists, this product is already counted.
+        // Idempotency: one OUT marker per (order, product) — if it exists this
+        // product is already counted (re-finalize, approve-after-create, retry).
         const alreadyDeducted = await tx.stockMovement.findFirst({
           where: {
             productId: product.id,
@@ -1515,15 +1719,14 @@ export class OrdersService {
         // v2.8.98 — currentStock is Decimal; route through Prisma.Decimal so
         // fractional units (kg cuts, pours) compose correctly.
         const cur = new Prisma.Decimal(product.currentStock);
-        const raw = cur.sub(item.quantity);
-        // Per-item + best-effort: NEVER throw (the caller runs this post-commit
-        // and must not roll back a real sale) and NEVER write negative stock —
-        // floor at 0 and log an oversell. Previously a single under-stocked
-        // item threw and rolled back the WHOLE order's decrements.
+        const raw = cur.sub(totalQty);
+        // Best-effort: NEVER throw (the caller runs this post-commit and must
+        // not roll back a real sale) and NEVER write negative stock — floor at
+        // 0 and log an oversell.
         const newStock = raw.lt(0) ? new Prisma.Decimal(0) : raw;
         if (raw.lt(0)) {
           this.logger.warn(
-            `Oversell on order ${order.orderNumber}: product ${product.id} qty ${item.quantity} > stock ${product.currentStock} — flooring to 0`,
+            `Oversell on order ${order.orderNumber}: product ${product.id} qty ${totalQty} > stock ${product.currentStock} — flooring to 0`,
           );
         }
 
@@ -1538,7 +1741,7 @@ export class OrdersService {
         await tx.stockMovement.create({
           data: {
             type: StockMovementType.OUT,
-            quantity: item.quantity,
+            quantity: totalQty,
             reason: deductReason,
             productId: product.id,
             userId: order.userId ?? null,
@@ -1569,9 +1772,21 @@ export class OrdersService {
     // by the best-effort caller — so exactly one reversal IN is written.
     return this.prisma.$transaction(
       async (tx) => {
+        // Aggregate per product — symmetric with deductStockForOrder. An order
+        // with two lines of the same product deducted ONE summed OUT marker, so
+        // the reversal must credit that same summed quantity ONCE, not just the
+        // first line's quantity.
+        const qtyByProduct = new Map<string, number>();
         for (const item of order.orderItems) {
+          qtyByProduct.set(
+            item.productId,
+            (qtyByProduct.get(item.productId) ?? 0) + Number(item.quantity),
+          );
+        }
+
+        for (const [productId, totalQty] of qtyByProduct) {
           const product = await tx.product.findUnique({
-            where: { id: item.productId },
+            where: { id: productId },
           });
           if (!product || !product.stockTracked) continue;
 
@@ -1598,7 +1813,7 @@ export class OrdersService {
           if (alreadyReversed) continue;
 
           const newStock = new Prisma.Decimal(product.currentStock).add(
-            item.quantity,
+            totalQty,
           );
           await tx.product.update({
             where: { id: product.id },
@@ -1610,7 +1825,7 @@ export class OrdersService {
           await tx.stockMovement.create({
             data: {
               type: StockMovementType.IN,
-              quantity: item.quantity,
+              quantity: totalQty,
               reason: reverseReason,
               productId: product.id,
               userId: order.userId ?? null,
