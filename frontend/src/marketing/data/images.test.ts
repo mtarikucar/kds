@@ -13,6 +13,22 @@ describe("marketing image map", () => {
     expect(keys).toHaveLength(20);
   });
 
+  // Root-cause regression guard: /marketing/* is relayed (301) to the decoupled
+  // marketing.hummytummy.com app in prod, so images MUST NOT live there.
+  it("images are served from /brand/, never the relayed /marketing/ path", () => {
+    for (const key of keys) {
+      expect(
+        IMG[key].src.startsWith("/marketing/"),
+        `${key} src uses reserved /marketing/`,
+      ).toBe(false);
+      expect(
+        IMG[key].srcSm.startsWith("/marketing/"),
+        `${key} srcSm uses reserved /marketing/`,
+      ).toBe(false);
+      expect(IMG[key].src.startsWith("/brand/")).toBe(true);
+    }
+  });
+
   it.each(keys)("%s: lg + sm webp files exist and alt is set", (key) => {
     const i = IMG[key];
     expect(i.alt.trim().length).toBeGreaterThan(0);
