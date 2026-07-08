@@ -81,6 +81,15 @@ export class RecipesController {
     return this.service.create(dto, req.tenantId, scope.branchId);
   }
 
+  @Get(":id/costing")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Plate costing: cost/portion, food-cost %, gross margin",
+  })
+  getCosting(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.getCosting(id, scope);
+  }
+
   @Post(":id/check-stock")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Check if stock is sufficient for recipe" })

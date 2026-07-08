@@ -8,6 +8,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateRecipeDto, RecipeIngredientDto } from "../dto/create-recipe.dto";
 import { UpdateRecipeDto } from "../dto/update-recipe.dto";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { RecipeCostingService } from "./recipe-costing.service";
 
 // Iter-93: pagination cap on recipes list. Most tenants have ~50 distinct
 // product recipes; large chains in our pipeline have ~500. 500 is a comfortable
@@ -42,7 +43,10 @@ function assertUniqueIngredients(ingredients: RecipeIngredientDto[]): void {
 
 @Injectable()
 export class RecipesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private costing: RecipeCostingService,
+  ) {}
 
   async findAll(
     scope: BranchScope,
@@ -53,14 +57,20 @@ export class RecipesService {
       RECIPES_HARD_MAX_TAKE,
     );
     const skip = pagination?.offset ?? 0;
-    return this.prisma.recipe.findMany({
+    const recipes = await this.prisma.recipe.findMany({
       where: { ...branchScope(scope) },
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
           include: {
             stockItem: {
-              select: { id: true, name: true, unit: true, currentStock: true },
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+                currentStock: true,
+                costPerUnit: true,
+              },
             },
           },
         },
@@ -69,6 +79,8 @@ export class RecipesService {
       take,
       skip,
     });
+    // Attach plate costing (cost/portion, food-cost %, margin) to every recipe.
+    return recipes.map((r) => ({ ...r, costing: this.costing.compute(r) }));
   }
 
   async findOne(id: string, scope: BranchScope) {
@@ -92,7 +104,7 @@ export class RecipesService {
       },
     });
     if (!recipe) throw new NotFoundException("Recipe not found");
-    return recipe;
+    return { ...recipe, costing: this.costing.compute(recipe) };
   }
 
   async findByProduct(productId: string, scope: BranchScope) {
@@ -117,7 +129,19 @@ export class RecipesService {
     });
     if (!recipe)
       throw new NotFoundException("No recipe found for this product");
-    return recipe;
+    return { ...recipe, costing: this.costing.compute(recipe) };
+  }
+
+  /** Plate costing only (cost/portion, food-cost %, gross margin, breakdown). */
+  async getCosting(id: string, scope: BranchScope) {
+    const recipe = await this.findOne(id, scope);
+    return {
+      recipeId: recipe.id,
+      productId: recipe.productId,
+      productName: recipe.product?.name ?? null,
+      yield: recipe.yield,
+      ...recipe.costing,
+    };
   }
 
   async create(dto: CreateRecipeDto, tenantId: string, branchId: string) {

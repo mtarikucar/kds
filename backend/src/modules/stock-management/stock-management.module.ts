@@ -19,6 +19,7 @@ import { StockDashboardController } from "./controllers/stock-dashboard.controll
 import { StockItemCategoriesService } from "./services/stock-item-categories.service";
 import { StockItemsService } from "./services/stock-items.service";
 import { RecipesService } from "./services/recipes.service";
+import { RecipeCostingService } from "./services/recipe-costing.service";
 import { SuppliersService } from "./services/suppliers.service";
 import { PurchaseOrdersService } from "./services/purchase-orders.service";
 import { IngredientMovementsService } from "./services/ingredient-movements.service";
@@ -48,6 +49,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     StockItemCategoriesService,
     StockItemsService,
     RecipesService,
+    RecipeCostingService,
     SuppliersService,
     PurchaseOrdersService,
     IngredientMovementsService,
