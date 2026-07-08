@@ -3260,6 +3260,36 @@ model PurchaseOrder {
   @@map("purchase_orders")
 }
 
+// Reusable purchase-order template — a saved line-up (supplier + items) that
+// createOrderFromTemplate turns into a fresh PO for repeat/standing orders.
+model PurchaseOrderTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  branchId    String
+  name        String
+  supplierId  String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items PurchaseOrderTemplateItem[]
+
+  @@index([tenantId, branchId])
+  @@map("purchase_order_templates")
+}
+
+model PurchaseOrderTemplateItem {
+  id          String  @id @default(uuid())
+  templateId  String
+  template    PurchaseOrderTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stockItemId String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 2)
+
+  @@index([templateId])
+  @@map("purchase_order_template_items")
+}
+
 // Operating expense (rent, salary, utilities, …) — the OpEx line the P&L needs
 // below gross profit. taxAmount is the deductible input VAT when applicable.
 // Scalar FKs keep it isolated; DB FKs live in the migration.

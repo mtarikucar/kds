@@ -178,6 +178,82 @@ export class PurchaseOrdersService {
     });
   }
 
+  // ── Purchase-order templates (repeat / standing orders) ──────────────────
+
+  async createTemplate(
+    scope: BranchScope,
+    userId: string,
+    dto: {
+      name: string;
+      supplierId: string;
+      items: Array<{
+        stockItemId: string;
+        quantity: number;
+        unitPrice: number;
+      }>;
+    },
+  ) {
+    return this.prisma.purchaseOrderTemplate.create({
+      data: {
+        tenantId: scope.tenantId,
+        branchId: scope.branchId,
+        name: dto.name,
+        supplierId: dto.supplierId,
+        createdById: userId,
+        items: {
+          create: dto.items.map((i) => ({
+            stockItemId: i.stockItemId,
+            quantity: new Prisma.Decimal(i.quantity),
+            unitPrice: new Prisma.Decimal(i.unitPrice),
+          })),
+        },
+      },
+      include: { items: true },
+    });
+  }
+
+  async listTemplates(scope: BranchScope) {
+    return this.prisma.purchaseOrderTemplate.findMany({
+      where: { ...branchScope(scope) },
+      include: { items: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async deleteTemplate(scope: BranchScope, id: string) {
+    const claim = await this.prisma.purchaseOrderTemplate.deleteMany({
+      where: { id, ...branchScope(scope) },
+    });
+    if (claim.count === 0) throw new NotFoundException("Template not found");
+    return { id };
+  }
+
+  /** Spin a fresh DRAFT PO from a saved template (reuses create()'s guards). */
+  async createOrderFromTemplate(
+    scope: BranchScope,
+    templateId: string,
+    userId: string,
+  ) {
+    const t = await this.prisma.purchaseOrderTemplate.findFirst({
+      where: { id: templateId, ...branchScope(scope) },
+      include: { items: true },
+    });
+    if (!t) throw new NotFoundException("Template not found");
+    return this.create(
+      {
+        supplierId: t.supplierId,
+        items: t.items.map((i) => ({
+          stockItemId: i.stockItemId,
+          quantityOrdered: Number(i.quantity),
+          unitPrice: Number(i.unitPrice),
+        })),
+      } as CreatePurchaseOrderDto,
+      scope.tenantId,
+      scope.branchId,
+      userId,
+    );
+  }
+
   async submit(id: string, scope: BranchScope) {
     const po = await this.findOne(id, scope);
     if (po.status !== PurchaseOrderStatus.DRAFT) {

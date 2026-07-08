@@ -504,3 +504,37 @@ describe('PurchaseOrdersService.applyLandedCost', () => {
     await expect(svc.applyLandedCost('po1', SCOPE, {})).rejects.toThrow();
   });
 });
+
+describe('PurchaseOrdersService — templates', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+
+  beforeEach(() => {
+    prisma = {
+      purchaseOrderTemplate: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), deleteMany: jest.fn() },
+    };
+    svc = new PurchaseOrdersService(prisma);
+  });
+
+  it('createOrderFromTemplate maps template lines into a PO create call', async () => {
+    prisma.purchaseOrderTemplate.findFirst.mockResolvedValue({
+      id: 't1', supplierId: 'S1', items: [{ stockItemId: 'sA', quantity: 5, unitPrice: 10 }],
+    });
+    const createSpy = jest.spyOn(svc, 'create').mockResolvedValue({ id: 'po-new' } as any);
+    const po = await svc.createOrderFromTemplate(SCOPE, 't1', 'u1');
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supplierId: 'S1',
+        items: [{ stockItemId: 'sA', quantityOrdered: 5, unitPrice: 10 }],
+      }),
+      't1', 'b1', 'u1',
+    );
+    expect(po).toEqual({ id: 'po-new' });
+  });
+
+  it('createOrderFromTemplate rejects a missing template', async () => {
+    prisma.purchaseOrderTemplate.findFirst.mockResolvedValue(null);
+    await expect(svc.createOrderFromTemplate(SCOPE, 'missing', 'u1')).rejects.toThrow();
+  });
+});
