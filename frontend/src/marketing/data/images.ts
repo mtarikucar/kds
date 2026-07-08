@@ -46,8 +46,10 @@ const mk = (
   h: number,
   kind: ImgKind,
 ): Img => ({
-  src: `/marketing/${key}-lg.webp`,
-  srcSm: `/marketing/${key}-sm.webp`,
+  // NOTE: served from /brand/ — NOT /marketing/, which the prod host relays
+  // (301) to the decoupled marketing.hummytummy.com app. See images.test.ts guard.
+  src: `/brand/${key}-lg.webp`,
+  srcSm: `/brand/${key}-sm.webp`,
   alt,
   w,
   h,

@@ -16,7 +16,8 @@ import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(root, "public");
-const OUT = path.join(root, "public", "marketing");
+// Served from /brand/ — /marketing/ is relayed to marketing.hummytummy.com in prod.
+const OUT = path.join(root, "public", "brand");
 
 // source filename (without .png)  ->  stable key used by src/marketing/data/images.ts
 const MAP = {
