@@ -26,6 +26,7 @@ import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { PurchaseOrdersService } from "../services/purchase-orders.service";
 import { CreatePurchaseOrderDto } from "../dto/create-purchase-order.dto";
 import { ReceivePurchaseOrderDto } from "../dto/receive-purchase-order.dto";
+import { LandedCostDto } from "../dto/landed-cost.dto";
 import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../../common/scoping/branch-scope";
 
@@ -85,6 +86,19 @@ export class PurchaseOrdersController {
   })
   approve(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
     return this.service.approve(id, scope, scope.userId);
+  }
+
+  @Post(":id/landed-cost")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Allocate landed costs (freight/customs) across received lines",
+  })
+  applyLandedCost(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: LandedCostDto,
+  ) {
+    return this.service.applyLandedCost(id, scope, dto);
   }
 
   @Post(":id/receive")

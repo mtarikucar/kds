@@ -269,6 +269,100 @@ export class PurchaseOrdersService {
     });
   }
 
+  /**
+   * Landed cost — allocate extra receipt costs (freight, customs, other) across
+   * a received PO's lines proportionally to each line's received value, raising
+   * the affected stock items' moving-average cost basis. Records a LANDED_COST
+   * movement per item as an audit trail. Serializable so a concurrent
+   * cost-mutating op can't interleave.
+   */
+  async applyLandedCost(
+    id: string,
+    scope: BranchScope,
+    dto: { freight?: number; customs?: number; other?: number },
+  ) {
+    const extra = new Prisma.Decimal(dto.freight ?? 0)
+      .add(dto.customs ?? 0)
+      .add(dto.other ?? 0);
+    if (extra.lte(0)) {
+      throw new BadRequestException("Landed cost must be positive");
+    }
+    return this.prisma.$transaction(
+      async (tx) => {
+        const po = await tx.purchaseOrder.findFirst({
+          where: { id, ...branchScope(scope) },
+          include: { items: true },
+        });
+        if (!po) throw new NotFoundException("Purchase order not found");
+        if (
+          po.status !== PurchaseOrderStatus.RECEIVED &&
+          po.status !== PurchaseOrderStatus.PARTIALLY_RECEIVED
+        ) {
+          throw new BadRequestException(
+            "Landed cost can only be applied to a received purchase order",
+          );
+        }
+        const lines = po.items.filter((i) =>
+          new Prisma.Decimal(i.quantityReceived).gt(0),
+        );
+        const totalValue = lines.reduce(
+          (s, i) =>
+            s.add(new Prisma.Decimal(i.quantityReceived).mul(i.unitPrice)),
+          new Prisma.Decimal(0),
+        );
+        if (totalValue.lte(0)) {
+          throw new BadRequestException(
+            "No received value to allocate against",
+          );
+        }
+
+        const allocations: Array<{ stockItemId: string; allocated: number }> =
+          [];
+        for (const line of lines) {
+          const lineValue = new Prisma.Decimal(line.quantityReceived).mul(
+            line.unitPrice,
+          );
+          const allocated = extra.mul(lineValue).div(totalValue);
+          const si = await tx.stockItem.findFirst({
+            where: { id: line.stockItemId, ...branchScope(scope) },
+            select: { id: true, currentStock: true, costPerUnit: true },
+          });
+          if (!si) continue;
+          const currentStock = new Prisma.Decimal(si.currentStock);
+          if (currentStock.gt(0)) {
+            const newCost = new Prisma.Decimal(si.costPerUnit).add(
+              allocated.div(currentStock),
+            );
+            await tx.stockItem.updateMany({
+              where: { id: si.id, ...branchScope(scope) },
+              data: { costPerUnit: newCost as any },
+            });
+          }
+          await tx.ingredientMovement.create({
+            data: {
+              type: "LANDED_COST",
+              quantity: new Prisma.Decimal(0) as any,
+              costPerUnit: allocated as any,
+              notes: `Landed cost allocation for PO ${po.orderNumber}`,
+              referenceType: "PURCHASE_ORDER",
+              referenceId: po.id,
+              stockItemId: si.id,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+              createdById: scope.userId,
+            },
+          });
+          allocations.push({
+            stockItemId: si.id,
+            allocated: allocated.toDecimalPlaces(4).toNumber(),
+          });
+        }
+        return { poId: po.id, extraTotal: extra.toNumber(), allocations };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
   async receive(
     id: string,
     dto: ReceivePurchaseOrderDto,

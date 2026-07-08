@@ -461,3 +461,46 @@ describe('PurchaseOrdersService — approval gate (submit + approve)', () => {
     await expect(svc.approve('po1', SCOPE, 'mgr1')).rejects.toThrow();
   });
 });
+
+describe('PurchaseOrdersService.applyLandedCost', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+
+  beforeEach(() => {
+    prisma = { $transaction: jest.fn() };
+    svc = new PurchaseOrdersService(prisma);
+  });
+
+  it('allocates extra cost by line value and raises the stock cost basis', async () => {
+    const txMock: any = {
+      purchaseOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'po1', orderNumber: 'PO-1', status: 'RECEIVED',
+          items: [
+            { stockItemId: 'sA', quantityReceived: 10, unitPrice: 10 }, // value 100
+            { stockItemId: 'sB', quantityReceived: 10, unitPrice: 10 }, // value 100
+          ],
+        }),
+      },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'x', currentStock: 10, costPerUnit: 10 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+
+    // 40 freight split evenly (equal line values) → 20 each; over 10 units → +2/unit
+    const res = await svc.applyLandedCost('po1', SCOPE, { freight: 40 });
+    expect(res.extraTotal).toBe(40);
+    expect(res.allocations).toHaveLength(2);
+    expect(res.allocations[0].allocated).toBe(20);
+    // new cost = 10 + 20/10 = 12
+    expect(Number(txMock.stockItem.updateMany.mock.calls[0][0].data.costPerUnit)).toBe(12);
+  });
+
+  it('rejects a non-positive landed cost', async () => {
+    await expect(svc.applyLandedCost('po1', SCOPE, {})).rejects.toThrow();
+  });
+});
