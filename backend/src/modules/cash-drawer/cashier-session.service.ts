@@ -7,6 +7,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
+import { toCsv } from "../../common/utils/csv.util";
 
 interface CloseInput {
   countedCash?: number;
@@ -65,18 +66,62 @@ export class CashierSessionService {
     });
   }
 
-  async close(scope: BranchScope, sessionId: string, input: CloseInput) {
-    const session = await this.prisma.cashierSession.findFirst({
-      where: { id: sessionId, ...branchScope(scope) },
+  /**
+   * Closed-session reconciliation export (Z-report history) as CSV for the
+   * accountant — one row per session with opening float, cash sales, cash
+   * in/out, expected, counted and over/short.
+   */
+  async listCsv(scope: BranchScope, opts?: { status?: string }) {
+    const sessions = await this.prisma.cashierSession.findMany({
+      where: {
+        ...branchScope(scope),
+        ...(opts?.status ? { status: opts.status } : {}),
+      },
+      orderBy: { openedAt: "desc" },
+      take: 500,
     });
-    if (!session) throw new NotFoundException("Cashier session not found");
-    if (session.status !== "OPEN") {
-      throw new BadRequestException("Session is already closed");
-    }
+    const num = (v: Prisma.Decimal | number | null | undefined) =>
+      v == null ? 0 : Number(v);
+    const headers = [
+      "session",
+      "openedAt",
+      "closedAt",
+      "status",
+      "openingFloat",
+      "cashSales",
+      "cashIn",
+      "cashOut",
+      "expected",
+      "counted",
+      "overShort",
+    ];
+    const rows = sessions.map((s) => [
+      s.id,
+      s.openedAt ? s.openedAt.toISOString() : "",
+      s.closedAt ? s.closedAt.toISOString() : "",
+      s.status,
+      num(s.openingFloat),
+      num(s.cashSales),
+      num(s.cashIn),
+      num(s.cashOut),
+      num(s.expectedCash),
+      num(s.countedCash),
+      num(s.overShort),
+    ]);
+    return toCsv(headers, rows);
+  }
 
-    const closedAt = new Date();
-    const window = { gte: session.openedAt, lte: closedAt };
-
+  /**
+   * Expected-cash + component totals for a session over [openedAt, asOf].
+   * expected = openingFloat + cash sales + approved cash-in − approved cash-out.
+   * Shared by close() (asOf = close time) and the mid-shift X-report.
+   */
+  private async computeTotals(
+    scope: BranchScope,
+    session: { openedAt: Date; openingFloat: Prisma.Decimal | number },
+    asOf: Date,
+  ) {
+    const window = { gte: session.openedAt, lte: asOf };
     const [cashSalesAgg, drawerGroups] = await Promise.all([
       this.prisma.payment.aggregate({
         where: {
@@ -98,7 +143,6 @@ export class CashierSessionService {
         _sum: { amount: true },
       }),
     ]);
-
     const drawerSum = (t: string) =>
       new Prisma.Decimal(
         drawerGroups.find((g) => g.type === t)?._sum.amount ?? 0,
@@ -110,6 +154,56 @@ export class CashierSessionService {
       .add(cashSales)
       .add(cashIn)
       .sub(cashOut);
+    return { cashSales, cashIn, cashOut, expected };
+  }
+
+  /**
+   * X-report — a mid-shift read of the open session's running totals + expected
+   * cash, WITHOUT closing the drawer (unlike the Z-report/close). The classic
+   * "how much should be in the till right now" check managers run mid-shift.
+   */
+  async getXReport(scope: BranchScope, sessionId: string) {
+    const session = await this.prisma.cashierSession.findFirst({
+      where: { id: sessionId, ...branchScope(scope) },
+    });
+    if (!session) throw new NotFoundException("Cashier session not found");
+    if (session.status !== "OPEN") {
+      throw new BadRequestException("Session is not open");
+    }
+    const asOf = new Date();
+    const { cashSales, cashIn, cashOut, expected } = await this.computeTotals(
+      scope,
+      session,
+      asOf,
+    );
+    return {
+      sessionId: session.id,
+      status: "OPEN",
+      openedAt: session.openedAt,
+      asOf,
+      openingFloat: Number(session.openingFloat),
+      cashSales: Number(cashSales),
+      cashIn: Number(cashIn),
+      cashOut: Number(cashOut),
+      expectedCash: Number(expected),
+    };
+  }
+
+  async close(scope: BranchScope, sessionId: string, input: CloseInput) {
+    const session = await this.prisma.cashierSession.findFirst({
+      where: { id: sessionId, ...branchScope(scope) },
+    });
+    if (!session) throw new NotFoundException("Cashier session not found");
+    if (session.status !== "OPEN") {
+      throw new BadRequestException("Session is already closed");
+    }
+
+    const closedAt = new Date();
+    const { cashSales, cashIn, cashOut, expected } = await this.computeTotals(
+      scope,
+      session,
+      closedAt,
+    );
 
     // Derive the counted total from the physical denomination count when given;
     // fall back to an explicitly typed figure.

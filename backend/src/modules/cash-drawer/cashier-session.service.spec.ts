@@ -76,4 +76,27 @@ describe('CashierSessionService', () => {
       svc.close(SCOPE, 'sess-1', { countedCash: 100 }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('X-report reads running expected mid-shift without closing', async () => {
+    prisma.cashierSession.findFirst.mockResolvedValue({
+      id: 'sess-1', status: 'OPEN', openingFloat: 500, openedAt: new Date('2026-06-01T08:00:00Z'),
+    });
+    prisma.payment.aggregate.mockResolvedValue({ _sum: { amount: 1000 } });
+    prisma.cashDrawerMovement.groupBy.mockResolvedValue([
+      { type: 'CASH_IN', _sum: { amount: 50 } },
+      { type: 'CASH_OUT', _sum: { amount: 30 } },
+    ]);
+
+    const x = await svc.getXReport(SCOPE, 'sess-1');
+    expect(x.expectedCash).toBe(1520); // 500 + 1000 + 50 − 30
+    expect(x.cashSales).toBe(1000);
+    expect(x.status).toBe('OPEN');
+    // must NOT close the session
+    expect(prisma.cashierSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('X-report rejects a session that is not open', async () => {
+    prisma.cashierSession.findFirst.mockResolvedValue({ id: 'sess-1', status: 'CLOSED', openingFloat: 500, openedAt: new Date() });
+    await expect(svc.getXReport(SCOPE, 'sess-1')).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -70,6 +71,30 @@ export class CashDrawerController {
     @Query("status") status?: string,
   ) {
     return this.sessions.list(scope, { status });
+  }
+
+  @Get("sessions.csv")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Header("Content-Type", "text/csv; charset=utf-8")
+  @Header("Content-Disposition", 'attachment; filename="cashier-sessions.csv"')
+  @ApiOperation({ summary: "Export cashier sessions (Z history) as CSV" })
+  sessionsCsv(
+    @CurrentScope() scope: BranchScope,
+    @Query("status") status?: string,
+  ) {
+    return this.sessions.listCsv(scope, { status });
+  }
+
+  @Get("sessions/:id/x-report")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({
+    summary: "X-report: mid-shift running expected cash (does not close)",
+  })
+  xReport(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.sessions.getXReport(scope, id);
   }
 
   @Patch("sessions/:id/close")
