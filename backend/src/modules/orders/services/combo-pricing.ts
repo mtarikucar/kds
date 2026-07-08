@@ -217,7 +217,7 @@ export function explodeComboLine(
       : targetCents / slots.length,
   );
   const floors = raw.map((r) => Math.floor(r));
-  let remainder = targetCents - floors.reduce((a, b) => a + b, 0);
+  const remainder = targetCents - floors.reduce((a, b) => a + b, 0);
   // Give the extra cents to the largest fractional parts (largest-remainder).
   const order = raw
     .map((r, i) => ({ i, frac: r - Math.floor(r) }))

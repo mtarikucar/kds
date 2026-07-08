@@ -51,12 +51,23 @@ export class ProductsService {
         }))
         .sort((a: any, b: any) => a.displayOrder - b.displayOrder) || [];
 
+    // Flatten collection memberships to a simple [{id,name,slug}] list (only
+    // present when findOne included them; findAll leaves it undefined).
+    const collections = product.collections
+      ? product.collections.map((pc: any) => ({
+          id: pc.collection.id,
+          name: pc.collection.name,
+          slug: pc.collection.slug,
+        }))
+      : undefined;
+
     // Remove productImages and modifierGroups junction table, add transformed versions
     const { productImages, modifierGroups: _, ...rest } = product;
     return {
       ...rest,
       images,
       modifierGroups,
+      ...(collections !== undefined ? { collections } : {}),
     };
   }
 
@@ -89,6 +100,11 @@ export class ProductsService {
         // KDV rate per product (0/1/10/20). Defaults to 10 when unset so the
         // fiscal/receipt math is correct for non-10% items once configured.
         taxRate: createProductDto.taxRate ?? 10,
+        productType: createProductDto.productType ?? "STANDARD",
+        campaignPrice: createProductDto.campaignPrice ?? null,
+        campaignLabel: createProductDto.campaignLabel ?? null,
+        campaignStartAt: createProductDto.campaignStartAt ?? null,
+        campaignEndAt: createProductDto.campaignEndAt ?? null,
         categoryId: createProductDto.categoryId,
         tenantId,
       },
@@ -110,12 +126,128 @@ export class ProductsService {
         createProductDto.imageIds,
         tenantId,
       );
-
-      // Fetch updated product with images
-      return this.findOne(product.id, tenantId);
+    }
+    if (createProductDto.comboGroups !== undefined) {
+      await this.syncComboGroups(
+        product.id,
+        tenantId,
+        createProductDto.comboGroups,
+      );
+    }
+    if (createProductDto.collectionIds !== undefined) {
+      await this.syncCollections(
+        product.id,
+        tenantId,
+        createProductDto.collectionIds,
+      );
     }
 
-    return this.transformProductResponse(product);
+    // Re-read so combo groups / collections / images are in the response.
+    return this.findOne(product.id, tenantId);
+  }
+
+  /**
+   * Replace-all sync of a combo's slots. The editor sends the FULL combo
+   * definition; we validate every component (tenant-owned, not the combo
+   * itself, not another combo — no nesting) then drop + recreate the groups
+   * (Cascade removes their items). Idempotent w.r.t. the sent definition.
+   */
+  private async syncComboGroups(
+    productId: string,
+    tenantId: string,
+    groups: CreateProductDto["comboGroups"],
+  ) {
+    const list = groups ?? [];
+    const componentIds = [
+      ...new Set(list.flatMap((g) => g.items.map((i) => i.componentProductId))),
+    ];
+    if (componentIds.includes(productId)) {
+      throw new BadRequestException("Kombo kendisini bileşen olarak içeremez");
+    }
+    if (componentIds.length > 0) {
+      const components = await this.prisma.product.findMany({
+        where: { id: { in: componentIds }, tenantId },
+        select: { id: true, productType: true },
+      });
+      if (components.length !== componentIds.length) {
+        throw new BadRequestException(
+          "Bir veya daha fazla kombo bileşeni geçersiz veya bu işletmeye ait değil",
+        );
+      }
+      if (components.some((c) => c.productType === "COMBO")) {
+        throw new BadRequestException(
+          "Bir kombo, başka bir komboyu bileşen olarak içeremez",
+        );
+      }
+    }
+    for (const g of list) {
+      const minSel = g.minSelect ?? 1;
+      const maxSel = g.maxSelect ?? 1;
+      if (minSel > maxSel) {
+        throw new BadRequestException(
+          `"${g.name}" grubunda min seçim, max seçimden büyük olamaz`,
+        );
+      }
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.comboGroup.deleteMany({ where: { comboProductId: productId } });
+      for (const [gi, g] of list.entries()) {
+        await tx.comboGroup.create({
+          data: {
+            comboProductId: productId,
+            tenantId,
+            name: g.name,
+            displayName: g.displayName,
+            minSelect: g.minSelect ?? 1,
+            maxSelect: g.maxSelect ?? 1,
+            displayOrder: g.displayOrder ?? gi,
+            items: {
+              create: g.items.map((it, ii) => ({
+                tenantId,
+                componentProductId: it.componentProductId,
+                quantity: it.quantity ?? 1,
+                priceDelta: it.priceDelta ?? 0,
+                isDefault: it.isDefault ?? false,
+                displayOrder: it.displayOrder ?? ii,
+              })),
+            },
+          },
+        });
+      }
+    });
+  }
+
+  /** Replace-all sync of a product's collection memberships (tenant-scoped). */
+  private async syncCollections(
+    productId: string,
+    tenantId: string,
+    collectionIds: string[] | undefined,
+  ) {
+    const unique = [...new Set(collectionIds ?? [])];
+    if (unique.length > 0) {
+      const found = await this.prisma.menuCollection.findMany({
+        where: { id: { in: unique }, tenantId },
+        select: { id: true },
+      });
+      if (found.length !== unique.length) {
+        throw new BadRequestException(
+          "Bir veya daha fazla koleksiyon geçersiz veya bu işletmeye ait değil",
+        );
+      }
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.productCollection.deleteMany({ where: { productId } });
+      if (unique.length > 0) {
+        await tx.productCollection.createMany({
+          data: unique.map((collectionId, i) => ({
+            productId,
+            collectionId,
+            tenantId,
+            displayOrder: i,
+          })),
+        });
+      }
+    });
   }
 
   async findAll(
@@ -193,6 +325,24 @@ export class ProductsService {
           },
           orderBy: { order: "asc" },
         },
+        comboGroups: {
+          orderBy: { displayOrder: "asc" },
+          include: {
+            items: {
+              orderBy: { displayOrder: "asc" },
+              include: {
+                componentProduct: {
+                  select: { id: true, name: true, price: true, image: true },
+                },
+              },
+            },
+          },
+        },
+        collections: {
+          include: {
+            collection: { select: { id: true, name: true, slug: true } },
+          },
+        },
       },
     });
 
@@ -227,8 +377,10 @@ export class ProductsService {
       }
     }
 
-    // Extract imageIds from DTO
-    const { imageIds, ...productData } = updateProductDto;
+    // Extract relation-shaped fields (combo groups, collections) and imageIds
+    // — none are Product columns, so they must not reach product.updateMany.
+    const { imageIds, comboGroups, collectionIds, ...productData } =
+      updateProductDto;
 
     // Defence-in-depth: tenantId in the WHERE so a regression of the
     // pre-check above can't expose cross-tenant writes (B41-B45 pattern).
@@ -238,6 +390,13 @@ export class ProductsService {
     });
     if (claim.count === 0) {
       throw new BadRequestException("Product not found");
+    }
+
+    if (comboGroups !== undefined) {
+      await this.syncComboGroups(id, tenantId, comboGroups);
+    }
+    if (collectionIds !== undefined) {
+      await this.syncCollections(id, tenantId, collectionIds);
     }
 
     // Update images if provided

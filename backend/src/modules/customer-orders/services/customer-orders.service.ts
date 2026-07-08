@@ -18,6 +18,13 @@ import { CustomersService } from "../../customers/customers.service";
 import { CustomerSessionService } from "../../customers/customer-session.service";
 import { StockDeductionService } from "../../stock-management/services/stock-deduction.service";
 import { OutboxService } from "../../outbox/outbox.service";
+import { randomUUID } from "crypto";
+import {
+  isCampaignActive,
+  explodeComboLine,
+  ComboCatalog,
+  ComboValidationError,
+} from "../../orders/services/combo-pricing";
 import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 import { toIntCents } from "../../../common/money/to-int-cents";
 import { CreateCustomerOrderDto } from "../dto/create-customer-order.dto";
@@ -199,17 +206,13 @@ export class CustomerOrdersService {
       }
     }
 
-    const validatedItems = await this.validateAndCalculateItems(
-      dto.items,
-      tenantId,
-    );
+    const priced = await this.validateAndCalculateItems(dto.items, tenantId);
 
-    const totalAmount = validatedItems.reduce<Prisma.Decimal>(
-      (sum, i) => sum.add(i.itemTotal),
-      new Prisma.Decimal(0),
-    );
+    const totalAmount = priced.totalAmount;
     const discount = new Prisma.Decimal(0);
     const finalAmount = totalAmount.sub(discount);
+    // QR rail now persists per-order KDV (was 0 → Z-report undercounted QR).
+    const taxAmount = priced.totalTaxAmount;
 
     let customerId: string | null = null;
     if (dto.customerPhone) {
@@ -220,59 +223,64 @@ export class CustomerOrdersService {
       customerId = customer.id;
     }
 
+    const orderInclude = {
+      orderItems: {
+        include: {
+          product: true,
+          modifiers: {
+            include: { modifier: { include: { group: true } } },
+          },
+        },
+      },
+      table: true,
+    } satisfies Prisma.OrderInclude;
+
     const maxAttempts = 3;
     let lastErr: unknown;
     let createdOrder;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const orderNumber = this.generateOrderNumber();
       try {
-        createdOrder = await this.prisma.order.create({
-          data: {
-            orderNumber,
-            tenantId,
-            branchId,
-            tableId: dto.tableId || null,
-            sessionId: dto.sessionId,
-            customerPhone: dto.customerPhone,
-            customerId,
-            status: OrderStatus.PENDING_APPROVAL,
-            requiresApproval: true,
-            type: orderType,
-            totalAmount,
-            discount,
-            finalAmount,
-            notes: dto.notes,
-            orderItems: {
-              create: validatedItems.map((item) => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                modifierTotal: item.modifierTotal,
-                subtotal: item.itemTotal,
-                notes: item.notes,
-                status: "PENDING",
-                modifiers: {
-                  create: item.modifiers.map((mod) => ({
-                    modifierId: mod.modifierId,
-                    quantity: mod.quantity,
-                    priceAdjustment: mod.priceAdjustment,
-                  })),
-                },
+        const createData: any = {
+          orderNumber,
+          tenantId,
+          branchId,
+          tableId: dto.tableId || null,
+          sessionId: dto.sessionId,
+          customerPhone: dto.customerPhone,
+          customerId,
+          status: OrderStatus.PENDING_APPROVAL,
+          requiresApproval: true,
+          type: orderType,
+          totalAmount,
+          discount,
+          finalAmount,
+          taxAmount,
+          notes: dto.notes,
+          orderItems: { create: priced.topLevel },
+        };
+        if (priced.comboChildren.length === 0) {
+          createdOrder = await this.prisma.order.create({
+            data: createData,
+            include: orderInclude,
+          });
+        } else {
+          // Combos: children need orderId + parentOrderItemId, so create the
+          // order + top-level rows, then createMany children atomically.
+          createdOrder = await this.prisma.$transaction(async (tx) => {
+            const o = await tx.order.create({ data: createData });
+            await tx.orderItem.createMany({
+              data: priced.comboChildren.map((c) => ({
+                ...c,
+                orderId: o.id,
               })),
-            },
-          },
-          include: {
-            orderItems: {
-              include: {
-                product: true,
-                modifiers: {
-                  include: { modifier: { include: { group: true } } },
-                },
-              },
-            },
-            table: true,
-          },
-        });
+            });
+            return tx.order.findUniqueOrThrow({
+              where: { id: o.id },
+              include: orderInclude,
+            });
+          });
+        }
         break;
       } catch (err) {
         if (
@@ -843,6 +851,28 @@ export class CustomerOrdersService {
             },
           },
         },
+        comboGroups: {
+          orderBy: { displayOrder: "asc" },
+          include: {
+            items: {
+              orderBy: { displayOrder: "asc" },
+              include: {
+                componentProduct: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    taxRate: true,
+                    isAvailable: true,
+                    campaignPrice: true,
+                    campaignStartAt: true,
+                    campaignEndAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -926,12 +956,137 @@ export class CustomerOrdersService {
         : [];
     const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
 
-    return items.map((item) => {
+    // Build ready-to-create OrderItem rows. STANDARD items now carry
+    // campaign-aware pricing AND per-line KDV (taxRate/taxAmount) — the QR rail
+    // previously wrote neither, so QR sales showed 0 tax on the Z-report. COMBO
+    // items explode into a 0₺ parent + qty-1 children carrying the money
+    // (spec §2/§4), byte-identical to the POS rail via the shared pure module.
+    const now = new Date();
+    const extractTax = (grossInclusive: Prisma.Decimal, rate: number) =>
+      grossInclusive
+        .mul(rate)
+        .div(100 + rate)
+        .toDecimalPlaces(2);
+
+    const topLevel: any[] = [];
+    const comboChildren: any[] = [];
+    let totalAmount = new Prisma.Decimal(0);
+    let totalTaxAmount = new Prisma.Decimal(0);
+
+    for (const item of items) {
       const product = productMap.get(item.productId);
       if (!product)
         throw new BadRequestException(`Product ${item.productId} not found`);
 
-      const unitPrice = new Prisma.Decimal(product.price);
+      // ── COMBO ──────────────────────────────────────────────────────────
+      if ((product as any).productType === "COMBO") {
+        const groups = (product as any).comboGroups ?? [];
+        if (groups.length === 0) {
+          throw new BadRequestException(
+            `"${product.name}" bir kombo ama içeriği tanımlı değil`,
+          );
+        }
+        const availabilityById = new Map<string, boolean>();
+        const catalog: ComboCatalog = {
+          combo: {
+            id: product.id,
+            price: product.price,
+            campaignPrice: (product as any).campaignPrice,
+            campaignStartAt: (product as any).campaignStartAt,
+            campaignEndAt: (product as any).campaignEndAt,
+          },
+          groups: groups.map((g: any) => ({
+            id: g.id,
+            name: g.name,
+            minSelect: g.minSelect,
+            maxSelect: g.maxSelect,
+            items: g.items.map((it: any) => {
+              availabilityById.set(
+                it.componentProduct.id,
+                it.componentProduct.isAvailable !== false,
+              );
+              return {
+                componentProductId: it.componentProductId,
+                quantity: it.quantity,
+                priceDelta: it.priceDelta,
+                isDefault: it.isDefault,
+                component: {
+                  id: it.componentProduct.id,
+                  price: it.componentProduct.price,
+                  taxRate: it.componentProduct.taxRate,
+                  campaignPrice: it.componentProduct.campaignPrice,
+                  campaignStartAt: it.componentProduct.campaignStartAt,
+                  campaignEndAt: it.componentProduct.campaignEndAt,
+                },
+              };
+            }),
+          })),
+        };
+
+        let exploded;
+        try {
+          exploded = explodeComboLine(
+            catalog,
+            item.comboSelections ?? [],
+            item.quantity,
+            now,
+          );
+        } catch (err) {
+          if (err instanceof ComboValidationError) {
+            throw new BadRequestException(err.message);
+          }
+          throw err;
+        }
+        const unavailable = exploded.children.find(
+          (c) => availabilityById.get(c.productId) === false,
+        );
+        if (unavailable) {
+          throw new BadRequestException(
+            "Seçilen kombo bileşenlerinden biri şu an mevcut değil",
+          );
+        }
+
+        const parentId = randomUUID();
+        topLevel.push({
+          id: parentId,
+          productId: exploded.parent.productId,
+          quantity: exploded.parent.quantity,
+          unitPrice: 0,
+          modifierTotal: 0,
+          subtotal: 0,
+          taxRate: 0,
+          taxAmount: 0,
+          listUnitPrice: exploded.parent.listUnitPrice,
+          notes: item.notes,
+          status: "PENDING",
+        });
+        for (const child of exploded.children) {
+          comboChildren.push({
+            parentOrderItemId: parentId,
+            productId: child.productId,
+            quantity: child.quantity,
+            unitPrice: child.unitPrice,
+            modifierTotal: 0,
+            subtotal: child.subtotal,
+            taxRate: child.taxRate,
+            taxAmount: child.taxAmount,
+            listUnitPrice: child.listUnitPrice,
+            status: "PENDING",
+          });
+        }
+        totalAmount = totalAmount.add(exploded.lineTotal);
+        totalTaxAmount = totalTaxAmount.add(exploded.lineTax);
+        continue;
+      }
+
+      // ── STANDARD ───────────────────────────────────────────────────────
+      const campaignOn = isCampaignActive(product as any, now);
+      const effectiveUnit = campaignOn
+        ? new Prisma.Decimal((product as any).campaignPrice)
+        : new Prisma.Decimal(product.price);
+      const listUnitPrice = campaignOn
+        ? new Prisma.Decimal(product.price)
+        : undefined;
       const quantity = new Prisma.Decimal(item.quantity);
       let modifierTotal = new Prisma.Decimal(0);
 
@@ -949,16 +1104,30 @@ export class CustomerOrdersService {
         };
       });
 
-      const itemTotal = unitPrice.add(modifierTotal).mul(quantity);
-      return {
+      const itemTotal = effectiveUnit.add(modifierTotal).mul(quantity);
+      const rate = product.taxRate ?? 10;
+      const taxAmount = extractTax(itemTotal, rate);
+      totalAmount = totalAmount.add(itemTotal);
+      totalTaxAmount = totalTaxAmount.add(taxAmount);
+
+      topLevel.push({
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice,
+        unitPrice: effectiveUnit,
         modifierTotal,
-        itemTotal,
+        subtotal: itemTotal,
+        taxRate: rate,
+        taxAmount,
+        listUnitPrice,
         notes: item.notes,
-        modifiers: validatedModifiers,
-      };
-    });
+        status: "PENDING",
+        modifiers:
+          validatedModifiers.length > 0
+            ? { create: validatedModifiers }
+            : undefined,
+      });
+    }
+
+    return { topLevel, comboChildren, totalAmount, totalTaxAmount };
   }
 }
