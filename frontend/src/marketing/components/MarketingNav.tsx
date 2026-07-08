@@ -99,7 +99,7 @@ export default function MarketingNav() {
           </DesktopDropdown>
 
           <Link
-            to="/ozellikler/entegrasyonlar"
+            to="/entegrasyonlar"
             className="rounded-lg px-3 py-2 text-sm font-medium text-[#57534e] transition hover:text-[#1c1917]"
           >
             Entegrasyonlar

@@ -92,6 +92,9 @@ const SectorsIndexPage = lazyWithReload(
   () => import("./pages/marketing/SectorsIndexPage"),
 );
 const SectorPage = lazyWithReload(() => import("./pages/marketing/SectorPage"));
+const IntegrationsPage = lazyWithReload(
+  () => import("./pages/marketing/IntegrationsPage"),
+);
 const PublicReservationPage = lazyWithReload(
   () => import("./pages/reservations/PublicReservationPage"),
 );
@@ -332,6 +335,7 @@ function App() {
           <Route path="/ozellikler/:slug" element={<ModulePage />} />
           <Route path="/cozumler" element={<SectorsIndexPage />} />
           <Route path="/cozumler/:slug" element={<SectorPage />} />
+          <Route path="/entegrasyonlar" element={<IntegrationsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
