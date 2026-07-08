@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { CartItem, Product, CartModifier } from '../types';
+import type { CartItem, Product, CartModifier, ComboSelectionInput } from '../types';
+
+// Stable string key for a combo's component picks so two combos with different
+// selections never merge into one cart line.
+const comboKey = (sel?: ComboSelectionInput[]): string =>
+  (sel ?? [])
+    .map((s) => `${s.groupId}:${s.componentProductId}`)
+    .sort()
+    .join('|');
 
 // deep-review FM3: dine-in turnover is fast, so the persisted customer cart
 // self-expires well before the staff 12h window. A stale cart left on a shared
@@ -26,7 +34,13 @@ interface CartState {
   ) => void;
   setTableId: (tableId: string) => void;
   setCurrency: (currency: string) => void;
-  addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => void;
+  addItem: (
+    product: Product,
+    quantity: number,
+    modifiers: CartModifier[],
+    notes?: string,
+    comboSelections?: ComboSelectionInput[],
+  ) => void;
   updateItemQuantity: (itemId: string, quantity: number) => void;
   updateItemNotes: (itemId: string, notes: string) => void;
   removeItem: (itemId: string) => void;
@@ -153,10 +167,18 @@ export const useCartStore = create<CartState>()(
         set({ currency });
       },
 
-      addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => {
+      addItem: (
+        product: Product,
+        quantity: number,
+        modifiers: CartModifier[],
+        notes?: string,
+        comboSelections?: ComboSelectionInput[],
+      ) => {
         const items = get().items;
+        const key = comboKey(comboSelections);
 
-        // Check if identical item exists (same product, modifiers, and notes)
+        // Check if identical item exists (same product, modifiers, notes AND
+        // combo selections — combos with different picks stay separate lines).
         const existingItemIndex = items.findIndex(item => {
           const sameProduct = item.product.id === product.id;
           const sameNotes = (item.notes || '') === (notes || '');
@@ -168,8 +190,9 @@ export const useCartStore = create<CartState>()(
                 mod.id === matchingMod.id &&
                 mod.quantity === matchingMod.quantity;
             });
+          const sameCombo = comboKey(item.comboSelections) === key;
 
-          return sameProduct && sameNotes && sameModifiers;
+          return sameProduct && sameNotes && sameModifiers && sameCombo;
         });
 
         if (existingItemIndex !== -1) {
@@ -186,13 +209,16 @@ export const useCartStore = create<CartState>()(
 
           set({ items: updatedItems });
         } else {
-          // Add new item
+          // Add new item. For a COMBO the caller passes a product copy whose
+          // `price` already includes the chosen slot priceDeltas, so the shared
+          // total math needs no combo special-case.
           const newItem: CartItem = {
             id: crypto.randomUUID(),
             product,
             quantity,
             notes,
             modifiers,
+            comboSelections,
             itemTotal: calculateItemTotal(product.price, modifiers, quantity),
           };
 

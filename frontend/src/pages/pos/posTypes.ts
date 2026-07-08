@@ -1,4 +1,4 @@
-import type { Product } from '../../types';
+import type { Product, ComboSelectionInput } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 
 /** POS top-level view: table-selection grid or the order screen. */
@@ -12,4 +12,7 @@ export interface CartItem extends Product {
   quantity: number;
   notes?: string;
   modifiers?: SelectedModifier[];
+  // For a COMBO line: the chosen component per slot. `price` on this item is
+  // already the effective combo price (base + chosen slot deltas).
+  comboSelections?: ComboSelectionInput[];
 }

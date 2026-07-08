@@ -97,6 +97,11 @@ const CartPage = () => {
             modifierId: m.id,
             quantity: m.quantity,
           })),
+          // Combo slot picks — the backend explodes the combo into its
+          // component order lines with per-line KDV.
+          ...(item.comboSelections && item.comboSelections.length
+            ? { comboSelections: item.comboSelections }
+            : {}),
           notes: item.notes,
         })),
       });

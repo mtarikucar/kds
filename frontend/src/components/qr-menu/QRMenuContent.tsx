@@ -173,7 +173,9 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
       group => group.isRequired || group.minSelections > 0
     );
 
-    if (hasRequiredModifiers) {
+    // A combo must always open the modal so the customer picks each slot; a
+    // blind quick-add can't collect the required selections.
+    if (product.productType === "COMBO" || hasRequiredModifiers) {
       setSelectedProduct(product);
       setIsModalOpen(true);
       return;

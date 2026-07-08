@@ -111,6 +111,16 @@ function modifierKeyOf(modifiers: { modifierId: string }[]): string {
     .join('-');
 }
 
+/** Stable key for a combo's slot picks so different combos stay separate lines. */
+function comboKeyOf(
+  sel?: { groupId: string; componentProductId: string }[],
+): string {
+  return (sel ?? [])
+    .map((s) => `${s.groupId}:${s.componentProductId}`)
+    .sort()
+    .join('|');
+}
+
 /**
  * Add `quantity` of `product` (with `modifiers`) to `prev`, returning the new
  * cart array. If a line already exists for the same product AND the same
@@ -123,11 +133,15 @@ export function mergeCartItem(
   product: Product,
   quantity: number,
   modifiers: SelectedModifier[],
+  comboSelections?: { groupId: string; componentProductId: string }[],
 ): CartItem[] {
   const key = modifierKeyOf(modifiers);
+  const ckey = comboKeyOf(comboSelections);
   const existingItem = prev.find(
     (item) =>
-      item.id === product.id && modifierKeyOf(item.modifiers || []) === key,
+      item.id === product.id &&
+      modifierKeyOf(item.modifiers || []) === key &&
+      comboKeyOf(item.comboSelections) === ckey,
   );
 
   if (existingItem) {
@@ -137,7 +151,7 @@ export function mergeCartItem(
         : item,
     );
   }
-  return [...prev, { ...product, quantity, modifiers }];
+  return [...prev, { ...product, quantity, modifiers, comboSelections }];
 }
 
 /**
