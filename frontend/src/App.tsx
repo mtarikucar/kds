@@ -140,6 +140,11 @@ const ReportsPage = lazyWithReload(() => import("./pages/admin/ReportsPage"));
 const PurchasingPage = lazyWithReload(
   () => import("./pages/admin/PurchasingPage"),
 );
+const CashPage = lazyWithReload(() => import("./pages/admin/CashPage"));
+const AccountingBackOfficePage = lazyWithReload(
+  () => import("./pages/admin/AccountingBackOfficePage"),
+);
+const CostingPage = lazyWithReload(() => import("./pages/admin/CostingPage"));
 const AnalyticsPage = lazyWithReload(
   () => import("./pages/admin/AnalyticsPage"),
 );
@@ -484,6 +489,29 @@ function App() {
                   fallback={<UpsellCard addOnCode="inventory_tracking" />}
                 >
                   <PurchasingPage />
+                </FeatureGate>
+              }
+            />
+            <Route path="/admin/cash" element={<CashPage />} />
+            <Route
+              path="/admin/accounting-backoffice"
+              element={
+                <FeatureGate
+                  feature="advancedReports"
+                  fallback={<UpsellCard addOnCode="advanced_reports" />}
+                >
+                  <AccountingBackOfficePage />
+                </FeatureGate>
+              }
+            />
+            <Route
+              path="/admin/costing"
+              element={
+                <FeatureGate
+                  feature="inventoryTracking"
+                  fallback={<UpsellCard addOnCode="inventory_tracking" />}
+                >
+                  <CostingPage />
                 </FeatureGate>
               }
             />
