@@ -35,7 +35,8 @@ export class ExpensesService {
         category: dto.category,
         description: dto.description,
         amount: new Prisma.Decimal(dto.amount),
-        taxAmount: dto.taxAmount != null ? new Prisma.Decimal(dto.taxAmount) : null,
+        taxAmount:
+          dto.taxAmount != null ? new Prisma.Decimal(dto.taxAmount) : null,
         expenseDate: new Date(dto.expenseDate),
         supplierId: dto.supplierId ?? null,
         notes: dto.notes ?? null,
