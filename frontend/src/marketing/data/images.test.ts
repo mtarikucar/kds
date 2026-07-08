@@ -9,8 +9,8 @@ import { IMG, type ImgKey } from "./images";
 describe("marketing image map", () => {
   const keys = Object.keys(IMG) as ImgKey[];
 
-  it("references 20 images", () => {
-    expect(keys).toHaveLength(20);
+  it("references 25 images (20 brand + 5 real product screenshots)", () => {
+    expect(keys).toHaveLength(25);
   });
 
   // Root-cause regression guard: /marketing/* is relayed (301) to the decoupled

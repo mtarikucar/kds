@@ -200,7 +200,15 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    // X-Branch-Id: the branch-scope header the SPA sends on every scoped call
+    // (BranchGuard). Without it here, any cross-origin deployment (e.g. local
+    // dev on a different port) fails CORS preflight on all branch-scoped APIs.
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "X-Branch-Id",
+    ],
     exposedHeaders: ["X-Total-Count", "X-Request-ID"],
   });
 

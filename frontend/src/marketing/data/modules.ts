@@ -64,7 +64,9 @@ export const MODULES: Module[] = [
     category: "Sipariş & Satış",
     bullets: [
       "Müşteri masadaki QR’ı telefonuyla okutur, menüyü açar ve sipariş verir",
+      "Sipariş durumunu telefonundan canlı izler, aynı ekrandan öder",
       "Fiyat ve ürün değişikliği anında yansır — yeniden baskı yok",
+      "İşletmenize özel web adresi — menüyü linkle de paylaşın",
       "5 dilli arayüz (menü içeriği sizin girdiğiniz dilde görünür)",
       "Menüden garson ve hesap çağrısı",
     ],
@@ -79,6 +81,8 @@ export const MODULES: Module[] = [
     category: "Sipariş & Satış",
     bullets: [
       "Hızlı satış ekranı; nakit ve kart ile ödeme",
+      "Opsiyon grupları: boyut, pişirme, ekstra malzeme — fiyat farkıyla",
+      "Masalı veya masasız (tezgah / gel-al / paket) satış modu",
       "Hesap böl (eşit / ürün bazlı / özel), indirim, KDV-dahil satır vergisi",
       "PayTR ile müşteri kendi hesabını QR’dan öder (self-pay)",
       "Onaylı kasa (çekmece) hareketleri",
@@ -247,6 +251,8 @@ export const MODULES: Module[] = [
     category: "Entegrasyon & Donanım",
     bullets: [
       "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek tek panelde",
+      "Menü ve fiyatları tek panelden tüm platformlara gönderin",
+      "Kurye aldı / teslim edildi bildirimi otomatik işlenir",
       "e-Fatura / e-Arşiv (Paraşüt, Foriba, Logo)",
       "Partner ekran API’si",
       "PayTR ile online ödeme",
@@ -295,6 +301,7 @@ export const MODULES: Module[] = [
       "Planına dahil olanı tekrar satmaz",
       "PayTR ile ödeme sonrası otomatik aktivasyon",
       "Donanım + sipariş tek mağaza hub’ında",
+      "Kargo takibi, kurulum randevusu ve garanti talebi uygulama içinde",
     ],
   },
   {

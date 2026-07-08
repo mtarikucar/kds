@@ -17,7 +17,7 @@ export interface TrustItem {
 }
 
 export const TRUST: TrustItem[] = [
-  { icon: Languages, label: "5 dilde QR menü" },
+  { icon: Languages, label: "5 dilde arayüz (RTL dahil)" },
   { icon: Cloud, label: "7/24 bulut erişim" },
   { icon: Lock, label: "AES-256 şifreleme" },
   { icon: ShieldCheck, label: "KVKK uyumlu" },

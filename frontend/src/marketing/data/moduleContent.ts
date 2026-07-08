@@ -39,22 +39,22 @@ export interface ModuleMeta {
 export const CONTENT_META: Record<string, ModuleMeta> = {
   "qr-menu": {
     heroImage: "qrStand",
-    blockImages: ["heroTablet", "mascotServe"],
+    blockImages: ["screenQr", "heroTablet"],
     related: ["pos-odeme", "masa-siparis", "entegrasyonlar"],
   },
   "pos-odeme": {
     heroImage: "posChef",
-    blockImages: ["posTerminal", "reportPhone"],
+    blockImages: ["screenPos", "posTerminal"],
     related: ["qr-menu", "mutfak-ekrani-kds", "raporlar"],
   },
   "mutfak-ekrani-kds": {
-    heroImage: "kdsChef",
-    blockImages: ["kdsCooking", "dioramaInterior"],
+    heroImage: "screenKds",
+    blockImages: ["kdsChef", "kdsCooking"],
     related: ["pos-odeme", "masa-siparis", "stok-envanter"],
   },
   "masa-siparis": {
     heroImage: "dioramaInterior",
-    blockImages: ["dioramaBuilding", "mascotServe"],
+    blockImages: ["screenTables", "dioramaBuilding"],
     related: ["qr-menu", "rezervasyon", "coklu-sube"],
   },
   "stok-envanter": {
@@ -63,8 +63,8 @@ export const CONTENT_META: Record<string, ModuleMeta> = {
     related: ["raporlar", "e-fatura", "entegrasyonlar"],
   },
   raporlar: {
-    heroImage: "reportPhone",
-    blockImages: ["analytics", "chartIcon"],
+    heroImage: "screenDashboard",
+    blockImages: ["reportPhone", "analytics"],
     related: ["analitik", "stok-envanter", "coklu-sube"],
   },
   "coklu-sube": {

@@ -25,10 +25,10 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
       },
       {
         title: "5 dilde arayüz ve zengin ürün tanıtımı",
-        body: "Menü arayüzü Türkçe, İngilizce, Rusça, Özbekçe ve sağdan-sola yazım destekli Arapça olmak üzere beş dilde sunulur; turistik bölgelerdeki işletmelerde misafir kendi dilinde rahatça gezinir. Her ürüne yüksek çözünürlüklü görsel, açıklama, porsiyon ve alerjen bilgisi ekleyebilir; marka renginiz, yazı tipiniz ve logonuzla menüyü işletmenize özel bir görünüme kavuşturabilirsiniz. Ürün adlarını ve açıklamalarını hangi dilde göstermek isterseniz o metni siz girersiniz.",
+        body: "Menü arayüzü Türkçe, İngilizce, Rusça, Özbekçe ve sağdan-sola yazım destekli Arapça olmak üzere beş dilde sunulur; turistik bölgelerdeki işletmelerde misafir kendi dilinde rahatça gezinir. Her ürüne yüksek çözünürlüklü görsel, açıklama ve porsiyon bilgisi ekleyebilir; marka renginiz, yazı tipiniz ve logonuzla menüyü işletmenize özel bir görünüme kavuşturabilirsiniz. Ürün adlarını ve açıklamalarını hangi dilde göstermek isterseniz o metni siz girersiniz.",
         bullets: [
           "Arayüz 5 dilde: Türkçe, İngilizce, Rusça, Özbekçe ve Arapça (RTL desteğiyle)",
-          "Ürün başına yüksek çözünürlüklü görsel, açıklama, porsiyon ve alerjen bilgisi",
+          "Ürün başına yüksek çözünürlüklü görsel, açıklama ve porsiyon bilgisi",
           "Marka rengi, yazı tipi, logo ve ızgara/liste/kompakt düzen seçenekleri",
           "Görsel, açıklama ve fiyat gösterimini ürün bazında açıp kapatma",
         ],
