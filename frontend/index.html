@@ -2,7 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <script>
+      // Canonical host: the SPA is reachable on www.hummytummy.com (default
+      // vhost), but the API + auth cookies live on the apex — cross-origin
+      // calls from www die in CORS and login silently fails. Bounce to the
+      // apex BEFORE the app boots, preserving the full path.
+      (function () {
+        var h = window.location.hostname;
+        if (h.indexOf("www.") === 0) {
+          window.location.replace(
+            window.location.protocol +
+              "//" +
+              h.slice(4) +
+              window.location.pathname +
+              window.location.search +
+              window.location.hash,
+          );
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="HummyTummy — bulut tabanlı restoran yönetim sistemi. QR menü, POS, mutfak ekranı (KDS), sipariş & masa yönetimi, stok ve raporlar tek panelde. Cloud-based restaurant management: QR menu, POS, kitchen display, orders, inventory & reports." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
