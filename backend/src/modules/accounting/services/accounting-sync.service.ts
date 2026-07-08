@@ -1,7 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AccountingSettingsService } from "./accounting-settings.service";
 import { resolveEDocumentType } from "../e-document-routing";
+import {
+  MUKELLEF_QUERY,
+  MukellefQueryProvider,
+} from "../providers/mukellef-query.provider";
+import {
+  E_DOCUMENT_SIGNER,
+  EDocumentSigner,
+} from "../providers/e-document-signer";
 import {
   AccountingAdapter,
   AccountingInvoiceData,
@@ -19,7 +27,41 @@ export class AccountingSyncService {
   constructor(
     private prisma: PrismaService,
     private settingsService: AccountingSettingsService,
+    @Inject(MUKELLEF_QUERY) private mukellefQuery: MukellefQueryProvider,
+    @Inject(E_DOCUMENT_SIGNER) private signer: EDocumentSigner,
   ) {}
+
+  /** External-provisioning readiness for going live with e-document issuance. */
+  eDocumentReadiness() {
+    return {
+      mukellefQuery: this.mukellefQuery.name,
+      signer: this.signer.name,
+      signerConfigured: this.signer.isConfigured(),
+    };
+  }
+
+  /**
+   * Re-sync invoices the provider previously rejected (externalStatus=FAILED).
+   * Bounded batch; each retried independently so one failure doesn't stop the
+   * rest. Driven by a scheduler + callable on demand.
+   */
+  async resyncFailedInvoices(tenantId: string, limit = 50): Promise<number> {
+    const failed = await this.prisma.salesInvoice.findMany({
+      where: { tenantId, externalStatus: "FAILED" },
+      select: { id: true },
+      take: Math.min(limit, 200),
+    });
+    let retried = 0;
+    for (const inv of failed) {
+      try {
+        await this.syncInvoice(inv.id, tenantId);
+        retried += 1;
+      } catch (err: any) {
+        this.logger.warn(`Re-sync failed for ${inv.id}: ${err?.message}`);
+      }
+    }
+    return retried;
+  }
 
   async syncInvoice(invoiceId: string, tenantId: string): Promise<void> {
     const settings = await this.settingsService.findByTenant(tenantId);
@@ -99,7 +141,13 @@ export class AccountingSyncService {
         eDocumentType: resolveEDocumentType({
           taxId: invoice.customerTaxId,
           taxOffice: invoice.customerTaxOffice,
-          isRegisteredEFaturaUser: undefined,
+          // GİB mükellef check via the pluggable provider (mock in dev, HTTP in
+          // prod). Registered VKN → e-Fatura, otherwise e-Arşiv.
+          isRegisteredEFaturaUser: invoice.customerTaxId
+            ? await this.mukellefQuery.isRegisteredEFaturaUser(
+                invoice.customerTaxId,
+              )
+            : false,
         }),
         withholdingTaxAmount:
           invoice.withholdingTaxAmount != null

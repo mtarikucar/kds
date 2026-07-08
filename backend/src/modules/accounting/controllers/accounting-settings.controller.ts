@@ -53,6 +53,20 @@ export class AccountingSettingsController {
     return this.syncService.testConnection(req.tenantId);
   }
 
+  @Get("e-document/readiness")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  eDocumentReadiness() {
+    return this.syncService.eDocumentReadiness();
+  }
+
+  @Post("e-document/resync-failed")
+  @Roles(UserRole.ADMIN)
+  resyncFailed(@Request() req) {
+    return this.syncService
+      .resyncFailedInvoices(req.tenantId)
+      .then((retried) => ({ retried }));
+  }
+
   @Get("sync-status")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   syncStatus(@Request() req) {
