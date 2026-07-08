@@ -304,7 +304,7 @@ export default function LandingPage() {
           "Sesli ve görsel uyarılar",
           "Eşleşen donanım ekranlarına yönlendirme",
         ]}
-        image="kdsChef"
+        image="screenKds"
         reverse
       />
 
@@ -319,7 +319,7 @@ export default function LandingPage() {
           "KDV dahil satır bazlı vergi ve indirim",
           "PayTR ile müşteri kendi hesabını QR’dan öder",
         ]}
-        image="posChef"
+        image="screenPos"
       />
 
       <SplitFeature
@@ -333,7 +333,7 @@ export default function LandingPage() {
           "Rezervasyon yönetimi",
           "Garson çağrısı",
         ]}
-        image="dioramaInterior"
+        image="screenTables"
         reverse
       />
 
@@ -390,7 +390,7 @@ export default function LandingPage() {
           "Masa doluluk ısı haritası",
           "Gerçek zamanlı panel ve dışa aktarım",
         ]}
-        image="reportPhone"
+        image="screenDashboard"
         reverse
       />
 

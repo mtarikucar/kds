@@ -16,6 +16,10 @@ export const FAQ: QA[] = [
     a: "Kayıt olduğunuzda hesabınız 7 gün boyunca tüm özellikler açık şekilde başlar ve kredi kartı istemeyiz. Deneme bitince dilediğiniz ücretli plana geçerek devam edersiniz.",
   },
   {
+    q: "Satın almadan önce sistemi dolu haliyle görebilir miyim?",
+    a: "Evet. Tek tıkla, örnek menü, masalar ve canlı siparişlerle dolu bir demo restorana geçip POS’u, mutfak ekranını ve raporları gerçek akışıyla deneyebilirsiniz. Ayrıca kurulumda rol bazlı rehberli turlar (yönetici, mutfak, garson) ve adım adım kurulum listesi size eşlik eder.",
+  },
+  {
     q: "Hangi cihazlarda çalışır?",
     a: "Tarayıcısı olan her cihazda: tablet, telefon ve bilgisayar. QR menü müşterinin kendi telefonunda açılır; personel POS ve mutfak ekranını (KDS) tablet ya da bilgisayardan kullanır.",
   },

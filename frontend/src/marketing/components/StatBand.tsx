@@ -12,7 +12,7 @@ const STATS = [
   { v: String(MODULES.length), l: "modül, tek platformda" },
   { v: "4", l: "teslimat platformu entegre" },
   { v: String(liveIntegrations), l: "canlı entegrasyon" },
-  { v: "5", l: "dilde QR menü (RTL dahil)" },
+  { v: "5", l: "dilde arayüz — panel + QR menü (RTL dahil)" },
   { v: "7 gün", l: "ücretsiz, kartsız deneme" },
 ];
 

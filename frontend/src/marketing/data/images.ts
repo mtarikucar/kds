@@ -37,7 +37,13 @@ export type ImgKey =
   | "dioramaBuilding"
   | "shield"
   | "mascotShield"
-  | "supportAgent";
+  | "supportAgent"
+  // Real product screenshots (captured from the live app, Turkish UI)
+  | "screenKds"
+  | "screenPos"
+  | "screenDashboard"
+  | "screenTables"
+  | "screenQr";
 
 const mk = (
   key: string,
@@ -54,6 +60,16 @@ const mk = (
   w,
   h,
   kind,
+});
+
+// Real product screenshots live under /brand/screens/ (same relay caveat).
+const shot = (key: string, alt: string, w: number, h: number): Img => ({
+  src: `/brand/screens/${key}-lg.webp`,
+  srcSm: `/brand/screens/${key}-sm.webp`,
+  alt,
+  w,
+  h,
+  kind: "scene",
 });
 
 export const IMG: Record<ImgKey, Img> = {
@@ -178,5 +194,37 @@ export const IMG: Record<ImgKey, Img> = {
     1000,
     1250,
     "cutout",
+  ),
+
+  // ── Real product screenshots (Turkish UI, live demo data) ──────────
+  screenKds: shot(
+    "screenKds",
+    "HummyTummy Mutfak Ekranı (KDS) — Beklemede / Hazırlanıyor / Hazır kolonlarında canlı sipariş kartları",
+    1200,
+    621,
+  ),
+  screenPos: shot(
+    "screenPos",
+    "HummyTummy POS satış ekranı — ürün grid’i ve sipariş sepeti",
+    1200,
+    621,
+  ),
+  screenDashboard: shot(
+    "screenDashboard",
+    "HummyTummy kontrol paneli — günlük ciro, sipariş ve masa özetleri",
+    1200,
+    621,
+  ),
+  screenTables: shot(
+    "screenTables",
+    "HummyTummy masa yönetimi — canlı masa durumları",
+    1200,
+    621,
+  ),
+  screenQr: shot(
+    "screenQr",
+    "HummyTummy QR menü — müşteri telefonunda menü ve sepet",
+    390,
+    844,
   ),
 };

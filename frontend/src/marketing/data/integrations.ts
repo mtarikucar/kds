@@ -37,13 +37,25 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
   {
     key: "teslimat",
     title: "Teslimat Platformları",
-    desc: "Online sipariş platformlarındaki siparişler tek panelde birleşir; ayrı tabletlerle uğraşmazsınız.",
+    desc: "Online sipariş platformlarındaki siparişler tek panelde birleşir; menünüzü ve fiyatlarınızı da tek yerden tüm platformlara gönderirsiniz — ayrı tabletlerle uğraşmazsınız.",
     icon: Truck,
     brands: [
-      { name: "Yemeksepeti", status: "entegre", logo: "/brand/logos/yemeksepeti.png" },
+      {
+        name: "Yemeksepeti",
+        status: "entegre",
+        logo: "/brand/logos/yemeksepeti.png",
+      },
       { name: "Getir", status: "entegre", logo: "/brand/logos/getir.png" },
-      { name: "Trendyol Yemek", status: "entegre", logo: "/brand/logos/trendyol.png" },
-      { name: "Migros Yemek", status: "entegre", logo: "/brand/logos/migros.png" },
+      {
+        name: "Trendyol Yemek",
+        status: "entegre",
+        logo: "/brand/logos/trendyol.png",
+      },
+      {
+        name: "Migros Yemek",
+        status: "entegre",
+        logo: "/brand/logos/migros.png",
+      },
     ],
     noIntegration:
       "Platform entegrasyonu açık değilse siparişleri POS’a hızlıca kendiniz girersiniz; tüm kanallar yine tek adisyon akışında toplanır.",
@@ -79,8 +91,18 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     desc: "GMP-3 uyumlu yeni nesil yazarkasa ile mali fiş; sertifikasyon tamamlandıkça devreye alınır.",
     icon: Cpu,
     brands: [
-      { name: "Hugin", status: "yakinda", note: "Sertifikasyon aşamasında", logo: "/brand/logos/hugin.png" },
-      { name: "Beko", status: "yakinda", note: "Sertifikasyon aşamasında", logo: "/brand/logos/beko.png" },
+      {
+        name: "Hugin",
+        status: "yakinda",
+        note: "Sertifikasyon aşamasında",
+        logo: "/brand/logos/hugin.png",
+      },
+      {
+        name: "Beko",
+        status: "yakinda",
+        note: "Sertifikasyon aşamasında",
+        logo: "/brand/logos/beko.png",
+      },
       {
         name: "Paygo SP630",
         status: "yakinda",
@@ -93,18 +115,37 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
   {
     key: "kurye",
     title: "Kurye & Teslimat Takibi",
-    desc: "Teslimat, platform kuryeleri üzerinden yönetilir; kendi kuryenizle çalışırken siparişi adisyondan takip edersiniz.",
+    desc: "Siparişi tek dokunuşla yönetin: hazırlık süresiyle kabul edin, sebep belirterek reddedin; “hazırlanıyor” ve “hazır/kuryeye hazır” durumları platforma otomatik bildirilir. Teslimatı platform kuryesi taşır.",
     icon: Bike,
     brands: [
       {
-        name: "Platform kuryesi (Yemeksepeti/Getir)",
+        name: "Yemeksepeti kuryesi",
         status: "entegre",
-        note: "Teslimat platformun kuryesiyle",
+        note: "Kurye aldı / teslim edildi otomatik işlenir",
+        logo: "/brand/logos/yemeksepeti.png",
+      },
+      {
+        name: "Trendyol Yemek kuryesi",
+        status: "entegre",
+        note: "Kurye aldı / teslim edildi otomatik işlenir",
+        logo: "/brand/logos/trendyol.png",
+      },
+      {
+        name: "Getir kuryesi",
+        status: "entegre",
+        note: "“Kuryeye hazır” bildirimi (handover)",
+        logo: "/brand/logos/getir.png",
+      },
+      {
+        name: "Migros Yemek kuryesi",
+        status: "entegre",
+        note: "“Hazır” bildirimi ile teslim",
+        logo: "/brand/logos/migros.png",
       },
       { name: "Kendi kurye ataması & canlı takip", status: "yakinda" },
     ],
     noIntegration:
-      "Kendi kuryenizle teslimatta siparişi hazır/teslim edildi olarak işaretler, adisyondan durumunu izlersiniz.",
+      "Kendi kuryenizle teslimatta siparişi paket sipariş olarak açar, hazır/teslim edildi durumlarını adisyondan işlersiniz. Kurye adı, telefonu veya canlı konum bilgisi platform API’lerinde bulunmaz; kurye atama ve GPS takibi yol haritamızda.",
   },
   {
     key: "diger",
