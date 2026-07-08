@@ -29,18 +29,31 @@ function BrandCard({ brand }: { brand: Brand }) {
           : "border-dashed border-[#e3d7c7] bg-[#faf6f0]"
       }`}
     >
-      {/* Logo slot — replace monogram with a real logo later */}
-      <span
-        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-sm font-bold ${
-          live
-            ? "bg-[#1c1917] text-white"
-            : "bg-white text-[#a8a29e] ring-1 ring-[#e3d7c7]"
-        }`}
-        style={display}
-        aria-hidden
-      >
-        {monogram(brand.name)}
-      </span>
+      {brand.logo ? (
+        <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white ring-1 ring-[#ece2d4]">
+          <img
+            src={brand.logo}
+            alt={`${brand.name} logosu`}
+            width={128}
+            height={128}
+            loading="lazy"
+            decoding="async"
+            className="h-8 w-8 object-contain"
+          />
+        </span>
+      ) : (
+        <span
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-sm font-bold ${
+            live
+              ? "bg-[#1c1917] text-white"
+              : "bg-white text-[#a8a29e] ring-1 ring-[#e3d7c7]"
+          }`}
+          style={display}
+          aria-hidden
+        >
+          {monogram(brand.name)}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-[#1c1917]">
           {brand.name}

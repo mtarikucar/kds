@@ -20,6 +20,8 @@ export interface Brand {
   name: string;
   status: IntegrationStatus;
   note?: string;
+  /** Public path to the brand logo (128px PNG under /brand/logos/). */
+  logo?: string;
 }
 
 export interface IntegrationGroup {
@@ -38,10 +40,10 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     desc: "Online sipariş platformlarındaki siparişler tek panelde birleşir; ayrı tabletlerle uğraşmazsınız.",
     icon: Truck,
     brands: [
-      { name: "Yemeksepeti", status: "entegre" },
-      { name: "Getir", status: "entegre" },
-      { name: "Trendyol Yemek", status: "entegre" },
-      { name: "Migros Yemek", status: "entegre" },
+      { name: "Yemeksepeti", status: "entegre", logo: "/brand/logos/yemeksepeti.png" },
+      { name: "Getir", status: "entegre", logo: "/brand/logos/getir.png" },
+      { name: "Trendyol Yemek", status: "entegre", logo: "/brand/logos/trendyol.png" },
+      { name: "Migros Yemek", status: "entegre", logo: "/brand/logos/migros.png" },
     ],
     noIntegration:
       "Platform entegrasyonu açık değilse siparişleri POS’a hızlıca kendiniz girersiniz; tüm kanallar yine tek adisyon akışında toplanır.",
@@ -52,8 +54,8 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     desc: "Ödenen siparişler e-Fatura/e-Arşiv sağlayıcınıza otomatik akar; muhasebe senkron kalır.",
     icon: FileText,
     brands: [
-      { name: "Paraşüt", status: "entegre" },
-      { name: "Foriba", status: "entegre" },
+      { name: "Paraşüt", status: "entegre", logo: "/brand/logos/parasut.png" },
+      { name: "Foriba", status: "entegre", logo: "/brand/logos/foriba.png" },
       { name: "Logo", status: "entegre" },
     ],
     noIntegration:
@@ -65,7 +67,7 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     desc: "Online tahsilat ve abonelik ödemeleri güvenli altyapıyla; kasada nakit/kart ödemeleri adisyona işlenir.",
     icon: CreditCard,
     brands: [
-      { name: "PayTR", status: "entegre" },
+      { name: "PayTR", status: "entegre", logo: "/brand/logos/paytr.png" },
       { name: "Havale / EFT", status: "entegre", note: "Manuel onaylı" },
     ],
     noIntegration:
@@ -77,8 +79,8 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     desc: "GMP-3 uyumlu yeni nesil yazarkasa ile mali fiş; sertifikasyon tamamlandıkça devreye alınır.",
     icon: Cpu,
     brands: [
-      { name: "Hugin", status: "yakinda", note: "Sertifikasyon aşamasında" },
-      { name: "Beko", status: "yakinda", note: "Sertifikasyon aşamasında" },
+      { name: "Hugin", status: "yakinda", note: "Sertifikasyon aşamasında", logo: "/brand/logos/hugin.png" },
+      { name: "Beko", status: "yakinda", note: "Sertifikasyon aşamasında", logo: "/brand/logos/beko.png" },
       {
         name: "Paygo SP630",
         status: "yakinda",

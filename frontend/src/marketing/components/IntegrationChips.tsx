@@ -1,36 +1,52 @@
-// Delivery-platform integrations. We do NOT use partner trademark logos (we have
-// no licensed assets); styled name chips keep it honest. Exactly the 4 platforms
-// with real production adapters (spec §2 / §5).
+// Delivery-platform + e-invoice chips on the homepage, driven by the same
+// integration catalog as /entegrasyonlar (single source of truth). Shows real
+// brand logos where we have them.
 
-const PLATFORMS = ["Yemeksepeti", "Getir", "Trendyol Yemek", "Migros Yemek"];
+import { INTEGRATION_GROUPS } from "../data/integrations";
 
-const E_INVOICE = ["Paraşüt", "Foriba", "Logo"];
+function Chip({ name, logo }: { name: string; logo?: string }) {
+  return (
+    <span className="inline-flex items-center gap-2.5 rounded-xl border border-[#ece2d4] bg-white py-2.5 pl-3 pr-4 text-sm font-semibold text-[#44403c] shadow-sm">
+      {logo && (
+        <img
+          src={logo}
+          alt={`${name} logosu`}
+          width={128}
+          height={128}
+          loading="lazy"
+          decoding="async"
+          className="h-6 w-6 rounded object-contain"
+        />
+      )}
+      {name}
+    </span>
+  );
+}
 
 export default function IntegrationChips() {
+  const delivery =
+    INTEGRATION_GROUPS.find((g) => g.key === "teslimat")?.brands.filter(
+      (b) => b.status === "entegre",
+    ) ?? [];
+  const invoice =
+    INTEGRATION_GROUPS.find((g) => g.key === "muhasebe")?.brands.filter(
+      (b) => b.status === "entegre",
+    ) ?? [];
+
   return (
     <div className="mt-8 space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-semibold text-[#78716c]">Teslimat:</span>
-        {PLATFORMS.map((p) => (
-          <span
-            key={p}
-            className="rounded-xl border border-[#ece2d4] bg-white px-4 py-2.5 text-sm font-semibold text-[#44403c] shadow-sm"
-          >
-            {p}
-          </span>
+        {delivery.map((b) => (
+          <Chip key={b.name} name={b.name} logo={b.logo} />
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-semibold text-[#78716c]">
           e-Fatura / e-Arşiv:
         </span>
-        {E_INVOICE.map((p) => (
-          <span
-            key={p}
-            className="rounded-xl border border-[#ece2d4] bg-white px-4 py-2.5 text-sm font-semibold text-[#44403c] shadow-sm"
-          >
-            {p}
-          </span>
+        {invoice.map((b) => (
+          <Chip key={b.name} name={b.name} logo={b.logo} />
         ))}
       </div>
     </div>
