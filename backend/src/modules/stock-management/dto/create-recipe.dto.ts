@@ -36,7 +36,8 @@ export class RecipeIngredientDto {
   quantity!: number;
 
   @ApiPropertyOptional({
-    description: "Recipe unit label when it differs from the stock unit (e.g. G)",
+    description:
+      "Recipe unit label when it differs from the stock unit (e.g. G)",
   })
   @IsString()
   @IsOptional()
