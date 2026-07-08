@@ -20,7 +20,8 @@ import SplitFeature from "../marketing/components/SplitFeature";
 import FramedShot from "../marketing/components/FramedShot";
 import Picture from "../marketing/components/Picture";
 import TrustStrip from "../marketing/components/TrustStrip";
-import ModuleGrid from "../marketing/components/ModuleGrid";
+import BentoShowcase from "../marketing/components/BentoShowcase";
+import StatBand from "../marketing/components/StatBand";
 import IntegrationChips from "../marketing/components/IntegrationChips";
 import SectorGrid from "../marketing/components/SectorGrid";
 import PlanTeaser from "../marketing/components/PlanTeaser";
@@ -115,7 +116,7 @@ export default function LandingPage() {
             <h1
               data-rise
               style={{ ...display, animationDelay: "120ms" }}
-              className="mt-5 text-[2.6rem] font-semibold leading-[1.05] tracking-tight sm:text-6xl"
+              className="mt-6 text-[clamp(2.75rem,6.5vw,5.25rem)] font-semibold leading-[0.98] tracking-tight"
             >
               Restoranınızı{" "}
               <span className="relative whitespace-nowrap text-[#f97316]">
@@ -170,75 +171,112 @@ export default function LandingPage() {
                 Fiyatları Gör
               </Link>
             </div>
-            <p
+            <div
               data-rise
               style={{ animationDelay: "340ms" }}
-              className="mt-4 text-sm text-[#78716c]"
+              className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#78716c]"
             >
-              7 gün ücretsiz · kredi kartı gerekmez · istediğin an iptal
-            </p>
+              {[
+                "5 dilli QR menü",
+                "7/24 bulut",
+                "KVKK uyumlu",
+                "kredi kartı gerekmez",
+              ].map((t) => (
+                <span key={t} className="inline-flex items-center gap-1.5">
+                  <Check className="h-4 w-4 text-[#f97316]" />
+                  {t}
+                </span>
+              ))}
+            </div>
           </div>
 
-          {/* Framed product shot + mascot cutout */}
+          {/* Layered editorial media composition */}
           <div
             data-rise
             style={{ animationDelay: "260ms" }}
             className="relative"
           >
-            <FramedShot
-              img="heroTablet"
-              tilt
-              label="HummyTummy · Sipariş"
-              priority
-              sizes="(max-width: 1024px) 90vw, 520px"
-            />
+            <div className="absolute -inset-6 -z-10 rounded-[3rem] bg-gradient-to-br from-[#ffe4c4] via-[#fff3e8] to-transparent blur-2xl" />
+            <div className="relative rotate-2">
+              <FramedShot
+                img="heroTablet"
+                label="HummyTummy · Sipariş"
+                priority
+                sizes="(max-width: 1024px) 90vw, 520px"
+              />
+            </div>
             <Picture
               img="mascot"
               priority
-              sizes="180px"
-              className="pointer-events-none absolute -bottom-6 -left-8 hidden w-36 drop-shadow-[0_20px_30px_rgba(28,25,23,0.22)] sm:block"
+              sizes="220px"
+              className="pointer-events-none absolute -bottom-8 -left-10 hidden w-44 drop-shadow-[0_24px_34px_rgba(28,25,23,0.24)] sm:block lg:w-52"
             />
+            {/* rotated sticker badge */}
+            <div className="absolute -right-3 -top-4 grid h-24 w-24 -rotate-12 place-items-center rounded-full bg-[#f97316] text-center text-white shadow-lg shadow-orange-500/30 ring-4 ring-white">
+              <span
+                className="text-[13px] font-extrabold leading-tight"
+                style={display}
+              >
+                7 GÜN
+                <br />
+                ÜCRETSİZ
+              </span>
+            </div>
+            {/* floating live stat card */}
+            <div className="absolute -bottom-5 right-3 hidden rounded-2xl border border-[#ece2d4] bg-white/95 px-4 py-3 shadow-xl backdrop-blur sm:block">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-[#a8a29e]">
+                Bugünkü ciro
+              </div>
+              <div className="text-lg font-bold text-[#1c1917]" style={display}>
+                ₺18.420
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <TrustStrip />
 
-      {/* 3 core benefits */}
+      {/* 3 core benefits — editorial numbered columns, no cards */}
       <Section
+        index="01"
         eyebrow="Neden HummyTummy?"
         title="Ön salondan mutfağa, tek sistem"
         subtitle="Restoranınızın her parçası aynı sistemde konuşur — dağınık uygulamalarla uğraşmazsınız."
       >
-        <div className="mt-10 grid gap-5 sm:grid-cols-3">
-          {BENEFITS.map((b) => (
-            <div
-              key={b.title}
-              className="rounded-2xl border border-[#ece2d4] bg-white p-6"
-            >
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#fff3e8] text-[#f97316]">
-                <b.icon className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 text-lg font-semibold text-[#1c1917]">
+        <div className="mt-12 grid gap-x-10 gap-y-12 border-t border-[#e3d7c7] pt-10 sm:grid-cols-3">
+          {BENEFITS.map((b, idx) => (
+            <div key={b.title}>
+              <div className="flex items-baseline gap-3">
+                <span
+                  className="text-5xl font-semibold leading-none text-[#f5c9a3]"
+                  style={display}
+                >
+                  {String(idx + 1).padStart(2, "0")}
+                </span>
+                <b.icon className="h-5 w-5 translate-y-[-2px] text-[#f97316]" />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold text-[#1c1917]">
                 {b.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#78716c]">
-                {b.desc}
-              </p>
+              <p className="mt-2 leading-relaxed text-[#57534e]">{b.desc}</p>
             </div>
           ))}
         </div>
       </Section>
 
-      {/* Module grid */}
+      {/* Module showcase — asymmetric, image-driven bento */}
       <Section
         id="moduller"
+        index="02"
         eyebrow="Tüm özellikler tek platformda"
         title="Operasyonun tamamı, bir arada"
-        subtitle="QR menüden çoklu şubeye kadar ihtiyacınız olan her modül tek hesapta."
+        subtitle="QR menüden çoklu şubeye kadar ihtiyacınız olan her modül tek hesapta. Karta değil, ürüne bakın."
       >
-        <ModuleGrid />
+        <BentoShowcase />
       </Section>
+
+      <StatBand />
 
       {/* Flagship spotlights */}
       <SplitFeature
@@ -323,6 +361,13 @@ export default function LandingPage() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <IntegrationChips />
+            <Link
+              to="/entegrasyonlar"
+              className="group mt-7 inline-flex items-center gap-2 rounded-xl border border-[#e3d7c7] bg-white px-5 py-3 text-sm font-semibold text-[#1c1917] transition hover:border-[#f5c9a3] hover:bg-[#fff8f1]"
+            >
+              Tüm entegrasyonlar ve “entegrasyon yoksa nasıl çalışır?”
+              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+            </Link>
           </div>
           <div className="lg:order-first">
             <Picture

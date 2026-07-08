@@ -4,6 +4,8 @@ import { display } from "../theme";
 interface SectionProps {
   id?: string;
   eyebrow?: string;
+  /** Editorial index numeral ("01", "02"…) rendered as an oversized ghost figure. */
+  index?: string;
   title?: ReactNode;
   subtitle?: ReactNode;
   center?: boolean;
@@ -11,10 +13,11 @@ interface SectionProps {
   children?: ReactNode;
 }
 
-/** Standard homepage/section wrapper: max-w-6xl, Fraunces heading, scroll offset. */
+/** Standard marketing section wrapper: max-w-6xl, Fraunces heading, scroll offset. */
 export default function Section({
   id,
   eyebrow,
+  index,
   title,
   subtitle,
   center,
@@ -24,8 +27,17 @@ export default function Section({
   return (
     <section
       id={id}
-      className={`mx-auto max-w-6xl scroll-mt-24 px-5 py-16 sm:py-20 ${className}`}
+      className={`relative mx-auto max-w-6xl scroll-mt-24 px-5 py-16 sm:py-20 ${className}`}
     >
+      {index && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-2 right-2 select-none text-[7rem] font-semibold leading-none text-[#1c1917]/[0.045] sm:text-[10rem]"
+          style={display}
+        >
+          {index}
+        </span>
+      )}
       {(eyebrow || title || subtitle) && (
         <div className={`${center ? "mx-auto text-center" : ""} max-w-2xl`}>
           {eyebrow && (

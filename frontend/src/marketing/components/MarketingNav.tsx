@@ -99,7 +99,7 @@ export default function MarketingNav() {
           </DesktopDropdown>
 
           <Link
-            to="/ozellikler/entegrasyonlar"
+            to="/entegrasyonlar"
             className="rounded-lg px-3 py-2 text-sm font-medium text-[#57534e] transition hover:text-[#1c1917]"
           >
             Entegrasyonlar
@@ -109,6 +109,12 @@ export default function MarketingNav() {
             className="rounded-lg px-3 py-2 text-sm font-medium text-[#57534e] transition hover:text-[#1c1917]"
           >
             Fiyatlar
+          </Link>
+          <Link
+            to="/kurumsal"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-[#57534e] transition hover:text-[#1c1917]"
+          >
+            Kurumsal
           </Link>
         </div>
 
@@ -184,6 +190,20 @@ export default function MarketingNav() {
               className="rounded-lg px-2 py-2.5 text-sm font-semibold text-[#1c1917] hover:bg-[#f1e8db]"
             >
               Fiyatlar
+            </Link>
+            <Link
+              to="/kurumsal"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-2 py-2.5 text-sm font-semibold text-[#1c1917] hover:bg-[#f1e8db]"
+            >
+              Kurumsal
+            </Link>
+            <Link
+              to="/entegrasyonlar"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-2 py-2.5 text-sm font-semibold text-[#1c1917] hover:bg-[#f1e8db]"
+            >
+              Entegrasyonlar
             </Link>
             <Link
               to="/login"
