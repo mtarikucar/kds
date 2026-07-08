@@ -120,10 +120,12 @@ export class ProductsService {
     });
 
     // Attach images if provided
-    if (createProductDto.imageIds && createProductDto.imageIds.length > 0) {
+    const hasImages =
+      !!createProductDto.imageIds && createProductDto.imageIds.length > 0;
+    if (hasImages) {
       await this.attachImagesToProduct(
         product.id,
-        createProductDto.imageIds,
+        createProductDto.imageIds!,
         tenantId,
       );
     }
@@ -142,8 +144,16 @@ export class ProductsService {
       );
     }
 
-    // Re-read so combo groups / collections / images are in the response.
-    return this.findOne(product.id, tenantId);
+    // Re-read only when a relation was written (images/combo/collections) so a
+    // plain create keeps its single-query shape.
+    if (
+      hasImages ||
+      createProductDto.comboGroups !== undefined ||
+      createProductDto.collectionIds !== undefined
+    ) {
+      return this.findOne(product.id, tenantId);
+    }
+    return this.transformProductResponse(product);
   }
 
   /**
