@@ -1,0 +1,151 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import api from '../../lib/api';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
+
+const BASE = '/stock-management';
+
+export const useReorderSuggestions = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['purchasing', 'reorder', branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/dashboard/reorder-suggestions`);
+      return r.data;
+    },
+  });
+};
+
+export const useApAging = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['purchasing', 'ap-aging', branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/purchase-invoices/ap-aging`);
+      return r.data;
+    },
+  });
+};
+
+export const useSupplierScorecard = (params?: {
+  startDate?: string;
+  endDate?: string;
+}) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['purchasing', 'scorecard', params, branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/suppliers/scorecard`, { params });
+      return r.data;
+    },
+  });
+};
+
+export const useBatchValuation = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['purchasing', 'batch-valuation', branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/dashboard/batch-valuation`);
+      return r.data;
+    },
+  });
+};
+
+export interface StockTransfer {
+  id: string;
+  transferNumber: string;
+  fromBranchId: string;
+  toBranchId: string;
+  status: string;
+  items: Array<{ sourceStockItemId: string; destStockItemId: string; quantity: string }>;
+  createdAt: string;
+}
+
+export const useStockTransfers = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['purchasing', 'transfers', branchId],
+    queryFn: async (): Promise<StockTransfer[]> => {
+      const r = await api.get(`${BASE}/transfers`);
+      return r.data;
+    },
+  });
+};
+
+export const useCreateStockTransfer = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      toBranchId: string;
+      notes?: string;
+      items: Array<{
+        sourceStockItemId: string;
+        destStockItemId: string;
+        quantity: number;
+        unitCost?: number;
+      }>;
+    }) => {
+      const r = await api.post(`${BASE}/transfers`, input);
+      return r.data;
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['purchasing', 'transfers'] }),
+  });
+};
+
+export const useCompleteStockTransfer = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await api.patch(`${BASE}/transfers/${id}/complete`);
+      return r.data;
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['purchasing', 'transfers'] }),
+  });
+};
+
+export const useCancelStockTransfer = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await api.patch(`${BASE}/transfers/${id}/cancel`);
+      return r.data;
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['purchasing', 'transfers'] }),
+  });
+};
+
+export const useApprovePurchaseOrder = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await api.post(`${BASE}/purchase-orders/${id}/approve`);
+      return r.data;
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
+  });
+};
+
+export const useApplyLandedCost = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      freight?: number;
+      customs?: number;
+      other?: number;
+    }) => {
+      const { id, ...body } = input;
+      const r = await api.post(
+        `${BASE}/purchase-orders/${id}/landed-cost`,
+        body
+      );
+      return r.data;
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
+  });
+};

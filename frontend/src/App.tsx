@@ -137,6 +137,9 @@ const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
 );
 const ReportsPage = lazyWithReload(() => import("./pages/admin/ReportsPage"));
+const PurchasingPage = lazyWithReload(
+  () => import("./pages/admin/PurchasingPage"),
+);
 const AnalyticsPage = lazyWithReload(
   () => import("./pages/admin/AnalyticsPage"),
 );
@@ -470,6 +473,17 @@ function App() {
                   fallback={<UpsellCard addOnCode="advanced_reports" />}
                 >
                   <ReportsPage />
+                </FeatureGate>
+              }
+            />
+            <Route
+              path="/admin/purchasing"
+              element={
+                <FeatureGate
+                  feature="inventoryTracking"
+                  fallback={<UpsellCard addOnCode="inventory_tracking" />}
+                >
+                  <PurchasingPage />
                 </FeatureGate>
               }
             />

@@ -188,6 +188,14 @@ const SECTIONS: NavSection[] = [
         gate: { feature: 'advancedReports' },
       },
       {
+        to: '/admin/purchasing',
+        icon: ShoppingCart,
+        labelKey: 'navigation.purchasing',
+        labelFallback: 'Satın Alma & Stok',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'inventoryTracking' },
+      },
+      {
         to: '/admin/analytics',
         icon: Activity,
         labelKey: 'navigation.analytics',
