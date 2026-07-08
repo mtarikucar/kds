@@ -6,14 +6,22 @@ import {
   AccountingAdapter,
   AccountingInvoiceData,
 } from "./accounting-adapter.interface";
+import { EDocumentSigner } from "../providers/e-document-signer";
 
 export class ForibaEfaturaAdapter implements AccountingAdapter {
   readonly name = "foriba";
   private readonly logger = new Logger(ForibaEfaturaAdapter.name);
   private httpClient: AxiosInstance;
+  private signer?: EDocumentSigner;
 
   constructor() {
     this.httpClient = axios.create({ timeout: 30000 });
+  }
+
+  /** Attach the e-document signer used before dispatch (set by the sync svc). */
+  setSigner(signer: EDocumentSigner): this {
+    this.signer = signer;
+    return this;
   }
 
   async authenticate(
@@ -42,7 +50,14 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
     _companyId: string,
     invoice: AccountingInvoiceData,
   ): Promise<{ externalId: string }> {
-    const ublXml = this.generateUblTrXml(invoice);
+    let ublXml = this.generateUblTrXml(invoice);
+    // Sign the UBL before dispatch when a signer is configured (mali mühür /
+    // e-imza). GİB rejects an unsigned e-Fatura/e-Arşiv, so refuse to dispatch
+    // unsigned once a signer is present — better a recorded FAILED than a
+    // silently-unsigned document.
+    if (this.signer?.isConfigured()) {
+      ublXml = await this.signer.sign(ublXml);
+    }
 
     const response = await this.httpClient.post(
       `${this.httpClient.defaults.baseURL || "https://api.fitbulut.com/v2"}/dispatch-invoice`,

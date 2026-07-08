@@ -250,7 +250,8 @@ export class AccountingSyncService {
       case AccountingProvider.PARASUT:
         return new ParasutAdapter();
       case AccountingProvider.FORIBA:
-        return new ForibaEfaturaAdapter();
+        // Attach the signer so the UBL is XAdES-signed before dispatch.
+        return new ForibaEfaturaAdapter().setSigner(this.signer);
       case AccountingProvider.LOGO:
         return new LogoAdapter();
       default:

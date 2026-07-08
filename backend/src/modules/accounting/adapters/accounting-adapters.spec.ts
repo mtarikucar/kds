@@ -259,3 +259,37 @@ describe("ForibaEfaturaAdapter", () => {
     );
   });
 });
+
+describe('ForibaEfaturaAdapter — signing before dispatch', () => {
+  it('signs the UBL with the configured signer before base64-encoding', async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const signer: any = {
+      name: 'MOCK',
+      isConfigured: () => true,
+      sign: jest.fn().mockImplementation(async (xml: string) =>
+        xml.replace('</Invoice>', '<Signed/></Invoice>'),
+      ),
+    };
+    adapter.setSigner(signer);
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: 'fb-signed' } });
+    (adapter as any).httpClient = http;
+
+    await adapter.pushInvoice('tok', 'co-1', invoice);
+
+    expect(signer.sign).toHaveBeenCalledTimes(1);
+    const dispatched = Buffer.from(http.post.mock.calls[0][1].content, 'base64').toString();
+    expect(dispatched).toContain('<Signed/>'); // the signed artifact is what gets dispatched
+  });
+
+  it('dispatches unsigned when no signer is configured (isConfigured=false)', async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    adapter.setSigner({ name: 'NONE', isConfigured: () => false, sign: jest.fn() } as any);
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: 'fb-unsigned' } });
+    (adapter as any).httpClient = http;
+
+    const out = await adapter.pushInvoice('tok', 'co-1', invoice);
+    expect(out.externalId).toBe('fb-unsigned');
+  });
+});
