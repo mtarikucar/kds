@@ -380,6 +380,11 @@ model Product {
   // Distinct from the internal Recipe (stock-item deduction, not customer-facing).
   ingredients String?
   price       Decimal @db.Decimal(10, 2)
+  // Unit COST of the finished product (what it costs to make/buy), distinct
+  // from `price` (retail sell price). Drives at-cost inventory valuation,
+  // gross margin and menu engineering for products WITHOUT a recipe (recipe
+  // products derive cost from plate costing). Nullable: unset = "no cost basis".
+  costPrice   Decimal? @db.Decimal(10, 2)
   image       String? // Legacy field, kept for backwards compatibility
 
   // 3D / AR (menu AI-AR feature, Phase 2). A dish photo can be turned into a

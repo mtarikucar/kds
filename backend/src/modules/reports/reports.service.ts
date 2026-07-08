@@ -616,15 +616,20 @@ export class ReportsService {
     // Get out of stock items
     const outOfStockItems = products.filter((p) => stockLte(p, 0));
 
-    // Total stock value. Multiplying-and-accumulating Decimal prices in
-    // JS Number drifts after a few hundred line items; do the sum in
-    // integer cents and convert once at the end.
-    const totalStockValueCents = products.reduce(
-      (sum, p) =>
+    // Value inventory at COST (costPrice), NOT retail `price` — an asset is
+    // carried at cost; valuing at retail overstates the inventory figure.
+    // Products with no cost basis (costPrice null) contribute 0 and are counted
+    // so the gap is visible rather than silently distorting the total.
+    // Accumulate in integer cents to avoid Decimal→Number drift over many rows.
+    let itemsWithoutCost = 0;
+    const totalStockValueCents = products.reduce((sum, p) => {
+      if (p.costPrice == null) itemsWithoutCost += 1;
+      return (
         sum +
-        new Prisma.Decimal(p.currentStock).toNumber() * decimalToCents(p.price),
-      0,
-    );
+        new Prisma.Decimal(p.currentStock).toNumber() *
+          decimalToCents(p.costPrice ?? 0)
+      );
+    }, 0);
     const totalStockValue = centsToCurrency(totalStockValueCents);
 
     // Get recent stock movements
@@ -643,6 +648,9 @@ export class ReportsService {
       lowStockCount: lowStockItems.length,
       outOfStockCount: outOfStockItems.length,
       totalStockValue,
+      // Signals the total is at cost and how many products lack a cost basis.
+      valuationBasis: "cost" as const,
+      itemsWithoutCost,
       lowStockItems: lowStockItems.map((p) => ({
         productId: p.id,
         productName: p.name,
@@ -661,9 +669,11 @@ export class ReportsService {
         categoryName: p.category?.name,
         currentStock: new Prisma.Decimal(p.currentStock).toNumber(),
         price: Number(p.price),
+        costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+        // stockValue is at COST (costPrice), consistent with totalStockValue.
         stockValue: centsToCurrency(
           new Prisma.Decimal(p.currentStock).toNumber() *
-            decimalToCents(p.price),
+            decimalToCents(p.costPrice ?? 0),
         ),
         isLowStock: stockGt(p, 0) && stockLt(p, LOW_STOCK_THRESHOLD),
         isOutOfStock: stockLte(p, 0),
