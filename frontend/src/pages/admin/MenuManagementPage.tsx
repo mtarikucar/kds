@@ -43,6 +43,7 @@ import {
   type CategoryFormData,
 } from "./menuManagement/menuSchemas";
 import ModifiersTab from "./menuManagement/ModifiersTab";
+import CollectionsTab from "./menuManagement/CollectionsTab";
 import ImagesTab from "./menuManagement/ImagesTab";
 import MenuTab from "./menuManagement/MenuTab";
 import MenuImportTab from "./menuManagement/MenuImportTab";
@@ -56,7 +57,9 @@ const MenuManagementPage = () => {
   // Create translated schema
   const categorySchema = createCategorySchema(t);
 
-  const [activeTab, setActiveTab] = useState<"menu" | "images" | "modifiers">(
+  const [activeTab, setActiveTab] = useState<
+    "menu" | "images" | "modifiers" | "collections"
+  >(
     "menu",
   );
   // AI photo-import: promoted from a conditional tab to a persistent header
@@ -297,6 +300,15 @@ const MenuManagementPage = () => {
             <Settings2 className="h-4 w-4 mr-1 md:mr-2" />
             {t("menu.modifiers")}
           </Button>
+          <Button
+            variant={activeTab === "collections" ? "primary" : "outline"}
+            onClick={() => setActiveTab("collections")}
+            size="sm"
+            className="md:text-base"
+          >
+            <Layers className="h-4 w-4 mr-1 md:mr-2" />
+            {t("menu.collections", "Koleksiyonlar")}
+          </Button>
         </div>
 
         {/* Header actions (menu tab): AI photo-import (always visible so it's
@@ -390,6 +402,8 @@ const MenuManagementPage = () => {
 
       {/* Image Library Tab - Minimal Design */}
       {activeTab === "images" && <ImagesTab />}
+
+      {activeTab === "collections" && <CollectionsTab />}
 
       {/* AI menu import (photo → digitized menu) — full-screen modal */}
       <Modal
