@@ -15,6 +15,7 @@ import { WasteLogsController } from "./controllers/waste-logs.controller";
 import { StockCountsController } from "./controllers/stock-counts.controller";
 import { StockSettingsController } from "./controllers/stock-settings.controller";
 import { StockDashboardController } from "./controllers/stock-dashboard.controller";
+import { StockTransferController } from "./controllers/stock-transfer.controller";
 
 // Services
 import { StockItemCategoriesService } from "./services/stock-item-categories.service";
@@ -32,6 +33,7 @@ import { StockDeductionService } from "./services/stock-deduction.service";
 import { StockAlertsService } from "./services/stock-alerts.service";
 import { StockDashboardService } from "./services/stock-dashboard.service";
 import { ReorderSuggestionService } from "./services/reorder-suggestion.service";
+import { StockTransferService } from "./services/stock-transfer.service";
 import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
 
 @Module({
@@ -48,6 +50,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     StockCountsController,
     StockSettingsController,
     StockDashboardController,
+    StockTransferController,
   ],
   providers: [
     StockItemCategoriesService,
@@ -65,6 +68,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     StockAlertsService,
     StockDashboardService,
     ReorderSuggestionService,
+    StockTransferService,
     StockAlertsScheduler,
   ],
   exports: [StockDeductionService, StockAlertsService, StockItemsService],

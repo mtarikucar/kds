@@ -3252,6 +3252,45 @@ model Expense {
   @@map("expenses")
 }
 
+// Inter-branch stock transfer. Because StockItems are branch-scoped, each line
+// maps a source item (in fromBranch) to the destination item (in toBranch). On
+// COMPLETE the source is decremented and the destination incremented, with a
+// TRANSFER_OUT/TRANSFER_IN movement on each side. Scalar FKs; spans branches so
+// scoped by tenant + both-branch validation.
+model StockTransfer {
+  id             String    @id @default(uuid())
+  tenantId       String
+  fromBranchId   String
+  toBranchId     String
+  transferNumber String
+  status         String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  notes          String?
+  createdById    String?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  items StockTransferItem[]
+
+  @@unique([tenantId, transferNumber])
+  @@index([tenantId, fromBranchId, status])
+  @@index([tenantId, toBranchId, status])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id                String  @id @default(uuid())
+  transferId        String
+  transfer          StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  sourceStockItemId String
+  destStockItemId   String
+  quantity          Decimal @db.Decimal(10, 3)
+  unitCost          Decimal? @db.Decimal(10, 4)
+
+  @@index([transferId])
+  @@map("stock_transfer_items")
+}
+
 // Monthly expense budget per category — compared against actual expenses for a
 // budget-vs-actual variance report. Scalar FKs keep it isolated.
 model Budget {
