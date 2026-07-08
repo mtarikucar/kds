@@ -128,12 +128,12 @@ export interface SisterCompany {
 export const SISTER_COMPANIES: SisterCompany[] = [
   {
     name: "Efruze",
-    tagline: "[Kısa tanım — sen vereceksin]",
-    desc: "Efruze hakkında kısa açıklama buraya gelecek. Ne yaptığı, HummyTummy ile ilişkisi.",
+    tagline: "Grup şirketi",
+    desc: "Aynı çatı altında üreten kardeş markalarımızdan. Detaylı tanıtım içeriği hazırlanıyor.",
   },
   {
     name: "Figurinica",
-    tagline: "[Kısa tanım — sen vereceksin]",
-    desc: "Figurinica hakkında kısa açıklama buraya gelecek. Ne yaptığı, HummyTummy ile ilişkisi.",
+    tagline: "Grup şirketi",
+    desc: "Aynı çatı altında üreten kardeş markalarımızdan. Detaylı tanıtım içeriği hazırlanıyor.",
   },
 ];

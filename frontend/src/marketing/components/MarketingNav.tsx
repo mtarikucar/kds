@@ -110,6 +110,12 @@ export default function MarketingNav() {
           >
             Fiyatlar
           </Link>
+          <Link
+            to="/kurumsal"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-[#57534e] transition hover:text-[#1c1917]"
+          >
+            Kurumsal
+          </Link>
         </div>
 
         <div className="hidden items-center gap-2 lg:flex">
@@ -184,6 +190,20 @@ export default function MarketingNav() {
               className="rounded-lg px-2 py-2.5 text-sm font-semibold text-[#1c1917] hover:bg-[#f1e8db]"
             >
               Fiyatlar
+            </Link>
+            <Link
+              to="/kurumsal"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-2 py-2.5 text-sm font-semibold text-[#1c1917] hover:bg-[#f1e8db]"
+            >
+              Kurumsal
+            </Link>
+            <Link
+              to="/entegrasyonlar"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-2 py-2.5 text-sm font-semibold text-[#1c1917] hover:bg-[#f1e8db]"
+            >
+              Entegrasyonlar
             </Link>
             <Link
               to="/login"

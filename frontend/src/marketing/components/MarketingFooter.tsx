@@ -52,6 +52,22 @@ export default function MarketingFooter() {
             </li>
             <li>
               <Link
+                to="/kurumsal"
+                className="text-[#57534e] hover:text-[#1c1917]"
+              >
+                Hakkımızda
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/entegrasyonlar"
+                className="text-[#57534e] hover:text-[#1c1917]"
+              >
+                Entegrasyonlar
+              </Link>
+            </li>
+            <li>
+              <Link
                 to="/fiyatlandirma"
                 className="text-[#57534e] hover:text-[#1c1917]"
               >

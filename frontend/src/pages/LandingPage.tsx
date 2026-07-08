@@ -20,7 +20,8 @@ import SplitFeature from "../marketing/components/SplitFeature";
 import FramedShot from "../marketing/components/FramedShot";
 import Picture from "../marketing/components/Picture";
 import TrustStrip from "../marketing/components/TrustStrip";
-import ModuleGrid from "../marketing/components/ModuleGrid";
+import BentoShowcase from "../marketing/components/BentoShowcase";
+import StatBand from "../marketing/components/StatBand";
 import IntegrationChips from "../marketing/components/IntegrationChips";
 import SectorGrid from "../marketing/components/SectorGrid";
 import PlanTeaser from "../marketing/components/PlanTeaser";
@@ -236,41 +237,46 @@ export default function LandingPage() {
 
       <TrustStrip />
 
-      {/* 3 core benefits */}
+      {/* 3 core benefits — editorial numbered columns, no cards */}
       <Section
+        index="01"
         eyebrow="Neden HummyTummy?"
         title="Ön salondan mutfağa, tek sistem"
         subtitle="Restoranınızın her parçası aynı sistemde konuşur — dağınık uygulamalarla uğraşmazsınız."
       >
-        <div className="mt-10 grid gap-5 sm:grid-cols-3">
-          {BENEFITS.map((b) => (
-            <div
-              key={b.title}
-              className="rounded-2xl border border-[#ece2d4] bg-white p-6"
-            >
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#fff3e8] text-[#f97316]">
-                <b.icon className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 text-lg font-semibold text-[#1c1917]">
+        <div className="mt-12 grid gap-x-10 gap-y-12 border-t border-[#e3d7c7] pt-10 sm:grid-cols-3">
+          {BENEFITS.map((b, idx) => (
+            <div key={b.title}>
+              <div className="flex items-baseline gap-3">
+                <span
+                  className="text-5xl font-semibold leading-none text-[#f5c9a3]"
+                  style={display}
+                >
+                  {String(idx + 1).padStart(2, "0")}
+                </span>
+                <b.icon className="h-5 w-5 translate-y-[-2px] text-[#f97316]" />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold text-[#1c1917]">
                 {b.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#78716c]">
-                {b.desc}
-              </p>
+              <p className="mt-2 leading-relaxed text-[#57534e]">{b.desc}</p>
             </div>
           ))}
         </div>
       </Section>
 
-      {/* Module grid */}
+      {/* Module showcase — asymmetric, image-driven bento */}
       <Section
         id="moduller"
+        index="02"
         eyebrow="Tüm özellikler tek platformda"
         title="Operasyonun tamamı, bir arada"
-        subtitle="QR menüden çoklu şubeye kadar ihtiyacınız olan her modül tek hesapta."
+        subtitle="QR menüden çoklu şubeye kadar ihtiyacınız olan her modül tek hesapta. Karta değil, ürüne bakın."
       >
-        <ModuleGrid />
+        <BentoShowcase />
       </Section>
+
+      <StatBand />
 
       {/* Flagship spotlights */}
       <SplitFeature
@@ -355,6 +361,13 @@ export default function LandingPage() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <IntegrationChips />
+            <Link
+              to="/entegrasyonlar"
+              className="group mt-7 inline-flex items-center gap-2 rounded-xl border border-[#e3d7c7] bg-white px-5 py-3 text-sm font-semibold text-[#1c1917] transition hover:border-[#f5c9a3] hover:bg-[#fff8f1]"
+            >
+              Tüm entegrasyonlar ve “entegrasyon yoksa nasıl çalışır?”
+              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+            </Link>
           </div>
           <div className="lg:order-first">
             <Picture
