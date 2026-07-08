@@ -74,6 +74,21 @@ export class RecipesService {
             },
           },
         },
+        // Nested BOM: sub-recipe components with their own stock ingredients, so
+        // plate costing rolls the sub-recipe cost into the parent.
+        components: {
+          include: {
+            subRecipe: {
+              include: {
+                ingredients: {
+                  include: {
+                    stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       take,
@@ -101,6 +116,21 @@ export class RecipesService {
             },
           },
         },
+        // Nested BOM: sub-recipe components with their own stock ingredients, so
+        // plate costing rolls the sub-recipe cost into the parent.
+        components: {
+          include: {
+            subRecipe: {
+              include: {
+                ingredients: {
+                  include: {
+                    stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!recipe) throw new NotFoundException("Recipe not found");
@@ -121,6 +151,21 @@ export class RecipesService {
                 unit: true,
                 currentStock: true,
                 costPerUnit: true,
+              },
+            },
+          },
+        },
+        // Nested BOM: sub-recipe components with their own stock ingredients, so
+        // plate costing rolls the sub-recipe cost into the parent.
+        components: {
+          include: {
+            subRecipe: {
+              include: {
+                ingredients: {
+                  include: {
+                    stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
               },
             },
           },
@@ -201,6 +246,16 @@ export class RecipesService {
             conversionFactor: i.conversionFactor ?? null,
           })),
         },
+        components: dto.components?.length
+          ? {
+              create: dto.components.map((c) => ({
+                subRecipeId: c.subRecipeId,
+                quantity: c.quantity,
+                recipeUnit: c.recipeUnit ?? null,
+                conversionFactor: c.conversionFactor ?? null,
+              })),
+            }
+          : undefined,
       },
       include: {
         product: { select: { id: true, name: true, price: true } },
@@ -263,6 +318,25 @@ export class RecipesService {
             conversionFactor: i.conversionFactor ?? null,
           })),
         });
+      }
+
+      // Replace sub-recipe components if provided (nested BOM).
+      if (dto.components) {
+        if (dto.components.some((c) => c.subRecipeId === id)) {
+          throw new BadRequestException("A recipe cannot include itself");
+        }
+        await tx.recipeSubComponent.deleteMany({ where: { recipeId: id } });
+        if (dto.components.length > 0) {
+          await tx.recipeSubComponent.createMany({
+            data: dto.components.map((c) => ({
+              recipeId: id,
+              subRecipeId: c.subRecipeId,
+              quantity: c.quantity,
+              recipeUnit: c.recipeUnit ?? null,
+              conversionFactor: c.conversionFactor ?? null,
+            })),
+          });
+        }
       }
 
       return tx.recipe.findUnique({

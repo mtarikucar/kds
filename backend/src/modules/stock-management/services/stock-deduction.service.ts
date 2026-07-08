@@ -62,7 +62,20 @@ export class StockDeductionService {
                 // recipe(s) and buildDeductions selects the row matching the
                 // order's branch.
                 recipes: {
-                  include: { ingredients: { include: { stockItem: true } } },
+                  include: {
+                    ingredients: { include: { stockItem: true } },
+                    // Nested BOM: one level of sub-recipe (prep) with its own
+                    // stock ingredients, expanded at deduction time.
+                    components: {
+                      include: {
+                        subRecipe: {
+                          include: {
+                            ingredients: { include: { stockItem: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -127,33 +140,57 @@ export class StockDeductionService {
         (r: any) => r.branchId === order.branchId,
       );
       if (!recipe) continue;
-      const yieldVal = recipe.yield || 1;
-      for (const ingredient of recipe.ingredients) {
-        // Convert the recipe-unit quantity to the stock item's base unit before
-        // deducting (e.g. 200 G of a KG-stocked item → 0.2). Null/≤0 factor =
-        // base-unit quantity (1:1), so existing recipes are unaffected.
-        const factor =
-          ingredient.conversionFactor != null &&
-          new Prisma.Decimal(ingredient.conversionFactor).gt(0)
-            ? new Prisma.Decimal(ingredient.conversionFactor)
-            : new Prisma.Decimal(1);
-        const perServing = new Prisma.Decimal(ingredient.quantity)
-          .mul(factor)
-          .div(yieldVal);
-        const needed = perServing.mul(orderItem.quantity);
-        const existing = acc.get(ingredient.stockItemId);
-        if (existing) {
-          existing.quantity = existing.quantity.add(needed);
-        } else {
-          acc.set(ingredient.stockItemId, {
-            stockItemId: ingredient.stockItemId,
-            quantity: needed,
-            stockItemName: ingredient.stockItem.name,
-          });
-        }
-      }
+      // Produce orderItem.quantity servings of this recipe; expandRecipe walks
+      // the direct ingredients and any nested sub-recipes.
+      this.expandRecipe(recipe, new Prisma.Decimal(orderItem.quantity), acc, 0);
     }
     return [...acc.values()];
+  }
+
+  /**
+   * Accumulate the base-unit stock draw for producing `servings` output units
+   * of `recipe`. Direct ingredients scale by servings ÷ yield; a sub-recipe
+   * component recurses, needing (component qty × factor × scale) of the
+   * sub-recipe's output. Recipe-unit conversionFactor applies at every level;
+   * null/≤0 factor = 1:1 (existing recipes unaffected). Depth-capped so a
+   * cyclic sub-recipe definition can't recurse forever.
+   */
+  private expandRecipe(
+    recipe: any,
+    servings: Prisma.Decimal,
+    acc: Map<string, Deduction>,
+    depth: number,
+  ) {
+    if (!recipe || depth > 6) return;
+    const yieldVal = new Prisma.Decimal(recipe.yield || 1);
+    const scale = servings.div(yieldVal);
+    const factorOf = (v: any) =>
+      v != null && new Prisma.Decimal(v).gt(0)
+        ? new Prisma.Decimal(v)
+        : new Prisma.Decimal(1);
+
+    for (const ingredient of recipe.ingredients ?? []) {
+      const needed = new Prisma.Decimal(ingredient.quantity)
+        .mul(factorOf(ingredient.conversionFactor))
+        .mul(scale);
+      const existing = acc.get(ingredient.stockItemId);
+      if (existing) {
+        existing.quantity = existing.quantity.add(needed);
+      } else {
+        acc.set(ingredient.stockItemId, {
+          stockItemId: ingredient.stockItemId,
+          quantity: needed,
+          stockItemName: ingredient.stockItem?.name,
+        });
+      }
+    }
+
+    for (const comp of recipe.components ?? []) {
+      const subServings = new Prisma.Decimal(comp.quantity)
+        .mul(factorOf(comp.conversionFactor))
+        .mul(scale);
+      this.expandRecipe(comp.subRecipe, subServings, acc, depth + 1);
+    }
   }
 
   private async applyDeduction(

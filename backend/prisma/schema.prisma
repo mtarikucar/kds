@@ -3115,6 +3115,10 @@ model Recipe {
 
   // Relations
   ingredients RecipeIngredient[]
+  // Sub-recipe (nested BOM): components are other recipes (preps) used by this
+  // one; usedInComponents is the reverse (where this recipe is a prep).
+  components       RecipeSubComponent[] @relation("RecipeComponents")
+  usedInComponents RecipeSubComponent[] @relation("RecipeAsComponent")
   // v3.0.0 — branch scope.
   branchId    String
   branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -3123,6 +3127,27 @@ model Recipe {
   @@index([tenantId])
   @@index([tenantId, branchId])
   @@map("recipes")
+}
+
+// Nested BOM link: a recipe uses `quantity` of another recipe (a prep/
+// sub-recipe). At deduction + costing the sub-recipe is expanded into its own
+// stock ingredients, scaled by quantity ÷ sub-recipe yield. recipeUnit/
+// conversionFactor work exactly as on RecipeIngredient (null = 1:1). One level
+// of expansion is applied (a sub-recipe's ingredients are stock items).
+model RecipeSubComponent {
+  id          String  @id @default(uuid())
+  recipeId    String
+  recipe      Recipe  @relation("RecipeComponents", fields: [recipeId], references: [id], onDelete: Cascade)
+  subRecipeId String
+  subRecipe   Recipe  @relation("RecipeAsComponent", fields: [subRecipeId], references: [id], onDelete: Restrict)
+  quantity    Decimal @db.Decimal(10, 3)
+  recipeUnit  String?
+  conversionFactor Decimal? @db.Decimal(12, 6)
+
+  @@unique([recipeId, subRecipeId])
+  @@index([recipeId])
+  @@index([subRecipeId])
+  @@map("recipe_sub_components")
 }
 
 model RecipeIngredient {

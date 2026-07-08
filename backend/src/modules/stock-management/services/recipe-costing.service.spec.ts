@@ -113,3 +113,36 @@ describe('RecipeCostingService — recipe-unit conversion', () => {
     expect(res.totalRecipeCost).toBe(20);
   });
 });
+
+describe('RecipeCostingService — nested BOM (sub-recipes)', () => {
+  const svc = new RecipeCostingService();
+  const d = (v: string) => new Prisma.Decimal(v);
+
+  it('expands a sub-recipe component into cost = qty × sub cost-per-portion', () => {
+    // Sauce: yields 1000 (g), 1 ingredient 1000g @ 0.05/g = 50 total → 0.05/portion(g)
+    const sauce = {
+      yield: 1000,
+      product: { price: null },
+      ingredients: [{ quantity: d('1000'), stockItem: { id: 'tomato', costPerUnit: d('0.05') } }],
+    };
+    // Dish uses 200 g of sauce → 200 × 0.05 = 10, plus 1 direct ingredient 100g @ 0.1 = 10 → total 20
+    const dish = {
+      yield: 1,
+      product: { price: d('50') },
+      ingredients: [{ quantity: d('100'), stockItem: { id: 'pasta', costPerUnit: d('0.1') } }],
+      components: [{ quantity: d('200'), recipeUnit: 'g', name: 'Sauce', subRecipe: sauce }],
+    };
+
+    const res = svc.compute(dish);
+    expect(res.totalRecipeCost).toBe(20); // 10 sauce + 10 pasta
+    expect(res.costPerPortion).toBe(20);
+    // a sub-recipe line is included
+    expect(res.ingredients.some((l) => l.name === 'Sauce' && l.lineCost === 10)).toBe(true);
+  });
+
+  it('does not recurse forever on a self-referential (cyclic) sub-recipe', () => {
+    const cyclic: any = { yield: 1, product: { price: null }, ingredients: [], components: [] };
+    cyclic.components.push({ quantity: d('1'), name: 'self', subRecipe: cyclic });
+    expect(() => svc.compute(cyclic)).not.toThrow();
+  });
+});

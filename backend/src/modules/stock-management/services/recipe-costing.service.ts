@@ -28,6 +28,15 @@ export interface RecipeCostingInput {
       costPerUnit?: Num;
     } | null;
   }>;
+  // Nested BOM: sub-recipe components used by this recipe. Each contributes
+  // quantity × the sub-recipe's cost-per-portion (recursively computed).
+  components?: Array<{
+    quantity: Num;
+    conversionFactor?: Num;
+    recipeUnit?: string | null;
+    name?: string | null;
+    subRecipe?: RecipeCostingInput | null;
+  }>;
 }
 
 export interface RecipeCostingLine {
@@ -63,8 +72,9 @@ export interface RecipeCostingResult {
  */
 @Injectable()
 export class RecipeCostingService {
-  compute(recipe: RecipeCostingInput): RecipeCostingResult {
+  compute(recipe: RecipeCostingInput, depth = 0): RecipeCostingResult {
     const yieldPortions = recipe?.yield && recipe.yield > 0 ? recipe.yield : 1;
+    const MAX_DEPTH = 6; // cycle / runaway-nesting guard
 
     let total = new Prisma.Decimal(0);
     const ingredients: RecipeCostingLine[] = (recipe?.ingredients ?? []).map(
@@ -88,6 +98,29 @@ export class RecipeCostingService {
         };
       },
     );
+
+    // Nested BOM: each sub-recipe component contributes (converted quantity) ×
+    // (the sub-recipe's cost-per-portion), computed recursively. Depth-capped
+    // so a cyclic definition can't recurse forever.
+    for (const comp of recipe?.components ?? []) {
+      if (depth >= MAX_DEPTH || !comp.subRecipe) continue;
+      const sub = this.compute(comp.subRecipe, depth + 1);
+      const qty = dec(comp.quantity);
+      const rawFactor = dec(comp.conversionFactor);
+      const factor = rawFactor.gt(0) ? rawFactor : new Prisma.Decimal(1);
+      const baseQty = qty.mul(factor);
+      const subUnitCost = new Prisma.Decimal(sub.costPerPortion);
+      const lineCost = baseQty.mul(subUnitCost);
+      total = total.add(lineCost);
+      ingredients.push({
+        stockItemId: null,
+        name: comp.name ?? (comp.subRecipe as any)?.name ?? "Sub-recipe",
+        unit: comp.recipeUnit ?? null,
+        quantity: qty.toNumber(),
+        unitCost: round2(subUnitCost),
+        lineCost: round2(lineCost),
+      });
+    }
 
     const perPortion = total.div(yieldPortions);
     const price =

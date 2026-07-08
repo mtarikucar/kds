@@ -385,3 +385,67 @@ describe('StockDeductionService.deductForOrder — recipe-unit conversion', () =
     expect(txMock.stockItem.updateMany.mock.calls[0][0].data.currentStock.decrement.toString()).toBe('0.2');
   });
 });
+
+/**
+ * Nested BOM at deduction: a recipe component (sub-recipe) is expanded into its
+ * own stock ingredients, scaled by component qty ÷ sub-recipe yield.
+ */
+describe('StockDeductionService.deductForOrder — nested BOM (sub-recipe)', () => {
+  let prisma: MockPrismaClient;
+  let svc: StockDeductionService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      get: jest.fn().mockResolvedValue({
+        enableAutoDeduction: true, deductOnStatus: null, allowNegativeStock: true,
+      }),
+    };
+    svc = new StockDeductionService(prisma as any, settings);
+  });
+
+  it('deducts both the direct ingredient and the expanded sub-recipe stock', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'ord-1', orderNumber: 'O1', tenantId: 't1', branchId: 'b1', stockDeducted: false,
+      orderItems: [
+        {
+          quantity: 1,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1', yield: 1,
+                ingredients: [{ stockItemId: 'pasta', quantity: '100', stockItem: { name: 'Pasta' } }],
+                components: [
+                  {
+                    quantity: '200',
+                    subRecipe: {
+                      yield: 1000,
+                      ingredients: [{ stockItemId: 'tomato', quantity: '1000', stockItem: { name: 'Tomato' } }],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any);
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'x', tenantId: 't1', currentStock: '10000', costPerUnit: '0', minStock: '0' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    const result: any = await svc.deductForOrder('ord-1', 't1', undefined, 'u1');
+    const byId: Record<string, string> = {};
+    for (const d of result.deductions) byId[d.stockItemId] = d.quantity.toString();
+    expect(byId['pasta']).toBe('100'); // direct
+    expect(byId['tomato']).toBe('200'); // 1000 × (200 ÷ 1000 sub-yield)
+  });
+});
