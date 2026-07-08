@@ -26,3 +26,52 @@ export const useTopProducts = (params: SalesReportDto) => {
     enabled: !!params.startDate && !!params.endDate,
   });
 };
+
+// ── Back-office financial reports (P&L, labor, forecast, consolidated) ──────
+interface RangeParams { startDate?: string; endDate?: string }
+
+export const useProfitAndLoss = (params: RangeParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['reports', 'pnl', params, branchId],
+    queryFn: async () => {
+      const response = await api.get('/reports/profit-and-loss', { params });
+      return response.data;
+    },
+    enabled: !!params.startDate && !!params.endDate,
+  });
+};
+
+export const useLaborReport = (params: RangeParams) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['reports', 'labor', params, branchId],
+    queryFn: async () => {
+      const response = await api.get('/reports/labor', { params });
+      return response.data;
+    },
+    enabled: !!params.startDate && !!params.endDate,
+  });
+};
+
+export const useSalesForecast = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['reports', 'sales-forecast', branchId],
+    queryFn: async () => {
+      const response = await api.get('/reports/sales-forecast');
+      return response.data;
+    },
+  });
+};
+
+export const useConsolidatedPnl = (params: RangeParams) => {
+  return useQuery({
+    queryKey: ['reports', 'consolidated-pnl', params],
+    queryFn: async () => {
+      const response = await api.get('/reports/consolidated-pnl', { params });
+      return response.data;
+    },
+    enabled: !!params.startDate && !!params.endDate,
+  });
+};
