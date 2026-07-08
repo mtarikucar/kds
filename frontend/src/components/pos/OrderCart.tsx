@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart, Combine, Split, Users, ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { Product } from '../../types';
+import { Product, ComboSelectionInput } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -13,6 +13,7 @@ interface CartItem extends Product {
   quantity: number;
   notes?: string;
   modifiers?: SelectedModifier[];
+  comboSelections?: ComboSelectionInput[];
 }
 
 interface OrderCartProps {
@@ -180,6 +181,26 @@ const OrderCart = ({
                 >
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-sm text-slate-900 truncate">{item.name}</h4>
+                    {/* Combo components as sub-text (resolved from the product's
+                        combo slots + the line's chosen selections). */}
+                    {item.comboSelections && item.comboSelections.length > 0 && (
+                      <p className="text-xs text-slate-400 truncate mt-0.5">
+                        {item.comboSelections
+                          .map((sel) => {
+                            for (const g of item.comboGroups ?? []) {
+                              const it = g.items.find(
+                                (i) =>
+                                  i.componentProductId ===
+                                  sel.componentProductId,
+                              );
+                              if (it) return it.name || '';
+                            }
+                            return '';
+                          })
+                          .filter(Boolean)
+                          .join(' + ')}
+                      </p>
+                    )}
                     {/* Selected modifiers as sub-text */}
                     {lineModifiers.length > 0 && (
                       <p className="text-xs text-slate-400 truncate mt-0.5">

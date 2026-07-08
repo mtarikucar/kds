@@ -17,6 +17,7 @@ const QRMenuPage: React.FC<QRMenuPageProps> = ({ searchQuery = '' }) => {
           settings={menuData.settings}
           tenant={menuData.tenant}
           enableCustomerOrdering={menuData.enableCustomerOrdering}
+          collections={menuData.collections}
           searchQuery={searchQuery}
         />
       )}

@@ -16,6 +16,7 @@ interface QRMenuContentProps {
   settings: MenuSettings;
   tenant: { id: string; name: string; currency?: string };
   enableCustomerOrdering: boolean;
+  collections?: { id: string; name: string; slug: string; productIds: string[] }[];
   searchQuery?: string;
   isLoading?: boolean;
 }
@@ -25,6 +26,7 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
   settings,
   tenant,
   enableCustomerOrdering,
+  collections = [],
   searchQuery: externalSearchQuery,
   isLoading = false,
 }) => {
@@ -50,6 +52,17 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
 
   // Get all products
   const allProducts = categories.flatMap(cat => cat.products);
+  const productById = new Map(allProducts.map((p) => [p.id, p]));
+
+  // Resolve each collection to its (available) products, dropping empties.
+  const collectionRails = (collections || [])
+    .map((c) => ({
+      ...c,
+      products: c.productIds
+        .map((id) => productById.get(id))
+        .filter((p): p is Product => !!p),
+    }))
+    .filter((c) => c.products.length > 0);
 
   // Filter products
   const filteredProducts = allProducts.filter((product) => {
@@ -313,6 +326,42 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
           ) : (
             // All categories view
             <div className="space-y-8">
+              {/* Collection strips — kategoriden bağımsız vitrinler
+                  ("Kampanyalar", "Menüler", "Yeni"). Horizontal scroll. */}
+              {collectionRails.map((col) => (
+                <div key={col.id} className="space-y-3">
+                  <h2
+                    className="px-1 text-lg font-bold"
+                    style={{ color: settings.secondaryColor }}
+                  >
+                    {col.name}
+                  </h2>
+                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+                    {col.products.map((product) => (
+                      <div
+                        key={`${col.id}-${product.id}`}
+                        className="w-40 flex-shrink-0 snap-start"
+                      >
+                        <ProductCard
+                          product={product}
+                          onClick={() => handleProductClick(product)}
+                          onQuickAdd={(e) => handleQuickAdd(product, e)}
+                          primaryColor={settings.primaryColor}
+                          secondaryColor={settings.secondaryColor}
+                          currency={tenant.currency || 'TRY'}
+                          showImages={settings.showImages}
+                          showDescription={false}
+                          showPrices={settings.showPrices}
+                          enableCustomerOrdering={enableCustomerOrdering}
+                          layoutStyle="GRID"
+                          isAdded={addedProductId === product.id}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
               {productsByCategory.map(({ category, products }) => (
                 <motion.div
                   key={category.id}
