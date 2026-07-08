@@ -3252,6 +3252,24 @@ model Expense {
   @@map("expenses")
 }
 
+// Monthly expense budget per category — compared against actual expenses for a
+// budget-vs-actual variance report. Scalar FKs keep it isolated.
+model Budget {
+  id        String   @id @default(uuid())
+  tenantId  String
+  branchId  String
+  category  String
+  year      Int
+  month     Int // 1-12
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, branchId, category, year, month])
+  @@index([tenantId, branchId, year, month])
+  @@map("budgets")
+}
+
 // Accounts-Payable vendor bill. Optionally linked to a PurchaseOrder for the
 // 3-way match (ordered ↔ received/GRN ↔ invoiced): a mismatch beyond tolerance
 // flags DISCREPANCY so it can't be paid blind. taxAmount is the indirilecek KDV

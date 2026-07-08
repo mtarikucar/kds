@@ -76,6 +76,83 @@ export class ExpensesService {
     return { id };
   }
 
+  /** Set (upsert) a monthly budget for a category. */
+  async setBudget(
+    scope: BranchScope,
+    dto: { category: string; year: number; month: number; amount: number },
+  ) {
+    return this.prisma.budget.upsert({
+      where: {
+        tenantId_branchId_category_year_month: {
+          tenantId: scope.tenantId,
+          branchId: scope.branchId,
+          category: dto.category,
+          year: dto.year,
+          month: dto.month,
+        },
+      },
+      create: {
+        tenantId: scope.tenantId,
+        branchId: scope.branchId,
+        category: dto.category,
+        year: dto.year,
+        month: dto.month,
+        amount: new Prisma.Decimal(dto.amount),
+      },
+      update: { amount: new Prisma.Decimal(dto.amount) },
+    });
+  }
+
+  /** Budget vs actual expenses for a month, per category, with variance. */
+  async getBudgetVsActual(scope: BranchScope, year: number, month: number) {
+    const budgets = await this.prisma.budget.findMany({
+      where: { ...branchScope(scope), year, month },
+    });
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+    const actual = await this.summary(
+      scope.tenantId,
+      monthStart,
+      monthEnd,
+      scope.branchId,
+    );
+
+    const actualByCat = new Map(
+      actual.byCategory.map((c) => [c.category, c.amount]),
+    );
+    const budgetByCat = new Map(
+      budgets.map((b) => [b.category, Number(b.amount)]),
+    );
+    const categories = new Set([...budgetByCat.keys(), ...actualByCat.keys()]);
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    let totalBudget = 0;
+    let totalActual = 0;
+    const rows = [...categories].map((category) => {
+      const budget = budgetByCat.get(category) ?? 0;
+      const actualAmt = actualByCat.get(category) ?? 0;
+      totalBudget += budget;
+      totalActual += actualAmt;
+      return {
+        category,
+        budget: r2(budget),
+        actual: r2(actualAmt),
+        variance: r2(budget - actualAmt),
+        overBudget: actualAmt > budget,
+      };
+    });
+    rows.sort((a, b) => a.variance - b.variance); // most over-budget first
+
+    return {
+      year,
+      month,
+      totalBudget: r2(totalBudget),
+      totalActual: r2(totalActual),
+      totalVariance: r2(totalBudget - totalActual),
+      byCategory: rows,
+    };
+  }
+
   /** Expense totals + per-category breakdown for a window (tenant or branch). */
   async summary(
     tenantId: string,

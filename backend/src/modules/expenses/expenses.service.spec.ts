@@ -37,3 +37,38 @@ describe('ExpensesService', () => {
     expect(res.byCategory[1]).toMatchObject({ category: 'RENT', amount: 5000 });
   });
 });
+
+describe('ExpensesService.getBudgetVsActual', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: ExpensesService;
+
+  beforeEach(() => {
+    prisma = {
+      budget: { findMany: jest.fn() },
+      expense: { groupBy: jest.fn() },
+    };
+    svc = new ExpensesService(prisma);
+  });
+
+  it('compares budget vs actual per category with variance + over-budget flag', async () => {
+    prisma.budget.findMany.mockResolvedValue([
+      { category: 'RENT', amount: 5000 },
+      { category: 'MARKETING', amount: 1000 },
+    ]);
+    // actuals via summary → expense.groupBy
+    prisma.expense.groupBy.mockResolvedValue([
+      { category: 'RENT', _sum: { amount: 5000, taxAmount: 0 }, _count: 1 },
+      { category: 'MARKETING', _sum: { amount: 1500, taxAmount: 0 }, _count: 2 }, // over budget
+    ]);
+
+    const res = await svc.getBudgetVsActual(SCOPE, 2026, 6);
+    expect(res.totalBudget).toBe(6000);
+    expect(res.totalActual).toBe(6500);
+    expect(res.totalVariance).toBe(-500);
+    const mkt = res.byCategory.find((c: any) => c.category === 'MARKETING');
+    expect(mkt).toMatchObject({ budget: 1000, actual: 1500, variance: -500, overBudget: true });
+    const rent = res.byCategory.find((c: any) => c.category === 'RENT');
+    expect(rent).toMatchObject({ variance: 0, overBudget: false });
+  });
+});

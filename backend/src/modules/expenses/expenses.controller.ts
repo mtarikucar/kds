@@ -17,6 +17,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 import { ExpensesService } from "./expenses.service";
 import { CreateExpenseDto } from "./dto/create-expense.dto";
+import { SetBudgetDto } from "./dto/set-budget.dto";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../common/scoping/branch-scope";
 
@@ -59,6 +60,28 @@ export class ExpensesController {
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
       scope.branchId,
+    );
+  }
+
+  @Post("budget")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Set (upsert) a monthly category budget" })
+  setBudget(@CurrentScope() scope: BranchScope, @Body() dto: SetBudgetDto) {
+    return this.service.setBudget(scope, dto);
+  }
+
+  @Get("budget-vs-actual")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Budget vs actual expenses for a month" })
+  budgetVsActual(
+    @CurrentScope() scope: BranchScope,
+    @Query("year") year: string,
+    @Query("month") month: string,
+  ) {
+    return this.service.getBudgetVsActual(
+      scope,
+      parseInt(year, 10),
+      parseInt(month, 10),
     );
   }
 
