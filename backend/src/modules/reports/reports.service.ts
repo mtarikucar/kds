@@ -549,6 +549,90 @@ export class ReportsService {
   }
 
   /**
+   * Tip pooling / tronc — distribute the period's total tips across staff in
+   * proportion to hours worked (from attendance). The pool defaults to the
+   * period's collected tips but can be overridden. Staff with no logged hours
+   * receive nothing; if nobody logged hours the pool is reported undistributed.
+   */
+  async getTipDistribution(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+    poolOverride?: number,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const tips = await this.getTipsReport(
+      tenantId,
+      dateRange.start,
+      dateRange.end,
+      branchId,
+    );
+    const poolCents =
+      poolOverride != null
+        ? Math.round(poolOverride * 100)
+        : Math.round(tips.totalTips * 100);
+
+    const attendances = await this.prisma.attendance.findMany({
+      where: {
+        tenantId,
+        ...(branchId ? { branchId } : {}),
+        date: { gte: dateRange.start, lte: dateRange.end },
+      },
+      select: {
+        totalWorkedMinutes: true,
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    const perStaff = new Map<
+      string,
+      { userId: string; staffName: string; minutes: number }
+    >();
+    let totalMinutes = 0;
+    for (const a of attendances) {
+      const id = a.user?.id ?? "unknown";
+      const e = perStaff.get(id) ?? {
+        userId: id,
+        staffName: a.user
+          ? `${a.user.firstName} ${a.user.lastName}`
+          : "Unknown",
+        minutes: 0,
+      };
+      e.minutes += a.totalWorkedMinutes;
+      perStaff.set(id, e);
+      totalMinutes += a.totalWorkedMinutes;
+    }
+
+    let allocatedCents = 0;
+    const distribution = [...perStaff.values()]
+      .map((e) => {
+        const share =
+          totalMinutes > 0
+            ? Math.round(poolCents * (e.minutes / totalMinutes))
+            : 0;
+        allocatedCents += share;
+        return {
+          userId: e.userId,
+          staffName: e.staffName,
+          hours: Math.round((e.minutes / 60) * 100) / 100,
+          tipShare: centsToCurrency(share),
+        };
+      })
+      .sort((a, b) => b.tipShare - a.tipShare);
+
+    return {
+      pool: centsToCurrency(poolCents),
+      totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+      distributed: centsToCurrency(allocatedCents),
+      undistributed: centsToCurrency(poolCents - allocatedCents),
+      distribution,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
+  /**
    * Profit & Loss snapshot — revenue → COGS → gross profit → operating expenses
    * → net profit, with margins. Revenue + COGS reuse the sales/COGS reports;
    * OpEx is summed from the expense ledger over the same window. The full

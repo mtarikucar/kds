@@ -374,3 +374,27 @@ describe('ReportsService.getConsolidatedPnl', () => {
     expect(res.perBranch[0].branchId).toBe('bB');
   });
 });
+
+describe('ReportsService.getTipDistribution', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+  beforeEach(() => { prisma = mockPrismaClient(); svc = new ReportsService(prisma as any); });
+
+  it('splits the tip pool by hours worked', async () => {
+    jest.spyOn(svc, 'getTipsReport').mockResolvedValue({ totalTips: 300 } as any);
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      { totalWorkedMinutes: 600, user: { id: 'u1', firstName: 'A', lastName: 'B' } }, // 10h
+      { totalWorkedMinutes: 1200, user: { id: 'u2', firstName: 'C', lastName: 'D' } }, // 20h
+    ]);
+    const res = await svc.getTipDistribution('t1', start, end);
+    expect(res.pool).toBe(300);
+    expect(res.totalHours).toBe(30);
+    // u2 worked 2/3 of hours → 200, u1 → 100
+    const byId = Object.fromEntries(res.distribution.map((d: any) => [d.userId, d.tipShare]));
+    expect(byId['u2']).toBe(200);
+    expect(byId['u1']).toBe(100);
+    expect(res.distributed).toBe(300);
+  });
+});

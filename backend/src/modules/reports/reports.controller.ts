@@ -185,6 +185,24 @@ export class ReportsController {
     );
   }
 
+  @Get("tip-distribution")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({ summary: "Tip pool (tronc) distribution by hours worked" })
+  async getTipDistribution(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    const pool =
+      (query as any).pool != null ? parseFloat((query as any).pool) : undefined;
+    return this.reportsService.getTipDistribution(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+      pool,
+    );
+  }
+
   @Get("profit-and-loss")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
