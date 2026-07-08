@@ -15,6 +15,7 @@ import {
   useCreateCashMovement,
   useTipDistribution,
   useOkcDevice,
+  downloadSessionsCsv,
 } from '../../features/cash/cashApi';
 
 type Tab = 'sessions' | 'safe' | 'tips' | 'okc';
@@ -62,6 +63,12 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
   const { data: x } = useXReport(selected);
   if (isLoading) return <Loading />;
   return (
+    <div className="space-y-4">
+    <div className="flex justify-end">
+      <button onClick={() => downloadSessionsCsv()} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+        Z geçmişi CSV indir
+      </button>
+    </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card>
         <CardHeader><CardTitle>Açık vardiyalar</CardTitle></CardHeader>
@@ -94,6 +101,7 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

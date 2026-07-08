@@ -149,3 +149,56 @@ export const useApplyLandedCost = () => {
       qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
   });
 };
+
+// ── PO templates, supplier return (RMA), barcode lookup, CSV export ─────────
+export const usePoTemplates = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ['purchasing', 'po-templates', branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/purchase-orders/templates`);
+      return r.data as Array<{ id: string; name: string; supplierId: string; items: any[] }>;
+    },
+  });
+};
+
+export const useCreateOrderFromTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      const r = await api.post(`${BASE}/purchase-orders/templates/${templateId}/create-order`);
+      return r.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
+  });
+};
+
+export const useDeletePoTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`${BASE}/purchase-orders/templates/${id}`);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchasing', 'po-templates'] }),
+  });
+};
+
+export const useSupplierReturn = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      supplierId: string;
+      reason?: string;
+      items: Array<{ stockItemId: string; quantity: number; unitCost?: number }>;
+    }) => {
+      const r = await api.post(`${BASE}/purchase-invoices/supplier-return`, input);
+      return r.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchasing'] }),
+  });
+};
+
+export const lookupBarcode = async (barcode: string) => {
+  const r = await api.get(`${BASE}/items/by-barcode/${encodeURIComponent(barcode)}`);
+  return r.data;
+};

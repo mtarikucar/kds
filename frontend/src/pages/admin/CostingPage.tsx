@@ -78,10 +78,10 @@ function MenuTab({ fmt }: { fmt: Fmt }) {
               : items.map((it: any, i: number) => (
                 <tr key={i} className="border-t border-slate-100">
                   <td className="py-2 pr-4">{it.productName ?? it.name}</td>
-                  <td className="tabular-nums">{it.quantitySold ?? it.unitsSold ?? '—'}</td>
-                  <td className="tabular-nums">{it.cost != null ? fmt(it.cost) : '—'}</td>
-                  <td className="tabular-nums">{it.price != null ? fmt(it.price) : '—'}</td>
-                  <td className="tabular-nums">{it.margin != null ? fmt(it.margin) : '—'}</td>
+                  <td className="tabular-nums">{it.unitsSold ?? it.quantitySold ?? '—'}</td>
+                  <td className="tabular-nums">{it.unitCost != null ? fmt(it.unitCost) : '—'}</td>
+                  <td className="tabular-nums">{it.unitPrice != null ? fmt(it.unitPrice) : '—'}</td>
+                  <td className="tabular-nums">{it.unitMargin != null ? fmt(it.unitMargin) : '—'}</td>
                   <td>{it.classification && <span className={`rounded-full px-2 py-0.5 text-xs ${CLASS_TONE[it.classification] ?? 'bg-slate-100'}`}>{it.classification}</span>}</td>
                 </tr>
               ))}
@@ -103,13 +103,15 @@ function VarianceTab({ fmt }: { fmt: Fmt }) {
     <Card>
       <CardHeader><CardTitle>Teorik vs fiili kullanım varyansı</CardTitle></CardHeader>
       <CardContent>
-        <Table head={['Kalem', 'Teorik', 'Fiili/Sayım', 'Varyans', 'Maliyet etkisi']}
+        {/* Backend keys: theoreticalUsage, wasteUsage, countVarianceQty, varianceValue, variancePct */}
+        <Table head={['Kalem', 'Teorik kullanım', 'Fire', 'Sayım varyansı', 'Maliyet etkisi', '%']}
           rows={rows.map((r: any) => [
-            r.name ?? r.stockItemName,
-            String(r.theoretical ?? r.expected ?? '—'),
-            String(r.actual ?? r.counted ?? '—'),
-            String(r.variance ?? '—'),
-            r.varianceCost != null ? fmt(r.varianceCost) : '—',
+            r.name ?? r.stockItemName ?? '—',
+            r.theoreticalUsage != null ? String(r.theoreticalUsage) : '—',
+            r.wasteUsage != null ? String(r.wasteUsage) : '—',
+            r.countVarianceQty != null ? String(r.countVarianceQty) : '—',
+            r.varianceValue != null ? fmt(r.varianceValue) : '—',
+            r.variancePct != null ? `%${r.variancePct}` : '—',
           ])} />
       </CardContent>
     </Card>

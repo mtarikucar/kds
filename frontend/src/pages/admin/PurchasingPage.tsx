@@ -5,6 +5,9 @@ import {
   Award,
   ArrowLeftRight,
   Boxes,
+  FileStack,
+  ScanLine,
+  Trash2,
 } from 'lucide-react';
 import {
   Card,
@@ -21,9 +24,13 @@ import {
   useStockTransfers,
   useCompleteStockTransfer,
   useCancelStockTransfer,
+  usePoTemplates,
+  useCreateOrderFromTemplate,
+  useDeletePoTemplate,
+  lookupBarcode,
 } from '../../features/stock-management/purchasingApi';
 
-type Tab = 'reorder' | 'ap' | 'suppliers' | 'transfers' | 'valuation';
+type Tab = 'reorder' | 'ap' | 'suppliers' | 'transfers' | 'valuation' | 'more';
 
 export default function PurchasingPage() {
   const fmt = useFormatCurrency();
@@ -35,6 +42,7 @@ export default function PurchasingPage() {
     { id: 'suppliers', label: 'Tedarikçi Karnesi', icon: Award },
     { id: 'transfers', label: 'Şube Transferleri', icon: ArrowLeftRight },
     { id: 'valuation', label: 'Stok Değerleme', icon: Boxes },
+    { id: 'more', label: 'Şablonlar & Barkod', icon: FileStack },
   ];
 
   return (
@@ -71,6 +79,78 @@ export default function PurchasingPage() {
       {tab === 'suppliers' && <SuppliersTab fmt={fmt} />}
       {tab === 'transfers' && <TransfersTab />}
       {tab === 'valuation' && <ValuationTab fmt={fmt} />}
+      {tab === 'more' && <MoreTab fmt={fmt} />}
+    </div>
+  );
+}
+
+function MoreTab({ fmt }: { fmt: Fmt }) {
+  const { data: templates, isLoading } = usePoTemplates();
+  const createOrder = useCreateOrderFromTemplate();
+  const deleteTpl = useDeletePoTemplate();
+  const [barcode, setBarcode] = useState('');
+  const [found, setFound] = useState<any>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  const onLookup = async () => {
+    setNotFound(false);
+    setFound(null);
+    if (!barcode.trim()) return;
+    try {
+      setFound(await lookupBarcode(barcode.trim()));
+    } catch {
+      setNotFound(true);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader><CardTitle>Sipariş şablonları</CardTitle></CardHeader>
+        <CardContent>
+          {isLoading ? <Loading /> : (!templates || templates.length === 0) ? (
+            <Empty text="Kayıtlı şablon yok." />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {templates.map((t) => (
+                <li key={t.id} className="flex items-center justify-between py-2 text-sm">
+                  <span>{t.name} <span className="text-slate-400">({t.items?.length ?? 0} kalem)</span></span>
+                  <span className="space-x-3">
+                    <button onClick={() => createOrder.mutate(t.id)} className="text-indigo-600 hover:underline">Sipariş oluştur</button>
+                    <button onClick={() => deleteTpl.mutate(t.id)} className="text-slate-400 hover:text-rose-600" aria-label="Sil"><Trash2 className="inline h-4 w-4" /></button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {createOrder.isSuccess && <p className="mt-3 text-sm text-emerald-600">Taslak sipariş oluşturuldu.</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Barkod ile stok arama</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <input
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onLookup()}
+              placeholder="Barkod okut / yaz"
+              className="flex-1 rounded-md border-slate-300 text-sm"
+            />
+            <button onClick={onLookup} className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              <ScanLine className="h-4 w-4" /> Ara
+            </button>
+          </div>
+          {found && (
+            <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm">
+              <p className="font-semibold">{found.name}</p>
+              <p className="text-slate-600">Stok: {found.currentStock} {found.unit} · Maliyet: {fmt(Number(found.costPerUnit ?? 0))} · Barkod: {found.barcode}</p>
+            </div>
+          )}
+          {notFound && <p className="mt-3 text-sm text-rose-600">Bu barkodla eşleşen stok kalemi bulunamadı.</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -79,26 +159,34 @@ type Fmt = (n: number) => string;
 
 function ReorderTab({ fmt }: { fmt: Fmt }) {
   const { data, isLoading } = useReorderSuggestions();
-  const lines: any[] = data?.suggestions ?? data ?? [];
   if (isLoading) return <Loading />;
+  // Backend shape: { draftOrders: [{ supplierName, items: [...] }], unassigned, totalItemsBelowPar }
+  const draftOrders: any[] = data?.draftOrders ?? [];
+  const unassigned: any[] = data?.unassigned ?? [];
+  const rows = [
+    ...draftOrders.flatMap((s: any) =>
+      (s.items ?? []).map((l: any) => [
+        s.supplierName ?? '—',
+        l.stockItemName ?? l.name ?? '—',
+        `${l.suggestedQty ?? l.suggestedQuantity ?? ''} ${l.unit ?? ''}`,
+        l.estimatedCost != null ? fmt(l.estimatedCost) : '—',
+      ])
+    ),
+    ...unassigned.map((l: any) => [
+      'Tedarikçisiz',
+      l.stockItemName ?? l.name ?? '—',
+      `${l.suggestedQty ?? l.suggestedQuantity ?? ''} ${l.unit ?? ''}`,
+      l.estimatedCost != null ? fmt(l.estimatedCost) : '—',
+    ]),
+  ];
   return (
     <Card>
-      <CardHeader><CardTitle>Par altı kalemler için sipariş önerileri</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Par altı kalemler için sipariş önerileri ({data?.totalItemsBelowPar ?? rows.length})</CardTitle></CardHeader>
       <CardContent>
-        {lines.length === 0 ? (
+        {rows.length === 0 ? (
           <Empty text="Sipariş önerisi yok — stoklar par seviyesinin üzerinde." />
         ) : (
-          <Table
-            head={['Tedarikçi', 'Kalem', 'Önerilen', 'Tahmini tutar']}
-            rows={lines.flatMap((s: any) =>
-              (s.lines ?? [s]).map((l: any) => [
-                s.supplierName ?? '—',
-                l.stockItemName ?? l.name ?? '—',
-                `${l.suggestedQuantity ?? l.quantity ?? ''} ${l.unit ?? ''}`,
-                l.estimatedCost != null ? fmt(l.estimatedCost) : '—',
-              ])
-            )}
-          />
+          <Table head={['Tedarikçi', 'Kalem', 'Önerilen', 'Tahmini tutar']} rows={rows} />
         )}
       </CardContent>
     </Card>

@@ -72,3 +72,15 @@ export const usePrintOkcReceipt = () => {
     },
   });
 };
+
+export const downloadSessionsCsv = async () => {
+  const r = await api.get('/cash-drawer/sessions.csv', { responseType: 'blob' });
+  const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cashier-sessions.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
