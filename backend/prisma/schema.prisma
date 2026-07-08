@@ -3022,6 +3022,16 @@ model StockItem {
   // Fixed quantity to suggest ordering when the item hits its reorder point.
   // Null = derive a default (bring stock back up toward twice the par level).
   reorderQuantity Decimal? @db.Decimal(10, 3)
+
+  // Unit-of-measure conversion for PURCHASING: you buy in `purchaseUnit`
+  // (e.g. BOX) but stock/consume in the base `unit` (e.g. PCS).
+  // purchaseConversion = base units per 1 purchase unit (a BOX of 12 → 12).
+  // Null/1 = bought in the base unit (no conversion). Used by reorder
+  // suggestions to propose whole-pack order quantities; the receive path stays
+  // in base units until a PO-item unit snapshot is added.
+  purchaseUnit       String?
+  purchaseConversion Decimal? @db.Decimal(10, 3)
+
   costPerUnit  Decimal @default(0) @db.Decimal(10, 4)
 
   trackExpiry Boolean @default(false)

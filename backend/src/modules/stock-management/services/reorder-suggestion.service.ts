@@ -2,6 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import {
+  baseToPurchasePacks,
+  purchaseToBase,
+} from "../../../common/utils/uom.util";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -16,6 +20,9 @@ export interface SuggestionLine {
   suggestedQty: number;
   unitPrice: number;
   estimatedCost: number;
+  // Set when the item is bought in packs: order this many `purchaseUnit`s.
+  purchaseUnit: string | null;
+  purchaseQty: number | null;
   supplier: { id: string; name: string; supplierSku: string | null } | null;
 }
 
@@ -51,6 +58,8 @@ export class ReorderSuggestionService {
         minStock: true,
         costPerUnit: true,
         reorderQuantity: true,
+        purchaseUnit: true,
+        purchaseConversion: true,
         supplierStockItems: {
           select: {
             isPreferred: true,
@@ -69,10 +78,22 @@ export class ReorderSuggestionService {
     const lines: SuggestionLine[] = belowPar.map((i) => {
       const par = Number(i.minStock);
       const cur = Number(i.currentStock);
-      const suggestedQty =
+      const baseNeed =
         i.reorderQuantity != null
           ? Number(i.reorderQuantity)
           : Math.max(par * 2 - cur, par);
+      // If the item is bought in packs, round the base need UP to whole packs
+      // and surface the pack count so the operator orders in purchase units.
+      const factor =
+        i.purchaseConversion != null ? Number(i.purchaseConversion) : null;
+      let suggestedQty = baseNeed;
+      let purchaseUnit: string | null = null;
+      let purchaseQty: number | null = null;
+      if (factor && factor > 1 && i.purchaseUnit) {
+        purchaseQty = baseToPurchasePacks(baseNeed, factor);
+        suggestedQty = purchaseToBase(purchaseQty, factor);
+        purchaseUnit = i.purchaseUnit;
+      }
       // Preferred supplier wins; else the first supplier; else no supplier.
       const preferred =
         i.supplierStockItems.find((s) => s.isPreferred) ??
@@ -90,6 +111,8 @@ export class ReorderSuggestionService {
         suggestedQty: r3(suggestedQty),
         unitPrice: r4(unitPrice),
         estimatedCost: r2(suggestedQty * unitPrice),
+        purchaseUnit,
+        purchaseQty,
         supplier: preferred?.supplier
           ? {
               id: preferred.supplier.id,

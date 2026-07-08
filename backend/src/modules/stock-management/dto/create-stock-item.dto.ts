@@ -63,6 +63,22 @@ export class CreateStockItemDto {
   @IsOptional()
   reorderQuantity?: number;
 
+  @ApiPropertyOptional({ description: "Purchase unit label (e.g. BOX)" })
+  @IsString()
+  @IsOptional()
+  @MaxLength(24)
+  purchaseUnit?: string;
+
+  @ApiPropertyOptional({
+    description: "Base units per 1 purchase unit (a BOX of 12 → 12)",
+    minimum: 0,
+  })
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @Max(QTY_MAX)
+  @IsOptional()
+  purchaseConversion?: number;
+
   @ApiPropertyOptional({ description: "Cost per unit", minimum: 0 })
   @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)

@@ -76,3 +76,35 @@ describe('ReorderSuggestionService', () => {
     expect(res.draftOrders).toHaveLength(0);
   });
 });
+
+describe('ReorderSuggestionService — purchase-unit (pack) rounding', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: ReorderSuggestionService;
+
+  beforeEach(() => {
+    prisma = { stockItem: { findMany: jest.fn() } };
+    svc = new ReorderSuggestionService(prisma);
+  });
+
+  it('rounds the base need up to whole purchase packs and reports pack count', async () => {
+    prisma.stockItem.findMany.mockResolvedValue([
+      {
+        id: 'A', name: 'Cola', unit: 'PCS', currentStock: 2, minStock: 10,
+        costPerUnit: 1, reorderQuantity: null,
+        // buy in BOX of 12; base need = max(2*10-2,10)=18 → 2 boxes = 24 PCS
+        purchaseUnit: 'BOX', purchaseConversion: 12,
+        supplierStockItems: [
+          { isPreferred: true, unitPrice: 1, supplierSku: null, supplier: { id: 'S1', name: 'Main' } },
+        ],
+      },
+    ]);
+
+    const res = await svc.getSuggestions(SCOPE);
+    const line = res.draftOrders[0].items[0];
+    expect(line.purchaseUnit).toBe('BOX');
+    expect(line.purchaseQty).toBe(2);       // whole packs
+    expect(line.suggestedQty).toBe(24);      // 2 × 12 base units
+    expect(line.estimatedCost).toBe(24);     // 24 × 1
+  });
+});
