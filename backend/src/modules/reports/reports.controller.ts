@@ -128,6 +128,23 @@ export class ReportsController {
     );
   }
 
+  @Get("menu-engineering")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({
+    summary: "Menu engineering: Star/Plow-horse/Puzzle/Dog + contribution margin",
+  })
+  async getMenuEngineering(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getMenuEngineering(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+    );
+  }
+
   @Get("inventory")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.INVENTORY_TRACKING)

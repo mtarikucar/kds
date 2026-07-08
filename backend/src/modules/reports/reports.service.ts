@@ -290,6 +290,146 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Menu engineering — classify each sold product into the classic
+   * profitability × popularity quadrant (Star / Plow-horse / Puzzle / Dog) plus
+   * per-item contribution margin. Cost basis is Product.costPrice (recipe
+   * products can sync their plate cost into costPrice). Popularity is "high"
+   * when a product's units-sold is at least 70% of the average (the classic
+   * menu-mix rule); profitability is "high" when unit margin ≥ the average unit
+   * margin. Products without a cost basis are surfaced separately (uncosted) and
+   * excluded from the averages so they don't skew the quadrant.
+   */
+  async getMenuEngineering(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const sold = await this.prisma.orderItem.groupBy({
+      by: ["productId"],
+      where: {
+        order: {
+          tenantId,
+          ...branchScope,
+          status: OrderStatus.PAID,
+          createdAt: { gte: dateRange.start, lte: dateRange.end },
+        },
+      },
+      _sum: { quantity: true, subtotal: true },
+    });
+
+    const productIds = sold.map((s) => s.productId);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, tenantId },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        costPrice: true,
+        category: { select: { name: true } },
+      },
+    });
+    const pMap = new Map(products.map((p) => [p.id, p]));
+
+    const rows = sold.map((s) => {
+      const p = pMap.get(s.productId);
+      const qty = Number(s._sum.quantity ?? 0);
+      const revenueCents = decimalToCents(s._sum.subtotal);
+      const price = p ? new Prisma.Decimal(p.price) : new Prisma.Decimal(0);
+      const hasCost = !!p && p.costPrice != null;
+      const cost = hasCost
+        ? new Prisma.Decimal(p!.costPrice as any)
+        : null;
+      const unitMarginCents = cost
+        ? decimalToCents(price.sub(cost))
+        : null;
+      return {
+        productId: s.productId,
+        productName: p?.name ?? "Unknown",
+        categoryName: p?.category?.name ?? null,
+        unitsSold: qty,
+        revenue: centsToCurrency(revenueCents),
+        unitPrice: centsToCurrency(decimalToCents(price)),
+        unitCost: cost ? centsToCurrency(decimalToCents(cost)) : null,
+        unitMargin:
+          unitMarginCents != null ? centsToCurrency(unitMarginCents) : null,
+        totalContribution:
+          unitMarginCents != null
+            ? centsToCurrency(unitMarginCents * qty)
+            : null,
+        _unitMarginCents: unitMarginCents,
+        hasCost,
+      };
+    });
+
+    const costed = rows.filter((r) => r.hasCost);
+    const uncosted = rows
+      .filter((r) => !r.hasCost)
+      .map(({ _unitMarginCents, hasCost, ...rest }) => rest);
+
+    const avgUnits =
+      costed.length > 0
+        ? costed.reduce((s, r) => s + r.unitsSold, 0) / costed.length
+        : 0;
+    const avgUnitMarginCents =
+      costed.length > 0
+        ? costed.reduce((s, r) => s + (r._unitMarginCents ?? 0), 0) /
+          costed.length
+        : 0;
+    // Classic menu-engineering popularity rule: "high" ≥ 70% of average mix.
+    const POPULARITY_FACTOR = 0.7;
+    const popularityThreshold = avgUnits * POPULARITY_FACTOR;
+
+    const classify = (highPop: boolean, highMargin: boolean) =>
+      highPop && highMargin
+        ? "STAR"
+        : highPop && !highMargin
+          ? "PLOWHORSE"
+          : !highPop && highMargin
+            ? "PUZZLE"
+            : "DOG";
+
+    const items = costed
+      .map((r) => {
+        const highPop = r.unitsSold >= popularityThreshold;
+        const highMargin = (r._unitMarginCents ?? 0) >= avgUnitMarginCents;
+        const { _unitMarginCents, hasCost, ...rest } = r;
+        return { ...rest, classification: classify(highPop, highMargin) };
+      })
+      .sort((a, b) => (b.totalContribution ?? 0) - (a.totalContribution ?? 0));
+
+    const counts = items.reduce(
+      (acc, i) => {
+        acc[i.classification] = (acc[i.classification] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    return {
+      items,
+      uncosted,
+      averages: {
+        avgUnitsSold: Math.round(avgUnits * 100) / 100,
+        avgUnitMargin: centsToCurrency(Math.round(avgUnitMarginCents)),
+        popularityThreshold: Math.round(popularityThreshold * 100) / 100,
+      },
+      counts: {
+        STAR: counts.STAR ?? 0,
+        PLOWHORSE: counts.PLOWHORSE ?? 0,
+        PUZZLE: counts.PUZZLE ?? 0,
+        DOG: counts.DOG ?? 0,
+        uncosted: uncosted.length,
+      },
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
   async getTopProducts(
     tenantId: string,
     startDate?: Date,

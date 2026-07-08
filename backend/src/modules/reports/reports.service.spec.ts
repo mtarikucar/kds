@@ -125,3 +125,64 @@ describe('ReportsService.getCogsReport', () => {
     expect(res.grossMarginPct).toBeNull();
   });
 });
+
+/**
+ * Menu engineering — classic profitability × popularity quadrant. Popularity
+ * is "high" at ≥70% of average units-sold; profitability "high" at ≥ average
+ * unit margin. Un-costed products are excluded from the averages/quadrant.
+ */
+describe('ReportsService.getMenuEngineering', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('classifies items into Star / Plow-horse / Puzzle by margin × popularity', async () => {
+    (prisma.orderItem.groupBy as any).mockResolvedValue([
+      { productId: 'A', _sum: { quantity: 100, subtotal: 2000 } },
+      { productId: 'B', _sum: { quantity: 100, subtotal: 1000 } },
+      { productId: 'C', _sum: { quantity: 5, subtotal: 150 } },
+    ]);
+    (prisma.product.findMany as any).mockResolvedValue([
+      { id: 'A', name: 'A', price: 20, costPrice: 5, category: { name: 'Main' } },  // margin 15, popular
+      { id: 'B', name: 'B', price: 10, costPrice: 8, category: { name: 'Main' } },  // margin 2, popular
+      { id: 'C', name: 'C', price: 30, costPrice: 5, category: { name: 'Main' } },  // margin 25, unpopular
+    ]);
+
+    const res = await svc.getMenuEngineering('t1', start, end);
+
+    const byId = Object.fromEntries(res.items.map((i: any) => [i.productId, i]));
+    expect(byId['A'].classification).toBe('STAR');       // high pop + high margin
+    expect(byId['B'].classification).toBe('PLOWHORSE');   // high pop + low margin
+    expect(byId['C'].classification).toBe('PUZZLE');      // low pop + high margin
+    expect(byId['A'].unitMargin).toBe(15);
+    expect(byId['A'].totalContribution).toBe(1500);
+    expect(res.counts.STAR).toBe(1);
+    expect(res.counts.PLOWHORSE).toBe(1);
+    expect(res.counts.PUZZLE).toBe(1);
+  });
+
+  it('separates un-costed products and excludes them from the quadrant', async () => {
+    (prisma.orderItem.groupBy as any).mockResolvedValue([
+      { productId: 'A', _sum: { quantity: 10, subtotal: 200 } },
+      { productId: 'X', _sum: { quantity: 50, subtotal: 500 } },
+    ]);
+    (prisma.product.findMany as any).mockResolvedValue([
+      { id: 'A', name: 'A', price: 20, costPrice: 5, category: { name: 'Main' } },
+      { id: 'X', name: 'X', price: 10, costPrice: null, category: { name: 'Main' } }, // no cost basis
+    ]);
+
+    const res = await svc.getMenuEngineering('t1', start, end);
+
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0].productId).toBe('A');
+    expect(res.uncosted).toHaveLength(1);
+    expect(res.uncosted[0].productId).toBe('X');
+    expect(res.counts.uncosted).toBe(1);
+  });
+});
