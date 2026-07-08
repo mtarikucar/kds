@@ -372,10 +372,19 @@ model Category {
   @@map("categories")
 }
 
+// STANDARD = normal satılan ürün. COMBO = bileşenlere "patlatılan" menü
+// (ör. Maxi Menü = burger + patates + içecek). Combo children are written as
+// separate OrderItems carrying the money + their own KDV (see spec §2/§4).
+enum ProductType {
+  STANDARD
+  COMBO
+}
+
 model Product {
-  id          String  @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
   description String?
+  productType ProductType @default(STANDARD)
   // Customer-facing "içindekiler" (contents/ingredients) shown on the QR menu.
   // Distinct from the internal Recipe (stock-item deduction, not customer-facing).
   ingredients String?
@@ -413,6 +422,15 @@ model Product {
   displayOrder Int     @default(0)
   taxRate      Int     @default(10) // KDV rate: 0, 1, 10, 20
 
+  // Campaign / promotion (see spec §4). campaignPrice is the KDV-inclusive
+  // discounted price; null = no campaign. Window is optional (null start = now,
+  // null end = forever). resolveEffectivePrice() is the SINGLE source of truth
+  // read by both order pricing rails AND the public menu (shown = charged).
+  campaignPrice   Decimal?  @db.Decimal(10, 2)
+  campaignLabel   String?   @db.VarChar(40)
+  campaignStartAt DateTime?
+  campaignEndAt   DateTime?
+
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
@@ -435,9 +453,107 @@ model Product {
   recipes          Recipe[] // Ingredient-level recipe(s) for stock deduction
   mediaJobs        ProductMediaJob[] // AI media generation jobs (photo/frame/video)
 
+  // Combo/collection relations (menu combo + campaign feature)
+  comboGroups        ComboGroup[] // slots when THIS product is a COMBO
+  componentInCombos  ComboGroupItem[] // combo slots that include THIS product
+  collections        ProductCollection[] // classification (kategoriden bağımsız)
+
   @@index([tenantId])
   @@index([categoryId])
   @@map("products")
+}
+
+// A "slot" of a combo product, e.g. "İçeceğini Seç" or "Ana Ürün". Fixed
+// content (2 Dürüm) = a single-item slot with quantity 2; a choice slot =
+// multiple items with min/max selection. See spec §3.
+model ComboGroup {
+  id            String  @id @default(uuid())
+  name          String
+  displayName   String?
+  minSelect     Int     @default(1)
+  maxSelect     Int     @default(1)
+  displayOrder  Int     @default(0)
+
+  comboProductId String
+  comboProduct   Product @relation(fields: [comboProductId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ComboGroupItem[]
+
+  @@index([comboProductId])
+  @@index([tenantId])
+  @@map("combo_groups")
+}
+
+// A selectable component inside a combo slot. quantity=2 → "2 Dürüm";
+// priceDelta → "büyük patates +10₺"; isDefault → pre-selected / fixed content.
+model ComboGroupItem {
+  id           String  @id @default(uuid())
+  quantity     Int     @default(1)
+  priceDelta   Decimal @default(0) @db.Decimal(10, 2)
+  isDefault    Boolean @default(false)
+  displayOrder Int     @default(0)
+
+  groupId String
+  group   ComboGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  componentProductId String
+  componentProduct   Product @relation(fields: [componentProductId], references: [id], onDelete: Restrict)
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+
+  @@index([groupId])
+  @@index([componentProductId])
+  @@index([tenantId])
+  @@map("combo_group_items")
+}
+
+// Classification independent of Category. A product/combo can live in several
+// collections ("Kampanyalar", "Menüler", "Yeni") shown as menu strips/chips
+// WITHOUT leaving its real category. See spec §3/§9.
+model MenuCollection {
+  id           String  @id @default(uuid())
+  name         String
+  slug         String
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products ProductCollection[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("menu_collections")
+}
+
+model ProductCollection {
+  id           String @id @default(uuid())
+  displayOrder Int    @default(0)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  collectionId String
+  collection   MenuCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, collectionId])
+  @@index([collectionId])
+  @@index([tenantId])
+  @@map("product_collections")
 }
 
 // An async AI media-generation job (fal.ai queue): a dish PHOTO, an ingredients
@@ -856,6 +972,15 @@ model OrderItem {
   notes         String?
   status        String  @default("PENDING") // PENDING, PREPARING, READY
 
+  // Combo explosion: a COMBO sale writes one 0₺ parent grouping line + N child
+  // lines that carry the money (money-on-children, spec §2/§4). listUnitPrice
+  // snapshots the pre-combo/pre-campaign catalog unit price for "you saved X"
+  // analytics. Parent delete cascades children (paket bütünlüğü).
+  parentOrderItemId String?
+  parent            OrderItem?  @relation("ComboChildren", fields: [parentOrderItemId], references: [id], onDelete: Cascade)
+  children          OrderItem[] @relation("ComboChildren")
+  listUnitPrice     Decimal?    @db.Decimal(10, 2)
+
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -871,6 +996,7 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+  @@index([parentOrderItemId])
   @@map("order_items")
 }
 
