@@ -9,6 +9,7 @@ import { StockItemsController } from "./controllers/stock-items.controller";
 import { RecipesController } from "./controllers/recipes.controller";
 import { SuppliersController } from "./controllers/suppliers.controller";
 import { PurchaseOrdersController } from "./controllers/purchase-orders.controller";
+import { PurchaseInvoicesController } from "./controllers/purchase-invoices.controller";
 import { IngredientMovementsController } from "./controllers/ingredient-movements.controller";
 import { WasteLogsController } from "./controllers/waste-logs.controller";
 import { StockCountsController } from "./controllers/stock-counts.controller";
@@ -22,6 +23,7 @@ import { RecipesService } from "./services/recipes.service";
 import { RecipeCostingService } from "./services/recipe-costing.service";
 import { SuppliersService } from "./services/suppliers.service";
 import { PurchaseOrdersService } from "./services/purchase-orders.service";
+import { PurchaseInvoicesService } from "./services/purchase-invoices.service";
 import { IngredientMovementsService } from "./services/ingredient-movements.service";
 import { WasteLogsService } from "./services/waste-logs.service";
 import { StockCountsService } from "./services/stock-counts.service";
@@ -40,6 +42,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     RecipesController,
     SuppliersController,
     PurchaseOrdersController,
+    PurchaseInvoicesController,
     IngredientMovementsController,
     WasteLogsController,
     StockCountsController,
@@ -53,6 +56,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     RecipeCostingService,
     SuppliersService,
     PurchaseOrdersService,
+    PurchaseInvoicesService,
     IngredientMovementsService,
     WasteLogsService,
     StockCountsService,

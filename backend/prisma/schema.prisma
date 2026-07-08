@@ -3209,6 +3209,35 @@ model PurchaseOrder {
   @@map("purchase_orders")
 }
 
+// Accounts-Payable vendor bill. Optionally linked to a PurchaseOrder for the
+// 3-way match (ordered ↔ received/GRN ↔ invoiced): a mismatch beyond tolerance
+// flags DISCREPANCY so it can't be paid blind. taxAmount is the indirilecek KDV
+// (deductible input VAT). Scalar FKs keep it isolated; DB FKs live in the
+// migration. Unique (tenant, supplier, invoiceNumber) dedupes a re-sent bill.
+model PurchaseInvoice {
+  id              String  @id @default(uuid())
+  tenantId        String
+  branchId        String
+  supplierId      String
+  purchaseOrderId String? // link for the 3-way match
+  invoiceNumber   String
+  invoiceDate     DateTime
+  subtotal        Decimal @db.Decimal(12, 2) // goods net
+  taxAmount       Decimal @db.Decimal(12, 2) // indirilecek KDV
+  total           Decimal @db.Decimal(12, 2) // subtotal + tax
+  status          String  @default("RECEIVED") // RECEIVED, MATCHED, DISCREPANCY, APPROVED, PAID
+  matchVariance   Decimal? @db.Decimal(12, 2) // invoice total − received (GRN) total
+  notes           String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, supplierId, invoiceNumber])
+  @@index([tenantId, branchId, status])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_invoices")
+}
+
 model PurchaseOrderItem {
   id               String  @id @default(uuid())
   quantityOrdered  Decimal @db.Decimal(10, 3)
