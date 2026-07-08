@@ -332,3 +332,45 @@ describe('ReportsService.getLaborReport', () => {
     expect(res.staffWithoutRate).toBe(1);
   });
 });
+
+describe('ReportsService.getSalesForecast', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  beforeEach(() => { prisma = mockPrismaClient(); svc = new ReportsService(prisma as any); });
+
+  it('projects horizon days from weekday averages and totals them', async () => {
+    // two Mondays averaging 100, everything else falls back to overall average
+    (prisma.$queryRaw as any).mockResolvedValue([
+      { day: new Date('2026-06-01'), revenue: 100 }, // Monday
+      { day: new Date('2026-06-08'), revenue: 100 }, // Monday
+    ]);
+    const res = await svc.getSalesForecast('t1', 7);
+    expect(res.historyDays).toBe(2);
+    expect(res.avgDailyRevenue).toBe(100);
+    expect(res.forecast).toHaveLength(7);
+    expect(res.projectedTotal).toBeGreaterThan(0);
+  });
+});
+
+describe('ReportsService.getConsolidatedPnl', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  beforeEach(() => { prisma = mockPrismaClient(); svc = new ReportsService(prisma as any); });
+
+  it('rolls per-branch P&L into a total', async () => {
+    (prisma.branch.findMany as any).mockResolvedValue([
+      { id: 'bA', name: 'A' }, { id: 'bB', name: 'B' },
+    ]);
+    jest.spyOn(svc, 'getProfitAndLoss').mockImplementation(async (_t, _s, _e, branchId) =>
+      (branchId === 'bA'
+        ? { revenue: 1000, cogs: 300, grossProfit: 700, operatingExpenses: 200, netProfit: 500, netMarginPct: 50 }
+        : { revenue: 2000, cogs: 600, grossProfit: 1400, operatingExpenses: 400, netProfit: 1000, netMarginPct: 50 }) as any,
+    );
+
+    const res = await svc.getConsolidatedPnl('t1');
+    expect(res.totals.revenue).toBe(3000);
+    expect(res.totals.netProfit).toBe(1500);
+    // sorted by netProfit desc → branch B first
+    expect(res.perBranch[0].branchId).toBe('bB');
+  });
+});

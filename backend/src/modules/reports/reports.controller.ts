@@ -202,6 +202,30 @@ export class ReportsController {
     );
   }
 
+  @Get("sales-forecast")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({
+    summary: "Sales forecast (weekday-average projection of the next N days)",
+  })
+  async getSalesForecast(@Request() req, @Query() query: DateRangeQueryDto) {
+    return this.reportsService.getSalesForecast(
+      req.tenantId,
+      7,
+      query.branchId,
+    );
+  }
+
+  @Get("consolidated-pnl")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({ summary: "Consolidated P&L across all branches" })
+  async getConsolidatedPnl(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getConsolidatedPnl(req.tenantId, start, end);
+  }
+
   @Get("labor")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)

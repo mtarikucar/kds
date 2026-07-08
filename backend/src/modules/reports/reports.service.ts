@@ -727,6 +727,135 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Sales forecast — projects the next `horizonDays` of revenue from the
+   * trailing 28 days, using per-weekday averages (captures the weekly pattern
+   * a flat average misses). Days with no history fall back to the overall
+   * daily average. A lightweight, dependency-free baseline forecast.
+   */
+  async getSalesForecast(tenantId: string, horizonDays = 7, branchId?: string) {
+    const end = new Date();
+    const start = new Date(end.getTime() - 28 * 86400000);
+    const branchFilter = branchId
+      ? Prisma.sql`AND "branchId" = ${branchId}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ day: Date; revenue: unknown }[]>(
+      Prisma.sql`
+        SELECT DATE("createdAt") AS day, SUM("finalAmount") AS revenue
+        FROM orders
+        WHERE "tenantId" = ${tenantId} ${branchFilter}
+          AND status = 'PAID'
+          AND "createdAt" >= ${start} AND "createdAt" <= ${end}
+        GROUP BY DATE("createdAt")
+      `,
+    );
+
+    const byDow = new Map<number, { sum: number; count: number }>();
+    let totalSum = 0;
+    let totalDays = 0;
+    for (const r of rows) {
+      const dow = new Date(r.day).getUTCDay();
+      const rev = Number(r.revenue ?? 0);
+      const e = byDow.get(dow) ?? { sum: 0, count: 0 };
+      e.sum += rev;
+      e.count += 1;
+      byDow.set(dow, e);
+      totalSum += rev;
+      totalDays += 1;
+    }
+    const overallAvg = totalDays > 0 ? totalSum / totalDays : 0;
+    const dowAvg = (dow: number) => {
+      const e = byDow.get(dow);
+      return e && e.count > 0 ? e.sum / e.count : overallAvg;
+    };
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    const forecast: Array<{ date: string; forecastRevenue: number }> = [];
+    let projectedTotal = 0;
+    for (let i = 1; i <= horizonDays; i++) {
+      const d = new Date(end.getTime() + i * 86400000);
+      const val = r2(dowAvg(d.getUTCDay()));
+      projectedTotal += val;
+      forecast.push({
+        date: d.toISOString().split("T")[0],
+        forecastRevenue: val,
+      });
+    }
+
+    return {
+      method: "weekday-average (trailing 28d)",
+      historyDays: totalDays,
+      avgDailyRevenue: r2(overallAvg),
+      horizonDays,
+      projectedTotal: r2(projectedTotal),
+      forecast,
+    };
+  }
+
+  /**
+   * Consolidated P&L across every branch — one P&L per branch plus a rolled-up
+   * total, for the multi-branch operator. Branch P&Ls run in parallel.
+   */
+  async getConsolidatedPnl(tenantId: string, startDate?: Date, endDate?: Date) {
+    const branches = await this.prisma.branch.findMany({
+      where: { tenantId },
+      select: { id: true, name: true },
+    });
+    const perBranch = await Promise.all(
+      branches.map(async (b) => {
+        const pnl = await this.getProfitAndLoss(
+          tenantId,
+          startDate,
+          endDate,
+          b.id,
+        );
+        return {
+          branchId: b.id,
+          branchName: b.name,
+          revenue: pnl.revenue,
+          cogs: pnl.cogs,
+          grossProfit: pnl.grossProfit,
+          operatingExpenses: pnl.operatingExpenses,
+          netProfit: pnl.netProfit,
+          netMarginPct: pnl.netMarginPct,
+        };
+      }),
+    );
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const totals = perBranch.reduce(
+      (t, b) => ({
+        revenue: t.revenue + b.revenue,
+        cogs: t.cogs + b.cogs,
+        grossProfit: t.grossProfit + b.grossProfit,
+        operatingExpenses: t.operatingExpenses + b.operatingExpenses,
+        netProfit: t.netProfit + b.netProfit,
+      }),
+      {
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        operatingExpenses: 0,
+        netProfit: 0,
+      },
+    );
+
+    return {
+      perBranch: perBranch.sort((a, b) => b.netProfit - a.netProfit),
+      totals: {
+        revenue: r2(totals.revenue),
+        cogs: r2(totals.cogs),
+        grossProfit: r2(totals.grossProfit),
+        operatingExpenses: r2(totals.operatingExpenses),
+        netProfit: r2(totals.netProfit),
+        netMarginPct:
+          totals.revenue > 0
+            ? Math.round((totals.netProfit / totals.revenue) * 1000) / 10
+            : null,
+      },
+    };
+  }
+
   async getTopProducts(
     tenantId: string,
     startDate?: Date,
