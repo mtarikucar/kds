@@ -217,6 +217,30 @@ describe("ForibaEfaturaAdapter", () => {
     expect(xml).toContain("<cac:AccountingCustomerParty>");
   });
 
+  it("emits a WithholdingTaxTotal and reduces the payable for KDV tevkifatı", async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: "fb-uuid-w" } });
+    (adapter as any).httpClient = http;
+    await adapter.pushInvoice("tok", "co-1", {
+      ...invoice,
+      totalAmount: 118,
+      withholdingTaxAmount: 9,
+      withholdingCode: "601",
+    });
+    const xml = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(xml).toContain("<cac:WithholdingTaxTotal>");
+    expect(xml).toContain("KDV Tevkifati");
+    expect(xml).toContain("601"); // tevkifat code
+    // payable reduced by the withheld amount: 118 − 9 = 109.00
+    expect(xml).toContain(
+      "<cbc:PayableAmount currencyID=\"TRY\">109.00</cbc:PayableAmount>",
+    );
+  });
+
   it("testConnection returns false when authenticate throws", async () => {
     const adapter = new ForibaEfaturaAdapter();
     const http = fakeHttp();

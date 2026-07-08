@@ -4227,6 +4227,10 @@ model SalesInvoice {
   status        String @default("DRAFT")
   // For a REFUND, the SALES invoice it credits. Null on ordinary invoices.
   originalInvoiceId String?
+  // KDV tevkifatı (VAT withholding): amount withheld by the buyer + the GİB
+  // tevkifat code (e.g. "601"). Null = no withholding. Reduces the payable.
+  withholdingTaxAmount Decimal? @db.Decimal(10, 2)
+  withholdingCode      String?
 
   customerName      String?
   customerPhone     String?

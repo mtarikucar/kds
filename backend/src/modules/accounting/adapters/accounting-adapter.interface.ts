@@ -9,6 +9,10 @@ export interface AccountingInvoiceData {
   // the UBL-TR ProfileID: EFATURA → TICARIFATURA (B2B), EARSIVFATURA → e-Arşiv
   // (B2C). Defaults to EARSIVFATURA when unset — the safe final-consumer path.
   eDocumentType?: "EFATURA" | "EARSIVFATURA";
+  // KDV tevkifatı (VAT withholding) — amount withheld by the buyer + GİB code.
+  // When present the UBL carries a WithholdingTaxTotal and a reduced payable.
+  withholdingTaxAmount?: number;
+  withholdingCode?: string;
   // Issuer / seller (satıcı) identity — snapshotted onto the SalesInvoice
   // from the tenant's AccountingSettings "Company Info". A valid UBL-TR
   // document needs an AccountingSupplierParty; these feed that block.

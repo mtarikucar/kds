@@ -113,6 +113,29 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
       new Prisma.Decimal(0),
     );
 
+    // KDV tevkifatı — when the buyer withholds part of the VAT, emit a
+    // WithholdingTaxTotal and reduce the payable by the withheld amount.
+    const withheld =
+      invoice.withholdingTaxAmount != null
+        ? new Prisma.Decimal(invoice.withholdingTaxAmount)
+        : new Prisma.Decimal(0);
+    const payable = new Prisma.Decimal(invoice.totalAmount).sub(withheld);
+    const withholdingXml = withheld.gt(0)
+      ? `
+  <cac:WithholdingTaxTotal>
+    <cbc:TaxAmount currencyID="${invoice.currency}">${withheld.toFixed(2)}</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxAmount currencyID="${invoice.currency}">${withheld.toFixed(2)}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cac:TaxScheme>
+          <cbc:Name>KDV Tevkifati</cbc:Name>
+          <cbc:TaxTypeCode>${this.escapeXml(invoice.withholdingCode || "")}</cbc:TaxTypeCode>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:WithholdingTaxTotal>`
+      : "";
+
     const lineItems = lineTotals
       .map(
         ({ lineExt, lineTax, rate, unit, qty, item }, index) => `
@@ -156,12 +179,12 @@ ${this.supplierPartyXml(invoice)}
 ${this.customerPartyXml(invoice)}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="${invoice.currency}">${totalTax.toFixed(2)}</cbc:TaxAmount>
-  </cac:TaxTotal>
+  </cac:TaxTotal>${withholdingXml}
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="${invoice.currency}">${totalExcTax.toFixed(2)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${totalExcTax.toFixed(2)}</cbc:TaxExclusiveAmount>
     <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${new Prisma.Decimal(invoice.totalAmount).toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${invoice.currency}">${new Prisma.Decimal(invoice.totalAmount).toFixed(2)}</cbc:PayableAmount>
+    <cbc:PayableAmount currencyID="${invoice.currency}">${payable.toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
   ${lineItems}
 </Invoice>`;

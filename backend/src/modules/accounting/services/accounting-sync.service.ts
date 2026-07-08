@@ -101,6 +101,11 @@ export class AccountingSyncService {
           taxOffice: invoice.customerTaxOffice,
           isRegisteredEFaturaUser: undefined,
         }),
+        withholdingTaxAmount:
+          invoice.withholdingTaxAmount != null
+            ? Number(invoice.withholdingTaxAmount)
+            : undefined,
+        withholdingCode: invoice.withholdingCode || undefined,
         // Issuer/seller identity snapshotted on the invoice at build time
         // (fake-working sweep #3). Falls back to the tenant's current
         // Company Info for legacy rows written before the seller columns
