@@ -4166,8 +4166,10 @@ model AccountingSettings {
 model SalesInvoice {
   id            String @id @default(uuid())
   invoiceNumber String
-  type          String @default("SALES")
+  type          String @default("SALES") // SALES, REFUND (İade Faturası / credit note)
   status        String @default("DRAFT")
+  // For a REFUND, the SALES invoice it credits. Null on ordinary invoices.
+  originalInvoiceId String?
 
   customerName      String?
   customerPhone     String?

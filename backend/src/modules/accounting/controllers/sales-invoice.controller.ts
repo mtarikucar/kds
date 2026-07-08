@@ -9,7 +9,7 @@ import {
   UseGuards,
   Request,
 } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { SalesInvoiceService } from "../services/sales-invoice.service";
 import { AccountingSyncService } from "../services/accounting-sync.service";
 import {
@@ -65,5 +65,14 @@ export class SalesInvoiceController {
   @Roles(UserRole.ADMIN)
   cancel(@Param("id") id: string, @Request() req) {
     return this.service.cancel(id, req.tenantId);
+  }
+
+  @Post(":id/credit-note")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Issue a credit note (İade Faturası) reversing this invoice",
+  })
+  creditNote(@Param("id") id: string, @Request() req) {
+    return this.service.createCreditNote(id, req.tenantId);
   }
 }
