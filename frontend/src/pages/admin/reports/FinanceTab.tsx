@@ -82,15 +82,16 @@ export default function FinanceTab({ dateRange }: Props) {
       {/* P&L summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Metric label="Ciro" value={fmt(pnl?.revenue ?? 0)} icon={DollarSign} tone="slate" loading={pnlLoading} />
-        <Metric label="SMM (COGS)" value={fmt(pnl?.cogs ?? 0)} sub={pct(pnl?.foodCostPct)} icon={Receipt} tone="amber" />
-        <Metric label="Brüt Kâr" value={fmt(pnl?.grossProfit ?? 0)} sub={pct(pnl?.grossMarginPct)} icon={TrendingUp} tone="emerald" />
-        <Metric label="İşletme Gideri" value={fmt(pnl?.operatingExpenses ?? 0)} icon={TrendingDown} tone="rose" />
+        <Metric label="SMM (COGS)" value={fmt(pnl?.cogs ?? 0)} sub={pct(pnl?.foodCostPct)} icon={Receipt} tone="amber" loading={pnlLoading} />
+        <Metric label="Brüt Kâr" value={fmt(pnl?.grossProfit ?? 0)} sub={pct(pnl?.grossMarginPct)} icon={TrendingUp} tone="emerald" loading={pnlLoading} />
+        <Metric label="İşletme Gideri" value={fmt(pnl?.operatingExpenses ?? 0)} icon={TrendingDown} tone="rose" loading={pnlLoading} />
         <Metric
           label="Net Kâr"
           value={fmt(pnl?.netProfit ?? 0)}
           sub={pct(pnl?.netMarginPct)}
           icon={pnl && pnl.netProfit >= 0 ? TrendingUp : TrendingDown}
           tone={pnl && pnl.netProfit >= 0 ? 'emerald' : 'rose'}
+          loading={pnlLoading}
         />
         <Metric
           label="Prime Cost (SMM+İşçilik)"

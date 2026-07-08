@@ -6,6 +6,7 @@ import { SalesInvoiceService } from "./services/sales-invoice.service";
 import { AccountingSyncService } from "./services/accounting-sync.service";
 import { AccountingSettingsController } from "./controllers/accounting-settings.controller";
 import { SalesInvoiceController } from "./controllers/sales-invoice.controller";
+import { EDocumentController } from "./controllers/e-document.controller";
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import {
   MUKELLEF_QUERY,
@@ -21,7 +22,11 @@ import { AccountingResyncScheduler } from "./schedulers/accounting-resync.schedu
 
 @Module({
   imports: [PrismaModule, SubscriptionsModule],
-  controllers: [AccountingSettingsController, SalesInvoiceController],
+  controllers: [
+    AccountingSettingsController,
+    SalesInvoiceController,
+    EDocumentController,
+  ],
   providers: [
     TaxCalculationService,
     AccountingSettingsService,

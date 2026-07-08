@@ -168,11 +168,22 @@ function SupplierReturnForm({ stockItemId, stockItemName }: { stockItemId: strin
 
   const submit = () => {
     if (!supplierId || !Number(qty)) return;
-    ret.mutate({
-      supplierId,
-      reason: reason || undefined,
-      items: [{ stockItemId, quantity: Number(qty) }],
-    });
+    ret.mutate(
+      {
+        supplierId,
+        reason: reason || undefined,
+        items: [{ stockItemId, quantity: Number(qty) }],
+      },
+      {
+        // Reset after a successful return so a second click can't re-submit the
+        // same decrement against a stale form.
+        onSuccess: () => {
+          setSupplierId('');
+          setQty('');
+          setReason('');
+        },
+      }
+    );
   };
 
   return (

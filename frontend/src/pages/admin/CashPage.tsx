@@ -61,7 +61,7 @@ type Fmt = (n: number) => string;
 function SessionsTab({ fmt }: { fmt: Fmt }) {
   const { data: sessions, isLoading } = useCashierSessions('OPEN');
   const [selected, setSelected] = useState<string | undefined>();
-  const { data: x } = useXReport(selected);
+  const { data: x, isLoading: xLoading } = useXReport(selected);
   if (isLoading) return <Loading />;
   return (
     <div className="space-y-4">
@@ -100,7 +100,7 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
       <Card>
         <CardHeader><CardTitle>X-Report (kapatmadan)</CardTitle></CardHeader>
         <CardContent>
-          {!x ? <Empty text="Soldan bir vardiya seçin." /> : (
+          {xLoading ? <Loading /> : !x ? <Empty text="Soldan bir vardiya seçin." /> : (
             <div className="grid grid-cols-2 gap-3 text-sm">
               <KV label="Açılış" value={fmt(x.openingFloat)} />
               <KV label="Nakit satış" value={fmt(x.cashSales)} />

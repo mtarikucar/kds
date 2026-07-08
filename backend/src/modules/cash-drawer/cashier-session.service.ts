@@ -29,12 +29,16 @@ export class CashierSessionService {
   constructor(private prisma: PrismaService) {}
 
   async open(scope: BranchScope, userId: string, openingFloat: number) {
+    // One OPEN session per BRANCH. computeTotals reconciles cash branch-wide
+    // (Payment/CashDrawerMovement carry no session link), so two overlapping
+    // sessions would both count the same cash and produce phantom over/short.
+    // Until per-session payment linkage exists, enforce a single open till.
     const existing = await this.prisma.cashierSession.findFirst({
-      where: { ...branchScope(scope), userId, status: "OPEN" },
+      where: { ...branchScope(scope), status: "OPEN" },
     });
     if (existing) {
       throw new ConflictException(
-        "This cashier already has an open session — close it before opening a new one",
+        "This branch already has an open cashier session — close it before opening a new one",
       );
     }
     return this.prisma.cashierSession.create({

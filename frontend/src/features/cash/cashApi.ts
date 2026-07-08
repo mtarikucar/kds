@@ -74,7 +74,11 @@ export const usePrintOkcReceipt = () => {
 };
 
 export const downloadSessionsCsv = async () => {
-  const r = await api.get('/cash-drawer/sessions.csv', { responseType: 'blob' });
+  // Z-history = closed sessions only (OPEN rows have empty reconciliation cols).
+  const r = await api.get('/cash-drawer/sessions.csv', {
+    params: { status: 'CLOSED' },
+    responseType: 'blob',
+  });
   const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }));
   const a = document.createElement('a');
   a.href = url;

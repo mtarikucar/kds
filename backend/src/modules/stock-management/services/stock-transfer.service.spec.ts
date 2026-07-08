@@ -24,7 +24,7 @@ describe('StockTransferService.complete', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findFirst: jest.fn().mockResolvedValue({ id: 'sB', currentStock: 0, costPerUnit: 0 }),
       },
-      stockBatch: { create: jest.fn().mockResolvedValue({}) },
+      stockBatch: { create: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
       ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
     };
     prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
@@ -92,7 +92,7 @@ describe('StockTransferService.complete — destination guard (no silent stock l
         updateMany: jest.fn().mockResolvedValue({ count: 1 }), // source decrement OK
         findFirst: jest.fn().mockResolvedValue(null), // dest item not in the branch
       },
-      stockBatch: { create: jest.fn() },
+      stockBatch: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
       ingredientMovement: { create: jest.fn() },
     };
     prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));

@@ -87,6 +87,7 @@ function EDocTab() {
             {resync.isPending ? 'Gönderiliyor…' : 'Yeniden gönder'}
           </button>
           {resync.isSuccess && <p className="mt-3 text-sm text-emerald-600">{resync.data?.retried ?? 0} belge yeniden denendi.</p>}
+          {resync.isError && <p className="mt-3 text-sm text-rose-600">Yeniden gönderme başarısız (yalnızca ADMIN yetkilidir).</p>}
           <p className="mt-2 text-xs text-slate-500">Saatlik zamanlayıcı FAILED belgeleri otomatik de dener.</p>
         </CardContent>
       </Card>
@@ -113,8 +114,16 @@ function BudgetTab({ fmt }: { fmt: Fmt }) {
 function ConsolidatedTab({ fmt }: { fmt: Fmt }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading } = useConsolidatedPnl(range);
+  const { data, isLoading, isError } = useConsolidatedPnl(range);
   if (isLoading) return <Loading />;
+  if (isError)
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-amber-700">
+          Konsolide P&L yalnızca tüm şubelere erişimi olan yöneticiler içindir.
+        </CardContent>
+      </Card>
+    );
   return (
     <Card>
       <CardHeader><CardTitle>Konsolide Kâr-Zarar (net {fmt(data?.totals?.netProfit ?? 0)})</CardTitle></CardHeader>

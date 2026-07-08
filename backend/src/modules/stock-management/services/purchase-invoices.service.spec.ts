@@ -134,6 +134,7 @@ describe('PurchaseInvoicesService.createSupplierReturn', () => {
   it('decrements stock and records a SUPPLIER_RETURN movement', async () => {
     const txMock: any = {
       stockItem: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockBatch: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
       ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
     };
     prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
@@ -147,6 +148,7 @@ describe('PurchaseInvoicesService.createSupplierReturn', () => {
     const mv = txMock.ingredientMovement.create.mock.calls[0][0].data;
     expect(mv.type).toBe('SUPPLIER_RETURN');
     expect(mv.quantity.toString()).toBe('-3');
+    expect(txMock.stockBatch.findMany).toHaveBeenCalled();
   });
 
   it('aborts when stock is insufficient to return', async () => {

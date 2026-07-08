@@ -51,6 +51,9 @@ export interface RecipeCostingLine {
 export interface RecipeCostingResult {
   /** Cost of one produced portion (total recipe cost ÷ yield). */
   costPerPortion: number;
+  /** Full-precision cost per portion — used by a parent recipe's roll-up so a
+   * sub-cent prep cost (e.g. 0.003/g) isn't rounded away before scaling. */
+  costPerPortionRaw: number;
   /** Cost of the whole recipe batch (all portions). */
   totalRecipeCost: number;
   /** Product sell price, or null if the product carries no price. */
@@ -109,7 +112,8 @@ export class RecipeCostingService {
       const rawFactor = dec(comp.conversionFactor);
       const factor = rawFactor.gt(0) ? rawFactor : new Prisma.Decimal(1);
       const baseQty = qty.mul(factor);
-      const subUnitCost = new Prisma.Decimal(sub.costPerPortion);
+      // Use the FULL-precision sub cost so a sub-cent prep isn't zeroed by 2dp.
+      const subUnitCost = new Prisma.Decimal(sub.costPerPortionRaw);
       const lineCost = baseQty.mul(subUnitCost);
       total = total.add(lineCost);
       ingredients.push({
@@ -132,6 +136,7 @@ export class RecipeCostingService {
 
     return {
       costPerPortion: round2(perPortion),
+      costPerPortionRaw: perPortion.toNumber(),
       totalRecipeCost: round2(total),
       sellPrice: price ? round2(price) : null,
       foodCostPct,

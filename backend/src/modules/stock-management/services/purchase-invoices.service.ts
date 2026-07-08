@@ -7,6 +7,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { drawDownBatchesFifo } from "../../../common/stock/batch-drawdown";
 
 interface CreateInvoiceInput {
   supplierId: string;
@@ -315,6 +316,17 @@ export class PurchaseInvoicesService {
               "Insufficient stock to return this item",
             );
           }
+          // Keep the FIFO batch ledger in sync (mirrors waste/deduction) so
+          // batch valuation + FIFO-COGS don't retain a phantom returned layer.
+          await drawDownBatchesFifo(
+            tx,
+            {
+              stockItemId: item.stockItemId,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+            },
+            qty,
+          );
           await tx.ingredientMovement.create({
             data: {
               type: "SUPPLIER_RETURN",

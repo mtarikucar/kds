@@ -6,6 +6,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BranchScope } from "../../../common/scoping/branch-scope";
+import { drawDownBatchesFifo } from "../../../common/stock/batch-drawdown";
 
 interface CreateTransferInput {
   toBranchId: string;
@@ -142,6 +143,18 @@ export class StockTransferService {
               "Insufficient stock at source for a transfer item",
             );
           }
+          // Draw the source FIFO batch ledger down too (transfer-out is a
+          // physical stock-out) so the source branch's batch valuation stays
+          // in sync with currentStock.
+          await drawDownBatchesFifo(
+            tx,
+            {
+              stockItemId: item.sourceStockItemId,
+              tenantId: scope.tenantId,
+              branchId: transfer.fromBranchId,
+            },
+            new Prisma.Decimal(item.quantity),
+          );
           // Load the destination item first so we can carry the transfer cost
           // onto its cost basis (a bare increment left dest COGS at 0/stale).
           const destItem = await tx.stockItem.findFirst({
@@ -167,7 +180,13 @@ export class StockTransferService {
             // Weighted-average the incoming cost into the dest item AND put it on
             // a FIFO batch, so a later sale records the real cost in COGS
             // (deduction reads batch cost, falling back to costPerUnit).
-            const existing = new Prisma.Decimal(destItem.currentStock);
+            // Clamp negative on-hand to 0 (allowNegativeStock) so the weighted
+            // average can't skew outside [existingCost, unitCost] — mirrors the
+            // receive() fix (v2.8.94).
+            const existing = Prisma.Decimal.max(
+              new Prisma.Decimal(destItem.currentStock),
+              0,
+            );
             const existingCost = new Prisma.Decimal(destItem.costPerUnit);
             const unitCost = new Prisma.Decimal(item.unitCost);
             const total = existing.add(qtyDec);

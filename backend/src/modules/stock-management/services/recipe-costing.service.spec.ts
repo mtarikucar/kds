@@ -146,3 +146,20 @@ describe('RecipeCostingService — nested BOM (sub-recipes)', () => {
     expect(() => svc.compute(cyclic)).not.toThrow();
   });
 });
+
+describe('RecipeCostingService — sub-cent sub-recipe cost (pass-4 fix)', () => {
+  const svc = new RecipeCostingService();
+  const d = (v: string) => new Prisma.Decimal(v);
+  it('does not round a sub-cent prep cost away before scaling', () => {
+    // spice mix: yield 1000 g, one ingredient 1000 g @ 0.003/g = 3.00 total → 0.003/g
+    const spice = { yield: 1000, product: { price: null }, ingredients: [{ quantity: d('1000'), stockItem: { id: 's', costPerUnit: d('0.003') } }] };
+    // dish uses 500 g of spice → 500 × 0.003 = 1.50 (would be 0.00 if rounded to 2dp first)
+    const dish = {
+      yield: 1, product: { price: d('50') },
+      ingredients: [],
+      components: [{ quantity: d('500'), name: 'Spice', subRecipe: spice }],
+    };
+    const res = svc.compute(dish);
+    expect(res.totalRecipeCost).toBe(1.5); // not 0.00
+  });
+});
