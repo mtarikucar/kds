@@ -108,6 +108,13 @@ export class StockTransferService {
             id: transferId,
             tenantId: scope.tenantId,
             status: "PENDING",
+            // Only a branch that is party to the transfer (source or dest) may
+            // complete it — otherwise an unrelated branch's manager could move
+            // two other branches' stock. Mirrors list()'s scoping.
+            OR: [
+              { fromBranchId: scope.branchId },
+              { toBranchId: scope.branchId },
+            ],
           },
           data: { status: "COMPLETED", completedAt: new Date() },
         });
@@ -135,22 +142,61 @@ export class StockTransferService {
               "Insufficient stock at source for a transfer item",
             );
           }
-          const inc = await tx.stockItem.updateMany({
+          // Load the destination item first so we can carry the transfer cost
+          // onto its cost basis (a bare increment left dest COGS at 0/stale).
+          const destItem = await tx.stockItem.findFirst({
             where: {
               id: item.destStockItemId,
               tenantId: scope.tenantId,
               branchId: transfer.toBranchId,
             },
-            data: { currentStock: { increment: item.quantity as any } },
+            select: { id: true, currentStock: true, costPerUnit: true },
           });
-          // If the destination item isn't in toBranch, the increment matches 0
-          // rows. Without this guard the source is decremented and the stock
-          // vanishes — abort (rolls back the whole transfer) instead.
-          if (inc.count === 0) {
+          // If the destination item isn't in toBranch the source would be
+          // decremented and the stock would vanish — abort (rolls back) instead.
+          if (!destItem) {
             throw new BadRequestException(
               "Destination stock item not found in the destination branch",
             );
           }
+          const qtyDec = new Prisma.Decimal(item.quantity);
+          const destData: Record<string, any> = {
+            currentStock: { increment: qtyDec as any },
+          };
+          if (item.unitCost != null) {
+            // Weighted-average the incoming cost into the dest item AND put it on
+            // a FIFO batch, so a later sale records the real cost in COGS
+            // (deduction reads batch cost, falling back to costPerUnit).
+            const existing = new Prisma.Decimal(destItem.currentStock);
+            const existingCost = new Prisma.Decimal(destItem.costPerUnit);
+            const unitCost = new Prisma.Decimal(item.unitCost);
+            const total = existing.add(qtyDec);
+            destData.costPerUnit = (
+              total.gt(0)
+                ? existing
+                    .mul(existingCost)
+                    .add(qtyDec.mul(unitCost))
+                    .div(total)
+                : unitCost
+            ) as any;
+            await tx.stockBatch.create({
+              data: {
+                quantity: qtyDec as any,
+                costPerUnit: unitCost as any,
+                stockItemId: item.destStockItemId,
+                tenantId: scope.tenantId,
+                branchId: transfer.toBranchId,
+              },
+            });
+          }
+          await tx.stockItem.updateMany({
+            where: {
+              id: item.destStockItemId,
+              tenantId: scope.tenantId,
+              branchId: transfer.toBranchId,
+            },
+            data: destData,
+          });
           await tx.ingredientMovement.create({
             data: {
               type: "TRANSFER_OUT",
@@ -191,7 +237,13 @@ export class StockTransferService {
 
   async cancel(scope: BranchScope, transferId: string) {
     const claim = await this.prisma.stockTransfer.updateMany({
-      where: { id: transferId, tenantId: scope.tenantId, status: "PENDING" },
+      where: {
+        id: transferId,
+        tenantId: scope.tenantId,
+        status: "PENDING",
+        // Only a party branch (source or dest) may cancel.
+        OR: [{ fromBranchId: scope.branchId }, { toBranchId: scope.branchId }],
+      },
       data: { status: "CANCELLED" },
     });
     if (claim.count === 0) {

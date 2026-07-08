@@ -64,10 +64,16 @@ function MenuTab({ fmt }: { fmt: Fmt }) {
   const { data, isLoading } = useMenuEngineering(range);
   if (isLoading) return <Loading />;
   const items: any[] = data?.items ?? data ?? [];
+  const uncostedCount = data?.counts?.uncosted ?? (data?.uncosted?.length ?? 0);
   return (
     <Card>
       <CardHeader><CardTitle>Menü mühendisliği (son 30 gün)</CardTitle></CardHeader>
       <CardContent>
+        {uncostedCount > 0 && (
+          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            {uncostedCount} satılan ürünün maliyeti tanımlı değil — sınıflandırılamadıkları için tabloda görünmüyorlar. Reçete/maliyet girin.
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-slate-500">

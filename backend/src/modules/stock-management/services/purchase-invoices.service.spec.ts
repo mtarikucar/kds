@@ -95,7 +95,7 @@ describe('PurchaseInvoicesService.getApAging', () => {
   let svc: PurchaseInvoicesService;
 
   beforeEach(() => {
-    prisma = { purchaseInvoice: { findMany: jest.fn() } };
+    prisma = { purchaseInvoice: { findMany: jest.fn() }, supplier: { findMany: jest.fn().mockResolvedValue([]) } };
     svc = new PurchaseInvoicesService(prisma);
   });
 
@@ -124,7 +124,10 @@ describe('PurchaseInvoicesService.createSupplierReturn', () => {
   let svc: PurchaseInvoicesService;
 
   beforeEach(() => {
-    prisma = { $transaction: jest.fn() };
+    prisma = {
+      $transaction: jest.fn(),
+      supplier: { findFirst: jest.fn().mockResolvedValue({ id: 'S1' }) },
+    };
     svc = new PurchaseInvoicesService(prisma);
   });
 

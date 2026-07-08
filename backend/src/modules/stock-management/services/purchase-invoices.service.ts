@@ -239,6 +239,16 @@ export class PurchaseInvoicesService {
       bySupplier.set(inv.supplierId, s);
     }
 
+    // Resolve supplier names so the per-supplier table isn't opaque UUIDs.
+    const supplierIds = [...bySupplier.keys()];
+    const suppliers = supplierIds.length
+      ? await this.prisma.supplier.findMany({
+          where: { id: { in: supplierIds }, tenantId: scope.tenantId },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameOf = new Map(suppliers.map((s) => [s.id, s.name]));
+
     const r2 = (n: number) => Math.round(n * 100) / 100;
     return {
       asOf: now,
@@ -250,7 +260,11 @@ export class PurchaseInvoicesService {
         d90plus: r2(buckets.d90plus),
       },
       bySupplier: [...bySupplier.values()]
-        .map((s) => ({ ...s, total: r2(s.total) }))
+        .map((s) => ({
+          ...s,
+          supplierName: nameOf.get(s.supplierId) ?? "—",
+          total: r2(s.total),
+        }))
         .sort((a, b) => b.total - a.total),
     };
   }
@@ -274,6 +288,14 @@ export class PurchaseInvoicesService {
       }>;
     },
   ) {
+    // Tenant-ownership on the supplier (mirrors create()) so a foreign/garbage
+    // supplierId can't be stamped onto the movement ledger.
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { id: dto.supplierId, tenantId: scope.tenantId },
+      select: { id: true },
+    });
+    if (!supplier) throw new BadRequestException("Supplier not found");
+
     return this.prisma.$transaction(
       async (tx) => {
         const returnedItems: Array<{ stockItemId: string; quantity: number }> =

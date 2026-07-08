@@ -85,6 +85,24 @@ export class RecipesService {
                     stockItem: { select: { costPerUnit: true, name: true } },
                   },
                 },
+                // Second BOM level (prep → sub-prep → dish). Costing/deduction
+                // recurse further but data is loaded to depth 2; deeper nesting
+                // is uncommon and the recursion is depth-capped regardless.
+                components: {
+                  include: {
+                    subRecipe: {
+                      include: {
+                        ingredients: {
+                          include: {
+                            stockItem: {
+                              select: { costPerUnit: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -127,6 +145,24 @@ export class RecipesService {
                     stockItem: { select: { costPerUnit: true, name: true } },
                   },
                 },
+                // Second BOM level (prep → sub-prep → dish). Costing/deduction
+                // recurse further but data is loaded to depth 2; deeper nesting
+                // is uncommon and the recursion is depth-capped regardless.
+                components: {
+                  include: {
+                    subRecipe: {
+                      include: {
+                        ingredients: {
+                          include: {
+                            stockItem: {
+                              select: { costPerUnit: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -164,6 +200,24 @@ export class RecipesService {
                 ingredients: {
                   include: {
                     stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
+                // Second BOM level (prep → sub-prep → dish). Costing/deduction
+                // recurse further but data is loaded to depth 2; deeper nesting
+                // is uncommon and the recursion is depth-capped regardless.
+                components: {
+                  include: {
+                    subRecipe: {
+                      include: {
+                        ingredients: {
+                          include: {
+                            stockItem: {
+                              select: { costPerUnit: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },

@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -51,7 +52,7 @@ export class CreateExpenseDto {
   expenseDate: string;
 
   @ApiPropertyOptional()
-  @IsString()
+  @IsUUID()
   @IsOptional()
   supplierId?: string;
 

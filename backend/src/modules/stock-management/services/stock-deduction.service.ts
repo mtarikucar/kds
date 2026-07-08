@@ -71,6 +71,18 @@ export class StockDeductionService {
                         subRecipe: {
                           include: {
                             ingredients: { include: { stockItem: true } },
+                            // Second BOM level (prep → sub-prep → dish).
+                            components: {
+                              include: {
+                                subRecipe: {
+                                  include: {
+                                    ingredients: {
+                                      include: { stockItem: true },
+                                    },
+                                  },
+                                },
+                              },
+                            },
                           },
                         },
                       },

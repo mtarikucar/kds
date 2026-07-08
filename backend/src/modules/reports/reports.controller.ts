@@ -218,7 +218,9 @@ export class ReportsController {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
     const pool =
-      (query as any).pool != null ? parseFloat((query as any).pool) : undefined;
+      query.pool != null && query.pool !== ""
+        ? parseFloat(query.pool)
+        : undefined;
     return this.reportsService.getTipDistribution(
       req.tenantId,
       start,

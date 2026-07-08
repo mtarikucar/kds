@@ -3,6 +3,7 @@ import { Type } from "class-transformer";
 import {
   IsDateString,
   IsInt,
+  IsNumberString,
   IsOptional,
   IsUUID,
   Max,
@@ -39,6 +40,14 @@ export class DateRangeQueryDto {
   @IsOptional()
   @IsUUID()
   branchId?: string;
+
+  // Optional tronc pool override for /reports/tip-distribution. Declared here so
+  // the whitelist ValidationPipe preserves it instead of stripping it.
+  @ApiPropertyOptional({ description: "Tip pool override (tronc)" })
+  @EmptyStringToUndefined()
+  @IsOptional()
+  @IsNumberString()
+  pool?: string;
 }
 
 export class TopProductsQueryDto extends DateRangeQueryDto {

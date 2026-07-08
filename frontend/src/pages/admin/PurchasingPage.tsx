@@ -250,7 +250,7 @@ function ApAgingTab({ fmt }: { fmt: Fmt }) {
         <CardContent>
           <Table
             head={['Tedarikçi', 'Fatura sayısı', 'Toplam']}
-            rows={(data?.bySupplier ?? []).map((s: any) => [s.supplierId, String(s.count), fmt(s.total)])}
+            rows={(data?.bySupplier ?? []).map((s: any) => [s.supplierName ?? s.supplierId, String(s.count), fmt(s.total)])}
           />
         </CardContent>
       </Card>
