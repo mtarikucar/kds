@@ -21,6 +21,7 @@ describe('PurchaseInvoicesService', () => {
         create: jest.fn().mockImplementation(async ({ data }: any) => ({ id: 'inv-1', ...data })),
       },
       purchaseOrder: { findFirst: jest.fn() },
+      supplier: { findFirst: jest.fn().mockResolvedValue({ id: 'S1' }) },
     };
     svc = new PurchaseInvoicesService(prisma);
   });

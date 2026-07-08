@@ -250,6 +250,9 @@ export class SalesInvoiceService {
             customerEmail: dto?.customerEmail,
             customerTaxId: dto?.customerTaxId,
             customerTaxOffice: dto?.customerTaxOffice,
+            // KDV tevkifatı — buyer-withheld VAT + GİB code (optional).
+            withholdingTaxAmount: dto?.withholdingTaxAmount ?? null,
+            withholdingCode: dto?.withholdingCode ?? null,
             // Issuer identity from Company Info (fake-working sweep #3).
             ...SalesInvoiceService.sellerSnapshot(settings),
             subtotal: Math.round(subtotal * 100) / 100,
@@ -512,6 +515,9 @@ export class SalesInvoiceService {
           currency: original.currency,
           taxBreakdown: original.taxBreakdown ?? undefined,
           paymentMethod: original.paymentMethod,
+          // Carry the original's withholding so the İade mirrors it.
+          withholdingTaxAmount: original.withholdingTaxAmount,
+          withholdingCode: original.withholdingCode,
           issueDate: new Date(),
           tenantId,
           items: {

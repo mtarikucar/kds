@@ -73,6 +73,17 @@ export class AccountingSyncService {
     });
     if (!invoice) return;
 
+    // Do NOT transmit a credit note (İade Faturası) through the sale path — the
+    // adapters emit it as a positive SATIS with no İade/return marker, so the
+    // provider would book it as another sale. Until a dedicated İade payload
+    // exists, credit notes stay local documents.
+    if (invoice.type === "REFUND") {
+      this.logger.log(
+        `Invoice ${invoiceId} is a credit note (REFUND); skipping provider sync (no İade transmission yet).`,
+      );
+      return;
+    }
+
     // M4: only skip when the existing externalId is for the SAME provider.
     // After a provider swap (e.g. Parasut → Logo) the old externalId is
     // a foreign key to a different system; re-sync must run.
@@ -174,6 +185,11 @@ export class AccountingSyncService {
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
           taxRate: item.taxRate,
+          // Forward the stored net subtotal + tax so the UBL reconciles with the
+          // order total instead of recomputing from the 2-dp unit price.
+          lineSubtotal:
+            item.subtotal != null ? Number(item.subtotal) : undefined,
+          lineTax: item.taxAmount != null ? Number(item.taxAmount) : undefined,
         })),
       };
 

@@ -189,6 +189,25 @@ export class RecipesService {
     };
   }
 
+  /** Reject sub-recipe components that don't belong to the tenant+branch. */
+  private async assertSubRecipesOwned(
+    components: { subRecipeId: string }[] | undefined,
+    tenantId: string,
+    branchId: string,
+  ) {
+    if (!components?.length) return;
+    const ids = [...new Set(components.map((c) => c.subRecipeId))];
+    const found = await this.prisma.recipe.findMany({
+      where: { id: { in: ids }, tenantId, branchId },
+      select: { id: true },
+    });
+    if (found.length !== ids.length) {
+      throw new BadRequestException(
+        "One or more sub-recipes not found in this branch",
+      );
+    }
+  }
+
   async create(dto: CreateRecipeDto, tenantId: string, branchId: string) {
     // Iter-93: reject duplicate ingredients up front — see
     // assertUniqueIngredients comment for the double-deduction bug.
@@ -229,6 +248,10 @@ export class RecipesService {
     if (stockItems.length !== stockItemIds.length) {
       throw new BadRequestException("One or more stock items not found");
     }
+
+    // Sub-recipe components must belong to the same tenant + branch — otherwise
+    // a foreign recipe id would leak its name/ingredients/cost through costing.
+    await this.assertSubRecipesOwned(dto.components, tenantId, branchId);
 
     return this.prisma.recipe.create({
       data: {
@@ -324,6 +347,20 @@ export class RecipesService {
       if (dto.components) {
         if (dto.components.some((c) => c.subRecipeId === id)) {
           throw new BadRequestException("A recipe cannot include itself");
+        }
+        // Ownership: every sub-recipe must be in the same branch, else costing
+        // would leak a foreign recipe's name/ingredients/cost.
+        if (dto.components.length > 0) {
+          const subIds = [...new Set(dto.components.map((c) => c.subRecipeId))];
+          const owned = await tx.recipe.findMany({
+            where: { id: { in: subIds }, ...branchScope(scope) },
+            select: { id: true },
+          });
+          if (owned.length !== subIds.length) {
+            throw new BadRequestException(
+              "One or more sub-recipes not found in this branch",
+            );
+          }
         }
         await tx.recipeSubComponent.deleteMany({ where: { recipeId: id } });
         if (dto.components.length > 0) {

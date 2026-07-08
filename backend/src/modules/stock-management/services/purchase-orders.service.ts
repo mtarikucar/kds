@@ -378,42 +378,52 @@ export class PurchaseOrdersService {
             "Landed cost can only be applied to a received purchase order",
           );
         }
-        const lines = po.items.filter((i) =>
+        // Preload stock items so we allocate ONLY across lines whose stock is
+        // still on hand. Freight on a since-consumed line has nowhere to be
+        // capitalized (its cost basis is gone), so including it in the basis
+        // would silently drop that share while the API claimed full application.
+        const receivedLines = po.items.filter((i) =>
           new Prisma.Decimal(i.quantityReceived).gt(0),
         );
-        const totalValue = lines.reduce(
+        const stockIds = [...new Set(receivedLines.map((i) => i.stockItemId))];
+        const items = await tx.stockItem.findMany({
+          where: { id: { in: stockIds }, ...branchScope(scope) },
+          select: { id: true, currentStock: true, costPerUnit: true },
+        });
+        const itemMap = new Map(items.map((s) => [s.id, s]));
+
+        const capitalizable = receivedLines.filter((i) => {
+          const si = itemMap.get(i.stockItemId);
+          return si && new Prisma.Decimal(si.currentStock).gt(0);
+        });
+        const totalValue = capitalizable.reduce(
           (s, i) =>
             s.add(new Prisma.Decimal(i.quantityReceived).mul(i.unitPrice)),
           new Prisma.Decimal(0),
         );
         if (totalValue.lte(0)) {
           throw new BadRequestException(
-            "No received value to allocate against",
+            "No on-hand received stock to capitalize the landed cost against",
           );
         }
 
         const allocations: Array<{ stockItemId: string; allocated: number }> =
           [];
-        for (const line of lines) {
+        let appliedTotal = new Prisma.Decimal(0);
+        for (const line of capitalizable) {
           const lineValue = new Prisma.Decimal(line.quantityReceived).mul(
             line.unitPrice,
           );
           const allocated = extra.mul(lineValue).div(totalValue);
-          const si = await tx.stockItem.findFirst({
-            where: { id: line.stockItemId, ...branchScope(scope) },
-            select: { id: true, currentStock: true, costPerUnit: true },
-          });
-          if (!si) continue;
+          const si = itemMap.get(line.stockItemId)!;
           const currentStock = new Prisma.Decimal(si.currentStock);
-          if (currentStock.gt(0)) {
-            const newCost = new Prisma.Decimal(si.costPerUnit).add(
-              allocated.div(currentStock),
-            );
-            await tx.stockItem.updateMany({
-              where: { id: si.id, ...branchScope(scope) },
-              data: { costPerUnit: newCost as any },
-            });
-          }
+          const newCost = new Prisma.Decimal(si.costPerUnit).add(
+            allocated.div(currentStock),
+          );
+          await tx.stockItem.updateMany({
+            where: { id: si.id, ...branchScope(scope) },
+            data: { costPerUnit: newCost as any },
+          });
           await tx.ingredientMovement.create({
             data: {
               type: "LANDED_COST",
@@ -428,12 +438,19 @@ export class PurchaseOrdersService {
               createdById: scope.userId,
             },
           });
+          appliedTotal = appliedTotal.add(allocated);
           allocations.push({
             stockItemId: si.id,
             allocated: allocated.toDecimalPlaces(4).toNumber(),
           });
         }
-        return { poId: po.id, extraTotal: extra.toNumber(), allocations };
+        // extraTotal reflects what was actually capitalized (== extra, since the
+        // basis is the on-hand lines we allocate all of extra across).
+        return {
+          poId: po.id,
+          extraTotal: appliedTotal.toDecimalPlaces(2).toNumber(),
+          allocations,
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );

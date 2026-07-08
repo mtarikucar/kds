@@ -68,3 +68,30 @@ describe('StockTransferService.complete', () => {
     await expect(svc.complete(SCOPE, 'tr1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('StockTransferService.complete — destination guard (no silent stock loss)', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'bA', userId: 'u1', role: 'ADMIN' } as const;
+  it('aborts if the destination item is not in the destination branch', async () => {
+    const prisma: any = { $transaction: jest.fn() };
+    const svc = new StockTransferService(prisma);
+    const txMock: any = {
+      stockTransfer: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tr1', transferNumber: 'TRF-1', fromBranchId: 'bA', toBranchId: 'bB',
+          items: [{ sourceStockItemId: 'sA', destStockItemId: 'sB', quantity: 5, unitCost: 2 }],
+        }),
+      },
+      stockItem: {
+        updateMany: jest.fn()
+          .mockResolvedValueOnce({ count: 1 }) // source decrement OK
+          .mockResolvedValueOnce({ count: 0 }), // dest increment matches nothing
+      },
+      ingredientMovement: { create: jest.fn() },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+    await expect(svc.complete(SCOPE, 'tr1')).rejects.toThrow(/Destination stock item not found/);
+    // no movement written when the transfer aborts
+    expect(txMock.ingredientMovement.create).not.toHaveBeenCalled();
+  });
+});

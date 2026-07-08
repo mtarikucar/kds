@@ -84,6 +84,14 @@ export class PurchaseInvoicesService {
   }
 
   async create(scope: BranchScope, userId: string, dto: CreateInvoiceInput) {
+    // Tenant-ownership on the supplier (mirrors PurchaseOrdersService.create) —
+    // a globally-unique supplier id must not be attachable across tenants.
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { id: dto.supplierId, tenantId: scope.tenantId },
+      select: { id: true },
+    });
+    if (!supplier) throw new BadRequestException("Supplier not found");
+
     const dup = await this.prisma.purchaseInvoice.findFirst({
       where: {
         tenantId: scope.tenantId,

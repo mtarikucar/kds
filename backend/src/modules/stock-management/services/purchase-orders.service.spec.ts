@@ -484,7 +484,10 @@ describe('PurchaseOrdersService.applyLandedCost', () => {
         }),
       },
       stockItem: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'x', currentStock: 10, costPerUnit: 10 }),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'sA', currentStock: 10, costPerUnit: 10 },
+          { id: 'sB', currentStock: 10, costPerUnit: 10 },
+        ]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       ingredientMovement: { create: jest.fn().mockResolvedValue({}) },

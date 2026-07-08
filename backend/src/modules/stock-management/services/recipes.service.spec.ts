@@ -455,3 +455,27 @@ describe("RecipesService (iter-93)", () => {
     });
   });
 });
+
+describe('RecipesService.create — sub-recipe ownership', () => {
+  it('rejects a component sub-recipe not in the branch', async () => {
+    const prisma: any = {
+      product: { findFirst: jest.fn().mockResolvedValue({ id: 'p1', name: 'Dish' }) },
+      recipe: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]), // foreign sub-recipe → not found in branch
+      },
+      stockItem: { findMany: jest.fn().mockResolvedValue([{ id: 'si1' }]) },
+    };
+    const svc = new (require('./recipes.service').RecipesService)(prisma, {} as any);
+    await expect(
+      svc.create(
+        {
+          productId: 'p1',
+          ingredients: [{ stockItemId: 'si1', quantity: 1 }],
+          components: [{ subRecipeId: 'foreign-recipe', quantity: 1 }],
+        } as any,
+        't1', 'b1',
+      ),
+    ).rejects.toThrow(/sub-recipes not found/);
+  });
+});

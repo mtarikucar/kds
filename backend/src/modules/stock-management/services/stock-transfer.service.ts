@@ -41,6 +41,38 @@ export class StockTransferService {
     if (!toBranch) {
       throw new BadRequestException("Destination branch not found");
     }
+
+    // Validate every line's source item is in the caller's branch and the dest
+    // item is in the destination branch (fail early; complete() also guards).
+    const srcIds = [...new Set(dto.items.map((i) => i.sourceStockItemId))];
+    const dstIds = [...new Set(dto.items.map((i) => i.destStockItemId))];
+    const [srcOwned, dstOwned] = await Promise.all([
+      this.prisma.stockItem.count({
+        where: {
+          id: { in: srcIds },
+          tenantId: scope.tenantId,
+          branchId: scope.branchId,
+        },
+      }),
+      this.prisma.stockItem.count({
+        where: {
+          id: { in: dstIds },
+          tenantId: scope.tenantId,
+          branchId: dto.toBranchId,
+        },
+      }),
+    ]);
+    if (srcOwned !== srcIds.length) {
+      throw new BadRequestException(
+        "One or more source items are not in your branch",
+      );
+    }
+    if (dstOwned !== dstIds.length) {
+      throw new BadRequestException(
+        "One or more destination items are not in the destination branch",
+      );
+    }
+
     const count = await this.prisma.stockTransfer.count({
       where: { tenantId: scope.tenantId },
     });
@@ -103,7 +135,7 @@ export class StockTransferService {
               "Insufficient stock at source for a transfer item",
             );
           }
-          await tx.stockItem.updateMany({
+          const inc = await tx.stockItem.updateMany({
             where: {
               id: item.destStockItemId,
               tenantId: scope.tenantId,
@@ -111,6 +143,14 @@ export class StockTransferService {
             },
             data: { currentStock: { increment: item.quantity as any } },
           });
+          // If the destination item isn't in toBranch, the increment matches 0
+          // rows. Without this guard the source is decremented and the stock
+          // vanishes — abort (rolls back the whole transfer) instead.
+          if (inc.count === 0) {
+            throw new BadRequestException(
+              "Destination stock item not found in the destination branch",
+            );
+          }
           await tx.ingredientMovement.create({
             data: {
               type: "TRANSFER_OUT",

@@ -28,6 +28,11 @@ export interface AccountingInvoiceData {
     quantity: number;
     unitPrice: number;
     taxRate: number;
+    // Stored net line subtotal + tax (already reconciled with the order total).
+    // When present the UBL emits these instead of recomputing unitPrice×qty,
+    // avoiding kuruş drift that fails GİB total reconciliation.
+    lineSubtotal?: number;
+    lineTax?: number;
   }>;
   paymentMethod?: string;
   totalAmount: number;

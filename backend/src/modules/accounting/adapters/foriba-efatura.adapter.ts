@@ -27,6 +27,13 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
   async authenticate(
     credentials: Record<string, string>,
   ): Promise<{ accessToken: string; expiresAt?: Date }> {
+    // Pin the client to the tenant-configured host so dispatch goes to the SAME
+    // environment we auth against (mirrors LogoAdapter). Without this the
+    // pushInvoice fallback always hit the hardcoded production endpoint, so a
+    // sandbox-configured tenant would auth to sandbox but file to production.
+    if (credentials.apiUrl) {
+      this.httpClient.defaults.baseURL = credentials.apiUrl;
+    }
     const response = await this.httpClient.post(
       `${credentials.apiUrl}/token`,
       new URLSearchParams({
@@ -114,8 +121,19 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
       const qty = new Prisma.Decimal(i.quantity);
       const unit = new Prisma.Decimal(i.unitPrice);
       const rate = new Prisma.Decimal(i.taxRate);
-      const lineExt = unit.mul(qty);
-      const lineTax = lineExt.mul(rate).div(100);
+      // Prefer the STORED net line subtotal/tax (already reconciled with the
+      // order total) over unitPrice×qty. Recomputing from a 2-dp unit price
+      // reintroduces kuruş drift so TaxExclusive+TaxTotal ≠ TaxInclusive and
+      // GİB rejects the document. Fall back to the computed values only when
+      // the caller didn't supply the stored figures.
+      const lineExt =
+        i.lineSubtotal != null
+          ? new Prisma.Decimal(i.lineSubtotal)
+          : unit.mul(qty);
+      const lineTax =
+        i.lineTax != null
+          ? new Prisma.Decimal(i.lineTax)
+          : lineExt.mul(rate).div(100);
       return { lineExt, lineTax, rate, unit, qty, item: i };
     });
 

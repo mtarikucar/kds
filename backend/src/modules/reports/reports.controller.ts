@@ -36,6 +36,21 @@ import { PlanFeature } from "../../common/constants/subscription.enum";
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
+  /**
+   * Resolve which branch a report may read. ADMINs manage the whole tenant, so
+   * they may target any branch in it (or tenant-wide when branchId is omitted).
+   * A non-admin is locked to the branch BranchGuard authorized on req.scope — a
+   * caller-supplied query.branchId can NOT widen access to a sibling branch.
+   */
+  private branchFor(
+    req: any,
+    query: { branchId?: string },
+  ): string | undefined {
+    const scope = req.scope;
+    if (scope?.role === UserRole.ADMIN) return query.branchId;
+    return scope?.branchId;
+  }
+
   @Get("sales")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -48,7 +63,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -66,7 +81,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -83,7 +98,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -100,7 +115,7 @@ export class ReportsController {
       start,
       end,
       query.limit ?? 10,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -118,7 +133,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -131,7 +146,7 @@ export class ReportsController {
     return this.reportsService.getOrdersByHour(
       req.tenantId,
       targetDate,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -149,7 +164,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -166,7 +181,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -181,7 +196,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -216,7 +231,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -230,14 +245,16 @@ export class ReportsController {
     return this.reportsService.getSalesForecast(
       req.tenantId,
       7,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
   @Get("consolidated-pnl")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  // Tenant-wide (every branch) — ADMIN only. A branch-restricted MANAGER must
+  // not read sibling branches' financials via the consolidated view.
+  @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
-  @ApiOperation({ summary: "Consolidated P&L across all branches" })
+  @ApiOperation({ summary: "Consolidated P&L across all branches (ADMIN)" })
   async getConsolidatedPnl(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
@@ -258,7 +275,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -276,7 +293,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 
@@ -299,7 +316,7 @@ export class ReportsController {
       req.tenantId,
       start,
       end,
-      query.branchId,
+      this.branchFor(req, query),
     );
   }
 }

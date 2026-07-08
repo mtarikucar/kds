@@ -3067,6 +3067,9 @@ model StockItem {
   @@index([categoryId])
   @@index([isActive])
   @@index([tenantId, branchId])
+  // Matches the barcode migration's index — keeps schema (db push) and
+  // migration (migrate deploy) in agreement so migrate dev won't drop it.
+  @@index([tenantId, branchId, barcode])
   @@map("stock_items")
 }
 
@@ -4296,6 +4299,8 @@ model SalesInvoice {
   @@index([paymentId])
   @@index([status])
   @@index([issueDate])
+  // Matches the credit-note migration's index (schema↔migration parity).
+  @@index([originalInvoiceId])
   @@map("sales_invoices")
 }
 

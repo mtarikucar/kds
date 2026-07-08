@@ -293,3 +293,32 @@ describe('ForibaEfaturaAdapter — signing before dispatch', () => {
     expect(out.externalId).toBe('fb-unsigned');
   });
 });
+
+describe('ForibaEfaturaAdapter — total reconciliation + configured host', () => {
+  it('emits the stored net line subtotal/tax (not unitPrice×qty) so totals reconcile', async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { uuid: 'fb-recon' } });
+    (adapter as any).httpClient = http;
+    // unitPrice 8.33 × 3 = 24.99, but the stored net subtotal is 25.00.
+    await adapter.pushInvoice('tok', 'co-1', {
+      ...invoice,
+      totalAmount: 30,
+      items: [{ description: 'X', quantity: 3, unitPrice: 8.33, taxRate: 20, lineSubtotal: 25, lineTax: 5 }],
+    });
+    const xml = Buffer.from(http.post.mock.calls[0][1].content, 'base64').toString();
+    expect(xml).toContain('<cbc:LineExtensionAmount currencyID="TRY">25.00</cbc:LineExtensionAmount>');
+    // header TaxExclusive 25.00 + TaxTotal 5.00 == TaxInclusive 30.00 (reconciles)
+    expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="TRY">25.00</cbc:TaxExclusiveAmount>');
+    expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="TRY">30.00</cbc:TaxInclusiveAmount>');
+  });
+
+  it('pins the client to the tenant apiUrl on authenticate (dispatch same host as auth)', async () => {
+    const adapter = new ForibaEfaturaAdapter();
+    const http = fakeHttp();
+    http.post.mockResolvedValue({ data: { access_token: 't', expires_in: 100 } });
+    (adapter as any).httpClient = http;
+    await adapter.authenticate({ apiUrl: 'https://sandbox.foriba.example', username: 'u', password: 'p' });
+    expect(http.defaults.baseURL).toBe('https://sandbox.foriba.example');
+  });
+});
