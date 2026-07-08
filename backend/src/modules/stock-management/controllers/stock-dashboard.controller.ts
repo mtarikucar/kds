@@ -51,4 +51,17 @@ export class StockDashboardController {
       query.endDate,
     );
   }
+
+  @Get("usage-variance")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Theoretical (recipe) vs actual (count) usage variance — shrinkage detector",
+  })
+  getUsageVariance(
+    @CurrentScope() scope: BranchScope,
+    @Query() query: WasteLogsSummaryQueryDto,
+  ) {
+    return this.service.getUsageVariance(scope, query.startDate, query.endDate);
+  }
 }
