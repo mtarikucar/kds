@@ -21,10 +21,28 @@ export class PurchaseOrderItemDto {
   @Min(0)
   quantityOrdered: number;
 
-  @ApiProperty({ description: "Unit price", minimum: 0 })
+  @ApiProperty({ description: "Unit price (per ordered unit)", minimum: 0 })
   @IsNumber()
   @Min(0)
   unitPrice: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Purchase unit label when ordering in packs (e.g. BOX). Requires conversionFactor.",
+  })
+  @IsString()
+  @IsOptional()
+  purchaseUnit?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Base units per 1 purchase unit. Set to order/receive this line in packs; null = base unit.",
+    minimum: 0,
+  })
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @IsOptional()
+  conversionFactor?: number;
 }
 
 export class CreatePurchaseOrderDto {

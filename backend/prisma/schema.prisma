@@ -3254,6 +3254,14 @@ model PurchaseOrderItem {
   quantityReceived Decimal @default(0) @db.Decimal(10, 3)
   unitPrice        Decimal @db.Decimal(10, 4)
 
+  // Opt-in purchase-unit ordering. When set, quantityOrdered/Received +
+  // unitPrice are in the PURCHASE unit (e.g. BOX), and receiving converts to
+  // the stock item's base unit: base qty = qty × conversionFactor, base cost =
+  // unitPrice ÷ conversionFactor. Null (existing/default POs) = ordered in the
+  // base unit (factor 1), so behaviour is unchanged.
+  purchaseUnit      String?
+  conversionFactor  Decimal? @db.Decimal(10, 3)
+
   purchaseOrderId String
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 

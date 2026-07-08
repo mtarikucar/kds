@@ -160,6 +160,9 @@ export class PurchaseOrdersService {
               stockItemId: item.stockItemId,
               quantityOrdered: item.quantityOrdered,
               unitPrice: item.unitPrice,
+              // Optional purchase-unit snapshot; null = base-unit line.
+              purchaseUnit: item.purchaseUnit ?? null,
+              conversionFactor: item.conversionFactor ?? null,
             })),
           },
         },
@@ -283,7 +286,19 @@ export class PurchaseOrdersService {
           const existingStock = new Prisma.Decimal(stockItem.currentStock);
           const existingCost = new Prisma.Decimal(stockItem.costPerUnit ?? 0);
           const unitPrice = new Prisma.Decimal(poItem.unitPrice);
-          const newStock = existingStock.add(receivedQty);
+          // UOM conversion: when the line is ordered in a purchase unit, convert
+          // the received quantity + unit price to the base stock unit before
+          // touching stock / cost / batches. Null or ≤0 factor = base-unit line
+          // (1:1), so existing POs are unaffected. Total receipt cost is
+          // invariant: baseQty × baseUnitPrice = receivedQty × unitPrice.
+          const factor =
+            poItem.conversionFactor != null &&
+            new Prisma.Decimal(poItem.conversionFactor).gt(0)
+              ? new Prisma.Decimal(poItem.conversionFactor)
+              : new Prisma.Decimal(1);
+          const baseReceivedQty = receivedQty.mul(factor);
+          const baseUnitPrice = unitPrice.div(factor);
+          const newStock = existingStock.add(baseReceivedQty);
           // v2.8.94 — clamp existingStock to zero in the weighted-average
           // numerator. Pre-fix a negative currentStock (left behind by an
           // earlier allowNegativeStock=true deduction past zero — see
@@ -296,19 +311,19 @@ export class PurchaseOrdersService {
             existingStock,
             new Prisma.Decimal(0),
           );
-          const denominator = clampedExisting.add(receivedQty);
+          const denominator = clampedExisting.add(baseReceivedQty);
           const weightedCost =
             newStock.isZero() || denominator.isZero()
-              ? unitPrice
+              ? baseUnitPrice
               : clampedExisting
                   .mul(existingCost)
-                  .add(receivedQty.mul(unitPrice))
+                  .add(baseReceivedQty.mul(baseUnitPrice))
                   .div(denominator);
 
           await tx.stockItem.update({
             where: { id: poItem.stockItemId },
             data: {
-              currentStock: { increment: receivedQty as any },
+              currentStock: { increment: baseReceivedQty as any },
               costPerUnit: weightedCost.toDecimalPlaces(
                 4,
                 Prisma.Decimal.ROUND_HALF_UP,
@@ -323,8 +338,8 @@ export class PurchaseOrdersService {
           await tx.stockBatch.create({
             data: {
               batchNumber: lineItem.batchNumber,
-              quantity: receivedQty as any,
-              costPerUnit: unitPrice as any,
+              quantity: baseReceivedQty as any,
+              costPerUnit: baseUnitPrice as any,
               expiryDate: lineItem.expiryDate
                 ? new Date(lineItem.expiryDate)
                 : undefined,
@@ -338,8 +353,8 @@ export class PurchaseOrdersService {
           await tx.ingredientMovement.create({
             data: {
               type: IngredientMovementType.PO_RECEIVE,
-              quantity: receivedQty as any,
-              costPerUnit: unitPrice as any,
+              quantity: baseReceivedQty as any,
+              costPerUnit: baseUnitPrice as any,
               notes: `PO ${po.orderNumber}${dto.notes ? ` - ${dto.notes}` : ""}`,
               referenceType: "PURCHASE_ORDER",
               referenceId: po.id,

@@ -353,3 +353,61 @@ describe("PurchaseOrdersService.cancel (deep-review M18)", () => {
     expect(txMock.purchaseOrderItem.update).toHaveBeenCalled();
   });
 });
+
+/**
+ * Purchase-unit (UOM) conversion on receive. When a PO line carries a
+ * conversionFactor, quantities/price are in the purchase unit (BOX) and receive
+ * converts to the base stock unit: base qty = qty × factor, base cost =
+ * unitPrice ÷ factor. Total receipt cost is invariant. Lines without a factor
+ * are unaffected.
+ */
+describe('PurchaseOrdersService.receive — purchase-unit (UOM) conversion', () => {
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+
+  beforeEach(() => {
+    prisma = {
+      purchaseOrder: { findFirst: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    svc = new PurchaseOrdersService(prisma as any);
+  });
+
+  it('converts a BOX-of-12 line to base PCS on receive (qty×12, cost÷12)', async () => {
+    prisma.purchaseOrder.findFirst.mockResolvedValue({
+      id: 'po-1', tenantId: 't1', status: PurchaseOrderStatus.SUBMITTED, orderNumber: 'PO-1',
+      items: [{ id: 'poi-1', stockItemId: 'stock-1', stockItem: { name: 'Cola' }, quantityReceived: '0', quantityOrdered: '5', unitPrice: '60', conversionFactor: '12' }],
+    });
+    const txMock: any = {
+      purchaseOrderItem: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'poi-1', stockItemId: 'stock-1', stockItem: { name: 'Cola' },
+          quantityReceived: '0', quantityOrdered: '5', unitPrice: '60', conversionFactor: '12',
+        }),
+        update: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([{ quantityReceived: '2', quantityOrdered: '5' }]),
+      },
+      stockItem: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'stock-1', currentStock: '0', costPerUnit: '0' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      stockBatch: { create: jest.fn().mockResolvedValue({}) },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+      purchaseOrder: { update: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+
+    await svc.receive('po-1', { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 2 }] } as any, SCOPE, 'u1');
+
+    // Base stock += 2 boxes × 12 = 24 PCS.
+    expect(txMock.stockItem.update.mock.calls[0][0].data.currentStock.increment.toString()).toBe('24');
+    // Batch + movement are in base units at the per-base-unit cost (60 ÷ 12 = 5).
+    expect(txMock.stockBatch.create.mock.calls[0][0].data.quantity.toString()).toBe('24');
+    expect(txMock.stockBatch.create.mock.calls[0][0].data.costPerUnit.toString()).toBe('5');
+    expect(txMock.ingredientMovement.create.mock.calls[0][0].data.quantity.toString()).toBe('24');
+    expect(txMock.ingredientMovement.create.mock.calls[0][0].data.costPerUnit.toString()).toBe('5');
+    // The PO line's received qty stays in purchase units (2 BOX, not 24).
+    expect(txMock.purchaseOrderItem.update.mock.calls[0][0].data.quantityReceived.toString()).toBe('2');
+  });
+});
