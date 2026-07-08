@@ -33,23 +33,44 @@ export class CashierSessionService {
     // (Payment/CashDrawerMovement carry no session link), so two overlapping
     // sessions would both count the same cash and produce phantom over/short.
     // Until per-session payment linkage exists, enforce a single open till.
-    const existing = await this.prisma.cashierSession.findFirst({
-      where: { ...branchScope(scope), status: "OPEN" },
-    });
-    if (existing) {
-      throw new ConflictException(
-        "This branch already has an open cashier session — close it before opening a new one",
+    //
+    // Serializable so two concurrent opens can't both pass the check-then-create
+    // (Postgres SSI aborts one on the insert-insert phantom); the loser's 40001
+    // (Prisma P2034) is surfaced as the same ConflictException.
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.cashierSession.findFirst({
+            where: { ...branchScope(scope), status: "OPEN" },
+          });
+          if (existing) {
+            throw new ConflictException(
+              "This branch already has an open cashier session — close it before opening a new one",
+            );
+          }
+          return tx.cashierSession.create({
+            data: {
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+              userId,
+              openingFloat: new Prisma.Decimal(openingFloat),
+              status: "OPEN",
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2034"
+      ) {
+        throw new ConflictException(
+          "This branch already has an open cashier session — close it before opening a new one",
+        );
+      }
+      throw e;
     }
-    return this.prisma.cashierSession.create({
-      data: {
-        tenantId: scope.tenantId,
-        branchId: scope.branchId,
-        userId,
-        openingFloat: new Prisma.Decimal(openingFloat),
-        status: "OPEN",
-      },
-    });
   }
 
   async getCurrent(scope: BranchScope, userId: string) {

@@ -409,18 +409,31 @@ export class StockDeductionService {
           if (!stockItem) continue;
 
           // Restore the FULL deducted quantity to the authoritative on-hand
-          // total. This is symmetric with deductForOrder, which now decrements
+          // total. This is symmetric with deductForOrder, which decrements
           // currentStock by the full quantity — so a deduct+reverse nets zero
-          // and no phantom stock is minted. Batches are a consume-only FIFO
-          // COST sub-ledger (like waste-logs) and are deliberately NOT restored
-          // here; the per-batch breakdown isn't recorded on the movement, and
-          // currentStock — not the batch sum — is what every consumer
-          // (counts / dashboards / oversell / alerts) treats as authoritative.
+          // and no phantom stock is minted.
           // Defence-in-depth: tenantId in the WHERE so a regression of the
           // pre-check can't expose cross-tenant stock writes.
           await tx.stockItem.updateMany({
             where: { id: movement.stockItemId, tenantId },
             data: { currentStock: { increment: reverseQty as any } },
+          });
+
+          // Restore the FIFO cost layer too, so Σ(batch.qty) stays in sync with
+          // currentStock (a deduct+reverse nets to zero on the batch ledger as
+          // well). The exact consumed batches aren't recorded on the movement,
+          // so re-create a single layer at the movement's recorded cost — the
+          // restored VALUE (reverseQty × costPerUnit) matches what was consumed.
+          await tx.stockBatch.create({
+            data: {
+              quantity: reverseQty as any,
+              costPerUnit: new Prisma.Decimal(
+                movement.costPerUnit ?? stockItem.costPerUnit ?? 0,
+              ) as any,
+              stockItemId: movement.stockItemId,
+              tenantId,
+              branchId: movement.branchId,
+            },
           });
 
           await tx.ingredientMovement.create({

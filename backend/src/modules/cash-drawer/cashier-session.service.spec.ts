@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CashierSessionService } from './cashier-session.service';
 
 /**
@@ -25,6 +26,13 @@ describe('CashierSessionService', () => {
       payment: { aggregate: jest.fn() },
       cashDrawerMovement: { groupBy: jest.fn() },
     };
+    // open() runs its check-then-create inside a Serializable transaction;
+    // pass the same mock through as the tx client.
+    prisma.$transaction = jest
+      .fn()
+      .mockImplementation(async (cb: any) =>
+        typeof cb === 'function' ? cb(prisma) : cb,
+      );
     svc = new CashierSessionService(prisma);
   });
 
@@ -43,6 +51,25 @@ describe('CashierSessionService', () => {
       ConflictException,
     );
     expect(prisma.cashierSession.create).not.toHaveBeenCalled();
+  });
+
+  it('opens inside a Serializable txn and maps a serialization abort (P2034) to Conflict', async () => {
+    // Two concurrent opens both pass the findFirst check; Postgres SSI aborts
+    // the loser with 40001 → Prisma P2034 → the same "already open" Conflict.
+    const p2034 = new Prisma.PrismaClientKnownRequestError('write conflict', {
+      code: 'P2034',
+      clientVersion: 'test',
+    });
+    prisma.$transaction.mockRejectedValueOnce(p2034);
+    await expect(svc.open(SCOPE, 'cashier-9', 500)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    // and the guard genuinely runs under Serializable
+    prisma.cashierSession.findFirst.mockResolvedValue(null);
+    await svc.open(SCOPE, 'cashier-9', 500);
+    expect(prisma.$transaction.mock.calls[1][1]).toEqual({
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   });
 
   it('closes with expected = float + sales + in − out, counted from denominations, over/short = diff', async () => {
@@ -111,6 +138,13 @@ describe('CashierSessionService — safe drops / petty cash reduce expected cash
       payment: { aggregate: jest.fn() },
       cashDrawerMovement: { groupBy: jest.fn() },
     };
+    // open() runs its check-then-create inside a Serializable transaction;
+    // pass the same mock through as the tx client.
+    prisma.$transaction = jest
+      .fn()
+      .mockImplementation(async (cb: any) =>
+        typeof cb === 'function' ? cb(prisma) : cb,
+      );
     svc = new CashierSessionService(prisma);
   });
 

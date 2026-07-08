@@ -46,6 +46,7 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1' }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      stockBatch: { create: jest.fn().mockResolvedValue({}) },
       order: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
@@ -72,6 +73,9 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
     // A reversal movement gets created (because the in-txn check
     // returned empty).
     expect(txMock.ingredientMovement.create).toHaveBeenCalled();
+    // ...and the FIFO cost layer is restored alongside currentStock, so a
+    // deduct+reverse nets to zero on the batch ledger too (pass-5 residual).
+    expect(txMock.stockBatch.create).toHaveBeenCalled();
   });
 
   it('skips reversal when the in-txn check finds an existing ORDER_REVERSAL for the stockItem', async () => {
