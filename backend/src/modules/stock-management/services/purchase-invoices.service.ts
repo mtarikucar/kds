@@ -178,6 +178,75 @@ export class PurchaseInvoicesService {
     });
   }
 
+  /**
+   * Accounts-Payable aging — unpaid vendor bills bucketed by how overdue they
+   * are from the invoice date (current / 31-60 / 61-90 / 90+), totalled and
+   * broken down by supplier. The classic "what do we owe and how late" view.
+   */
+  async getApAging(scope: BranchScope, asOf?: Date) {
+    const now = asOf ?? new Date();
+    const unpaid = await this.prisma.purchaseInvoice.findMany({
+      where: { ...branchScope(scope), status: { not: "PAID" } },
+      select: {
+        id: true,
+        supplierId: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        total: true,
+        status: true,
+      },
+    });
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const bucketOf = (age: number) =>
+      age <= 30
+        ? "current"
+        : age <= 60
+          ? "d31_60"
+          : age <= 90
+            ? "d61_90"
+            : "d90plus";
+
+    const buckets = { current: 0, d31_60: 0, d61_90: 0, d90plus: 0 };
+    const bySupplier = new Map<
+      string,
+      { supplierId: string; total: number; count: number }
+    >();
+    let total = 0;
+
+    for (const inv of unpaid) {
+      const age = Math.floor(
+        (now.getTime() - new Date(inv.invoiceDate).getTime()) / dayMs,
+      );
+      const amt = Number(inv.total);
+      buckets[bucketOf(age)] += amt;
+      total += amt;
+      const s = bySupplier.get(inv.supplierId) ?? {
+        supplierId: inv.supplierId,
+        total: 0,
+        count: 0,
+      };
+      s.total += amt;
+      s.count += 1;
+      bySupplier.set(inv.supplierId, s);
+    }
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return {
+      asOf: now,
+      total: r2(total),
+      buckets: {
+        current: r2(buckets.current),
+        d31_60: r2(buckets.d31_60),
+        d61_90: r2(buckets.d61_90),
+        d90plus: r2(buckets.d90plus),
+      },
+      bySupplier: [...bySupplier.values()]
+        .map((s) => ({ ...s, total: r2(s.total) }))
+        .sort((a, b) => b.total - a.total),
+    };
+  }
+
   async markPaid(scope: BranchScope, invoiceId: string) {
     const claim = await this.prisma.purchaseInvoice.updateMany({
       where: { id: invoiceId, ...branchScope(scope), status: "APPROVED" },

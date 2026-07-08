@@ -87,3 +87,32 @@ describe('PurchaseInvoicesService', () => {
     expect(inv.status).toBe('MATCHED');
   });
 });
+
+describe('PurchaseInvoicesService.getApAging', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseInvoicesService;
+
+  beforeEach(() => {
+    prisma = { purchaseInvoice: { findMany: jest.fn() } };
+    svc = new PurchaseInvoicesService(prisma);
+  });
+
+  it('buckets unpaid bills by age and totals by supplier', async () => {
+    const asOf = new Date('2026-07-01T00:00:00Z');
+    prisma.purchaseInvoice.findMany.mockResolvedValue([
+      { id: 'i1', supplierId: 'S1', invoiceNumber: 'F1', invoiceDate: new Date('2026-06-20'), total: 100, status: 'APPROVED' }, // ~11d current
+      { id: 'i2', supplierId: 'S1', invoiceNumber: 'F2', invoiceDate: new Date('2026-05-01'), total: 200, status: 'RECEIVED' }, // ~61d → 61_90
+      { id: 'i3', supplierId: 'S2', invoiceNumber: 'F3', invoiceDate: new Date('2026-03-01'), total: 400, status: 'APPROVED' }, // >90d
+    ]);
+
+    const res = await svc.getApAging(SCOPE, asOf);
+    expect(res.total).toBe(700);
+    expect(res.buckets.current).toBe(100);
+    expect(res.buckets.d61_90).toBe(200);
+    expect(res.buckets.d90plus).toBe(400);
+    expect(res.bySupplier[0]).toMatchObject({ supplierId: 'S2', total: 400 });
+    // only unpaid queried
+    expect(prisma.purchaseInvoice.findMany.mock.calls[0][0].where.status).toEqual({ not: 'PAID' });
+  });
+});

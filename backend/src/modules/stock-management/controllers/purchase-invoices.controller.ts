@@ -54,6 +54,13 @@ export class PurchaseInvoicesController {
     return this.service.list(scope, { status, supplierId });
   }
 
+  @Get("ap-aging")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Accounts-payable aging (unpaid bills by age)" })
+  apAging(@CurrentScope() scope: BranchScope) {
+    return this.service.getApAging(scope);
+  }
+
   @Get(":id/match")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
