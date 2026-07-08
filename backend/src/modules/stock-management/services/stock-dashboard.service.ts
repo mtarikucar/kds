@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { StockAlertsService } from "./stock-alerts.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
@@ -158,6 +159,53 @@ export class StockDashboardService {
    * (spillage, over-portioning, theft). Each variance is valued at the item's
    * cost so the loss is a money figure, not just a quantity.
    */
+  /**
+   * FIFO batch valuation — current inventory value at the actual per-batch
+   * cost (Σ batch.quantity × batch.costPerUnit), vs the moving-average
+   * costPerUnit on StockItem. The accurate "what is my stock worth right now"
+   * figure the accountant reconciles against, per item and in total.
+   */
+  async getBatchValuation(scope: BranchScope) {
+    const rows = await this.prisma.$queryRaw<
+      {
+        stockItemId: string;
+        name: string;
+        unit: string;
+        qty: unknown;
+        value: unknown;
+      }[]
+    >(Prisma.sql`
+      SELECT b."stockItemId" AS "stockItemId", si.name AS name, si.unit AS unit,
+             SUM(b.quantity) AS qty,
+             SUM(b.quantity * b."costPerUnit") AS value
+      FROM stock_batches b
+      JOIN stock_items si ON si.id = b."stockItemId"
+      WHERE b."tenantId" = ${scope.tenantId}
+        AND b."branchId" = ${scope.branchId}
+        AND b.quantity > 0
+      GROUP BY b."stockItemId", si.name, si.unit
+      ORDER BY value DESC
+    `);
+
+    let totalValue = 0;
+    const items = rows.map((r) => {
+      const value = Math.round(Number(r.value ?? 0) * 100) / 100;
+      totalValue += value;
+      return {
+        stockItemId: r.stockItemId,
+        name: r.name,
+        unit: r.unit,
+        quantity: Number(r.qty ?? 0),
+        value,
+      };
+    });
+    return {
+      totalValue: Math.round(totalValue * 100) / 100,
+      itemCount: items.length,
+      items,
+    };
+  }
+
   async getUsageVariance(
     scope: BranchScope,
     startDate?: string,

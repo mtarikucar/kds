@@ -191,3 +191,20 @@ describe('StockDashboardService.getUsageVariance', () => {
     expect(prisma.stockItem.findMany).not.toHaveBeenCalled();
   });
 });
+
+describe('StockDashboardService.getBatchValuation', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  it('sums per-batch value (qty × costPerUnit) into a total', async () => {
+    const prisma: any = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        { stockItemId: 's1', name: 'Flour', unit: 'KG', qty: 10, value: 50 },
+        { stockItemId: 's2', name: 'Oil', unit: 'L', qty: 5, value: 25 },
+      ]),
+    };
+    const svc = new StockDashboardService(prisma, {} as any);
+    const res = await svc.getBatchValuation(SCOPE);
+    expect(res.totalValue).toBe(75);
+    expect(res.itemCount).toBe(2);
+    expect(res.items[0]).toMatchObject({ stockItemId: 's1', value: 50 });
+  });
+});

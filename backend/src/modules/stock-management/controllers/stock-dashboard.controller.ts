@@ -51,6 +51,13 @@ export class StockDashboardController {
     return this.service.getValuation(scope);
   }
 
+  @Get("batch-valuation")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "FIFO batch valuation (value at per-batch cost)" })
+  getBatchValuation(@CurrentScope() scope: BranchScope) {
+    return this.service.getBatchValuation(scope);
+  }
+
   @Get("movement-summary")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get movement summary by type" })
