@@ -28,7 +28,13 @@ describe('CashDrawerController', () => {
       approve: jest.fn().mockResolvedValue({ id: 'm1', status: 'APPROVED' }),
       reject: jest.fn().mockResolvedValue({ id: 'm1', status: 'REJECTED' }),
     };
-    ctrl = new CashDrawerController(svc as any);
+    const sessions = {
+      open: jest.fn().mockResolvedValue({ id: 'sess-1' }),
+      getCurrent: jest.fn().mockResolvedValue(null),
+      list: jest.fn().mockResolvedValue([]),
+      close: jest.fn().mockResolvedValue({ id: 'sess-1', status: 'CLOSED' }),
+    };
+    ctrl = new CashDrawerController(svc as any, sessions as any);
   });
 
   it('create explodes the scope into (tenantId, branchId, userId, dto)', () => {

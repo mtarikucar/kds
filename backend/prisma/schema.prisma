@@ -2320,6 +2320,38 @@ model CashDrawerMovement {
   @@map("cash_drawer_movements")
 }
 
+// A cashier's shift: opening float → movements during the shift → counted
+// close, with expected-vs-counted (over/short) attributed to the cashier.
+// Groups the otherwise-loose CashDrawerMovement rows into an accountable
+// session so end-of-day cash reconciliation is per-person, not a single number
+// typed into the Z-report. Scalar FKs (no Prisma relations) keep this isolated
+// from the core User/Tenant/Branch models; DB-level FKs live in the migration.
+model CashierSession {
+  id           String  @id @default(uuid())
+  tenantId     String
+  branchId     String
+  userId       String // the cashier who owns the shift
+  status       String  @default("OPEN") // OPEN, CLOSED
+  openingFloat Decimal @db.Decimal(10, 2)
+
+  // Populated at close.
+  countedCash           Decimal? @db.Decimal(10, 2) // physically counted (or derived from denominations)
+  expectedCash          Decimal? @db.Decimal(10, 2) // openingFloat + cashSales + cashIn − cashOut
+  overShort             Decimal? @db.Decimal(10, 2) // countedCash − expectedCash (negative = short)
+  cashSales             Decimal? @db.Decimal(10, 2)
+  cashIn                Decimal? @db.Decimal(10, 2)
+  cashOut               Decimal? @db.Decimal(10, 2)
+  denominationBreakdown Json? // {"200":3,"100":5,...} at close
+
+  notes    String?
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  @@index([tenantId, branchId, status])
+  @@index([tenantId, branchId, userId, status])
+  @@map("cashier_sessions")
+}
+
 // ========================================
 // PUBLIC STATISTICS & ANALYTICS
 // ========================================
