@@ -9,6 +9,7 @@ import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard"
 import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { StockDashboardService } from "../services/stock-dashboard.service";
+import { ReorderSuggestionService } from "../services/reorder-suggestion.service";
 // Iter-95: same shape as the iter-92 waste-logs summary DTO — startDate
 // / endDate with @IsDateString. ValidationPipe rejects bad strings at
 // the boundary; the service-side parseWindow adds NaN defense + 366d cap.
@@ -22,7 +23,19 @@ import { BranchScope } from "../../../common/scoping/branch-scope";
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
 @RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class StockDashboardController {
-  constructor(private readonly service: StockDashboardService) {}
+  constructor(
+    private readonly service: StockDashboardService,
+    private readonly reorder: ReorderSuggestionService,
+  ) {}
+
+  @Get("reorder-suggestions")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Suggested draft POs for items at/below their par level",
+  })
+  getReorderSuggestions(@CurrentScope() scope: BranchScope) {
+    return this.reorder.getSuggestions(scope);
+  }
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)

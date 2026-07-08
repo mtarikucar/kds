@@ -53,6 +53,16 @@ export class CreateStockItemDto {
   @IsOptional()
   minStock?: number;
 
+  @ApiPropertyOptional({
+    description: "Fixed quantity to suggest ordering at reorder point",
+    minimum: 0,
+  })
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @Max(QTY_MAX)
+  @IsOptional()
+  reorderQuantity?: number;
+
   @ApiPropertyOptional({ description: "Cost per unit", minimum: 0 })
   @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)

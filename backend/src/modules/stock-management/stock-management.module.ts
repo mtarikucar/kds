@@ -29,6 +29,7 @@ import { StockSettingsService } from "./services/stock-settings.service";
 import { StockDeductionService } from "./services/stock-deduction.service";
 import { StockAlertsService } from "./services/stock-alerts.service";
 import { StockDashboardService } from "./services/stock-dashboard.service";
+import { ReorderSuggestionService } from "./services/reorder-suggestion.service";
 import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
 
 @Module({
@@ -59,6 +60,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     StockDeductionService,
     StockAlertsService,
     StockDashboardService,
+    ReorderSuggestionService,
     StockAlertsScheduler,
   ],
   exports: [StockDeductionService, StockAlertsService, StockItemsService],

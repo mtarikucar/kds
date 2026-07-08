@@ -2980,7 +2980,12 @@ model StockItem {
   description String?
 
   currentStock Decimal @default(0) @db.Decimal(10, 3)
+  // Par / reorder trigger: when currentStock <= minStock the item is due for
+  // reorder (also the low-stock alert threshold).
   minStock     Decimal @default(0) @db.Decimal(10, 3)
+  // Fixed quantity to suggest ordering when the item hits its reorder point.
+  // Null = derive a default (bring stock back up toward twice the par level).
+  reorderQuantity Decimal? @db.Decimal(10, 3)
   costPerUnit  Decimal @default(0) @db.Decimal(10, 4)
 
   trackExpiry Boolean @default(false)
