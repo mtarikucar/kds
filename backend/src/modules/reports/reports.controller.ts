@@ -185,6 +185,23 @@ export class ReportsController {
     );
   }
 
+  @Get("profit-and-loss")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({
+    summary: "P&L: revenue − COGS − operating expenses → net profit",
+  })
+  async getProfitAndLoss(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getProfitAndLoss(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+    );
+  }
+
   @Get("menu-engineering")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)

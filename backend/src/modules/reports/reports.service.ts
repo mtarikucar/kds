@@ -548,6 +548,66 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Profit & Loss snapshot — revenue → COGS → gross profit → operating expenses
+   * → net profit, with margins. Revenue + COGS reuse the sales/COGS reports;
+   * OpEx is summed from the expense ledger over the same window. The full
+   * management P&L a restaurateur reads to know whether the branch made money.
+   */
+  async getProfitAndLoss(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const [sales, cogsReport] = await Promise.all([
+      this.getSalesSummary(tenantId, startDate, endDate, branchId),
+      this.getCogsReport(tenantId, startDate, endDate, branchId),
+    ]);
+
+    const expWhere: Prisma.ExpenseWhereInput = {
+      tenantId,
+      ...(branchId ? { branchId } : {}),
+      expenseDate: { gte: cogsReport.startDate, lte: cogsReport.endDate },
+    };
+    const expGroups = await this.prisma.expense.groupBy({
+      by: ["category"],
+      where: expWhere,
+      _sum: { amount: true },
+    });
+
+    const revenueCents = decimalToCents(sales.totalSales);
+    const cogsCents = decimalToCents(cogsReport.cogs);
+    const opexCents = expGroups.reduce(
+      (s, g) => s + decimalToCents(g._sum.amount),
+      0,
+    );
+    const grossProfitCents = revenueCents - cogsCents;
+    const netProfitCents = grossProfitCents - opexCents;
+
+    const pct = (part: number) =>
+      revenueCents > 0 ? Math.round((part / revenueCents) * 1000) / 10 : null;
+
+    return {
+      revenue: centsToCurrency(revenueCents),
+      cogs: centsToCurrency(cogsCents),
+      grossProfit: centsToCurrency(grossProfitCents),
+      grossMarginPct: pct(grossProfitCents),
+      operatingExpenses: centsToCurrency(opexCents),
+      expensesByCategory: expGroups
+        .map((g) => ({
+          category: g.category,
+          amount: centsToCurrency(decimalToCents(g._sum.amount)),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+      netProfit: centsToCurrency(netProfitCents),
+      netMarginPct: pct(netProfitCents),
+      foodCostPct: cogsReport.foodCostPct,
+      startDate: cogsReport.startDate,
+      endDate: cogsReport.endDate,
+    };
+  }
+
   async getTopProducts(
     tenantId: string,
     startDate?: Date,

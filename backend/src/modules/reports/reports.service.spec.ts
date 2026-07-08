@@ -252,3 +252,38 @@ describe('ReportsService.getSalesComparison', () => {
     expect(res.previous.endDate.getTime()).toBe(new Date('2026-06-16T00:00:00Z').getTime());
   });
 });
+
+/**
+ * P&L snapshot — revenue → COGS → gross profit → OpEx → net profit.
+ */
+describe('ReportsService.getProfitAndLoss', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('computes gross + net profit from revenue, COGS and OpEx', async () => {
+    jest.spyOn(svc, 'getSalesSummary').mockResolvedValue({ totalSales: 10000 } as any);
+    jest.spyOn(svc, 'getCogsReport').mockResolvedValue({ cogs: 3000, foodCostPct: 30, startDate: start, endDate: end } as any);
+    (prisma.expense.groupBy as any).mockResolvedValue([
+      { category: 'RENT', _sum: { amount: 2000 } },
+      { category: 'SALARY', _sum: { amount: 3000 } },
+    ]);
+
+    const res = await svc.getProfitAndLoss('t1', start, end);
+
+    expect(res.revenue).toBe(10000);
+    expect(res.cogs).toBe(3000);
+    expect(res.grossProfit).toBe(7000);
+    expect(res.grossMarginPct).toBe(70);
+    expect(res.operatingExpenses).toBe(5000);
+    expect(res.netProfit).toBe(2000);
+    expect(res.netMarginPct).toBe(20);
+    expect(res.expensesByCategory[0]).toMatchObject({ category: 'SALARY', amount: 3000 });
+  });
+});

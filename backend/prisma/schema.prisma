@@ -3227,6 +3227,29 @@ model PurchaseOrder {
   @@map("purchase_orders")
 }
 
+// Operating expense (rent, salary, utilities, …) — the OpEx line the P&L needs
+// below gross profit. taxAmount is the deductible input VAT when applicable.
+// Scalar FKs keep it isolated; DB FKs live in the migration.
+model Expense {
+  id          String   @id @default(uuid())
+  tenantId    String
+  branchId    String
+  category    String // RENT, SALARY, UTILITIES, SUPPLIES, MAINTENANCE, MARKETING, TAX, OTHER
+  description String
+  amount      Decimal  @db.Decimal(12, 2)
+  taxAmount   Decimal? @db.Decimal(12, 2)
+  expenseDate DateTime
+  supplierId  String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, branchId, expenseDate])
+  @@index([tenantId, category])
+  @@map("expenses")
+}
+
 // Accounts-Payable vendor bill. Optionally linked to a PurchaseOrder for the
 // 3-way match (ordered ↔ received/GRN ↔ invoiced): a mismatch beyond tolerance
 // flags DISCREPANCY so it can't be paid blind. taxAmount is the indirilecek KDV
