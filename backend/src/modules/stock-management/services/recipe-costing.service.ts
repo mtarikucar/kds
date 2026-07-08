@@ -19,6 +19,8 @@ export interface RecipeCostingInput {
   product?: { price?: Num } | null;
   ingredients: Array<{
     quantity: Num;
+    // Base units per 1 recipe unit; null = quantity is already in the base unit.
+    conversionFactor?: Num;
     stockItem?: {
       id?: string;
       name?: string;
@@ -68,8 +70,13 @@ export class RecipeCostingService {
     const ingredients: RecipeCostingLine[] = (recipe?.ingredients ?? []).map(
       (ing) => {
         const qty = dec(ing.quantity);
+        // Convert the recipe-unit quantity to the stock base unit for costing
+        // (costPerUnit is per base unit). Null/≤0 factor = base-unit (1:1).
+        const rawFactor = dec(ing.conversionFactor);
+        const factor = rawFactor.gt(0) ? rawFactor : new Prisma.Decimal(1);
+        const baseQty = qty.mul(factor);
         const unitCost = dec(ing.stockItem?.costPerUnit);
-        const lineCost = qty.mul(unitCost);
+        const lineCost = baseQty.mul(unitCost);
         total = total.add(lineCost);
         return {
           stockItemId: ing.stockItem?.id ?? null,

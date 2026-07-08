@@ -324,3 +324,64 @@ describe('StockDeductionService.deductForOrder — currentStock is the authorita
     );
   });
 });
+
+/**
+ * Recipe-unit conversion at deduction: an ingredient quantity in a recipe unit
+ * (G) converts to the stock base unit (KG) via conversionFactor before the
+ * stock is drawn down. Null factor = base-unit (1:1), unchanged.
+ */
+describe('StockDeductionService.deductForOrder — recipe-unit conversion', () => {
+  let prisma: MockPrismaClient;
+  let svc: StockDeductionService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      get: jest.fn().mockResolvedValue({
+        enableAutoDeduction: true,
+        deductOnStatus: null,
+        allowNegativeStock: true,
+      }),
+    };
+    svc = new StockDeductionService(prisma as any, settings);
+  });
+
+  it('deducts the base-unit quantity after applying the ingredient conversion factor', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'ord-1', orderNumber: 'ORD-1', tenantId: 't1', branchId: 'b1', stockDeducted: false,
+      orderItems: [
+        {
+          quantity: 1,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1', yield: 1,
+                ingredients: [
+                  { stockItemId: 'flour', quantity: '200', conversionFactor: '0.001', stockItem: { name: 'Flour' } },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any);
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'flour', tenantId: 't1', currentStock: '100', costPerUnit: '0', minStock: '0' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    const result: any = await svc.deductForOrder('ord-1', 't1', undefined, 'u1');
+
+    // 200 G × 0.001 (G→KG) ÷ yield 1 × qty 1 = 0.2 base units
+    expect(result.deductions[0].stockItemId).toBe('flour');
+    expect(result.deductions[0].quantity.toString()).toBe('0.2');
+    expect(txMock.stockItem.updateMany.mock.calls[0][0].data.currentStock.decrement.toString()).toBe('0.2');
+  });
+});

@@ -84,3 +84,32 @@ describe('RecipeCostingService', () => {
     expect(res.totalRecipeCost).toBe(0.06);
   });
 });
+
+describe('RecipeCostingService — recipe-unit conversion', () => {
+  const svc = new RecipeCostingService();
+  const d = (v: string) => new Prisma.Decimal(v);
+
+  it('converts a recipe-unit quantity to base units for line cost (200 G of a KG item)', () => {
+    // 200 G with factor 0.001 (G→KG) = 0.2 KG × 10/KG = 2.00
+    const res = svc.compute({
+      yield: 1,
+      product: { price: d('20') },
+      ingredients: [
+        { quantity: d('200'), conversionFactor: d('0.001'), stockItem: { id: 'flour', costPerUnit: d('10') } },
+      ],
+    });
+    expect(res.totalRecipeCost).toBe(2);
+    expect(res.costPerPortion).toBe(2);
+    // displayed quantity stays as entered (recipe unit)
+    expect(res.ingredients[0].quantity).toBe(200);
+  });
+
+  it('treats a null/zero factor as base-unit (1:1), unchanged', () => {
+    const res = svc.compute({
+      yield: 1,
+      product: { price: d('20') },
+      ingredients: [{ quantity: d('2'), stockItem: { costPerUnit: d('10') } }],
+    });
+    expect(res.totalRecipeCost).toBe(20);
+  });
+});

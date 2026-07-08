@@ -3127,6 +3127,14 @@ model RecipeIngredient {
   id       String  @id @default(uuid())
   quantity Decimal @db.Decimal(10, 3)
 
+  // Recipe-unit conversion: the ingredient quantity may be expressed in a
+  // recipe unit (e.g. G) different from the stock item's base unit (KG).
+  // conversionFactor = base units per 1 recipe unit (1 G measured in KG =
+  // 0.001). Null = quantity is already in the stock item's base unit (1:1), so
+  // existing recipes are unaffected. Applied at deduction + plate costing.
+  recipeUnit       String?
+  conversionFactor Decimal? @db.Decimal(12, 6)
+
   recipeId String
   recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 

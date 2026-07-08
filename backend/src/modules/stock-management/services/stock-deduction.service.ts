@@ -129,9 +129,17 @@ export class StockDeductionService {
       if (!recipe) continue;
       const yieldVal = recipe.yield || 1;
       for (const ingredient of recipe.ingredients) {
-        const perServing = new Prisma.Decimal(ingredient.quantity).div(
-          yieldVal,
-        );
+        // Convert the recipe-unit quantity to the stock item's base unit before
+        // deducting (e.g. 200 G of a KG-stocked item → 0.2). Null/≤0 factor =
+        // base-unit quantity (1:1), so existing recipes are unaffected.
+        const factor =
+          ingredient.conversionFactor != null &&
+          new Prisma.Decimal(ingredient.conversionFactor).gt(0)
+            ? new Prisma.Decimal(ingredient.conversionFactor)
+            : new Prisma.Decimal(1);
+        const perServing = new Prisma.Decimal(ingredient.quantity)
+          .mul(factor)
+          .div(yieldVal);
         const needed = perServing.mul(orderItem.quantity);
         const existing = acc.get(ingredient.stockItemId);
         if (existing) {

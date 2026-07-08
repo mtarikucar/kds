@@ -34,6 +34,24 @@ export class RecipeIngredientDto {
   @IsNumber()
   @Min(0)
   quantity!: number;
+
+  @ApiPropertyOptional({
+    description: "Recipe unit label when it differs from the stock unit (e.g. G)",
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(24)
+  recipeUnit?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Base units per 1 recipe unit (1 G in KG = 0.001). Null = quantity is in the base unit.",
+    minimum: 0,
+  })
+  @IsNumber({ maxDecimalPlaces: 6 })
+  @Min(0)
+  @IsOptional()
+  conversionFactor?: number;
 }
 
 export class CreateRecipeDto {

@@ -197,6 +197,8 @@ export class RecipesService {
           create: dto.ingredients.map((i) => ({
             stockItemId: i.stockItemId,
             quantity: i.quantity,
+            recipeUnit: i.recipeUnit ?? null,
+            conversionFactor: i.conversionFactor ?? null,
           })),
         },
       },
@@ -257,6 +259,8 @@ export class RecipesService {
             recipeId: id,
             stockItemId: i.stockItemId,
             quantity: i.quantity,
+            recipeUnit: i.recipeUnit ?? null,
+            conversionFactor: i.conversionFactor ?? null,
           })),
         });
       }
