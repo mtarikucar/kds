@@ -111,6 +111,23 @@ export class ReportsController {
     );
   }
 
+  @Get("cogs")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({
+    summary: "COGS + food-cost % + gross margin from the movement ledger",
+  })
+  async getCogsReport(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getCogsReport(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+    );
+  }
+
   @Get("inventory")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.INVENTORY_TRACKING)

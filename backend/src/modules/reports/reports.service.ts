@@ -213,6 +213,83 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Cost of Goods Sold + food-cost % for the window — the KPI a restaurateur
+   * watches most. COGS is read straight from the ingredient-movement ledger:
+   * every order deduction already recorded its FIFO-weighted costPerUnit
+   * (stock-deduction.service.ts), so COGS is the net cost of ORDER_DEDUCTION
+   * less ORDER_REVERSAL. `quantity` is negative for consumption, so
+   * SUM(quantity * costPerUnit) is negative and COGS negates it. WASTE cost is
+   * surfaced alongside as a separate line (shrinkage, not COGS). The
+   * product-of-two-columns sum can't be expressed via Prisma groupBy, so it is
+   * a single parameterized aggregate query. Un-costed movements (null
+   * costPerUnit) contribute nothing rather than understating as zero.
+   */
+  async getCogsReport(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const sales = await this.prisma.order.aggregate({
+      where: {
+        tenantId,
+        ...branchScope,
+        status: OrderStatus.PAID,
+        createdAt: { gte: dateRange.start, lte: dateRange.end },
+      },
+      _sum: { finalAmount: true },
+      _count: true,
+    });
+    const totalSalesCents = decimalToCents(sales._sum.finalAmount);
+
+    const branchFilter = branchId
+      ? Prisma.sql`AND "branchId" = ${branchId}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<
+      { cogs_net: unknown; waste_net: unknown }[]
+    >(Prisma.sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN type IN ('ORDER_DEDUCTION','ORDER_REVERSAL')
+          THEN quantity * "costPerUnit" END), 0) AS cogs_net,
+        COALESCE(SUM(CASE WHEN type = 'WASTE'
+          THEN quantity * "costPerUnit" END), 0) AS waste_net
+      FROM ingredient_movements
+      WHERE "tenantId" = ${tenantId} ${branchFilter}
+        AND "createdAt" >= ${dateRange.start}
+        AND "createdAt" <= ${dateRange.end}
+    `);
+
+    const cogsCents = decimalToCents(
+      new Prisma.Decimal((rows[0]?.cogs_net ?? 0) as any).neg(),
+    );
+    const wasteCostCents = decimalToCents(
+      new Prisma.Decimal((rows[0]?.waste_net ?? 0) as any).neg(),
+    );
+    const grossProfitCents = totalSalesCents - cogsCents;
+
+    const pct = (part: number) =>
+      totalSalesCents > 0
+        ? Math.round((part / totalSalesCents) * 1000) / 10
+        : null;
+
+    return {
+      totalSales: centsToCurrency(totalSalesCents),
+      totalOrders: sales._count,
+      cogs: centsToCurrency(cogsCents),
+      wasteCost: centsToCurrency(wasteCostCents),
+      grossProfit: centsToCurrency(grossProfitCents),
+      foodCostPct: pct(cogsCents),
+      wasteCostPct: pct(wasteCostCents),
+      grossMarginPct: pct(grossProfitCents),
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
   async getTopProducts(
     tenantId: string,
     startDate?: Date,
