@@ -430,6 +430,53 @@ export class ReportsService {
     };
   }
 
+  /**
+   * Tips report — totals + per-tender breakdown of recorded tips over the
+   * window. Tips are the Payment.tipAmount recorded separately from the goods
+   * amount, so this never double-counts sales. Feeds payroll / tip-out.
+   */
+  async getTipsReport(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const byMethod = await this.prisma.payment.groupBy({
+      by: ["method"],
+      where: {
+        tenantId,
+        ...branchScope,
+        status: "COMPLETED",
+        tipAmount: { not: null },
+        createdAt: { gte: dateRange.start, lte: dateRange.end },
+      },
+      _sum: { tipAmount: true },
+      _count: true,
+    });
+
+    const totalCents = byMethod.reduce(
+      (s, m) => s + decimalToCents(m._sum.tipAmount),
+      0,
+    );
+
+    return {
+      totalTips: centsToCurrency(totalCents),
+      tipCount: byMethod.reduce((s, m) => s + m._count, 0),
+      byMethod: byMethod
+        .map((m) => ({
+          method: m.method,
+          tips: centsToCurrency(decimalToCents(m._sum.tipAmount)),
+          count: m._count,
+        }))
+        .sort((a, b) => b.tips - a.tips),
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
   async getTopProducts(
     tenantId: string,
     startDate?: Date,

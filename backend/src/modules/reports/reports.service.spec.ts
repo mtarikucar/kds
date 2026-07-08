@@ -186,3 +186,31 @@ describe('ReportsService.getMenuEngineering', () => {
     expect(res.counts.uncosted).toBe(1);
   });
 });
+
+/**
+ * Tips report — totals + per-tender breakdown. Tips are Payment.tipAmount,
+ * recorded separately from the goods amount, so they never double-count sales.
+ */
+describe('ReportsService.getTipsReport', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('totals tips and breaks them down by tender, sorted desc', async () => {
+    (prisma.payment.groupBy as any).mockResolvedValue([
+      { method: 'CASH', _sum: { tipAmount: 20 }, _count: 2 },
+      { method: 'CARD', _sum: { tipAmount: 80 }, _count: 4 },
+    ]);
+    const res = await svc.getTipsReport('t1', start, end);
+    expect(res.totalTips).toBe(100);
+    expect(res.tipCount).toBe(6);
+    expect(res.byMethod[0]).toMatchObject({ method: 'CARD', tips: 80, count: 4 });
+    expect(res.byMethod[1]).toMatchObject({ method: 'CASH', tips: 20 });
+  });
+});

@@ -128,6 +128,21 @@ export class ReportsController {
     );
   }
 
+  @Get("tips")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+  @ApiOperation({ summary: "Tips report: total + per-tender breakdown" })
+  async getTipsReport(@Request() req, @Query() query: DateRangeQueryDto) {
+    const start = query.startDate ? new Date(query.startDate) : undefined;
+    const end = query.endDate ? new Date(query.endDate) : undefined;
+    return this.reportsService.getTipsReport(
+      req.tenantId,
+      start,
+      end,
+      query.branchId,
+    );
+  }
+
   @Get("menu-engineering")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)

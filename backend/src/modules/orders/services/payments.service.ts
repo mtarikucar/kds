@@ -1425,6 +1425,9 @@ export class PaymentsService {
               payment = await tx.payment.create({
                 data: {
                   amount: derivedTotal,
+                  // Tip is recorded separately from the goods amount; it does
+                  // not participate in the tender reconciliation below.
+                  tipAmount: dto.tipAmount ?? null,
                   method: dto.method,
                   status: PaymentStatus.COMPLETED,
                   notes: dto.notes,

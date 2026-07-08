@@ -905,7 +905,11 @@ model OrderItemModifier {
 model Payment {
   id     String  @id @default(uuid())
   amount Decimal @db.Decimal(10, 2)
-  method String // CASH, CARD, DIGITAL
+  // Tip recorded with this payment (cash declared or card tip). Informational:
+  // NOT part of `amount`'s goods-total reconciliation — it drives the tips
+  // report + payroll, kept separate so the fiş/Z tender math is untouched.
+  tipAmount Decimal? @db.Decimal(10, 2)
+  method String // CASH, CARD, DIGITAL, MULTINET, SODEXO, EDENRED, SETCARD, METROPOL, HOUSE
   status String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
 
   transactionId  String?
