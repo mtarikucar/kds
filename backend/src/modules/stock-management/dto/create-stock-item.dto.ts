@@ -29,6 +29,12 @@ export class CreateStockItemDto {
   @IsOptional()
   sku?: string;
 
+  @ApiPropertyOptional({ description: "Scannable barcode (EAN/UPC/QR)" })
+  @IsString()
+  @MaxLength(100)
+  @IsOptional()
+  barcode?: string;
+
   @ApiProperty({ enum: StockUnit, description: "Unit of measurement" })
   @IsEnum(StockUnit)
   unit: StockUnit;

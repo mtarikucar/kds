@@ -3014,6 +3014,8 @@ model StockItem {
   id          String  @id @default(uuid())
   name        String
   sku         String?
+  // Scannable barcode (EAN/UPC/QR) for receiving + stock counts. Optional.
+  barcode     String?
   unit        String // KG, G, L, ML, PCS, BOX, BAG, CAN, BOTTLE, BUNCH, SLICE, PORTION
   description String?
 

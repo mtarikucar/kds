@@ -74,6 +74,16 @@ export class StockItemsController {
     );
   }
 
+  @Get("by-barcode/:barcode")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
+  @ApiOperation({ summary: "Look up a stock item by scanned barcode" })
+  findByBarcode(
+    @Param("barcode") barcode: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.service.findByBarcode(barcode, scope);
+  }
+
   @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: "Get a stock item by ID" })

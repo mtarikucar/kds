@@ -21,6 +21,7 @@ export class StockItemsService {
       where.OR = [
         { name: { contains: query.search, mode: "insensitive" } },
         { sku: { contains: query.search, mode: "insensitive" } },
+        { barcode: { contains: query.search, mode: "insensitive" } },
       ];
     }
     if (query.categoryId) where.categoryId = query.categoryId;
@@ -53,6 +54,17 @@ export class StockItemsService {
       },
     });
     if (!item) throw new NotFoundException("Stock item not found");
+    return item;
+  }
+
+  /** Exact barcode lookup within the caller's branch (POS/receiving scan). */
+  async findByBarcode(barcode: string, scope: BranchScope) {
+    const item = await this.prisma.stockItem.findFirst({
+      where: { barcode, ...branchScope(scope) },
+    });
+    if (!item) {
+      throw new NotFoundException("No stock item with that barcode");
+    }
     return item;
   }
 
