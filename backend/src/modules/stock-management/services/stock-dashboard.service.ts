@@ -233,9 +233,7 @@ export class StockDashboardService {
       };
     });
 
-    rows.sort(
-      (a, b) => Math.abs(b.varianceValue) - Math.abs(a.varianceValue),
-    );
+    rows.sort((a, b) => Math.abs(b.varianceValue) - Math.abs(a.varianceValue));
 
     const totalVarianceValue = r2(
       rows.reduce((s, r) => s + r.varianceValue, 0),
@@ -254,7 +252,8 @@ export class StockDashboardService {
         varianceValue: totalVarianceValue,
         wasteValue: totalWasteValue,
         // Negative variance = net unexplained LOSS across the branch.
-        netUnexplainedLoss: totalVarianceValue < 0 ? r2(-totalVarianceValue) : 0,
+        netUnexplainedLoss:
+          totalVarianceValue < 0 ? r2(-totalVarianceValue) : 0,
       },
     };
   }

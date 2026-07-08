@@ -62,8 +62,7 @@ export interface RecipeCostingResult {
 @Injectable()
 export class RecipeCostingService {
   compute(recipe: RecipeCostingInput): RecipeCostingResult {
-    const yieldPortions =
-      recipe?.yield && recipe.yield > 0 ? recipe.yield : 1;
+    const yieldPortions = recipe?.yield && recipe.yield > 0 ? recipe.yield : 1;
 
     let total = new Prisma.Decimal(0);
     const ingredients: RecipeCostingLine[] = (recipe?.ingredients ?? []).map(

@@ -38,7 +38,10 @@ export class CreatePurchaseInvoiceDto {
   @Max(1_000_000_000)
   subtotal: number;
 
-  @ApiProperty({ description: "Deductible input VAT (indirilecek KDV)", minimum: 0 })
+  @ApiProperty({
+    description: "Deductible input VAT (indirilecek KDV)",
+    minimum: 0,
+  })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(1_000_000_000)

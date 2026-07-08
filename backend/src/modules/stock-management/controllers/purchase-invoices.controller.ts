@@ -56,7 +56,9 @@ export class PurchaseInvoicesController {
 
   @Get(":id/match")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: "3-way match breakdown (ordered/received/invoiced)" })
+  @ApiOperation({
+    summary: "3-way match breakdown (ordered/received/invoiced)",
+  })
   getMatch(
     @Param("id", ParseUUIDPipe) id: string,
     @CurrentScope() scope: BranchScope,

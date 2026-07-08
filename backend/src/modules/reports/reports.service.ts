@@ -416,12 +416,8 @@ export class ReportsService {
       const revenueCents = decimalToCents(s._sum.subtotal);
       const price = p ? new Prisma.Decimal(p.price) : new Prisma.Decimal(0);
       const hasCost = !!p && p.costPrice != null;
-      const cost = hasCost
-        ? new Prisma.Decimal(p!.costPrice as any)
-        : null;
-      const unitMarginCents = cost
-        ? decimalToCents(price.sub(cost))
-        : null;
+      const cost = hasCost ? new Prisma.Decimal(p!.costPrice as any) : null;
+      const unitMarginCents = cost ? decimalToCents(price.sub(cost)) : null;
       return {
         productId: s.productId,
         productName: p?.name ?? "Unknown",

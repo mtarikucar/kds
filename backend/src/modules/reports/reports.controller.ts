@@ -56,7 +56,8 @@ export class ReportsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({
-    summary: "Sales vs the previous equal-length window (MoM/period-over-period)",
+    summary:
+      "Sales vs the previous equal-length window (MoM/period-over-period)",
   })
   async getSalesComparison(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
@@ -188,7 +189,8 @@ export class ReportsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({
-    summary: "Menu engineering: Star/Plow-horse/Puzzle/Dog + contribution margin",
+    summary:
+      "Menu engineering: Star/Plow-horse/Puzzle/Dog + contribution margin",
   })
   async getMenuEngineering(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;

@@ -101,11 +101,7 @@ export class PurchaseInvoicesService {
     let status = "RECEIVED";
     let matchVariance: Prisma.Decimal | null = null;
     if (dto.purchaseOrderId) {
-      const match = await this.computeMatch(
-        scope,
-        dto.purchaseOrderId,
-        total,
-      );
+      const match = await this.computeMatch(scope, dto.purchaseOrderId, total);
       status = match.status;
       matchVariance = new Prisma.Decimal(match.variance);
     }

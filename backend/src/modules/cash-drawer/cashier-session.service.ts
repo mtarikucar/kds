@@ -54,10 +54,7 @@ export class CashierSessionService {
     });
   }
 
-  async list(
-    scope: BranchScope,
-    opts?: { status?: string; limit?: number },
-  ) {
+  async list(scope: BranchScope, opts?: { status?: string; limit?: number }) {
     return this.prisma.cashierSession.findMany({
       where: {
         ...branchScope(scope),
