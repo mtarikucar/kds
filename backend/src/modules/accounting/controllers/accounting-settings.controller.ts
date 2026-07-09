@@ -17,16 +17,19 @@ import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
-import { RequiresIntegration } from "../../subscriptions/decorators/requires-integration.decorator";
+import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
+import { PlanFeature } from "../../../common/constants/subscription.enum";
 
-// v2.8.90 — accounting credential surface gated on integration. Tenants
-// without any accounting add-on shouldn't see vendor connect / sync
-// endpoints; this gate mirrors the sidebar rule server-side.
+// Gated on ADVANCED_REPORTS — the same feature the Muhasebe page (which now
+// hosts these settings as its "Ayarlar" tab) is gated on. The prior
+// @RequiresIntegration("accounting") gate 403'd for EVERY tenant because no
+// plan or add-on ever grants integration.accounting, so the credential surface
+// was permanently unreachable.
 @ApiTags("accounting-settings")
 @ApiBearerAuth()
 @Controller("accounting-settings")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
-@RequiresIntegration("accounting")
+@RequiresFeature(PlanFeature.ADVANCED_REPORTS)
 export class AccountingSettingsController {
   constructor(
     private readonly service: AccountingSettingsService,

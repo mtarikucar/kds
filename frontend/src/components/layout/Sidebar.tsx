@@ -207,7 +207,7 @@ const SECTIONS: NavSection[] = [
         to: '/admin/accounting-backoffice',
         icon: Receipt,
         labelKey: 'navigation.accountingBackOffice',
-        labelFallback: 'Muhasebe & e-Belge',
+        labelFallback: 'Muhasebe',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
       },
@@ -234,12 +234,7 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'deliveryIntegration' },
       },
-      {
-        to: '/admin/invoices',
-        icon: Receipt,
-        labelKey: 'navigation.invoices',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
+      // Faturalar is now the "Faturalar" tab inside Muhasebe — no separate nav.
     ],
   },
   {
