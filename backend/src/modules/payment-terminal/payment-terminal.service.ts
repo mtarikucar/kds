@@ -9,6 +9,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 import { OrderStatus } from "../../common/constants/order-status.enum";
 import { CommandQueueService } from "../device-mesh/command-queue.service";
@@ -760,6 +761,18 @@ export class PaymentTerminalService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async recoverApprovedUnrecorded() {
+    // Multi-replica guard: one replica per tick sweeps the stuck charges.
+    // Payment idempotencyKey already prevents double-booking, but the lock
+    // avoids N replicas re-driving the same provider record() calls.
+    await withAdvisoryLock(
+      this.prisma,
+      "paymentTerminal.recoverApprovedUnrecorded",
+      () => this.recoverApprovedUnrecordedInner(),
+      this.logger,
+    );
+  }
+
+  private async recoverApprovedUnrecordedInner() {
     const stuck = await this.prisma.paymentTerminalCharge.findMany({
       where: {
         status: "APPROVED",

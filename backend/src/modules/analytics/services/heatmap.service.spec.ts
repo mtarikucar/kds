@@ -282,42 +282,33 @@ describe('HeatmapService', () => {
   });
 
   describe('getTrafficFlowPaths', () => {
-    it('builds a path with duration in seconds and skips singleton tracks', async () => {
+    it('fetches all path points in ONE batched query — no N+1 per tracking id (perf audit 2026-07)', async () => {
       (prisma.occupancyRecord.findMany as any)
-        // distinct tracking ids
+        // 1) distinct tracking ids
         .mockResolvedValueOnce([{ trackingId: 'tk-1' }, { trackingId: 'tk-2' }])
-        // points for tk-1 (2 points, 120s apart)
+        // 2) a SINGLE batched points query for every tracking id, ordered by
+        //    trackingId then timestamp (each row carries its trackingId)
         .mockResolvedValueOnce([
-          {
-            positionX: 0,
-            positionZ: 0,
-            timestamp: new Date('2026-01-01T00:00:00Z'),
-          },
-          {
-            positionX: 5,
-            positionZ: 5,
-            timestamp: new Date('2026-01-01T00:02:00Z'),
-          },
-        ])
-        // points for tk-2 (1 point -> skipped, needs >= 2)
-        .mockResolvedValueOnce([
-          {
-            positionX: 1,
-            positionZ: 1,
-            timestamp: new Date('2026-01-01T00:00:00Z'),
-          },
+          { trackingId: 'tk-1', positionX: 0, positionZ: 0, timestamp: new Date('2026-01-01T00:00:00Z') },
+          { trackingId: 'tk-1', positionX: 5, positionZ: 5, timestamp: new Date('2026-01-01T00:02:00Z') },
+          { trackingId: 'tk-2', positionX: 1, positionZ: 1, timestamp: new Date('2026-01-01T00:00:00Z') },
         ]);
 
       const res = await svc.getTrafficFlowPaths(t, b, start, end);
 
-      // totalVisitors counts distinct tracking ids, not surviving paths
+      // The load-bearing assertion: exactly TWO queries total (ids + points),
+      // regardless of how many tracking ids there are — not 1 + N.
+      expect((prisma.occupancyRecord.findMany as any).mock.calls).toHaveLength(2);
+      // The batched query filters by trackingId IN the selected ids.
+      const pointsWhere = (prisma.occupancyRecord.findMany as any).mock.calls[1][0].where;
+      expect(pointsWhere.trackingId).toEqual({ in: ['tk-1', 'tk-2'] });
+
+      // Grouping is correct: tk-1 (2 points) → a path; tk-2 (1 point) → skipped.
       expect(res.totalVisitors).toBe(2);
-      // only tk-1 yielded a path
       expect(res.paths).toHaveLength(1);
       expect(res.paths[0].trackingId).toBe('tk-1');
       expect(res.paths[0].duration).toBe(120);
       expect(res.paths[0].points).toHaveLength(2);
-      // avg dwell over surviving paths
       expect(res.avgDwellTime).toBe(120);
     });
 
@@ -325,11 +316,7 @@ describe('HeatmapService', () => {
       (prisma.occupancyRecord.findMany as any)
         .mockResolvedValueOnce([{ trackingId: 'tk-1' }])
         .mockResolvedValueOnce([
-          {
-            positionX: 0,
-            positionZ: 0,
-            timestamp: new Date('2026-01-01T00:00:00Z'),
-          },
+          { trackingId: 'tk-1', positionX: 0, positionZ: 0, timestamp: new Date('2026-01-01T00:00:00Z') },
         ]);
 
       const res = await svc.getTrafficFlowPaths(t, b, start, end);
@@ -337,6 +324,17 @@ describe('HeatmapService', () => {
       expect(res.paths).toHaveLength(0);
       expect(res.totalVisitors).toBe(1);
       expect(res.avgDwellTime).toBe(0);
+    });
+
+    it('skips the batched points query entirely when there are no tracking ids', async () => {
+      (prisma.occupancyRecord.findMany as any).mockResolvedValueOnce([]);
+
+      const res = await svc.getTrafficFlowPaths(t, b, start, end);
+
+      // Only the distinct-ids query ran; no second query on an empty id set.
+      expect((prisma.occupancyRecord.findMany as any).mock.calls).toHaveLength(1);
+      expect(res.paths).toHaveLength(0);
+      expect(res.totalVisitors).toBe(0);
     });
   });
 

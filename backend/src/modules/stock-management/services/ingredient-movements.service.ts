@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { drawDownBatchesFifo } from "../../../common/stock/batch-drawdown";
 import { CreateIngredientMovementDto } from "../dto/create-ingredient-movement.dto";
 import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
@@ -126,6 +128,34 @@ export class IngredientMovementsService {
         throw new BadRequestException(
           `Stock for ${stockItem.name} changed mid-flight; please retry.`,
         );
+      }
+
+      // Keep the FIFO batch ledger in sync (mirrors waste/deduction/receive):
+      // a manual OUT / negative ADJUSTMENT draws batches down oldest-first; a
+      // manual IN / positive ADJUSTMENT adds a batch layer at the supplied or
+      // current cost, so batch valuation + FIFO-COGS don't drift.
+      if (quantityChange < 0) {
+        await drawDownBatchesFifo(
+          tx,
+          {
+            stockItemId: stockItem.id,
+            tenantId: scope.tenantId,
+            branchId: stockItem.branchId,
+          },
+          new Prisma.Decimal(Math.abs(quantityChange)),
+        );
+      } else if (quantityChange > 0) {
+        await tx.stockBatch.create({
+          data: {
+            quantity: new Prisma.Decimal(quantityChange) as any,
+            costPerUnit: new Prisma.Decimal(
+              dto.costPerUnit ?? stockItem.costPerUnit ?? 0,
+            ) as any,
+            stockItemId: stockItem.id,
+            tenantId: scope.tenantId,
+            branchId: stockItem.branchId,
+          },
+        });
       }
 
       return tx.ingredientMovement.create({

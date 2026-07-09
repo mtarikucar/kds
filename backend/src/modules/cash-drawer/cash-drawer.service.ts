@@ -50,7 +50,14 @@ export class CashDrawerService {
     "CASH_IN",
   ]);
 
-  private static readonly REVIEW_TYPES = new Set(["CASH_OUT", "ADJUSTMENT"]);
+  // Money leaving the till outside a sale — all require manager approval.
+  private static readonly REVIEW_TYPES = new Set([
+    "CASH_OUT",
+    "ADJUSTMENT",
+    "SAFE_DROP",
+    "BANK_DEPOSIT",
+    "PETTY_CASH",
+  ]);
 
   async create(
     tenantId: string,

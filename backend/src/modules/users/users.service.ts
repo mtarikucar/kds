@@ -228,6 +228,7 @@ export class UsersService {
           firstName: createUserDto.firstName,
           lastName: createUserDto.lastName,
           role: createUserDto.role,
+          hourlyRate: createUserDto.hourlyRate ?? null,
           // Admin/Manager-created accounts are already vetted — skip the
           // PENDING_APPROVAL flow used by public self-registration.
           status: "ACTIVE",
@@ -360,6 +361,18 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
+    // Security (audit 2026-07): a lower-privileged actor must not mutate an
+    // ADMIN target. The role-change block below gates only the ROLE field on
+    // the actor's role — credential fields (password/email) and status were
+    // ungated, so a MANAGER could PATCH an ADMIN's password, revoke its
+    // sessions, and log in as that admin (full account takeover). Block any
+    // sub-ADMIN actor from writing to an ADMIN target regardless of field.
+    if (existing.role === UserRole.ADMIN && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        "Only an ADMIN can modify another ADMIN account",
+      );
+    }
+
     // Role changes are privileged: only ADMIN can do them, and nobody can
     // change their own role (avoids "MANAGER promotes self to ADMIN").
     if (dto.role !== undefined && dto.role !== existing.role) {
@@ -400,6 +413,7 @@ export class UsersService {
     if (dto.firstName !== undefined) data.firstName = dto.firstName;
     if (dto.lastName !== undefined) data.lastName = dto.lastName;
     if (dto.role !== undefined) data.role = dto.role;
+    if (dto.hourlyRate !== undefined) data.hourlyRate = dto.hourlyRate;
     if (dto.password !== undefined) {
       data.password = await bcrypt.hash(dto.password, this.bcryptCost());
     }
@@ -477,8 +491,12 @@ export class UsersService {
     });
   }
 
-  async remove(id: string, tenantId: string, actorId: string) {
-    if (id === actorId) {
+  async remove(
+    id: string,
+    tenantId: string,
+    actor: { id: string; role: string },
+  ) {
+    if (id === actor.id) {
       throw new BadRequestException("You cannot delete your own account");
     }
 
@@ -488,6 +506,15 @@ export class UsersService {
     });
     if (!target) {
       throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // Security (audit 2026-07): mirror update()'s privilege boundary — a
+    // MANAGER must not be able to deactivate an ADMIN (it would revoke the
+    // admin's sessions and lock them out). Only an ADMIN removes an ADMIN.
+    if (target.role === UserRole.ADMIN && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        "Only an ADMIN can deactivate another ADMIN account",
+      );
     }
 
     // Cannot deactivate the only remaining active admin.

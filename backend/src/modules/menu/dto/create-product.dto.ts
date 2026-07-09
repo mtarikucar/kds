@@ -139,6 +139,16 @@ export class CreateProductDto {
   @Max(10_000_000)
   price: number;
 
+  // Unit COST (what it costs to make/buy), distinct from the retail `price`.
+  // Feeds at-cost inventory valuation + gross margin for products without a
+  // recipe. Optional — unset means "no cost basis yet".
+  @ApiProperty({ example: 6.5, required: false })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10_000_000)
+  @IsOptional()
+  costPrice?: number;
+
   @ApiProperty({ example: "https://example.com/image.jpg", required: false })
   // Treat "" / whitespace as "no image" — @IsOptional only skips null/undefined,
   // so without this an empty string (routinely sent by the editor form on a

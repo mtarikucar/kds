@@ -2,6 +2,7 @@ import {
   IsDateString,
   IsEmail,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -67,6 +68,21 @@ export class CreateSalesInvoiceDto {
   @IsEmail()
   @MaxLength(254)
   customerEmail?: string;
+
+  @ApiPropertyOptional({
+    description: "KDV tevkifatı — amount withheld by buyer",
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000_000)
+  withholdingTaxAmount?: number;
+
+  @ApiPropertyOptional({ description: "GİB tevkifat code (e.g. 601)" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  withholdingCode?: string;
 }
 
 /**

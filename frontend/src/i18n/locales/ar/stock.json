@@ -148,7 +148,17 @@
     "createError": "فشل إنشاء أمر الشراء",
     "submitError": "فشل إرسال أمر الشراء",
     "receiveError": "فشل استلام البضائع",
-    "cancelError": "فشل إلغاء أمر الشراء"
+    "cancelError": "فشل إلغاء أمر الشراء",
+    "statusPendingApproval": "بانتظار الموافقة",
+    "approve": "موافقة",
+    "approveError": "تعذر اعتماد الطلب",
+    "landedCost": "توزيع التكاليف الإضافية (شحن/جمارك)",
+    "landedCostFreight": "شحن",
+    "landedCostCustoms": "جمارك",
+    "landedCostOther": "أخرى",
+    "landedCostApply": "توزيع",
+    "landedCostApplied": "تم توزيع التكاليف على تكلفة المخزون",
+    "landedCostError": "تعذر توزيع التكاليف"
   },
   "movements": {
     "title": "الحركات",

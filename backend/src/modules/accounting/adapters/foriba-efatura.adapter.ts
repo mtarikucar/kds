@@ -6,19 +6,45 @@ import {
   AccountingAdapter,
   AccountingInvoiceData,
 } from "./accounting-adapter.interface";
+import { EDocumentSigner } from "../providers/e-document-signer";
 
 export class ForibaEfaturaAdapter implements AccountingAdapter {
   readonly name = "foriba";
   private readonly logger = new Logger(ForibaEfaturaAdapter.name);
   private httpClient: AxiosInstance;
+  private signer?: EDocumentSigner;
 
   constructor() {
     this.httpClient = axios.create({ timeout: 30000 });
   }
 
+  /** Attach the e-document signer used before dispatch (set by the sync svc). */
+  setSigner(signer: EDocumentSigner): this {
+    this.signer = signer;
+    return this;
+  }
+
+  /**
+   * Pin the dispatch host to the tenant-configured apiUrl. Must be called on
+   * EVERY sync (the service builds a fresh adapter per call and may skip
+   * authenticate() on a cached token), otherwise pushInvoice's fallback would
+   * dispatch to the hardcoded production endpoint even for a sandbox tenant.
+   */
+  setApiBase(url: string): this {
+    if (url) this.httpClient.defaults.baseURL = url;
+    return this;
+  }
+
   async authenticate(
     credentials: Record<string, string>,
   ): Promise<{ accessToken: string; expiresAt?: Date }> {
+    // Pin the client to the tenant-configured host so dispatch goes to the SAME
+    // environment we auth against (mirrors LogoAdapter). Without this the
+    // pushInvoice fallback always hit the hardcoded production endpoint, so a
+    // sandbox-configured tenant would auth to sandbox but file to production.
+    if (credentials.apiUrl) {
+      this.httpClient.defaults.baseURL = credentials.apiUrl;
+    }
     const response = await this.httpClient.post(
       `${credentials.apiUrl}/token`,
       new URLSearchParams({
@@ -42,7 +68,14 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
     _companyId: string,
     invoice: AccountingInvoiceData,
   ): Promise<{ externalId: string }> {
-    const ublXml = this.generateUblTrXml(invoice);
+    let ublXml = this.generateUblTrXml(invoice);
+    // Sign the UBL before dispatch when a signer is configured (mali mühür /
+    // e-imza). GİB rejects an unsigned e-Fatura/e-Arşiv, so refuse to dispatch
+    // unsigned once a signer is present — better a recorded FAILED than a
+    // silently-unsigned document.
+    if (this.signer?.isConfigured()) {
+      ublXml = await this.signer.sign(ublXml);
+    }
 
     const response = await this.httpClient.post(
       `${this.httpClient.defaults.baseURL || "https://api.fitbulut.com/v2"}/dispatch-invoice`,
@@ -84,6 +117,11 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
 
   private generateUblTrXml(invoice: AccountingInvoiceData): string {
     const uuid = crypto.randomUUID();
+    // Profile selection: e-Fatura (B2B) → TICARIFATURA, e-Arşiv (B2C) →
+    // EARSIVFATURA. Was hardcoded to TICARIFATURA, which GİB rejects for a
+    // final-consumer sale. Defaults to e-Arşiv when the type wasn't resolved.
+    const profileId =
+      invoice.eDocumentType === "EFATURA" ? "TICARIFATURA" : "EARSIVFATURA";
 
     // UBL-TR rejects XML where header totals don't match the line items
     // bit-for-bit. JS Number was accumulating rounding error across the
@@ -94,8 +132,19 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
       const qty = new Prisma.Decimal(i.quantity);
       const unit = new Prisma.Decimal(i.unitPrice);
       const rate = new Prisma.Decimal(i.taxRate);
-      const lineExt = unit.mul(qty);
-      const lineTax = lineExt.mul(rate).div(100);
+      // Prefer the STORED net line subtotal/tax (already reconciled with the
+      // order total) over unitPrice×qty. Recomputing from a 2-dp unit price
+      // reintroduces kuruş drift so TaxExclusive+TaxTotal ≠ TaxInclusive and
+      // GİB rejects the document. Fall back to the computed values only when
+      // the caller didn't supply the stored figures.
+      const lineExt =
+        i.lineSubtotal != null
+          ? new Prisma.Decimal(i.lineSubtotal)
+          : unit.mul(qty);
+      const lineTax =
+        i.lineTax != null
+          ? new Prisma.Decimal(i.lineTax)
+          : lineExt.mul(rate).div(100);
       return { lineExt, lineTax, rate, unit, qty, item: i };
     });
 
@@ -107,6 +156,29 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
       (s, l) => s.add(l.lineTax),
       new Prisma.Decimal(0),
     );
+
+    // KDV tevkifatı — when the buyer withholds part of the VAT, emit a
+    // WithholdingTaxTotal and reduce the payable by the withheld amount.
+    const withheld =
+      invoice.withholdingTaxAmount != null
+        ? new Prisma.Decimal(invoice.withholdingTaxAmount)
+        : new Prisma.Decimal(0);
+    const payable = new Prisma.Decimal(invoice.totalAmount).sub(withheld);
+    const withholdingXml = withheld.gt(0)
+      ? `
+  <cac:WithholdingTaxTotal>
+    <cbc:TaxAmount currencyID="${invoice.currency}">${withheld.toFixed(2)}</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxAmount currencyID="${invoice.currency}">${withheld.toFixed(2)}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cac:TaxScheme>
+          <cbc:Name>KDV Tevkifati</cbc:Name>
+          <cbc:TaxTypeCode>${this.escapeXml(invoice.withholdingCode || "")}</cbc:TaxTypeCode>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:WithholdingTaxTotal>`
+      : "";
 
     const lineItems = lineTotals
       .map(
@@ -141,29 +213,50 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
   <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
   <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
-  <cbc:ProfileID>TICARIFATURA</cbc:ProfileID>
+  <cbc:ProfileID>${profileId}</cbc:ProfileID>
   <cbc:ID>${invoice.invoiceNumber}</cbc:ID>
   <cbc:UUID>${uuid}</cbc:UUID>
   <cbc:IssueDate>${invoice.issueDate}</cbc:IssueDate>
   <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
 ${this.supplierPartyXml(invoice)}
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyName><cbc:Name>${this.escapeXml(invoice.customerName || "Musteri")}</cbc:Name></cac:PartyName>
-    </cac:Party>
-  </cac:AccountingCustomerParty>
+${this.customerPartyXml(invoice)}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="${invoice.currency}">${totalTax.toFixed(2)}</cbc:TaxAmount>
-  </cac:TaxTotal>
+  </cac:TaxTotal>${withholdingXml}
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="${invoice.currency}">${totalExcTax.toFixed(2)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${totalExcTax.toFixed(2)}</cbc:TaxExclusiveAmount>
     <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${new Prisma.Decimal(invoice.totalAmount).toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${invoice.currency}">${new Prisma.Decimal(invoice.totalAmount).toFixed(2)}</cbc:PayableAmount>
+    <cbc:PayableAmount currencyID="${invoice.currency}">${payable.toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
   ${lineItems}
 </Invoice>`;
+  }
+
+  /**
+   * cac:AccountingCustomerParty — the buyer (alıcı) block. e-Fatura (B2B)
+   * REQUIRES a PartyTaxScheme carrying the buyer VKN/TCKN + tax office; the
+   * pre-fix code emitted only a "Musteri" placeholder name, so GİB rejected
+   * every B2B invoice. e-Arşiv (B2C, final consumer) can carry just the name.
+   * The tax scheme is emitted only when a tax id is present.
+   */
+  private customerPartyXml(invoice: AccountingInvoiceData): string {
+    const name = invoice.customerName?.trim() || "Musteri";
+    const taxId = invoice.customerTaxId?.trim();
+    const taxOffice = invoice.customerTaxOffice?.trim();
+    const taxSchemeXml = taxId
+      ? `
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>${this.escapeXml(taxId)}</cbc:CompanyID>
+        <cac:TaxScheme><cbc:Name>${this.escapeXml(taxOffice || "")}</cbc:Name></cac:TaxScheme>
+      </cac:PartyTaxScheme>`
+      : "";
+    return `  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>${this.escapeXml(name)}</cbc:Name></cac:PartyName>${taxSchemeXml}
+    </cac:Party>
+  </cac:AccountingCustomerParty>`;
   }
 
   /**

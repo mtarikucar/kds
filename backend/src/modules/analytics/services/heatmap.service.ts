@@ -349,30 +349,47 @@ export class HeatmapService {
       take: limit,
     });
 
-    const paths: TrafficFlowPathDto[] = [];
+    const ids = trackingIds.map((t) => t.trackingId);
 
-    // Get path points for each tracking ID
-    for (const { trackingId } of trackingIds) {
-      const points = await this.prisma.occupancyRecord.findMany({
-        where: {
-          tenantId,
-          branchId,
-          trackingId,
-          timestamp: {
-            gte: startDate,
-            lte: endDate,
+    // Fetch every path point for the selected tracks in ONE batched query.
+    // Previously this looped and issued one findMany PER tracking id (up to
+    // `limit` = 50 sequential round-trips for a single endpoint call). Ordered
+    // by trackingId then timestamp so a single in-memory pass groups the rows
+    // while preserving chronological order within each track. (No `state`
+    // filter here — same as before: the MOVING filter only selects which
+    // tracks to draw, the path itself uses all of that track's points.)
+    const allPoints = ids.length
+      ? await this.prisma.occupancyRecord.findMany({
+          where: {
+            tenantId,
+            branchId,
+            trackingId: { in: ids },
+            timestamp: {
+              gte: startDate,
+              lte: endDate,
+            },
           },
-        },
-        select: {
-          positionX: true,
-          positionZ: true,
-          timestamp: true,
-        },
-        orderBy: {
-          timestamp: "asc",
-        },
-      });
+          select: {
+            trackingId: true,
+            positionX: true,
+            positionZ: true,
+            timestamp: true,
+          },
+          orderBy: [{ trackingId: "asc" }, { timestamp: "asc" }],
+        })
+      : [];
 
+    const pointsByTrack = new Map<string, typeof allPoints>();
+    for (const point of allPoints) {
+      const existing = pointsByTrack.get(point.trackingId);
+      if (existing) existing.push(point);
+      else pointsByTrack.set(point.trackingId, [point]);
+    }
+
+    const paths: TrafficFlowPathDto[] = [];
+    // Iterate the distinct-id order so path ordering is stable.
+    for (const trackingId of ids) {
+      const points = pointsByTrack.get(trackingId) ?? [];
       if (points.length >= 2) {
         const firstPoint = points[0];
         const lastPoint = points[points.length - 1];

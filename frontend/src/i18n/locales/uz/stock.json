@@ -148,7 +148,17 @@
     "createError": "Buyurtma yaratib bo'lmadi",
     "submitError": "Buyurtma yuborib bo'lmadi",
     "receiveError": "Qabul qilib bo'lmadi",
-    "cancelError": "Bekor qilib bo'lmadi"
+    "cancelError": "Bekor qilib bo'lmadi",
+    "statusPendingApproval": "Tasdiq kutilmoqda",
+    "approve": "Tasdiqlash",
+    "approveError": "Buyurtmani tasdiqlab bolmadi",
+    "landedCost": "Qoshimcha xarajatni taqsimlash (yuk/bojxona)",
+    "landedCostFreight": "Yuk tashish",
+    "landedCostCustoms": "Bojxona",
+    "landedCostOther": "Boshqa",
+    "landedCostApply": "Taqsimlash",
+    "landedCostApplied": "Xarajat tannarxga taqsimlandi",
+    "landedCostError": "Xarajatni taqsimlab bolmadi"
   },
   "movements": {
     "title": "Harakatlar",

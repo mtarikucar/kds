@@ -141,3 +141,70 @@ describe('StockDashboardService.getDashboard / getValuation — branch fence', (
     expect(where.isActive).toBe(true);
   });
 });
+
+/**
+ * Theoretical-vs-actual usage variance. ORDER_DEDUCTION (net of ORDER_REVERSAL)
+ * = recipe-predicted usage; COUNT_ADJUSTMENT = the unexplained shrinkage a
+ * physical count reveals, valued at the item's cost.
+ */
+describe('StockDashboardService.getUsageVariance', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: StockDashboardService;
+
+  beforeEach(() => {
+    prisma = {
+      ingredientMovement: { groupBy: jest.fn() },
+      stockItem: { findMany: jest.fn() },
+    };
+    svc = new StockDashboardService(prisma, {} as any);
+  });
+
+  it('computes theoretical usage, waste and count-variance valued at cost', async () => {
+    prisma.ingredientMovement.groupBy.mockResolvedValue([
+      { stockItemId: 'flour', type: 'ORDER_DEDUCTION', _sum: { quantity: -100 } },
+      { stockItemId: 'flour', type: 'ORDER_REVERSAL', _sum: { quantity: 10 } },
+      { stockItemId: 'flour', type: 'WASTE', _sum: { quantity: -5 } },
+      { stockItemId: 'flour', type: 'COUNT_ADJUSTMENT', _sum: { quantity: -8 } },
+    ]);
+    prisma.stockItem.findMany.mockResolvedValue([
+      { id: 'flour', name: 'Flour', unit: 'KG', costPerUnit: 2 },
+    ]);
+
+    const res = await svc.getUsageVariance(SCOPE);
+    const row = res.items[0];
+    expect(row.theoreticalUsage).toBe(90);
+    expect(row.wasteUsage).toBe(5);
+    expect(row.countVarianceQty).toBe(-8);
+    expect(row.varianceValue).toBe(-16);
+    expect(row.variancePct).toBe(-8.9);
+    expect(res.totals.varianceValue).toBe(-16);
+    expect(res.totals.wasteValue).toBe(10);
+    expect(res.totals.netUnexplainedLoss).toBe(16);
+  });
+
+  it('returns empty totals when there are no movements', async () => {
+    prisma.ingredientMovement.groupBy.mockResolvedValue([]);
+    const res = await svc.getUsageVariance(SCOPE);
+    expect(res.items).toHaveLength(0);
+    expect(res.totals.varianceValue).toBe(0);
+    expect(prisma.stockItem.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('StockDashboardService.getBatchValuation', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  it('sums per-batch value (qty × costPerUnit) into a total', async () => {
+    const prisma: any = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        { stockItemId: 's1', name: 'Flour', unit: 'KG', qty: 10, value: 50 },
+        { stockItemId: 's2', name: 'Oil', unit: 'L', qty: 5, value: 25 },
+      ]),
+    };
+    const svc = new StockDashboardService(prisma, {} as any);
+    const res = await svc.getBatchValuation(SCOPE);
+    expect(res.totalValue).toBe(75);
+    expect(res.itemCount).toBe(2);
+    expect(res.items[0]).toMatchObject({ stockItemId: 's1', value: 50 });
+  });
+});

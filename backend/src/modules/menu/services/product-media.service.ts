@@ -11,6 +11,7 @@ import { promises as fs } from "fs";
 import * as path from "path";
 import axios from "axios";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 const FAL_QUEUE = "https://queue.fal.run";
 const MAX_POLL_ATTEMPTS = 40; // ~20 min at 30s ticks → FAILED (timeout)
@@ -327,6 +328,18 @@ export class ProductMediaService {
   @Cron(CronExpression.EVERY_30_SECONDS)
   async pollPendingJobs(): Promise<void> {
     if (!this.key) return; // real polling only; simulator finishes inline
+    // Multi-replica guard: one replica per tick polls the fal.ai queue.
+    // Without it every replica polls the same in-flight jobs, burning
+    // duplicate external API quota.
+    await withAdvisoryLock(
+      this.prisma,
+      "productMedia.pollPendingJobs",
+      () => this.pollPendingJobsInner(),
+      this.logger,
+    );
+  }
+
+  private async pollPendingJobsInner(): Promise<void> {
     const jobs = await this.prisma.productMediaJob.findMany({
       where: {
         status: { in: ["IN_QUEUE", "IN_PROGRESS"] },

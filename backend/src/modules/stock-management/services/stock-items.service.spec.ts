@@ -42,13 +42,14 @@ describe("StockItemsService", () => {
       (prisma.stockItem.findMany as any).mockResolvedValue([]);
     });
 
-    it("builds an insensitive OR search across name+sku", async () => {
+    it("builds an insensitive OR search across name+sku+barcode", async () => {
       await svc.findAll(SCOPE, { search: "tom" } as any);
 
       const arg = (prisma.stockItem.findMany as any).mock.calls[0][0];
       expect(arg.where.OR).toEqual([
         { name: { contains: "tom", mode: "insensitive" } },
         { sku: { contains: "tom", mode: "insensitive" } },
+        { barcode: { contains: "tom", mode: "insensitive" } },
       ]);
     });
 
@@ -199,6 +200,23 @@ describe("StockItemsService", () => {
       expect("sku" in arg.data).toBe(false);
     });
 
+    it("strips currentStock + costPerUnit from a metadata update (ledger fields are movement/count-only)", async () => {
+      (prisma.stockItem.findFirst as any).mockResolvedValue({ id: "si-1" });
+      (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.stockItem.findUnique as any).mockResolvedValue({ id: "si-1" });
+
+      await svc.update(
+        "si-1",
+        { name: "New", currentStock: 9999, costPerUnit: 42 } as any,
+        SCOPE,
+      );
+
+      const arg = (prisma.stockItem.updateMany as any).mock.calls[0][0];
+      expect("currentStock" in arg.data).toBe(false);
+      expect("costPerUnit" in arg.data).toBe(false);
+      expect(arg.data.name).toBe("New");
+    });
+
     it("throws NotFound when the update matched 0 rows (deleted mid-flight)", async () => {
       (prisma.stockItem.findFirst as any).mockResolvedValue({ id: "si-1" });
       (prisma.stockItem.updateMany as any).mockResolvedValue({ count: 0 });
@@ -297,5 +315,28 @@ describe("StockItemsService", () => {
       expect(deltaDays).toBeGreaterThan(2.9);
       expect(deltaDays).toBeLessThan(3.1);
     });
+  });
+});
+
+describe('StockItemsService.findByBarcode', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: StockItemsService;
+
+  beforeEach(() => {
+    prisma = { stockItem: { findFirst: jest.fn() } };
+    svc = new StockItemsService(prisma);
+  });
+
+  it('returns the branch-scoped item matching the barcode', async () => {
+    prisma.stockItem.findFirst.mockResolvedValue({ id: 's1', barcode: '869000' });
+    const item = await svc.findByBarcode('869000', SCOPE);
+    expect(item.id).toBe('s1');
+    expect(prisma.stockItem.findFirst.mock.calls[0][0].where).toMatchObject({ barcode: '869000', tenantId: 't1', branchId: 'b1' });
+  });
+
+  it('throws when no item matches the barcode', async () => {
+    prisma.stockItem.findFirst.mockResolvedValue(null);
+    await expect(svc.findByBarcode('nope', SCOPE)).rejects.toThrow();
   });
 });

@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
+import FinanceTab from './reports/FinanceTab';
 import { useListBranches } from '../../features/branches/branchesApi';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -21,6 +22,7 @@ import {
   TrendingUp,
   CreditCard,
   BarChart3,
+  Wallet,
   Clock,
   Users,
   Package,
@@ -33,7 +35,7 @@ interface DateRangeForm {
   endDate: string;
 }
 
-type TabType = 'sales' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
+type TabType = 'sales' | 'finance' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
 
 const ReportsPage = () => {
   const { t } = useTranslation('reports');
@@ -72,6 +74,7 @@ const ReportsPage = () => {
   const { hasFeature } = useSubscription();
   const allTabs = [
     { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3, gate: undefined as keyof import('../../types').PlanFeatures | undefined },
+    { id: 'finance' as TabType, label: t('reports.finance', 'Finans (Kâr-Zarar)'), icon: Wallet, gate: undefined },
     { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock, gate: undefined },
     { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users, gate: undefined },
     { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package, gate: 'inventoryTracking' as const },
@@ -333,6 +336,8 @@ const ReportsPage = () => {
           )}
         </>
       )}
+
+      {activeTab === 'finance' && <FinanceTab dateRange={dateRange} />}
 
       {activeTab === 'hourly' && (
         <HourlyOrdersChart date={dateRange.endDate} />

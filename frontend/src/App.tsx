@@ -143,6 +143,14 @@ const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
 );
 const ReportsPage = lazyWithReload(() => import("./pages/admin/ReportsPage"));
+const PurchasingPage = lazyWithReload(
+  () => import("./pages/admin/PurchasingPage"),
+);
+const CashPage = lazyWithReload(() => import("./pages/admin/CashPage"));
+const AccountingBackOfficePage = lazyWithReload(
+  () => import("./pages/admin/AccountingBackOfficePage"),
+);
+const CostingPage = lazyWithReload(() => import("./pages/admin/CostingPage"));
 const AnalyticsPage = lazyWithReload(
   () => import("./pages/admin/AnalyticsPage"),
 );
@@ -482,6 +490,40 @@ function App() {
               }
             />
             <Route
+              path="/admin/purchasing"
+              element={
+                <FeatureGate
+                  feature="inventoryTracking"
+                  fallback={<UpsellCard />}
+                >
+                  <PurchasingPage />
+                </FeatureGate>
+              }
+            />
+            <Route path="/admin/cash" element={<CashPage />} />
+            <Route
+              path="/admin/accounting-backoffice"
+              element={
+                <FeatureGate
+                  feature="advancedReports"
+                  fallback={<UpsellCard addOnCode="advanced_reports" />}
+                >
+                  <AccountingBackOfficePage />
+                </FeatureGate>
+              }
+            />
+            <Route
+              path="/admin/costing"
+              element={
+                <FeatureGate
+                  feature="inventoryTracking"
+                  fallback={<UpsellCard />}
+                >
+                  <CostingPage />
+                </FeatureGate>
+              }
+            />
+            <Route
               path="/admin/analytics"
               element={
                 <FeatureGate
@@ -632,7 +674,7 @@ function App() {
                 element={
                   <FeatureGate
                     integration={{ domain: "sms" }}
-                    fallback={<UpsellCard addOnCode="integration_sms" />}
+                    fallback={<UpsellCard />}
                   >
                     <SmsSettingsPage />
                   </FeatureGate>
@@ -659,7 +701,7 @@ function App() {
                 element={
                   <FeatureGate
                     integration={{ domain: "accounting" }}
-                    fallback={<UpsellCard addOnCode="integration_efatura" />}
+                    fallback={<UpsellCard />}
                   >
                     <AccountingSettingsPage />
                   </FeatureGate>

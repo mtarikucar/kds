@@ -402,3 +402,51 @@ describe("SalesInvoiceService seller-identity snapshot (fake-working sweep #3)",
     expect(invoice.sellerTaxId).toBe("1234567890");
   });
 });
+
+describe('SalesInvoiceService.createCreditNote', () => {
+  let prisma: any;
+  let svc: SalesInvoiceService;
+
+  const original = {
+    id: 'inv-1', type: 'SALES', customerName: 'Ali', customerPhone: null, customerEmail: null,
+    customerTaxId: null, customerTaxOffice: null, sellerName: 'Shop', sellerTaxId: null,
+    sellerTaxOffice: null, sellerAddress: null, sellerPhone: null, sellerEmail: null,
+    subtotal: 100, taxAmount: 20, totalAmount: 120, discount: 0, currency: 'TRY',
+    taxBreakdown: null, paymentMethod: 'CASH',
+    items: [{ description: 'Kola', quantity: 2, unitPrice: 50, taxRate: 20, taxAmount: 20, subtotal: 100, total: 120 }],
+  };
+
+  beforeEach(() => {
+    const settings: any = { getNextInvoiceNumber: jest.fn().mockResolvedValue('INV-CN-1') };
+    prisma = { $transaction: jest.fn() };
+    svc = new SalesInvoiceService(prisma, settings, new TaxCalculationService());
+  });
+
+  it('creates a REFUND mirroring the original, linked via originalInvoiceId', async () => {
+    const tx: any = {
+      salesInvoice: {
+        findFirst: jest.fn().mockResolvedValueOnce(original).mockResolvedValueOnce(null),
+        create: jest.fn().mockImplementation(async ({ data }: any) => ({ id: 'cn-1', ...data, items: data.items.create })),
+      },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
+
+    const cn = await svc.createCreditNote('inv-1', 't1');
+    expect(cn.type).toBe('REFUND');
+    expect(cn.originalInvoiceId).toBe('inv-1');
+    expect(Number(cn.totalAmount)).toBe(120);
+    expect(cn.items).toHaveLength(1);
+  });
+
+  it('refuses to credit a credit note', async () => {
+    const tx: any = { salesInvoice: { findFirst: jest.fn().mockResolvedValue({ ...original, type: 'REFUND' }) } };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
+    await expect(svc.createCreditNote('inv-1', 't1')).rejects.toThrow();
+  });
+
+  it('refuses a second credit note for the same invoice', async () => {
+    const tx: any = { salesInvoice: { findFirst: jest.fn().mockResolvedValueOnce(original).mockResolvedValueOnce({ id: 'existing' }) } };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
+    await expect(svc.createCreditNote('inv-1', 't1')).rejects.toThrow();
+  });
+});

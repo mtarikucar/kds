@@ -263,6 +263,9 @@ export class SalesInvoiceService {
             customerEmail: dto?.customerEmail,
             customerTaxId: dto?.customerTaxId,
             customerTaxOffice: dto?.customerTaxOffice,
+            // KDV tevkifatı — buyer-withheld VAT + GİB code (optional).
+            withholdingTaxAmount: dto?.withholdingTaxAmount ?? null,
+            withholdingCode: dto?.withholdingCode ?? null,
             // Issuer identity from Company Info (fake-working sweep #3).
             ...SalesInvoiceService.sellerSnapshot(settings),
             subtotal: Math.round(subtotal * 100) / 100,
@@ -473,6 +476,92 @@ export class SalesInvoiceService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Credit note / İade Faturası — a REFUND invoice that reverses a SALES
+   * invoice. Mirrors the original's parties + amounts + lines and links back
+   * via originalInvoiceId. One per original (full return); crediting a credit
+   * note is refused. Reporting is order-based, so this is a document record and
+   * does not double-count sales.
+   */
+  async createCreditNote(id: string, tenantId: string) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const original = await tx.salesInvoice.findFirst({
+          where: { id, tenantId },
+          include: { items: true },
+        });
+        if (!original) throw new NotFoundException("Invoice not found");
+        if (original.type === "REFUND") {
+          throw new BadRequestException("Cannot credit a credit note");
+        }
+        if (original.status === InvoiceStatus.CANCELLED) {
+          throw new BadRequestException("Cannot credit a cancelled invoice");
+        }
+        const existing = await tx.salesInvoice.findFirst({
+          where: { tenantId, originalInvoiceId: id },
+          select: { id: true },
+        });
+        if (existing) {
+          throw new BadRequestException(
+            "A credit note already exists for this invoice",
+          );
+        }
+
+        const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+          tenantId,
+          tx,
+        );
+        return tx.salesInvoice.create({
+          data: {
+            invoiceNumber,
+            type: "REFUND",
+            status: InvoiceStatus.ISSUED,
+            originalInvoiceId: original.id,
+            customerName: original.customerName,
+            customerPhone: original.customerPhone,
+            customerEmail: original.customerEmail,
+            customerTaxId: original.customerTaxId,
+            customerTaxOffice: original.customerTaxOffice,
+            sellerName: original.sellerName,
+            sellerTaxId: original.sellerTaxId,
+            sellerTaxOffice: original.sellerTaxOffice,
+            sellerAddress: original.sellerAddress,
+            sellerPhone: original.sellerPhone,
+            sellerEmail: original.sellerEmail,
+            subtotal: original.subtotal,
+            taxAmount: original.taxAmount,
+            totalAmount: original.totalAmount,
+            discount: original.discount,
+            currency: original.currency,
+            taxBreakdown: original.taxBreakdown ?? undefined,
+            paymentMethod: original.paymentMethod,
+            // Carry the original's withholding so the İade mirrors it.
+            withholdingTaxAmount: original.withholdingTaxAmount,
+            withholdingCode: original.withholdingCode,
+            issueDate: new Date(),
+            tenantId,
+            items: {
+              create: original.items.map((it) => ({
+                description: it.description,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                taxRate: it.taxRate,
+                taxAmount: it.taxAmount,
+                subtotal: it.subtotal,
+                total: it.total,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+      },
+      // Serializable so two concurrent credit-note requests for the same
+      // original can't both pass the dedup check and mint duplicate İade
+      // Faturası documents (matches createFromOrder).
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async findAll(tenantId: string, query: InvoiceQueryDto) {

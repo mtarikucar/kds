@@ -160,6 +160,9 @@ export class PurchaseOrdersService {
               stockItemId: item.stockItemId,
               quantityOrdered: item.quantityOrdered,
               unitPrice: item.unitPrice,
+              // Optional purchase-unit snapshot; null = base-unit line.
+              purchaseUnit: item.purchaseUnit ?? null,
+              conversionFactor: item.conversionFactor ?? null,
             })),
           },
         },
@@ -175,6 +178,82 @@ export class PurchaseOrdersService {
     });
   }
 
+  // ── Purchase-order templates (repeat / standing orders) ──────────────────
+
+  async createTemplate(
+    scope: BranchScope,
+    userId: string,
+    dto: {
+      name: string;
+      supplierId: string;
+      items: Array<{
+        stockItemId: string;
+        quantity: number;
+        unitPrice: number;
+      }>;
+    },
+  ) {
+    return this.prisma.purchaseOrderTemplate.create({
+      data: {
+        tenantId: scope.tenantId,
+        branchId: scope.branchId,
+        name: dto.name,
+        supplierId: dto.supplierId,
+        createdById: userId,
+        items: {
+          create: dto.items.map((i) => ({
+            stockItemId: i.stockItemId,
+            quantity: new Prisma.Decimal(i.quantity),
+            unitPrice: new Prisma.Decimal(i.unitPrice),
+          })),
+        },
+      },
+      include: { items: true },
+    });
+  }
+
+  async listTemplates(scope: BranchScope) {
+    return this.prisma.purchaseOrderTemplate.findMany({
+      where: { ...branchScope(scope) },
+      include: { items: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async deleteTemplate(scope: BranchScope, id: string) {
+    const claim = await this.prisma.purchaseOrderTemplate.deleteMany({
+      where: { id, ...branchScope(scope) },
+    });
+    if (claim.count === 0) throw new NotFoundException("Template not found");
+    return { id };
+  }
+
+  /** Spin a fresh DRAFT PO from a saved template (reuses create()'s guards). */
+  async createOrderFromTemplate(
+    scope: BranchScope,
+    templateId: string,
+    userId: string,
+  ) {
+    const t = await this.prisma.purchaseOrderTemplate.findFirst({
+      where: { id: templateId, ...branchScope(scope) },
+      include: { items: true },
+    });
+    if (!t) throw new NotFoundException("Template not found");
+    return this.create(
+      {
+        supplierId: t.supplierId,
+        items: t.items.map((i) => ({
+          stockItemId: i.stockItemId,
+          quantityOrdered: Number(i.quantity),
+          unitPrice: Number(i.unitPrice),
+        })),
+      } as CreatePurchaseOrderDto,
+      scope.tenantId,
+      scope.branchId,
+      userId,
+    );
+  }
+
   async submit(id: string, scope: BranchScope) {
     const po = await this.findOne(id, scope);
     if (po.status !== PurchaseOrderStatus.DRAFT) {
@@ -183,6 +262,25 @@ export class PurchaseOrdersService {
       );
     }
 
+    // Approval gate: when a threshold is configured and this PO's total meets
+    // it, submit lands in PENDING_APPROVAL (a manager must approve() before it
+    // can be received). No threshold → straight to SUBMITTED, unchanged.
+    const settings = await this.prisma.stockSettings.findFirst({
+      where: { tenantId: scope.tenantId },
+      select: { poApprovalThreshold: true },
+    });
+    const total = (po.items ?? []).reduce(
+      (s: Prisma.Decimal, i: any) =>
+        s.add(new Prisma.Decimal(i.quantityOrdered).mul(i.unitPrice)),
+      new Prisma.Decimal(0),
+    );
+    const needsApproval =
+      settings?.poApprovalThreshold != null &&
+      total.gte(new Prisma.Decimal(settings.poApprovalThreshold));
+    const nextStatus = needsApproval
+      ? PurchaseOrderStatus.PENDING_APPROVAL
+      : PurchaseOrderStatus.SUBMITTED;
+
     // Atomic claim with branch + status predicate — if a parallel call
     // already submitted this PO (or it slipped to another state), the
     // updateMany returns 0 and we abort instead of clobbering a more
@@ -190,7 +288,7 @@ export class PurchaseOrdersService {
     // branchId) filter).
     const result = await this.prisma.purchaseOrder.updateMany({
       where: { id, ...branchScope(scope), status: PurchaseOrderStatus.DRAFT },
-      data: { status: PurchaseOrderStatus.SUBMITTED, submittedAt: new Date() },
+      data: { status: nextStatus, submittedAt: new Date() },
     });
     if (result.count === 0) {
       throw new BadRequestException("Purchase order is no longer in DRAFT");
@@ -208,6 +306,183 @@ export class PurchaseOrdersService {
         },
       },
     });
+  }
+
+  /**
+   * Manager approval of a PENDING_APPROVAL PO — moves it to SUBMITTED (so it
+   * can be received) and records who approved and when. Claim-first on the
+   * PENDING_APPROVAL status so a double-approve or a cancelled PO can't slip
+   * through. Controller-gated to ADMIN/MANAGER.
+   */
+  async approve(id: string, scope: BranchScope, userId: string) {
+    const result = await this.prisma.purchaseOrder.updateMany({
+      where: {
+        id,
+        ...branchScope(scope),
+        status: PurchaseOrderStatus.PENDING_APPROVAL,
+      },
+      data: {
+        status: PurchaseOrderStatus.SUBMITTED,
+        approvedById: userId,
+        approvedAt: new Date(),
+      },
+    });
+    if (result.count === 0) {
+      throw new BadRequestException("Purchase order is not awaiting approval");
+    }
+    return this.prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        items: {
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, branchId: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Landed cost — allocate extra receipt costs (freight, customs, other) across
+   * a received PO's lines proportionally to each line's received value, raising
+   * the affected stock items' moving-average cost basis. Records a LANDED_COST
+   * movement per item as an audit trail. Serializable so a concurrent
+   * cost-mutating op can't interleave.
+   */
+  async applyLandedCost(
+    id: string,
+    scope: BranchScope,
+    dto: { freight?: number; customs?: number; other?: number },
+  ) {
+    const extra = new Prisma.Decimal(dto.freight ?? 0)
+      .add(dto.customs ?? 0)
+      .add(dto.other ?? 0);
+    if (extra.lte(0)) {
+      throw new BadRequestException("Landed cost must be positive");
+    }
+    return this.prisma.$transaction(
+      async (tx) => {
+        const po = await tx.purchaseOrder.findFirst({
+          where: { id, ...branchScope(scope) },
+          include: { items: true },
+        });
+        if (!po) throw new NotFoundException("Purchase order not found");
+        if (
+          po.status !== PurchaseOrderStatus.RECEIVED &&
+          po.status !== PurchaseOrderStatus.PARTIALLY_RECEIVED
+        ) {
+          throw new BadRequestException(
+            "Landed cost can only be applied to a received purchase order",
+          );
+        }
+        // Preload stock items so we allocate ONLY across lines whose stock is
+        // still on hand. Freight on a since-consumed line has nowhere to be
+        // capitalized (its cost basis is gone), so including it in the basis
+        // would silently drop that share while the API claimed full application.
+        const receivedLines = po.items.filter((i) =>
+          new Prisma.Decimal(i.quantityReceived).gt(0),
+        );
+        const stockIds = [...new Set(receivedLines.map((i) => i.stockItemId))];
+        const items = await tx.stockItem.findMany({
+          where: { id: { in: stockIds }, ...branchScope(scope) },
+          select: { id: true, currentStock: true, costPerUnit: true },
+        });
+        const itemMap = new Map(items.map((s) => [s.id, s]));
+
+        const capitalizable = receivedLines.filter((i) => {
+          const si = itemMap.get(i.stockItemId);
+          return si && new Prisma.Decimal(si.currentStock).gt(0);
+        });
+        const totalValue = capitalizable.reduce(
+          (s, i) =>
+            s.add(new Prisma.Decimal(i.quantityReceived).mul(i.unitPrice)),
+          new Prisma.Decimal(0),
+        );
+        if (totalValue.lte(0)) {
+          throw new BadRequestException(
+            "No on-hand received stock to capitalize the landed cost against",
+          );
+        }
+
+        const allocations: Array<{ stockItemId: string; allocated: number }> =
+          [];
+        let appliedTotal = new Prisma.Decimal(0);
+        for (const line of capitalizable) {
+          const lineValue = new Prisma.Decimal(line.quantityReceived).mul(
+            line.unitPrice,
+          );
+          const allocated = extra.mul(lineValue).div(totalValue);
+          const si = itemMap.get(line.stockItemId)!;
+          const currentStock = new Prisma.Decimal(si.currentStock);
+          // Moving-average uplift is per authoritative on-hand unit.
+          const newCost = new Prisma.Decimal(si.costPerUnit).add(
+            allocated.div(currentStock),
+          );
+          await tx.stockItem.updateMany({
+            where: { id: si.id, ...branchScope(scope) },
+            data: { costPerUnit: newCost as any },
+          });
+          // Capitalize the freight onto the FIFO cost ledger too (deduction/COGS
+          // read StockBatch.costPerUnit). Divide by the ACTUAL on-hand batch sum
+          // — not currentStock — so Σ(batch.qty × increment) == allocated even
+          // when the batch ledger has drifted from currentStock.
+          const batchAgg = await tx.stockBatch.aggregate({
+            where: {
+              stockItemId: si.id,
+              ...branchScope(scope),
+              quantity: { gt: 0 },
+            },
+            _sum: { quantity: true },
+          });
+          const batchQty = new Prisma.Decimal(batchAgg._sum.quantity ?? 0);
+          if (batchQty.gt(0)) {
+            await tx.stockBatch.updateMany({
+              where: {
+                stockItemId: si.id,
+                ...branchScope(scope),
+                quantity: { gt: 0 },
+              },
+              data: {
+                costPerUnit: { increment: allocated.div(batchQty) as any },
+              },
+            });
+          }
+          // Accumulate in the map so a stock item appearing on >1 line adds up
+          // instead of the last write clobbering earlier allocations.
+          si.costPerUnit = newCost as any;
+          await tx.ingredientMovement.create({
+            data: {
+              type: "LANDED_COST",
+              quantity: new Prisma.Decimal(0) as any,
+              costPerUnit: allocated as any,
+              notes: `Landed cost allocation for PO ${po.orderNumber}`,
+              referenceType: "PURCHASE_ORDER",
+              referenceId: po.id,
+              stockItemId: si.id,
+              tenantId: scope.tenantId,
+              branchId: scope.branchId,
+              createdById: scope.userId,
+            },
+          });
+          appliedTotal = appliedTotal.add(allocated);
+          allocations.push({
+            stockItemId: si.id,
+            allocated: allocated.toDecimalPlaces(4).toNumber(),
+          });
+        }
+        // extraTotal reflects what was actually capitalized (== extra, since the
+        // basis is the on-hand lines we allocate all of extra across).
+        return {
+          poId: po.id,
+          extraTotal: appliedTotal.toDecimalPlaces(2).toNumber(),
+          allocations,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async receive(
@@ -283,7 +558,19 @@ export class PurchaseOrdersService {
           const existingStock = new Prisma.Decimal(stockItem.currentStock);
           const existingCost = new Prisma.Decimal(stockItem.costPerUnit ?? 0);
           const unitPrice = new Prisma.Decimal(poItem.unitPrice);
-          const newStock = existingStock.add(receivedQty);
+          // UOM conversion: when the line is ordered in a purchase unit, convert
+          // the received quantity + unit price to the base stock unit before
+          // touching stock / cost / batches. Null or ≤0 factor = base-unit line
+          // (1:1), so existing POs are unaffected. Total receipt cost is
+          // invariant: baseQty × baseUnitPrice = receivedQty × unitPrice.
+          const factor =
+            poItem.conversionFactor != null &&
+            new Prisma.Decimal(poItem.conversionFactor).gt(0)
+              ? new Prisma.Decimal(poItem.conversionFactor)
+              : new Prisma.Decimal(1);
+          const baseReceivedQty = receivedQty.mul(factor);
+          const baseUnitPrice = unitPrice.div(factor);
+          const newStock = existingStock.add(baseReceivedQty);
           // v2.8.94 — clamp existingStock to zero in the weighted-average
           // numerator. Pre-fix a negative currentStock (left behind by an
           // earlier allowNegativeStock=true deduction past zero — see
@@ -296,19 +583,19 @@ export class PurchaseOrdersService {
             existingStock,
             new Prisma.Decimal(0),
           );
-          const denominator = clampedExisting.add(receivedQty);
+          const denominator = clampedExisting.add(baseReceivedQty);
           const weightedCost =
             newStock.isZero() || denominator.isZero()
-              ? unitPrice
+              ? baseUnitPrice
               : clampedExisting
                   .mul(existingCost)
-                  .add(receivedQty.mul(unitPrice))
+                  .add(baseReceivedQty.mul(baseUnitPrice))
                   .div(denominator);
 
           await tx.stockItem.update({
             where: { id: poItem.stockItemId },
             data: {
-              currentStock: { increment: receivedQty as any },
+              currentStock: { increment: baseReceivedQty as any },
               costPerUnit: weightedCost.toDecimalPlaces(
                 4,
                 Prisma.Decimal.ROUND_HALF_UP,
@@ -323,8 +610,8 @@ export class PurchaseOrdersService {
           await tx.stockBatch.create({
             data: {
               batchNumber: lineItem.batchNumber,
-              quantity: receivedQty as any,
-              costPerUnit: unitPrice as any,
+              quantity: baseReceivedQty as any,
+              costPerUnit: baseUnitPrice as any,
               expiryDate: lineItem.expiryDate
                 ? new Date(lineItem.expiryDate)
                 : undefined,
@@ -338,8 +625,8 @@ export class PurchaseOrdersService {
           await tx.ingredientMovement.create({
             data: {
               type: IngredientMovementType.PO_RECEIVE,
-              quantity: receivedQty as any,
-              costPerUnit: unitPrice as any,
+              quantity: baseReceivedQty as any,
+              costPerUnit: baseUnitPrice as any,
               notes: `PO ${po.orderNumber}${dto.notes ? ` - ${dto.notes}` : ""}`,
               referenceType: "PURCHASE_ORDER",
               referenceId: po.id,

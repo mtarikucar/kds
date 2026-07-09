@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Request,
   UseGuards,
 } from "@nestjs/common";
@@ -24,6 +25,8 @@ import {
   UpdateSupplierDto,
   SupplierStockItemDto,
 } from "../dto/create-supplier.dto";
+import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 
 @ApiTags("stock-management/suppliers")
 @ApiBearerAuth()
@@ -38,6 +41,21 @@ export class SuppliersController {
   @ApiOperation({ summary: "Get all suppliers" })
   findAll(@Request() req) {
     return this.service.findAll(req.tenantId);
+  }
+
+  @Get("scorecard")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Supplier scorecard: on-time %, fill rate, spend" })
+  scorecard(
+    @CurrentScope() scope: BranchScope,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+  ) {
+    return this.service.getScorecard(
+      scope,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
   }
 
   @Get(":id")

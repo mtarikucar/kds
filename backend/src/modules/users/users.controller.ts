@@ -129,9 +129,9 @@ export class UsersController {
   remove(
     @Param("id") id: string,
     @Request() req,
-    @CurrentUser("id") actorId: string,
+    @CurrentUser() actor: { id: string; role: string },
   ) {
-    return this.usersService.remove(id, req.tenantId, actorId);
+    return this.usersService.remove(id, req.tenantId, actor);
   }
 
   // Profile endpoints (all authenticated users)

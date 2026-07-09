@@ -121,6 +121,7 @@ export class ProductsService {
         description: createProductDto.description,
         ingredients: createProductDto.ingredients,
         price: createProductDto.price,
+        costPrice: createProductDto.costPrice ?? null,
         image: createProductDto.image,
         isAvailable: createProductDto.isAvailable ?? true,
         stockTracked: createProductDto.stockTracked ?? false,

@@ -5,6 +5,14 @@ export interface AccountingInvoiceData {
   customerName?: string;
   customerTaxId?: string;
   customerTaxOffice?: string;
+  // Resolved e-document type (e-document-routing.resolveEDocumentType). Selects
+  // the UBL-TR ProfileID: EFATURA → TICARIFATURA (B2B), EARSIVFATURA → e-Arşiv
+  // (B2C). Defaults to EARSIVFATURA when unset — the safe final-consumer path.
+  eDocumentType?: "EFATURA" | "EARSIVFATURA";
+  // KDV tevkifatı (VAT withholding) — amount withheld by the buyer + GİB code.
+  // When present the UBL carries a WithholdingTaxTotal and a reduced payable.
+  withholdingTaxAmount?: number;
+  withholdingCode?: string;
   // Issuer / seller (satıcı) identity — snapshotted onto the SalesInvoice
   // from the tenant's AccountingSettings "Company Info". A valid UBL-TR
   // document needs an AccountingSupplierParty; these feed that block.
@@ -20,6 +28,11 @@ export interface AccountingInvoiceData {
     quantity: number;
     unitPrice: number;
     taxRate: number;
+    // Stored net line subtotal + tax (already reconciled with the order total).
+    // When present the UBL emits these instead of recomputing unitPrice×qty,
+    // avoiding kuruş drift that fails GİB total reconciliation.
+    lineSubtotal?: number;
+    lineTax?: number;
   }>;
   paymentMethod?: string;
   totalAmount: number;

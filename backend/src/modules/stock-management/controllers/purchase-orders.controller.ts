@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -26,6 +27,8 @@ import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { PurchaseOrdersService } from "../services/purchase-orders.service";
 import { CreatePurchaseOrderDto } from "../dto/create-purchase-order.dto";
 import { ReceivePurchaseOrderDto } from "../dto/receive-purchase-order.dto";
+import { LandedCostDto } from "../dto/landed-cost.dto";
+import { CreatePoTemplateDto } from "../dto/create-po-template.dto";
 import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../../common/scoping/branch-scope";
 
@@ -46,6 +49,41 @@ export class PurchaseOrdersController {
     @Query("status") status?: string,
   ) {
     return this.service.findAll(scope, status);
+  }
+
+  // Templates (declared before :id so "templates" isn't captured as an id).
+  @Get("templates")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "List purchase-order templates" })
+  listTemplates(@CurrentScope() scope: BranchScope) {
+    return this.service.listTemplates(scope);
+  }
+
+  @Post("templates")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Save a purchase-order template" })
+  createTemplate(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreatePoTemplateDto,
+  ) {
+    return this.service.createTemplate(scope, scope.userId, dto);
+  }
+
+  @Delete("templates/:id")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Delete a purchase-order template" })
+  deleteTemplate(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.deleteTemplate(scope, id);
+  }
+
+  @Post("templates/:id/create-order")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Create a draft PO from a template" })
+  createOrderFromTemplate(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.service.createOrderFromTemplate(scope, id, scope.userId);
   }
 
   @Get(":id")
@@ -76,6 +114,28 @@ export class PurchaseOrdersController {
   @ApiOperation({ summary: "Submit a draft purchase order" })
   submit(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
     return this.service.submit(id, scope);
+  }
+
+  @Post(":id/approve")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Approve a purchase order awaiting approval (over threshold)",
+  })
+  approve(@Param("id") id: string, @CurrentScope() scope: BranchScope) {
+    return this.service.approve(id, scope, scope.userId);
+  }
+
+  @Post(":id/landed-cost")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Allocate landed costs (freight/customs) across received lines",
+  })
+  applyLandedCost(
+    @Param("id") id: string,
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: LandedCostDto,
+  ) {
+    return this.service.applyLandedCost(id, scope, dto);
   }
 
   @Post(":id/receive")

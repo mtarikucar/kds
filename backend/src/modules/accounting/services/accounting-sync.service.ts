@@ -1,6 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AccountingSettingsService } from "./accounting-settings.service";
+import { resolveEDocumentType } from "../e-document-routing";
+import {
+  MUKELLEF_QUERY,
+  MukellefQueryProvider,
+} from "../providers/mukellef-query.provider";
+import {
+  E_DOCUMENT_SIGNER,
+  EDocumentSigner,
+} from "../providers/e-document-signer";
 import {
   AccountingAdapter,
   AccountingInvoiceData,
@@ -18,7 +27,41 @@ export class AccountingSyncService {
   constructor(
     private prisma: PrismaService,
     private settingsService: AccountingSettingsService,
+    @Inject(MUKELLEF_QUERY) private mukellefQuery: MukellefQueryProvider,
+    @Inject(E_DOCUMENT_SIGNER) private signer: EDocumentSigner,
   ) {}
+
+  /** External-provisioning readiness for going live with e-document issuance. */
+  eDocumentReadiness() {
+    return {
+      mukellefQuery: this.mukellefQuery.name,
+      signer: this.signer.name,
+      signerConfigured: this.signer.isConfigured(),
+    };
+  }
+
+  /**
+   * Re-sync invoices the provider previously rejected (externalStatus=FAILED).
+   * Bounded batch; each retried independently so one failure doesn't stop the
+   * rest. Driven by a scheduler + callable on demand.
+   */
+  async resyncFailedInvoices(tenantId: string, limit = 50): Promise<number> {
+    const failed = await this.prisma.salesInvoice.findMany({
+      where: { tenantId, externalStatus: "FAILED" },
+      select: { id: true },
+      take: Math.min(limit, 200),
+    });
+    let retried = 0;
+    for (const inv of failed) {
+      try {
+        await this.syncInvoice(inv.id, tenantId);
+        retried += 1;
+      } catch (err: any) {
+        this.logger.warn(`Re-sync failed for ${inv.id}: ${err?.message}`);
+      }
+    }
+    return retried;
+  }
 
   async syncInvoice(invoiceId: string, tenantId: string): Promise<void> {
     const settings = await this.settingsService.findByTenant(tenantId);
@@ -29,6 +72,17 @@ export class AccountingSyncService {
       include: { items: true },
     });
     if (!invoice) return;
+
+    // Do NOT transmit a credit note (İade Faturası) through the sale path — the
+    // adapters emit it as a positive SATIS with no İade/return marker, so the
+    // provider would book it as another sale. Until a dedicated İade payload
+    // exists, credit notes stay local documents.
+    if (invoice.type === "REFUND") {
+      this.logger.log(
+        `Invoice ${invoiceId} is a credit note (REFUND); skipping provider sync (no İade transmission yet).`,
+      );
+      return;
+    }
 
     // M4: only skip when the existing externalId is for the SAME provider.
     // After a provider swap (e.g. Parasut → Logo) the old externalId is
@@ -81,6 +135,13 @@ export class AccountingSyncService {
       // apiUrl) pass through unchanged.
       const creds =
         await this.settingsService.getDecryptedCredentials(tenantId);
+      // Pin Foriba's dispatch host to the configured apiUrl on EVERY sync — the
+      // adapter is freshly constructed per call and getToken() may skip
+      // authenticate() on a cached token, so the baseURL set inside authenticate
+      // wouldn't be applied to this instance (would fall back to prod).
+      if (adapter instanceof ForibaEfaturaAdapter) {
+        adapter.setApiBase(((creds ?? settings) as any).foribaApiUrl || "");
+      }
       const token = await this.getToken(tenantId, creds ?? settings, adapter);
       const companyId = this.getCompanyId(creds ?? settings);
 
@@ -91,6 +152,26 @@ export class AccountingSyncService {
         customerName: invoice.customerName || undefined,
         customerTaxId: invoice.customerTaxId || undefined,
         customerTaxOffice: invoice.customerTaxOffice || undefined,
+        // Route e-Fatura (B2B) vs e-Arşiv (B2C). isRegisteredEFaturaUser comes
+        // from a GİB mükellef query (needs integrator credentials); unset here
+        // → e-Arşiv, the safe final-consumer default. Wire the query result in
+        // to enable automatic B2B e-Fatura routing.
+        eDocumentType: resolveEDocumentType({
+          taxId: invoice.customerTaxId,
+          taxOffice: invoice.customerTaxOffice,
+          // GİB mükellef check via the pluggable provider (mock in dev, HTTP in
+          // prod). Registered VKN → e-Fatura, otherwise e-Arşiv.
+          isRegisteredEFaturaUser: invoice.customerTaxId
+            ? await this.mukellefQuery.isRegisteredEFaturaUser(
+                invoice.customerTaxId,
+              )
+            : false,
+        }),
+        withholdingTaxAmount:
+          invoice.withholdingTaxAmount != null
+            ? Number(invoice.withholdingTaxAmount)
+            : undefined,
+        withholdingCode: invoice.withholdingCode || undefined,
         // Issuer/seller identity snapshotted on the invoice at build time
         // (fake-working sweep #3). Falls back to the tenant's current
         // Company Info for legacy rows written before the seller columns
@@ -111,6 +192,11 @@ export class AccountingSyncService {
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
           taxRate: item.taxRate,
+          // Forward the stored net subtotal + tax so the UBL reconciles with the
+          // order total instead of recomputing from the 2-dp unit price.
+          lineSubtotal:
+            item.subtotal != null ? Number(item.subtotal) : undefined,
+          lineTax: item.taxAmount != null ? Number(item.taxAmount) : undefined,
         })),
       };
 
@@ -187,7 +273,8 @@ export class AccountingSyncService {
       case AccountingProvider.PARASUT:
         return new ParasutAdapter();
       case AccountingProvider.FORIBA:
-        return new ForibaEfaturaAdapter();
+        // Attach the signer so the UBL is XAdES-signed before dispatch.
+        return new ForibaEfaturaAdapter().setSigner(this.signer);
       case AccountingProvider.LOGO:
         return new LogoAdapter();
       default:

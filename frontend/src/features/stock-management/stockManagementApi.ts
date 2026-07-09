@@ -260,7 +260,16 @@ export const useDeleteSupplier = () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       toast.success(i18n.t('stock:suppliers.deleted'));
     },
-    onError: () => toast.error(i18n.t('stock:suppliers.deleteError')),
+    // Surface the backend's specific block reason (active POs vs recorded
+    // invoices/expenses) — a fixed string left the operator guessing why.
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message;
+      toast.error(
+        typeof msg === 'string' && msg
+          ? msg
+          : i18n.t('stock:suppliers.deleteError'),
+      );
+    },
   });
 };
 

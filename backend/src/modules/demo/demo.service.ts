@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import * as bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { UserRole } from "../../common/constants/roles.enum";
 import {
   OrderStatus,
@@ -342,6 +343,18 @@ export class DemoService {
    */
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
   async resetDemoData(): Promise<void> {
+    // Multi-replica guard: only one replica runs the destructive wipe + reseed
+    // per tick. Without it every replica deletes and re-seeds the demo tenant,
+    // double-seeding the sample orders.
+    await withAdvisoryLock(
+      this.prisma,
+      "demo.resetDemoData",
+      () => this.resetDemoDataInner(),
+      this.logger,
+    );
+  }
+
+  private async resetDemoDataInner(): Promise<void> {
     const tenant = await this.prisma.tenant.findFirst({
       where: { subdomain: DemoService.SUBDOMAIN },
       select: { id: true },

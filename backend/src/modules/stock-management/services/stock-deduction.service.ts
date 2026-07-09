@@ -48,6 +48,19 @@ export class StockDeductionService {
       return;
     }
 
+    // v3 branch-scope: a product carries one recipe PER BRANCH
+    // (@@unique([productId, branchId])). Prisma can't reference order.branchId
+    // from inside the same query, so pre-read it cheaply and filter the
+    // recipe include — otherwise an N-branch tenant hydrates N full BOM trees
+    // per order item and buildDeductions discards N−1 of them. The tree only
+    // needs stockItem.name here (applyDeduction re-reads rows inside the tx),
+    // so hydrate a slim select, not full StockItem rows.
+    const orderHead = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      select: { branchId: true },
+    });
+    if (!orderHead) return;
+    const slimStockItem = { select: { id: true, name: true } };
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -55,14 +68,36 @@ export class StockDeductionService {
           include: {
             product: {
               include: {
-                // v3 branch-scope: a product carries one recipe PER BRANCH
-                // (@@unique([productId, branchId])), so the relation is now
-                // one-to-many. We can't reference order.branchId from inside
-                // the query that fetches the order, so we pull the product's
-                // recipe(s) and buildDeductions selects the row matching the
-                // order's branch.
                 recipes: {
-                  include: { ingredients: { include: { stockItem: true } } },
+                  where: { branchId: orderHead.branchId },
+                  include: {
+                    ingredients: { include: { stockItem: slimStockItem } },
+                    // Nested BOM: one level of sub-recipe (prep) with its own
+                    // stock ingredients, expanded at deduction time.
+                    components: {
+                      include: {
+                        subRecipe: {
+                          include: {
+                            ingredients: {
+                              include: { stockItem: slimStockItem },
+                            },
+                            // Second BOM level (prep → sub-prep → dish).
+                            components: {
+                              include: {
+                                subRecipe: {
+                                  include: {
+                                    ingredients: {
+                                      include: { stockItem: slimStockItem },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -127,25 +162,57 @@ export class StockDeductionService {
         (r: any) => r.branchId === order.branchId,
       );
       if (!recipe) continue;
-      const yieldVal = recipe.yield || 1;
-      for (const ingredient of recipe.ingredients) {
-        const perServing = new Prisma.Decimal(ingredient.quantity).div(
-          yieldVal,
-        );
-        const needed = perServing.mul(orderItem.quantity);
-        const existing = acc.get(ingredient.stockItemId);
-        if (existing) {
-          existing.quantity = existing.quantity.add(needed);
-        } else {
-          acc.set(ingredient.stockItemId, {
-            stockItemId: ingredient.stockItemId,
-            quantity: needed,
-            stockItemName: ingredient.stockItem.name,
-          });
-        }
-      }
+      // Produce orderItem.quantity servings of this recipe; expandRecipe walks
+      // the direct ingredients and any nested sub-recipes.
+      this.expandRecipe(recipe, new Prisma.Decimal(orderItem.quantity), acc, 0);
     }
     return [...acc.values()];
+  }
+
+  /**
+   * Accumulate the base-unit stock draw for producing `servings` output units
+   * of `recipe`. Direct ingredients scale by servings ÷ yield; a sub-recipe
+   * component recurses, needing (component qty × factor × scale) of the
+   * sub-recipe's output. Recipe-unit conversionFactor applies at every level;
+   * null/≤0 factor = 1:1 (existing recipes unaffected). Depth-capped so a
+   * cyclic sub-recipe definition can't recurse forever.
+   */
+  private expandRecipe(
+    recipe: any,
+    servings: Prisma.Decimal,
+    acc: Map<string, Deduction>,
+    depth: number,
+  ) {
+    if (!recipe || depth > 6) return;
+    const yieldVal = new Prisma.Decimal(recipe.yield || 1);
+    const scale = servings.div(yieldVal);
+    const factorOf = (v: any) =>
+      v != null && new Prisma.Decimal(v).gt(0)
+        ? new Prisma.Decimal(v)
+        : new Prisma.Decimal(1);
+
+    for (const ingredient of recipe.ingredients ?? []) {
+      const needed = new Prisma.Decimal(ingredient.quantity)
+        .mul(factorOf(ingredient.conversionFactor))
+        .mul(scale);
+      const existing = acc.get(ingredient.stockItemId);
+      if (existing) {
+        existing.quantity = existing.quantity.add(needed);
+      } else {
+        acc.set(ingredient.stockItemId, {
+          stockItemId: ingredient.stockItemId,
+          quantity: needed,
+          stockItemName: ingredient.stockItem?.name,
+        });
+      }
+    }
+
+    for (const comp of recipe.components ?? []) {
+      const subServings = new Prisma.Decimal(comp.quantity)
+        .mul(factorOf(comp.conversionFactor))
+        .mul(scale);
+      this.expandRecipe(comp.subRecipe, subServings, acc, depth + 1);
+    }
   }
 
   private async applyDeduction(
@@ -164,11 +231,13 @@ export class StockDeductionService {
     });
     if (!stockItem) return;
 
+    // FIFO batch drawdown — a COST sub-ledger only. The authoritative on-hand
+    // total (stockItem.currentStock) is decremented by the FULL quantity below
+    // regardless of batches; this loop exists purely to compute the
+    // weighted-average cost of the units actually shipped (oldest batches
+    // first). Deployments without batches simply skip it and fall back to
+    // stockItem.costPerUnit.
     let remaining = deduction.quantity;
-    // FIFO batch drawdown: consume the oldest (by expiryDate, then
-    // receivedAt) batches first. If we run out of batches before the
-    // full quantity is consumed, fall through to the bare stockItem
-    // path below so legacy deployments without batches still work.
     //
     // v2.8.93 — explicit `nulls: 'last'` on expiryDate. Without it, the
     // sort order for NULL expiry depends on the underlying DB's ASC
@@ -221,30 +290,35 @@ export class StockDeductionService {
         ? weightedCostAccumulator.div(consumedFromBatches)
         : (stockItem.costPerUnit ?? null);
 
-    // After batch drawdown `remaining` is what the bare stockItem row
-    // needs to absorb. Do this as a conditional UPDATE: if
-    // allowNegativeStock=false we require currentStock >= remaining,
-    // otherwise we allow the decrement unconditionally. `updateMany`
-    // returns `count: 0` when the guard fails (no race window).
-    if (remaining.gt(0)) {
-      const update = allowNegativeStock
-        ? await tx.stockItem.updateMany({
-            where: { id: deduction.stockItemId, tenantId },
-            data: { currentStock: { decrement: remaining as any } },
-          })
-        : await tx.stockItem.updateMany({
-            where: {
-              id: deduction.stockItemId,
-              tenantId,
-              currentStock: { gte: remaining as any },
-            },
-            data: { currentStock: { decrement: remaining as any } },
-          });
-      if (update.count === 0) {
-        throw new ConflictException(
-          `Insufficient stock for ${deduction.stockItemName}`,
-        );
-      }
+    // currentStock is the AUTHORITATIVE on-hand total and already INCLUDES
+    // batch quantities: purchase-orders.receive() increments currentStock by
+    // the received qty AND creates a StockBatch of the same qty; waste-logs
+    // decrements currentStock by the FULL waste qty and draws batches down only
+    // for costing. So the on-hand decrement must be the FULL deduction
+    // quantity, NOT the post-batch leftover. Decrementing only the leftover (the
+    // old behaviour) left currentStock inflated on every batch-covered sale,
+    // which silently corrupted the ledger, defeated the oversell guard, and
+    // suppressed low-stock alerts. Conditional UPDATE: when
+    // allowNegativeStock=false we require currentStock >= quantity, so a
+    // `count: 0` (guard failure) is the race-free "insufficient stock" signal.
+    const qty = deduction.quantity;
+    const update = allowNegativeStock
+      ? await tx.stockItem.updateMany({
+          where: { id: deduction.stockItemId, tenantId },
+          data: { currentStock: { decrement: qty as any } },
+        })
+      : await tx.stockItem.updateMany({
+          where: {
+            id: deduction.stockItemId,
+            tenantId,
+            currentStock: { gte: qty as any },
+          },
+          data: { currentStock: { decrement: qty as any } },
+        });
+    if (update.count === 0) {
+      throw new ConflictException(
+        `Insufficient stock for ${deduction.stockItemName}`,
+      );
     }
 
     const totalDeducted = deduction.quantity;
@@ -344,12 +418,61 @@ export class StockDeductionService {
           });
           if (!stockItem) continue;
 
-          // Defence-in-depth: tenantId in the WHERE so a regression of
-          // the pre-check can't expose cross-tenant stock writes.
+          // Restore the FULL deducted quantity to the authoritative on-hand
+          // total. This is symmetric with deductForOrder, which decrements
+          // currentStock by the full quantity — so a deduct+reverse nets zero
+          // and no phantom stock is minted.
+          // Defence-in-depth: tenantId in the WHERE so a regression of the
+          // pre-check can't expose cross-tenant stock writes.
           await tx.stockItem.updateMany({
             where: { id: movement.stockItemId, tenantId },
             data: { currentStock: { increment: reverseQty as any } },
           });
+
+          // Restore the FIFO cost layer too, so Σ(batch.qty) stays in sync with
+          // currentStock (a deduct+reverse nets to zero on the batch ledger as
+          // well). The exact consumed batches aren't recorded on the movement,
+          // so re-create a single layer at the movement's recorded cost.
+          // CLAMP to the post-reversal headroom (currentStock − Σ batch.qty):
+          // an allowNegativeStock oversell only drew batches down to 0, so
+          // restoring the FULL reverseQty would mint phantom units and push
+          // Σ(batch) ABOVE currentStock. Never let the restore exceed it.
+          // Known limitation: the restored layer carries no expiryDate (the
+          // movement doesn't record which batches were drawn), so reversed
+          // perishable units re-enter FIFO by receivedAt without expiry
+          // tracking — acceptable for a cost sub-ledger.
+          const newStock = new Prisma.Decimal(stockItem.currentStock).add(
+            reverseQty,
+          );
+          const batchAgg = await tx.stockBatch.aggregate({
+            where: {
+              stockItemId: movement.stockItemId,
+              tenantId,
+              branchId: movement.branchId,
+              quantity: { gt: 0 },
+            },
+            _sum: { quantity: true },
+          });
+          const headroom = newStock.sub(
+            new Prisma.Decimal(batchAgg._sum.quantity ?? 0),
+          );
+          const restoreQty = Prisma.Decimal.min(
+            reverseQty,
+            Prisma.Decimal.max(headroom, new Prisma.Decimal(0)),
+          );
+          if (restoreQty.gt(0)) {
+            await tx.stockBatch.create({
+              data: {
+                quantity: restoreQty as any,
+                costPerUnit: new Prisma.Decimal(
+                  movement.costPerUnit ?? stockItem.costPerUnit ?? 0,
+                ) as any,
+                stockItemId: movement.stockItemId,
+                tenantId,
+                branchId: movement.branchId,
+              },
+            });
+          }
 
           await tx.ingredientMovement.create({
             data: {

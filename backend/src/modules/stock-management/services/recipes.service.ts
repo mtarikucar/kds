@@ -8,6 +8,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CreateRecipeDto, RecipeIngredientDto } from "../dto/create-recipe.dto";
 import { UpdateRecipeDto } from "../dto/update-recipe.dto";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { RecipeCostingService } from "./recipe-costing.service";
 
 // Iter-93: pagination cap on recipes list. Most tenants have ~50 distinct
 // product recipes; large chains in our pipeline have ~500. 500 is a comfortable
@@ -42,7 +43,10 @@ function assertUniqueIngredients(ingredients: RecipeIngredientDto[]): void {
 
 @Injectable()
 export class RecipesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private costing: RecipeCostingService,
+  ) {}
 
   async findAll(
     scope: BranchScope,
@@ -53,14 +57,53 @@ export class RecipesService {
       RECIPES_HARD_MAX_TAKE,
     );
     const skip = pagination?.offset ?? 0;
-    return this.prisma.recipe.findMany({
+    const recipes = await this.prisma.recipe.findMany({
       where: { ...branchScope(scope) },
       include: {
         product: { select: { id: true, name: true, price: true } },
         ingredients: {
           include: {
             stockItem: {
-              select: { id: true, name: true, unit: true, currentStock: true },
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+                currentStock: true,
+                costPerUnit: true,
+              },
+            },
+          },
+        },
+        // Nested BOM: sub-recipe components with their own stock ingredients, so
+        // plate costing rolls the sub-recipe cost into the parent.
+        components: {
+          include: {
+            subRecipe: {
+              include: {
+                ingredients: {
+                  include: {
+                    stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
+                // Second BOM level (prep → sub-prep → dish). Costing/deduction
+                // recurse further but data is loaded to depth 2; deeper nesting
+                // is uncommon and the recursion is depth-capped regardless.
+                components: {
+                  include: {
+                    subRecipe: {
+                      include: {
+                        ingredients: {
+                          include: {
+                            stockItem: {
+                              select: { costPerUnit: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -69,6 +112,8 @@ export class RecipesService {
       take,
       skip,
     });
+    // Attach plate costing (cost/portion, food-cost %, margin) to every recipe.
+    return recipes.map((r) => ({ ...r, costing: this.costing.compute(r) }));
   }
 
   async findOne(id: string, scope: BranchScope) {
@@ -89,10 +134,43 @@ export class RecipesService {
             },
           },
         },
+        // Nested BOM: sub-recipe components with their own stock ingredients, so
+        // plate costing rolls the sub-recipe cost into the parent.
+        components: {
+          include: {
+            subRecipe: {
+              include: {
+                ingredients: {
+                  include: {
+                    stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
+                // Second BOM level (prep → sub-prep → dish). Costing/deduction
+                // recurse further but data is loaded to depth 2; deeper nesting
+                // is uncommon and the recursion is depth-capped regardless.
+                components: {
+                  include: {
+                    subRecipe: {
+                      include: {
+                        ingredients: {
+                          include: {
+                            stockItem: {
+                              select: { costPerUnit: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!recipe) throw new NotFoundException("Recipe not found");
-    return recipe;
+    return { ...recipe, costing: this.costing.compute(recipe) };
   }
 
   async findByProduct(productId: string, scope: BranchScope) {
@@ -113,11 +191,75 @@ export class RecipesService {
             },
           },
         },
+        // Nested BOM: sub-recipe components with their own stock ingredients, so
+        // plate costing rolls the sub-recipe cost into the parent.
+        components: {
+          include: {
+            subRecipe: {
+              include: {
+                ingredients: {
+                  include: {
+                    stockItem: { select: { costPerUnit: true, name: true } },
+                  },
+                },
+                // Second BOM level (prep → sub-prep → dish). Costing/deduction
+                // recurse further but data is loaded to depth 2; deeper nesting
+                // is uncommon and the recursion is depth-capped regardless.
+                components: {
+                  include: {
+                    subRecipe: {
+                      include: {
+                        ingredients: {
+                          include: {
+                            stockItem: {
+                              select: { costPerUnit: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!recipe)
       throw new NotFoundException("No recipe found for this product");
-    return recipe;
+    return { ...recipe, costing: this.costing.compute(recipe) };
+  }
+
+  /** Plate costing only (cost/portion, food-cost %, gross margin, breakdown). */
+  async getCosting(id: string, scope: BranchScope) {
+    const recipe = await this.findOne(id, scope);
+    return {
+      recipeId: recipe.id,
+      productId: recipe.productId,
+      productName: recipe.product?.name ?? null,
+      yield: recipe.yield,
+      ...recipe.costing,
+    };
+  }
+
+  /** Reject sub-recipe components that don't belong to the tenant+branch. */
+  private async assertSubRecipesOwned(
+    components: { subRecipeId: string }[] | undefined,
+    tenantId: string,
+    branchId: string,
+  ) {
+    if (!components?.length) return;
+    const ids = [...new Set(components.map((c) => c.subRecipeId))];
+    const found = await this.prisma.recipe.findMany({
+      where: { id: { in: ids }, tenantId, branchId },
+      select: { id: true },
+    });
+    if (found.length !== ids.length) {
+      throw new BadRequestException(
+        "One or more sub-recipes not found in this branch",
+      );
+    }
   }
 
   async create(dto: CreateRecipeDto, tenantId: string, branchId: string) {
@@ -161,6 +303,10 @@ export class RecipesService {
       throw new BadRequestException("One or more stock items not found");
     }
 
+    // Sub-recipe components must belong to the same tenant + branch — otherwise
+    // a foreign recipe id would leak its name/ingredients/cost through costing.
+    await this.assertSubRecipesOwned(dto.components, tenantId, branchId);
+
     return this.prisma.recipe.create({
       data: {
         name: dto.name || product.name,
@@ -173,8 +319,20 @@ export class RecipesService {
           create: dto.ingredients.map((i) => ({
             stockItemId: i.stockItemId,
             quantity: i.quantity,
+            recipeUnit: i.recipeUnit ?? null,
+            conversionFactor: i.conversionFactor ?? null,
           })),
         },
+        components: dto.components?.length
+          ? {
+              create: dto.components.map((c) => ({
+                subRecipeId: c.subRecipeId,
+                quantity: c.quantity,
+                recipeUnit: c.recipeUnit ?? null,
+                conversionFactor: c.conversionFactor ?? null,
+              })),
+            }
+          : undefined,
       },
       include: {
         product: { select: { id: true, name: true, price: true } },
@@ -233,8 +391,43 @@ export class RecipesService {
             recipeId: id,
             stockItemId: i.stockItemId,
             quantity: i.quantity,
+            recipeUnit: i.recipeUnit ?? null,
+            conversionFactor: i.conversionFactor ?? null,
           })),
         });
+      }
+
+      // Replace sub-recipe components if provided (nested BOM).
+      if (dto.components) {
+        if (dto.components.some((c) => c.subRecipeId === id)) {
+          throw new BadRequestException("A recipe cannot include itself");
+        }
+        // Ownership: every sub-recipe must be in the same branch, else costing
+        // would leak a foreign recipe's name/ingredients/cost.
+        if (dto.components.length > 0) {
+          const subIds = [...new Set(dto.components.map((c) => c.subRecipeId))];
+          const owned = await tx.recipe.findMany({
+            where: { id: { in: subIds }, ...branchScope(scope) },
+            select: { id: true },
+          });
+          if (owned.length !== subIds.length) {
+            throw new BadRequestException(
+              "One or more sub-recipes not found in this branch",
+            );
+          }
+        }
+        await tx.recipeSubComponent.deleteMany({ where: { recipeId: id } });
+        if (dto.components.length > 0) {
+          await tx.recipeSubComponent.createMany({
+            data: dto.components.map((c) => ({
+              recipeId: id,
+              subRecipeId: c.subRecipeId,
+              quantity: c.quantity,
+              recipeUnit: c.recipeUnit ?? null,
+              conversionFactor: c.conversionFactor ?? null,
+            })),
+          });
+        }
       }
 
       return tx.recipe.findUnique({

@@ -21,6 +21,7 @@ export class StockItemsService {
       where.OR = [
         { name: { contains: query.search, mode: "insensitive" } },
         { sku: { contains: query.search, mode: "insensitive" } },
+        { barcode: { contains: query.search, mode: "insensitive" } },
       ];
     }
     if (query.categoryId) where.categoryId = query.categoryId;
@@ -56,6 +57,17 @@ export class StockItemsService {
     return item;
   }
 
+  /** Exact barcode lookup within the caller's branch (POS/receiving scan). */
+  async findByBarcode(barcode: string, scope: BranchScope) {
+    const item = await this.prisma.stockItem.findFirst({
+      where: { barcode, ...branchScope(scope) },
+    });
+    if (!item) {
+      throw new NotFoundException("No stock item with that barcode");
+    }
+    return item;
+  }
+
   async create(dto: CreateStockItemDto, tenantId: string, branchId: string) {
     return this.prisma.stockItem.create({
       // v3 branch-scope: SKU uniqueness is the compound
@@ -69,7 +81,14 @@ export class StockItemsService {
 
   async update(id: string, dto: UpdateStockItemDto, scope: BranchScope) {
     await this.findOne(id, scope);
-    const data = "sku" in dto ? { ...dto, sku: dto.sku ? dto.sku : null } : dto;
+    // On-hand + cost basis are authoritative ledger state — they may ONLY move
+    // through movements / counts / receipts (which also keep the StockBatch
+    // ledger + audit trail in sync). Strip them from the generic metadata
+    // update so a PATCH can't silently overwrite currentStock (lost update, no
+    // audit row, batch drift). currentStock on the DTO is create-only.
+    const { currentStock: _cs, costPerUnit: _cpu, ...rest } = dto as any;
+    const data =
+      "sku" in rest ? { ...rest, sku: rest.sku ? rest.sku : null } : rest;
     // Defence-in-depth: branch filter in the update's own WHERE so the
     // pre-check can't be the *only* scope guard. updateMany + count
     // check (TOCTOU-safe) — if the row was deleted between the pre-check

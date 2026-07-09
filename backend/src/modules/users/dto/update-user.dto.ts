@@ -2,10 +2,13 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsEmail,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from "class-validator";
 import { UserRole } from "../../../common/constants/roles.enum";
@@ -58,4 +61,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({ description: "Hourly pay rate (for labor reporting)" })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000)
+  hourlyRate?: number;
 }

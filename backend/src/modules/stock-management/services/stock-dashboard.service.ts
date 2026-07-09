@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { StockAlertsService } from "./stock-alerts.service";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
@@ -145,6 +146,163 @@ export class StockDashboardService {
       totalValue,
       itemCount: items.length,
       items: itemValuations.sort((a, b) => b.totalValue - a.totalValue),
+    };
+  }
+
+  /**
+   * Theoretical-vs-actual usage variance — the shrinkage/theft/over-portion
+   * detector. ORDER_DEDUCTION (net of ORDER_REVERSAL) is the THEORETICAL usage
+   * the recipes predict for the sales made. WASTE is logged loss. Anything
+   * BEYOND those only surfaces when a physical stock count is finalised — the
+   * COUNT_ADJUSTMENT delta. A negative count adjustment means the shelf held
+   * less than the book expected after deduction + waste: unexplained loss
+   * (spillage, over-portioning, theft). Each variance is valued at the item's
+   * cost so the loss is a money figure, not just a quantity.
+   */
+  /**
+   * FIFO batch valuation — current inventory value at the actual per-batch
+   * cost (Σ batch.quantity × batch.costPerUnit), vs the moving-average
+   * costPerUnit on StockItem. The accurate "what is my stock worth right now"
+   * figure the accountant reconciles against, per item and in total.
+   */
+  async getBatchValuation(scope: BranchScope) {
+    const rows = await this.prisma.$queryRaw<
+      {
+        stockItemId: string;
+        name: string;
+        unit: string;
+        qty: unknown;
+        value: unknown;
+      }[]
+    >(Prisma.sql`
+      SELECT b."stockItemId" AS "stockItemId", si.name AS name, si.unit AS unit,
+             SUM(b.quantity) AS qty,
+             SUM(b.quantity * b."costPerUnit") AS value
+      FROM stock_batches b
+      JOIN stock_items si ON si.id = b."stockItemId"
+      WHERE b."tenantId" = ${scope.tenantId}
+        AND b."branchId" = ${scope.branchId}
+        AND b.quantity > 0
+      GROUP BY b."stockItemId", si.name, si.unit
+      ORDER BY value DESC
+    `);
+
+    let totalValue = 0;
+    const items = rows.map((r) => {
+      const value = Math.round(Number(r.value ?? 0) * 100) / 100;
+      totalValue += value;
+      return {
+        stockItemId: r.stockItemId,
+        name: r.name,
+        unit: r.unit,
+        quantity: Number(r.qty ?? 0),
+        value,
+      };
+    });
+    return {
+      totalValue: Math.round(totalValue * 100) / 100,
+      itemCount: items.length,
+      items,
+    };
+  }
+
+  async getUsageVariance(
+    scope: BranchScope,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const where: any = { ...branchScope(scope) };
+    const window = parseWindow(startDate, endDate);
+    if (window.gte || window.lte) where.createdAt = window;
+    where.type = {
+      in: ["ORDER_DEDUCTION", "ORDER_REVERSAL", "WASTE", "COUNT_ADJUSTMENT"],
+    };
+
+    const groups = await this.prisma.ingredientMovement.groupBy({
+      by: ["stockItemId", "type"],
+      where,
+      _sum: { quantity: true },
+    });
+
+    const perItem = new Map<
+      string,
+      { deduction: number; reversal: number; waste: number; countAdj: number }
+    >();
+    for (const g of groups) {
+      const e = perItem.get(g.stockItemId) ?? {
+        deduction: 0,
+        reversal: 0,
+        waste: 0,
+        countAdj: 0,
+      };
+      const q = Number(g._sum.quantity ?? 0);
+      if (g.type === "ORDER_DEDUCTION") e.deduction += q;
+      else if (g.type === "ORDER_REVERSAL") e.reversal += q;
+      else if (g.type === "WASTE") e.waste += q;
+      else if (g.type === "COUNT_ADJUSTMENT") e.countAdj += q;
+      perItem.set(g.stockItemId, e);
+    }
+
+    const itemIds = [...perItem.keys()];
+    const items = itemIds.length
+      ? await this.prisma.stockItem.findMany({
+          where: { id: { in: itemIds }, ...branchScope(scope) },
+          select: { id: true, name: true, unit: true, costPerUnit: true },
+        })
+      : [];
+    const itemMap = new Map(items.map((i) => [i.id, i]));
+
+    const r3 = (n: number) => Math.round(n * 1000) / 1000;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    const rows = itemIds.map((id) => {
+      const e = perItem.get(id)!;
+      const si = itemMap.get(id);
+      const cost = si ? Number(si.costPerUnit ?? 0) : 0;
+      // quantities are signed: deductions/waste negative, so negate to usage.
+      const theoreticalUsage = -(e.deduction + e.reversal);
+      const wasteUsage = -e.waste;
+      // count adjustment: signed. Negative = missing stock (shrinkage).
+      const countVarianceQty = e.countAdj;
+      const varianceValue = countVarianceQty * cost;
+      const variancePct =
+        theoreticalUsage > 0
+          ? Math.round((countVarianceQty / theoreticalUsage) * 1000) / 10
+          : null;
+      return {
+        stockItemId: id,
+        name: si?.name ?? "Unknown",
+        unit: si?.unit ?? null,
+        theoreticalUsage: r3(theoreticalUsage),
+        wasteUsage: r3(wasteUsage),
+        countVarianceQty: r3(countVarianceQty),
+        varianceValue: r2(varianceValue),
+        variancePct,
+      };
+    });
+
+    rows.sort((a, b) => Math.abs(b.varianceValue) - Math.abs(a.varianceValue));
+
+    const totalVarianceValue = r2(
+      rows.reduce((s, r) => s + r.varianceValue, 0),
+    );
+    const totalWasteValue = r2(
+      itemIds.reduce((s, id) => {
+        const e = perItem.get(id)!;
+        const cost = Number(itemMap.get(id)?.costPerUnit ?? 0);
+        return s + -e.waste * cost;
+      }, 0),
+    );
+
+    return {
+      items: rows,
+      totals: {
+        varianceValue: totalVarianceValue,
+        wasteValue: totalWasteValue,
+        // Negative variance = net unexplained LOSS across the branch.
+        netUnexplainedLoss:
+          totalVarianceValue < 0 ? r2(-totalVarianceValue) : 0,
+      },
     };
   }
 

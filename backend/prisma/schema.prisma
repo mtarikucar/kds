@@ -248,6 +248,8 @@ model User {
   // Profile
   avatar    String?
   phone     String?
+  // Hourly pay rate for labor-cost / prime-cost reporting. Null = not set.
+  hourlyRate Decimal? @db.Decimal(10, 2)
   // Preferred UI language (e.g. "tr", "en") — set on the onboarding page so a
   // user's language follows them across devices. Falls back to the SPA's
   // client-side i18n when null.
@@ -389,6 +391,11 @@ model Product {
   // Distinct from the internal Recipe (stock-item deduction, not customer-facing).
   ingredients String?
   price       Decimal @db.Decimal(10, 2)
+  // Unit COST of the finished product (what it costs to make/buy), distinct
+  // from `price` (retail sell price). Drives at-cost inventory valuation,
+  // gross margin and menu engineering for products WITHOUT a recipe (recipe
+  // products derive cost from plate costing). Nullable: unset = "no cost basis".
+  costPrice   Decimal? @db.Decimal(10, 2)
   image       String? // Legacy field, kept for backwards compatibility
 
   // 3D / AR (menu AI-AR feature, Phase 2). A dish photo can be turned into a
@@ -1026,7 +1033,11 @@ model OrderItemModifier {
 model Payment {
   id     String  @id @default(uuid())
   amount Decimal @db.Decimal(10, 2)
-  method String // CASH, CARD, DIGITAL
+  // Tip recorded with this payment (cash declared or card tip). Informational:
+  // NOT part of `amount`'s goods-total reconciliation — it drives the tips
+  // report + payroll, kept separate so the fiş/Z tender math is untouched.
+  tipAmount Decimal? @db.Decimal(10, 2)
+  method String // CASH, CARD, DIGITAL, MULTINET, SODEXO, EDENRED, SETCARD, METROPOL, HOUSE
   status String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
 
   transactionId  String?
@@ -2437,6 +2448,39 @@ model CashDrawerMovement {
   @@map("cash_drawer_movements")
 }
 
+// A cashier's shift: opening float → movements during the shift → counted
+// close, with expected-vs-counted (over/short) attributed to the cashier.
+// Groups the otherwise-loose CashDrawerMovement rows into an accountable
+// session so end-of-day cash reconciliation is per-person, not a single number
+// typed into the Z-report. Scalar FKs (no Prisma relations) keep this isolated
+// from the core User/Tenant/Branch models; referential integrity is enforced
+// at the app layer (scope checks) — the migration adds indexes, not FKs.
+model CashierSession {
+  id           String  @id @default(uuid())
+  tenantId     String
+  branchId     String
+  userId       String // the cashier who owns the shift
+  status       String  @default("OPEN") // OPEN, CLOSED
+  openingFloat Decimal @db.Decimal(10, 2)
+
+  // Populated at close.
+  countedCash           Decimal? @db.Decimal(10, 2) // physically counted (or derived from denominations)
+  expectedCash          Decimal? @db.Decimal(10, 2) // openingFloat + cashSales + cashIn − cashOut
+  overShort             Decimal? @db.Decimal(10, 2) // countedCash − expectedCash (negative = short)
+  cashSales             Decimal? @db.Decimal(10, 2)
+  cashIn                Decimal? @db.Decimal(10, 2)
+  cashOut               Decimal? @db.Decimal(10, 2)
+  denominationBreakdown Json? // {"200":3,"100":5,...} at close
+
+  notes    String?
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  @@index([tenantId, branchId, status])
+  @@index([tenantId, branchId, userId, status])
+  @@map("cashier_sessions")
+}
+
 // ========================================
 // PUBLIC STATISTICS & ANALYTICS
 // ========================================
@@ -3097,11 +3141,28 @@ model StockItem {
   id          String  @id @default(uuid())
   name        String
   sku         String?
+  // Scannable barcode (EAN/UPC/QR) for receiving + stock counts. Optional.
+  barcode     String?
   unit        String // KG, G, L, ML, PCS, BOX, BAG, CAN, BOTTLE, BUNCH, SLICE, PORTION
   description String?
 
   currentStock Decimal @default(0) @db.Decimal(10, 3)
+  // Par / reorder trigger: when currentStock <= minStock the item is due for
+  // reorder (also the low-stock alert threshold).
   minStock     Decimal @default(0) @db.Decimal(10, 3)
+  // Fixed quantity to suggest ordering when the item hits its reorder point.
+  // Null = derive a default (bring stock back up toward twice the par level).
+  reorderQuantity Decimal? @db.Decimal(10, 3)
+
+  // Unit-of-measure conversion for PURCHASING: you buy in `purchaseUnit`
+  // (e.g. BOX) but stock/consume in the base `unit` (e.g. PCS).
+  // purchaseConversion = base units per 1 purchase unit (a BOX of 12 → 12).
+  // Null/1 = bought in the base unit (no conversion). Used by reorder
+  // suggestions to propose whole-pack order quantities; the receive path stays
+  // in base units until a PO-item unit snapshot is added.
+  purchaseUnit       String?
+  purchaseConversion Decimal? @db.Decimal(10, 3)
+
   costPerUnit  Decimal @default(0) @db.Decimal(10, 4)
 
   trackExpiry Boolean @default(false)
@@ -3133,6 +3194,9 @@ model StockItem {
   @@index([categoryId])
   @@index([isActive])
   @@index([tenantId, branchId])
+  // Matches the barcode migration's index — keeps schema (db push) and
+  // migration (migrate deploy) in agreement so migrate dev won't drop it.
+  @@index([tenantId, branchId, barcode])
   @@map("stock_items")
 }
 
@@ -3183,6 +3247,10 @@ model Recipe {
 
   // Relations
   ingredients RecipeIngredient[]
+  // Sub-recipe (nested BOM): components are other recipes (preps) used by this
+  // one; usedInComponents is the reverse (where this recipe is a prep).
+  components       RecipeSubComponent[] @relation("RecipeComponents")
+  usedInComponents RecipeSubComponent[] @relation("RecipeAsComponent")
   // v3.0.0 — branch scope.
   branchId    String
   branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -3193,9 +3261,38 @@ model Recipe {
   @@map("recipes")
 }
 
+// Nested BOM link: a recipe uses `quantity` of another recipe (a prep/
+// sub-recipe). At deduction + costing the sub-recipe is expanded into its own
+// stock ingredients, scaled by quantity ÷ sub-recipe yield. recipeUnit/
+// conversionFactor work exactly as on RecipeIngredient (null = 1:1). One level
+// of expansion is applied (a sub-recipe's ingredients are stock items).
+model RecipeSubComponent {
+  id          String  @id @default(uuid())
+  recipeId    String
+  recipe      Recipe  @relation("RecipeComponents", fields: [recipeId], references: [id], onDelete: Cascade)
+  subRecipeId String
+  subRecipe   Recipe  @relation("RecipeAsComponent", fields: [subRecipeId], references: [id], onDelete: Restrict)
+  quantity    Decimal @db.Decimal(10, 3)
+  recipeUnit  String?
+  conversionFactor Decimal? @db.Decimal(12, 6)
+
+  @@unique([recipeId, subRecipeId])
+  @@index([recipeId])
+  @@index([subRecipeId])
+  @@map("recipe_sub_components")
+}
+
 model RecipeIngredient {
   id       String  @id @default(uuid())
   quantity Decimal @db.Decimal(10, 3)
+
+  // Recipe-unit conversion: the ingredient quantity may be expressed in a
+  // recipe unit (e.g. G) different from the stock item's base unit (KG).
+  // conversionFactor = base units per 1 recipe unit (1 G measured in KG =
+  // 0.001). Null = quantity is already in the stock item's base unit (1:1), so
+  // existing recipes are unaffected. Applied at deduction + plate costing.
+  recipeUnit       String?
+  conversionFactor Decimal? @db.Decimal(12, 6)
 
   recipeId String
   recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
@@ -3274,6 +3371,10 @@ model PurchaseOrder {
   updatedAt   DateTime  @updatedAt
   submittedAt DateTime?
   receivedAt  DateTime?
+  // Manager approval audit — set by approve() when a PENDING_APPROVAL PO clears
+  // the threshold gate. Null on POs that never needed approval.
+  approvedById String?
+  approvedAt   DateTime?
 
   // Relations
   items    PurchaseOrderItem[]
@@ -3289,11 +3390,159 @@ model PurchaseOrder {
   @@map("purchase_orders")
 }
 
+// Reusable purchase-order template — a saved line-up (supplier + items) that
+// createOrderFromTemplate turns into a fresh PO for repeat/standing orders.
+model PurchaseOrderTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  branchId    String
+  name        String
+  supplierId  String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items PurchaseOrderTemplateItem[]
+
+  @@index([tenantId, branchId])
+  @@map("purchase_order_templates")
+}
+
+model PurchaseOrderTemplateItem {
+  id          String  @id @default(uuid())
+  templateId  String
+  template    PurchaseOrderTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stockItemId String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 2)
+
+  @@index([templateId])
+  @@map("purchase_order_template_items")
+}
+
+// Operating expense (rent, salary, utilities, …) — the OpEx line the P&L needs
+// below gross profit. taxAmount is the deductible input VAT when applicable.
+// Scalar FKs keep it isolated; integrity is app-enforced (no DB FKs).
+model Expense {
+  id          String   @id @default(uuid())
+  tenantId    String
+  branchId    String
+  category    String // RENT, SALARY, UTILITIES, SUPPLIES, MAINTENANCE, MARKETING, TAX, OTHER
+  description String
+  amount      Decimal  @db.Decimal(12, 2)
+  taxAmount   Decimal? @db.Decimal(12, 2)
+  expenseDate DateTime
+  supplierId  String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, branchId, expenseDate])
+  @@index([tenantId, category])
+  @@map("expenses")
+}
+
+// Inter-branch stock transfer. Because StockItems are branch-scoped, each line
+// maps a source item (in fromBranch) to the destination item (in toBranch). On
+// COMPLETE the source is decremented and the destination incremented, with a
+// TRANSFER_OUT/TRANSFER_IN movement on each side. Scalar FKs; spans branches so
+// scoped by tenant + both-branch validation.
+model StockTransfer {
+  id             String    @id @default(uuid())
+  tenantId       String
+  fromBranchId   String
+  toBranchId     String
+  transferNumber String
+  status         String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  notes          String?
+  createdById    String?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  items StockTransferItem[]
+
+  @@unique([tenantId, transferNumber])
+  @@index([tenantId, fromBranchId, status])
+  @@index([tenantId, toBranchId, status])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id                String  @id @default(uuid())
+  transferId        String
+  transfer          StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  sourceStockItemId String
+  destStockItemId   String
+  quantity          Decimal @db.Decimal(10, 3)
+  unitCost          Decimal? @db.Decimal(10, 4)
+
+  @@index([transferId])
+  @@map("stock_transfer_items")
+}
+
+// Monthly expense budget per category — compared against actual expenses for a
+// budget-vs-actual variance report. Scalar FKs keep it isolated.
+model Budget {
+  id        String   @id @default(uuid())
+  tenantId  String
+  branchId  String
+  category  String
+  year      Int
+  month     Int // 1-12
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, branchId, category, year, month])
+  @@index([tenantId, branchId, year, month])
+  @@map("budgets")
+}
+
+// Accounts-Payable vendor bill. Optionally linked to a PurchaseOrder for the
+// 3-way match (ordered ↔ received/GRN ↔ invoiced): a mismatch beyond tolerance
+// flags DISCREPANCY so it can't be paid blind. taxAmount is the indirilecek KDV
+// (deductible input VAT). Scalar FKs keep it isolated; integrity is
+// app-enforced (no DB FKs). Unique (tenant, supplier, invoiceNumber) dedupes
+// a re-sent bill.
+model PurchaseInvoice {
+  id              String  @id @default(uuid())
+  tenantId        String
+  branchId        String
+  supplierId      String
+  purchaseOrderId String? // link for the 3-way match
+  invoiceNumber   String
+  invoiceDate     DateTime
+  subtotal        Decimal @db.Decimal(12, 2) // goods net
+  taxAmount       Decimal @db.Decimal(12, 2) // indirilecek KDV
+  total           Decimal @db.Decimal(12, 2) // subtotal + tax
+  status          String  @default("RECEIVED") // RECEIVED, MATCHED, DISCREPANCY, APPROVED, PAID
+  matchVariance   Decimal? @db.Decimal(12, 2) // invoice total − received (GRN) total
+  notes           String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, supplierId, invoiceNumber])
+  @@index([tenantId, branchId, status])
+  @@index([tenantId, purchaseOrderId])
+  @@map("purchase_invoices")
+}
+
 model PurchaseOrderItem {
   id               String  @id @default(uuid())
   quantityOrdered  Decimal @db.Decimal(10, 3)
   quantityReceived Decimal @default(0) @db.Decimal(10, 3)
   unitPrice        Decimal @db.Decimal(10, 4)
+
+  // Opt-in purchase-unit ordering. When set, quantityOrdered/Received +
+  // unitPrice are in the PURCHASE unit (e.g. BOX), and receiving converts to
+  // the stock item's base unit: base qty = qty × conversionFactor, base cost =
+  // unitPrice ÷ conversionFactor. Null (existing/default POs) = ordered in the
+  // base unit (factor 1), so behaviour is unchanged.
+  purchaseUnit      String?
+  conversionFactor  Decimal? @db.Decimal(10, 3)
 
   purchaseOrderId String
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -3429,6 +3678,9 @@ model StockSettings {
   // below zero are refused. When true, negative stock is allowed and
   // the shortfall is recorded for investigation.
   allowNegativeStock  Boolean @default(false)
+  // When set, a submitted PO whose total ≥ this needs a manager approve()
+  // before it can be received. Null = no approval gate (submit → SUBMITTED).
+  poApprovalThreshold Decimal? @db.Decimal(12, 2)
   // Monotonic per-tenant PO counter; used by purchase-orders.service
   // to mint collision-free order numbers in a transaction.
   poSequence          Int     @default(0)
@@ -4102,8 +4354,14 @@ model AccountingSettings {
 model SalesInvoice {
   id            String @id @default(uuid())
   invoiceNumber String
-  type          String @default("SALES")
+  type          String @default("SALES") // SALES, REFUND (İade Faturası / credit note)
   status        String @default("DRAFT")
+  // For a REFUND, the SALES invoice it credits. Null on ordinary invoices.
+  originalInvoiceId String?
+  // KDV tevkifatı (VAT withholding): amount withheld by the buyer + the GİB
+  // tevkifat code (e.g. "601"). Null = no withholding. Reduces the payable.
+  withholdingTaxAmount Decimal? @db.Decimal(10, 2)
+  withholdingCode      String?
 
   customerName      String?
   customerPhone     String?
@@ -4168,7 +4426,10 @@ model SalesInvoice {
   @@index([orderId])
   @@index([paymentId])
   @@index([status])
+  @@index([externalStatus])
   @@index([issueDate])
+  // Matches the credit-note migration's index (schema↔migration parity).
+  @@index([originalInvoiceId])
   @@map("sales_invoices")
 }
 

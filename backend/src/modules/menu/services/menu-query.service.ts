@@ -5,24 +5,62 @@ import {
   resolveEffectivePrice,
   isCampaignActive,
 } from "../../orders/services/combo-pricing";
+import { MenuCacheService } from "./menu-cache.service";
 
 /**
  * Public-menu query, extracted VERBATIM from QrMenuController.getPublicMenu so
  * the @Public QR menu and the partner /display surface share one source of
  * truth. Menu content is tenant-level (no per-branch availability columns), so
  * the only filter besides tenant is the optional tableId for table-specific
- * QR codes. No behaviour change from the inline controller version.
+ * QR codes.
+ *
+ * Caching: the tenant-level payload (tenant info + QR settings + the deep
+ * category→product→modifier tree + POS flags) is identical across every table
+ * and re-read on every scan — the hottest anonymous query. It is cached in
+ * Redis (MenuCacheService, short TTL, degrade-only). The per-request table
+ * lookup is table-specific and stays uncached, merged on top of the cached base.
  */
 @Injectable()
 export class MenuQueryService {
   constructor(
     private prisma: PrismaService,
     private posSettingsService: PosSettingsService,
+    private menuCache: MenuCacheService,
   ) {}
 
   async getPublicMenu(tenantId: string, opts?: { tableId?: string }) {
     const tableId = opts?.tableId;
 
+    // Table info is table-specific (cannot be shared across a tenant's QR
+    // codes), a single cheap indexed lookup, so it stays per-request and
+    // uncached. Merged onto the cached tenant-level base below.
+    let table = null;
+    if (tableId) {
+      table = await this.prisma.table.findFirst({
+        where: { id: tableId, tenantId },
+      });
+    }
+    const tablePayload = table ? { id: table.id, number: table.number } : null;
+
+    // Serve the cached tenant-level menu when present; only the table changes
+    // per request, so one cache entry serves every table + the no-table scan.
+    const cached =
+      await this.menuCache.getMenu<Record<string, unknown>>(tenantId);
+    if (cached) {
+      return { ...cached, table: tablePayload };
+    }
+
+    const base = await this.buildTenantMenu(tenantId);
+    // Best-effort populate — a cache write must never fail the request.
+    await this.menuCache.setMenu(tenantId, base);
+    return { ...base, table: tablePayload };
+  }
+
+  /**
+   * Build the tenant-level menu payload (everything except the per-request
+   * `table`). This is the cacheable unit; getPublicMenu adds `table` on top.
+   */
+  private async buildTenantMenu(tenantId: string) {
     const tenant = await this.prisma.tenant.findFirst({
       where: { id: tenantId, status: "ACTIVE" },
       select: {
@@ -50,14 +88,6 @@ export class MenuQueryService {
     const settings = await this.prisma.qrMenuSettings.findFirst({
       where: { tenantId, branchId: null },
     });
-
-    // Get table information if tableId provided
-    let table = null;
-    if (tableId) {
-      table = await this.prisma.table.findFirst({
-        where: { id: tableId, tenantId },
-      });
-    }
 
     const categories = await this.prisma.category.findMany({
       where: {
@@ -297,12 +327,6 @@ export class MenuQueryService {
           whatsapp: tenant.socialWhatsapp,
         },
       },
-      table: table
-        ? {
-            id: table.id,
-            number: table.number,
-          }
-        : null,
       settings: {
         primaryColor: settings?.primaryColor ?? "#3B82F6",
         secondaryColor: settings?.secondaryColor ?? "#F3F4F6",

@@ -3,6 +3,7 @@ import { CategoriesService } from "./services/categories.service";
 import { ProductsService } from "./services/products.service";
 import { MenuQueryService } from "./services/menu-query.service";
 import { MenuCollectionsService } from "./services/menu-collections.service";
+import { MenuCacheService } from "./services/menu-cache.service";
 import { MenuImportService } from "./services/menu-import.service";
 import { Product3dService } from "./services/product-3d.service";
 import { ProductMediaService } from "./services/product-media.service";
@@ -37,6 +38,7 @@ import { UploadModule } from "../upload/upload.module";
     ProductsService,
     MenuQueryService,
     MenuCollectionsService,
+    MenuCacheService,
     MenuImportService,
     Product3dService,
     ProductMediaService,

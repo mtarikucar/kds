@@ -34,6 +34,53 @@ export class RecipeIngredientDto {
   @IsNumber()
   @Min(0)
   quantity!: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Recipe unit label when it differs from the stock unit (e.g. G)",
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(24)
+  recipeUnit?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Base units per 1 recipe unit (1 G in KG = 0.001). Null = quantity is in the base unit.",
+    minimum: 0,
+  })
+  @IsNumber({ maxDecimalPlaces: 6 })
+  @Min(0)
+  @IsOptional()
+  conversionFactor?: number;
+}
+
+export class RecipeComponentDto {
+  @ApiProperty({ description: "Sub-recipe UUID used as a component (prep)" })
+  @IsUUID()
+  subRecipeId!: string;
+
+  @ApiProperty({
+    description: "Quantity of the sub-recipe output used",
+    minimum: 0,
+  })
+  @IsNumber()
+  @Min(0)
+  quantity!: number;
+
+  @ApiPropertyOptional({ description: "Recipe unit label (e.g. G)" })
+  @IsString()
+  @IsOptional()
+  @MaxLength(24)
+  recipeUnit?: string;
+
+  @ApiPropertyOptional({
+    description: "Base units per recipe unit; null = 1:1",
+  })
+  @IsNumber({ maxDecimalPlaces: 6 })
+  @Min(0)
+  @IsOptional()
+  conversionFactor?: number;
 }
 
 export class CreateRecipeDto {
@@ -77,4 +124,15 @@ export class CreateRecipeDto {
   @ValidateNested({ each: true })
   @Type(() => RecipeIngredientDto)
   ingredients!: RecipeIngredientDto[];
+
+  @ApiPropertyOptional({
+    type: [RecipeComponentDto],
+    description: "Sub-recipe components (nested BOM)",
+  })
+  @IsArray()
+  @IsOptional()
+  @ArrayMaxSize(MAX_RECIPE_INGREDIENTS)
+  @ValidateNested({ each: true })
+  @Type(() => RecipeComponentDto)
+  components?: RecipeComponentDto[];
 }

@@ -35,6 +35,9 @@ describe("ProductMediaService", () => {
     jest.clearAllMocks();
     prisma = mockPrismaClient();
     (prisma as any).$transaction = jest.fn(async (cb: any) => cb(prisma));
+    // pollPendingJobs now runs under a Postgres advisory lock (multi-replica
+    // guard). Grant it by default so the poll body runs.
+    (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
     let seq = 0;
     (prisma.productMediaJob.create as any).mockImplementation(
       async ({ data }: any) => ({ id: `job${++seq}`, ...data }),
@@ -225,6 +228,13 @@ describe("ProductMediaService", () => {
   describe("pollPendingJobs", () => {
     it("no-op without a key", async () => {
       svc = make({ FAL_SIMULATOR: "true" });
+      await svc.pollPendingJobs();
+      expect(prisma.productMediaJob.findMany).not.toHaveBeenCalled();
+    });
+
+    it("skips polling when the advisory lock is held by another replica", async () => {
+      svc = make({ FAL_KEY: "k" });
+      (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: false }]);
       await svc.pollPendingJobs();
       expect(prisma.productMediaJob.findMany).not.toHaveBeenCalled();
     });
