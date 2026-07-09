@@ -33,6 +33,8 @@ export const useIssueCreditNote = () => {
       const r = await api.post(`/sales-invoices/${invoiceId}/credit-note`);
       return r.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sales-invoices'] }),
+    // Must match the list query key ['salesInvoices', ...] (accountingApi) —
+    // a kebab-case key would prefix-mismatch and never refresh the list.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['salesInvoices'] }),
   });
 };

@@ -160,10 +160,19 @@ export class SuppliersService {
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
-    // Serializable so the reference checks and the delete commit atomically —
-    // otherwise an invoice/expense posted between the counts and the delete
-    // would orphan the vendor's financial trail (the exact gap the guard
-    // exists to close). SSI aborts the loser of that race.
+    // One txn so the three reference checks + delete see a consistent snapshot
+    // and commit atomically. This reliably blocks the COMMON case (deleting a
+    // supplier that already has POs / invoices / expenses).
+    //
+    // Known residual (accepted, LOW): it does NOT close the microsecond race
+    // where an invoice/expense is inserted for this supplier AFTER the counts
+    // read 0 but BEFORE the delete commits. Postgres SSI can't serialize
+    // against the create paths because they run at READ COMMITTED and (for
+    // expenses) never read the supplier row, so there's no rw-edge to abort on.
+    // Consequence is only an orphaned scalar supplierId (no DB FK by design)
+    // that AP-aging renders as "—" — no corruption. Fully closing it would
+    // need a DB FK (safe now: these tables are new/empty) or a shared advisory
+    // lock in the create paths; deferred rather than wrap a money path.
     return this.prisma.$transaction(
       async (tx) => {
         // Check if supplier has any non-cancelled POs
