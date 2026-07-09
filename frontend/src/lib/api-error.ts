@@ -76,6 +76,22 @@ export function asApiError(err: unknown): ApiError | null {
  */
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   const api = asApiError(err);
+  // Prefer a localized message when the backend attached a machine-readable
+  // `errorCode` we have a translation for. NestJS HttpException `message`s are
+  // hardcoded English ("Invalid email or password"), so without this step the
+  // toast shows English even under a Turkish / Arabic / Russian / Uzbek locale.
+  // Only codes present in `errors:apiCodes` are localized; anything else (e.g.
+  // field-specific class-validator messages under VALIDATION_ERROR) keeps the
+  // more-specific backend message below.
+  const code = api?.response?.data?.errorCode;
+  if (code) {
+    // i18n.exists() (not t() with a defaultValue) — for an unmapped code
+    // i18next returns the key string itself, which is truthy and would leak
+    // "apiCodes.SOME_CODE" into the toast. exists() only passes for codes we
+    // actually translated.
+    const key = `errors:apiCodes.${code}`;
+    if (i18n.exists(key)) return i18n.t(key);
+  }
   const raw = api?.response?.data?.message;
   if (typeof raw === 'string' && raw.length > 0) return raw;
   if (Array.isArray(raw) && raw.length > 0) return raw.join('; ');
