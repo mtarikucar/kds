@@ -666,7 +666,7 @@ function App() {
                 element={
                   <FeatureGate
                     integration={{ domain: "sms" }}
-                    fallback={<UpsellCard addOnCode="integration_sms" />}
+                    fallback={<UpsellCard />}
                   >
                     <SmsSettingsPage />
                   </FeatureGate>
@@ -693,7 +693,7 @@ function App() {
                 element={
                   <FeatureGate
                     integration={{ domain: "accounting" }}
-                    fallback={<UpsellCard addOnCode="integration_efatura" />}
+                    fallback={<UpsellCard />}
                   >
                     <AccountingSettingsPage />
                   </FeatureGate>
