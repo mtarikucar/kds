@@ -318,5 +318,8 @@
     "error": "To‘lov xatosi",
     "cancelled": "To‘lov bekor qilindi",
     "recorded": "To‘lov qabul qilindi"
-  }
+  },
+  "campaign": "Aksiya",
+  "startingFrom": "dan",
+  "required": "Majburiy"
 }

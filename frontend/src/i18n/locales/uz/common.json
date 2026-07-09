@@ -1037,7 +1037,10 @@
     "copyPassword": "Parolni nusxalash",
     "passwordCopied": "Parol nusxalandi!",
     "socialMedia": "Bizni kuzating",
-    "connectWithUs": "Biz bilan bog'laning"
+    "connectWithUs": "Biz bilan bog'laning",
+    "campaign": "Aksiya",
+    "startingFrom": "dan",
+    "required": "Majburiy"
   },
   "qr": {
     "shareText": "Menyumizni ko'ring",

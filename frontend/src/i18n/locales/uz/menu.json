@@ -126,7 +126,17 @@
       "unusedHint": "Hech bir mahsulotga biriktirilmagan rasmlar. Joy bo'shatish uchun o'chiring.",
       "noUnusedImages": "Ishlatilmagan rasmlar yo'q",
       "noUnusedHint": "Har bir rasm kamida bitta mahsulotga biriktirilgan."
-    }
+    },
+    "comboSlots": "Kombo tarkibi",
+    "campaign": "Aksiya",
+    "campaignHint": "Chegirmali narx kiriting — menyuda ustidan chizilgan narx va nishon ko‘rsatiladi. Doimiy uchun sanalarni bo‘sh qoldiring. Aksiya bo‘lmasa bo‘sh qoldiring.",
+    "campaignPrice": "Aksiya narxi (₺)",
+    "campaignLabel": "Nishon matni",
+    "campaignStart": "Boshlanishi",
+    "campaignEnd": "Tugashi",
+    "collections": "To'plamlar",
+    "productTypeStandard": "Oddiy mahsulot",
+    "productTypeCombo": "Kombo / Menyu"
   },
   "media": {
     "title": "AI-studiya",

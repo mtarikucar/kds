@@ -1057,7 +1057,10 @@
     "copyPassword": "نسخ كلمة المرور",
     "passwordCopied": "تم نسخ كلمة المرور!",
     "socialMedia": "تابعنا",
-    "connectWithUs": "تواصل معنا"
+    "connectWithUs": "تواصل معنا",
+    "campaign": "عرض",
+    "startingFrom": "من",
+    "required": "مطلوب"
   },
   "qr": {
     "shareText": "اطلع على قائمتنا",

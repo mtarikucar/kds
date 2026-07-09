@@ -318,5 +318,8 @@
     "error": "Ödeme hatası",
     "cancelled": "Çekim iptal edildi",
     "recorded": "Ödeme alındı"
-  }
+  },
+  "campaign": "Kampanya",
+  "startingFrom": "başlangıç",
+  "required": "Zorunlu"
 }

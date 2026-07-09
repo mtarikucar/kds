@@ -126,7 +126,17 @@
       "unusedHint": "Images not attached to any product. Delete to reclaim storage.",
       "noUnusedImages": "No unused images",
       "noUnusedHint": "Every image is attached to at least one product."
-    }
+    },
+    "comboSlots": "Combo contents",
+    "campaign": "Campaign",
+    "campaignHint": "Enter a discounted price — the menu shows the list price struck through plus a badge. Leave the dates empty for always-on. Leave blank for no campaign.",
+    "campaignPrice": "Campaign price (₺)",
+    "campaignLabel": "Badge text",
+    "campaignStart": "Start",
+    "campaignEnd": "End",
+    "collections": "Collections",
+    "productTypeStandard": "Standard product",
+    "productTypeCombo": "Combo / Menu"
   },
   "media": {
     "title": "AI Studio",

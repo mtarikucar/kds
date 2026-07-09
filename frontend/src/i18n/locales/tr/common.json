@@ -1057,7 +1057,10 @@
     "passwordCopied": "Şifre kopyalandı!",
     "socialMedia": "Bizi Takip Edin",
     "connectWithUs": "Bizimle bağlantı kurun",
-    "productImage": "Ürün görseli"
+    "productImage": "Ürün görseli",
+    "campaign": "Kampanya",
+    "startingFrom": "başlangıç",
+    "required": "Zorunlu"
   },
   "qr": {
     "shareText": "Menümüze göz atın",

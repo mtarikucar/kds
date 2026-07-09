@@ -1057,7 +1057,10 @@
     "passwordCopied": "Password copied!",
     "socialMedia": "Follow Us",
     "connectWithUs": "Connect with us",
-    "productImage": "Product image"
+    "productImage": "Product image",
+    "campaign": "Campaign",
+    "startingFrom": "from",
+    "required": "Required"
   },
   "qr": {
     "shareText": "Check out our menu",

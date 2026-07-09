@@ -1047,7 +1047,10 @@
     "copyPassword": "Скопировать пароль",
     "passwordCopied": "Пароль скопирован!",
     "socialMedia": "Подпишитесь на нас",
-    "connectWithUs": "Свяжитесь с нами"
+    "connectWithUs": "Свяжитесь с нами",
+    "campaign": "Акция",
+    "startingFrom": "от",
+    "required": "Обязательно"
   },
   "qr": {
     "shareText": "Посмотрите наше меню",
