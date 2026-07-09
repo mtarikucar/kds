@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTenantWidePath } from './api';
+import { isTenantWidePath, isAuthCredentialPath } from './api';
 
 /**
  * Guards the frontend's client-side branch-scope gate. The interceptor sends
@@ -66,5 +66,49 @@ describe('isTenantWidePath', () => {
 
   it('returns false for an undefined url', () => {
     expect(isTenantWidePath(undefined)).toBe(false);
+  });
+});
+
+/**
+ * Guards the response interceptor's "don't treat a bad credential as an expired
+ * session" rule. A 401 from the @Public auth endpoints must reject straight
+ * through (so the login form's "Invalid email or password" toast shows) rather
+ * than firing /auth/refresh and hard-reloading to /login — which wiped the
+ * toast and looked like a mysterious "logs in but bounces back to login".
+ */
+describe('isAuthCredentialPath', () => {
+  it('matches the @Public credential endpoints (a 401 here = bad input, not expiry)', () => {
+    for (const url of [
+      '/auth/login',
+      '/auth/register',
+      '/auth/google',
+      '/auth/apple',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/auth/verify-email',
+      '/auth/refresh',
+      // full absolute form (axios may hand us baseURL + path)
+      'https://hummytummy.com/api/auth/login',
+      '/auth/login?foo=bar',
+    ]) {
+      expect(isAuthCredentialPath(url), url).toBe(true);
+    }
+  });
+
+  it('does NOT match authenticated auth routes — a 401 there IS an expired session', () => {
+    for (const url of [
+      '/auth/logout',
+      '/auth/profile',
+      '/auth/complete-profile',
+      '/auth/change-password',
+      '/auth/resend-verification',
+      '/auth/demo-session',
+      // unrelated data routes
+      '/orders',
+      '/menu/categories',
+      undefined,
+    ]) {
+      expect(isAuthCredentialPath(url), String(url)).toBe(false);
+    }
   });
 });
