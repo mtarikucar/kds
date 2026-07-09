@@ -349,8 +349,13 @@ export class SalesInvoiceService {
     // Build invoice lines from the per-item allocations. Each
     // allocation row carries (orderItemId, quantity, amount). We
     // derive unitPrice and tax from the parent OrderItem at its
-    // captured rate.
-    const invoiceItems = payment.orderItemPayments.map((alloc) => {
+    // captured rate. Combo guard (defense-in-depth): skip any allocation
+    // against a 0₺ combo PARENT (product.productType COMBO) so it can't leak a
+    // bogus 0₺/0% line into the per-payment e-Fatura UBL — payByItems already
+    // blocks paying a parent, this covers any other allocation path.
+    const invoiceItems = payment.orderItemPayments
+      .filter((alloc) => alloc.orderItem?.product?.productType !== "COMBO")
+      .map((alloc) => {
       const item = alloc.orderItem;
       if (!item.quantity || item.quantity <= 0) {
         throw new BadRequestException(

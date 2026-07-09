@@ -1623,14 +1623,35 @@ export class OrdersService {
       if (!item) {
         throw new NotFoundException(`Item ${itemId} not found on this order`);
       }
-      if (order.orderItems.length === 1) {
+
+      // Combo integrity: a combo CHILD can't be removed alone (it would leave a
+      // combo missing a component, silently sold below package price). Remove
+      // the whole combo via its 0₺ parent instead. Removing the PARENT
+      // cascade-deletes its children (self-relation onDelete: Cascade), so the
+      // set actually removed is {parent} ∪ {its children} — the total recompute
+      // MUST exclude all of them (the pre-fix `filter(i.id !== itemId)` still
+      // counted the cascaded children → a ghost total charging a combo with no
+      // backing rows).
+      if ((item as any).parentOrderItemId) {
+        throw new BadRequestException(
+          "Kombo bileşeni tek başına kaldırılamaz — komboyu (ana satırı) kaldırın",
+        );
+      }
+      const comboChildIds = order.orderItems
+        .filter((i) => (i as any).parentOrderItemId === itemId)
+        .map((i) => i.id);
+      const removedIds = new Set<string>([itemId, ...comboChildIds]);
+
+      // Last-item guard, combo-aware: refuse if removing this (combo or single)
+      // line would leave the order with zero items — cancel it instead.
+      if (order.orderItems.every((i) => removedIds.has(i.id))) {
         throw new BadRequestException(
           "Cannot remove the last item from an order; cancel the order instead.",
         );
       }
 
       const allocations = await tx.orderItemPayment.count({
-        where: { orderItemId: itemId },
+        where: { orderItemId: { in: [...removedIds] } },
       });
       if (allocations > 0) {
         throw new ConflictException(
@@ -1638,22 +1659,23 @@ export class OrdersService {
         );
       }
 
-      // Also block when this specific item is reserved by a PENDING
-      // self-pay intent — deleting it would orphan the intent's
-      // itemsByOrder snapshot and the webhook would fail post-charge.
-      await this.ensureNoInFlightSelfPayIntent(
-        tx,
-        orderId,
-        scope.tenantId,
-        itemId,
-      );
+      // Also block when any removed item is reserved by a PENDING self-pay
+      // intent — deleting it would orphan the intent's itemsByOrder snapshot.
+      for (const rid of removedIds) {
+        await this.ensureNoInFlightSelfPayIntent(
+          tx,
+          orderId,
+          scope.tenantId,
+          rid,
+        );
+      }
 
+      // Delete the parent — the cascade removes its children in the same tx.
       await tx.orderItem.delete({ where: { id: itemId } });
 
-      // Recompute totals from the surviving items so the order math
-      // stays self-consistent. taxAmount mirrors the order-create
-      // pattern: pro-rata discount applied to the gross tax sum.
-      const remaining = order.orderItems.filter((i) => i.id !== itemId);
+      // Recompute totals from the surviving items (EXCLUDING the cascaded combo
+      // children) so the order math stays self-consistent.
+      const remaining = order.orderItems.filter((i) => !removedIds.has(i.id));
       const newTotal = remaining.reduce<Prisma.Decimal>(
         (s, i) => s.add(new Prisma.Decimal(i.subtotal)),
         new Prisma.Decimal(0),

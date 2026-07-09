@@ -1252,6 +1252,22 @@ export class PaymentsService {
               dto.items,
             );
 
+            // Combo guard: the 0₺ parent is a grouping row, not a payable line.
+            // Paying it would mint a phantom 0.00 Payment + 0₺ auto-invoice +
+            // drawer-pop and mark the combo "paid". Reject any attempt to
+            // settle a combo parent by items (getPayableItems already hides it,
+            // but a direct API call could still target it).
+            const comboParentIds = new Set(
+              order.orderItems
+                .filter((it: any) => it.parentOrderItemId)
+                .map((it: any) => it.parentOrderItemId),
+            );
+            if (dto.items.some((d) => comboParentIds.has(d.orderItemId))) {
+              throw new BadRequestException(
+                "Kombo ana satırı ödenemez — kombo bileşenleri (veya tüm hesap) üzerinden ödeyin",
+              );
+            }
+
             // Sum already-paid quantities per OrderItem (only COMPLETED payments count).
             const paidAgg = await tx.orderItemPayment.groupBy({
               by: ["orderItemId"],
@@ -1855,7 +1871,19 @@ export class PaymentsService {
     );
     const remainingAmount = finalAmount.sub(paidAmount);
 
-    const items = order.orderItems.map((item) => {
+    // Combo lines: the 0₺ parent is a grouping row (money lives on its
+    // children). Exclude it from the payable/split-bill list so no confusing
+    // ₺0 "Maxi Menü" line appears and item-level completion can't wait on a
+    // parent that never carries an amount. The children remain individually
+    // payable — their apportioned amounts still sum to the combo total.
+    const comboParentIds = new Set(
+      order.orderItems
+        .filter((it) => it.parentOrderItemId)
+        .map((it) => it.parentOrderItemId),
+    );
+    const items = order.orderItems
+      .filter((it) => !comboParentIds.has(it.id))
+      .map((item) => {
       const paidQuantity = item.orderItemPayments.reduce(
         (s, a) => s + a.quantity,
         0,

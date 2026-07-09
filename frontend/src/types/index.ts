@@ -628,6 +628,11 @@ export interface OrderItem {
   unitPrice?: number; // Product unit price (same as price for backwards compatibility)
   subtotal?: number; // Calculated: (unitPrice + modifierTotal) * quantity
   modifierTotal?: number; // Sum of all modifier price adjustments
+  // Combo explosion: a combo is stored as a 0₺ parent + qty-1 children that
+  // reference the parent here. Used to re-group a combo back into one cart line
+  // when reopening an occupied table.
+  parentOrderItemId?: string | null;
+  listUnitPrice?: number;
   status?: string; // Item-level status (e.g., PENDING, PREPARING, READY)
   notes: string | null;
   modifiers?: OrderItemModifier[]; // Applied modifiers for this order item
