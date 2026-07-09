@@ -310,9 +310,14 @@ export class OrdersService {
       const normalizedSelections = (item.comboSelections ?? []).map((sel) => {
         if (sel.groupId) return sel;
         const g = catalog.groups.find((gr) =>
-          gr.items.some((it) => it.componentProductId === sel.componentProductId),
+          gr.items.some(
+            (it) => it.componentProductId === sel.componentProductId,
+          ),
         );
-        return { groupId: g?.id ?? "", componentProductId: sel.componentProductId };
+        return {
+          groupId: g?.id ?? "",
+          componentProductId: sel.componentProductId,
+        };
       });
 
       let exploded;

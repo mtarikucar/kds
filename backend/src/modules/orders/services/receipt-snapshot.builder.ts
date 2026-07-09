@@ -136,7 +136,9 @@ export class ReceiptSnapshotBuilder {
         lines.push({
           name: item.product.name,
           quantity: item.quantity,
-          unitPrice: fmt(item.quantity > 0 ? comboTotal / item.quantity : comboTotal),
+          unitPrice: fmt(
+            item.quantity > 0 ? comboTotal / item.quantity : comboTotal,
+          ),
           totalPrice: fmt(comboTotal),
           modifiers: kids.map((k) => k.product.name),
           notes: item.notes ?? null,
