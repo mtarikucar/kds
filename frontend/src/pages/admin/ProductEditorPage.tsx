@@ -520,7 +520,14 @@ export default function ProductEditorPage() {
                     type="number"
                     error={productForm.formState.errors.currentStock?.message}
                     {...productForm.register("currentStock", {
-                      valueAsNumber: true,
+                      // Empty → undefined (not NaN). `valueAsNumber` on a blank
+                      // field yields NaN, which the optional z.number() rejects
+                      // ("Expected number, received nan") and silently blocks
+                      // Save — hit hardest by combos, which carry no stock.
+                      setValueAs: (v) =>
+                        v === "" || v === null || v === undefined
+                          ? undefined
+                          : Number(v),
                     })}
                   />
                   <div>
