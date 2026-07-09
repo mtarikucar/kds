@@ -19,7 +19,9 @@ const syncColors: Record<string, string> = {
   FAILED: 'bg-red-100 text-red-700',
 };
 
-const InvoicesPage = () => {
+// Reusable invoice-list body (no page chrome) so both the standalone
+// /admin/invoices route AND the Muhasebe page's "Faturalar" tab render it.
+export const InvoicesPanel = () => {
   const { t } = useTranslation('settings');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
@@ -72,18 +74,7 @@ const InvoicesPage = () => {
     amount.toLocaleString('tr-TR', { style: 'currency', currency: currency || 'TRY' });
 
   return (
-    <div className="h-full p-4 md:p-6 overflow-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Receipt className="w-6 h-6 text-slate-700" />
-          <h1 className="text-xl font-heading font-bold text-slate-900">
-            {t('accounting.invoicesTitle')}
-          </h1>
-        </div>
-        <p className="text-sm text-slate-500">{t('accounting.invoicesDesc')}</p>
-      </div>
-
+    <>
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
@@ -236,6 +227,25 @@ const InvoicesPage = () => {
           </div>
         )}
       </div>
+    </>
+  );
+};
+
+// Standalone page = header chrome + the shared panel.
+const InvoicesPage = () => {
+  const { t } = useTranslation('settings');
+  return (
+    <div className="h-full p-4 md:p-6 overflow-auto">
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Receipt className="w-6 h-6 text-slate-700" />
+          <h1 className="text-xl font-heading font-bold text-slate-900">
+            {t('accounting.invoicesTitle')}
+          </h1>
+        </div>
+        <p className="text-sm text-slate-500">{t('accounting.invoicesDesc')}</p>
+      </div>
+      <InvoicesPanel />
     </div>
   );
 };

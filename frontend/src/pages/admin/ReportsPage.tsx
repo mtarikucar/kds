@@ -4,6 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
 import FinanceTab from './reports/FinanceTab';
+import {
+  BudgetTab,
+  ConsolidatedTab,
+  ForecastTab,
+} from './reports/AccountingReportsTabs';
 import { useListBranches } from '../../features/branches/branchesApi';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -28,6 +33,8 @@ import {
   Package,
   UserCog,
   FileText,
+  PiggyBank,
+  Building2,
 } from 'lucide-react';
 
 interface DateRangeForm {
@@ -35,7 +42,7 @@ interface DateRangeForm {
   endDate: string;
 }
 
-type TabType = 'sales' | 'finance' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
+type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
 
 const ReportsPage = () => {
   const { t } = useTranslation('reports');
@@ -75,6 +82,9 @@ const ReportsPage = () => {
   const allTabs = [
     { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3, gate: undefined as keyof import('../../types').PlanFeatures | undefined },
     { id: 'finance' as TabType, label: t('reports.finance', 'Finans (Kâr-Zarar)'), icon: Wallet, gate: undefined },
+    { id: 'budget' as TabType, label: t('reports.budget', 'Bütçe vs Fiili'), icon: PiggyBank, gate: undefined },
+    { id: 'consolidated' as TabType, label: t('reports.consolidated', 'Konsolide P&L'), icon: Building2, gate: undefined },
+    { id: 'forecast' as TabType, label: t('reports.forecast', 'Satış Tahmini'), icon: TrendingUp, gate: undefined },
     { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock, gate: undefined },
     { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users, gate: undefined },
     { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package, gate: 'inventoryTracking' as const },
@@ -338,6 +348,9 @@ const ReportsPage = () => {
       )}
 
       {activeTab === 'finance' && <FinanceTab dateRange={dateRange} />}
+      {activeTab === 'budget' && <BudgetTab />}
+      {activeTab === 'consolidated' && <ConsolidatedTab />}
+      {activeTab === 'forecast' && <ForecastTab />}
 
       {activeTab === 'hourly' && (
         <HourlyOrdersChart date={dateRange.endDate} />

@@ -700,8 +700,8 @@ function App() {
                 path="accounting"
                 element={
                   <FeatureGate
-                    integration={{ domain: "accounting" }}
-                    fallback={<UpsellCard />}
+                    feature="advancedReports"
+                    fallback={<UpsellCard addOnCode="advanced_reports" />}
                   >
                     <AccountingSettingsPage />
                   </FeatureGate>

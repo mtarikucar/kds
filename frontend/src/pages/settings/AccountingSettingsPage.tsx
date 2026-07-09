@@ -64,7 +64,9 @@ const defaultSettings: AccountingSettingsState = {
   foribaServiceType: '',
 };
 
-const AccountingSettingsPage = () => {
+// Reusable settings body (no page chrome) so both the standalone route AND
+// the Muhasebe page's "Ayarlar" tab render it.
+export const AccountingSettingsPanel = () => {
   const { t } = useTranslation('settings');
   const { data: accountingSettings, isLoading } = useGetAccountingSettings();
   const { mutateAsync: updateSettings } = useUpdateAccountingSettings();
@@ -144,24 +146,14 @@ const AccountingSettingsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="py-12 text-center">
         <p className="text-slate-500">{t('accounting.loading')}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full p-4 md:p-6 overflow-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-heading font-bold text-slate-900">
-          {t('accounting.title')}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {t('accounting.description')}
-        </p>
-      </div>
-
-      <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-6">
         {/* Company Info Section */}
         <SettingsSection
           title={t('accounting.companySection')}
@@ -407,7 +399,24 @@ const AccountingSettingsPage = () => {
             )}
           </SettingsGroup>
         </SettingsSection>
+    </div>
+  );
+};
+
+// Standalone settings page = header chrome + the shared panel.
+const AccountingSettingsPage = () => {
+  const { t } = useTranslation('settings');
+  return (
+    <div className="h-full p-4 md:p-6 overflow-auto">
+      <div className="mb-6">
+        <h1 className="text-xl font-heading font-bold text-slate-900">
+          {t('accounting.title')}
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          {t('accounting.description')}
+        </p>
       </div>
+      <AccountingSettingsPanel />
     </div>
   );
 };
