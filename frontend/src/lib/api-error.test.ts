@@ -1,5 +1,6 @@
 import { AxiosError, AxiosHeaders } from 'axios';
 import { describe, expect, it } from 'vitest';
+import i18n from '../i18n/config';
 import {
   asApiError,
   getApiErrorCode,
@@ -61,6 +62,29 @@ describe('getApiErrorMessage', () => {
 
   it('falls back for non-axios errors', () => {
     expect(getApiErrorMessage(new Error('boom'), 'fallback')).toBe('fallback');
+  });
+
+  it('localizes a known errorCode over the backend English message', () => {
+    // The backend hardcodes English messages; when it also sends a known
+    // errorCode we show the locale-appropriate string instead (fixes the
+    // "Invalid email or password" toast staying English under tr/ar/ru/uz).
+    const err = axiosErrorWith({
+      errorCode: 'INVALID_CREDENTIALS',
+      message: 'Invalid email or password',
+    });
+    const expected = i18n.t('errors:apiCodes.INVALID_CREDENTIALS', {
+      defaultValue: '',
+    });
+    expect(expected).toBeTruthy();
+    expect(getApiErrorMessage(err, 'fallback')).toBe(expected);
+  });
+
+  it('keeps the specific backend message for an unmapped errorCode', () => {
+    const err = axiosErrorWith({
+      errorCode: 'SOME_UNMAPPED_CODE',
+      message: 'field-specific detail',
+    });
+    expect(getApiErrorMessage(err, 'fallback')).toBe('field-specific detail');
   });
 });
 
