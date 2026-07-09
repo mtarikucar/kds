@@ -158,6 +158,9 @@ export default function FinanceTab({ dateRange }: Props) {
               >
                 {createExpense.isPending ? 'Kaydediliyor…' : 'Kaydet'}
               </button>
+              {createExpense.isError && (
+                <p className="sm:col-span-5 text-xs text-rose-600">Gider kaydedilemedi — alanları kontrol edip tekrar deneyin.</p>
+              )}
             </form>
           )}
 
@@ -198,7 +201,8 @@ export default function FinanceTab({ dateRange }: Props) {
                       <button
                         type="button"
                         onClick={() => deleteExpense.mutate(e.id)}
-                        className="text-slate-400 hover:text-rose-600"
+                        disabled={deleteExpense.isPending}
+                        className="text-slate-400 hover:text-rose-600 disabled:opacity-50"
                         aria-label="Sil"
                       >
                         <Trash2 className="h-4 w-4" />

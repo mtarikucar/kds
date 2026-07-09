@@ -16,7 +16,11 @@ import {
   useConsolidatedPnl,
   useSalesForecast,
 } from '../../features/reports/reportsApi';
-import { useBudgetVsActual } from '../../features/expenses/expensesApi';
+import {
+  useBudgetVsActual,
+  useSetBudget,
+  EXPENSE_CATEGORIES,
+} from '../../features/expenses/expensesApi';
 
 type Tab = 'edoc' | 'budget' | 'consolidated' | 'forecast';
 
@@ -87,7 +91,13 @@ function EDocTab() {
             {resync.isPending ? 'Gönderiliyor…' : 'Yeniden gönder'}
           </button>
           {resync.isSuccess && <p className="mt-3 text-sm text-emerald-600">{resync.data?.retried ?? 0} belge yeniden denendi.</p>}
-          {resync.isError && <p className="mt-3 text-sm text-rose-600">Yeniden gönderme başarısız (yalnızca ADMIN yetkilidir).</p>}
+          {resync.isError && (
+            <p className="mt-3 text-sm text-rose-600">
+              {(resync.error as any)?.response?.status === 403
+                ? 'Yeniden gönderme için ADMIN yetkisi gerekli.'
+                : 'Yeniden gönderme başarısız — tekrar deneyin.'}
+            </p>
+          )}
           <p className="mt-2 text-xs text-slate-500">Saatlik zamanlayıcı FAILED belgeleri otomatik de dener.</p>
         </CardContent>
       </Card>
@@ -99,11 +109,34 @@ function BudgetTab({ fmt }: { fmt: Fmt }) {
   const now = new Date();
   const [ym] = useState({ year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 });
   const { data, isLoading } = useBudgetVsActual(ym.year, ym.month);
+  const setBudget = useSetBudget();
+  const [category, setCategory] = useState('OTHER');
+  const [amount, setAmount] = useState('');
+  const save = () => {
+    if (!(Number(amount) >= 0) || amount === '') return;
+    setBudget.mutate(
+      { category, year: ym.year, month: ym.month, amount: Number(amount) },
+      {
+        onSuccess: () => setAmount(''),
+        onError: () => undefined,
+      }
+    );
+  };
   if (isLoading) return <Loading />;
   return (
     <Card>
       <CardHeader><CardTitle>Bütçe vs Fiili — {ym.year}/{ym.month} (varyans {fmt(data?.totalVariance ?? 0)})</CardTitle></CardHeader>
       <CardContent>
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end rounded-lg bg-slate-50 p-3">
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-md border-slate-300 text-sm" aria-label="Kategori">
+            {EXPENSE_CATEGORIES.map((c: string) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder={`${ym.year}/${ym.month} bütçesi`} className="rounded-md border-slate-300 text-sm" />
+          <button onClick={save} disabled={setBudget.isPending || amount === ''} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+            {setBudget.isPending ? 'Kaydediliyor…' : 'Bütçe belirle'}
+          </button>
+          {setBudget.isError && <p className="sm:col-span-3 text-xs text-rose-600">Bütçe kaydedilemedi — tekrar deneyin.</p>}
+        </div>
         <Table head={['Kategori', 'Bütçe', 'Fiili', 'Varyans']}
           rows={(data?.byCategory ?? []).map((c: any) => [c.category, fmt(c.budget), fmt(c.actual), (c.overBudget ? '▲ ' : '') + fmt(c.variance)])} />
       </CardContent>
@@ -114,13 +147,17 @@ function BudgetTab({ fmt }: { fmt: Fmt }) {
 function ConsolidatedTab({ fmt }: { fmt: Fmt }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading, isError } = useConsolidatedPnl(range);
+  const { data, isLoading, isError, error } = useConsolidatedPnl(range);
   if (isLoading) return <Loading />;
+  // Only a 403 means a permissions problem; a 500/network failure gets an
+  // honest retry message instead of a misleading access claim.
   if (isError)
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-amber-700">
-          Konsolide P&L yalnızca tüm şubelere erişimi olan yöneticiler içindir.
+          {(error as any)?.response?.status === 403
+            ? 'Konsolide P&L yalnızca tüm şubelere erişimi olan yöneticiler içindir.'
+            : 'Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.'}
         </CardContent>
       </Card>
     );

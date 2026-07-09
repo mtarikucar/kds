@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
   CreateSupplierDto,
@@ -159,34 +160,48 @@ export class SuppliersService {
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
-    // Check if supplier has any non-cancelled POs
-    const activePOs = await this.prisma.purchaseOrder.count({
-      where: { supplierId: id, status: { notIn: ["CANCELLED", "RECEIVED"] } },
-    });
-    if (activePOs > 0) {
-      throw new BadRequestException(
-        "Cannot delete supplier with active purchase orders",
-      );
-    }
-    // AP invoices/expenses reference the supplier by scalar id (no DB FK) —
-    // deleting would orphan the financial trail (AP aging shows "—", audits
-    // lose the vendor). Block instead of silently orphaning.
-    const [invoices, expenses] = await Promise.all([
-      this.prisma.purchaseInvoice.count({
-        where: { supplierId: id, tenantId },
-      }),
-      this.prisma.expense.count({ where: { supplierId: id, tenantId } }),
-    ]);
-    if (invoices > 0 || expenses > 0) {
-      throw new BadRequestException(
-        "Cannot delete a supplier with recorded invoices or expenses",
-      );
-    }
-    const claim = await this.prisma.supplier.deleteMany({
-      where: { id, tenantId },
-    });
-    if (claim.count === 0) throw new NotFoundException("Supplier not found");
-    return { id };
+    // Serializable so the reference checks and the delete commit atomically —
+    // otherwise an invoice/expense posted between the counts and the delete
+    // would orphan the vendor's financial trail (the exact gap the guard
+    // exists to close). SSI aborts the loser of that race.
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Check if supplier has any non-cancelled POs
+        const activePOs = await tx.purchaseOrder.count({
+          where: {
+            supplierId: id,
+            status: { notIn: ["CANCELLED", "RECEIVED"] },
+          },
+        });
+        if (activePOs > 0) {
+          throw new BadRequestException(
+            "Cannot delete supplier with active purchase orders",
+          );
+        }
+        // AP invoices/expenses reference the supplier by scalar id (no DB FK) —
+        // deleting would orphan the financial trail (AP aging shows "—", audits
+        // lose the vendor). Block instead of silently orphaning.
+        const [invoices, expenses] = await Promise.all([
+          tx.purchaseInvoice.count({
+            where: { supplierId: id, tenantId },
+          }),
+          tx.expense.count({ where: { supplierId: id, tenantId } }),
+        ]);
+        if (invoices > 0 || expenses > 0) {
+          throw new BadRequestException(
+            "Cannot delete a supplier with recorded invoices or expenses",
+          );
+        }
+        const claim = await tx.supplier.deleteMany({
+          where: { id, tenantId },
+        });
+        if (claim.count === 0) {
+          throw new NotFoundException("Supplier not found");
+        }
+        return { id };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async addStockItem(

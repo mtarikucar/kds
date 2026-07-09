@@ -48,6 +48,19 @@ export class StockDeductionService {
       return;
     }
 
+    // v3 branch-scope: a product carries one recipe PER BRANCH
+    // (@@unique([productId, branchId])). Prisma can't reference order.branchId
+    // from inside the same query, so pre-read it cheaply and filter the
+    // recipe include — otherwise an N-branch tenant hydrates N full BOM trees
+    // per order item and buildDeductions discards N−1 of them. The tree only
+    // needs stockItem.name here (applyDeduction re-reads rows inside the tx),
+    // so hydrate a slim select, not full StockItem rows.
+    const orderHead = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      select: { branchId: true },
+    });
+    if (!orderHead) return;
+    const slimStockItem = { select: { id: true, name: true } };
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -55,29 +68,26 @@ export class StockDeductionService {
           include: {
             product: {
               include: {
-                // v3 branch-scope: a product carries one recipe PER BRANCH
-                // (@@unique([productId, branchId])), so the relation is now
-                // one-to-many. We can't reference order.branchId from inside
-                // the query that fetches the order, so we pull the product's
-                // recipe(s) and buildDeductions selects the row matching the
-                // order's branch.
                 recipes: {
+                  where: { branchId: orderHead.branchId },
                   include: {
-                    ingredients: { include: { stockItem: true } },
+                    ingredients: { include: { stockItem: slimStockItem } },
                     // Nested BOM: one level of sub-recipe (prep) with its own
                     // stock ingredients, expanded at deduction time.
                     components: {
                       include: {
                         subRecipe: {
                           include: {
-                            ingredients: { include: { stockItem: true } },
+                            ingredients: {
+                              include: { stockItem: slimStockItem },
+                            },
                             // Second BOM level (prep → sub-prep → dish).
                             components: {
                               include: {
                                 subRecipe: {
                                   include: {
                                     ingredients: {
-                                      include: { stockItem: true },
+                                      include: { stockItem: slimStockItem },
                                     },
                                   },
                                 },

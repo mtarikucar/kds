@@ -72,3 +72,22 @@ describe('ExpensesService.getBudgetVsActual', () => {
     expect(rent).toMatchObject({ variance: 0, overBudget: false });
   });
 });
+
+describe('ExpensesService.setBudget', () => {
+  it('upserts on the (tenant,branch,category,year,month) natural key with a Decimal amount', async () => {
+    const prisma: any = {
+      budget: { upsert: jest.fn().mockResolvedValue({ id: 'b1' }) },
+    };
+    const svc = new ExpensesService(prisma);
+    const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as any;
+
+    await svc.setBudget(SCOPE, { category: 'RENT', year: 2026, month: 7, amount: 15000 });
+
+    const arg = prisma.budget.upsert.mock.calls[0][0];
+    expect(arg.where.tenantId_branchId_category_year_month).toEqual({
+      tenantId: 't1', branchId: 'b1', category: 'RENT', year: 2026, month: 7,
+    });
+    expect(arg.create.amount.toString()).toBe('15000');
+    expect(arg.update.amount.toString()).toBe('15000');
+  });
+});

@@ -72,6 +72,25 @@ export const useStockTransfers = () => {
   });
 };
 
+/**
+ * Stock items of ANOTHER branch (the transfer destination) — sends an explicit
+ * X-Branch-Id override, which the api interceptor respects and BranchGuard
+ * still validates against the caller's allowed branches.
+ */
+export const useBranchStockItems = (branchId?: string) =>
+  useQuery({
+    queryKey: ['purchasing', 'branch-items', branchId],
+    queryFn: async (): Promise<
+      Array<{ id: string; name: string; unit: string }>
+    > => {
+      const r = await api.get(`${BASE}/items`, {
+        headers: { 'X-Branch-Id': branchId! },
+      });
+      return r.data;
+    },
+    enabled: !!branchId,
+  });
+
 export const useCreateStockTransfer = () => {
   const qc = useQueryClient();
   return useMutation({

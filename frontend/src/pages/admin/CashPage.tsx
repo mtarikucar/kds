@@ -142,6 +142,7 @@ function SafeTab({ fmt }: { fmt: Fmt }) {
           </button>
         </form>
         {create.isSuccess && <p className="mt-3 text-sm text-emerald-600">Hareket kaydedildi (onay bekliyor). Tutar: {fmt(create.data?.amount ?? 0)}</p>}
+        {create.isError && <p className="mt-3 text-sm text-rose-600">Hareket kaydedilemedi — tutarı kontrol edip tekrar deneyin.</p>}
       </CardContent>
     </Card>
   );
@@ -150,15 +151,18 @@ function SafeTab({ fmt }: { fmt: Fmt }) {
 function TipsTab({ fmt }: { fmt: Fmt }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading, isError } = useTipDistribution(range);
+  const { data, isLoading, isError, error } = useTipDistribution(range);
   if (isLoading) return <Loading />;
   // tip-distribution is ADVANCED_REPORTS-gated on the backend; without it the
-  // request 403s — say so instead of showing a fabricated ₺0 pool.
+  // request 403s — say so instead of showing a fabricated ₺0 pool. Only a 403
+  // means "upgrade"; other failures get an honest retry message.
   if (isError)
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-amber-700">
-          Bahşiş havuzu raporu için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.
+          {(error as any)?.response?.status === 403
+            ? 'Bahşiş havuzu raporu için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.'
+            : 'Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.'}
         </CardContent>
       </Card>
     );

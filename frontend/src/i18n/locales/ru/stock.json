@@ -148,7 +148,17 @@
     "createError": "Не удалось создать заказ",
     "submitError": "Не удалось отправить заказ",
     "receiveError": "Не удалось принять товары",
-    "cancelError": "Не удалось отменить заказ"
+    "cancelError": "Не удалось отменить заказ",
+    "statusPendingApproval": "Ожидает одобрения",
+    "approve": "Одобрить",
+    "approveError": "Не удалось одобрить заказ",
+    "landedCost": "Распределить доп. расходы (фрахт/таможня)",
+    "landedCostFreight": "Фрахт",
+    "landedCostCustoms": "Таможня",
+    "landedCostOther": "Прочее",
+    "landedCostApply": "Распределить",
+    "landedCostApplied": "Доп. расходы включены в себестоимость",
+    "landedCostError": "Не удалось распределить расходы"
   },
   "movements": {
     "title": "Движения",

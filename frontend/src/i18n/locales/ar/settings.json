@@ -620,7 +620,11 @@
     "cancelAction": "إلغاء",
     "noInvoices": "لا توجد فواتير.",
     "prev": "السابق",
-    "next": "التالي"
+    "next": "التالي",
+    "creditNoteAction": "إصدار إشعار دائن",
+    "creditNoteConfirm": "إصدار إشعار دائن لهذه الفاتورة؟",
+    "creditNoteIssued": "تم إنشاء إشعار دائن",
+    "creditNoteError": "تعذر إصدار إشعار دائن"
   },
   "emailChannel": {
     "reservationSection": "البريد الإلكتروني — أحداث الحجز",

@@ -61,16 +61,19 @@ type Fmt = (n: number) => string;
 function MenuTab({ fmt }: { fmt: Fmt }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading, isError } = useMenuEngineering(range);
+  const { data, isLoading, isError, error } = useMenuEngineering(range);
   if (isLoading) return <Loading />;
   // Backend gates menu-engineering on ADVANCED_REPORTS while this page is
   // inventoryTracking-gated — a BASIC tenant 403s here. Say so instead of
-  // rendering a misleading empty table.
+  // rendering a misleading empty table. Only a 403 means "upgrade"; any other
+  // failure (500/network) gets an honest retry message, not purchase advice.
   if (isError)
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-amber-700">
-          Menü mühendisliği için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.
+          {(error as any)?.response?.status === 403
+            ? 'Menü mühendisliği için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.'
+            : 'Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.'}
         </CardContent>
       </Card>
     );

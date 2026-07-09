@@ -100,7 +100,10 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     const tenantWide = isTenantWidePath(config.url);
-    if (!tenantWide) {
+    if (!tenantWide && !config.headers["X-Branch-Id"]) {
+      // Respect an explicitly supplied X-Branch-Id (e.g. reading ANOTHER
+      // branch's stock items when building an inter-branch transfer) —
+      // BranchGuard still validates it against the user's allowed branches.
       const branchId = useBranchScopeStore.getState().branchId;
       if (!branchId) {
         return Promise.reject(

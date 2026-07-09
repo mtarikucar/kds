@@ -620,7 +620,11 @@
     "cancelAction": "Cancel",
     "noInvoices": "No invoices found.",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "creditNoteAction": "Issue credit note",
+    "creditNoteConfirm": "Issue a credit note for this invoice?",
+    "creditNoteIssued": "Credit note issued",
+    "creditNoteError": "Credit note could not be issued"
   },
   "emailChannel": {
     "reservationSection": "Email — Reservation events",

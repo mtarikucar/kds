@@ -21,6 +21,11 @@ vi.mock('../stockManagementApi', () => ({
   useStockItems: () => ({ data: [] }),
 }));
 
+vi.mock('../purchasingApi', () => ({
+  useApprovePurchaseOrder: () => noop,
+  useApplyLandedCost: () => noop,
+}));
+
 import PurchaseOrdersTab from './PurchaseOrdersTab';
 
 beforeAll(() => {

@@ -16,12 +16,15 @@ import {
   CardContent,
 } from '../../components/ui/Card';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { toast } from 'sonner';
 import {
   useReorderSuggestions,
   useApAging,
   useSupplierScorecard,
   useBatchValuation,
   useStockTransfers,
+  useCreateStockTransfer,
+  useBranchStockItems,
   useCompleteStockTransfer,
   useCancelStockTransfer,
   usePoTemplates,
@@ -30,7 +33,12 @@ import {
   useSupplierReturn,
   lookupBarcode,
 } from '../../features/stock-management/purchasingApi';
-import { useSuppliers } from '../../features/stock-management/stockManagementApi';
+import {
+  useSuppliers,
+  useStockItems,
+} from '../../features/stock-management/stockManagementApi';
+import { useListBranches } from '../../features/branches/branchesApi';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
 
 type Tab = 'reorder' | 'ap' | 'suppliers' | 'transfers' | 'valuation' | 'more';
 
@@ -118,7 +126,7 @@ function MoreTab({ fmt }: { fmt: Fmt }) {
                 <li key={t.id} className="flex items-center justify-between py-2 text-sm">
                   <span>{t.name} <span className="text-slate-400">({t.items?.length ?? 0} kalem)</span></span>
                   <span className="space-x-3">
-                    <button onClick={() => createOrder.mutate(t.id)} className="text-indigo-600 hover:underline">Sipariş oluştur</button>
+                    <button onClick={() => createOrder.mutate(t.id)} disabled={createOrder.isPending} className="text-indigo-600 hover:underline disabled:opacity-50">Sipariş oluştur</button>
                     <button onClick={() => deleteTpl.mutate(t.id)} className="text-slate-400 hover:text-rose-600" aria-label="Sil"><Trash2 className="inline h-4 w-4" /></button>
                   </span>
                 </li>
@@ -306,8 +314,12 @@ function TransfersTab() {
   const { data, isLoading } = useStockTransfers();
   const complete = useCompleteStockTransfer();
   const cancel = useCancelStockTransfer();
+  const busy = complete.isPending || cancel.isPending;
+  const onErr = () => toast.error('Transfer işlemi başarısız — sayfayı yenileyip tekrar deneyin.');
   if (isLoading) return <Loading />;
   return (
+    <div className="space-y-4">
+    <CreateTransferForm />
     <Card>
       <CardHeader><CardTitle>Şubeler arası stok transferleri</CardTitle></CardHeader>
       <CardContent>
@@ -328,8 +340,8 @@ function TransfersTab() {
                     <td className="text-right space-x-2">
                       {t.status === 'PENDING' && (
                         <>
-                          <button onClick={() => complete.mutate(t.id)} className="text-emerald-600 hover:underline">Tamamla</button>
-                          <button onClick={() => cancel.mutate(t.id)} className="text-rose-600 hover:underline">İptal</button>
+                          <button disabled={busy} onClick={() => complete.mutate(t.id, { onError: onErr })} className="text-emerald-600 hover:underline disabled:opacity-50">Tamamla</button>
+                          <button disabled={busy} onClick={() => cancel.mutate(t.id, { onError: onErr })} className="text-rose-600 hover:underline disabled:opacity-50">İptal</button>
                         </>
                       )}
                     </td>
@@ -339,6 +351,76 @@ function TransfersTab() {
             </table>
           </div>
         )}
+      </CardContent>
+    </Card>
+    </div>
+  );
+}
+
+function CreateTransferForm() {
+  const myBranchId = useBranchScopeStore((s) => s.branchId);
+  const { data: branches } = useListBranches();
+  const { data: sourceItems } = useStockItems();
+  const [toBranchId, setToBranchId] = useState('');
+  const { data: destItems } = useBranchStockItems(toBranchId || undefined);
+  const [sourceStockItemId, setSource] = useState('');
+  const [destStockItemId, setDest] = useState('');
+  const [qty, setQty] = useState('');
+  const [unitCost, setUnitCost] = useState('');
+  const create = useCreateStockTransfer();
+
+  const targets = (branches ?? []).filter((b: any) => b.id !== myBranchId);
+  const canSubmit = toBranchId && sourceStockItemId && destStockItemId && Number(qty) > 0;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    create.mutate(
+      {
+        toBranchId,
+        items: [{
+          sourceStockItemId,
+          destStockItemId,
+          quantity: Number(qty),
+          unitCost: Number(unitCost) > 0 ? Number(unitCost) : undefined,
+        }],
+      },
+      {
+        onSuccess: () => {
+          toast.success('Transfer oluşturuldu (beklemede) — hedef şube tamamlayınca stok taşınır.');
+          setSource(''); setDest(''); setQty(''); setUnitCost('');
+        },
+        onError: (e: any) =>
+          toast.error(e?.response?.data?.message ?? 'Transfer oluşturulamadı.'),
+      }
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Yeni transfer oluştur</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+          <select value={toBranchId} onChange={(e) => { setToBranchId(e.target.value); setDest(''); }} className="rounded-md border-slate-300 text-sm" aria-label="Hedef şube">
+            <option value="">Hedef şube</option>
+            {targets.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <select value={sourceStockItemId} onChange={(e) => setSource(e.target.value)} className="rounded-md border-slate-300 text-sm" aria-label="Kaynak kalem">
+            <option value="">Kaynak kalem (bu şube)</option>
+            {(sourceItems ?? []).map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+          <select value={destStockItemId} onChange={(e) => setDest(e.target.value)} disabled={!toBranchId} className="rounded-md border-slate-300 text-sm disabled:opacity-50" aria-label="Hedef kalem">
+            <option value="">{toBranchId ? 'Hedef kalem' : 'Önce şube seçin'}</option>
+            {(destItems ?? []).map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+          <input value={qty} onChange={(e) => setQty(e.target.value)} type="number" min="0" step="0.001" placeholder="Miktar" className="rounded-md border-slate-300 text-sm" />
+          <div className="flex gap-2">
+            <input value={unitCost} onChange={(e) => setUnitCost(e.target.value)} type="number" min="0" step="0.01" placeholder="Birim maliyet (ops.)" className="flex-1 rounded-md border-slate-300 text-sm" />
+            <button onClick={submit} disabled={!canSubmit || create.isPending} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+              {create.isPending ? '…' : 'Oluştur'}
+            </button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">Birim maliyet girilirse hedef şubenin maliyet tabanına işlenir; boşsa hedef kalemin mevcut maliyeti kullanılır.</p>
       </CardContent>
     </Card>
   );

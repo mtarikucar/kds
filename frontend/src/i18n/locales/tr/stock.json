@@ -148,7 +148,17 @@
     "createError": "Sipariş oluşturulamadı",
     "submitError": "Sipariş gönderilemedi",
     "receiveError": "Teslim alınamadı",
-    "cancelError": "Sipariş iptal edilemedi"
+    "cancelError": "Sipariş iptal edilemedi",
+    "statusPendingApproval": "Onay Bekliyor",
+    "approve": "Onayla",
+    "approveError": "Sipariş onaylanamadı",
+    "landedCost": "Ek maliyet dağıt (navlun/gümrük)",
+    "landedCostFreight": "Navlun",
+    "landedCostCustoms": "Gümrük",
+    "landedCostOther": "Diğer",
+    "landedCostApply": "Dağıt",
+    "landedCostApplied": "Ek maliyet stok maliyetine dağıtıldı",
+    "landedCostError": "Ek maliyet dağıtılamadı"
   },
   "movements": {
     "title": "Hareketler",

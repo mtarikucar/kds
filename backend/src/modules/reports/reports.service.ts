@@ -120,6 +120,7 @@ export class ReportsService {
     startDate?: Date,
     endDate?: Date,
     branchId?: string,
+    opts?: { includeDailySales?: boolean },
   ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
     // branchScope is spread into every order.where so the same expression
@@ -183,42 +184,50 @@ export class ReportsService {
       count: pm._count,
     }));
 
-    // Get daily sales breakdown
-    const paidOrders = await this.prisma.order.findMany({
-      where: {
-        tenantId,
-        ...branchScope,
-        status: OrderStatus.PAID,
-        createdAt: {
-          gte: dateRange.start,
-          lte: dateRange.end,
+    // Get daily sales breakdown — this scans every PAID order row in the
+    // window, so callers that only need the headline aggregates (P&L, labor,
+    // comparison, consolidated) opt OUT and skip the row scan entirely.
+    let dailySales: { date: string; sales: number; orders: number }[] = [];
+    if (opts?.includeDailySales !== false) {
+      const paidOrders = await this.prisma.order.findMany({
+        where: {
+          tenantId,
+          ...branchScope,
+          status: OrderStatus.PAID,
+          createdAt: {
+            gte: dateRange.start,
+            lte: dateRange.end,
+          },
         },
-      },
-      select: {
-        createdAt: true,
-        finalAmount: true,
-      },
-    });
+        select: {
+          createdAt: true,
+          finalAmount: true,
+        },
+      });
 
-    // Accumulate in integer cents so a long tail of orders doesn't bleed
-    // IEEE-754 dust into the daily totals (which the dashboard then
-    // diffs day-over-day and renders as "0.000001" deltas).
-    const dailyMap = new Map<string, { salesCents: number; orders: number }>();
-    paidOrders.forEach((order) => {
-      const dateKey = order.createdAt.toISOString().slice(0, 10);
-      const existing = dailyMap.get(dateKey) || { salesCents: 0, orders: 0 };
-      existing.salesCents += decimalToCents(order.finalAmount);
-      existing.orders += 1;
-      dailyMap.set(dateKey, existing);
-    });
+      // Accumulate in integer cents so a long tail of orders doesn't bleed
+      // IEEE-754 dust into the daily totals (which the dashboard then
+      // diffs day-over-day and renders as "0.000001" deltas).
+      const dailyMap = new Map<
+        string,
+        { salesCents: number; orders: number }
+      >();
+      paidOrders.forEach((order) => {
+        const dateKey = order.createdAt.toISOString().slice(0, 10);
+        const existing = dailyMap.get(dateKey) || { salesCents: 0, orders: 0 };
+        existing.salesCents += decimalToCents(order.finalAmount);
+        existing.orders += 1;
+        dailyMap.set(dateKey, existing);
+      });
 
-    const dailySales = Array.from(dailyMap.entries())
-      .map(([date, data]) => ({
-        date,
-        sales: centsToCurrency(data.salesCents),
-        orders: data.orders,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      dailySales = Array.from(dailyMap.entries())
+        .map(([date, data]) => ({
+          date,
+          sales: centsToCurrency(data.salesCents),
+          orders: data.orders,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
 
     return {
       totalSales,
@@ -250,8 +259,12 @@ export class ReportsService {
     const prevEnd = new Date(dateRange.start.getTime());
 
     const [cur, prev, curCogs, prevCogs] = await Promise.all([
-      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId),
-      this.getSalesSummary(tenantId, prevStart, prevEnd, branchId),
+      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId, {
+        includeDailySales: false,
+      }),
+      this.getSalesSummary(tenantId, prevStart, prevEnd, branchId, {
+        includeDailySales: false,
+      }),
       this.getCogsReport(tenantId, dateRange.start, dateRange.end, branchId),
       this.getCogsReport(tenantId, prevStart, prevEnd, branchId),
     ]);
@@ -663,7 +676,9 @@ export class ReportsService {
     branchId?: string,
   ) {
     const [sales, cogsReport] = await Promise.all([
-      this.getSalesSummary(tenantId, startDate, endDate, branchId),
+      this.getSalesSummary(tenantId, startDate, endDate, branchId, {
+        includeDailySales: false,
+      }),
       this.getCogsReport(tenantId, startDate, endDate, branchId),
     ]);
 
@@ -790,7 +805,9 @@ export class ReportsService {
     }
 
     const [sales, cogsReport] = await Promise.all([
-      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId),
+      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId, {
+        includeDailySales: false,
+      }),
       this.getCogsReport(tenantId, dateRange.start, dateRange.end, branchId),
     ]);
     const revenueCents = decimalToCents(sales.totalSales);

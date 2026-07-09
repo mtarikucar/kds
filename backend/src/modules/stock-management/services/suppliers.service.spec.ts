@@ -16,6 +16,13 @@ describe('SuppliersService (iter-9 compound-WHERE + cross-tenant guards)', () =>
 
   beforeEach(() => {
     prisma = mockPrismaClient();
+    // remove() wraps its reference checks + delete in a Serializable txn;
+    // pass the same mock through as the tx client.
+    (prisma as any).$transaction = jest
+      .fn()
+      .mockImplementation(async (cb: any) =>
+        typeof cb === 'function' ? cb(prisma) : cb,
+      );
     svc = new SuppliersService(prisma as any);
   });
 
