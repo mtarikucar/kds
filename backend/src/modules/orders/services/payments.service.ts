@@ -859,6 +859,24 @@ export class PaymentsService {
         }
       }
 
+      // Fiscal reversal: a full refund (order → CANCELLED) that had an ISSUED
+      // fatura gets a reversing İade faturası (credit note) so the books/e-fatura
+      // net to zero. Best-effort + idempotent — a missing accounting config or
+      // an un-invoiced order simply no-ops. Closes the compliance gap where a
+      // refund left the sale invoice standing with no reversal.
+      if (orderMovedToCancelled && this.salesInvoiceService) {
+        try {
+          await this.salesInvoiceService.createRefundCreditNote(
+            payment.orderId,
+            tenantId,
+          );
+        } catch (err: any) {
+          this.logger.error(
+            `Credit-note (İade faturası) generation failed for refunded order ${payment.orderId}: ${err.message}`,
+          );
+        }
+      }
+
       return result;
     }
 

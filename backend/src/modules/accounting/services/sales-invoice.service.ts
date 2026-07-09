@@ -537,4 +537,112 @@ export class SalesInvoiceService {
     }
     return this.prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
   }
+
+  /**
+   * İade faturası (credit note): a reversing REFUND-type SalesInvoice for a
+   * refunded/cancelled order that already carried an ISSUED fatura. Negates the
+   * original's totals + line items so the two documents net to zero — closing
+   * the compliance gap where a refund left the ISSUED invoice standing with no
+   * reversing record. Idempotent per order; returns null when nothing was
+   * invoiced (a refund of an un-invoiced order needs no credit note).
+   */
+  async createRefundCreditNote(orderId: string, tenantId: string) {
+    const original = await this.prisma.salesInvoice.findFirst({
+      where: {
+        orderId,
+        tenantId,
+        status: { not: InvoiceStatus.CANCELLED },
+        type: { not: "REFUND" },
+      },
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!original) return null; // nothing invoiced → nothing to reverse
+
+    const existing = await this.prisma.salesInvoice.findFirst({
+      where: { orderId, tenantId, type: "REFUND" },
+      select: { id: true },
+    });
+    if (existing) {
+      return this.prisma.salesInvoice.findUnique({
+        where: { id: existing.id },
+        include: { items: true },
+      });
+    }
+
+    const settings = await this.settingsService.findByTenant(tenantId);
+    const neg = (v: Prisma.Decimal | number | string) =>
+      -Math.abs(Number(v));
+    const negBreakdown = (tb: any) => {
+      if (!tb || typeof tb !== "object") return tb ?? undefined;
+      const out: Record<string, any> = {};
+      for (const [rate, v] of Object.entries<any>(tb)) {
+        out[rate] = {
+          taxableAmount: neg(v.taxableAmount ?? 0),
+          taxAmount: neg(v.taxAmount ?? 0),
+        };
+      }
+      return out;
+    };
+
+    const creditNote = await this.prisma.$transaction(
+      async (tx) => {
+        const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+          tenantId,
+          tx,
+        );
+        return tx.salesInvoice.create({
+          data: {
+            invoiceNumber,
+            type: "REFUND",
+            status: InvoiceStatus.ISSUED,
+            customerName: original.customerName,
+            customerPhone: original.customerPhone,
+            customerEmail: original.customerEmail,
+            customerTaxId: original.customerTaxId,
+            customerTaxOffice: original.customerTaxOffice,
+            ...SalesInvoiceService.sellerSnapshot(settings),
+            subtotal: neg(original.subtotal),
+            taxAmount: neg(original.taxAmount),
+            totalAmount: neg(original.totalAmount),
+            discount: neg(original.discount),
+            taxBreakdown: negBreakdown(original.taxBreakdown),
+            orderId,
+            paymentMethod: original.paymentMethod,
+            issueDate: new Date(),
+            dueDate: new Date(),
+            tenantId,
+            items: {
+              create: original.items.map((it, i) => ({
+                description:
+                  (i === 0
+                    ? `İADE (orijinal fatura ${original.invoiceNumber}) — `
+                    : "") + it.description,
+                quantity: it.quantity,
+                unitPrice: neg(it.unitPrice),
+                taxRate: it.taxRate,
+                taxAmount: neg(it.taxAmount),
+                subtotal: neg(it.subtotal),
+                total: neg(it.total),
+              })),
+            },
+          },
+          include: { items: true },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+
+    if (this.syncService) {
+      const accSettings = await this.settingsService.findByTenant(tenantId);
+      if (accSettings.autoSync && accSettings.provider !== "NONE") {
+        this.syncService
+          .syncInvoice(creditNote.id, tenantId)
+          .catch((err) =>
+            this.logger.error(`Credit-note auto-sync failed: ${err.message}`),
+          );
+      }
+    }
+    return creditNote;
+  }
 }
