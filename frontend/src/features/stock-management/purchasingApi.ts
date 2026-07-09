@@ -144,7 +144,7 @@ export const useApprovePurchaseOrder = () => {
       return r.data;
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
+      qc.invalidateQueries({ queryKey: ['purchaseOrders'] }),
   });
 };
 
@@ -165,7 +165,7 @@ export const useApplyLandedCost = () => {
       return r.data;
     },
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
+      qc.invalidateQueries({ queryKey: ['purchaseOrders'] }),
   });
 };
 
@@ -188,7 +188,7 @@ export const useCreateOrderFromTemplate = () => {
       const r = await api.post(`${BASE}/purchase-orders/templates/${templateId}/create-order`);
       return r.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock', 'purchase-orders'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchaseOrders'] }),
   });
 };
 

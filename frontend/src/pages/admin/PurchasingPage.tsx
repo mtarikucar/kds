@@ -359,17 +359,26 @@ function TransfersTab() {
 
 function CreateTransferForm() {
   const myBranchId = useBranchScopeStore((s) => s.branchId);
+  const allowedBranchIds = useBranchScopeStore((s) => s.allowedBranchIds);
   const { data: branches } = useListBranches();
   const { data: sourceItems } = useStockItems();
   const [toBranchId, setToBranchId] = useState('');
-  const { data: destItems } = useBranchStockItems(toBranchId || undefined);
+  const { data: destItems, isError: destError } = useBranchStockItems(toBranchId || undefined);
   const [sourceStockItemId, setSource] = useState('');
   const [destStockItemId, setDest] = useState('');
   const [qty, setQty] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const create = useCreateStockTransfer();
 
-  const targets = (branches ?? []).filter((b: any) => b.id !== myBranchId);
+  // Only ACTIVE branches the caller is authorized for (empty allow-list =
+  // wildcard ADMIN) — the backend enforces the same rule; filtering here just
+  // avoids offering targets that would dead-end at the dest-item fetch.
+  const targets = (branches ?? []).filter(
+    (b: any) =>
+      b.id !== myBranchId &&
+      (b.status == null || b.status === 'active') &&
+      (allowedBranchIds.length === 0 || allowedBranchIds.includes(b.id))
+  );
   const canSubmit = toBranchId && sourceStockItemId && destStockItemId && Number(qty) > 0;
 
   const submit = () => {
@@ -386,7 +395,7 @@ function CreateTransferForm() {
       },
       {
         onSuccess: () => {
-          toast.success('Transfer oluşturuldu (beklemede) — hedef şube tamamlayınca stok taşınır.');
+          toast.success('Transfer oluşturuldu (beklemede) — Tamamla ile stok taşınır.');
           setSource(''); setDest(''); setQty(''); setUnitCost('');
         },
         onError: (e: any) =>
@@ -420,6 +429,9 @@ function CreateTransferForm() {
             </button>
           </div>
         </div>
+        {destError && (
+          <p className="mt-2 text-xs text-rose-600">Hedef şubenin kalemleri yüklenemedi — bu şube için yetkiniz olmayabilir.</p>
+        )}
         <p className="mt-2 text-xs text-slate-500">Birim maliyet girilirse hedef şubenin maliyet tabanına işlenir; boşsa hedef kalemin mevcut maliyeti kullanılır.</p>
       </CardContent>
     </Card>

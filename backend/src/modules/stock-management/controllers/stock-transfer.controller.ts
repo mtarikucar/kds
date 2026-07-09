@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Request,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
@@ -36,8 +37,16 @@ export class StockTransferController {
   create(
     @CurrentScope() scope: BranchScope,
     @Body() dto: CreateStockTransferDto,
+    @Request() req: any,
   ) {
-    return this.service.create(scope, scope.userId, dto);
+    // Narrowed users may only transfer INTO branches on their allow-list
+    // (empty list = wildcard ADMIN) — see service create() for why.
+    return this.service.create(
+      scope,
+      scope.userId,
+      dto,
+      req.user?.allowedBranchIds ?? [],
+    );
   }
 
   @Get()

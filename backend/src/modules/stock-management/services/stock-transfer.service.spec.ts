@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { StockTransferService } from './stock-transfer.service';
 
 describe('StockTransferService.complete', () => {
@@ -20,6 +20,7 @@ describe('StockTransferService.complete', () => {
           items: [{ sourceStockItemId: 'sA', destStockItemId: 'sB', quantity: 5, unitCost: 2 }],
         }),
       },
+      branch: { findFirst: jest.fn().mockResolvedValue({ id: 'bB' }) },
       stockItem: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findFirst: jest.fn().mockResolvedValue({ id: 'sB', currentStock: 0, costPerUnit: 0 }),
@@ -58,6 +59,7 @@ describe('StockTransferService.complete', () => {
           items: [{ sourceStockItemId: 'sA', destStockItemId: 'sB', quantity: 5, unitCost: 2 }],
         }),
       },
+      branch: { findFirst: jest.fn().mockResolvedValue({ id: 'bB' }) },
       stockItem: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) }, // gte guard fails
       ingredientMovement: { create: jest.fn() },
     };
@@ -88,6 +90,7 @@ describe('StockTransferService.complete — destination guard (no silent stock l
           items: [{ sourceStockItemId: 'sA', destStockItemId: 'sB', quantity: 5, unitCost: 2 }],
         }),
       },
+      branch: { findFirst: jest.fn().mockResolvedValue({ id: 'bB' }) },
       stockItem: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }), // source decrement OK
         findFirst: jest.fn().mockResolvedValue(null), // dest item not in the branch
@@ -114,5 +117,69 @@ describe('StockTransferService — party-branch authorization', () => {
       .rejects.toThrow(/not found or not pending/);
     const where = txMock.stockTransfer.updateMany.mock.calls[0][0].where;
     expect(where.OR).toEqual([{ fromBranchId: 'A' }, { toBranchId: 'A' }]);
+  });
+});
+
+describe('StockTransferService.create — destination authorization (pass-9)', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'bA', userId: 'u1', role: 'MANAGER' } as const;
+  const dto = {
+    toBranchId: 'bB',
+    items: [{ sourceStockItemId: 'sA', destStockItemId: 'sB', quantity: 2 }],
+  };
+
+  function wire() {
+    const prisma: any = {
+      branch: { findFirst: jest.fn().mockResolvedValue({ id: 'bB' }) },
+      stockItem: { count: jest.fn().mockResolvedValue(1) },
+      stockTransfer: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({ id: 'tr1', items: [] }),
+      },
+    };
+    return { prisma, svc: new StockTransferService(prisma) };
+  }
+
+  it('requires the destination branch to be ACTIVE (archived branches are write-proof)', async () => {
+    const { prisma, svc } = wire();
+    await svc.create(SCOPE, 'u1', dto as any, []);
+    const where = prisma.branch.findFirst.mock.calls[0][0].where;
+    expect(where.status).toBe('active');
+  });
+
+  it('rejects a destination outside a narrowed allow-list', async () => {
+    const { svc } = wire();
+    await expect(
+      svc.create(SCOPE, 'u1', dto as any, ['bA', 'bC']), // bB not allowed
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('wildcard (empty allow-list) may target any active tenant branch', async () => {
+    const { prisma, svc } = wire();
+    await svc.create(SCOPE, 'u1', dto as any, []);
+    expect(prisma.stockTransfer.create).toHaveBeenCalled();
+  });
+});
+
+describe('StockTransferService.complete — destination must be active (pass-9)', () => {
+  it('aborts when the destination branch was archived after create', async () => {
+    const prisma: any = { $transaction: jest.fn() };
+    const svc = new StockTransferService(prisma);
+    const txMock: any = {
+      stockTransfer: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tr1', transferNumber: 'TRF-1', fromBranchId: 'bA', toBranchId: 'bB',
+          items: [{ sourceStockItemId: 'sA', destStockItemId: 'sB', quantity: 5, unitCost: 2 }],
+        }),
+      },
+      branch: { findFirst: jest.fn().mockResolvedValue(null) }, // dest not active
+      stockItem: { updateMany: jest.fn() },
+      ingredientMovement: { create: jest.fn() },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+    await expect(
+      svc.complete({ tenantId: 't1', branchId: 'bA', userId: 'u1', role: 'ADMIN' } as any, 'tr1'),
+    ).rejects.toThrow(/[Dd]estination branch is not active/);
+    expect(txMock.stockItem.updateMany).not.toHaveBeenCalled();
   });
 });

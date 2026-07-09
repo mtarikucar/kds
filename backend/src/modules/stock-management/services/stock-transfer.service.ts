@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
@@ -31,12 +32,31 @@ interface CreateTransferInput {
 export class StockTransferService {
   constructor(private prisma: PrismaService) {}
 
-  async create(scope: BranchScope, userId: string, dto: CreateTransferInput) {
+  async create(
+    scope: BranchScope,
+    userId: string,
+    dto: CreateTransferInput,
+    // Caller's branch allow-list (empty = wildcard ADMIN). A narrowed user may
+    // only create transfers INTO branches they're authorized for — otherwise a
+    // source-branch manager could later complete the transfer and write stock
+    // + an arbitrary self-chosen cost basis into a branch outside their remit.
+    allowedBranchIds: string[] = [],
+  ) {
     if (dto.toBranchId === scope.branchId) {
       throw new BadRequestException("Cannot transfer to the same branch");
     }
+    if (
+      allowedBranchIds.length > 0 &&
+      !allowedBranchIds.includes(dto.toBranchId)
+    ) {
+      throw new ForbiddenException(
+        "You are not authorized for the destination branch",
+      );
+    }
+    // status:'active' — an archived/suspended branch is unreadable behind
+    // BranchGuard, so stock transferred into it would effectively vanish.
     const toBranch = await this.prisma.branch.findFirst({
-      where: { id: dto.toBranchId, tenantId: scope.tenantId },
+      where: { id: dto.toBranchId, tenantId: scope.tenantId, status: "active" },
       select: { id: true },
     });
     if (!toBranch) {
@@ -127,6 +147,21 @@ export class StockTransferService {
           include: { items: true },
         });
         if (!transfer) throw new BadRequestException("Transfer not found");
+
+        // The destination may have been archived/suspended AFTER the transfer
+        // was created — completing would move stock into a branch BranchGuard
+        // makes unreadable (it would vanish operationally). Abort instead.
+        const destBranch = await tx.branch.findFirst({
+          where: {
+            id: transfer.toBranchId,
+            tenantId: scope.tenantId,
+            status: "active",
+          },
+          select: { id: true },
+        });
+        if (!destBranch) {
+          throw new BadRequestException("Destination branch is not active");
+        }
 
         for (const item of transfer.items) {
           const dec = await tx.stockItem.updateMany({
