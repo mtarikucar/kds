@@ -1746,9 +1746,19 @@ export class OrdersService {
         // not roll back a real sale) and NEVER write negative stock — floor at
         // 0 and log an oversell.
         const newStock = raw.lt(0) ? new Prisma.Decimal(0) : raw;
+        // Record the amount that ACTUALLY left stock (cur − newStock), not the
+        // requested totalQty. On an oversell the two differ: we floor stock at
+        // 0 but only `cur` units physically existed. Recording the real
+        // decrement keeps the ledger honest AND makes the reversal symmetric —
+        // reverseProductStockForOrder credits back exactly THIS movement's
+        // quantity, so cancelling an oversold order can't mint phantom stock
+        // above the pre-sale level. (Non-oversell: removed === totalQty, so
+        // behaviour is unchanged.) Int column → round the (integer-in-practice)
+        // decrement.
+        const removed = Math.max(0, Math.round(Number(cur.sub(newStock))));
         if (raw.lt(0)) {
           this.logger.warn(
-            `Oversell on order ${order.orderNumber}: product ${product.id} qty ${totalQty} > stock ${product.currentStock} — flooring to 0`,
+            `Oversell on order ${order.orderNumber}: product ${product.id} qty ${totalQty} > stock ${product.currentStock} — flooring to 0 (removed ${removed})`,
           );
         }
 
@@ -1763,7 +1773,7 @@ export class OrdersService {
         await tx.stockMovement.create({
           data: {
             type: StockMovementType.OUT,
-            quantity: totalQty,
+            quantity: removed,
             reason: deductReason,
             productId: product.id,
             userId: order.userId ?? null,
@@ -1806,13 +1816,17 @@ export class OrdersService {
           );
         }
 
-        for (const [productId, totalQty] of qtyByProduct) {
+        for (const [productId] of qtyByProduct) {
           const product = await tx.product.findUnique({
             where: { id: productId },
           });
           if (!product || !product.stockTracked) continue;
 
-          // Only reverse what we deducted, and only once.
+          // Only reverse what we deducted, and only once. Credit back EXACTLY
+          // the OUT movement's recorded quantity (the amount that actually left
+          // stock), NOT the order's requested quantity — otherwise cancelling
+          // an oversold order would restore more than was ever removed and mint
+          // phantom stock. Non-oversell: recorded == requested, so unchanged.
           const deducted = await tx.stockMovement.findFirst({
             where: {
               productId: product.id,
@@ -1820,7 +1834,7 @@ export class OrdersService {
               type: StockMovementType.OUT,
               reason: deductReason,
             },
-            select: { id: true },
+            select: { id: true, quantity: true },
           });
           if (!deducted) continue;
           const alreadyReversed = await tx.stockMovement.findFirst({
@@ -1834,8 +1848,9 @@ export class OrdersService {
           });
           if (alreadyReversed) continue;
 
+          const creditQty = deducted.quantity;
           const newStock = new Prisma.Decimal(product.currentStock).add(
-            totalQty,
+            creditQty,
           );
           await tx.product.update({
             where: { id: product.id },
@@ -1847,7 +1862,7 @@ export class OrdersService {
           await tx.stockMovement.create({
             data: {
               type: StockMovementType.IN,
-              quantity: totalQty,
+              quantity: creditQty,
               reason: reverseReason,
               productId: product.id,
               userId: order.userId ?? null,

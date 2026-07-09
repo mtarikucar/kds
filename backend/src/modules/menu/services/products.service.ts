@@ -10,6 +10,34 @@ import { CreateProductDto } from "../dto/create-product.dto";
 import { UpdateProductDto } from "../dto/update-product.dto";
 import { sanitizePage } from "../../../common/dto/list-query.dto";
 import { UploadService } from "../../upload/upload.service";
+import {
+  resolveEffectivePrice,
+  isCampaignActive,
+} from "../../orders/services/combo-pricing";
+
+// Flatten a product's combo slots into the client shape the POS/QR combo modal
+// consumes (item.name lifted from the nested component product). Kept here so
+// the POS product list carries the SAME combo contract as the public menu.
+function shapeComboGroupsForClient(raw: any[] | undefined) {
+  return (raw ?? []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    displayName: g.displayName,
+    minSelect: g.minSelect,
+    maxSelect: g.maxSelect,
+    items: (g.items ?? [])
+      .filter((it: any) => it.componentProduct?.isAvailable !== false)
+      .map((it: any) => ({
+        id: it.id,
+        componentProductId: it.componentProductId,
+        name: it.componentProduct?.name,
+        image: it.componentProduct?.image ?? null,
+        quantity: it.quantity,
+        priceDelta: Number(it.priceDelta),
+        isDefault: it.isDefault,
+      })),
+  }));
+}
 
 @Injectable()
 export class ProductsService {
@@ -312,13 +340,47 @@ export class ProductsService {
           },
           orderBy: { displayOrder: "asc" },
         },
+        // Combo slots so the POS grid can open the combo selection modal.
+        comboGroups: {
+          orderBy: { displayOrder: "asc" },
+          include: {
+            items: {
+              orderBy: { displayOrder: "asc" },
+              include: {
+                componentProduct: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                    isAvailable: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
       take,
       skip,
     });
 
-    return products.map((product) => this.transformProductResponse(product));
+    // Decorate with the SAME campaign-aware, combo-shaped contract the public
+    // menu uses so the POS shows the charged (effective) price + strikethrough
+    // and can render combo slots. `price` becomes the effective price; the raw
+    // list price is exposed as `listPrice` when a campaign is active.
+    const now = new Date();
+    return products.map((product) => {
+      const base = this.transformProductResponse(product) as any;
+      const campaignActive = isCampaignActive(product as any, now);
+      return {
+        ...base,
+        price: resolveEffectivePrice(product as any, now),
+        listPrice: campaignActive ? Number(product.price) : undefined,
+        campaignActive,
+        comboGroups: shapeComboGroupsForClient((product as any).comboGroups),
+      };
+    });
   }
 
   async findOne(id: string, tenantId: string) {
