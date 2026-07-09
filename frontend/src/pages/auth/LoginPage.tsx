@@ -41,6 +41,11 @@ function readAndClearReturnPath(): string | null {
 const LoginPage = () => {
   const { t } = useTranslation(['auth', 'validation']);
   const [rememberMe, setRememberMe] = useState(false);
+  // Shown after a failed sign-in. The most common cause of "my password
+  // doesn't work" is an account created via Google (no password set), so the
+  // hint steers the user to the Google button / password reset. Generic (shown
+  // on every failure) so it leaks no account-existence info.
+  const [showAuthHelp, setShowAuthHelp] = useState(false);
   const location = useLocation();
   const locationState = location.state as LocationState | null;
 
@@ -111,9 +116,15 @@ const LoginPage = () => {
   }, [isAuthenticated, navigate, postLoginTarget]);
 
   const onSubmit = (data: LoginFormData) => {
+    setShowAuthHelp(false);
     login(data, {
       onSuccess: () => {
         navigate(postLoginTarget, { replace: true });
+      },
+      // Surface the "did you sign up with Google?" hint. useLogin already
+      // toasts the server message; this adds persistent, actionable guidance.
+      onError: () => {
+        setShowAuthHelp(true);
       },
     });
   };
@@ -171,6 +182,21 @@ const LoginPage = () => {
                 {locationState.message || t('auth:login.pendingApprovalMessage')}
               </p>
             </div>
+          </motion.div>
+        )}
+
+        {/* Failed-login helper: most "password doesn't work" cases are
+        Google-created accounts (no password). Steer to the Google button /
+        reset. Shown generically so it reveals no account-existence info. */}
+        {showAuthHelp && (
+          <motion.div
+            variants={itemVariants}
+            className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3"
+          >
+            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <p className="text-blue-800 text-sm">
+              {t('auth:login.authHelp')}
+            </p>
           </motion.div>
         )}
 

@@ -69,6 +69,41 @@ export function isTenantWidePath(url: string | undefined): boolean {
   });
 }
 
+/**
+ * The @Public auth endpoints authenticate a CREDENTIAL, not a session: a 401
+ * from POST /auth/login means "wrong email/password", from /auth/google a bad
+ * OAuth token, from /auth/reset-password an expired reset token. These must NOT
+ * run the session-expiry recovery in the response interceptor below (refresh →
+ * hard-redirect to /login). Doing so fires a pointless /auth/refresh (no valid
+ * cookie → 401) and then `window.location.href = /login`, whose full page
+ * reload WIPES the error toast the login form is showing. The user then sees a
+ * mysterious bounce back to a blank /login with NO message instead of "Invalid
+ * email or password" — a simple typo becomes an unexplained "it logs in but
+ * returns to login". Let these reject straight through so the caller's onError
+ * surfaces the real message and the page stays put.
+ *
+ * Only the @Public credential routes belong here. Authenticated auth routes
+ * (/auth/logout, /auth/complete-profile, /auth/change-password,
+ * /auth/resend-verification, /auth/demo-session) are deliberately excluded —
+ * a 401 from those IS an expired session and SHOULD refresh + bounce.
+ */
+const AUTH_CREDENTIAL_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/google",
+  "/auth/apple",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/verify-email",
+  "/auth/refresh",
+];
+
+export function isAuthCredentialPath(url: string | undefined): boolean {
+  if (!url) return false;
+  const path = url.split("?")[0];
+  return AUTH_CREDENTIAL_PATHS.some((p) => path === p || path.endsWith(p));
+}
+
 const API_BASE_URL = API_URL;
 
 // withCredentials: true so the httpOnly refresh cookie is sent on
@@ -166,6 +201,16 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // A failure from the @Public credential endpoints is a bad-credential /
+    // bad-input error, NOT an expired session. Reject straight through so the
+    // caller's onError shows the real message ("Invalid email or password")
+    // instead of the session-expiry recovery below firing a refresh and
+    // hard-reloading to /login, which wipes that toast and looks like a
+    // mysterious bounce. See isAuthCredentialPath above.
+    if (isAuthCredentialPath(originalRequest?.url)) {
+      return Promise.reject(error);
+    }
 
     // Onboarding-trial lock backstop: the backend SubscriptionStatusGuard 403s a
     // locked (TRIAL_ENDED / EXPIRED) tenant with errorCode
