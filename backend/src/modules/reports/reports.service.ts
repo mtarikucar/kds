@@ -224,10 +224,14 @@ export class ReportsService {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const branchScope = branchId ? { branchId } : {};
 
-    // Get top selling products
+    // Get top selling products. Exclude the 0₺ combo PARENT line (its product
+    // is the COMBO itself) — the revenue lives on the component child lines, so
+    // a combo would otherwise surface as a 0-revenue product. Children +
+    // standalone items (STANDARD) carry the real per-component revenue.
     const topProducts = await this.prisma.orderItem.groupBy({
       by: ["productId"],
       where: {
+        product: { productType: { not: "COMBO" } },
         order: {
           tenantId,
           ...branchScope,

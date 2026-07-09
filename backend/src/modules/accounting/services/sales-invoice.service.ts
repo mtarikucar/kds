@@ -112,8 +112,21 @@ export class SalesInvoiceService {
     // nonsensical, but if gross is 0 there is nothing to apportion against.
     const hasDiscount = orderDiscount.gt(0) && orderGross.gt(0);
 
+    // Combo lines: the 0₺ parent is a grouping row (money + KDV live on its
+    // children). Exclude parents from the invoice so no bogus 0₺/0% line is
+    // written — children + standalone items still reconcile to finalAmount
+    // (the parent contributes 0 to every sum). Same leaf-filter as the fiş.
+    const comboParentIds = new Set(
+      order.orderItems
+        .filter((it) => it.parentOrderItemId)
+        .map((it) => it.parentOrderItemId),
+    );
+    const leafItems = order.orderItems.filter(
+      (it) => !comboParentIds.has(it.id),
+    );
+
     // First pass: validate quantities and capture each line's gross.
-    const lineGross = order.orderItems.map((item) => {
+    const lineGross = leafItems.map((item) => {
       // quantity===0 would back-calc unitPrice as NaN and persist into the
       // Decimal column, breaking downstream math and tax-authority XML.
       if (!item.quantity || item.quantity <= 0) {
@@ -146,7 +159,7 @@ export class SalesInvoiceService {
       }
     }
 
-    const invoiceItems = order.orderItems.map((item, i) => {
+    const invoiceItems = leafItems.map((item, i) => {
       const taxRate = item.taxRate ?? 10;
       // extractTax pulls the KDV component out of the (now net) inclusive
       // line gross, so subtotal/taxAmount reconcile to the discounted total.
