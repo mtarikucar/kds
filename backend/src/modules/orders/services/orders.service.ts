@@ -302,11 +302,24 @@ export class OrdersService {
         })),
       };
 
+      // Normalize selections: the POS reopen path (mapOrderItemsToCart) can
+      // only reconstruct componentProductId from the stored children, not the
+      // groupId — resolve an empty/unknown groupId by finding the slot that
+      // offers that component. Lets update()/re-save re-explode a reopened
+      // combo without losing which slot each component filled.
+      const normalizedSelections = (item.comboSelections ?? []).map((sel) => {
+        if (sel.groupId) return sel;
+        const g = catalog.groups.find((gr) =>
+          gr.items.some((it) => it.componentProductId === sel.componentProductId),
+        );
+        return { groupId: g?.id ?? "", componentProductId: sel.componentProductId };
+      });
+
       let exploded;
       try {
         exploded = explodeComboLine(
           catalog,
-          item.comboSelections ?? [],
+          normalizedSelections,
           item.quantity,
           now,
         );
@@ -986,22 +999,11 @@ export class OrdersService {
       customerName: updateOrderDto.customerName,
     };
 
+    // Combo children written in the atomic second step of the item rewrite.
+    let comboChildren: any[] = [];
+
     // If items are provided, update the order items
     if (updateOrderDto.items && updateOrderDto.items.length > 0) {
-      // Combos can't be edited in place (v1): this rewrite path prices flat
-      // lines and would strip a combo's children + per-line KDV, minting a
-      // wrong bill. Force a remove-&-re-add instead (money-safety guard).
-      const orderHasCombo = ((order as any).orderItems ?? []).some(
-        (oi: any) =>
-          oi.parentOrderItemId != null ||
-          oi.product?.productType === "COMBO",
-      );
-      if (orderHasCombo) {
-        throw new BadRequestException(
-          "Kombo içeren sipariş kalem bazında düzenlenemez — komboyu kaldırıp yeniden ekleyin",
-        );
-      }
-
       // Validate all products exist and belong to tenant
       // (Product/Modifier are tenant-scoped catalog rows, not branch-scoped.)
       // Eager-load modifier groups so update() enforces the SAME
@@ -1026,6 +1028,30 @@ export class OrdersService {
               },
             },
           },
+          // Combo slots so update() can re-explode a combo line (POS reopen +
+          // add-items keeps the combo priced correctly instead of rejecting).
+          comboGroups: {
+            orderBy: { displayOrder: "asc" },
+            include: {
+              items: {
+                orderBy: { displayOrder: "asc" },
+                include: {
+                  componentProduct: {
+                    select: {
+                      id: true,
+                      name: true,
+                      price: true,
+                      taxRate: true,
+                      isAvailable: true,
+                      campaignPrice: true,
+                      campaignStartAt: true,
+                      campaignEndAt: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -1040,14 +1066,6 @@ export class OrdersService {
       if (unavailableProducts.length > 0) {
         throw new BadRequestException(
           `Products not available: ${unavailableProducts.map((p) => p.name).join(", ")}`,
-        );
-      }
-
-      // A COMBO can't be introduced via PATCH — combos are chosen at order
-      // creation (POS/QR) where the slot selections are collected.
-      if (products.some((p) => (p as any).productType === "COMBO")) {
-        throw new BadRequestException(
-          "Kombo ürün bu ekrandan eklenemez — kombolar sipariş oluştururken seçilir",
         );
       }
 
@@ -1093,16 +1111,37 @@ export class OrdersService {
       // Build product price map from DB (never trust client-supplied prices)
       const productMap = new Map(products.map((p) => [p.id, p]));
 
-      // Calculate new totals using server-side prices — same pure line-item
-      // pricing math as createInner(), extracted into OrderPricingCalculator
-      // (wave-d2 split). The discount POLICY (cap via Math.min) stays inline.
-      const { orderItems, totalAmount, totalTaxAmount } =
-        this.pricingCalculator.priceItems(
-          updateOrderDto.items,
-          productMap,
-          modifierMap,
-          this.taxCalculationService,
-        );
+      // Calculate new totals using server-side prices. STANDARD items go
+      // through the pure calculator (campaign-aware); COMBO items explode into
+      // a 0₺ parent + qty-1 children — same split as createInner so a reopened
+      // combo table can be re-saved (add items) without losing/mis-pricing the
+      // combo. Children are written in the atomic second step below.
+      const now = new Date();
+      const standardDtoItems = updateOrderDto.items.filter(
+        (i) => (productMap.get(i.productId) as any)?.productType !== "COMBO",
+      );
+      const comboDtoItems = updateOrderDto.items.filter(
+        (i) => (productMap.get(i.productId) as any)?.productType === "COMBO",
+      );
+      const standard = this.pricingCalculator.priceItems(
+        standardDtoItems,
+        productMap,
+        modifierMap,
+        this.taxCalculationService,
+        now,
+      );
+      const combo = this.buildComboOrderItems(
+        comboDtoItems as any,
+        productMap as any,
+        now,
+      );
+      const orderItems = [...standard.orderItems, ...combo.parents];
+      comboChildren = combo.children;
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      const totalAmount = round2(standard.totalAmount + combo.totalAmount);
+      const totalTaxAmount = round2(
+        standard.totalTaxAmount + combo.totalTaxAmount,
+      );
 
       const rawDiscount =
         updateOrderDto.discount !== undefined
@@ -1261,38 +1300,37 @@ export class OrdersService {
         await this.ensureNoInFlightSelfPayIntent(tx, id, scope.tenantId);
         await tx.orderItem.deleteMany({ where: { orderId: id } });
       }
-      return tx.order.update({
-        where: { id },
-        data: updateData,
-        include: {
-          orderItems: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  price: true,
-                  image: true,
-                },
-              },
-            },
-          },
-          table: {
-            select: {
-              id: true,
-              number: true,
-              section: true,
-            },
-          },
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
+      const updateInclude = {
+        orderItems: {
+          include: {
+            product: {
+              select: { id: true, name: true, price: true, image: true },
             },
           },
         },
+        table: { select: { id: true, number: true, section: true } },
+        user: { select: { id: true, firstName: true, lastName: true } },
+      } satisfies Prisma.OrderInclude;
+
+      const updated = await tx.order.update({
+        where: { id },
+        data: updateData,
+        include: updateInclude,
       });
+
+      // Combo children reference the (now-created) parent + the order, so they
+      // are written in the same atomic tx AFTER the parents exist, then the
+      // order is re-read with the full response shape.
+      if (comboChildren.length > 0) {
+        await tx.orderItem.createMany({
+          data: comboChildren.map((c) => ({ ...c, orderId: id })),
+        });
+        return tx.order.findUniqueOrThrow({
+          where: { id },
+          include: updateInclude,
+        });
+      }
+      return updated;
     });
 
     // Always emit to kitchen via WebSocket when order is updated
