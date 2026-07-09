@@ -39,6 +39,15 @@ export class CreatePaymentDto {
   @IsEnum(PaymentMethod)
   method: PaymentMethod;
 
+  // Tip recorded with this payment (informational, not part of `amount`).
+  // Drives the tips report + payroll.
+  @ApiPropertyOptional({ description: "Tip amount recorded with this payment" })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10_000_000)
+  @IsOptional()
+  tipAmount?: number;
+
   // 500 chars — generous for "Customer left a tip" / "Manager
   // discretion: comped dessert" but not a 100KB blob. Notes land
   // in the Payment audit row, which is reprinted on the receipt

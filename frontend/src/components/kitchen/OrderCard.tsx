@@ -225,39 +225,72 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTou
           </div>
         </div>
 
-        {/* Order Items */}
+        {/* Order Items. Combo lines arrive as a parent (grouping) row + child
+            rows (parentOrderItemId set); render each combo as a header with its
+            components indented beneath, and skip children from the flat list. */}
         <div className="space-y-1.5 mb-3">
-          {(order.orderItems || order.items || []).map((item) => (
-            <div key={item.id} className="flex items-start justify-between text-sm">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className={kioskItemNameText(kiosk)}>
-                    {item.product?.name}
-                  </span>
-                </div>
-                {/* Modifiers */}
-                {item.modifiers && item.modifiers.length > 0 && (
-                  <div className="mt-0.5 space-y-0.5">
-                    {item.modifiers.map((mod: any) => (
-                      <p key={mod.id} className="text-xs text-blue-600 pl-2">
-                        + {mod.modifier?.name || mod.name}
-                        {mod.quantity > 1 && ` x${mod.quantity}`}
+          {(() => {
+            const allItems = (order.orderItems || order.items || []) as any[];
+            const childrenByParent = new Map<string, any[]>();
+            for (const it of allItems) {
+              if (it.parentOrderItemId) {
+                const arr = childrenByParent.get(it.parentOrderItemId) ?? [];
+                arr.push(it);
+                childrenByParent.set(it.parentOrderItemId, arr);
+              }
+            }
+            const topLevel = allItems.filter((it) => !it.parentOrderItemId);
+            return topLevel.map((item) => {
+              const comboChildren = childrenByParent.get(item.id) ?? [];
+              const isCombo = comboChildren.length > 0;
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-start justify-between text-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className={kioskItemNameText(kiosk)}>
+                        {item.product?.name}
+                      </span>
+                    </div>
+                    {/* Combo components (indented) */}
+                    {isCombo && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {comboChildren.map((child: any) => (
+                          <p
+                            key={child.id}
+                            className="text-xs text-emerald-700 pl-2"
+                          >
+                            • {child.product?.name}
+                            {child.quantity > 1 && ` x${child.quantity}`}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {/* Modifiers */}
+                    {item.modifiers && item.modifiers.length > 0 && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {item.modifiers.map((mod: any) => (
+                          <p key={mod.id} className="text-xs text-blue-600 pl-2">
+                            + {mod.modifier?.name || mod.name}
+                            {mod.quantity > 1 && ` x${mod.quantity}`}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {/* Item Notes */}
+                    {item.notes && (
+                      <p className="text-xs text-slate-500 italic mt-0.5 pl-2">
+                        {item.notes}
                       </p>
-                    ))}
+                    )}
                   </div>
-                )}
-                {/* Item Notes */}
-                {item.notes && (
-                  <p className="text-xs text-slate-500 italic mt-0.5 pl-2">
-                    {item.notes}
-                  </p>
-                )}
-              </div>
-              <span className={kioskQtyText(kiosk)}>
-                x{item.quantity}
-              </span>
-            </div>
-          ))}
+                  <span className={kioskQtyText(kiosk)}>x{item.quantity}</span>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Order Notes */}

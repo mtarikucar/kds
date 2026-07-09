@@ -90,3 +90,7 @@ test-results/
 .last-deployment-images
 .env.production.rendered
 .env.test.rendered
+
+# local live-test harness (not portable)
+frontend/__live/
+frontend/.env.local

@@ -154,6 +154,131 @@ describe("OrdersService.deductStockForOrder — userless orders", () => {
     expect(updateArg.data.currentStock.toString()).toBe("0");
     expect(updateArg.data.isAvailable).toBe(false);
   });
+
+  it("records the ACTUAL removed quantity on oversell (cur, not requested) so a later reversal can't mint phantom stock", async () => {
+    jest.spyOn(service, "findOneByTenant").mockResolvedValue({
+      id: "order-5",
+      orderNumber: "ORD-5",
+      userId: null,
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      orderItems: [{ productId: "p-1", quantity: 3 }], // sell 3
+    } as any);
+    (prisma.product.findUnique as any).mockResolvedValue({
+      id: "p-1",
+      name: "Cola",
+      stockTracked: true,
+      currentStock: new Prisma.Decimal("1"), // only 1 exists
+    });
+    (prisma.stockMovement.findFirst as any).mockResolvedValue(null);
+    (prisma.product.update as any).mockResolvedValue({});
+    (prisma.stockMovement.create as any).mockResolvedValue({});
+
+    await service.deductStockForOrder("order-5", "tenant-1");
+
+    // OUT movement records 1 (what left stock), NOT 3 (requested).
+    expect(prisma.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: "OUT", productId: "p-1", quantity: 1 }),
+      }),
+    );
+  });
+});
+
+describe("OrdersService stock — combo: two lines of the same product", () => {
+  let service: OrdersService;
+  let prisma: MockPrismaClient;
+
+  beforeEach(async () => {
+    prisma = mockPrismaClient();
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb(prisma),
+    );
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        ReceiptSnapshotBuilder,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: KdsGateway,
+          useValue: { emitNewOrder: jest.fn(), emitLowStockAlert: jest.fn() },
+        },
+      ],
+    }).compile();
+    service = module.get(OrdersService);
+  });
+
+  it("deducts the SUMMED quantity once — the old (order,product) key dropped the 2nd line", async () => {
+    // A combo cola child (qty 1) + a standalone cola line (qty 2). Same product.
+    jest.spyOn(service, "findOneByTenant").mockResolvedValue({
+      id: "order-c",
+      orderNumber: "ORD-C",
+      userId: null,
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      orderItems: [
+        { productId: "p-cola", quantity: 1, parentOrderItemId: "parent-1" },
+        { productId: "p-cola", quantity: 2 },
+      ],
+    } as any);
+    (prisma.product.findUnique as any).mockResolvedValue({
+      id: "p-cola",
+      name: "Cola",
+      stockTracked: true,
+      currentStock: new Prisma.Decimal("10"),
+    });
+    (prisma.stockMovement.findFirst as any).mockResolvedValue(null);
+    (prisma.product.update as any).mockResolvedValue({});
+    (prisma.stockMovement.create as any).mockResolvedValue({});
+
+    await service.deductStockForOrder("order-c", "tenant-1");
+
+    // ONE deduction, qty 3 (1 + 2), stock 10 → 7.
+    expect(prisma.product.update).toHaveBeenCalledTimes(1);
+    const updateArg = (prisma.product.update as any).mock.calls[0][0];
+    expect(updateArg.data.currentStock.toString()).toBe("7");
+    expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
+    expect(prisma.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ productId: "p-cola", quantity: 3 }),
+      }),
+    );
+  });
+
+  it("reverses the SUMMED quantity once (symmetric)", async () => {
+    jest.spyOn(service, "findOneByTenant").mockResolvedValue({
+      id: "order-c",
+      orderNumber: "ORD-C",
+      userId: null,
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      orderItems: [
+        { productId: "p-cola", quantity: 1, parentOrderItemId: "parent-1" },
+        { productId: "p-cola", quantity: 2 },
+      ],
+    } as any);
+    (prisma.product.findUnique as any).mockResolvedValue({
+      id: "p-cola",
+      name: "Cola",
+      stockTracked: true,
+      currentStock: new Prisma.Decimal("7"),
+    });
+    (prisma.stockMovement.findFirst as any)
+      .mockResolvedValueOnce({ id: "out-1", quantity: 3 }) // was deducted (recorded 3)
+      .mockResolvedValueOnce(null); // not yet reversed
+    (prisma.product.update as any).mockResolvedValue({});
+    (prisma.stockMovement.create as any).mockResolvedValue({});
+
+    await service.reverseProductStockForOrder("order-c", "tenant-1");
+
+    const updateArg = (prisma.product.update as any).mock.calls[0][0];
+    expect(updateArg.data.currentStock.toString()).toBe("10"); // 7 + 3
+    expect(prisma.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ quantity: 3, type: "IN" }),
+      }),
+    );
+  });
 });
 
 describe("OrdersService.reverseProductStockForOrder", () => {
@@ -196,9 +321,9 @@ describe("OrdersService.reverseProductStockForOrder", () => {
   });
 
   it("restores currentStock with a compensating IN when the order was deducted", async () => {
-    // findFirst #1 (was-deducted? → yes), #2 (already-reversed? → no)
+    // findFirst #1 (was-deducted? → yes, recorded 2), #2 (already-reversed? → no)
     (prisma.stockMovement.findFirst as any)
-      .mockResolvedValueOnce({ id: "out-1" })
+      .mockResolvedValueOnce({ id: "out-1", quantity: 2 })
       .mockResolvedValueOnce(null);
 
     await service.reverseProductStockForOrder("order-1", "tenant-1");
@@ -226,7 +351,7 @@ describe("OrdersService.reverseProductStockForOrder", () => {
   it("is idempotent — does not double-credit when a reversal already exists", async () => {
     // #1 was-deducted? → yes; #2 already-reversed? → yes
     (prisma.stockMovement.findFirst as any)
-      .mockResolvedValueOnce({ id: "out-1" })
+      .mockResolvedValueOnce({ id: "out-1", quantity: 2 })
       .mockResolvedValueOnce({ id: "rev-1" });
     await service.reverseProductStockForOrder("order-1", "tenant-1");
     expect(prisma.product.update).not.toHaveBeenCalled();

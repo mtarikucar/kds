@@ -96,6 +96,9 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
             modifierId: m.id,
             quantity: m.quantity,
           })),
+          ...(item.comboSelections && item.comboSelections.length
+            ? { comboSelections: item.comboSelections }
+            : {}),
           notes: item.notes,
         })),
       });

@@ -1,7 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Minus, Check } from 'lucide-react';
-import { Product, ModifierGroup, Modifier, SelectionType } from '../../types';
+import {
+  Product,
+  ModifierGroup,
+  Modifier,
+  SelectionType,
+  ComboGroup,
+  ComboItem,
+  ComboSelectionInput,
+} from '../../types';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -17,7 +25,12 @@ interface ProductOptionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product;
-  onAddToCart: (product: Product, quantity: number, modifiers: SelectedModifier[]) => void;
+  onAddToCart: (
+    product: Product,
+    quantity: number,
+    modifiers: SelectedModifier[],
+    comboSelections?: ComboSelectionInput[],
+  ) => void;
 }
 
 const ProductOptionsModal = ({
@@ -31,14 +44,56 @@ const ProductOptionsModal = ({
 
   const [quantity, setQuantity] = useState(1);
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, SelectedModifier[]>>(new Map());
+  const [comboSelections, setComboSelections] = useState<Map<string, string[]>>(
+    new Map(),
+  );
+  const isCombo = product.productType === 'COMBO';
 
-  // Reset state when modal opens with a new product
+  // Reset state when modal opens with a new product; preselect combo defaults.
   useEffect(() => {
     if (isOpen) {
       setQuantity(1);
       setSelectedModifiers(new Map());
+      const initialCombo = new Map<string, string[]>();
+      (product.comboGroups ?? []).forEach((g) => {
+        initialCombo.set(
+          g.id,
+          g.items
+            .filter((i) => i.isDefault)
+            .map((i) => i.componentProductId)
+            .slice(0, g.maxSelect),
+        );
+      });
+      setComboSelections(initialCombo);
     }
-  }, [isOpen, product.id]);
+  }, [isOpen, product.id, product.comboGroups]);
+
+  const handleComboToggle = (group: ComboGroup, item: ComboItem) => {
+    setComboSelections((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(group.id) || [];
+      const selected = cur.includes(item.componentProductId);
+      if (group.maxSelect === 1) {
+        next.set(group.id, [item.componentProductId]);
+      } else if (selected) {
+        next.set(group.id, cur.filter((x) => x !== item.componentProductId));
+      } else if (cur.length < group.maxSelect) {
+        next.set(group.id, [...cur, item.componentProductId]);
+      }
+      return next;
+    });
+  };
+
+  const comboUnitPrice = (): number => {
+    let total = Number(product.price);
+    (product.comboGroups ?? []).forEach((g) => {
+      (comboSelections.get(g.id) || []).forEach((cid) => {
+        const it = g.items.find((i) => i.componentProductId === cid);
+        if (it) total += Number(it.priceDelta) * (it.quantity ?? 1);
+      });
+    });
+    return total;
+  };
 
   const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
     setSelectedModifiers((prev) => {
@@ -90,6 +145,12 @@ const ProductOptionsModal = ({
   };
 
   const canAddToCart = (): boolean => {
+    if (isCombo) {
+      for (const g of product.comboGroups ?? []) {
+        const n = (comboSelections.get(g.id) || []).length;
+        if (n < g.minSelect || n > g.maxSelect) return false;
+      }
+    }
     if (!product.modifierGroups) return true;
 
     for (const group of product.modifierGroups) {
@@ -105,14 +166,15 @@ const ProductOptionsModal = ({
   };
 
   const calculateTotal = useMemo(() => {
-    let total = Number(product.price);
+    let total = isCombo ? comboUnitPrice() : Number(product.price);
     selectedModifiers.forEach((modifiers) => {
       modifiers.forEach((mod) => {
         total += mod.priceAdjustment * mod.quantity;
       });
     });
     return total * quantity;
-  }, [product.price, selectedModifiers, quantity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.price, selectedModifiers, comboSelections, quantity]);
 
   const handleAddToCart = () => {
     if (!canAddToCart()) return;
@@ -122,11 +184,31 @@ const ProductOptionsModal = ({
       allModifiers.push(...modifiers);
     });
 
-    onAddToCart(product, quantity, allModifiers);
+    let comboSel: ComboSelectionInput[] | undefined;
+    let productForCart = product;
+    if (isCombo) {
+      comboSel = [];
+      (product.comboGroups ?? []).forEach((g) => {
+        (comboSelections.get(g.id) || []).forEach((cid) =>
+          comboSel!.push({ groupId: g.id, componentProductId: cid }),
+        );
+      });
+      // Fold the chosen slot deltas into the line price so the cart total math
+      // (which reads item.price) is correct without a combo special-case.
+      productForCart = { ...product, price: comboUnitPrice() };
+    }
+
+    onAddToCart(
+      productForCart,
+      quantity,
+      allModifiers,
+      comboSel && comboSel.length ? comboSel : undefined,
+    );
     onClose();
   };
 
   const hasModifierGroups = product.modifierGroups && product.modifierGroups.length > 0;
+  const hasComboGroups = isCombo && (product.comboGroups?.length ?? 0) > 0;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={product.name} size="lg">
@@ -144,9 +226,100 @@ const ProductOptionsModal = ({
             )}
             <div className="flex-1">
               <p className="text-slate-600 text-sm line-clamp-2">{product.description}</p>
-              <p className="text-xl font-bold text-blue-600 mt-1">{formatPrice(product.price)}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {isCombo && (
+                  <span className="text-xs font-medium text-slate-400">
+                    {t('startingFrom', 'başlangıç')}
+                  </span>
+                )}
+                <p className="text-xl font-bold text-blue-600">
+                  {formatPrice(product.price)}
+                </p>
+                {product.campaignActive && product.listPrice != null && (
+                  <>
+                    <span className="text-sm text-slate-400 line-through">
+                      {formatPrice(product.listPrice)}
+                    </span>
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                      {product.campaignLabel || t('campaign', 'Kampanya')}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Combo slots */}
+          {hasComboGroups &&
+            product.comboGroups!.map((group) => {
+              const n = (comboSelections.get(group.id) || []).length;
+              return (
+                <div key={group.id} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-800">
+                      {group.displayName || group.name}
+                    </h3>
+                    {(n < group.minSelect || n > group.maxSelect) && (
+                      <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
+                        {t('required', 'Zorunlu')}
+                      </span>
+                    )}
+                    {group.maxSelect > 1 && (
+                      <span className="text-xs text-slate-500">
+                        (en çok {group.maxSelect})
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {group.items.map((item) => {
+                      const isSelected = (
+                        comboSelections.get(group.id) || []
+                      ).includes(item.componentProductId);
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleComboToggle(group, item)}
+                          className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                isSelected
+                                  ? 'border-blue-500 bg-blue-500'
+                                  : 'border-slate-300'
+                              }`}
+                            >
+                              {isSelected && (
+                                <Check className="w-3 h-3 text-white" />
+                              )}
+                            </div>
+                            <span
+                              className={`font-medium ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}
+                            >
+                              {item.quantity && item.quantity > 1
+                                ? `${item.quantity}× `
+                                : ''}
+                              {item.name}
+                            </span>
+                          </div>
+                          {Number(item.priceDelta) > 0 && (
+                            <span
+                              className={`text-sm font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}
+                            >
+                              +{formatPrice(Number(item.priceDelta))}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
 
           {/* Modifier Groups */}
           {hasModifierGroups && product.modifierGroups!.map((group) => (

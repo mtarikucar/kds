@@ -16,6 +16,9 @@ import {
   Modifier,
   CartModifier,
   SelectionType,
+  ComboGroup,
+  ComboItem,
+  ComboSelectionInput,
 } from "../../types";
 import { formatCurrency, cn } from "../../lib/utils";
 import { useCartStore } from "../../store/cartStore";
@@ -55,8 +58,15 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   const [selectedModifiers, setSelectedModifiers] = useState<
     Map<string, CartModifier[]>
   >(new Map());
+  // Combo slot picks: groupId → chosen componentProductId[]. Defaults are
+  // preselected on open.
+  const [comboSelections, setComboSelections] = useState<Map<string, string[]>>(
+    new Map(),
+  );
   const [showSuccess, setShowSuccess] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const isCombo = product?.productType === "COMBO";
 
   useEffect(() => {
     if (isOpen && product) {
@@ -64,11 +74,22 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
       setNotes("");
       setSelectedModifiers(new Map());
       setShowSuccess(false);
-      const requiredGroups = new Set(
-        product.modifierGroups
+      // Preselect combo defaults; expand required modifier + all combo groups.
+      const initialCombo = new Map<string, string[]>();
+      (product.comboGroups ?? []).forEach((g) => {
+        const defs = g.items
+          .filter((i) => i.isDefault)
+          .map((i) => i.componentProductId)
+          .slice(0, g.maxSelect);
+        initialCombo.set(g.id, defs);
+      });
+      setComboSelections(initialCombo);
+      const requiredGroups = new Set([
+        ...(product.modifierGroups
           ?.filter((g) => g.isRequired || g.minSelections > 0)
-          .map((g) => g.id) || [],
-      );
+          .map((g) => g.id) || []),
+        ...(product.comboGroups ?? []).map((g) => `combo:${g.id}`),
+      ]);
       setExpandedGroups(requiredGroups);
     }
   }, [isOpen, product]);
@@ -165,7 +186,51 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     return (selectedModifiers.get(groupId) || []).length;
   };
 
+  // ── Combo slot selection ──────────────────────────────────────────────
+  const isComboSelected = (groupId: string, componentId: string): boolean =>
+    (comboSelections.get(groupId) || []).includes(componentId);
+
+  const handleComboToggle = (group: ComboGroup, item: ComboItem) => {
+    setComboSelections((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(group.id) || [];
+      const selected = cur.includes(item.componentProductId);
+      if (group.maxSelect === 1) {
+        // Radio: always land on the tapped option (a required single slot
+        // never empties).
+        next.set(group.id, [item.componentProductId]);
+      } else if (selected) {
+        next.set(
+          group.id,
+          cur.filter((x) => x !== item.componentProductId),
+        );
+      } else if (cur.length < group.maxSelect) {
+        next.set(group.id, [...cur, item.componentProductId]);
+      }
+      return next;
+    });
+  };
+
+  // Per-unit combo price = effective combo base + Σ chosen slot priceDelta*qty.
+  const comboUnitPrice = (): number => {
+    let total = Number(product.price);
+    (product.comboGroups ?? []).forEach((g) => {
+      (comboSelections.get(g.id) || []).forEach((cid) => {
+        const it = g.items.find((i) => i.componentProductId === cid);
+        if (it) total += Number(it.priceDelta) * (it.quantity ?? 1);
+      });
+    });
+    return total;
+  };
+
   const canAddToCart = (): boolean => {
+    // Combo slots must each satisfy their min/max before adding.
+    if (isCombo) {
+      for (const g of product.comboGroups ?? []) {
+        const n = (comboSelections.get(g.id) || []).length;
+        if (n < g.minSelect || n > g.maxSelect) return false;
+      }
+    }
     if (!product.modifierGroups) return true;
 
     for (const group of product.modifierGroups) {
@@ -195,7 +260,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     // Number() coercion: price/priceAdjustment are typed `number` but may
     // arrive as Prisma-Decimal strings; `total += …` on a string CONCATENATES
     // and corrupts the shown price. Same defence as cartStore.calculateItemTotal.
-    let total = Number(product.price);
+    let total = isCombo ? comboUnitPrice() : Number(product.price);
     selectedModifiers.forEach((modifiers) => {
       modifiers.forEach((mod) => {
         total += Number(mod.priceAdjustment) * mod.quantity;
@@ -212,7 +277,28 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
       allModifiers.push(...modifiers);
     });
 
-    addItem(product, quantity, allModifiers, notes || undefined);
+    // For a combo, pass a product copy whose price already folds in the chosen
+    // slot deltas (so the cart's shared total math is correct) + the flat
+    // comboSelections list the backend expects.
+    let comboSel: ComboSelectionInput[] | undefined;
+    let productForCart = product;
+    if (isCombo) {
+      comboSel = [];
+      (product.comboGroups ?? []).forEach((g) => {
+        (comboSelections.get(g.id) || []).forEach((cid) =>
+          comboSel!.push({ groupId: g.id, componentProductId: cid }),
+        );
+      });
+      productForCart = { ...product, price: comboUnitPrice() };
+    }
+
+    addItem(
+      productForCart,
+      quantity,
+      allModifiers,
+      notes || undefined,
+      comboSel && comboSel.length ? comboSel : undefined,
+    );
 
     setShowSuccess(true);
     setTimeout(() => {
@@ -274,9 +360,26 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
           </h2>
 
           {showPrices && (
-            <p className="text-2xl font-black" style={{ color: primaryColor }}>
-              {formatCurrency(product.price, currency)}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {isCombo && (
+                <span className="text-sm font-medium text-slate-400">
+                  {t("qrMenu.startingFrom", "başlangıç")}
+                </span>
+              )}
+              <p className="text-2xl font-black" style={{ color: primaryColor }}>
+                {formatCurrency(product.price, currency)}
+              </p>
+              {product.campaignActive && product.listPrice != null && (
+                <>
+                  <span className="text-base font-medium text-slate-400 line-through">
+                    {formatCurrency(product.listPrice, currency)}
+                  </span>
+                  <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                    {product.campaignLabel || t("qrMenu.campaign", "Kampanya")}
+                  </span>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -311,6 +414,127 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
             className="mb-5 w-full rounded-xl bg-black"
           />
         )}
+
+        {/* Combo slots — one component per slot (radio) or up to maxSelect */}
+        {isCombo &&
+          product.comboGroups &&
+          product.comboGroups.length > 0 && (
+            <div className="mb-5 space-y-3">
+              {product.comboGroups.map((group) => {
+                const key = `combo:${group.id}`;
+                const isExpanded = expandedGroups.has(key);
+                const count = (comboSelections.get(group.id) || []).length;
+                const satisfied =
+                  count >= group.minSelect && count <= group.maxSelect;
+                return (
+                  <div
+                    key={group.id}
+                    className="border border-slate-200 rounded-2xl overflow-hidden"
+                  >
+                    <button
+                      onClick={() => toggleGroupExpanded(key)}
+                      className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-slate-900">
+                            {group.displayName || group.name}
+                          </h3>
+                          {!satisfied && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                              {t("qrMenu.required", "Zorunlu")}
+                            </span>
+                          )}
+                          {satisfied && count > 0 && (
+                            <Check
+                              className="h-4 w-4"
+                              style={{ color: primaryColor }}
+                            />
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {group.maxSelect === 1
+                            ? t("qrMenu.selectOne", "Birini seçin")
+                            : t("qrMenu.selectUpTo", `En çok ${group.maxSelect}`, {
+                                max: group.maxSelect,
+                              })}
+                        </p>
+                      </div>
+                      <motion.div
+                        animate={{ rotate: isExpanded ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <ChevronDown className="h-5 w-5 text-slate-400" />
+                      </motion.div>
+                    </button>
+
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="p-4 pt-2 flex flex-wrap gap-2">
+                            {group.items.map((item) => {
+                              const selected = isComboSelected(
+                                group.id,
+                                item.componentProductId,
+                              );
+                              return (
+                                <motion.button
+                                  key={item.id}
+                                  onClick={() => handleComboToggle(group, item)}
+                                  className={cn(
+                                    "px-4 py-2 rounded-full text-sm font-medium transition-all border-2",
+                                    selected
+                                      ? "border-transparent text-white"
+                                      : "border-slate-200 text-slate-700 hover:border-slate-300 bg-white",
+                                  )}
+                                  style={{
+                                    backgroundColor: selected
+                                      ? primaryColor
+                                      : undefined,
+                                  }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    {selected && <Check className="h-3.5 w-3.5" />}
+                                    {item.quantity && item.quantity > 1
+                                      ? `${item.quantity}× `
+                                      : ""}
+                                    {item.name}
+                                    {Number(item.priceDelta) > 0 && (
+                                      <span
+                                        className={cn(
+                                          "text-xs",
+                                          selected
+                                            ? "text-white/80"
+                                            : "text-green-600",
+                                        )}
+                                      >
+                                        +
+                                        {formatCurrency(
+                                          Number(item.priceDelta),
+                                          currency,
+                                        )}
+                                      </span>
+                                    )}
+                                  </span>
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
         {/* Modifier Groups - Accordion Style */}
         {product.modifierGroups && product.modifierGroups.length > 0 && (

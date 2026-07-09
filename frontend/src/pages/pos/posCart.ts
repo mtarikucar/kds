@@ -111,6 +111,16 @@ function modifierKeyOf(modifiers: { modifierId: string }[]): string {
     .join('-');
 }
 
+/** Stable key for a combo's slot picks so different combos stay separate lines. */
+function comboKeyOf(
+  sel?: { groupId: string; componentProductId: string }[],
+): string {
+  return (sel ?? [])
+    .map((s) => `${s.groupId}:${s.componentProductId}`)
+    .sort()
+    .join('|');
+}
+
 /**
  * Add `quantity` of `product` (with `modifiers`) to `prev`, returning the new
  * cart array. If a line already exists for the same product AND the same
@@ -123,11 +133,15 @@ export function mergeCartItem(
   product: Product,
   quantity: number,
   modifiers: SelectedModifier[],
+  comboSelections?: { groupId: string; componentProductId: string }[],
 ): CartItem[] {
   const key = modifierKeyOf(modifiers);
+  const ckey = comboKeyOf(comboSelections);
   const existingItem = prev.find(
     (item) =>
-      item.id === product.id && modifierKeyOf(item.modifiers || []) === key,
+      item.id === product.id &&
+      modifierKeyOf(item.modifiers || []) === key &&
+      comboKeyOf(item.comboSelections) === ckey,
   );
 
   if (existingItem) {
@@ -137,7 +151,7 @@ export function mergeCartItem(
         : item,
     );
   }
-  return [...prev, { ...product, quantity, modifiers }];
+  return [...prev, { ...product, quantity, modifiers, comboSelections }];
 }
 
 /**
@@ -254,21 +268,56 @@ export function mapOrderItemsToCart(
   order: Pick<Order, 'orderItems' | 'items'>,
 ): CartItem[] {
   const items: OrderItem[] = order.orderItems || order.items || [];
-  return items.map((item) => ({
-    ...(item.product as Product),
-    quantity: item.quantity,
-    notes: item.notes || undefined,
-    // deep-review FH3: round-trip line-item modifiers into the SelectedModifier
-    // shape the cart + buildOrderData expect. Without this, continuing an
-    // OCCUPIED table's order stripped every paid modifier (wrong kitchen
-    // ticket + undercharge). priceAdjustment may serialize as a string from the
-    // Decimal column, hence Number(...). `name` is display-only; buildOrderData
-    // re-emits only {modifierId, quantity} and the backend re-prices server-side.
-    modifiers: item.modifiers?.map((m) => ({
+
+  // Combo lines are stored as a 0₺ parent + qty-1 children. Re-group them into
+  // ONE cart line priced at the combo package total (Σ children subtotal) so a
+  // reopened OCCUPIED table shows the real total — NOT the parent's catalog
+  // price PLUS every component at its own catalog price (a gross overcharge).
+  const childrenByParent = new Map<string, OrderItem[]>();
+  for (const it of items) {
+    if (it.parentOrderItemId) {
+      const arr = childrenByParent.get(it.parentOrderItemId) ?? [];
+      arr.push(it);
+      childrenByParent.set(it.parentOrderItemId, arr);
+    }
+  }
+
+  const mapModifiers = (item: OrderItem) =>
+    item.modifiers?.map((m) => ({
       modifierId: m.modifierId,
       name: m.modifier?.name ?? '',
       priceAdjustment: Number(m.priceAdjustment),
       quantity: m.quantity,
-    })),
-  }));
+    }));
+
+  const result: CartItem[] = [];
+  for (const item of items) {
+    if (item.parentOrderItemId) continue; // combo child — folded into its parent
+    const kids = childrenByParent.get(item.id) ?? [];
+    if (kids.length > 0) {
+      // Combo parent → one line at the combo effective unit price (children sum
+      // / qty). comboSelections reconstructed from the children (best-effort;
+      // the reopened combo is display/whole-pay only — edits are blocked).
+      const comboTotal = kids.reduce((s, k) => s + Number(k.subtotal ?? 0), 0);
+      const qty = item.quantity || 1;
+      result.push({
+        ...(item.product as Product),
+        price: qty > 0 ? comboTotal / qty : comboTotal,
+        quantity: qty,
+        notes: item.notes || undefined,
+        comboSelections: kids.map((k) => ({ groupId: '', componentProductId: k.productId })),
+      });
+    } else {
+      // Standalone → use the CHARGED unit price (item.unitPrice), not the
+      // catalog price, so a campaign item reopens at what was actually charged.
+      result.push({
+        ...(item.product as Product),
+        price: Number(item.unitPrice ?? item.product?.price ?? 0),
+        quantity: item.quantity,
+        notes: item.notes || undefined,
+        modifiers: mapModifiers(item),
+      });
+    }
+  }
+  return result;
 }

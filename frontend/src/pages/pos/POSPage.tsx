@@ -25,7 +25,7 @@ import ManualLockDialog from '../../components/pos/ManualLockDialog';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
-import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment } from '../../types';
+import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment, ComboSelectionInput } from '../../types';
 import { useResponsive, BREAKPOINTS } from '../../hooks/useResponsive';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import Spinner from '../../components/ui/Spinner';
@@ -280,8 +280,10 @@ const POSPage = () => {
       group => group.isRequired || group.minSelections > 0
     );
 
-    if (hasRequiredModifiers) {
-      // Open options modal for modifier selection
+    // A combo must open the options modal so the cashier picks each slot; a
+    // blind add can't collect the required component selections.
+    if (product.productType === 'COMBO' || hasRequiredModifiers) {
+      // Open options modal for modifier / combo selection
       setProductForOptions(product);
       setIsProductOptionsModalOpen(true);
       return;
@@ -298,15 +300,27 @@ const POSPage = () => {
     if (currentOrderId) setCartDirtySinceOrder(true);
   }, [currentOrderId]);
 
-  const addItemToCart = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
-    // Dedup/merge rule (same product + same modifier set → increment) lives in
-    // posCart.mergeCartItem (unit-tested).
-    setCartItems((prev) => mergeCartItem(prev, product, quantity, modifiers));
+  const addItemToCart = (
+    product: Product,
+    quantity: number,
+    modifiers: SelectedModifier[],
+    comboSelections?: ComboSelectionInput[],
+  ) => {
+    // Dedup/merge rule (same product + same modifier set + same combo picks →
+    // increment) lives in posCart.mergeCartItem (unit-tested).
+    setCartItems((prev) =>
+      mergeCartItem(prev, product, quantity, modifiers, comboSelections),
+    );
     markCartDirty();
   };
 
-  const handleAddItemWithModifiers = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
-    addItemToCart(product, quantity, modifiers);
+  const handleAddItemWithModifiers = (
+    product: Product,
+    quantity: number,
+    modifiers: SelectedModifier[],
+    comboSelections?: ComboSelectionInput[],
+  ) => {
+    addItemToCart(product, quantity, modifiers, comboSelections);
     setIsProductOptionsModalOpen(false);
     setProductForOptions(null);
   };

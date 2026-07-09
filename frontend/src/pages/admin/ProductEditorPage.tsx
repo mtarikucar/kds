@@ -4,10 +4,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, ImageIcon, Sparkles, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ImageIcon,
+  Layers,
+  Sparkles,
+  Tag,
+  Trash2,
+} from "lucide-react";
 import {
   useCategories,
   useProduct,
+  useProducts,
   useCreateProduct,
   useUpdateProduct,
 } from "../../features/menu/menuApi";
@@ -18,12 +26,27 @@ import Input from "../../components/ui/Input";
 import ImageLibraryModal from "../../components/product/ImageLibraryModal";
 import Product3dPanel from "../../components/product/Product3dPanel";
 import ProductMediaPanel from "../../components/product/ProductMediaPanel";
+import ComboBuilder from "./menuManagement/ComboBuilder";
+import CollectionMultiSelect from "./menuManagement/CollectionMultiSelect";
 import {
   createProductSchema,
   type ProductFormData,
 } from "./menuManagement/menuSchemas";
 import { getImageUrl } from "./menuManagement/imageUrl";
-import type { Product, ProductImage } from "../../types";
+import type { Product, ProductImage, ComboGroupInput } from "../../types";
+
+// ISO <-> <input type="datetime-local"> (local-time) conversion for campaign
+// windows. datetime-local has no timezone; interpreting it in local time on
+// both directions round-trips correctly.
+const isoToLocalInput = (iso?: string | null): string => {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+};
+const localInputToIso = (local?: string | null): string | null =>
+  local ? new Date(local).toISOString() : null;
 
 /** A titled card section. Module-level so it isn't re-created each render
     (which would remount its inputs and drop focus while typing). */
@@ -68,6 +91,7 @@ export default function ProductEditorPage() {
 
   const { data: categories } = useCategories();
   const { data: fetchedProduct } = useProduct(routeProductId ?? "");
+  const { data: allProducts } = useProducts();
   const { mutateAsync: createProduct, isPending: isCreating } =
     useCreateProduct();
   const { mutateAsync: updateProduct, isPending: isUpdating } =
@@ -80,6 +104,10 @@ export default function ProductEditorPage() {
   const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState<
     string[]
   >([]);
+  const [comboGroups, setComboGroups] = useState<ComboGroupInput[]>([]);
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(
+    [],
+  );
   const [imageLibraryOpen, setImageLibraryOpen] = useState(false);
 
   const productForm = useForm<ProductFormData>({
@@ -106,6 +134,28 @@ export default function ProductEditorPage() {
         ? fetchedProduct.modifierGroups.map((mg) => mg.id)
         : [],
     );
+    // Hydrate combo slots + collection memberships from the GET response.
+    setComboGroups(
+      Array.isArray(fetchedProduct.comboGroups)
+        ? fetchedProduct.comboGroups.map((g) => ({
+            name: g.name,
+            displayName: g.displayName ?? undefined,
+            minSelect: g.minSelect,
+            maxSelect: g.maxSelect,
+            items: (g.items ?? []).map((it) => ({
+              componentProductId: it.componentProductId,
+              quantity: it.quantity,
+              priceDelta: Number(it.priceDelta ?? 0),
+              isDefault: it.isDefault,
+            })),
+          }))
+        : [],
+    );
+    setSelectedCollectionIds(
+      Array.isArray(fetchedProduct.collections)
+        ? fetchedProduct.collections.map((c) => c.id)
+        : [],
+    );
     productForm.reset({
       name: fetchedProduct.name,
       description: fetchedProduct.description || "",
@@ -118,17 +168,37 @@ export default function ProductEditorPage() {
       isAvailable: fetchedProduct.isAvailable ?? true,
       stockTracked: fetchedProduct.stockTracked ?? false,
       taxRate: fetchedProduct.taxRate ?? 10,
+      productType: fetchedProduct.productType ?? "STANDARD",
+      campaignPrice: fetchedProduct.campaignPrice ?? null,
+      campaignLabel: fetchedProduct.campaignLabel ?? null,
+      campaignStartAt: isoToLocalInput(fetchedProduct.campaignStartAt),
+      campaignEndAt: isoToLocalInput(fetchedProduct.campaignEndAt),
     });
   }, [fetchedProduct, product, productForm, t]);
 
   const buildSubmitData = (data: ProductFormData) => {
-    const { image, ...rest } = data;
+    const { image, campaignStartAt, campaignEndAt, ...rest } = data;
+    const productType = data.productType ?? "STANDARD";
+    const cp =
+      data.campaignPrice != null && Number(data.campaignPrice) > 0
+        ? Number(data.campaignPrice)
+        : null;
     return {
       ...rest,
       price: Number(data.price),
       currentStock: data.currentStock ? Number(data.currentStock) : 0,
       taxRate: data.taxRate != null ? Number(data.taxRate) : 10,
       imageIds: productImages.map((img) => img.id),
+      productType,
+      // Combo slots (replace-all). Empty for STANDARD so switching a combo
+      // back to standard clears its slots.
+      comboGroups: productType === "COMBO" ? comboGroups : [],
+      collectionIds: selectedCollectionIds,
+      // Campaign: null clears; a positive price + window sets it.
+      campaignPrice: cp,
+      campaignLabel: data.campaignLabel?.trim() ? data.campaignLabel.trim() : null,
+      campaignStartAt: localInputToIso(campaignStartAt),
+      campaignEndAt: localInputToIso(campaignEndAt),
       // Only send a legacy image when it's a real value — "" 400s the DTO.
       ...(image && image.trim() ? { image: image.trim() } : {}),
     };
@@ -212,7 +282,14 @@ export default function ProductEditorPage() {
 
   const saving = isCreating || isUpdating;
   const liveIngredients = productForm.watch("ingredients") || "";
+  const productType = productForm.watch("productType") ?? "STANDARD";
   const hasImage = productImages.length > 0 || !!product?.image;
+
+  // Combo component candidates: this tenant's STANDARD products, excluding the
+  // combo itself (no self-reference, no nested combos).
+  const componentOptions = (allProducts ?? [])
+    .filter((p) => p.productType !== "COMBO" && p.id !== product?.id)
+    .map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }));
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
@@ -239,6 +316,29 @@ export default function ProductEditorPage() {
             {/* Temel bilgiler */}
             <Section title={t("menu.basicInfo", "Temel bilgiler")}>
               <div className="space-y-3">
+                {/* Ürün tipi: normal vs kombo */}
+                <div className="inline-flex rounded-lg border border-slate-300 p-0.5">
+                  {(["STANDARD", "COMBO"] as const).map((pt) => (
+                    <button
+                      key={pt}
+                      type="button"
+                      onClick={() =>
+                        productForm.setValue("productType", pt, {
+                          shouldDirty: true,
+                        })
+                      }
+                      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                        productType === pt
+                          ? "bg-primary-600 text-white"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {pt === "STANDARD"
+                        ? t("menu.productTypeStandard", "Normal ürün")
+                        : t("menu.productTypeCombo", "Kombo / Menü")}
+                    </button>
+                  ))}
+                </div>
                 <Input
                   label={t("menu.itemName")}
                   error={productForm.formState.errors.name?.message}
@@ -420,7 +520,14 @@ export default function ProductEditorPage() {
                     type="number"
                     error={productForm.formState.errors.currentStock?.message}
                     {...productForm.register("currentStock", {
-                      valueAsNumber: true,
+                      // Empty → undefined (not NaN). `valueAsNumber` on a blank
+                      // field yields NaN, which the optional z.number() rejects
+                      // ("Expected number, received nan") and silently blocks
+                      // Save — hit hardest by combos, which carry no stock.
+                      setValueAs: (v) =>
+                        v === "" || v === null || v === undefined
+                          ? undefined
+                          : Number(v),
                     })}
                   />
                   <div>
@@ -459,6 +566,82 @@ export default function ProductEditorPage() {
               </div>
             </Section>
           </div>
+        </div>
+
+        {/* Full-width sections: combo builder, campaign, collections */}
+        <div className="mt-4 space-y-4">
+          {productType === "COMBO" && (
+            <Section
+              title={t("menu.comboSlots", "Kombo içeriği")}
+              icon={<Layers className="h-4 w-4 text-primary-600" />}
+            >
+              <ComboBuilder
+                groups={comboGroups}
+                onChange={setComboGroups}
+                components={componentOptions}
+              />
+            </Section>
+          )}
+
+          <Section
+            title={t("menu.campaign", "Kampanya")}
+            icon={<Tag className="h-4 w-4 text-primary-600" />}
+          >
+            <div className="space-y-3">
+              <p className="-mt-1 text-xs text-slate-500">
+                {t(
+                  "menu.campaignHint",
+                  "İndirimli fiyat girin — menüde üstü çizili liste fiyatı + rozet gösterilir. Tarih boş bırakılırsa hemen/süresiz geçerli olur. Boş bırakırsanız kampanya yoktur.",
+                )}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label={t("menu.campaignPrice", "Kampanya fiyatı (₺)")}
+                  type="number"
+                  step="0.01"
+                  {...productForm.register("campaignPrice", {
+                    setValueAs: (v) =>
+                      v === "" || v === null ? null : Number(v),
+                  })}
+                />
+                <Input
+                  label={t("menu.campaignLabel", "Rozet metni")}
+                  placeholder="%20 İndirim"
+                  {...productForm.register("campaignLabel")}
+                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    {t("menu.campaignStart", "Başlangıç")}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    {...productForm.register("campaignStartAt")}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    {t("menu.campaignEnd", "Bitiş")}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    {...productForm.register("campaignEndAt")}
+                  />
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          <Section
+            title={t("menu.collections", "Koleksiyonlar")}
+            icon={<Layers className="h-4 w-4 text-primary-600" />}
+          >
+            <CollectionMultiSelect
+              selected={selectedCollectionIds}
+              onChange={setSelectedCollectionIds}
+            />
+          </Section>
         </div>
       </form>
 

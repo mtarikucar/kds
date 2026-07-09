@@ -620,7 +620,11 @@
     "cancelAction": "Отменить",
     "noInvoices": "Счета не найдены.",
     "prev": "Назад",
-    "next": "Далее"
+    "next": "Далее",
+    "creditNoteAction": "Выставить кредит-ноту",
+    "creditNoteConfirm": "Выставить кредит-ноту по этому счету?",
+    "creditNoteIssued": "Кредит-нота создана",
+    "creditNoteError": "Не удалось выставить кредит-ноту"
   },
   "emailChannel": {
     "reservationSection": "Email — события брони",

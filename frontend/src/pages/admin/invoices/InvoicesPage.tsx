@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Receipt, Search, RefreshCw, XCircle } from 'lucide-react';
+import { Receipt, Search, RefreshCw, XCircle, Undo2 } from 'lucide-react';
 import { useGetSalesInvoices, useSyncInvoice, useCancelInvoice } from '../../../features/accounting/accountingApi';
+import { useIssueCreditNote } from '../../../features/accounting/eBelgeApi';
 
 const PAGE_SIZE = 20;
 
@@ -34,6 +35,7 @@ const InvoicesPage = () => {
   const { data, isLoading } = useGetSalesInvoices(params);
   const { mutateAsync: syncInvoice } = useSyncInvoice();
   const { mutateAsync: cancelInvoice } = useCancelInvoice();
+  const creditNote = useIssueCreditNote();
 
   const invoices = data?.data ?? [];
   const totalPages = data?.meta.totalPages ?? 1;
@@ -53,6 +55,16 @@ const InvoicesPage = () => {
       toast.success(t('accounting.cancelAction'));
     } catch {
       toast.error(t('settingsFailed'));
+    }
+  };
+
+  const handleCreditNote = async (id: string) => {
+    if (!window.confirm(t('accounting.creditNoteConfirm'))) return;
+    try {
+      await creditNote.mutateAsync(id);
+      toast.success(t('accounting.creditNoteIssued'));
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? t('accounting.creditNoteError'));
     }
   };
 
@@ -169,6 +181,18 @@ const InvoicesPage = () => {
                             className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                           >
                             <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
+                        {inv.status !== 'CANCELLED' && inv.type !== 'REFUND' && (
+                          // İade Faturası — credits the whole invoice (backend
+                          // dedupes: one credit note per original).
+                          <button
+                            onClick={() => handleCreditNote(inv.id)}
+                            disabled={creditNote.isPending}
+                            title={t('accounting.creditNoteAction')}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Undo2 className="w-4 h-4" />
                           </button>
                         )}
                         {inv.status !== 'CANCELLED' && (

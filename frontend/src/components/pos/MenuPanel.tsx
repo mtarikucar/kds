@@ -29,7 +29,11 @@ type ViewMode = 'grid' | 'list';
  * detection in POSPage.handleAddItem so the card's inline-stepper decision
  * stays in sync with which products force the ProductOptionsModal path.
  */
+// True when tapping the card must open the options modal instead of a blind
+// add: a required modifier group OR a combo (whose slots must be chosen). A
+// combo therefore never shows an inline +/- stepper.
 const hasRequiredModifiers = (product: Product): boolean =>
+  product.productType === "COMBO" ||
   !!product.modifierGroups?.some(
     (group) => group.isRequired || group.minSelections > 0,
   );
@@ -267,7 +271,14 @@ const MenuPanel = ({
                       <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1 line-clamp-1">{product.description}</p>
                     )}
                     <div className="mt-2 sm:mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-primary-600 font-bold text-base sm:text-lg leading-tight">{formatPrice(product.price)}</p>
+                      <p className="text-primary-600 font-bold text-base sm:text-lg leading-tight flex items-center gap-1.5">
+                        {product.campaignActive && product.listPrice != null && (
+                          <span className="text-xs font-medium text-slate-400 line-through">
+                            {formatPrice(product.listPrice)}
+                          </span>
+                        )}
+                        {formatPrice(product.price)}
+                      </p>
                       {showInlineSteppers ? (
                         /* Inline +/- stepper for an in-cart item (no modal).
                            Full-width on mobile (− and + pinned to the edges),
@@ -388,6 +399,11 @@ const MenuPanel = ({
                       <p className="text-sm text-slate-500 line-clamp-1 mt-0.5">{product.description}</p>
                     )}
                     <div className="flex items-center gap-2 mt-2">
+                      {product.campaignActive && product.listPrice != null && (
+                        <span className="text-sm font-medium text-slate-400 line-through">
+                          {formatPrice(product.listPrice)}
+                        </span>
+                      )}
                       <p className="text-primary-600 font-bold text-lg">{formatPrice(product.price)}</p>
                       {product.currentStock !== null && product.currentStock <= 5 && product.currentStock > 0 && (
                         <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium ring-1 ring-inset ring-amber-200/60">

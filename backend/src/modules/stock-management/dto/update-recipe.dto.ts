@@ -10,7 +10,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { RecipeIngredientDto } from "./create-recipe.dto";
+import { RecipeIngredientDto, RecipeComponentDto } from "./create-recipe.dto";
 
 // Iter-93: keep same caps as Create. Update can replace the ingredients
 // list outright; the size guard still applies.
@@ -51,4 +51,16 @@ export class UpdateRecipeDto {
   @Type(() => RecipeIngredientDto)
   @IsOptional()
   ingredients?: RecipeIngredientDto[];
+
+  @ApiPropertyOptional({
+    type: [RecipeComponentDto],
+    description: "Replace all sub-recipe components (nested BOM)",
+    maxItems: MAX_RECIPE_INGREDIENTS,
+  })
+  @IsArray()
+  @ArrayMaxSize(MAX_RECIPE_INGREDIENTS)
+  @ValidateNested({ each: true })
+  @Type(() => RecipeComponentDto)
+  @IsOptional()
+  components?: RecipeComponentDto[];
 }

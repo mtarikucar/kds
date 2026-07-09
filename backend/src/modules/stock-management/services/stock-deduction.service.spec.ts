@@ -43,8 +43,12 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
         create: jest.fn().mockResolvedValue({}),
       },
       stockItem: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1', currentStock: 0 }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+        create: jest.fn().mockResolvedValue({}),
       },
       order: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -72,6 +76,49 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
     // A reversal movement gets created (because the in-txn check
     // returned empty).
     expect(txMock.ingredientMovement.create).toHaveBeenCalled();
+    // ...and the FIFO cost layer is restored alongside currentStock, so a
+    // deduct+reverse nets to zero on the batch ledger too (pass-5 residual).
+    expect(txMock.stockBatch.create).toHaveBeenCalled();
+  });
+
+  it('clamps the restored batch layer to the currentStock headroom (oversell reversal mints no phantom units)', async () => {
+    // allowNegativeStock oversell: batches only covered 3 of a 15-unit deduct
+    // (currentStock went to -12, batches to 0). Reversing the order restores
+    // currentStock to 3 — the recreated batch layer must be 3, NOT the full 15,
+    // or Σ(batch.qty) would exceed currentStock by 12 phantom units.
+    (prisma.ingredientMovement.findMany as any).mockResolvedValueOnce([
+      {
+        id: 'm-2',
+        stockItemId: 'stock-1',
+        quantity: '-15' as any,
+        costPerUnit: '2' as any,
+        tenantId: 't1',
+        branchId: 'b1',
+        notes: 'Order ORD-2',
+      },
+    ]);
+    const txMock: any = {
+      ingredientMovement: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1', currentStock: -12 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    await svc.reverseForOrder('order-2', 't1', 'user-1');
+
+    // newStock = -12 + 15 = 3; batch sum = 0 → headroom 3 → restore exactly 3.
+    const batchArg = txMock.stockBatch.create.mock.calls[0][0].data;
+    expect(batchArg.quantity.toString()).toBe('3');
   });
 
   it('skips reversal when the in-txn check finds an existing ORDER_REVERSAL for the stockItem', async () => {
@@ -322,5 +369,130 @@ describe('StockDeductionService.deductForOrder — currentStock is the authorita
     await expect(svc.deductForOrder('ord-1', 't1', undefined, 'user-1')).rejects.toThrow(
       /Insufficient stock/,
     );
+  });
+});
+
+/**
+ * Recipe-unit conversion at deduction: an ingredient quantity in a recipe unit
+ * (G) converts to the stock base unit (KG) via conversionFactor before the
+ * stock is drawn down. Null factor = base-unit (1:1), unchanged.
+ */
+describe('StockDeductionService.deductForOrder — recipe-unit conversion', () => {
+  let prisma: MockPrismaClient;
+  let svc: StockDeductionService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      get: jest.fn().mockResolvedValue({
+        enableAutoDeduction: true,
+        deductOnStatus: null,
+        allowNegativeStock: true,
+      }),
+    };
+    svc = new StockDeductionService(prisma as any, settings);
+  });
+
+  it('deducts the base-unit quantity after applying the ingredient conversion factor', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'ord-1', orderNumber: 'ORD-1', tenantId: 't1', branchId: 'b1', stockDeducted: false,
+      orderItems: [
+        {
+          quantity: 1,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1', yield: 1,
+                ingredients: [
+                  { stockItemId: 'flour', quantity: '200', conversionFactor: '0.001', stockItem: { name: 'Flour' } },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any);
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'flour', tenantId: 't1', currentStock: '100', costPerUnit: '0', minStock: '0' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    const result: any = await svc.deductForOrder('ord-1', 't1', undefined, 'u1');
+
+    // 200 G × 0.001 (G→KG) ÷ yield 1 × qty 1 = 0.2 base units
+    expect(result.deductions[0].stockItemId).toBe('flour');
+    expect(result.deductions[0].quantity.toString()).toBe('0.2');
+    expect(txMock.stockItem.updateMany.mock.calls[0][0].data.currentStock.decrement.toString()).toBe('0.2');
+  });
+});
+
+/**
+ * Nested BOM at deduction: a recipe component (sub-recipe) is expanded into its
+ * own stock ingredients, scaled by component qty ÷ sub-recipe yield.
+ */
+describe('StockDeductionService.deductForOrder — nested BOM (sub-recipe)', () => {
+  let prisma: MockPrismaClient;
+  let svc: StockDeductionService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      get: jest.fn().mockResolvedValue({
+        enableAutoDeduction: true, deductOnStatus: null, allowNegativeStock: true,
+      }),
+    };
+    svc = new StockDeductionService(prisma as any, settings);
+  });
+
+  it('deducts both the direct ingredient and the expanded sub-recipe stock', async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: 'ord-1', orderNumber: 'O1', tenantId: 't1', branchId: 'b1', stockDeducted: false,
+      orderItems: [
+        {
+          quantity: 1,
+          product: {
+            recipes: [
+              {
+                branchId: 'b1', yield: 1,
+                ingredients: [{ stockItemId: 'pasta', quantity: '100', stockItem: { name: 'Pasta' } }],
+                components: [
+                  {
+                    quantity: '200',
+                    subRecipe: {
+                      yield: 1000,
+                      ingredients: [{ stockItemId: 'tomato', quantity: '1000', stockItem: { name: 'Tomato' } }],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    } as any);
+
+    const txMock: any = {
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'x', tenantId: 't1', currentStock: '10000', costPerUnit: '0', minStock: '0' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    const result: any = await svc.deductForOrder('ord-1', 't1', undefined, 'u1');
+    const byId: Record<string, string> = {};
+    for (const d of result.deductions) byId[d.stockItemId] = d.quantity.toString();
+    expect(byId['pasta']).toBe('100'); // direct
+    expect(byId['tomato']).toBe('200'); // 1000 × (200 ÷ 1000 sub-yield)
   });
 });

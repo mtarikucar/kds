@@ -48,6 +48,19 @@ export class StockDeductionService {
       return;
     }
 
+    // v3 branch-scope: a product carries one recipe PER BRANCH
+    // (@@unique([productId, branchId])). Prisma can't reference order.branchId
+    // from inside the same query, so pre-read it cheaply and filter the
+    // recipe include — otherwise an N-branch tenant hydrates N full BOM trees
+    // per order item and buildDeductions discards N−1 of them. The tree only
+    // needs stockItem.name here (applyDeduction re-reads rows inside the tx),
+    // so hydrate a slim select, not full StockItem rows.
+    const orderHead = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      select: { branchId: true },
+    });
+    if (!orderHead) return;
+    const slimStockItem = { select: { id: true, name: true } };
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -55,14 +68,36 @@ export class StockDeductionService {
           include: {
             product: {
               include: {
-                // v3 branch-scope: a product carries one recipe PER BRANCH
-                // (@@unique([productId, branchId])), so the relation is now
-                // one-to-many. We can't reference order.branchId from inside
-                // the query that fetches the order, so we pull the product's
-                // recipe(s) and buildDeductions selects the row matching the
-                // order's branch.
                 recipes: {
-                  include: { ingredients: { include: { stockItem: true } } },
+                  where: { branchId: orderHead.branchId },
+                  include: {
+                    ingredients: { include: { stockItem: slimStockItem } },
+                    // Nested BOM: one level of sub-recipe (prep) with its own
+                    // stock ingredients, expanded at deduction time.
+                    components: {
+                      include: {
+                        subRecipe: {
+                          include: {
+                            ingredients: {
+                              include: { stockItem: slimStockItem },
+                            },
+                            // Second BOM level (prep → sub-prep → dish).
+                            components: {
+                              include: {
+                                subRecipe: {
+                                  include: {
+                                    ingredients: {
+                                      include: { stockItem: slimStockItem },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -127,25 +162,57 @@ export class StockDeductionService {
         (r: any) => r.branchId === order.branchId,
       );
       if (!recipe) continue;
-      const yieldVal = recipe.yield || 1;
-      for (const ingredient of recipe.ingredients) {
-        const perServing = new Prisma.Decimal(ingredient.quantity).div(
-          yieldVal,
-        );
-        const needed = perServing.mul(orderItem.quantity);
-        const existing = acc.get(ingredient.stockItemId);
-        if (existing) {
-          existing.quantity = existing.quantity.add(needed);
-        } else {
-          acc.set(ingredient.stockItemId, {
-            stockItemId: ingredient.stockItemId,
-            quantity: needed,
-            stockItemName: ingredient.stockItem.name,
-          });
-        }
-      }
+      // Produce orderItem.quantity servings of this recipe; expandRecipe walks
+      // the direct ingredients and any nested sub-recipes.
+      this.expandRecipe(recipe, new Prisma.Decimal(orderItem.quantity), acc, 0);
     }
     return [...acc.values()];
+  }
+
+  /**
+   * Accumulate the base-unit stock draw for producing `servings` output units
+   * of `recipe`. Direct ingredients scale by servings ÷ yield; a sub-recipe
+   * component recurses, needing (component qty × factor × scale) of the
+   * sub-recipe's output. Recipe-unit conversionFactor applies at every level;
+   * null/≤0 factor = 1:1 (existing recipes unaffected). Depth-capped so a
+   * cyclic sub-recipe definition can't recurse forever.
+   */
+  private expandRecipe(
+    recipe: any,
+    servings: Prisma.Decimal,
+    acc: Map<string, Deduction>,
+    depth: number,
+  ) {
+    if (!recipe || depth > 6) return;
+    const yieldVal = new Prisma.Decimal(recipe.yield || 1);
+    const scale = servings.div(yieldVal);
+    const factorOf = (v: any) =>
+      v != null && new Prisma.Decimal(v).gt(0)
+        ? new Prisma.Decimal(v)
+        : new Prisma.Decimal(1);
+
+    for (const ingredient of recipe.ingredients ?? []) {
+      const needed = new Prisma.Decimal(ingredient.quantity)
+        .mul(factorOf(ingredient.conversionFactor))
+        .mul(scale);
+      const existing = acc.get(ingredient.stockItemId);
+      if (existing) {
+        existing.quantity = existing.quantity.add(needed);
+      } else {
+        acc.set(ingredient.stockItemId, {
+          stockItemId: ingredient.stockItemId,
+          quantity: needed,
+          stockItemName: ingredient.stockItem?.name,
+        });
+      }
+    }
+
+    for (const comp of recipe.components ?? []) {
+      const subServings = new Prisma.Decimal(comp.quantity)
+        .mul(factorOf(comp.conversionFactor))
+        .mul(scale);
+      this.expandRecipe(comp.subRecipe, subServings, acc, depth + 1);
+    }
   }
 
   private async applyDeduction(
@@ -352,19 +419,60 @@ export class StockDeductionService {
           if (!stockItem) continue;
 
           // Restore the FULL deducted quantity to the authoritative on-hand
-          // total. This is symmetric with deductForOrder, which now decrements
+          // total. This is symmetric with deductForOrder, which decrements
           // currentStock by the full quantity — so a deduct+reverse nets zero
-          // and no phantom stock is minted. Batches are a consume-only FIFO
-          // COST sub-ledger (like waste-logs) and are deliberately NOT restored
-          // here; the per-batch breakdown isn't recorded on the movement, and
-          // currentStock — not the batch sum — is what every consumer
-          // (counts / dashboards / oversell / alerts) treats as authoritative.
+          // and no phantom stock is minted.
           // Defence-in-depth: tenantId in the WHERE so a regression of the
           // pre-check can't expose cross-tenant stock writes.
           await tx.stockItem.updateMany({
             where: { id: movement.stockItemId, tenantId },
             data: { currentStock: { increment: reverseQty as any } },
           });
+
+          // Restore the FIFO cost layer too, so Σ(batch.qty) stays in sync with
+          // currentStock (a deduct+reverse nets to zero on the batch ledger as
+          // well). The exact consumed batches aren't recorded on the movement,
+          // so re-create a single layer at the movement's recorded cost.
+          // CLAMP to the post-reversal headroom (currentStock − Σ batch.qty):
+          // an allowNegativeStock oversell only drew batches down to 0, so
+          // restoring the FULL reverseQty would mint phantom units and push
+          // Σ(batch) ABOVE currentStock. Never let the restore exceed it.
+          // Known limitation: the restored layer carries no expiryDate (the
+          // movement doesn't record which batches were drawn), so reversed
+          // perishable units re-enter FIFO by receivedAt without expiry
+          // tracking — acceptable for a cost sub-ledger.
+          const newStock = new Prisma.Decimal(stockItem.currentStock).add(
+            reverseQty,
+          );
+          const batchAgg = await tx.stockBatch.aggregate({
+            where: {
+              stockItemId: movement.stockItemId,
+              tenantId,
+              branchId: movement.branchId,
+              quantity: { gt: 0 },
+            },
+            _sum: { quantity: true },
+          });
+          const headroom = newStock.sub(
+            new Prisma.Decimal(batchAgg._sum.quantity ?? 0),
+          );
+          const restoreQty = Prisma.Decimal.min(
+            reverseQty,
+            Prisma.Decimal.max(headroom, new Prisma.Decimal(0)),
+          );
+          if (restoreQty.gt(0)) {
+            await tx.stockBatch.create({
+              data: {
+                quantity: restoreQty as any,
+                costPerUnit: new Prisma.Decimal(
+                  movement.costPerUnit ?? stockItem.costPerUnit ?? 0,
+                ) as any,
+                stockItemId: movement.stockItemId,
+                tenantId,
+                branchId: movement.branchId,
+              },
+            });
+          }
 
           await tx.ingredientMovement.create({
             data: {

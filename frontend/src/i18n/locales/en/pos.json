@@ -318,5 +318,8 @@
     "error": "Payment error",
     "cancelled": "Charge cancelled",
     "recorded": "Payment received"
-  }
+  },
+  "campaign": "Campaign",
+  "startingFrom": "from",
+  "required": "Required"
 }

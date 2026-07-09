@@ -184,6 +184,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </button>
             )}
 
+            {/* Campaign ribbon — flags an active discount at a glance */}
+            {product.campaignActive && (
+              <span className="absolute top-2 left-2 rtl:left-auto rtl:right-2 z-10 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                {product.campaignLabel || t("qrMenu.campaign", "Kampanya")}
+              </span>
+            )}
+
             {/* Unavailable Overlay */}
             {isUnavailable && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -196,12 +203,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {/* Price Badge - Only for grid layout */}
             {showPrices && layoutStyle !== "LIST" && (
               <div
-                className="absolute bottom-2 right-2 rtl:right-auto rtl:left-2 px-2.5 py-1 rounded-lg font-bold text-sm text-white shadow-lg"
+                className="absolute bottom-2 right-2 rtl:right-auto rtl:left-2 flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-sm text-white shadow-lg"
                 style={{
                   backgroundColor: primaryColor,
                   boxShadow: `0 2px 10px ${primaryColor}50`,
                 }}
               >
+                {product.campaignActive && product.listPrice != null && (
+                  <span className="text-[11px] font-medium text-white/70 line-through">
+                    {formatCurrency(product.listPrice, currency)}
+                  </span>
+                )}
                 {formatCurrency(product.price, currency)}
               </div>
             )}
@@ -234,11 +246,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {layoutStyle === "LIST" && (
             <div className="flex items-center justify-between mt-auto pt-2">
               {showPrices && (
-                <span
-                  className="font-bold text-sm"
-                  style={{ color: primaryColor }}
-                >
-                  {formatCurrency(product.price, currency)}
+                <span className="flex items-center gap-1.5">
+                  {product.campaignActive && product.listPrice != null && (
+                    <span className="text-xs font-medium text-slate-400 line-through">
+                      {formatCurrency(product.listPrice, currency)}
+                    </span>
+                  )}
+                  <span
+                    className="font-bold text-sm"
+                    style={{ color: primaryColor }}
+                  >
+                    {formatCurrency(product.price, currency)}
+                  </span>
                 </span>
               )}
 

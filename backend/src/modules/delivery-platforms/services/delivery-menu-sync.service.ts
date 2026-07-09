@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { resolveEffectivePrice } from "../../orders/services/combo-pricing";
 import { AdapterFactory } from "../adapters/adapter-factory";
 import { DeliveryLogService } from "./delivery-log.service";
 import { DeliveryAuthService } from "./delivery-auth.service";
@@ -55,9 +56,15 @@ export class DeliveryMenuSyncService {
       const freshConfig = await this.authService.ensureValidToken(config.id);
       if (!freshConfig) return;
 
-      // Get all mapped items for this platform
+      // Get all mapped items for this platform. Combos are EXCLUDED — the
+      // platform menu contract carries no slot/combo structure, so pushing a
+      // combo as a flat item would misrepresent it (spec §9, honesty guard).
       const mappings = await this.prisma.menuItemMapping.findMany({
-        where: { tenantId, platform },
+        where: {
+          tenantId,
+          platform,
+          product: { productType: { not: "COMBO" } },
+        },
         include: {
           product: {
             select: {
@@ -65,15 +72,21 @@ export class DeliveryMenuSyncService {
               name: true,
               price: true,
               isAvailable: true,
+              campaignPrice: true,
+              campaignStartAt: true,
+              campaignEndAt: true,
             },
           },
         },
       });
 
+      // Push the EFFECTIVE price (active campaign price when its window is
+      // open) so the delivery menu matches what the QR/POS charge.
+      const now = new Date();
       const items = mappings.map((m) => ({
         externalItemId: m.externalItemId,
         name: m.product.name,
-        price: Number(m.product.price),
+        price: resolveEffectivePrice(m.product as any, now),
         isAvailable: m.product.isAvailable && m.isActive,
       }));
 

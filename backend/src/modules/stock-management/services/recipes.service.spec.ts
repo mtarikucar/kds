@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { RecipesService } from "./recipes.service";
+import { RecipeCostingService } from "./recipe-costing.service";
 
 /**
  * Iter-93 regression for the recipes service. Pre-fix:
@@ -52,7 +53,7 @@ describe("RecipesService (iter-93)", () => {
         },
         stockItem: { findMany: jest.fn() },
       };
-      svc = new RecipesService(prisma);
+      svc = new RecipesService(prisma, new RecipeCostingService());
     });
 
     it("rejects two ingredient entries for the same stockItemId", async () => {
@@ -257,7 +258,7 @@ describe("RecipesService (iter-93)", () => {
           .fn()
           .mockImplementation(async (fn: any) => fn(txMock)),
       };
-      svc = new RecipesService(prisma);
+      svc = new RecipesService(prisma, new RecipeCostingService());
     });
 
     it("rejects duplicate ingredients on update", async () => {
@@ -307,7 +308,7 @@ describe("RecipesService (iter-93)", () => {
           .fn()
           .mockImplementation(async (fn: any) => fn(txMock)),
       };
-      const localSvc = new RecipesService(localPrisma);
+      const localSvc = new RecipesService(localPrisma, new RecipeCostingService());
 
       await localSvc.update("r1", { name: "New name" } as any, SCOPE);
 
@@ -331,7 +332,7 @@ describe("RecipesService (iter-93)", () => {
         recipe: { findFirst },
         $transaction: jest.fn(),
       };
-      const localSvc = new RecipesService(localPrisma);
+      const localSvc = new RecipesService(localPrisma, new RecipeCostingService());
       const { NotFoundException } = require("@nestjs/common");
 
       await expect(
@@ -350,7 +351,7 @@ describe("RecipesService (iter-93)", () => {
       prisma = {
         recipe: { findMany: jest.fn().mockResolvedValue([]) },
       };
-      svc = new RecipesService(prisma);
+      svc = new RecipesService(prisma, new RecipeCostingService());
     });
 
     it("applies a 500-row default take when no pagination passed", async () => {
@@ -387,7 +388,7 @@ describe("RecipesService (iter-93)", () => {
 
     beforeEach(() => {
       prisma = { recipe: { findFirst: jest.fn() } };
-      svc = new RecipesService(prisma);
+      svc = new RecipesService(prisma, new RecipeCostingService());
     });
 
     it("findOne scopes by id + (tenantId, branchId)", async () => {
@@ -427,7 +428,7 @@ describe("RecipesService (iter-93)", () => {
           deleteMany: jest.fn(),
         },
       };
-      const svc = new RecipesService(prisma);
+      const svc = new RecipesService(prisma, new RecipeCostingService());
       const { NotFoundException } = require("@nestjs/common");
       await expect(svc.remove("cross-branch", SCOPE)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -444,7 +445,7 @@ describe("RecipesService (iter-93)", () => {
           deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
       };
-      const svc = new RecipesService(prisma);
+      const svc = new RecipesService(prisma, new RecipeCostingService());
       await svc.remove("r1", SCOPE);
       expect(prisma.recipe.deleteMany.mock.calls[0][0].where).toEqual({
         id: "r1",
@@ -452,5 +453,29 @@ describe("RecipesService (iter-93)", () => {
         branchId: "b1",
       });
     });
+  });
+});
+
+describe('RecipesService.create — sub-recipe ownership', () => {
+  it('rejects a component sub-recipe not in the branch', async () => {
+    const prisma: any = {
+      product: { findFirst: jest.fn().mockResolvedValue({ id: 'p1', name: 'Dish' }) },
+      recipe: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]), // foreign sub-recipe → not found in branch
+      },
+      stockItem: { findMany: jest.fn().mockResolvedValue([{ id: 'si1' }]) },
+    };
+    const svc = new (require('./recipes.service').RecipesService)(prisma, {} as any);
+    await expect(
+      svc.create(
+        {
+          productId: 'p1',
+          ingredients: [{ stockItemId: 'si1', quantity: 1 }],
+          components: [{ subRecipeId: 'foreign-recipe', quantity: 1 }],
+        } as any,
+        't1', 'b1',
+      ),
+    ).rejects.toThrow(/sub-recipes not found/);
   });
 });

@@ -318,5 +318,8 @@
     "error": "خطأ في الدفع",
     "cancelled": "تم إلغاء الخصم",
     "recorded": "تم استلام الدفعة"
-  }
+  },
+  "campaign": "عرض",
+  "startingFrom": "من",
+  "required": "مطلوب"
 }

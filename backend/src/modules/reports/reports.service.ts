@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OrderStatus } from "../../common/constants/order-status.enum";
 import { getTenantMidnight } from "../../common/helpers/timezone.helper";
+import { toCsv } from "../../common/utils/csv.util";
 
 /**
  * Hard cap on the explicit date window a single report call can request.
@@ -93,6 +94,24 @@ export class ReportsService {
     const end =
       endDate ??
       getTenantMidnight(new Date(now.getTime() + MILLIS_PER_DAY), tz);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new BadRequestException("startDate / endDate must be valid dates");
+    }
+    if (start > end) {
+      throw new BadRequestException(
+        "startDate must be before or equal to endDate",
+      );
+    }
+    // Apply the window cap on the RESOLVED pair too — otherwise passing only
+    // startDate (end defaults to now) bypasses the cap and unbounds the query.
+    if (
+      (end.getTime() - start.getTime()) / MILLIS_PER_DAY >
+      REPORT_MAX_WINDOW_DAYS
+    ) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${REPORT_MAX_WINDOW_DAYS} days. Split the report into smaller windows.`,
+      );
+    }
     return { start, end };
   }
 
@@ -101,6 +120,7 @@ export class ReportsService {
     startDate?: Date,
     endDate?: Date,
     branchId?: string,
+    opts?: { includeDailySales?: boolean },
   ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
     // branchScope is spread into every order.where so the same expression
@@ -164,42 +184,50 @@ export class ReportsService {
       count: pm._count,
     }));
 
-    // Get daily sales breakdown
-    const paidOrders = await this.prisma.order.findMany({
-      where: {
-        tenantId,
-        ...branchScope,
-        status: OrderStatus.PAID,
-        createdAt: {
-          gte: dateRange.start,
-          lte: dateRange.end,
+    // Get daily sales breakdown — this scans every PAID order row in the
+    // window, so callers that only need the headline aggregates (P&L, labor,
+    // comparison, consolidated) opt OUT and skip the row scan entirely.
+    let dailySales: { date: string; sales: number; orders: number }[] = [];
+    if (opts?.includeDailySales !== false) {
+      const paidOrders = await this.prisma.order.findMany({
+        where: {
+          tenantId,
+          ...branchScope,
+          status: OrderStatus.PAID,
+          createdAt: {
+            gte: dateRange.start,
+            lte: dateRange.end,
+          },
         },
-      },
-      select: {
-        createdAt: true,
-        finalAmount: true,
-      },
-    });
+        select: {
+          createdAt: true,
+          finalAmount: true,
+        },
+      });
 
-    // Accumulate in integer cents so a long tail of orders doesn't bleed
-    // IEEE-754 dust into the daily totals (which the dashboard then
-    // diffs day-over-day and renders as "0.000001" deltas).
-    const dailyMap = new Map<string, { salesCents: number; orders: number }>();
-    paidOrders.forEach((order) => {
-      const dateKey = order.createdAt.toISOString().slice(0, 10);
-      const existing = dailyMap.get(dateKey) || { salesCents: 0, orders: 0 };
-      existing.salesCents += decimalToCents(order.finalAmount);
-      existing.orders += 1;
-      dailyMap.set(dateKey, existing);
-    });
+      // Accumulate in integer cents so a long tail of orders doesn't bleed
+      // IEEE-754 dust into the daily totals (which the dashboard then
+      // diffs day-over-day and renders as "0.000001" deltas).
+      const dailyMap = new Map<
+        string,
+        { salesCents: number; orders: number }
+      >();
+      paidOrders.forEach((order) => {
+        const dateKey = order.createdAt.toISOString().slice(0, 10);
+        const existing = dailyMap.get(dateKey) || { salesCents: 0, orders: 0 };
+        existing.salesCents += decimalToCents(order.finalAmount);
+        existing.orders += 1;
+        dailyMap.set(dateKey, existing);
+      });
 
-    const dailySales = Array.from(dailyMap.entries())
-      .map(([date, data]) => ({
-        date,
-        sales: centsToCurrency(data.salesCents),
-        orders: data.orders,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      dailySales = Array.from(dailyMap.entries())
+        .map(([date, data]) => ({
+          date,
+          sales: centsToCurrency(data.salesCents),
+          orders: data.orders,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
 
     return {
       totalSales,
@@ -210,6 +238,740 @@ export class ReportsService {
       dailySales,
       startDate: dateRange.start,
       endDate: dateRange.end,
+    };
+  }
+
+  /**
+   * Period-over-period comparison — the current window vs the immediately
+   * preceding window of equal length (last-7-days vs the 7 days before, this
+   * month vs last month, etc.). Returns each headline metric with its absolute
+   * change and % change so trends are visible, not just point-in-time totals.
+   */
+  async getSalesComparison(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const spanMs = dateRange.end.getTime() - dateRange.start.getTime();
+    const prevStart = new Date(dateRange.start.getTime() - spanMs);
+    const prevEnd = new Date(dateRange.start.getTime());
+
+    const [cur, prev, curCogs, prevCogs] = await Promise.all([
+      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId, {
+        includeDailySales: false,
+      }),
+      this.getSalesSummary(tenantId, prevStart, prevEnd, branchId, {
+        includeDailySales: false,
+      }),
+      this.getCogsReport(tenantId, dateRange.start, dateRange.end, branchId),
+      this.getCogsReport(tenantId, prevStart, prevEnd, branchId),
+    ]);
+
+    const pctChange = (c: number, p: number) =>
+      p > 0 ? Math.round(((c - p) / p) * 1000) / 10 : null;
+    const metric = (name: string, c: number, p: number) => ({
+      metric: name,
+      current: c,
+      previous: p,
+      change: Math.round((c - p) * 100) / 100,
+      changePct: pctChange(c, p),
+    });
+
+    return {
+      current: { startDate: dateRange.start, endDate: dateRange.end },
+      previous: { startDate: prevStart, endDate: prevEnd },
+      metrics: [
+        metric("totalSales", cur.totalSales, prev.totalSales),
+        metric("totalOrders", cur.totalOrders, prev.totalOrders),
+        metric(
+          "averageOrderValue",
+          cur.averageOrderValue,
+          prev.averageOrderValue,
+        ),
+        metric("cogs", curCogs.cogs, prevCogs.cogs),
+        metric("grossProfit", curCogs.grossProfit, prevCogs.grossProfit),
+      ],
+      foodCostPct: {
+        current: curCogs.foodCostPct,
+        previous: prevCogs.foodCostPct,
+      },
+    };
+  }
+
+  /** Daily sales breakdown as a CSV string for accountant/spreadsheet export. */
+  async getSalesSummaryCsv(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ): Promise<string> {
+    const summary = await this.getSalesSummary(
+      tenantId,
+      startDate,
+      endDate,
+      branchId,
+    );
+    return toCsv(
+      ["date", "orders", "sales"],
+      summary.dailySales.map((d) => [d.date, d.orders, d.sales]),
+    );
+  }
+
+  /**
+   * Cost of Goods Sold + food-cost % for the window — the KPI a restaurateur
+   * watches most. COGS is read straight from the ingredient-movement ledger:
+   * every order deduction already recorded its FIFO-weighted costPerUnit
+   * (stock-deduction.service.ts), so COGS is the net cost of ORDER_DEDUCTION
+   * less ORDER_REVERSAL. `quantity` is negative for consumption, so
+   * SUM(quantity * costPerUnit) is negative and COGS negates it. WASTE cost is
+   * surfaced alongside as a separate line (shrinkage, not COGS). The
+   * product-of-two-columns sum can't be expressed via Prisma groupBy, so it is
+   * a single parameterized aggregate query. Un-costed movements (null
+   * costPerUnit) contribute nothing rather than understating as zero.
+   */
+  async getCogsReport(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const sales = await this.prisma.order.aggregate({
+      where: {
+        tenantId,
+        ...branchScope,
+        status: OrderStatus.PAID,
+        createdAt: { gte: dateRange.start, lte: dateRange.end },
+      },
+      _sum: { finalAmount: true },
+      _count: true,
+    });
+    const totalSalesCents = decimalToCents(sales._sum.finalAmount);
+
+    const branchFilter = branchId
+      ? Prisma.sql`AND "branchId" = ${branchId}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<
+      { cogs_net: unknown; waste_net: unknown }[]
+    >(Prisma.sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN type IN ('ORDER_DEDUCTION','ORDER_REVERSAL')
+          THEN quantity * "costPerUnit" END), 0) AS cogs_net,
+        COALESCE(SUM(CASE WHEN type = 'WASTE'
+          THEN quantity * "costPerUnit" END), 0) AS waste_net
+      FROM ingredient_movements
+      WHERE "tenantId" = ${tenantId} ${branchFilter}
+        AND "createdAt" >= ${dateRange.start}
+        AND "createdAt" <= ${dateRange.end}
+    `);
+
+    const cogsCents = decimalToCents(
+      new Prisma.Decimal((rows[0]?.cogs_net ?? 0) as any).neg(),
+    );
+    const wasteCostCents = decimalToCents(
+      new Prisma.Decimal((rows[0]?.waste_net ?? 0) as any).neg(),
+    );
+    const grossProfitCents = totalSalesCents - cogsCents;
+
+    const pct = (part: number) =>
+      totalSalesCents > 0
+        ? Math.round((part / totalSalesCents) * 1000) / 10
+        : null;
+
+    return {
+      totalSales: centsToCurrency(totalSalesCents),
+      totalOrders: sales._count,
+      cogs: centsToCurrency(cogsCents),
+      wasteCost: centsToCurrency(wasteCostCents),
+      grossProfit: centsToCurrency(grossProfitCents),
+      foodCostPct: pct(cogsCents),
+      wasteCostPct: pct(wasteCostCents),
+      grossMarginPct: pct(grossProfitCents),
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
+  /**
+   * Menu engineering — classify each sold product into the classic
+   * profitability × popularity quadrant (Star / Plow-horse / Puzzle / Dog) plus
+   * per-item contribution margin. Cost basis is Product.costPrice (recipe
+   * products can sync their plate cost into costPrice). Popularity is "high"
+   * when a product's units-sold is at least 70% of the average (the classic
+   * menu-mix rule); profitability is "high" when unit margin ≥ the average unit
+   * margin. Products without a cost basis are surfaced separately (uncosted) and
+   * excluded from the averages so they don't skew the quadrant.
+   */
+  async getMenuEngineering(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const sold = await this.prisma.orderItem.groupBy({
+      by: ["productId"],
+      where: {
+        order: {
+          tenantId,
+          ...branchScope,
+          status: OrderStatus.PAID,
+          createdAt: { gte: dateRange.start, lte: dateRange.end },
+        },
+      },
+      _sum: { quantity: true, subtotal: true },
+    });
+
+    const productIds = sold.map((s) => s.productId);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, tenantId },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        costPrice: true,
+        category: { select: { name: true } },
+      },
+    });
+    const pMap = new Map(products.map((p) => [p.id, p]));
+
+    const rows = sold.map((s) => {
+      const p = pMap.get(s.productId);
+      const qty = Number(s._sum.quantity ?? 0);
+      const revenueCents = decimalToCents(s._sum.subtotal);
+      const price = p ? new Prisma.Decimal(p.price) : new Prisma.Decimal(0);
+      const hasCost = !!p && p.costPrice != null;
+      const cost = hasCost ? new Prisma.Decimal(p!.costPrice as any) : null;
+      const unitMarginCents = cost ? decimalToCents(price.sub(cost)) : null;
+      return {
+        productId: s.productId,
+        productName: p?.name ?? "Unknown",
+        categoryName: p?.category?.name ?? null,
+        unitsSold: qty,
+        revenue: centsToCurrency(revenueCents),
+        unitPrice: centsToCurrency(decimalToCents(price)),
+        unitCost: cost ? centsToCurrency(decimalToCents(cost)) : null,
+        unitMargin:
+          unitMarginCents != null ? centsToCurrency(unitMarginCents) : null,
+        totalContribution:
+          unitMarginCents != null
+            ? centsToCurrency(unitMarginCents * qty)
+            : null,
+        _unitMarginCents: unitMarginCents,
+        hasCost,
+      };
+    });
+
+    const costed = rows.filter((r) => r.hasCost);
+    const uncosted = rows
+      .filter((r) => !r.hasCost)
+      .map(({ _unitMarginCents, hasCost, ...rest }) => rest);
+
+    const avgUnits =
+      costed.length > 0
+        ? costed.reduce((s, r) => s + r.unitsSold, 0) / costed.length
+        : 0;
+    const avgUnitMarginCents =
+      costed.length > 0
+        ? costed.reduce((s, r) => s + (r._unitMarginCents ?? 0), 0) /
+          costed.length
+        : 0;
+    // Classic menu-engineering popularity rule: "high" ≥ 70% of average mix.
+    const POPULARITY_FACTOR = 0.7;
+    const popularityThreshold = avgUnits * POPULARITY_FACTOR;
+
+    const classify = (highPop: boolean, highMargin: boolean) =>
+      highPop && highMargin
+        ? "STAR"
+        : highPop && !highMargin
+          ? "PLOWHORSE"
+          : !highPop && highMargin
+            ? "PUZZLE"
+            : "DOG";
+
+    const items = costed
+      .map((r) => {
+        const highPop = r.unitsSold >= popularityThreshold;
+        const highMargin = (r._unitMarginCents ?? 0) >= avgUnitMarginCents;
+        const { _unitMarginCents, hasCost, ...rest } = r;
+        return { ...rest, classification: classify(highPop, highMargin) };
+      })
+      .sort((a, b) => (b.totalContribution ?? 0) - (a.totalContribution ?? 0));
+
+    const counts = items.reduce(
+      (acc, i) => {
+        acc[i.classification] = (acc[i.classification] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    return {
+      items,
+      uncosted,
+      averages: {
+        avgUnitsSold: Math.round(avgUnits * 100) / 100,
+        avgUnitMargin: centsToCurrency(Math.round(avgUnitMarginCents)),
+        popularityThreshold: Math.round(popularityThreshold * 100) / 100,
+      },
+      counts: {
+        STAR: counts.STAR ?? 0,
+        PLOWHORSE: counts.PLOWHORSE ?? 0,
+        PUZZLE: counts.PUZZLE ?? 0,
+        DOG: counts.DOG ?? 0,
+        uncosted: uncosted.length,
+      },
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
+  /**
+   * Tips report — totals + per-tender breakdown of recorded tips over the
+   * window. Tips are the Payment.tipAmount recorded separately from the goods
+   * amount, so this never double-counts sales. Feeds payroll / tip-out.
+   */
+  async getTipsReport(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const byMethod = await this.prisma.payment.groupBy({
+      by: ["method"],
+      where: {
+        tenantId,
+        ...branchScope,
+        status: "COMPLETED",
+        tipAmount: { not: null },
+        createdAt: { gte: dateRange.start, lte: dateRange.end },
+      },
+      _sum: { tipAmount: true },
+      _count: true,
+    });
+
+    const totalCents = byMethod.reduce(
+      (s, m) => s + decimalToCents(m._sum.tipAmount),
+      0,
+    );
+
+    return {
+      totalTips: centsToCurrency(totalCents),
+      tipCount: byMethod.reduce((s, m) => s + m._count, 0),
+      byMethod: byMethod
+        .map((m) => ({
+          method: m.method,
+          tips: centsToCurrency(decimalToCents(m._sum.tipAmount)),
+          count: m._count,
+        }))
+        .sort((a, b) => b.tips - a.tips),
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
+  /**
+   * Tip pooling / tronc — distribute the period's total tips across staff in
+   * proportion to hours worked (from attendance). The pool defaults to the
+   * period's collected tips but can be overridden. Staff with no logged hours
+   * receive nothing; if nobody logged hours the pool is reported undistributed.
+   */
+  async getTipDistribution(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+    poolOverride?: number,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const tips = await this.getTipsReport(
+      tenantId,
+      dateRange.start,
+      dateRange.end,
+      branchId,
+    );
+    const poolCents =
+      poolOverride != null
+        ? Math.round(poolOverride * 100)
+        : Math.round(tips.totalTips * 100);
+
+    const attendances = await this.prisma.attendance.findMany({
+      where: {
+        tenantId,
+        ...(branchId ? { branchId } : {}),
+        date: { gte: dateRange.start, lte: dateRange.end },
+      },
+      select: {
+        totalWorkedMinutes: true,
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    const perStaff = new Map<
+      string,
+      { userId: string; staffName: string; minutes: number }
+    >();
+    let totalMinutes = 0;
+    for (const a of attendances) {
+      const id = a.user?.id ?? "unknown";
+      const e = perStaff.get(id) ?? {
+        userId: id,
+        staffName: a.user
+          ? `${a.user.firstName} ${a.user.lastName}`
+          : "Unknown",
+        minutes: 0,
+      };
+      e.minutes += a.totalWorkedMinutes;
+      perStaff.set(id, e);
+      totalMinutes += a.totalWorkedMinutes;
+    }
+
+    let allocatedCents = 0;
+    const distribution = [...perStaff.values()]
+      .map((e) => {
+        const share =
+          totalMinutes > 0
+            ? Math.round(poolCents * (e.minutes / totalMinutes))
+            : 0;
+        allocatedCents += share;
+        return {
+          userId: e.userId,
+          staffName: e.staffName,
+          hours: Math.round((e.minutes / 60) * 100) / 100,
+          tipShare: centsToCurrency(share),
+        };
+      })
+      .sort((a, b) => b.tipShare - a.tipShare);
+
+    return {
+      pool: centsToCurrency(poolCents),
+      totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+      distributed: centsToCurrency(allocatedCents),
+      undistributed: centsToCurrency(poolCents - allocatedCents),
+      distribution,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
+  /**
+   * Profit & Loss snapshot — revenue → COGS → gross profit → operating expenses
+   * → net profit, with margins. Revenue + COGS reuse the sales/COGS reports;
+   * OpEx is summed from the expense ledger over the same window. The full
+   * management P&L a restaurateur reads to know whether the branch made money.
+   */
+  async getProfitAndLoss(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const [sales, cogsReport] = await Promise.all([
+      this.getSalesSummary(tenantId, startDate, endDate, branchId, {
+        includeDailySales: false,
+      }),
+      this.getCogsReport(tenantId, startDate, endDate, branchId),
+    ]);
+
+    const expWhere: Prisma.ExpenseWhereInput = {
+      tenantId,
+      ...(branchId ? { branchId } : {}),
+      expenseDate: { gte: cogsReport.startDate, lte: cogsReport.endDate },
+    };
+    const expGroups = await this.prisma.expense.groupBy({
+      by: ["category"],
+      where: expWhere,
+      _sum: { amount: true },
+    });
+
+    const revenueCents = decimalToCents(sales.totalSales);
+    const cogsCents = decimalToCents(cogsReport.cogs);
+    const opexCents = expGroups.reduce(
+      (s, g) => s + decimalToCents(g._sum.amount),
+      0,
+    );
+    const grossProfitCents = revenueCents - cogsCents;
+    const netProfitCents = grossProfitCents - opexCents;
+
+    const pct = (part: number) =>
+      revenueCents > 0 ? Math.round((part / revenueCents) * 1000) / 10 : null;
+
+    return {
+      revenue: centsToCurrency(revenueCents),
+      cogs: centsToCurrency(cogsCents),
+      grossProfit: centsToCurrency(grossProfitCents),
+      grossMarginPct: pct(grossProfitCents),
+      operatingExpenses: centsToCurrency(opexCents),
+      expensesByCategory: expGroups
+        .map((g) => ({
+          category: g.category,
+          amount: centsToCurrency(decimalToCents(g._sum.amount)),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+      netProfit: centsToCurrency(netProfitCents),
+      netMarginPct: pct(netProfitCents),
+      foodCostPct: cogsReport.foodCostPct,
+      startDate: cogsReport.startDate,
+      endDate: cogsReport.endDate,
+    };
+  }
+
+  /**
+   * Labor cost + prime cost. Labor is Σ (attendance worked-hours × the staff's
+   * hourlyRate); prime cost = COGS + labor (the two biggest controllable costs
+   * in a restaurant). Reports labor %, sales-per-labor-hour and per-staff cost.
+   * Staff with no hourlyRate contribute 0 and are counted so the gap shows.
+   */
+  async getLaborReport(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
+
+    const attendances = await this.prisma.attendance.findMany({
+      where: {
+        tenantId,
+        ...branchScope,
+        date: { gte: dateRange.start, lte: dateRange.end },
+      },
+      select: {
+        totalWorkedMinutes: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            hourlyRate: true,
+          },
+        },
+      },
+    });
+
+    const perStaff = new Map<
+      string,
+      {
+        userId: string;
+        staffName: string;
+        role: string | null;
+        minutes: number;
+        costCents: number;
+        hasRate: boolean;
+      }
+    >();
+    let totalCostCents = 0;
+    let totalMinutes = 0;
+    let staffWithoutRate = 0;
+    const seenNoRate = new Set<string>();
+    for (const a of attendances) {
+      const u = a.user;
+      const hasRate = u?.hourlyRate != null;
+      const key = u?.id ?? "unknown";
+      if (!hasRate && !seenNoRate.has(key)) {
+        seenNoRate.add(key);
+        staffWithoutRate += 1;
+      }
+      const rate = hasRate
+        ? new Prisma.Decimal(u!.hourlyRate as any)
+        : new Prisma.Decimal(0);
+      const costCents = decimalToCents(
+        new Prisma.Decimal(a.totalWorkedMinutes).div(60).mul(rate),
+      );
+      totalCostCents += costCents;
+      totalMinutes += a.totalWorkedMinutes;
+      const e = perStaff.get(key) ?? {
+        userId: key,
+        staffName: u ? `${u.firstName} ${u.lastName}` : "Unknown",
+        role: u?.role ?? null,
+        minutes: 0,
+        costCents: 0,
+        hasRate,
+      };
+      e.minutes += a.totalWorkedMinutes;
+      e.costCents += costCents;
+      perStaff.set(key, e);
+    }
+
+    const [sales, cogsReport] = await Promise.all([
+      this.getSalesSummary(tenantId, dateRange.start, dateRange.end, branchId, {
+        includeDailySales: false,
+      }),
+      this.getCogsReport(tenantId, dateRange.start, dateRange.end, branchId),
+    ]);
+    const revenueCents = decimalToCents(sales.totalSales);
+    const cogsCents = decimalToCents(cogsReport.cogs);
+    const primeCostCents = cogsCents + totalCostCents;
+    const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+
+    const pct = (part: number) =>
+      revenueCents > 0 ? Math.round((part / revenueCents) * 1000) / 10 : null;
+
+    return {
+      laborCost: centsToCurrency(totalCostCents),
+      laborPct: pct(totalCostCents),
+      totalHours,
+      salesPerLaborHour:
+        totalHours > 0
+          ? centsToCurrency(Math.round(revenueCents / totalHours))
+          : null,
+      staffWithoutRate,
+      byStaff: [...perStaff.values()]
+        .map((e) => ({
+          userId: e.userId,
+          staffName: e.staffName,
+          role: e.role,
+          hours: Math.round((e.minutes / 60) * 100) / 100,
+          laborCost: centsToCurrency(e.costCents),
+          hasRate: e.hasRate,
+        }))
+        .sort((a, b) => b.laborCost - a.laborCost),
+      primeCost: centsToCurrency(primeCostCents),
+      primeCostPct: pct(primeCostCents),
+      cogs: cogsReport.cogs,
+      revenue: sales.totalSales,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    };
+  }
+
+  /**
+   * Sales forecast — projects the next `horizonDays` of revenue from the
+   * trailing 28 days, using per-weekday averages (captures the weekly pattern
+   * a flat average misses). Days with no history fall back to the overall
+   * daily average. A lightweight, dependency-free baseline forecast.
+   */
+  async getSalesForecast(tenantId: string, horizonDays = 7, branchId?: string) {
+    const end = new Date();
+    const start = new Date(end.getTime() - 28 * 86400000);
+    const branchFilter = branchId
+      ? Prisma.sql`AND "branchId" = ${branchId}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ day: Date; revenue: unknown }[]>(
+      Prisma.sql`
+        SELECT DATE("createdAt") AS day, SUM("finalAmount") AS revenue
+        FROM orders
+        WHERE "tenantId" = ${tenantId} ${branchFilter}
+          AND status = 'PAID'
+          AND "createdAt" >= ${start} AND "createdAt" <= ${end}
+        GROUP BY DATE("createdAt")
+      `,
+    );
+
+    const byDow = new Map<number, { sum: number; count: number }>();
+    let totalSum = 0;
+    let totalDays = 0;
+    for (const r of rows) {
+      const dow = new Date(r.day).getUTCDay();
+      const rev = Number(r.revenue ?? 0);
+      const e = byDow.get(dow) ?? { sum: 0, count: 0 };
+      e.sum += rev;
+      e.count += 1;
+      byDow.set(dow, e);
+      totalSum += rev;
+      totalDays += 1;
+    }
+    const overallAvg = totalDays > 0 ? totalSum / totalDays : 0;
+    const dowAvg = (dow: number) => {
+      const e = byDow.get(dow);
+      return e && e.count > 0 ? e.sum / e.count : overallAvg;
+    };
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    const forecast: Array<{ date: string; forecastRevenue: number }> = [];
+    let projectedTotal = 0;
+    for (let i = 1; i <= horizonDays; i++) {
+      const d = new Date(end.getTime() + i * 86400000);
+      const val = r2(dowAvg(d.getUTCDay()));
+      projectedTotal += val;
+      forecast.push({
+        date: d.toISOString().split("T")[0],
+        forecastRevenue: val,
+      });
+    }
+
+    return {
+      method: "weekday-average (trailing 28d)",
+      historyDays: totalDays,
+      avgDailyRevenue: r2(overallAvg),
+      horizonDays,
+      projectedTotal: r2(projectedTotal),
+      forecast,
+    };
+  }
+
+  /**
+   * Consolidated P&L across every branch — one P&L per branch plus a rolled-up
+   * total, for the multi-branch operator. Branch P&Ls run in parallel.
+   */
+  async getConsolidatedPnl(tenantId: string, startDate?: Date, endDate?: Date) {
+    const branches = await this.prisma.branch.findMany({
+      where: { tenantId },
+      select: { id: true, name: true },
+    });
+    const perBranch = await Promise.all(
+      branches.map(async (b) => {
+        const pnl = await this.getProfitAndLoss(
+          tenantId,
+          startDate,
+          endDate,
+          b.id,
+        );
+        return {
+          branchId: b.id,
+          branchName: b.name,
+          revenue: pnl.revenue,
+          cogs: pnl.cogs,
+          grossProfit: pnl.grossProfit,
+          operatingExpenses: pnl.operatingExpenses,
+          netProfit: pnl.netProfit,
+          netMarginPct: pnl.netMarginPct,
+        };
+      }),
+    );
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const totals = perBranch.reduce(
+      (t, b) => ({
+        revenue: t.revenue + b.revenue,
+        cogs: t.cogs + b.cogs,
+        grossProfit: t.grossProfit + b.grossProfit,
+        operatingExpenses: t.operatingExpenses + b.operatingExpenses,
+        netProfit: t.netProfit + b.netProfit,
+      }),
+      {
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        operatingExpenses: 0,
+        netProfit: 0,
+      },
+    );
+
+    return {
+      perBranch: perBranch.sort((a, b) => b.netProfit - a.netProfit),
+      totals: {
+        revenue: r2(totals.revenue),
+        cogs: r2(totals.cogs),
+        grossProfit: r2(totals.grossProfit),
+        operatingExpenses: r2(totals.operatingExpenses),
+        netProfit: r2(totals.netProfit),
+        netMarginPct:
+          totals.revenue > 0
+            ? Math.round((totals.netProfit / totals.revenue) * 1000) / 10
+            : null,
+      },
     };
   }
 
@@ -224,10 +986,14 @@ export class ReportsService {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const branchScope = branchId ? { branchId } : {};
 
-    // Get top selling products
+    // Get top selling products. Exclude the 0₺ combo PARENT line (its product
+    // is the COMBO itself) — the revenue lives on the component child lines, so
+    // a combo would otherwise surface as a 0-revenue product. Children +
+    // standalone items (STANDARD) carry the real per-component revenue.
     const topProducts = await this.prisma.orderItem.groupBy({
       by: ["productId"],
       where: {
+        product: { productType: { not: "COMBO" } },
         order: {
           tenantId,
           ...branchScope,
@@ -539,15 +1305,20 @@ export class ReportsService {
     // Get out of stock items
     const outOfStockItems = products.filter((p) => stockLte(p, 0));
 
-    // Total stock value. Multiplying-and-accumulating Decimal prices in
-    // JS Number drifts after a few hundred line items; do the sum in
-    // integer cents and convert once at the end.
-    const totalStockValueCents = products.reduce(
-      (sum, p) =>
+    // Value inventory at COST (costPrice), NOT retail `price` — an asset is
+    // carried at cost; valuing at retail overstates the inventory figure.
+    // Products with no cost basis (costPrice null) contribute 0 and are counted
+    // so the gap is visible rather than silently distorting the total.
+    // Accumulate in integer cents to avoid Decimal→Number drift over many rows.
+    let itemsWithoutCost = 0;
+    const totalStockValueCents = products.reduce((sum, p) => {
+      if (p.costPrice == null) itemsWithoutCost += 1;
+      return (
         sum +
-        new Prisma.Decimal(p.currentStock).toNumber() * decimalToCents(p.price),
-      0,
-    );
+        new Prisma.Decimal(p.currentStock).toNumber() *
+          decimalToCents(p.costPrice ?? 0)
+      );
+    }, 0);
     const totalStockValue = centsToCurrency(totalStockValueCents);
 
     // Get recent stock movements
@@ -566,6 +1337,9 @@ export class ReportsService {
       lowStockCount: lowStockItems.length,
       outOfStockCount: outOfStockItems.length,
       totalStockValue,
+      // Signals the total is at cost and how many products lack a cost basis.
+      valuationBasis: "cost" as const,
+      itemsWithoutCost,
       lowStockItems: lowStockItems.map((p) => ({
         productId: p.id,
         productName: p.name,
@@ -584,9 +1358,11 @@ export class ReportsService {
         categoryName: p.category?.name,
         currentStock: new Prisma.Decimal(p.currentStock).toNumber(),
         price: Number(p.price),
+        costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+        // stockValue is at COST (costPrice), consistent with totalStockValue.
         stockValue: centsToCurrency(
           new Prisma.Decimal(p.currentStock).toNumber() *
-            decimalToCents(p.price),
+            decimalToCents(p.costPrice ?? 0),
         ),
         isLowStock: stockGt(p, 0) && stockLt(p, LOW_STOCK_THRESHOLD),
         isOutOfStock: stockLte(p, 0),

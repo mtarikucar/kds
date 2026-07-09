@@ -159,10 +159,79 @@ export interface Product {
   isAvailable: boolean;
   displayOrder: number;
   taxRate?: number; // KDV rate (0/1/10/20); backend defaults to 10
+  // Combo + campaign (menu combo feature). productType STANDARD unless this is
+  // a combo bundle. On the public menu, `price` is the CHARGED (effective)
+  // price and `listPrice` the pre-discount catalog price when a campaign runs.
+  productType?: "STANDARD" | "COMBO";
+  listPrice?: number;
+  campaignActive?: boolean;
+  campaignLabel?: string | null;
+  campaignPrice?: number | null;
+  campaignStartAt?: string | null;
+  campaignEndAt?: string | null;
+  comboGroups?: ComboGroup[];
+  collections?: MenuCollection[]; // admin GET returns [{id,name,slug}]
   tenantId: string;
   createdAt: string;
   updatedAt: string;
 }
+
+// A combo slot as delivered by the public menu / admin GET.
+export interface ComboItem {
+  id: string;
+  componentProductId: string;
+  name?: string;
+  image?: string | null;
+  quantity: number;
+  priceDelta: number;
+  isDefault: boolean;
+  // admin GET nests the component product
+  componentProduct?: { id: string; name: string; price: number; image?: string | null };
+}
+
+export interface ComboGroup {
+  id: string;
+  name: string;
+  displayName?: string | null;
+  minSelect: number;
+  maxSelect: number;
+  items: ComboItem[];
+}
+
+// Combo builder input (admin create/update product body)
+export interface ComboGroupItemInput {
+  componentProductId: string;
+  quantity?: number;
+  priceDelta?: number;
+  isDefault?: boolean;
+  displayOrder?: number;
+}
+export interface ComboGroupInput {
+  name: string;
+  displayName?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  displayOrder?: number;
+  items: ComboGroupItemInput[];
+}
+
+export interface MenuCollection {
+  id: string;
+  name: string;
+  slug: string;
+  displayOrder?: number;
+  isActive?: boolean;
+  productCount?: number;
+  productIds?: string[]; // public menu shape
+}
+
+export interface CreateMenuCollectionDto {
+  name: string;
+  slug?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+export interface UpdateMenuCollectionDto extends Partial<CreateMenuCollectionDto> {}
 
 export interface CreateProductDto {
   name: string;
@@ -177,6 +246,14 @@ export interface CreateProductDto {
   isAvailable?: boolean;
   displayOrder?: number;
   taxRate?: number;
+  // Combo + campaign + classification
+  productType?: "STANDARD" | "COMBO";
+  comboGroups?: ComboGroupInput[];
+  campaignPrice?: number | null;
+  campaignLabel?: string | null;
+  campaignStartAt?: string | null;
+  campaignEndAt?: string | null;
+  collectionIds?: string[];
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}
@@ -551,6 +628,11 @@ export interface OrderItem {
   unitPrice?: number; // Product unit price (same as price for backwards compatibility)
   subtotal?: number; // Calculated: (unitPrice + modifierTotal) * quantity
   modifierTotal?: number; // Sum of all modifier price adjustments
+  // Combo explosion: a combo is stored as a 0₺ parent + qty-1 children that
+  // reference the parent here. Used to re-group a combo back into one cart line
+  // when reopening an occupied table.
+  parentOrderItemId?: string | null;
+  listUnitPrice?: number;
   status?: string; // Item-level status (e.g., PENDING, PREPARING, READY)
   notes: string | null;
   modifiers?: OrderItemModifier[]; // Applied modifiers for this order item
@@ -664,10 +746,16 @@ export interface DeliveryPlatformLog {
   createdAt: string;
 }
 
+export interface ComboSelectionInput {
+  groupId: string;
+  componentProductId: string;
+}
+
 export interface CreateOrderItemDto {
   productId: string;
   quantity: number;
   notes?: string;
+  comboSelections?: ComboSelectionInput[];
 }
 
 export interface CreateOrderDto {
@@ -1270,6 +1358,7 @@ export interface CustomerOrderItem {
   quantity: number;
   notes?: string;
   modifiers?: CustomerOrderItemModifier[];
+  comboSelections?: ComboSelectionInput[];
 }
 
 export interface CreateCustomerOrderDto {
@@ -1346,6 +1435,8 @@ export interface CartItem {
   quantity: number;
   notes?: string;
   modifiers: CartModifier[];
+  // For a COMBO product: the component chosen per slot (sent as comboSelections).
+  comboSelections?: ComboSelectionInput[];
   itemTotal: number; // Calculated: (product.price + sum(modifier.priceAdjustment * modifier.quantity)) * quantity
 }
 

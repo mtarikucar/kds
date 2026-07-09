@@ -78,7 +78,7 @@ describe('AccountingSyncService.syncInvoice', () => {
       // the decrypted creds are what reach the adapter.
       getDecryptedCredentials: jest.fn().mockResolvedValue(null),
     };
-    svc = new AccountingSyncService(prisma as any, settings as any);
+    svc = new AccountingSyncService(prisma as any, settings as any, { name: "MOCK", isRegisteredEFaturaUser: async () => false } as any, { name: "MOCK", isConfigured: () => true, sign: async (x: string) => x } as any);
   });
 
   it('is a no-op when the tenant has no accounting provider configured', async () => {
@@ -352,7 +352,7 @@ describe('AccountingSyncService.testConnection', () => {
       // the decrypted creds are what reach the adapter.
       getDecryptedCredentials: jest.fn().mockResolvedValue(null),
     };
-    svc = new AccountingSyncService(prisma as any, settings as any);
+    svc = new AccountingSyncService(prisma as any, settings as any, { name: "MOCK", isRegisteredEFaturaUser: async () => false } as any, { name: "MOCK", isConfigured: () => true, sign: async (x: string) => x } as any);
   });
 
   it('returns a clean failure when no provider is configured', async () => {
@@ -429,5 +429,47 @@ describe('AccountingSyncService.testConnection', () => {
     const creds = adapter.testConnection.mock.calls[0][0];
     expect(creds.password).toBe('real-plaintext-pass');
     expect(creds.password).not.toMatch(/^v1:/);
+  });
+});
+
+describe('AccountingSyncService — e-document readiness + FAILED re-sync', () => {
+  const mukellef: any = { name: 'MOCK', isRegisteredEFaturaUser: async () => true };
+  const signer: any = { name: 'MOCK', isConfigured: () => true, sign: async (x: string) => x };
+
+  it('reports external-provisioning readiness', () => {
+    const prisma: any = { salesInvoice: {} };
+    const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
+    expect(svc.eDocumentReadiness()).toEqual({
+      mukellefQuery: 'MOCK',
+      signer: 'MOCK',
+      signerConfigured: true,
+    });
+  });
+
+  it('retries every FAILED invoice and counts the successes', async () => {
+    const prisma: any = {
+      salesInvoice: { findMany: jest.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]) },
+    };
+    const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
+    const syncSpy = jest.spyOn(svc, 'syncInvoice').mockResolvedValue(undefined as any);
+
+    const retried = await svc.resyncFailedInvoices('t1');
+    expect(retried).toBe(2);
+    expect(syncSpy).toHaveBeenCalledTimes(2);
+    // only FAILED invoices queried
+    expect(prisma.salesInvoice.findMany.mock.calls[0][0].where.externalStatus).toBe('FAILED');
+  });
+
+  it('keeps going when one invoice re-sync throws', async () => {
+    const prisma: any = {
+      salesInvoice: { findMany: jest.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]) },
+    };
+    const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
+    jest.spyOn(svc, 'syncInvoice')
+      .mockRejectedValueOnce(new Error('still failing'))
+      .mockResolvedValueOnce(undefined as any);
+
+    const retried = await svc.resyncFailedInvoices('t1');
+    expect(retried).toBe(1); // one succeeded, one threw
   });
 });

@@ -148,7 +148,17 @@
     "createError": "Failed to create purchase order",
     "submitError": "Failed to submit purchase order",
     "receiveError": "Failed to receive items",
-    "cancelError": "Failed to cancel purchase order"
+    "cancelError": "Failed to cancel purchase order",
+    "statusPendingApproval": "Pending Approval",
+    "approve": "Approve",
+    "approveError": "Order could not be approved",
+    "landedCost": "Allocate landed cost (freight/customs)",
+    "landedCostFreight": "Freight",
+    "landedCostCustoms": "Customs",
+    "landedCostOther": "Other",
+    "landedCostApply": "Allocate",
+    "landedCostApplied": "Landed cost allocated into stock cost",
+    "landedCostError": "Landed cost could not be allocated"
   },
   "movements": {
     "title": "Movements",

@@ -490,6 +490,9 @@ export class PaymentsService {
             const payment = await tx.payment.create({
               data: {
                 amount: createPaymentDto.amount,
+                // Tip recorded separately from the goods amount; it does not
+                // participate in the tender reconciliation.
+                tipAmount: createPaymentDto.tipAmount ?? null,
                 method: createPaymentDto.method,
                 status: PaymentStatus.COMPLETED,
                 notes: createPaymentDto.notes,
@@ -855,6 +858,24 @@ export class PaymentsService {
         } catch (err: any) {
           this.logger.error(
             `Product stock reversal failed for refunded order ${payment.orderId}: ${err.message}`,
+          );
+        }
+      }
+
+      // Fiscal reversal: a full refund (order → CANCELLED) that had an ISSUED
+      // fatura gets a reversing İade faturası (credit note) so the books/e-fatura
+      // net to zero. Best-effort + idempotent — a missing accounting config or
+      // an un-invoiced order simply no-ops. Closes the compliance gap where a
+      // refund left the sale invoice standing with no reversal.
+      if (orderMovedToCancelled && this.salesInvoiceService) {
+        try {
+          await this.salesInvoiceService.createRefundCreditNote(
+            payment.orderId,
+            tenantId,
+          );
+        } catch (err: any) {
+          this.logger.error(
+            `Credit-note (İade faturası) generation failed for refunded order ${payment.orderId}: ${err.message}`,
           );
         }
       }
@@ -1244,12 +1265,42 @@ export class PaymentsService {
             // into PaymentValidator (byte-identical exceptions/order).
             this.validator.assertOrderPayable(order);
 
+            // Combo split-bill: a combo is paid AS A WHOLE. getPayableItems
+            // emits ONE payable line keyed by the 0₺ parent; expand that here
+            // into its money-bearing children so the allocation settles the
+            // entire combo atomically. A combo CHILD can't be paid in isolation
+            // (that would split the combo across payers / leave it partial).
+            const childrenByParent = new Map<string, any[]>();
+            for (const oi of order.orderItems as any[]) {
+              if (oi.parentOrderItemId) {
+                const arr = childrenByParent.get(oi.parentOrderItemId) ?? [];
+                arr.push(oi);
+                childrenByParent.set(oi.parentOrderItemId, arr);
+              }
+            }
+            const childIds = new Set(
+              (order.orderItems as any[])
+                .filter((oi) => oi.parentOrderItemId)
+                .map((oi) => oi.id),
+            );
+            if (dto.items.some((d) => childIds.has(d.orderItemId))) {
+              throw new BadRequestException(
+                "Kombo bileşeni tek başına ödenemez — komboyu (ana satırı) seçin",
+              );
+            }
+            const expandedItems = dto.items.flatMap((d) => {
+              const kids = childrenByParent.get(d.orderItemId);
+              return kids && kids.length > 0
+                ? kids.map((k) => ({ orderItemId: k.id, quantity: k.quantity }))
+                : [d];
+            });
+
             // PASS 3 — item membership + duplicate-id validation moved
             // verbatim into PaymentValidator. Returns the id→OrderItem map
             // reused below for the quantity validation and allocation math.
             const itemsById = this.validator.resolveItemsById(
               order.orderItems,
-              dto.items,
+              expandedItems,
             );
 
             // Sum already-paid quantities per OrderItem (only COMPLETED payments count).
@@ -1300,7 +1351,7 @@ export class PaymentsService {
             }
 
             // Validate that requested quantities don't exceed remaining.
-            for (const entry of dto.items) {
+            for (const entry of expandedItems) {
               const item = itemsById.get(entry.orderItemId)!;
               const alreadyPaid = paidByItem.get(entry.orderItemId) ?? 0;
               const reserved = reservedByItem.get(entry.orderItemId) ?? 0;
@@ -1330,7 +1381,7 @@ export class PaymentsService {
               amount: Prisma.Decimal;
             }[] = [];
             let derivedTotal = new Prisma.Decimal(0);
-            for (const entry of dto.items) {
+            for (const entry of expandedItems) {
               const item = itemsById.get(entry.orderItemId)!;
               const alreadyPaid = paidByItem.get(entry.orderItemId) ?? 0;
               const isLastUnits =
@@ -1380,7 +1431,7 @@ export class PaymentsService {
             // the drift onto the closing allocation row so the per-item ledger
             // stays consistent with the Payment row.
             const postAllocated = new Map<string, number>(paidByItem);
-            for (const entry of dto.items) {
+            for (const entry of expandedItems) {
               postAllocated.set(
                 entry.orderItemId,
                 (postAllocated.get(entry.orderItemId) ?? 0) + entry.quantity,
@@ -1855,7 +1906,52 @@ export class PaymentsService {
     );
     const remainingAmount = finalAmount.sub(paidAmount);
 
-    const items = order.orderItems.map((item) => {
+    // Combo lines: the 0₺ parent is a grouping row (money lives on its
+    // children). Exclude it from the payable/split-bill list so no confusing
+    // ₺0 "Maxi Menü" line appears and item-level completion can't wait on a
+    // parent that never carries an amount. The children remain individually
+    // payable — their apportioned amounts still sum to the combo total.
+    // Group combo children under their 0₺ parent → ONE payable line per combo,
+    // priced at the sum of its children (paid AS A WHOLE via payByItems'
+    // parent-expansion). Standalone items keep their own per-line behaviour.
+    const childrenByParent = new Map<string, typeof order.orderItems>();
+    for (const it of order.orderItems) {
+      if (it.parentOrderItemId) {
+        const arr = childrenByParent.get(it.parentOrderItemId) ?? [];
+        arr.push(it);
+        childrenByParent.set(it.parentOrderItemId, arr);
+      }
+    }
+
+    const items: any[] = [];
+    for (const item of order.orderItems) {
+      if (item.parentOrderItemId) continue; // folded into its combo line
+      const kids = childrenByParent.get(item.id) ?? [];
+      if (kids.length > 0) {
+        // Combo line: one payable unit for the whole combo.
+        const comboTotal = kids.reduce(
+          (s, k) => s.add(this.itemTotalWithDiscount(k, order)),
+          new Prisma.Decimal(0),
+        );
+        const allPaid = kids.every(
+          (k) =>
+            k.orderItemPayments.reduce((s, a) => s + a.quantity, 0) >=
+            k.quantity,
+        );
+        items.push({
+          orderItemId: item.id,
+          productName: item.product?.name ?? null,
+          quantity: 1,
+          paidQuantity: allPaid ? 1 : 0,
+          remainingQuantity: allPaid ? 0 : 1,
+          unitPrice: comboTotal.toFixed(2),
+          unitTotal: comboTotal.toFixed(2),
+          itemTotal: comboTotal.toFixed(2),
+          modifierLabels: [],
+          isCombo: true,
+        });
+        continue;
+      }
       const paidQuantity = item.orderItemPayments.reduce(
         (s, a) => s + a.quantity,
         0,
@@ -1869,7 +1965,7 @@ export class PaymentsService {
       // it lets the UI display the same number the server will charge
       // (per-unit × quantity drifts on sub-kuruş rounding).
       const itemTotal = this.itemTotalWithDiscount(item, order);
-      return {
+      items.push({
         orderItemId: item.id,
         productName: item.product?.name ?? null,
         quantity: item.quantity,
@@ -1881,8 +1977,8 @@ export class PaymentsService {
         modifierLabels: (item.modifiers || [])
           .map((m) => m.modifier?.displayName || m.modifier?.name || "")
           .filter(Boolean),
-      };
-    });
+      });
+    }
 
     const remainingQuantity = items.reduce(
       (s, i) => s + i.remainingQuantity,

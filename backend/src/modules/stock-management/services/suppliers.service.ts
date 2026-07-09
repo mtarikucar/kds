@@ -3,16 +3,114 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
   CreateSupplierDto,
   UpdateSupplierDto,
   SupplierStockItemDto,
 } from "../dto/create-supplier.dto";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 @Injectable()
 export class SuppliersService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Supplier scorecard — per-supplier PO count, on-time delivery %, fill rate
+   * (received ÷ ordered qty) and total spend over a window. Turns the raw PO
+   * history into the vendor-performance view purchasing uses to rank suppliers.
+   */
+  async getScorecard(scope: BranchScope, startDate?: Date, endDate?: Date) {
+    const where: any = { ...branchScope(scope) };
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = startDate;
+      if (endDate) where.createdAt.lte = endDate;
+    }
+    const pos = await this.prisma.purchaseOrder.findMany({
+      where,
+      select: {
+        supplierId: true,
+        status: true,
+        expectedDate: true,
+        receivedAt: true,
+        items: {
+          select: {
+            quantityOrdered: true,
+            quantityReceived: true,
+            unitPrice: true,
+          },
+        },
+      },
+    });
+
+    const agg = new Map<
+      string,
+      {
+        poCount: number;
+        receivedCount: number;
+        onTimeCount: number;
+        orderedQty: number;
+        receivedQty: number;
+        spendCents: number;
+      }
+    >();
+    for (const po of pos) {
+      const a = agg.get(po.supplierId) ?? {
+        poCount: 0,
+        receivedCount: 0,
+        onTimeCount: 0,
+        orderedQty: 0,
+        receivedQty: 0,
+        spendCents: 0,
+      };
+      a.poCount += 1;
+      const isReceived =
+        po.status === "RECEIVED" || po.status === "PARTIALLY_RECEIVED";
+      if (isReceived && po.receivedAt) {
+        a.receivedCount += 1;
+        if (po.expectedDate && po.receivedAt <= po.expectedDate) {
+          a.onTimeCount += 1;
+        }
+      }
+      for (const it of po.items) {
+        const ord = Number(it.quantityOrdered);
+        const rec = Number(it.quantityReceived);
+        a.orderedQty += ord;
+        a.receivedQty += rec;
+        a.spendCents += Math.round(rec * Number(it.unitPrice) * 100);
+      }
+      agg.set(po.supplierId, a);
+    }
+
+    const ids = [...agg.keys()];
+    const suppliers = ids.length
+      ? await this.prisma.supplier.findMany({
+          where: { id: { in: ids }, tenantId: scope.tenantId },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameOf = new Map(suppliers.map((s) => [s.id, s.name]));
+    const pct = (n: number, d: number) =>
+      d > 0 ? Math.round((n / d) * 1000) / 10 : null;
+
+    return {
+      suppliers: ids
+        .map((id) => {
+          const a = agg.get(id)!;
+          return {
+            supplierId: id,
+            supplierName: nameOf.get(id) ?? "Unknown",
+            poCount: a.poCount,
+            onTimePct: pct(a.onTimeCount, a.receivedCount),
+            fillRatePct: pct(a.receivedQty, a.orderedQty),
+            totalSpend: Math.round(a.spendCents) / 100,
+          };
+        })
+        .sort((x, y) => y.totalSpend - x.totalSpend),
+    };
+  }
 
   async findAll(tenantId: string) {
     return this.prisma.supplier.findMany({
@@ -62,20 +160,48 @@ export class SuppliersService {
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
-    // Check if supplier has any non-cancelled POs
-    const activePOs = await this.prisma.purchaseOrder.count({
-      where: { supplierId: id, status: { notIn: ["CANCELLED", "RECEIVED"] } },
-    });
-    if (activePOs > 0) {
-      throw new BadRequestException(
-        "Cannot delete supplier with active purchase orders",
-      );
-    }
-    const claim = await this.prisma.supplier.deleteMany({
-      where: { id, tenantId },
-    });
-    if (claim.count === 0) throw new NotFoundException("Supplier not found");
-    return { id };
+    // Serializable so the reference checks and the delete commit atomically —
+    // otherwise an invoice/expense posted between the counts and the delete
+    // would orphan the vendor's financial trail (the exact gap the guard
+    // exists to close). SSI aborts the loser of that race.
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Check if supplier has any non-cancelled POs
+        const activePOs = await tx.purchaseOrder.count({
+          where: {
+            supplierId: id,
+            status: { notIn: ["CANCELLED", "RECEIVED"] },
+          },
+        });
+        if (activePOs > 0) {
+          throw new BadRequestException(
+            "Cannot delete supplier with active purchase orders",
+          );
+        }
+        // AP invoices/expenses reference the supplier by scalar id (no DB FK) —
+        // deleting would orphan the financial trail (AP aging shows "—", audits
+        // lose the vendor). Block instead of silently orphaning.
+        const [invoices, expenses] = await Promise.all([
+          tx.purchaseInvoice.count({
+            where: { supplierId: id, tenantId },
+          }),
+          tx.expense.count({ where: { supplierId: id, tenantId } }),
+        ]);
+        if (invoices > 0 || expenses > 0) {
+          throw new BadRequestException(
+            "Cannot delete a supplier with recorded invoices or expenses",
+          );
+        }
+        const claim = await tx.supplier.deleteMany({
+          where: { id, tenantId },
+        });
+        if (claim.count === 0) {
+          throw new NotFoundException("Supplier not found");
+        }
+        return { id };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async addStockItem(

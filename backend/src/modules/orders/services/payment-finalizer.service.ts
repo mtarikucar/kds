@@ -716,15 +716,25 @@ export class PaymentFinalizer {
       // Money in integer kuruş; the order-level discount is apportioned across
       // lines by value (largest-remainder, no drift on a legally-binding fiş);
       // line value includes paid modifiers so netCents == order.finalAmount.
+      // Combo lines: the 0₺ parent is a grouping row — the money + KDV live on
+      // its children. Exclude parents from the fiş so no bogus 0₺/0% line is
+      // printed; children + standalone items still sum to order.finalAmount.
+      const comboParentIds = new Set(
+        order.orderItems
+          .filter((it) => it.parentOrderItemId)
+          .map((it) => it.parentOrderItemId),
+      );
       const { lines, netCents } = buildFiscalLines(
-        order.orderItems.map((it) => ({
-          productId: it.productId,
-          productName: it.product?.name,
-          quantity: it.quantity,
-          unitPrice: it.unitPrice,
-          modifierTotal: it.modifierTotal,
-          taxRate: it.taxRate,
-        })),
+        order.orderItems
+          .filter((it) => !comboParentIds.has(it.id))
+          .map((it) => ({
+            productId: it.productId,
+            productName: it.product?.name,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            modifierTotal: it.modifierTotal,
+            taxRate: it.taxRate,
+          })),
         order.discount,
       );
 

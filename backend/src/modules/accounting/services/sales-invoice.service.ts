@@ -112,8 +112,21 @@ export class SalesInvoiceService {
     // nonsensical, but if gross is 0 there is nothing to apportion against.
     const hasDiscount = orderDiscount.gt(0) && orderGross.gt(0);
 
+    // Combo lines: the 0₺ parent is a grouping row (money + KDV live on its
+    // children). Exclude parents from the invoice so no bogus 0₺/0% line is
+    // written — children + standalone items still reconcile to finalAmount
+    // (the parent contributes 0 to every sum). Same leaf-filter as the fiş.
+    const comboParentIds = new Set(
+      order.orderItems
+        .filter((it) => it.parentOrderItemId)
+        .map((it) => it.parentOrderItemId),
+    );
+    const leafItems = order.orderItems.filter(
+      (it) => !comboParentIds.has(it.id),
+    );
+
     // First pass: validate quantities and capture each line's gross.
-    const lineGross = order.orderItems.map((item) => {
+    const lineGross = leafItems.map((item) => {
       // quantity===0 would back-calc unitPrice as NaN and persist into the
       // Decimal column, breaking downstream math and tax-authority XML.
       if (!item.quantity || item.quantity <= 0) {
@@ -146,7 +159,7 @@ export class SalesInvoiceService {
       }
     }
 
-    const invoiceItems = order.orderItems.map((item, i) => {
+    const invoiceItems = leafItems.map((item, i) => {
       const taxRate = item.taxRate ?? 10;
       // extractTax pulls the KDV component out of the (now net) inclusive
       // line gross, so subtotal/taxAmount reconcile to the discounted total.
@@ -250,6 +263,9 @@ export class SalesInvoiceService {
             customerEmail: dto?.customerEmail,
             customerTaxId: dto?.customerTaxId,
             customerTaxOffice: dto?.customerTaxOffice,
+            // KDV tevkifatı — buyer-withheld VAT + GİB code (optional).
+            withholdingTaxAmount: dto?.withholdingTaxAmount ?? null,
+            withholdingCode: dto?.withholdingCode ?? null,
             // Issuer identity from Company Info (fake-working sweep #3).
             ...SalesInvoiceService.sellerSnapshot(settings),
             subtotal: Math.round(subtotal * 100) / 100,
@@ -336,8 +352,13 @@ export class SalesInvoiceService {
     // Build invoice lines from the per-item allocations. Each
     // allocation row carries (orderItemId, quantity, amount). We
     // derive unitPrice and tax from the parent OrderItem at its
-    // captured rate.
-    const invoiceItems = payment.orderItemPayments.map((alloc) => {
+    // captured rate. Combo guard (defense-in-depth): skip any allocation
+    // against a 0₺ combo PARENT (product.productType COMBO) so it can't leak a
+    // bogus 0₺/0% line into the per-payment e-Fatura UBL — payByItems already
+    // blocks paying a parent, this covers any other allocation path.
+    const invoiceItems = payment.orderItemPayments
+      .filter((alloc) => alloc.orderItem?.product?.productType !== "COMBO")
+      .map((alloc) => {
       const item = alloc.orderItem;
       if (!item.quantity || item.quantity <= 0) {
         throw new BadRequestException(
@@ -457,6 +478,92 @@ export class SalesInvoiceService {
     }
   }
 
+  /**
+   * Credit note / İade Faturası — a REFUND invoice that reverses a SALES
+   * invoice. Mirrors the original's parties + amounts + lines and links back
+   * via originalInvoiceId. One per original (full return); crediting a credit
+   * note is refused. Reporting is order-based, so this is a document record and
+   * does not double-count sales.
+   */
+  async createCreditNote(id: string, tenantId: string) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const original = await tx.salesInvoice.findFirst({
+          where: { id, tenantId },
+          include: { items: true },
+        });
+        if (!original) throw new NotFoundException("Invoice not found");
+        if (original.type === "REFUND") {
+          throw new BadRequestException("Cannot credit a credit note");
+        }
+        if (original.status === InvoiceStatus.CANCELLED) {
+          throw new BadRequestException("Cannot credit a cancelled invoice");
+        }
+        const existing = await tx.salesInvoice.findFirst({
+          where: { tenantId, originalInvoiceId: id },
+          select: { id: true },
+        });
+        if (existing) {
+          throw new BadRequestException(
+            "A credit note already exists for this invoice",
+          );
+        }
+
+        const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+          tenantId,
+          tx,
+        );
+        return tx.salesInvoice.create({
+          data: {
+            invoiceNumber,
+            type: "REFUND",
+            status: InvoiceStatus.ISSUED,
+            originalInvoiceId: original.id,
+            customerName: original.customerName,
+            customerPhone: original.customerPhone,
+            customerEmail: original.customerEmail,
+            customerTaxId: original.customerTaxId,
+            customerTaxOffice: original.customerTaxOffice,
+            sellerName: original.sellerName,
+            sellerTaxId: original.sellerTaxId,
+            sellerTaxOffice: original.sellerTaxOffice,
+            sellerAddress: original.sellerAddress,
+            sellerPhone: original.sellerPhone,
+            sellerEmail: original.sellerEmail,
+            subtotal: original.subtotal,
+            taxAmount: original.taxAmount,
+            totalAmount: original.totalAmount,
+            discount: original.discount,
+            currency: original.currency,
+            taxBreakdown: original.taxBreakdown ?? undefined,
+            paymentMethod: original.paymentMethod,
+            // Carry the original's withholding so the İade mirrors it.
+            withholdingTaxAmount: original.withholdingTaxAmount,
+            withholdingCode: original.withholdingCode,
+            issueDate: new Date(),
+            tenantId,
+            items: {
+              create: original.items.map((it) => ({
+                description: it.description,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                taxRate: it.taxRate,
+                taxAmount: it.taxAmount,
+                subtotal: it.subtotal,
+                total: it.total,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+      },
+      // Serializable so two concurrent credit-note requests for the same
+      // original can't both pass the dedup check and mint duplicate İade
+      // Faturası documents (matches createFromOrder).
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
   async findAll(tenantId: string, query: InvoiceQueryDto) {
     const where: any = { tenantId };
     if (query.status) where.status = query.status;
@@ -518,5 +625,113 @@ export class SalesInvoiceService {
       throw new BadRequestException("Invoice already cancelled");
     }
     return this.prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
+  }
+
+  /**
+   * İade faturası (credit note): a reversing REFUND-type SalesInvoice for a
+   * refunded/cancelled order that already carried an ISSUED fatura. Negates the
+   * original's totals + line items so the two documents net to zero — closing
+   * the compliance gap where a refund left the ISSUED invoice standing with no
+   * reversing record. Idempotent per order; returns null when nothing was
+   * invoiced (a refund of an un-invoiced order needs no credit note).
+   */
+  async createRefundCreditNote(orderId: string, tenantId: string) {
+    const original = await this.prisma.salesInvoice.findFirst({
+      where: {
+        orderId,
+        tenantId,
+        status: { not: InvoiceStatus.CANCELLED },
+        type: { not: "REFUND" },
+      },
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!original) return null; // nothing invoiced → nothing to reverse
+
+    const existing = await this.prisma.salesInvoice.findFirst({
+      where: { orderId, tenantId, type: "REFUND" },
+      select: { id: true },
+    });
+    if (existing) {
+      return this.prisma.salesInvoice.findUnique({
+        where: { id: existing.id },
+        include: { items: true },
+      });
+    }
+
+    const settings = await this.settingsService.findByTenant(tenantId);
+    const neg = (v: Prisma.Decimal | number | string) =>
+      -Math.abs(Number(v));
+    const negBreakdown = (tb: any) => {
+      if (!tb || typeof tb !== "object") return tb ?? undefined;
+      const out: Record<string, any> = {};
+      for (const [rate, v] of Object.entries<any>(tb)) {
+        out[rate] = {
+          taxableAmount: neg(v.taxableAmount ?? 0),
+          taxAmount: neg(v.taxAmount ?? 0),
+        };
+      }
+      return out;
+    };
+
+    const creditNote = await this.prisma.$transaction(
+      async (tx) => {
+        const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+          tenantId,
+          tx,
+        );
+        return tx.salesInvoice.create({
+          data: {
+            invoiceNumber,
+            type: "REFUND",
+            status: InvoiceStatus.ISSUED,
+            customerName: original.customerName,
+            customerPhone: original.customerPhone,
+            customerEmail: original.customerEmail,
+            customerTaxId: original.customerTaxId,
+            customerTaxOffice: original.customerTaxOffice,
+            ...SalesInvoiceService.sellerSnapshot(settings),
+            subtotal: neg(original.subtotal),
+            taxAmount: neg(original.taxAmount),
+            totalAmount: neg(original.totalAmount),
+            discount: neg(original.discount),
+            taxBreakdown: negBreakdown(original.taxBreakdown),
+            orderId,
+            paymentMethod: original.paymentMethod,
+            issueDate: new Date(),
+            dueDate: new Date(),
+            tenantId,
+            items: {
+              create: original.items.map((it, i) => ({
+                description:
+                  (i === 0
+                    ? `İADE (orijinal fatura ${original.invoiceNumber}) — `
+                    : "") + it.description,
+                quantity: it.quantity,
+                unitPrice: neg(it.unitPrice),
+                taxRate: it.taxRate,
+                taxAmount: neg(it.taxAmount),
+                subtotal: neg(it.subtotal),
+                total: neg(it.total),
+              })),
+            },
+          },
+          include: { items: true },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+
+    if (this.syncService) {
+      const accSettings = await this.settingsService.findByTenant(tenantId);
+      if (accSettings.autoSync && accSettings.provider !== "NONE") {
+        this.syncService
+          .syncInvoice(creditNote.id, tenantId)
+          .catch((err) =>
+            this.logger.error(`Credit-note auto-sync failed: ${err.message}`),
+          );
+      }
+    }
+    return creditNote;
   }
 }

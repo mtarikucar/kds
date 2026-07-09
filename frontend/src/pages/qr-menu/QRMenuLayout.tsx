@@ -76,6 +76,9 @@ export interface MenuData {
    */
   enableCustomerSelfPay?: boolean;
   categories: any[];
+  // Menu collections (classification) — each references product ids that also
+  // live in `categories`. Rendered as horizontal strips above the categories.
+  collections?: { id: string; name: string; slug: string; productIds: string[] }[];
 }
 
 interface QRMenuLayoutProps {

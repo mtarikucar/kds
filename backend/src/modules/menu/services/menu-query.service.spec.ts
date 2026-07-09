@@ -16,6 +16,7 @@ function makePrisma(overrides: Record<string, any> = {}) {
     qrMenuSettings: { findFirst: jest.fn().mockResolvedValue(null) },
     table: { findFirst: jest.fn().mockResolvedValue(null) },
     category: { findMany: jest.fn().mockResolvedValue([]) },
+    menuCollection: { findMany: jest.fn().mockResolvedValue([]) },
     ...overrides,
   };
 }

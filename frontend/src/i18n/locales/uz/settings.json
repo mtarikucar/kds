@@ -620,7 +620,11 @@
     "cancelAction": "Bekor qilish",
     "noInvoices": "Hisob-fakturalar topilmadi.",
     "prev": "Oldingi",
-    "next": "Keyingi"
+    "next": "Keyingi",
+    "creditNoteAction": "Kredit-nota chiqarish",
+    "creditNoteConfirm": "Ushbu hisob-faktura uchun kredit-nota chiqarilsinmi?",
+    "creditNoteIssued": "Kredit-nota yaratildi",
+    "creditNoteError": "Kredit-nota chiqarib bolmadi"
   },
   "emailChannel": {
     "reservationSection": "Email — Bron hodisalari",

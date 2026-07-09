@@ -620,7 +620,11 @@
     "cancelAction": "İptal Et",
     "noInvoices": "Henüz fatura bulunmuyor.",
     "prev": "Önceki",
-    "next": "Sonraki"
+    "next": "Sonraki",
+    "creditNoteAction": "İade faturası kes",
+    "creditNoteConfirm": "Bu fatura için iade faturası (İade Faturası) kesilsin mi?",
+    "creditNoteIssued": "İade faturası oluşturuldu",
+    "creditNoteError": "İade faturası kesilemedi"
   },
   "emailChannel": {
     "reservationSection": "E-posta — Rezervasyon olayları",

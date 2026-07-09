@@ -12,6 +12,9 @@ import {
   CreateProductDto,
   UpdateProductDto,
   ProductFilters,
+  MenuCollection,
+  CreateMenuCollectionDto,
+  UpdateMenuCollectionDto,
 } from "../../types";
 
 // Categories
@@ -107,6 +110,82 @@ export const useDeleteCategory = () => {
           error,
           i18n.t("common:notifications.operationFailed"),
         ),
+      );
+    },
+  });
+};
+
+// Collections (menu classification — kategoriden bağımsız)
+export const useCollections = () => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery({
+    queryKey: ["collections", branchId],
+    queryFn: async (): Promise<MenuCollection[]> => {
+      const response = await api.get<MenuCollection[]>("/menu/collections");
+      return response.data;
+    },
+  });
+};
+
+export const useCreateCollection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      data: CreateMenuCollectionDto,
+    ): Promise<MenuCollection> => {
+      const response = await api.post("/menu/collections", data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+      toast.success(i18n.t("common:notifications.operationSuccessful"));
+    },
+    onError: (error: any) => {
+      toast.error(
+        getApiErrorMessage(error, i18n.t("common:notifications.operationFailed")),
+      );
+    },
+  });
+};
+
+export const useUpdateCollection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateMenuCollectionDto;
+    }): Promise<MenuCollection> => {
+      const response = await api.patch(`/menu/collections/${id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+      toast.success(i18n.t("common:notifications.operationSuccessful"));
+    },
+    onError: (error: any) => {
+      toast.error(
+        getApiErrorMessage(error, i18n.t("common:notifications.operationFailed")),
+      );
+    },
+  });
+};
+
+export const useDeleteCollection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await api.delete(`/menu/collections/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+      toast.success(i18n.t("common:notifications.operationSuccessful"));
+    },
+    onError: (error: any) => {
+      toast.error(
+        getApiErrorMessage(error, i18n.t("common:notifications.operationFailed")),
       );
     },
   });

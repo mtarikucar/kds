@@ -1,11 +1,15 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
+  IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from "class-validator";
 import { UserRole } from "../../../common/constants/roles.enum";
@@ -51,6 +55,13 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MaxLength(NAME_MAX_LENGTH)
   lastName: string;
+
+  @ApiPropertyOptional({ description: "Hourly pay rate (for labor reporting)" })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1_000_000)
+  @IsOptional()
+  hourlyRate?: number;
 
   @ApiProperty({ enum: UserRole, example: UserRole.WAITER })
   @IsEnum(UserRole)

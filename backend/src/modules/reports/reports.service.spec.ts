@@ -54,6 +54,15 @@ describe('ReportsService.getDateRange (iter-64)', () => {
     );
   });
 
+  it('rejects a far-past startDate with NO endDate (cap applied to the resolved window)', async () => {
+    // pass-5 M4: the cap used to live only inside `if (start && end)`, so
+    // omitting endDate (end defaults to now) bypassed it and unbounded the query.
+    const start = new Date('2020-01-01T00:00:00Z');
+    await expect(
+      svc.getSalesSummary('t1', start, undefined as any),
+    ).rejects.toThrow(/366 days/);
+  });
+
   it('rejects inverted ranges (endDate before startDate)', async () => {
     const start = new Date('2026-06-30T00:00:00Z');
     const end = new Date('2026-01-01T00:00:00Z');
@@ -78,5 +87,323 @@ describe('ReportsService.getDateRange (iter-64)', () => {
     expect(prisma.tenant.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 't1' }, select: { timezone: true } }),
     );
+  });
+});
+
+/**
+ * COGS / food-cost % — the headline back-office KPI. COGS is read from the
+ * ingredient-movement ledger (each ORDER_DEDUCTION already carries its
+ * FIFO-weighted costPerUnit), so the report is a single aggregate, not a
+ * re-computation. `quantity` is negative for consumption, so the raw SUM is
+ * negative and the report negates it.
+ */
+describe('ReportsService.getCogsReport', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('negates ledger net-consumption into COGS and computes food-cost %', async () => {
+    (prisma.order.aggregate as any).mockResolvedValue({ _sum: { finalAmount: 1000 }, _count: 50 });
+    (prisma.$queryRaw as any).mockResolvedValue([{ cogs_net: '-300', waste_net: '-20' }]);
+
+    const res = await svc.getCogsReport('t1', start, end);
+
+    expect(res.totalSales).toBe(1000);
+    expect(res.totalOrders).toBe(50);
+    expect(res.cogs).toBe(300);
+    expect(res.wasteCost).toBe(20);
+    expect(res.grossProfit).toBe(700);
+    expect(res.foodCostPct).toBe(30);
+    expect(res.wasteCostPct).toBe(2);
+    expect(res.grossMarginPct).toBe(70);
+  });
+
+  it('returns null percentages when there are no sales (avoids divide-by-zero)', async () => {
+    (prisma.order.aggregate as any).mockResolvedValue({ _sum: { finalAmount: null }, _count: 0 });
+    (prisma.$queryRaw as any).mockResolvedValue([{ cogs_net: '0', waste_net: '0' }]);
+
+    const res = await svc.getCogsReport('t1', start, end);
+    expect(res.totalSales).toBe(0);
+    expect(res.foodCostPct).toBeNull();
+    expect(res.grossMarginPct).toBeNull();
+  });
+});
+
+/**
+ * Menu engineering — classic profitability × popularity quadrant. Popularity
+ * is "high" at ≥70% of average units-sold; profitability "high" at ≥ average
+ * unit margin. Un-costed products are excluded from the averages/quadrant.
+ */
+describe('ReportsService.getMenuEngineering', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('classifies items into Star / Plow-horse / Puzzle by margin × popularity', async () => {
+    (prisma.orderItem.groupBy as any).mockResolvedValue([
+      { productId: 'A', _sum: { quantity: 100, subtotal: 2000 } },
+      { productId: 'B', _sum: { quantity: 100, subtotal: 1000 } },
+      { productId: 'C', _sum: { quantity: 5, subtotal: 150 } },
+    ]);
+    (prisma.product.findMany as any).mockResolvedValue([
+      { id: 'A', name: 'A', price: 20, costPrice: 5, category: { name: 'Main' } },  // margin 15, popular
+      { id: 'B', name: 'B', price: 10, costPrice: 8, category: { name: 'Main' } },  // margin 2, popular
+      { id: 'C', name: 'C', price: 30, costPrice: 5, category: { name: 'Main' } },  // margin 25, unpopular
+    ]);
+
+    const res = await svc.getMenuEngineering('t1', start, end);
+
+    const byId = Object.fromEntries(res.items.map((i: any) => [i.productId, i]));
+    expect(byId['A'].classification).toBe('STAR');       // high pop + high margin
+    expect(byId['B'].classification).toBe('PLOWHORSE');   // high pop + low margin
+    expect(byId['C'].classification).toBe('PUZZLE');      // low pop + high margin
+    expect(byId['A'].unitMargin).toBe(15);
+    expect(byId['A'].totalContribution).toBe(1500);
+    expect(res.counts.STAR).toBe(1);
+    expect(res.counts.PLOWHORSE).toBe(1);
+    expect(res.counts.PUZZLE).toBe(1);
+  });
+
+  it('separates un-costed products and excludes them from the quadrant', async () => {
+    (prisma.orderItem.groupBy as any).mockResolvedValue([
+      { productId: 'A', _sum: { quantity: 10, subtotal: 200 } },
+      { productId: 'X', _sum: { quantity: 50, subtotal: 500 } },
+    ]);
+    (prisma.product.findMany as any).mockResolvedValue([
+      { id: 'A', name: 'A', price: 20, costPrice: 5, category: { name: 'Main' } },
+      { id: 'X', name: 'X', price: 10, costPrice: null, category: { name: 'Main' } }, // no cost basis
+    ]);
+
+    const res = await svc.getMenuEngineering('t1', start, end);
+
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0].productId).toBe('A');
+    expect(res.uncosted).toHaveLength(1);
+    expect(res.uncosted[0].productId).toBe('X');
+    expect(res.counts.uncosted).toBe(1);
+  });
+});
+
+/**
+ * Tips report — totals + per-tender breakdown. Tips are Payment.tipAmount,
+ * recorded separately from the goods amount, so they never double-count sales.
+ */
+describe('ReportsService.getTipsReport', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('totals tips and breaks them down by tender, sorted desc', async () => {
+    (prisma.payment.groupBy as any).mockResolvedValue([
+      { method: 'CASH', _sum: { tipAmount: 20 }, _count: 2 },
+      { method: 'CARD', _sum: { tipAmount: 80 }, _count: 4 },
+    ]);
+    const res = await svc.getTipsReport('t1', start, end);
+    expect(res.totalTips).toBe(100);
+    expect(res.tipCount).toBe(6);
+    expect(res.byMethod[0]).toMatchObject({ method: 'CARD', tips: 80, count: 4 });
+    expect(res.byMethod[1]).toMatchObject({ method: 'CASH', tips: 20 });
+  });
+});
+
+/**
+ * Period-over-period comparison — current window vs the immediately preceding
+ * equal-length window, with absolute + % change per metric.
+ */
+describe('ReportsService.getSalesComparison', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('computes deltas vs the previous equal-length window', async () => {
+    jest.spyOn(svc, 'getSalesSummary')
+      .mockResolvedValueOnce({ totalSales: 1200, totalOrders: 100, averageOrderValue: 12 } as any)
+      .mockResolvedValueOnce({ totalSales: 1000, totalOrders: 80, averageOrderValue: 12.5 } as any);
+    jest.spyOn(svc, 'getCogsReport')
+      .mockResolvedValueOnce({ cogs: 360, grossProfit: 840, foodCostPct: 30 } as any)
+      .mockResolvedValueOnce({ cogs: 320, grossProfit: 680, foodCostPct: 32 } as any);
+
+    const res = await svc.getSalesComparison(
+      't1',
+      new Date('2026-06-16T00:00:00Z'),
+      new Date('2026-06-30T00:00:00Z'),
+    );
+
+    const sales = res.metrics.find((m: any) => m.metric === 'totalSales');
+    expect(sales.current).toBe(1200);
+    expect(sales.previous).toBe(1000);
+    expect(sales.change).toBe(200);
+    expect(sales.changePct).toBe(20);
+    expect(res.foodCostPct).toEqual({ current: 30, previous: 32 });
+    // The previous window is the 14 days immediately before the current start.
+    expect(res.previous.endDate.getTime()).toBe(new Date('2026-06-16T00:00:00Z').getTime());
+  });
+});
+
+/**
+ * P&L snapshot — revenue → COGS → gross profit → OpEx → net profit.
+ */
+describe('ReportsService.getProfitAndLoss', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('computes gross + net profit from revenue, COGS and OpEx', async () => {
+    jest.spyOn(svc, 'getSalesSummary').mockResolvedValue({ totalSales: 10000 } as any);
+    jest.spyOn(svc, 'getCogsReport').mockResolvedValue({ cogs: 3000, foodCostPct: 30, startDate: start, endDate: end } as any);
+    (prisma.expense.groupBy as any).mockResolvedValue([
+      { category: 'RENT', _sum: { amount: 2000 } },
+      { category: 'SALARY', _sum: { amount: 3000 } },
+    ]);
+
+    const res = await svc.getProfitAndLoss('t1', start, end);
+
+    expect(res.revenue).toBe(10000);
+    expect(res.cogs).toBe(3000);
+    expect(res.grossProfit).toBe(7000);
+    expect(res.grossMarginPct).toBe(70);
+    expect(res.operatingExpenses).toBe(5000);
+    expect(res.netProfit).toBe(2000);
+    expect(res.netMarginPct).toBe(20);
+    expect(res.expensesByCategory[0]).toMatchObject({ category: 'SALARY', amount: 3000 });
+  });
+});
+
+/**
+ * Labor + prime cost. Labor = Σ worked-hours × hourlyRate; prime = COGS + labor.
+ */
+describe('ReportsService.getLaborReport', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new ReportsService(prisma as any);
+  });
+
+  it('sums labor from worked-hours × rate and derives prime cost + labor %', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      { totalWorkedMinutes: 600, user: { id: 'u1', firstName: 'A', lastName: 'B', role: 'WAITER', hourlyRate: 20 } }, // 10h×20=200
+      { totalWorkedMinutes: 480, user: { id: 'u2', firstName: 'C', lastName: 'D', role: 'KITCHEN', hourlyRate: 25 } }, // 8h×25=200
+    ]);
+    jest.spyOn(svc, 'getSalesSummary').mockResolvedValue({ totalSales: 2000 } as any);
+    jest.spyOn(svc, 'getCogsReport').mockResolvedValue({ cogs: 600, startDate: start, endDate: end } as any);
+
+    const res = await svc.getLaborReport('t1', start, end);
+
+    expect(res.laborCost).toBe(400);
+    expect(res.laborPct).toBe(20); // 400/2000
+    expect(res.totalHours).toBe(18);
+    expect(res.primeCost).toBe(1000); // 600 cogs + 400 labor
+    expect(res.primeCostPct).toBe(50);
+    expect(res.byStaff).toHaveLength(2);
+  });
+
+  it('counts staff without an hourly rate (they contribute 0)', async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      { totalWorkedMinutes: 600, user: { id: 'u1', firstName: 'A', lastName: 'B', role: 'WAITER', hourlyRate: null } },
+    ]);
+    jest.spyOn(svc, 'getSalesSummary').mockResolvedValue({ totalSales: 1000 } as any);
+    jest.spyOn(svc, 'getCogsReport').mockResolvedValue({ cogs: 0, startDate: start, endDate: end } as any);
+
+    const res = await svc.getLaborReport('t1', start, end);
+    expect(res.laborCost).toBe(0);
+    expect(res.staffWithoutRate).toBe(1);
+  });
+});
+
+describe('ReportsService.getSalesForecast', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  beforeEach(() => { prisma = mockPrismaClient(); svc = new ReportsService(prisma as any); });
+
+  it('projects horizon days from weekday averages and totals them', async () => {
+    // two Mondays averaging 100, everything else falls back to overall average
+    (prisma.$queryRaw as any).mockResolvedValue([
+      { day: new Date('2026-06-01'), revenue: 100 }, // Monday
+      { day: new Date('2026-06-08'), revenue: 100 }, // Monday
+    ]);
+    const res = await svc.getSalesForecast('t1', 7);
+    expect(res.historyDays).toBe(2);
+    expect(res.avgDailyRevenue).toBe(100);
+    expect(res.forecast).toHaveLength(7);
+    expect(res.projectedTotal).toBeGreaterThan(0);
+  });
+});
+
+describe('ReportsService.getConsolidatedPnl', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  beforeEach(() => { prisma = mockPrismaClient(); svc = new ReportsService(prisma as any); });
+
+  it('rolls per-branch P&L into a total', async () => {
+    (prisma.branch.findMany as any).mockResolvedValue([
+      { id: 'bA', name: 'A' }, { id: 'bB', name: 'B' },
+    ]);
+    jest.spyOn(svc, 'getProfitAndLoss').mockImplementation(async (_t, _s, _e, branchId) =>
+      (branchId === 'bA'
+        ? { revenue: 1000, cogs: 300, grossProfit: 700, operatingExpenses: 200, netProfit: 500, netMarginPct: 50 }
+        : { revenue: 2000, cogs: 600, grossProfit: 1400, operatingExpenses: 400, netProfit: 1000, netMarginPct: 50 }) as any,
+    );
+
+    const res = await svc.getConsolidatedPnl('t1');
+    expect(res.totals.revenue).toBe(3000);
+    expect(res.totals.netProfit).toBe(1500);
+    // sorted by netProfit desc → branch B first
+    expect(res.perBranch[0].branchId).toBe('bB');
+  });
+});
+
+describe('ReportsService.getTipDistribution', () => {
+  let prisma: MockPrismaClient;
+  let svc: ReportsService;
+  const start = new Date('2026-06-01T00:00:00Z');
+  const end = new Date('2026-06-30T23:59:59Z');
+  beforeEach(() => { prisma = mockPrismaClient(); svc = new ReportsService(prisma as any); });
+
+  it('splits the tip pool by hours worked', async () => {
+    jest.spyOn(svc, 'getTipsReport').mockResolvedValue({ totalTips: 300 } as any);
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      { totalWorkedMinutes: 600, user: { id: 'u1', firstName: 'A', lastName: 'B' } }, // 10h
+      { totalWorkedMinutes: 1200, user: { id: 'u2', firstName: 'C', lastName: 'D' } }, // 20h
+    ]);
+    const res = await svc.getTipDistribution('t1', start, end);
+    expect(res.pool).toBe(300);
+    expect(res.totalHours).toBe(30);
+    // u2 worked 2/3 of hours → 200, u1 → 100
+    const byId = Object.fromEntries(res.distribution.map((d: any) => [d.userId, d.tipShare]));
+    expect(byId['u2']).toBe(200);
+    expect(byId['u1']).toBe(100);
+    expect(res.distributed).toBe(300);
   });
 });

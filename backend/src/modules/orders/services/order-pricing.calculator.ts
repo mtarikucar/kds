@@ -1,5 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { TaxCalculationService } from "../../accounting/services/tax-calculation.service";
+import {
+  resolveEffectivePrice,
+  isCampaignActive,
+  CampaignPricable,
+} from "./combo-pricing";
 
 /**
  * Pure line-item pricing/totals/tax computation, extracted VERBATIM from the
@@ -34,6 +39,10 @@ export interface PricedOrderItem {
   taxRate: number;
   taxAmount: number;
   notes: string | undefined;
+  // Set ONLY when a campaign discount is active: the pre-discount catalog unit
+  // price, so the receipt/analytics can show "was X". undefined otherwise —
+  // Jest toEqual ignores undefined keys so existing specs are unaffected.
+  listUnitPrice?: number;
   modifiers?: {
     create: Array<{
       modifierId: string;
@@ -60,15 +69,26 @@ export class OrderPricingCalculator {
    */
   priceItems(
     items: ReadonlyArray<PricingItemInput>,
-    productMap: Map<string, { price: unknown; taxRate?: number | null }>,
+    productMap: Map<
+      string,
+      { price: unknown; taxRate?: number | null } & Partial<CampaignPricable>
+    >,
     modifierMap: Map<string, { priceAdjustment: unknown }>,
     taxCalculationService?: Pick<TaxCalculationService, "extractTax">,
+    now: Date = new Date(),
   ): PricingResult {
     let totalAmount = 0;
     let totalTaxAmount = 0;
     const orderItems = items.map((item) => {
       const product = productMap.get(item.productId);
-      const serverPrice = Number(product?.price ?? 0);
+      // Campaign-aware SINGLE source of truth: the charged price is the active
+      // campaign price when its window is open, else the list price. Identical
+      // to Number(product.price) for products without a campaign.
+      const serverPrice = resolveEffectivePrice(product ?? { price: 0 }, now);
+      const listUnitPrice =
+        product && isCampaignActive(product, now)
+          ? Number(product.price)
+          : undefined;
       const taxRate = product?.taxRate ?? 10;
 
       // Calculate modifier total for this item
@@ -104,6 +124,7 @@ export class OrderPricingCalculator {
         taxRate,
         taxAmount: itemTaxAmount,
         notes: item.notes,
+        listUnitPrice,
         modifiers:
           itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
       };

@@ -25,6 +25,7 @@ export type BuiltOrderData = CreateOrderDto & {
   items: Array<
     CreateOrderDto['items'][number] & {
       modifiers?: Array<{ modifierId: string; quantity: number }>;
+      comboSelections?: Array<{ groupId: string; componentProductId: string }>;
     }
   >;
 };
@@ -67,6 +68,9 @@ export function buildOrderData({
         modifierId: m.modifierId,
         quantity: m.quantity,
       })),
+      ...(item.comboSelections && item.comboSelections.length
+        ? { comboSelections: item.comboSelections }
+        : {}),
     })),
     // Stable per-click idempotency key. Backend dedupes by
     // (tenantId, idempotencyKey) so a double-tap on a slow network

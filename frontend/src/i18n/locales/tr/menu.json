@@ -126,7 +126,17 @@
       "unusedHint": "Hiçbir ürüne eklenmemiş görseller. Depolama alanı için silin.",
       "noUnusedImages": "Kullanılmayan görsel yok",
       "noUnusedHint": "Her görsel en az bir ürüne ekli."
-    }
+    },
+    "comboSlots": "Kombo içeriği",
+    "campaign": "Kampanya",
+    "campaignHint": "İndirimli fiyat girin — menüde üstü çizili liste fiyatı + rozet gösterilir. Tarih boş bırakılırsa hemen/süresiz geçerli olur. Boş bırakırsanız kampanya yoktur.",
+    "campaignPrice": "Kampanya fiyatı (₺)",
+    "campaignLabel": "Rozet metni",
+    "campaignStart": "Başlangıç",
+    "campaignEnd": "Bitiş",
+    "collections": "Koleksiyonlar",
+    "productTypeStandard": "Normal ürün",
+    "productTypeCombo": "Kombo / Menü"
   },
   "media": {
     "title": "Yapay zeka stüdyo",

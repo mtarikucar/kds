@@ -27,6 +27,9 @@ export enum IngredientMovementType {
 
 export enum PurchaseOrderStatus {
   DRAFT = "DRAFT",
+  // Submitted but over the approval threshold — awaits a manager's approve()
+  // before it can be received. Only reached when a threshold is configured.
+  PENDING_APPROVAL = "PENDING_APPROVAL",
   SUBMITTED = "SUBMITTED",
   PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED",
   RECEIVED = "RECEIVED",

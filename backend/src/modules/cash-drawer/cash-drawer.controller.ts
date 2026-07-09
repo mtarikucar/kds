@@ -2,17 +2,24 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 import { CashDrawerService } from "./cash-drawer.service";
+import { CashierSessionService } from "./cashier-session.service";
 import { CreateCashDrawerMovementDto } from "./dto/create-cash-drawer-movement.dto";
 import { RejectCashDrawerMovementDto } from "./dto/reject-cash-drawer-movement.dto";
+import {
+  OpenCashierSessionDto,
+  CloseCashierSessionDto,
+} from "./dto/cashier-session.dto";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../common/scoping/branch-scope";
 
@@ -28,7 +35,80 @@ import { BranchScope } from "../../common/scoping/branch-scope";
 @ApiBearerAuth()
 @Controller("cash-drawer")
 export class CashDrawerController {
-  constructor(private readonly svc: CashDrawerService) {}
+  constructor(
+    private readonly svc: CashDrawerService,
+    private readonly sessions: CashierSessionService,
+  ) {}
+
+  // ── Cashier sessions (shift + EOD reconciliation) ──────────────────────────
+
+  @Post("sessions/open")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: "Open a cashier session with an opening float" })
+  openSession(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: OpenCashierSessionDto,
+  ) {
+    return this.sessions.open(
+      scope,
+      dto.userId ?? scope.userId,
+      dto.openingFloat,
+    );
+  }
+
+  @Get("sessions/current")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: "Get the caller's currently open session" })
+  currentSession(@CurrentScope() scope: BranchScope) {
+    return this.sessions.getCurrent(scope, scope.userId);
+  }
+
+  @Get("sessions")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "List cashier sessions (ADMIN, MANAGER)" })
+  listSessions(
+    @CurrentScope() scope: BranchScope,
+    @Query("status") status?: string,
+  ) {
+    return this.sessions.list(scope, { status });
+  }
+
+  @Get("sessions.csv")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Header("Content-Type", "text/csv; charset=utf-8")
+  @Header("Content-Disposition", 'attachment; filename="cashier-sessions.csv"')
+  @ApiOperation({ summary: "Export cashier sessions (Z history) as CSV" })
+  sessionsCsv(
+    @CurrentScope() scope: BranchScope,
+    @Query("status") status?: string,
+  ) {
+    return this.sessions.listCsv(scope, { status });
+  }
+
+  @Get("sessions/:id/x-report")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({
+    summary: "X-report: mid-shift running expected cash (does not close)",
+  })
+  xReport(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.sessions.getXReport(scope, id);
+  }
+
+  @Patch("sessions/:id/close")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({
+    summary: "Close a session — reconciles counted vs expected cash",
+  })
+  closeSession(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CloseCashierSessionDto,
+  ) {
+    return this.sessions.close(scope, id, dto);
+  }
 
   @Post("movements")
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)

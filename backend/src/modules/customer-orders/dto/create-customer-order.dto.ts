@@ -45,6 +45,16 @@ export class OrderItemModifierDto {
   quantity: number;
 }
 
+export class ComboSelectionDto {
+  @ApiProperty({ example: "uuid-of-combo-group" })
+  @IsUUID()
+  groupId: string;
+
+  @ApiProperty({ example: "uuid-of-component-product" })
+  @IsUUID()
+  componentProductId: string;
+}
+
 export class CreateOrderItemDto {
   @ApiProperty({ example: "uuid-of-product" })
   @IsUUID()
@@ -72,6 +82,18 @@ export class CreateOrderItemDto {
   @Type(() => OrderItemModifierDto)
   @IsOptional()
   modifiers?: OrderItemModifierDto[];
+
+  @ApiPropertyOptional({
+    type: [ComboSelectionDto],
+    description:
+      "For a COMBO product: chosen component per slot. Omitted slots use their default items.",
+  })
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => ComboSelectionDto)
+  @IsOptional()
+  comboSelections?: ComboSelectionDto[];
 }
 
 export class CreateCustomerOrderDto {

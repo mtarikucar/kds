@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Eye, Send, PackageCheck, XCircle, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Plus, Eye, Send, PackageCheck, XCircle, Trash2, BadgeCheck, Anchor } from 'lucide-react';
 import {
   usePurchaseOrders, useCreatePurchaseOrder, useSubmitPurchaseOrder,
   useReceivePurchaseOrder, useCancelPurchaseOrder, useSuppliers, useStockItems,
 } from '../stockManagementApi';
+import { useApprovePurchaseOrder, useApplyLandedCost } from '../purchasingApi';
 import { PurchaseOrderStatus, type PurchaseOrder } from '../types';
 import Modal from '../../../components/ui/Modal';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
+  PENDING_APPROVAL: 'bg-purple-100 text-purple-700',
   SUBMITTED: 'bg-blue-100 text-blue-700',
   PARTIALLY_RECEIVED: 'bg-yellow-100 text-yellow-700',
   RECEIVED: 'bg-green-100 text-green-700',
@@ -22,6 +25,7 @@ const PurchaseOrdersTab = () => {
   const [showForm, setShowForm] = useState(false);
   const [receiveOrder, setReceiveOrder] = useState<PurchaseOrder | null>(null);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
+  const [landedCostOrder, setLandedCostOrder] = useState<PurchaseOrder | null>(null);
 
   const { data: orders = [], isLoading } = usePurchaseOrders(statusFilter || undefined);
   const { data: suppliers = [] } = useSuppliers();
@@ -30,6 +34,8 @@ const PurchaseOrdersTab = () => {
   const submitMutation = useSubmitPurchaseOrder();
   const receiveMutation = useReceivePurchaseOrder();
   const cancelMutation = useCancelPurchaseOrder();
+  const approveMutation = useApprovePurchaseOrder();
+  const landedCostMutation = useApplyLandedCost();
 
   const statusLabel = (status: string) => t(`purchaseOrders.status${status.charAt(0) + status.slice(1).toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`);
 
@@ -100,9 +106,30 @@ const PurchaseOrdersTab = () => {
                           <Send className="h-4 w-4" />
                         </button>
                       )}
+                      {order.status === 'PENDING_APPROVAL' && (
+                        // POs over stockSettings.poApprovalThreshold park here;
+                        // approve moves them to SUBMITTED.
+                        <button
+                          onClick={() =>
+                            approveMutation.mutate(order.id, {
+                              onError: () => toast.error(t('purchaseOrders.approveError')),
+                            })
+                          }
+                          disabled={approveMutation.isPending}
+                          className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-50 disabled:pointer-events-none"
+                          title={t('purchaseOrders.approve')}
+                        >
+                          <BadgeCheck className="h-4 w-4" />
+                        </button>
+                      )}
                       {(order.status === 'SUBMITTED' || order.status === 'PARTIALLY_RECEIVED') && (
                         <button onClick={() => setReceiveOrder(order)} className="p-1 text-gray-400 hover:text-emerald-600" title={t('purchaseOrders.receive')}>
                           <PackageCheck className="h-4 w-4" />
+                        </button>
+                      )}
+                      {(order.status === 'RECEIVED' || order.status === 'PARTIALLY_RECEIVED') && (
+                        <button onClick={() => setLandedCostOrder(order)} className="p-1 text-gray-400 hover:text-indigo-600" title={t('purchaseOrders.landedCost')}>
+                          <Anchor className="h-4 w-4" />
                         </button>
                       )}
                       {order.status !== 'RECEIVED' && order.status !== 'CANCELLED' && (
@@ -183,9 +210,67 @@ const PurchaseOrdersTab = () => {
           t={t}
         />
       )}
+
+      {/* Landed cost Modal */}
+      {landedCostOrder && (
+        <LandedCostForm
+          order={landedCostOrder}
+          onSave={async (data: { freight?: number; customs?: number; other?: number }) => {
+            try {
+              await landedCostMutation.mutateAsync({ id: landedCostOrder.id, ...data });
+              toast.success(t('purchaseOrders.landedCostApplied'));
+              setLandedCostOrder(null);
+            } catch {
+              toast.error(t('purchaseOrders.landedCostError'));
+            }
+          }}
+          onClose={() => setLandedCostOrder(null)}
+          isLoading={landedCostMutation.isPending}
+          t={t}
+        />
+      )}
     </div>
   );
 };
+
+function LandedCostForm({ order, onSave, onClose, isLoading, t }: any) {
+  const [form, setForm] = useState({ freight: '', customs: '', other: '' });
+  const num = (v: string) => (v && Number(v) > 0 ? Number(v) : undefined);
+  const total = ['freight', 'customs', 'other']
+    .map((k) => Number((form as any)[k]) || 0)
+    .reduce((a, b) => a + b, 0);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (total <= 0) return;
+    onSave({ freight: num(form.freight), customs: num(form.customs), other: num(form.other) });
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title={`${t('purchaseOrders.landedCost')} — ${order.orderNumber}`} size="sm">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {(['freight', 'customs', 'other'] as const).map((k) => (
+          <div key={k}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t(`purchaseOrders.landedCost${k.charAt(0).toUpperCase()}${k.slice(1)}`)}
+            </label>
+            <input
+              type="number" min="0" step="0.01" value={(form as any)[k]}
+              onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        ))}
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">{t('common.cancel')}</button>
+          <button type="submit" disabled={isLoading || total <= 0} className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+            {t('purchaseOrders.landedCostApply')}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 
 function CreatePOForm({ suppliers, stockItems, onSave, onClose, isLoading, t }: any) {
   const [form, setForm] = useState({

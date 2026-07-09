@@ -29,6 +29,14 @@ export const createProductSchema = (t: (key: string) => string) =>
     stockTracked: z.boolean().optional(),
     // KDV (VAT) rate — TR allows 0/1/10/20. Optional; backend defaults to 10.
     taxRate: z.number().optional(),
+    // Combo + campaign. productType STANDARD unless this is a combo bundle;
+    // combo slots themselves are managed as local state in the editor.
+    productType: z.enum(["STANDARD", "COMBO"]).optional(),
+    // Campaign price: null/empty clears; a positive number sets a discount.
+    campaignPrice: z.number().min(0).nullable().optional(),
+    campaignLabel: z.string().max(40).nullable().optional(),
+    campaignStartAt: z.string().nullable().optional(),
+    campaignEndAt: z.string().nullable().optional(),
   });
 
 export type CategoryFormData = z.infer<ReturnType<typeof createCategorySchema>>;

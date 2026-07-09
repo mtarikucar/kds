@@ -33,6 +33,31 @@ export enum PaymentMethod {
    * its own bucket so the operator can reconcile losses.
    */
   HOUSE = "HOUSE",
+
+  // Meal-voucher (yemek çeki / yemek kartı) tenders. First-class TR tender
+  // types so they reconcile as their own line in the payment-method breakdown
+  // and the Z-report instead of collapsing into "CARD". Fiscally treated as a
+  // card tender on the fiş (toFiscalTender), but tracked distinctly everywhere
+  // amounts are grouped by method.
+  MULTINET = "MULTINET",
+  SODEXO = "SODEXO",
+  EDENRED = "EDENRED", // Ticket Restaurant (Edenred)
+  SETCARD = "SETCARD",
+  METROPOL = "METROPOL",
+}
+
+/** Meal-voucher (yemek çeki/kartı) tender methods. */
+export const MEAL_VOUCHER_METHODS: readonly PaymentMethod[] = [
+  PaymentMethod.MULTINET,
+  PaymentMethod.SODEXO,
+  PaymentMethod.EDENRED,
+  PaymentMethod.SETCARD,
+  PaymentMethod.METROPOL,
+];
+
+/** True when a payment method is a meal-voucher tender. */
+export function isMealVoucher(method: string): boolean {
+  return (MEAL_VOUCHER_METHODS as readonly string[]).includes(method);
 }
 
 export enum PaymentStatus {

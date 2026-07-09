@@ -1,8 +1,9 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -14,8 +15,85 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from "class-validator";
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
+
+export class ComboGroupItemDto {
+  @ApiProperty({ example: "component-product-uuid" })
+  @IsUUID()
+  componentProductId: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  @IsOptional()
+  quantity?: number;
+
+  @ApiPropertyOptional({
+    example: 10,
+    default: 0,
+    description: "± combo price",
+  })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(-10_000)
+  @Max(10_000)
+  @IsOptional()
+  priceDelta?: number;
+
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
+
+  @ApiPropertyOptional({ example: 0, default: 0 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  displayOrder?: number;
+}
+
+export class ComboGroupDto {
+  @ApiProperty({ example: "İçeceğini Seç" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  name: string;
+
+  @ApiPropertyOptional({ example: "İçecek" })
+  @IsString()
+  @IsOptional()
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  @IsOptional()
+  minSelect?: number;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  @IsOptional()
+  maxSelect?: number;
+
+  @ApiPropertyOptional({ example: 0, default: 0 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  displayOrder?: number;
+
+  @ApiProperty({ type: [ComboGroupItemDto] })
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ComboGroupItemDto)
+  items: ComboGroupItemDto[];
+}
 
 // http(s):// for vendor images, or `/` for self-hosted (landing/public assets).
 // Blocks `javascript:` / `data:` / `vbscript:` — the legacy `image` column lands
@@ -60,6 +138,16 @@ export class CreateProductDto {
   @Min(0)
   @Max(10_000_000)
   price: number;
+
+  // Unit COST (what it costs to make/buy), distinct from the retail `price`.
+  // Feeds at-cost inventory valuation + gross margin for products without a
+  // recipe. Optional — unset means "no cost basis yet".
+  @ApiProperty({ example: 6.5, required: false })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10_000_000)
+  @IsOptional()
+  costPrice?: number;
 
   @ApiProperty({ example: "https://example.com/image.jpg", required: false })
   // Treat "" / whitespace as "no image" — @IsOptional only skips null/undefined,
@@ -135,4 +223,58 @@ export class CreateProductDto {
   @IsIn([0, 1, 10, 20])
   @IsOptional()
   taxRate?: number;
+
+  // ── Combo + campaign + classification (menu combo feature) ──────────────
+  @ApiPropertyOptional({ enum: ["STANDARD", "COMBO"], default: "STANDARD" })
+  @IsIn(["STANDARD", "COMBO"])
+  @IsOptional()
+  productType?: "STANDARD" | "COMBO";
+
+  @ApiPropertyOptional({
+    description: "Combo slots. Only meaningful when productType=COMBO.",
+    type: [ComboGroupDto],
+  })
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => ComboGroupDto)
+  @IsOptional()
+  comboGroups?: ComboGroupDto[];
+
+  @ApiPropertyOptional({
+    example: 79.9,
+    description: "KDV-inclusive campaign price. null clears the campaign.",
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10_000_000)
+  campaignPrice?: number | null;
+
+  @ApiPropertyOptional({ example: "%20 İndirim", nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  campaignLabel?: string | null;
+
+  @ApiPropertyOptional({ example: "2026-07-10T00:00:00.000Z", nullable: true })
+  @IsOptional()
+  @IsDateString()
+  campaignStartAt?: string | null;
+
+  @ApiPropertyOptional({ example: "2026-07-31T23:59:59.000Z", nullable: true })
+  @IsOptional()
+  @IsDateString()
+  campaignEndAt?: string | null;
+
+  @ApiPropertyOptional({
+    description: "Collection ids this product belongs to (replaces existing).",
+    example: ["collection-uuid"],
+  })
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsUUID("all", { each: true })
+  @IsOptional()
+  collectionIds?: string[];
 }

@@ -18,6 +18,7 @@ const SubdomainQRMenuPage: React.FC<SubdomainQRMenuPageProps> = ({ subdomain, se
           settings={menuData.settings}
           tenant={menuData.tenant}
           enableCustomerOrdering={menuData.enableCustomerOrdering}
+          collections={menuData.collections}
           searchQuery={searchQuery}
         />
       )}

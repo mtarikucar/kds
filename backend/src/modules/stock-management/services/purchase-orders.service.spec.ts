@@ -353,3 +353,195 @@ describe("PurchaseOrdersService.cancel (deep-review M18)", () => {
     expect(txMock.purchaseOrderItem.update).toHaveBeenCalled();
   });
 });
+
+/**
+ * Purchase-unit (UOM) conversion on receive. When a PO line carries a
+ * conversionFactor, quantities/price are in the purchase unit (BOX) and receive
+ * converts to the base stock unit: base qty = qty × factor, base cost =
+ * unitPrice ÷ factor. Total receipt cost is invariant. Lines without a factor
+ * are unaffected.
+ */
+describe('PurchaseOrdersService.receive — purchase-unit (UOM) conversion', () => {
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+
+  beforeEach(() => {
+    prisma = {
+      purchaseOrder: { findFirst: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    svc = new PurchaseOrdersService(prisma as any);
+  });
+
+  it('converts a BOX-of-12 line to base PCS on receive (qty×12, cost÷12)', async () => {
+    prisma.purchaseOrder.findFirst.mockResolvedValue({
+      id: 'po-1', tenantId: 't1', status: PurchaseOrderStatus.SUBMITTED, orderNumber: 'PO-1',
+      items: [{ id: 'poi-1', stockItemId: 'stock-1', stockItem: { name: 'Cola' }, quantityReceived: '0', quantityOrdered: '5', unitPrice: '60', conversionFactor: '12' }],
+    });
+    const txMock: any = {
+      purchaseOrderItem: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'poi-1', stockItemId: 'stock-1', stockItem: { name: 'Cola' },
+          quantityReceived: '0', quantityOrdered: '5', unitPrice: '60', conversionFactor: '12',
+        }),
+        update: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([{ quantityReceived: '2', quantityOrdered: '5' }]),
+      },
+      stockItem: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'stock-1', currentStock: '0', costPerUnit: '0' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      stockBatch: { create: jest.fn().mockResolvedValue({}) },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+      purchaseOrder: { update: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+
+    await svc.receive('po-1', { items: [{ purchaseOrderItemId: 'poi-1', quantityReceived: 2 }] } as any, SCOPE, 'u1');
+
+    // Base stock += 2 boxes × 12 = 24 PCS.
+    expect(txMock.stockItem.update.mock.calls[0][0].data.currentStock.increment.toString()).toBe('24');
+    // Batch + movement are in base units at the per-base-unit cost (60 ÷ 12 = 5).
+    expect(txMock.stockBatch.create.mock.calls[0][0].data.quantity.toString()).toBe('24');
+    expect(txMock.stockBatch.create.mock.calls[0][0].data.costPerUnit.toString()).toBe('5');
+    expect(txMock.ingredientMovement.create.mock.calls[0][0].data.quantity.toString()).toBe('24');
+    expect(txMock.ingredientMovement.create.mock.calls[0][0].data.costPerUnit.toString()).toBe('5');
+    // The PO line's received qty stays in purchase units (2 BOX, not 24).
+    expect(txMock.purchaseOrderItem.update.mock.calls[0][0].data.quantityReceived.toString()).toBe('2');
+  });
+});
+
+describe('PurchaseOrdersService — approval gate (submit + approve)', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+  const draftPo = { id: 'po1', status: 'DRAFT', items: [{ quantityOrdered: 10, unitPrice: 100 }] }; // total 1000
+
+  beforeEach(() => {
+    prisma = {
+      purchaseOrder: {
+        findFirst: jest.fn().mockResolvedValue(draftPo),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'po1' }),
+      },
+      stockSettings: { findFirst: jest.fn() },
+    };
+    svc = new PurchaseOrdersService(prisma);
+  });
+
+  it('routes submit to PENDING_APPROVAL when total ≥ threshold', async () => {
+    prisma.stockSettings.findFirst.mockResolvedValue({ poApprovalThreshold: 500 });
+    await svc.submit('po1', SCOPE);
+    expect(prisma.purchaseOrder.updateMany.mock.calls[0][0].data.status).toBe('PENDING_APPROVAL');
+  });
+
+  it('routes submit straight to SUBMITTED below threshold', async () => {
+    prisma.stockSettings.findFirst.mockResolvedValue({ poApprovalThreshold: 5000 });
+    await svc.submit('po1', SCOPE);
+    expect(prisma.purchaseOrder.updateMany.mock.calls[0][0].data.status).toBe('SUBMITTED');
+  });
+
+  it('routes submit to SUBMITTED when no threshold is configured', async () => {
+    prisma.stockSettings.findFirst.mockResolvedValue(null);
+    await svc.submit('po1', SCOPE);
+    expect(prisma.purchaseOrder.updateMany.mock.calls[0][0].data.status).toBe('SUBMITTED');
+  });
+
+  it('approve() moves PENDING_APPROVAL → SUBMITTED with approver audit', async () => {
+    await svc.approve('po1', SCOPE, 'mgr1');
+    const call = prisma.purchaseOrder.updateMany.mock.calls[0][0];
+    expect(call.where.status).toBe('PENDING_APPROVAL');
+    expect(call.data.status).toBe('SUBMITTED');
+    expect(call.data.approvedById).toBe('mgr1');
+  });
+
+  it('approve() rejects a PO that is not awaiting approval', async () => {
+    prisma.purchaseOrder.updateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.approve('po1', SCOPE, 'mgr1')).rejects.toThrow();
+  });
+});
+
+describe('PurchaseOrdersService.applyLandedCost', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+
+  beforeEach(() => {
+    prisma = { $transaction: jest.fn() };
+    svc = new PurchaseOrdersService(prisma);
+  });
+
+  it('allocates extra cost by line value and raises the stock cost basis', async () => {
+    const txMock: any = {
+      purchaseOrder: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'po1', orderNumber: 'PO-1', status: 'RECEIVED',
+          items: [
+            { stockItemId: 'sA', quantityReceived: 10, unitPrice: 10 }, // value 100
+            { stockItemId: 'sB', quantityReceived: 10, unitPrice: 10 }, // value 100
+          ],
+        }),
+      },
+      stockItem: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'sA', currentStock: 10, costPerUnit: 10 },
+          { id: 'sB', currentStock: 10, costPerUnit: 10 },
+        ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 10 } }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      ingredientMovement: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(txMock));
+
+    // 40 freight split evenly (equal line values) → 20 each; over 10 units → +2/unit
+    const res = await svc.applyLandedCost('po1', SCOPE, { freight: 40 });
+    expect(res.extraTotal).toBe(40);
+    expect(res.allocations).toHaveLength(2);
+    expect(res.allocations[0].allocated).toBe(20);
+    // new cost = 10 + 20/10 = 12
+    expect(Number(txMock.stockItem.updateMany.mock.calls[0][0].data.costPerUnit)).toBe(12);
+  });
+
+  it('rejects a non-positive landed cost', async () => {
+    await expect(svc.applyLandedCost('po1', SCOPE, {})).rejects.toThrow();
+  });
+});
+
+describe('PurchaseOrdersService — templates', () => {
+  const SCOPE = { tenantId: 't1', branchId: 'b1', userId: 'u1', role: 'ADMIN' } as const;
+  let prisma: any;
+  let svc: PurchaseOrdersService;
+
+  beforeEach(() => {
+    prisma = {
+      purchaseOrderTemplate: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), deleteMany: jest.fn() },
+    };
+    svc = new PurchaseOrdersService(prisma);
+  });
+
+  it('createOrderFromTemplate maps template lines into a PO create call', async () => {
+    prisma.purchaseOrderTemplate.findFirst.mockResolvedValue({
+      id: 't1', supplierId: 'S1', items: [{ stockItemId: 'sA', quantity: 5, unitPrice: 10 }],
+    });
+    const createSpy = jest.spyOn(svc, 'create').mockResolvedValue({ id: 'po-new' } as any);
+    const po = await svc.createOrderFromTemplate(SCOPE, 't1', 'u1');
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supplierId: 'S1',
+        items: [{ stockItemId: 'sA', quantityOrdered: 5, unitPrice: 10 }],
+      }),
+      't1', 'b1', 'u1',
+    );
+    expect(po).toEqual({ id: 'po-new' });
+  });
+
+  it('createOrderFromTemplate rejects a missing template', async () => {
+    prisma.purchaseOrderTemplate.findFirst.mockResolvedValue(null);
+    await expect(svc.createOrderFromTemplate(SCOPE, 'missing', 'u1')).rejects.toThrow();
+  });
+});

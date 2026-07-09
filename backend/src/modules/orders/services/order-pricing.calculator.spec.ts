@@ -73,6 +73,31 @@ describe('OrderPricingCalculator', () => {
     expect(res.totalAmount).toBe(30);
   });
 
+  it('charges the campaign price and records the pre-discount list price', () => {
+    const promoMap = new Map<string, any>([
+      ['p-promo', { price: new Prisma.Decimal('100.00'), taxRate: 10, campaignPrice: new Prisma.Decimal('80.00') }],
+    ]);
+    const res = calc.priceItems(
+      [{ productId: 'p-promo', quantity: 2 }],
+      promoMap,
+      modifierMap,
+      tax,
+    );
+    expect(res.orderItems[0].unitPrice).toBe(80); // charged = campaign
+    expect(res.orderItems[0].subtotal).toBe(160); // 2 * 80
+    expect(res.orderItems[0].listUnitPrice).toBe(100); // "was 100"
+    expect(res.totalAmount).toBe(160);
+  });
+
+  it('ignores a campaign whose window has not started', () => {
+    const future = new Map<string, any>([
+      ['p-future', { price: new Prisma.Decimal('100.00'), taxRate: 10, campaignPrice: new Prisma.Decimal('80.00'), campaignStartAt: new Date('2999-01-01') }],
+    ]);
+    const res = calc.priceItems([{ productId: 'p-future', quantity: 1 }], future, modifierMap, tax);
+    expect(res.orderItems[0].unitPrice).toBe(100);
+    expect(res.orderItems[0].listUnitPrice).toBeUndefined();
+  });
+
   it('treats unknown product/modifier ids as price 0 (Number coercion of nullish)', () => {
     const res = calc.priceItems(
       [{ productId: 'missing', quantity: 4, modifiers: [{ modifierId: 'missing-mod', quantity: 2 }] }],

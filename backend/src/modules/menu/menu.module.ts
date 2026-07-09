@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { CategoriesService } from "./services/categories.service";
 import { ProductsService } from "./services/products.service";
 import { MenuQueryService } from "./services/menu-query.service";
+import { MenuCollectionsService } from "./services/menu-collections.service";
 import { MenuCacheService } from "./services/menu-cache.service";
 import { MenuImportService } from "./services/menu-import.service";
 import { Product3dService } from "./services/product-3d.service";
@@ -12,6 +13,7 @@ import { QrMenuController } from "./controllers/qr-menu.controller";
 import { MenuImportController } from "./controllers/menu-import.controller";
 import { Product3dController } from "./controllers/product-3d.controller";
 import { ProductMediaController } from "./controllers/product-media.controller";
+import { MenuCollectionsController } from "./controllers/menu-collections.controller";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { PosSettingsModule } from "../pos-settings/pos-settings.module";
 import { UploadModule } from "../upload/upload.module";
@@ -29,11 +31,13 @@ import { UploadModule } from "../upload/upload.module";
     MenuImportController,
     Product3dController,
     ProductMediaController,
+    MenuCollectionsController,
   ],
   providers: [
     CategoriesService,
     ProductsService,
     MenuQueryService,
+    MenuCollectionsService,
     MenuCacheService,
     MenuImportService,
     Product3dService,
