@@ -422,19 +422,43 @@ export class StockDeductionService {
           // Restore the FIFO cost layer too, so Σ(batch.qty) stays in sync with
           // currentStock (a deduct+reverse nets to zero on the batch ledger as
           // well). The exact consumed batches aren't recorded on the movement,
-          // so re-create a single layer at the movement's recorded cost — the
-          // restored VALUE (reverseQty × costPerUnit) matches what was consumed.
-          await tx.stockBatch.create({
-            data: {
-              quantity: reverseQty as any,
-              costPerUnit: new Prisma.Decimal(
-                movement.costPerUnit ?? stockItem.costPerUnit ?? 0,
-              ) as any,
+          // so re-create a single layer at the movement's recorded cost.
+          // CLAMP to the post-reversal headroom (currentStock − Σ batch.qty):
+          // an allowNegativeStock oversell only drew batches down to 0, so
+          // restoring the FULL reverseQty would mint phantom units and push
+          // Σ(batch) ABOVE currentStock. Never let the restore exceed it.
+          const newStock = new Prisma.Decimal(stockItem.currentStock).add(
+            reverseQty,
+          );
+          const batchAgg = await tx.stockBatch.aggregate({
+            where: {
               stockItemId: movement.stockItemId,
               tenantId,
               branchId: movement.branchId,
+              quantity: { gt: 0 },
             },
+            _sum: { quantity: true },
           });
+          const headroom = newStock.sub(
+            new Prisma.Decimal(batchAgg._sum.quantity ?? 0),
+          );
+          const restoreQty = Prisma.Decimal.min(
+            reverseQty,
+            Prisma.Decimal.max(headroom, new Prisma.Decimal(0)),
+          );
+          if (restoreQty.gt(0)) {
+            await tx.stockBatch.create({
+              data: {
+                quantity: restoreQty as any,
+                costPerUnit: new Prisma.Decimal(
+                  movement.costPerUnit ?? stockItem.costPerUnit ?? 0,
+                ) as any,
+                stockItemId: movement.stockItemId,
+                tenantId,
+                branchId: movement.branchId,
+              },
+            });
+          }
 
           await tx.ingredientMovement.create({
             data: {

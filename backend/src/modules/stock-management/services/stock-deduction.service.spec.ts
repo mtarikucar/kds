@@ -43,10 +43,13 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
         create: jest.fn().mockResolvedValue({}),
       },
       stockItem: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1', currentStock: 0 }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      stockBatch: { create: jest.fn().mockResolvedValue({}) },
+      stockBatch: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+        create: jest.fn().mockResolvedValue({}),
+      },
       order: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
@@ -76,6 +79,46 @@ describe('StockDeductionService.reverseForOrder (iter-32)', () => {
     // ...and the FIFO cost layer is restored alongside currentStock, so a
     // deduct+reverse nets to zero on the batch ledger too (pass-5 residual).
     expect(txMock.stockBatch.create).toHaveBeenCalled();
+  });
+
+  it('clamps the restored batch layer to the currentStock headroom (oversell reversal mints no phantom units)', async () => {
+    // allowNegativeStock oversell: batches only covered 3 of a 15-unit deduct
+    // (currentStock went to -12, batches to 0). Reversing the order restores
+    // currentStock to 3 — the recreated batch layer must be 3, NOT the full 15,
+    // or Σ(batch.qty) would exceed currentStock by 12 phantom units.
+    (prisma.ingredientMovement.findMany as any).mockResolvedValueOnce([
+      {
+        id: 'm-2',
+        stockItemId: 'stock-1',
+        quantity: '-15' as any,
+        costPerUnit: '2' as any,
+        tenantId: 't1',
+        branchId: 'b1',
+        notes: 'Order ORD-2',
+      },
+    ]);
+    const txMock: any = {
+      ingredientMovement: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      stockItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'stock-1', tenantId: 't1', currentStock: -12 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      stockBatch: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(txMock));
+
+    await svc.reverseForOrder('order-2', 't1', 'user-1');
+
+    // newStock = -12 + 15 = 3; batch sum = 0 → headroom 3 → restore exactly 3.
+    const batchArg = txMock.stockBatch.create.mock.calls[0][0].data;
+    expect(batchArg.quantity.toString()).toBe('3');
   });
 
   it('skips reversal when the in-txn check finds an existing ORDER_REVERSAL for the stockItem', async () => {

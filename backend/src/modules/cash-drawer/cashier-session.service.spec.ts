@@ -53,21 +53,38 @@ describe('CashierSessionService', () => {
     expect(prisma.cashierSession.create).not.toHaveBeenCalled();
   });
 
-  it('opens inside a Serializable txn and maps a serialization abort (P2034) to Conflict', async () => {
-    // Two concurrent opens both pass the findFirst check; Postgres SSI aborts
-    // the loser with 40001 → Prisma P2034 → the same "already open" Conflict.
+  it('maps a serialization abort (P2034) to Conflict only when an open session truly exists', async () => {
+    // Same-branch race: SSI aborts the loser with 40001 → P2034; the re-check
+    // then sees the winner's row → the truthful "already open" Conflict.
     const p2034 = new Prisma.PrismaClientKnownRequestError('write conflict', {
       code: 'P2034',
       clientVersion: 'test',
     });
     prisma.$transaction.mockRejectedValueOnce(p2034);
+    prisma.cashierSession.findFirst.mockResolvedValue({ id: 'winner' });
     await expect(svc.open(SCOPE, 'cashier-9', 500)).rejects.toBeInstanceOf(
       ConflictException,
     );
-    // and the guard genuinely runs under Serializable
+  });
+
+  it('retries once on a false-positive P2034 (no open session actually exists)', async () => {
+    // SSI can abort logically non-conflicting opens (coarse predicate locks —
+    // e.g. two DIFFERENT branches opening at once). The re-check finds no open
+    // session → retry, which succeeds; the cashier is not dead-ended with a
+    // false "close your session" message.
+    const p2034 = new Prisma.PrismaClientKnownRequestError('write conflict', {
+      code: 'P2034',
+      clientVersion: 'test',
+    });
+    prisma.$transaction.mockRejectedValueOnce(p2034);
     prisma.cashierSession.findFirst.mockResolvedValue(null);
-    await svc.open(SCOPE, 'cashier-9', 500);
-    expect(prisma.$transaction.mock.calls[1][1]).toEqual({
+
+    const session = await svc.open(SCOPE, 'cashier-9', 500);
+
+    expect(session).toEqual({ id: 'sess-1' });
+    expect(prisma.cashierSession.create).toHaveBeenCalled();
+    // and the guard genuinely runs under Serializable
+    expect(prisma.$transaction.mock.calls[0][1]).toEqual({
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
   });

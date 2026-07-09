@@ -35,10 +35,9 @@ export class CashierSessionService {
     // Until per-session payment linkage exists, enforce a single open till.
     //
     // Serializable so two concurrent opens can't both pass the check-then-create
-    // (Postgres SSI aborts one on the insert-insert phantom); the loser's 40001
-    // (Prisma P2034) is surfaced as the same ConflictException.
-    try {
-      return await this.prisma.$transaction(
+    // (Postgres SSI aborts one on the insert-insert phantom with 40001 → P2034).
+    const attempt = () =>
+      this.prisma.$transaction(
         async (tx) => {
           const existing = await tx.cashierSession.findFirst({
             where: { ...branchScope(scope), status: "OPEN" },
@@ -60,14 +59,26 @@ export class CashierSessionService {
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+    try {
+      return await attempt();
     } catch (e) {
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === "P2034"
       ) {
-        throw new ConflictException(
-          "This branch already has an open cashier session — close it before opening a new one",
-        );
+        // SSI's coarse predicate locks can also abort logically NON-conflicting
+        // opens (e.g. two different branches at once). Only claim "already
+        // open" when a session truly exists; otherwise retry once — a further
+        // P2034 propagates to the global filter's truthful retryable 409.
+        const existing = await this.prisma.cashierSession.findFirst({
+          where: { ...branchScope(scope), status: "OPEN" },
+        });
+        if (existing) {
+          throw new ConflictException(
+            "This branch already has an open cashier session — close it before opening a new one",
+          );
+        }
+        return attempt();
       }
       throw e;
     }
