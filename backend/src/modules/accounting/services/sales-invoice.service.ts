@@ -359,29 +359,29 @@ export class SalesInvoiceService {
     const invoiceItems = payment.orderItemPayments
       .filter((alloc) => alloc.orderItem?.product?.productType !== "COMBO")
       .map((alloc) => {
-      const item = alloc.orderItem;
-      if (!item.quantity || item.quantity <= 0) {
-        throw new BadRequestException(
-          `Invoice cannot be generated: order item "${item.product?.name ?? item.id}" has non-positive quantity`,
-        );
-      }
-      const lineTotal = Number(alloc.amount);
-      const taxRate = item.taxRate ?? 10;
-      const tax = this.taxService.extractTax(lineTotal, taxRate);
-      return {
-        description: item.product?.name || "Ürün",
-        quantity: alloc.quantity,
-        unitPrice:
-          alloc.quantity > 0
-            ? Math.round((tax.subtotalExcludingTax / alloc.quantity) * 100) /
-              100
-            : 0,
-        taxRate,
-        taxAmount: tax.taxAmount,
-        subtotal: tax.subtotalExcludingTax,
-        total: lineTotal,
-      };
-    });
+        const item = alloc.orderItem;
+        if (!item.quantity || item.quantity <= 0) {
+          throw new BadRequestException(
+            `Invoice cannot be generated: order item "${item.product?.name ?? item.id}" has non-positive quantity`,
+          );
+        }
+        const lineTotal = Number(alloc.amount);
+        const taxRate = item.taxRate ?? 10;
+        const tax = this.taxService.extractTax(lineTotal, taxRate);
+        return {
+          description: item.product?.name || "Ürün",
+          quantity: alloc.quantity,
+          unitPrice:
+            alloc.quantity > 0
+              ? Math.round((tax.subtotalExcludingTax / alloc.quantity) * 100) /
+                100
+              : 0,
+          taxRate,
+          taxAmount: tax.taxAmount,
+          subtotal: tax.subtotalExcludingTax,
+          total: lineTotal,
+        };
+      });
 
     const subtotal = invoiceItems.reduce((s, i) => s + i.subtotal, 0);
     const taxAmount = invoiceItems.reduce((s, i) => s + i.taxAmount, 0);
@@ -660,8 +660,7 @@ export class SalesInvoiceService {
     }
 
     const settings = await this.settingsService.findByTenant(tenantId);
-    const neg = (v: Prisma.Decimal | number | string) =>
-      -Math.abs(Number(v));
+    const neg = (v: Prisma.Decimal | number | string) => -Math.abs(Number(v));
     const negBreakdown = (tb: any) => {
       if (!tb || typeof tb !== "object") return tb ?? undefined;
       const out: Record<string, any> = {};
