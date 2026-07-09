@@ -61,8 +61,19 @@ type Fmt = (n: number) => string;
 function MenuTab({ fmt }: { fmt: Fmt }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading } = useMenuEngineering(range);
+  const { data, isLoading, isError } = useMenuEngineering(range);
   if (isLoading) return <Loading />;
+  // Backend gates menu-engineering on ADVANCED_REPORTS while this page is
+  // inventoryTracking-gated — a BASIC tenant 403s here. Say so instead of
+  // rendering a misleading empty table.
+  if (isError)
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-amber-700">
+          Menü mühendisliği için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.
+        </CardContent>
+      </Card>
+    );
   const items: any[] = data?.items ?? data ?? [];
   const uncostedCount = data?.counts?.uncosted ?? (data?.uncosted?.length ?? 0);
   return (

@@ -77,6 +77,16 @@ describe('SuppliersService (iter-9 compound-WHERE + cross-tenant guards)', () =>
 
       await expect(svc.remove('sup-1', 't1')).rejects.toThrow(NotFoundException);
     });
+
+    it('refuses delete when AP invoices or expenses reference the supplier (no orphaned financial trail)', async () => {
+      prisma.supplier.findFirst.mockResolvedValue({ id: 'sup-1', tenantId: 't1' } as any);
+      (prisma.purchaseOrder.count as any).mockResolvedValue(0);
+      (prisma.purchaseInvoice.count as any).mockResolvedValue(3);
+      (prisma.expense.count as any).mockResolvedValue(0);
+
+      await expect(svc.remove('sup-1', 't1')).rejects.toThrow(BadRequestException);
+      expect((prisma.supplier.deleteMany as any).mock.calls.length).toBe(0);
+    });
   });
 
   describe('removeStockItem', () => {

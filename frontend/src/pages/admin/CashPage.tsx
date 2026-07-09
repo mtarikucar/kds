@@ -150,8 +150,18 @@ function SafeTab({ fmt }: { fmt: Fmt }) {
 function TipsTab({ fmt }: { fmt: Fmt }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading } = useTipDistribution(range);
+  const { data, isLoading, isError } = useTipDistribution(range);
   if (isLoading) return <Loading />;
+  // tip-distribution is ADVANCED_REPORTS-gated on the backend; without it the
+  // request 403s — say so instead of showing a fabricated ₺0 pool.
+  if (isError)
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-amber-700">
+          Bahşiş havuzu raporu için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.
+        </CardContent>
+      </Card>
+    );
   return (
     <Card>
       <CardHeader><CardTitle>Bahşiş havuzu dağıtımı — havuz {fmt(data?.pool ?? 0)}, {data?.totalHours ?? 0} saat</CardTitle></CardHeader>

@@ -2327,7 +2327,8 @@ model CashDrawerMovement {
 // Groups the otherwise-loose CashDrawerMovement rows into an accountable
 // session so end-of-day cash reconciliation is per-person, not a single number
 // typed into the Z-report. Scalar FKs (no Prisma relations) keep this isolated
-// from the core User/Tenant/Branch models; DB-level FKs live in the migration.
+// from the core User/Tenant/Branch models; referential integrity is enforced
+// at the app layer (scope checks) — the migration adds indexes, not FKs.
 model CashierSession {
   id           String  @id @default(uuid())
   tenantId     String
@@ -3295,7 +3296,7 @@ model PurchaseOrderTemplateItem {
 
 // Operating expense (rent, salary, utilities, …) — the OpEx line the P&L needs
 // below gross profit. taxAmount is the deductible input VAT when applicable.
-// Scalar FKs keep it isolated; DB FKs live in the migration.
+// Scalar FKs keep it isolated; integrity is app-enforced (no DB FKs).
 model Expense {
   id          String   @id @default(uuid())
   tenantId    String
@@ -3376,8 +3377,9 @@ model Budget {
 // Accounts-Payable vendor bill. Optionally linked to a PurchaseOrder for the
 // 3-way match (ordered ↔ received/GRN ↔ invoiced): a mismatch beyond tolerance
 // flags DISCREPANCY so it can't be paid blind. taxAmount is the indirilecek KDV
-// (deductible input VAT). Scalar FKs keep it isolated; DB FKs live in the
-// migration. Unique (tenant, supplier, invoiceNumber) dedupes a re-sent bill.
+// (deductible input VAT). Scalar FKs keep it isolated; integrity is
+// app-enforced (no DB FKs). Unique (tenant, supplier, invoiceNumber) dedupes
+// a re-sent bill.
 model PurchaseInvoice {
   id              String  @id @default(uuid())
   tenantId        String

@@ -36,6 +36,10 @@ export class CashierSessionService {
     //
     // Serializable so two concurrent opens can't both pass the check-then-create
     // (Postgres SSI aborts one on the insert-insert phantom with 40001 → P2034).
+    // Deliberately NO DB partial-unique backstop: schema.prisma can't express
+    // `UNIQUE (tenantId, branchId) WHERE status='OPEN'`, and adding it only in
+    // hand-written migration SQL would drift CI (db push, no constraint) from
+    // prod (migrate deploy, constraint) — the SSI transaction IS the guard.
     const attempt = () =>
       this.prisma.$transaction(
         async (tx) => {

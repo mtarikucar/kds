@@ -427,6 +427,10 @@ export class StockDeductionService {
           // an allowNegativeStock oversell only drew batches down to 0, so
           // restoring the FULL reverseQty would mint phantom units and push
           // Σ(batch) ABOVE currentStock. Never let the restore exceed it.
+          // Known limitation: the restored layer carries no expiryDate (the
+          // movement doesn't record which batches were drawn), so reversed
+          // perishable units re-enter FIFO by receivedAt without expiry
+          // tracking — acceptable for a cost sub-ledger.
           const newStock = new Prisma.Decimal(stockItem.currentStock).add(
             reverseQty,
           );

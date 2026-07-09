@@ -168,6 +168,20 @@ export class SuppliersService {
         "Cannot delete supplier with active purchase orders",
       );
     }
+    // AP invoices/expenses reference the supplier by scalar id (no DB FK) —
+    // deleting would orphan the financial trail (AP aging shows "—", audits
+    // lose the vendor). Block instead of silently orphaning.
+    const [invoices, expenses] = await Promise.all([
+      this.prisma.purchaseInvoice.count({
+        where: { supplierId: id, tenantId },
+      }),
+      this.prisma.expense.count({ where: { supplierId: id, tenantId } }),
+    ]);
+    if (invoices > 0 || expenses > 0) {
+      throw new BadRequestException(
+        "Cannot delete a supplier with recorded invoices or expenses",
+      );
+    }
     const claim = await this.prisma.supplier.deleteMany({
       where: { id, tenantId },
     });

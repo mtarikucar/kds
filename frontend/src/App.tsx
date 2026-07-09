@@ -486,7 +486,7 @@ function App() {
               element={
                 <FeatureGate
                   feature="inventoryTracking"
-                  fallback={<UpsellCard addOnCode="inventory_tracking" />}
+                  fallback={<UpsellCard />}
                 >
                   <PurchasingPage />
                 </FeatureGate>
@@ -509,7 +509,7 @@ function App() {
               element={
                 <FeatureGate
                   feature="inventoryTracking"
-                  fallback={<UpsellCard addOnCode="inventory_tracking" />}
+                  fallback={<UpsellCard />}
                 >
                   <CostingPage />
                 </FeatureGate>
