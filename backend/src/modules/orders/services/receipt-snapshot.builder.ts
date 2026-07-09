@@ -73,6 +73,8 @@ interface TenantInput {
 }
 
 interface OrderItemInput {
+  id?: string;
+  parentOrderItemId?: string | null;
   quantity: number;
   unitPrice: DecimalLike;
   totalPrice: DecimalLike;
@@ -103,6 +105,56 @@ interface PaymentInput {
 
 @Injectable()
 export class ReceiptSnapshotBuilder {
+  /**
+   * Fold combo children (parentOrderItemId set) into one priced receipt line
+   * under their parent, listing the components as "içindekiler". Standalone
+   * items pass through unchanged. Pure display grouping — the receipt TOTAL is
+   * taken from order.finalAmount, not summed here.
+   */
+  private groupComboReceiptLines(orderItems: OrderItemInput[]) {
+    const childrenByParent = new Map<string, OrderItemInput[]>();
+    for (const it of orderItems) {
+      if (it.parentOrderItemId) {
+        const arr = childrenByParent.get(it.parentOrderItemId) ?? [];
+        arr.push(it);
+        childrenByParent.set(it.parentOrderItemId, arr);
+      }
+    }
+    const lines: Array<{
+      name: string;
+      quantity: number;
+      unitPrice: string;
+      totalPrice: string;
+      modifiers: string[];
+      notes: string | null;
+    }> = [];
+    for (const item of orderItems) {
+      if (item.parentOrderItemId) continue; // folded into its combo line
+      const kids = item.id ? (childrenByParent.get(item.id) ?? []) : [];
+      if (kids.length > 0) {
+        const comboTotal = kids.reduce((s, k) => s + Number(k.totalPrice), 0);
+        lines.push({
+          name: item.product.name,
+          quantity: item.quantity,
+          unitPrice: fmt(item.quantity > 0 ? comboTotal / item.quantity : comboTotal),
+          totalPrice: fmt(comboTotal),
+          modifiers: kids.map((k) => k.product.name),
+          notes: item.notes ?? null,
+        });
+      } else {
+        lines.push({
+          name: item.product.name,
+          quantity: item.quantity,
+          unitPrice: fmt(item.unitPrice),
+          totalPrice: fmt(item.totalPrice),
+          modifiers: item.modifiers.map((m) => m.name),
+          notes: item.notes ?? null,
+        });
+      }
+    }
+    return lines;
+  }
+
   buildReceiptSnapshot(args: {
     tenant: TenantInput;
     order: OrderInput;
@@ -123,14 +175,12 @@ export class ReceiptSnapshotBuilder {
         tableNumber: order.table?.number ?? null,
         notes: order.notes,
       },
-      items: order.orderItems.map((item) => ({
-        name: item.product.name,
-        quantity: item.quantity,
-        unitPrice: fmt(item.unitPrice),
-        totalPrice: fmt(item.totalPrice),
-        modifiers: item.modifiers.map((m) => m.name),
-        notes: item.notes ?? null,
-      })),
+      // Combo lines: fold a 0₺ parent + qty-1 children into ONE priced receipt
+      // line at the combo total (children listed as "içindekiler" under
+      // modifiers) — a customer receipt shows "Maxi Menü ₺150", not a ₺0 parent
+      // plus apportioned component lines. Falls back to flat mapping when no
+      // parentOrderItemId is present (non-combo orders / callers without it).
+      items: this.groupComboReceiptLines(order.orderItems),
       totals: {
         subtotal: fmt(order.totalAmount),
         tax: fmt(order.taxAmount),
