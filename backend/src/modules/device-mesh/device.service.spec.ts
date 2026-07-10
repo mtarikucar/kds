@@ -321,6 +321,17 @@ describe("DeviceService heartbeat", () => {
     expect(updateArg.data.status).toBe("online");
     expect(updateArg.data.lastSeenAt).toBeInstanceOf(Date);
 
+    // REGRESSION LOCK: every heartbeat must slide tokenExpiresAt forward by
+    // the full token TTL (default 24h). Without the slide an
+    // actively-heartbeating fleet hard-fails authenticateToken() a day after
+    // pairing and every KDS/POS/printer needs a manual re-pair.
+    const slid = updateArg.data.tokenExpiresAt;
+    expect(slid).toBeInstanceOf(Date);
+    const expectedTtlMs = 24 * 3600 * 1000;
+    const delta = slid.getTime() - Date.now();
+    expect(delta).toBeGreaterThan(expectedTtlMs - 60_000);
+    expect(delta).toBeLessThanOrEqual(expectedTtlMs + 60_000);
+
     // Empty payload => no deviceLog row written.
     expect((prisma.deviceLog.create as any).mock.calls.length).toBe(0);
 
@@ -682,5 +693,99 @@ describe("DeviceService slot lifecycle + tallies (branch hub)", () => {
       expect(created).toBe(2);
       expect(create).toHaveBeenCalledTimes(3);
     });
+  });
+});
+
+/**
+ * assignBridge() is the only writer of Device.bridgeId (the topology
+ * parent-link the branch hub + claimNextForBridge fan-in key on). These
+ * specs lock the guards: tenant ownership, branch-scope 404, same-branch
+ * bridge requirement, retired-bridge rejection, and null-detach.
+ */
+describe("DeviceService assignBridge", () => {
+  let prisma: MockPrismaClient;
+  let outbox: { append: jest.Mock };
+  let svc: DeviceService;
+
+  const DEVICE = { id: "dev-1", tenantId: "t1", branchId: "b1" };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue("outbox-id") };
+    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    (prisma.device.findFirst as any).mockResolvedValue(DEVICE);
+    (prisma.device.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.device.findFirstOrThrow as any).mockResolvedValue({
+      ...DEVICE,
+      bridgeId: "br-1",
+    });
+  });
+
+  it("attaches the device to a same-branch bridge (tenant-fenced write)", async () => {
+    (prisma.localBridgeAgent.findFirst as any).mockResolvedValue({
+      id: "br-1",
+      branchId: "b1",
+      status: "online",
+    });
+
+    const out = await svc.assignBridge("t1", "dev-1", "br-1");
+
+    // Bridge lookup is tenant-fenced.
+    expect(
+      (prisma.localBridgeAgent.findFirst as any).mock.calls[0][0].where,
+    ).toEqual({ id: "br-1", tenantId: "t1" });
+    // Write carries the compound tenant WHERE (B41-B45 pattern).
+    const write = (prisma.device.updateMany as any).mock.calls[0][0];
+    expect(write.where).toEqual({ id: "dev-1", tenantId: "t1" });
+    expect(write.data).toEqual({ bridgeId: "br-1" });
+    expect(out.bridgeId).toBe("br-1");
+  });
+
+  it("detaches back to cloud-direct with bridgeId=null (no bridge lookup)", async () => {
+    await svc.assignBridge("t1", "dev-1", null);
+    expect((prisma.localBridgeAgent.findFirst as any).mock.calls.length).toBe(
+      0,
+    );
+    const write = (prisma.device.updateMany as any).mock.calls[0][0];
+    expect(write.data).toEqual({ bridgeId: null });
+  });
+
+  it("404s when the branch scope does not match the device branch (no cross-branch probe)", async () => {
+    await expect(
+      svc.assignBridge("t1", "dev-1", "br-1", "OTHER-branch"),
+    ).rejects.toThrow("Device not found");
+    expect((prisma.device.updateMany as any).mock.calls.length).toBe(0);
+  });
+
+  it("404s on an unknown or cross-tenant bridge", async () => {
+    (prisma.localBridgeAgent.findFirst as any).mockResolvedValue(null);
+    await expect(svc.assignBridge("t1", "dev-1", "nope")).rejects.toThrow(
+      "Bridge not found",
+    );
+    expect((prisma.device.updateMany as any).mock.calls.length).toBe(0);
+  });
+
+  it("rejects a retired bridge", async () => {
+    (prisma.localBridgeAgent.findFirst as any).mockResolvedValue({
+      id: "br-1",
+      branchId: "b1",
+      status: "retired",
+    });
+    await expect(svc.assignBridge("t1", "dev-1", "br-1")).rejects.toThrow(
+      /retired/,
+    );
+    expect((prisma.device.updateMany as any).mock.calls.length).toBe(0);
+  });
+
+  it("rejects a bridge in a different branch (a bridge only serves its own LAN)", async () => {
+    (prisma.localBridgeAgent.findFirst as any).mockResolvedValue({
+      id: "br-1",
+      branchId: "OTHER",
+      status: "online",
+    });
+    await expect(svc.assignBridge("t1", "dev-1", "br-1")).rejects.toThrow(
+      /same branch/,
+    );
+    expect((prisma.device.updateMany as any).mock.calls.length).toBe(0);
   });
 });

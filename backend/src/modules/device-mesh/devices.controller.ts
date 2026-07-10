@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -27,6 +28,7 @@ import {
   HeartbeatDto,
   EnqueueCommandDto,
   AckCommandDto,
+  AssignBridgeDto,
 } from "./dto/device.dto";
 
 /**
@@ -130,6 +132,30 @@ export class DevicesController {
   @ApiOperation({ summary: "Retire a device (ADMIN only)" })
   retire(@Req() req: any, @Param("id") id: string) {
     return this.devices.retire(req.user.tenantId, id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiBearerAuth()
+  @Patch(":id/bridge")
+  @ApiOperation({
+    summary:
+      "Attach the device behind a local bridge (bridgeId: null detaches back to cloud-direct)",
+  })
+  assignBridge(
+    @Req() req: any,
+    @Param("id") id: string,
+    @Body() dto: AssignBridgeDto,
+  ) {
+    // H14: forward the validated branch scope so a branch-restricted MANAGER
+    // can only re-home devices in the branch they are scoped to (same
+    // rationale as enqueueCommand above).
+    return this.devices.assignBridge(
+      req.user.tenantId,
+      id,
+      dto.bridgeId ?? null,
+      req.scope?.branchId,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

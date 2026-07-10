@@ -677,6 +677,57 @@ export class DeviceService {
     return out;
   }
 
+  /**
+   * Attach a device behind a local bridge — or detach it back to cloud-direct
+   * with `bridgeId = null`. Until now NOTHING wrote Device.bridgeId, so
+   * bridge-fronted hardware (yazarkasa, card terminals) rendered as
+   * cloud-direct in the branch topology and `claimNextForBridge()` could never
+   * fan-in their commands. Guards: the bridge must belong to the same tenant
+   * AND the same branch as the device (a bridge only serves its own LAN) and
+   * must not be retired.
+   */
+  async assignBridge(
+    tenantId: string,
+    deviceId: string,
+    bridgeId: string | null,
+    scopedBranchId?: string,
+  ) {
+    const row = await this.findOrThrow(tenantId, deviceId);
+    // H14 parity: /v1/devices is a branch-scoped surface, so a
+    // branch-restricted caller may only re-home devices in the branch they
+    // are scoped to. 404 (not 403) so the response doesn't confirm the
+    // device exists in another branch.
+    if (scopedBranchId && row.branchId !== scopedBranchId) {
+      throw new NotFoundException("Device not found");
+    }
+    if (bridgeId !== null) {
+      const bridge = await this.prisma.localBridgeAgent.findFirst({
+        where: { id: bridgeId, tenantId },
+        select: { id: true, branchId: true, status: true },
+      });
+      if (!bridge) throw new NotFoundException("Bridge not found");
+      if (bridge.status === "retired") {
+        throw new BadRequestException(
+          "Bridge is retired — provision a new bridge first",
+        );
+      }
+      if (bridge.branchId !== row.branchId) {
+        throw new BadRequestException(
+          "Bridge and device must belong to the same branch",
+        );
+      }
+    }
+    // Compound WHERE on the write (B41-B45 pattern) — see retire() below.
+    const claim = await this.prisma.device.updateMany({
+      where: { id: row.id, tenantId },
+      data: { bridgeId },
+    });
+    if (claim.count === 0) throw new NotFoundException("Device not found");
+    return this.prisma.device.findFirstOrThrow({
+      where: { id: row.id, tenantId },
+    });
+  }
+
   async retire(tenantId: string, deviceId: string) {
     const row = await this.findOrThrow(tenantId, deviceId);
     // Compound WHERE (B41-B45 pattern, iter-31 onward). findOrThrow
