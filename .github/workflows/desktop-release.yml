@@ -292,6 +292,18 @@ jobs:
             Write-Host "✅ Signing completed"
           } else {
             Write-Host "⚠️ Windows certificate not configured, skipping signing"
+            # Surface the unsigned build LOUDLY. A buried log line let unsigned
+            # binaries ship silently — every customer install then hits a
+            # Windows SmartScreen warning. The ::warning:: annotation shows on
+            # the run page + PR checks; the step summary makes it unmissable.
+            Write-Output "::warning title=UNSIGNED Windows build::WINDOWS_CERTIFICATE secret is not configured - this release ships an UNSIGNED .msi/.exe (SmartScreen warns on every install). Set WINDOWS_CERTIFICATE / WINDOWS_CERTIFICATE_PASSWORD to sign."
+            @'
+          ## ⚠️ UNSIGNED Windows build
+
+          `WINDOWS_CERTIFICATE` is not configured, so the Windows installer in this release is **unsigned** — Windows SmartScreen will warn every customer at install time.
+
+          **Fix:** obtain an Authenticode/EV code-signing certificate and set the `WINDOWS_CERTIFICATE` (base64 PFX) and `WINDOWS_CERTIFICATE_PASSWORD` repo secrets; signing then happens automatically.
+          '@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           }
 
       - name: Find and rename artifacts

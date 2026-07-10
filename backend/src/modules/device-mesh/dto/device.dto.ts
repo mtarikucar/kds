@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from "class-validator";
 import type { CommandKind } from "../device-mesh.types";
 
@@ -192,6 +193,21 @@ export class EnqueueCommandDto {
   @IsString()
   @MaxLength(128)
   idempotencyKey?: string;
+}
+
+export class AssignBridgeDto {
+  // Bridge to attach the device behind, or explicit `null` to detach back to
+  // cloud-direct. The body MUST carry the key (a missing bridgeId 400s) so an
+  // accidental empty PATCH can never silently detach a fleet. String, not
+  // @IsUUID — mirrors branchId handling above.
+  @ApiPropertyOptional({
+    nullable: true,
+    description: "Bridge id, or null to detach",
+  })
+  @ValidateIf((o) => o.bridgeId !== null)
+  @IsString()
+  @MaxLength(64)
+  bridgeId!: string | null;
 }
 
 export class AckCommandDto {
