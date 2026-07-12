@@ -878,6 +878,22 @@ export class PaymentsService {
             `Credit-note (İade faturası) generation failed for refunded order ${payment.orderId}: ${err.message}`,
           );
         }
+      } else if (this.salesInvoiceService) {
+        // Partial unwind (split-bill / progressive): the order stays open, but
+        // if THIS refunded payment carried its own per-payment invoice
+        // (createFromPayment), that invoice must still be reversed — the other
+        // customers' invoices stand. Best-effort + idempotent; no-ops when the
+        // payment was never individually invoiced.
+        try {
+          await this.salesInvoiceService.createRefundCreditNoteForPayment(
+            id,
+            tenantId,
+          );
+        } catch (err: any) {
+          this.logger.error(
+            `Per-payment credit-note generation failed for refunded payment ${id}: ${err.message}`,
+          );
+        }
       }
 
       return result;

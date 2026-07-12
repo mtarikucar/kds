@@ -1270,8 +1270,10 @@ export class ReportsService {
   /**
    * Get inventory report
    */
-  async getInventoryReport(tenantId: string) {
-    // Get all tracked products
+  async getInventoryReport(tenantId: string, branchId?: string) {
+    // Get all tracked products. Products (and their currentStock) are
+    // tenant-level by data model — no branchId column — so the stock-level
+    // section is deliberately tenant-wide; only movements below carry branch.
     const products = await this.prisma.product.findMany({
       where: {
         tenantId,
@@ -1321,9 +1323,10 @@ export class ReportsService {
     }, 0);
     const totalStockValue = centsToCurrency(totalStockValueCents);
 
-    // Get recent stock movements
+    // Get recent stock movements — branch-scoped when the caller is
+    // branch-restricted (StockMovement.branchId is NOT NULL since v3.0.0).
     const recentMovements = await this.prisma.stockMovement.findMany({
-      where: { tenantId },
+      where: { tenantId, ...(branchId ? { branchId } : {}) },
       take: 20,
       orderBy: { createdAt: "desc" },
       include: {

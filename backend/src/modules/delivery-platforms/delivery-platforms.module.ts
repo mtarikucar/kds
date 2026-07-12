@@ -8,6 +8,10 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 // orders via the SAME device-mesh print rail POS orders use. No cycle:
 // DeviceMeshModule imports only Prisma/LocalBridge/Subscriptions.
 import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
+// AccountingModule provides SalesInvoiceService so a platform-initiated full
+// refund reverses the order's İade faturası (credit note). No cycle:
+// AccountingModule imports only Prisma/Subscriptions.
+import { AccountingModule } from "../accounting/accounting.module";
 
 // Adapters
 import { GetirAdapter } from "./adapters/getir.adapter";
@@ -48,6 +52,7 @@ import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
     forwardRef(() => KdsModule),
     SubscriptionsModule,
     DeviceMeshModule,
+    AccountingModule,
   ],
   controllers: [
     DeliveryPlatformsController,

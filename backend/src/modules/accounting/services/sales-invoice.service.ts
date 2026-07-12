@@ -628,15 +628,30 @@ export class SalesInvoiceService {
   }
 
   /**
-   * İade faturası (credit note): a reversing REFUND-type SalesInvoice for a
-   * refunded/cancelled order that already carried an ISSUED fatura. Negates the
-   * original's totals + line items so the two documents net to zero — closing
-   * the compliance gap where a refund left the ISSUED invoice standing with no
-   * reversing record. Idempotent per order; returns null when nothing was
-   * invoiced (a refund of an un-invoiced order needs no credit note).
+   * İade faturası (credit note): reversing REFUND-type SalesInvoice(s) for a
+   * refunded/cancelled order that already carried ISSUED fatura(s).
+   *
+   * Split-bill / progressive orders carry MULTIPLE ISSUED invoices (one per
+   * Payment via createFromPayment, plus possibly an order-level one), so a
+   * full refund must reverse EVERY un-reversed original — the previous
+   * single-findFirst reversed only the newest and its order-level idempotency
+   * key then blocked the rest, leaving standing invoices with no reversing
+   * record. Idempotency is now PER ORIGINAL INVOICE via originalInvoiceId.
+   * Returns the last created/found credit note (single-invoice orders keep
+   * their old contract); null when nothing was invoiced.
    */
   async createRefundCreditNote(orderId: string, tenantId: string) {
-    const original = await this.prisma.salesInvoice.findFirst({
+    // MIGRATION GUARD: a REFUND written before per-invoice semantics has
+    // originalInvoiceId null — which original it reversed is unrecorded, so
+    // re-issuing per-invoice notes could double-reverse. Never risk that:
+    // such orders keep the legacy idempotent contract untouched.
+    const legacy = await this.prisma.salesInvoice.findFirst({
+      where: { orderId, tenantId, type: "REFUND", originalInvoiceId: null },
+      include: { items: true },
+    });
+    if (legacy) return legacy;
+
+    const originals = await this.prisma.salesInvoice.findMany({
       where: {
         orderId,
         tenantId,
@@ -644,12 +659,52 @@ export class SalesInvoiceService {
         type: { not: "REFUND" },
       },
       include: { items: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
-    if (!original) return null; // nothing invoiced → nothing to reverse
+    if (originals.length === 0) return null; // nothing invoiced → nothing to reverse
 
+    let last: Awaited<
+      ReturnType<SalesInvoiceService["createRefundCreditNoteForPayment"]>
+    > = null;
+    for (const original of originals) {
+      last = await this.reverseInvoice(original, tenantId);
+    }
+    return last;
+  }
+
+  /**
+   * Split-bill partial refund: reverse ONLY the refunded Payment's own
+   * per-payment invoice (createFromPayment sets paymentId). The order stays
+   * open (SERVED) and the other customers' invoices must stand, so the
+   * order-level createRefundCreditNote above would over-reverse here.
+   * No-ops (null) when the payment never had its own invoice.
+   */
+  async createRefundCreditNoteForPayment(paymentId: string, tenantId: string) {
+    const original = await this.prisma.salesInvoice.findFirst({
+      where: {
+        paymentId,
+        tenantId,
+        status: { not: InvoiceStatus.CANCELLED },
+        type: { not: "REFUND" },
+      },
+      include: { items: true },
+    });
+    if (!original) return null;
+    return this.reverseInvoice(original, tenantId);
+  }
+
+  /**
+   * Reverse ONE original invoice into a REFUND credit note. Idempotent per
+   * original via originalInvoiceId. The note deliberately does NOT copy
+   * paymentId — the partial unique index (one invoice per payment) belongs to
+   * the original; the link back is originalInvoiceId.
+   */
+  private async reverseInvoice(
+    original: Prisma.SalesInvoiceGetPayload<{ include: { items: true } }>,
+    tenantId: string,
+  ) {
     const existing = await this.prisma.salesInvoice.findFirst({
-      where: { orderId, tenantId, type: "REFUND" },
+      where: { tenantId, type: "REFUND", originalInvoiceId: original.id },
       select: { id: true },
     });
     if (existing) {
@@ -695,7 +750,8 @@ export class SalesInvoiceService {
             totalAmount: neg(original.totalAmount),
             discount: neg(original.discount),
             taxBreakdown: negBreakdown(original.taxBreakdown),
-            orderId,
+            orderId: original.orderId,
+            originalInvoiceId: original.id,
             paymentMethod: original.paymentMethod,
             issueDate: new Date(),
             dueDate: new Date(),

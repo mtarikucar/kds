@@ -450,3 +450,225 @@ describe('SalesInvoiceService.createCreditNote', () => {
     await expect(svc.createCreditNote('inv-1', 't1')).rejects.toThrow();
   });
 });
+
+/**
+ * A2 (analytics/accounting completion): createRefundCreditNote must reverse
+ * EVERY un-reversed invoice on the order (split-bill orders carry one invoice
+ * per Payment), with idempotency keyed PER ORIGINAL via originalInvoiceId —
+ * the old order-level key reversed only the newest invoice and then blocked
+ * the rest. Legacy orders that already carry a pre-semantics REFUND
+ * (originalInvoiceId null) keep the old contract to avoid double-reversal.
+ */
+describe("SalesInvoiceService.createRefundCreditNote (multi-invoice)", () => {
+  let prisma: MockPrismaClient;
+  let svc: SalesInvoiceService;
+
+  const mkOriginal = (id: string) => ({
+    id,
+    type: "SALES",
+    status: "ISSUED",
+    orderId: "o1",
+    invoiceNumber: `INV-${id}`,
+    customerName: null,
+    customerPhone: null,
+    customerEmail: null,
+    customerTaxId: null,
+    customerTaxOffice: null,
+    subtotal: 100,
+    taxAmount: 10,
+    totalAmount: 110,
+    discount: 0,
+    taxBreakdown: null,
+    paymentMethod: "CASH",
+    items: [
+      {
+        description: "Kola",
+        quantity: 1,
+        unitPrice: 100,
+        taxRate: 10,
+        taxAmount: 10,
+        subtotal: 100,
+        total: 110,
+      },
+    ],
+  });
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      findByTenant: jest
+        .fn()
+        .mockResolvedValue({ autoSync: false, provider: "NONE" }),
+      getNextInvoiceNumber: jest
+        .fn()
+        .mockResolvedValueOnce("CN-1")
+        .mockResolvedValueOnce("CN-2"),
+    };
+    svc = new SalesInvoiceService(
+      prisma as any,
+      settings,
+      new TaxCalculationService(),
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb(prisma),
+    );
+    (prisma.salesInvoice.create as any).mockImplementation(
+      async ({ data }: any) => ({
+        id: `cn-for-${data.originalInvoiceId}`,
+        ...data,
+        items: data.items.create,
+      }),
+    );
+  });
+
+  it("reverses EVERY un-reversed invoice of a split-bill order, linking each via originalInvoiceId", async () => {
+    // findFirst sequence: legacy-guard → per-original existing checks.
+    (prisma.salesInvoice.findFirst as any)
+      .mockResolvedValueOnce(null) // no legacy refund
+      .mockResolvedValueOnce(null) // i1 not yet reversed
+      .mockResolvedValueOnce(null); // i2 not yet reversed
+    (prisma.salesInvoice.findMany as any).mockResolvedValue([
+      mkOriginal("i1"),
+      mkOriginal("i2"),
+    ]);
+
+    const last = await svc.createRefundCreditNote("o1", "t1");
+
+    const creates = (prisma.salesInvoice.create as any).mock.calls;
+    expect(creates).toHaveLength(2);
+    expect(creates[0][0].data.originalInvoiceId).toBe("i1");
+    expect(creates[1][0].data.originalInvoiceId).toBe("i2");
+    // Reversal is a true negation, tied back to the order.
+    expect(Number(creates[0][0].data.totalAmount)).toBe(-110);
+    expect(creates[0][0].data.orderId).toBe("o1");
+    expect(creates[0][0].data.type).toBe("REFUND");
+    // The note must NOT copy paymentId — the partial unique (one invoice per
+    // payment) belongs to the original.
+    expect(creates[0][0].data.paymentId).toBeUndefined();
+    expect((last as any).originalInvoiceId).toBe("i2");
+  });
+
+  it("is idempotent PER ORIGINAL: an already-reversed invoice is skipped, the other still gets its note", async () => {
+    (prisma.salesInvoice.findFirst as any)
+      .mockResolvedValueOnce(null) // no legacy refund
+      .mockResolvedValueOnce({ id: "cn-old" }) // i1 already reversed
+      .mockResolvedValueOnce(null); // i2 not yet
+    (prisma.salesInvoice.findUnique as any).mockResolvedValue({
+      id: "cn-old",
+      originalInvoiceId: "i1",
+    });
+    (prisma.salesInvoice.findMany as any).mockResolvedValue([
+      mkOriginal("i1"),
+      mkOriginal("i2"),
+    ]);
+
+    await svc.createRefundCreditNote("o1", "t1");
+
+    const creates = (prisma.salesInvoice.create as any).mock.calls;
+    expect(creates).toHaveLength(1);
+    expect(creates[0][0].data.originalInvoiceId).toBe("i2");
+  });
+
+  it("MIGRATION GUARD: a legacy order-level refund (originalInvoiceId null) short-circuits — never double-reverses", async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValueOnce({
+      id: "legacy-cn",
+      type: "REFUND",
+      originalInvoiceId: null,
+    });
+
+    const out = await svc.createRefundCreditNote("o1", "t1");
+
+    expect((out as any).id).toBe("legacy-cn");
+    expect((prisma.salesInvoice.findMany as any).mock.calls).toHaveLength(0);
+    expect((prisma.salesInvoice.create as any).mock.calls).toHaveLength(0);
+  });
+
+  it("returns null when nothing was invoiced", async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue(null);
+    (prisma.salesInvoice.findMany as any).mockResolvedValue([]);
+    expect(await svc.createRefundCreditNote("o1", "t1")).toBeNull();
+  });
+});
+
+/**
+ * A2 (split-bill partial refund): refunding ONE customer's payment on a
+ * still-open order must reverse only THAT payment's own invoice — the other
+ * customers' invoices stand, so the order-level path would over-reverse.
+ */
+describe("SalesInvoiceService.createRefundCreditNoteForPayment", () => {
+  let prisma: MockPrismaClient;
+  let svc: SalesInvoiceService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    const settings: any = {
+      findByTenant: jest
+        .fn()
+        .mockResolvedValue({ autoSync: false, provider: "NONE" }),
+      getNextInvoiceNumber: jest.fn().mockResolvedValue("CN-P1"),
+    };
+    svc = new SalesInvoiceService(
+      prisma as any,
+      settings,
+      new TaxCalculationService(),
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb(prisma),
+    );
+    (prisma.salesInvoice.create as any).mockImplementation(
+      async ({ data }: any) => ({ id: "cn-p", ...data, items: data.items.create }),
+    );
+  });
+
+  it("reverses the refunded payment's own invoice once (idempotent)", async () => {
+    (prisma.salesInvoice.findFirst as any)
+      .mockResolvedValueOnce({
+        id: "i-pay",
+        type: "SALES",
+        status: "ISSUED",
+        orderId: "o1",
+        invoiceNumber: "INV-i-pay",
+        customerName: null,
+        customerPhone: null,
+        customerEmail: null,
+        customerTaxId: null,
+        customerTaxOffice: null,
+        subtotal: 50,
+        taxAmount: 5,
+        totalAmount: 55,
+        discount: 0,
+        taxBreakdown: null,
+        paymentMethod: "CARD",
+        items: [
+          {
+            description: "Pay share",
+            quantity: 1,
+            unitPrice: 50,
+            taxRate: 10,
+            taxAmount: 5,
+            subtotal: 50,
+            total: 55,
+          },
+        ],
+      })
+      .mockResolvedValueOnce(null); // not yet reversed
+
+    const cn = await svc.createRefundCreditNoteForPayment("pay-1", "t1");
+
+    // Lookup keyed by paymentId + tenant, never order-wide.
+    const firstWhere = (prisma.salesInvoice.findFirst as any).mock.calls[0][0]
+      .where;
+    expect(firstWhere.paymentId).toBe("pay-1");
+    expect(firstWhere.tenantId).toBe("t1");
+    expect((cn as any).originalInvoiceId).toBe("i-pay");
+    expect(Number((cn as any).totalAmount)).toBe(-55);
+  });
+
+  it("no-ops (null) when the payment never had its own invoice", async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue(null);
+    expect(
+      await svc.createRefundCreditNoteForPayment("pay-x", "t1"),
+    ).toBeNull();
+    expect((prisma.salesInvoice.create as any).mock.calls).toHaveLength(0);
+  });
+});

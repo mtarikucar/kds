@@ -73,9 +73,11 @@ describe("ReportsController", () => {
     expect(branchId).toBe("b2");
   });
 
-  it("getInventoryReport just forwards the tenantId", async () => {
-    await ctrl.getInventoryReport(req);
-    expect(svc.getInventoryReport).toHaveBeenCalledWith("t1");
+  it("getInventoryReport threads the branch scope (A4 — was the only report ignoring branchFor)", async () => {
+    await ctrl.getInventoryReport(req, { branchId: "b2" });
+    const [tenantId, branchId] = svc.getInventoryReport.mock.calls[0];
+    expect(tenantId).toBe("t1");
+    expect(branchId).toBe("b2");
   });
 });
 
