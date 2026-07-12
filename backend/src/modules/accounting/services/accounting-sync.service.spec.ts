@@ -448,7 +448,10 @@ describe('AccountingSyncService — e-document readiness + FAILED re-sync', () =
 
   it('retries every FAILED invoice and counts the successes', async () => {
     const prisma: any = {
-      salesInvoice: { findMany: jest.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]) },
+      salesInvoice: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
     const syncSpy = jest.spyOn(svc, 'syncInvoice').mockResolvedValue(undefined as any);
@@ -462,7 +465,10 @@ describe('AccountingSyncService — e-document readiness + FAILED re-sync', () =
 
   it('keeps going when one invoice re-sync throws', async () => {
     const prisma: any = {
-      salesInvoice: { findMany: jest.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]) },
+      salesInvoice: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
     jest.spyOn(svc, 'syncInvoice')
@@ -471,5 +477,327 @@ describe('AccountingSyncService — e-document readiness + FAILED re-sync', () =
 
     const retried = await svc.resyncFailedInvoices('t1');
     expect(retried).toBe(1); // one succeeded, one threw
+  });
+
+  it('A6: releases crash-stuck SYNCING rows (updatedAt older than 15min) back to FAILED before the retry pass', async () => {
+    const prisma: any = {
+      salesInvoice: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'i-stuck' }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
+    jest.spyOn(svc, 'syncInvoice').mockResolvedValue(undefined as any);
+
+    const before = Date.now();
+    const retried = await svc.resyncFailedInvoices('t1');
+    const after = Date.now();
+
+    // The release write: SYNCING + stale updatedAt → FAILED + a syncError
+    // trail, tenant-scoped. Fresh SYNCING rows (in-flight syncs) excluded
+    // via the updatedAt cutoff.
+    const release = prisma.salesInvoice.updateMany.mock.calls[0][0];
+    expect(release.where.tenantId).toBe('t1');
+    expect(release.where.externalStatus).toBe('SYNCING');
+    const cutoff = release.where.updatedAt.lt as Date;
+    expect(cutoff).toBeInstanceOf(Date);
+    expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - 15 * 60 * 1000);
+    expect(cutoff.getTime()).toBeLessThanOrEqual(after - 15 * 60 * 1000);
+    expect(release.data.externalStatus).toBe('FAILED');
+    expect(release.data.syncError).toMatch(/stuck SYNCING/i);
+
+    // Release runs BEFORE the FAILED query so just-released rows are
+    // picked up by the same sweep.
+    expect(
+      prisma.salesInvoice.updateMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(prisma.salesInvoice.findMany.mock.invocationCallOrder[0]);
+    expect(retried).toBe(1);
+  });
+});
+
+/**
+ * A5 — validateBuyerFor is WIRED into the sync flow: an e-Fatura with an
+ * incomplete buyer party (missing vergi dairesi) must be failed LOCALLY
+ * (FAILED + syncError) without any provider traffic — invalid XML must
+ * never reach GİB.
+ */
+describe('AccountingSyncService — A5 buyer validation', () => {
+  let prisma: MockPrismaClient;
+  let settings: { findByTenant: jest.Mock; getDecryptedCredentials: jest.Mock };
+  let svc: AccountingSyncService;
+
+  const TENANT = 't-1';
+  const INVOICE_ID = 'inv-1';
+
+  const foribaSettings = {
+    provider: AccountingProvider.FORIBA,
+    foribaApiUrl: 'https://foriba.test',
+    foribaUsername: 'u',
+    foribaPassword: 'p',
+  };
+
+  const eFaturaInvoice = {
+    id: INVOICE_ID,
+    tenantId: TENANT,
+    invoiceNumber: 'FTR-000001',
+    issueDate: new Date('2026-01-15T00:00:00.000Z'),
+    dueDate: null,
+    customerName: 'Acme A.Ş.',
+    customerTaxId: '1234567890', // valid VKN
+    customerTaxOffice: null, // MISSING → e-Fatura buyer party incomplete
+    currency: 'TRY',
+    paymentMethod: 'CARD',
+    totalAmount: 120,
+    externalId: null,
+    externalProvider: null,
+    externalStatus: null,
+    items: [{ description: 'Burger', quantity: 2, unitPrice: 50, taxRate: 10 }],
+  };
+
+  function fakeAdapter() {
+    return {
+      name: 'foriba',
+      authenticate: jest.fn().mockResolvedValue({ accessToken: 'tok' }),
+      pushInvoice: jest.fn().mockResolvedValue({ externalId: 'EXT-999' }),
+      cancelInvoice: jest.fn(),
+      testConnection: jest.fn().mockResolvedValue(true),
+    };
+  }
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    settings = {
+      findByTenant: jest.fn().mockResolvedValue(foribaSettings),
+      getDecryptedCredentials: jest.fn().mockResolvedValue(null),
+    };
+    // mukellef query says the buyer IS a registered e-Fatura user → the
+    // invoice routes to EFATURA, which REQUIRES a complete buyer party.
+    svc = new AccountingSyncService(
+      prisma as any,
+      settings as any,
+      { name: 'MOCK', isRegisteredEFaturaUser: async () => true } as any,
+      { name: 'MOCK', isConfigured: () => true, sign: async (x: string) => x } as any,
+    );
+  });
+
+  it('marks FAILED + syncError and never calls the provider when the e-Fatura buyer party is incomplete', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...eFaturaInvoice,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT); // must not throw
+
+    // NO provider traffic at all — not even auth.
+    expect(adapter.authenticate).not.toHaveBeenCalled();
+    expect(adapter.pushInvoice).not.toHaveBeenCalled();
+
+    // 1st updateMany = SYNCING claim, 2nd = the FAILED write (the existing
+    // re-claimable failure pattern) carrying the human-readable problem.
+    const failCall = (prisma.salesInvoice.updateMany as any).mock.calls[1][0];
+    expect(failCall.where.tenantId).toBe(TENANT);
+    expect(failCall.data.externalStatus).toBe('FAILED');
+    expect(failCall.data.syncError).toMatch(/vergi dairesi/i);
+  });
+
+  it('pushes a COMPLETE registered buyer as EFATURA (validation does not overblock)', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...eFaturaInvoice,
+      customerTaxOffice: 'Kadıköy',
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT);
+
+    expect(adapter.pushInvoice).toHaveBeenCalledTimes(1);
+    expect(adapter.pushInvoice.mock.calls[0][2].eDocumentType).toBe('EFATURA');
+    const anyFailedWrite = (
+      prisma.salesInvoice.updateMany as any
+    ).mock.calls.some((c: any[]) => c[0]?.data?.externalStatus === 'FAILED');
+    expect(anyFailedWrite).toBe(false);
+  });
+
+  it('still pushes a B2C sale (no tax id) as EARSIVFATURA — minimal buyer data is valid there', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...eFaturaInvoice,
+      customerTaxId: null,
+      customerTaxOffice: null,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT);
+
+    expect(adapter.pushInvoice).toHaveBeenCalledTimes(1);
+    expect(adapter.pushInvoice.mock.calls[0][2].eDocumentType).toBe(
+      'EARSIVFATURA',
+    );
+  });
+});
+
+/**
+ * A3 — provider-side cancel flow. The adapters are honest GATED stubs
+ * (success:false) until the real void APIs are integrated, so the contract
+ * under test is the SERVICE's: resolve the adapter from the invoice's OWN
+ * externalProvider, and on any failure flag the row CANCEL_PENDING with a
+ * "Manuel iptal gerekli" syncError instead of pretending the cancel worked.
+ */
+describe('AccountingSyncService.cancelInvoiceAtProvider (A3)', () => {
+  let prisma: MockPrismaClient;
+  let settings: { findByTenant: jest.Mock; getDecryptedCredentials: jest.Mock };
+  let svc: AccountingSyncService;
+
+  const TENANT = 't-1';
+  const INVOICE_ID = 'inv-1';
+
+  const foribaSettings = {
+    provider: AccountingProvider.FORIBA,
+    foribaApiUrl: 'https://foriba.test',
+    foribaUsername: 'u',
+    foribaPassword: 'p',
+  };
+
+  const syncedInvoice = {
+    id: INVOICE_ID,
+    tenantId: TENANT,
+    invoiceNumber: 'FTR-000001',
+    externalId: 'EXT-999',
+    externalProvider: AccountingProvider.FORIBA,
+    externalStatus: 'SYNCED',
+  };
+
+  function fakeAdapter() {
+    return {
+      name: 'foriba',
+      authenticate: jest.fn().mockResolvedValue({ accessToken: 'tok' }),
+      pushInvoice: jest.fn(),
+      cancelInvoice: jest.fn().mockResolvedValue({
+        success: false,
+        error:
+          'Provider cancel API not yet integrated — cancel manually in the Foriba panel',
+      }),
+      testConnection: jest.fn().mockResolvedValue(true),
+    };
+  }
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    settings = {
+      findByTenant: jest.fn().mockResolvedValue(foribaSettings),
+      getDecryptedCredentials: jest.fn().mockResolvedValue(null),
+    };
+    svc = new AccountingSyncService(
+      prisma as any,
+      settings as any,
+      { name: 'MOCK', isRegisteredEFaturaUser: async () => false } as any,
+      { name: 'MOCK', isConfigured: () => true, sign: async (x: string) => x } as any,
+    );
+  });
+
+  it('is a successful no-op for an invoice that never reached a provider', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...syncedInvoice,
+      externalId: null,
+      externalProvider: null,
+      externalStatus: null,
+    });
+    const adapterSpy = jest.spyOn(svc as any, 'getAdapter');
+
+    const out = await svc.cancelInvoiceAtProvider(INVOICE_ID, TENANT);
+
+    expect(out).toEqual({ success: true });
+    expect(adapterSpy).not.toHaveBeenCalled();
+    expect(prisma.salesInvoice.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('flags CANCEL_PENDING + "Manuel iptal gerekli" when the adapter refuses (the GATED stub path)', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...syncedInvoice,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    const out = await svc.cancelInvoiceAtProvider(INVOICE_ID, TENANT);
+
+    expect(out.success).toBe(false);
+    expect(adapter.cancelInvoice).toHaveBeenCalledWith(
+      'tok',
+      expect.any(String),
+      'EXT-999',
+    );
+    const write = (prisma.salesInvoice.updateMany as any).mock.calls[0][0];
+    expect(write.where).toMatchObject({ id: INVOICE_ID, tenantId: TENANT });
+    expect(write.data.externalStatus).toBe('CANCEL_PENDING');
+    expect(write.data.syncError).toMatch(/^Manuel iptal gerekli: /);
+    expect(write.data.syncError).toContain('cancel manually');
+  });
+
+  it('records CANCELLED + clears syncError when the provider cancel succeeds (future ungated adapters)', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...syncedInvoice,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    adapter.cancelInvoice.mockResolvedValue({ success: true });
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    const out = await svc.cancelInvoiceAtProvider(INVOICE_ID, TENANT);
+
+    expect(out.success).toBe(true);
+    const write = (prisma.salesInvoice.updateMany as any).mock.calls[0][0];
+    expect(write.data.externalStatus).toBe('CANCELLED');
+    expect(write.data.syncError).toBeNull();
+  });
+
+  it('resolves adapter + credentials from the invoice\'s externalProvider, not the CURRENT settings.provider', async () => {
+    // Tenant has since swapped to Parasut, but the document lives at Foriba.
+    settings.findByTenant.mockResolvedValue({
+      ...foribaSettings,
+      provider: AccountingProvider.PARASUT,
+      parasutUsername: 'pu',
+      parasutPassword: 'pp',
+    });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...syncedInvoice,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    const getAdapterSpy = jest
+      .spyOn(svc as any, 'getAdapter')
+      .mockReturnValue(adapter);
+
+    await svc.cancelInvoiceAtProvider(INVOICE_ID, TENANT);
+
+    expect(getAdapterSpy).toHaveBeenCalledWith(AccountingProvider.FORIBA);
+    // The FORIBA credential columns are read, not the active Parasut ones.
+    const creds = adapter.authenticate.mock.calls[0][0];
+    expect(creds).toMatchObject({
+      apiUrl: 'https://foriba.test',
+      username: 'u',
+      password: 'p',
+    });
+  });
+
+  it('flags CANCEL_PENDING when auth/setup throws (provider still holds the document)', async () => {
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...syncedInvoice,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    const adapter = fakeAdapter();
+    adapter.authenticate.mockRejectedValue(new Error('bad creds'));
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    const out = await svc.cancelInvoiceAtProvider(INVOICE_ID, TENANT); // no throw
+
+    expect(out.success).toBe(false);
+    const write = (prisma.salesInvoice.updateMany as any).mock.calls[0][0];
+    expect(write.data.externalStatus).toBe('CANCEL_PENDING');
+    expect(write.data.syncError).toBe('Manuel iptal gerekli: bad creds');
   });
 });

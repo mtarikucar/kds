@@ -311,11 +311,12 @@ describe('AccountingSettingsService', () => {
         autoGenerateInvoice: true,
         autoSync: true,
       });
-      // total=10, synced=7, failed=2 → pending = 10 - 7 - 2 = 1
+      // total=10, synced=7, failed=2 → pending = 10 - 7 - 2 = 1; stuck=1
       (prisma.salesInvoice.count as any)
         .mockResolvedValueOnce(10)
         .mockResolvedValueOnce(7)
-        .mockResolvedValueOnce(2);
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(1);
       (prisma.salesInvoice.findFirst as any).mockResolvedValue({
         syncedAt: new Date('2026-06-24T00:00:00Z'),
       });
@@ -329,9 +330,39 @@ describe('AccountingSettingsService', () => {
         total: 10,
         synced: 7,
         failed: 2,
+        stuck: 1,
         pending: 1,
       });
       expect(out.lastSyncedAt).toEqual(new Date('2026-06-24T00:00:00Z'));
+    });
+
+    it('counts crash-stuck rows as SYNCING older than the 15-minute threshold (A6)', async () => {
+      (prisma.accountingSettings.findFirst as any).mockResolvedValue({
+        tenantId: 't-1',
+        branchId: null,
+        provider: 'FORIBA',
+        autoGenerateInvoice: false,
+        autoSync: true,
+      });
+      (prisma.salesInvoice.count as any).mockResolvedValue(0);
+      (prisma.salesInvoice.findFirst as any).mockResolvedValue(null);
+
+      const before = Date.now();
+      await svc.getSyncStatus('t-1');
+      const after = Date.now();
+
+      // 4th count = the stuck counter: externalStatus SYNCING + updatedAt
+      // older than now-15min (the shared STUCK_SYNCING_THRESHOLD_MS).
+      const stuckWhere = (prisma.salesInvoice.count as any).mock.calls[3][0]
+        .where;
+      expect(stuckWhere.tenantId).toBe('t-1');
+      expect(stuckWhere.externalStatus).toBe('SYNCING');
+      const cutoff = stuckWhere.updatedAt.lt as Date;
+      expect(cutoff).toBeInstanceOf(Date);
+      expect(cutoff.getTime()).toBeGreaterThanOrEqual(
+        before - 15 * 60 * 1000,
+      );
+      expect(cutoff.getTime()).toBeLessThanOrEqual(after - 15 * 60 * 1000);
     });
 
     it('never returns a negative pending count when counts race', async () => {
@@ -346,7 +377,8 @@ describe('AccountingSettingsService', () => {
       (prisma.salesInvoice.count as any)
         .mockResolvedValueOnce(5)
         .mockResolvedValueOnce(6)
-        .mockResolvedValueOnce(2);
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(0);
       (prisma.salesInvoice.findFirst as any).mockResolvedValue(null);
 
       const out = await svc.getSyncStatus('t-1');

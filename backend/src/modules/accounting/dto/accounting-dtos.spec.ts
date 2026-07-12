@@ -43,6 +43,53 @@ describe("UpdateAccountingSettingsDto", () => {
       true,
     );
   });
+
+  // V6: nextInvoiceNumber must be ACCEPTED (not stripped) so the operator
+  // can re-align the fiscal counter; the service persists the DTO as-is.
+  it("accepts and coerces a valid nextInvoiceNumber", async () => {
+    const dto = plainToInstance(UpdateAccountingSettingsDto, {
+      nextInvoiceNumber: "42",
+    });
+    expect(await errs(dto)).toEqual([]);
+    expect(dto.nextInvoiceNumber).toBe(42);
+  });
+
+  // A7: the seller tax id rides the sellerTaxId snapshot into every issued
+  // document — a malformed one only surfaces as a GİB rejection after sync,
+  // so it must be shaped like customerTaxId: 10 (VKN) or 11 (TCKN) digits.
+  it("accepts a 10-digit VKN and an 11-digit TCKN companyTaxId (A7)", async () => {
+    expect(
+      await errs(
+        plainToInstance(UpdateAccountingSettingsDto, {
+          companyTaxId: "1234567890",
+        }),
+      ),
+    ).toEqual([]);
+    expect(
+      await errs(
+        plainToInstance(UpdateAccountingSettingsDto, {
+          companyTaxId: "12345678901",
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects a companyTaxId that is not 10/11 digits (A7)", async () => {
+    for (const bad of ["123", "12345678901234", "12345abcde", "12 34567890"]) {
+      const dto = plainToInstance(UpdateAccountingSettingsDto, {
+        companyTaxId: bad,
+      });
+      expect((await errs(dto)).some((m) => /companyTaxId/.test(m))).toBe(true);
+    }
+  });
+
+  it("lets an empty companyTaxId pass (optional field cleared by a form)", async () => {
+    const dto = plainToInstance(UpdateAccountingSettingsDto, {
+      companyTaxId: "",
+    });
+    expect(await errs(dto)).toEqual([]);
+    expect(dto.companyTaxId).toBeUndefined();
+  });
 });
 
 describe("CreateSalesInvoiceDto", () => {

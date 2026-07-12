@@ -3,12 +3,14 @@ import {
   IsOptional,
   IsString,
   IsInt,
+  Matches,
   Min,
   IsIn,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   EmptyStringToNumber,
+  EmptyStringToUndefined,
   StringToBoolean,
 } from "../../../common/dto/transforms";
 
@@ -20,7 +22,20 @@ export class UpdateAccountingSettingsDto {
   autoGenerateInvoice?: boolean;
 
   @ApiPropertyOptional() @IsString() @IsOptional() companyName?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() companyTaxId?: string;
+  // A7: same VKN/TCKN shape rule as CreateSalesInvoiceDto.customerTaxId — a
+  // malformed seller tax id would ride the sellerTaxId snapshot into every
+  // issued document and only surface as a GİB rejection after sync.
+  // EmptyStringToUndefined lets a form clear the field ("" → skip validation).
+  @ApiPropertyOptional({
+    description: "TR VKN (10 digits) or TCKN (11 digits)",
+  })
+  @EmptyStringToUndefined()
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d{10}(\d)?$/, {
+    message: "companyTaxId must be 10 (VKN) or 11 (TCKN) digits",
+  })
+  companyTaxId?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyTaxOffice?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyAddress?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyPhone?: string;

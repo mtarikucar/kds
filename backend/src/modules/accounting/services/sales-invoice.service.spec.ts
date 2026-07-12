@@ -672,3 +672,85 @@ describe("SalesInvoiceService.createRefundCreditNoteForPayment", () => {
     expect((prisma.salesInvoice.create as any).mock.calls).toHaveLength(0);
   });
 });
+
+/**
+ * A3 — cancel() must trigger a best-effort provider-side void AFTER the
+ * local cancel, and a provider/sync failure must never roll back or block
+ * the local cancellation (the sync service flags CANCEL_PENDING on the row
+ * itself; cancel() only logs).
+ */
+describe("SalesInvoiceService.cancel — provider void wiring (A3)", () => {
+  let prisma: MockPrismaClient;
+  let syncService: { cancelInvoiceAtProvider: jest.Mock };
+  let svc: SalesInvoiceService;
+
+  const invoice = { id: "inv-1", tenantId: "t1", status: "ISSUED" };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    syncService = {
+      cancelInvoiceAtProvider: jest
+        .fn()
+        .mockResolvedValue({ success: false, error: "gated" }),
+    };
+    const settings: any = { findByTenant: jest.fn() };
+    svc = new SalesInvoiceService(
+      prisma as any,
+      settings,
+      new TaxCalculationService(),
+      syncService as any,
+    );
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...invoice });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.salesInvoice.findUniqueOrThrow as any).mockResolvedValue({
+      ...invoice,
+      status: "CANCELLED",
+    });
+  });
+
+  it("calls cancelInvoiceAtProvider AFTER the local cancel claim", async () => {
+    const out = await svc.cancel("inv-1", "t1");
+
+    expect(syncService.cancelInvoiceAtProvider).toHaveBeenCalledWith(
+      "inv-1",
+      "t1",
+    );
+    expect(
+      (prisma.salesInvoice.updateMany as any).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      syncService.cancelInvoiceAtProvider.mock.invocationCallOrder[0],
+    );
+    expect(out.status).toBe("CANCELLED");
+  });
+
+  it("still cancels locally when the provider void throws (best-effort, logged only)", async () => {
+    syncService.cancelInvoiceAtProvider.mockRejectedValue(
+      new Error("provider exploded"),
+    );
+
+    const out = await svc.cancel("inv-1", "t1");
+
+    expect(out.status).toBe("CANCELLED");
+  });
+
+  it("does not attempt a provider void when the local claim loses (already cancelled)", async () => {
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 0 });
+
+    await expect(svc.cancel("inv-1", "t1")).rejects.toThrow(
+      /already cancelled/i,
+    );
+    expect(syncService.cancelInvoiceAtProvider).not.toHaveBeenCalled();
+  });
+
+  it("works without a sync service (optional dependency)", async () => {
+    const settings: any = { findByTenant: jest.fn() };
+    const bare = new SalesInvoiceService(
+      prisma as any,
+      settings,
+      new TaxCalculationService(),
+    );
+
+    const out = await bare.cancel("inv-1", "t1");
+    expect(out.status).toBe("CANCELLED");
+  });
+});
