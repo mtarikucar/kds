@@ -15,9 +15,9 @@ import {
   useXReport,
   useCreateCashMovement,
   useTipDistribution,
-  useOkcDevice,
   downloadSessionsCsv,
 } from '../../features/cash/cashApi';
+import { useListFiscalDevices } from '../../features/fiscal/fiscalApi';
 
 type Tab = 'sessions' | 'safe' | 'tips' | 'okc';
 
@@ -179,21 +179,40 @@ function TipsTab({ fmt }: { fmt: Fmt }) {
 }
 
 function OkcTab() {
-  const { data, isLoading } = useOkcDevice();
+  // Sourced from the single fiscal rail (fiscal-core /v1/fiscal/devices).
+  // That endpoint is gated by the "fiscal" integration, so tenants without a
+  // yazarkasa add-on get a 403 → isError; we degrade to the "not configured"
+  // state rather than surfacing an error.
+  const { data: devices, isLoading, isError } = useListFiscalDevices();
   if (isLoading) return <Loading />;
+  const list = isError ? [] : (devices ?? []);
+  const ready = list.filter((d) => d.status === 'online');
   return (
     <Card>
       <CardHeader><CardTitle>Yazarkasa (ÖKC) durumu</CardTitle></CardHeader>
       <CardContent>
-        <div className="flex items-center gap-3 text-sm">
-          <span className={`h-3 w-3 rounded-full ${data?.available ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-          <span>Sağlayıcı: <strong>{data?.device ?? '—'}</strong></span>
-          <span>{data?.available ? 'Hazır' : 'Cihaz yapılandırılmamış'}</span>
-        </div>
-        {!data?.available && (
-          <p className="mt-3 text-xs text-slate-500">
-            Mali fiş basmak için bir ÖKC cihaz sağlayıcısı (vendor SDK) bağlanmalı. Fiş üretimi + akış hazır; yalnızca fiziksel cihaz adaptörü eksik.
-          </p>
+        {list.length === 0 ? (
+          <>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="h-3 w-3 rounded-full bg-slate-400" />
+              <span>Cihaz yapılandırılmamış</span>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              Mali fiş basmak için Ayarlar → Mali Cihazlar’dan bir yazarkasa (ÖKC) kaydedin. Fiş üretimi + akış hazır; yalnızca sertifikalı fiziksel cihaz adaptörü (vendor SDK) eksik.
+            </p>
+          </>
+        ) : (
+          <div className="space-y-2 text-sm">
+            {list.map((d) => (
+              <div key={d.id} className="flex items-center gap-3">
+                <span className={`h-3 w-3 rounded-full ${d.status === 'online' ? 'bg-emerald-500' : d.status === 'error' ? 'bg-red-500' : 'bg-slate-400'}`} />
+                <span>Sağlayıcı: <strong>{d.providerId}</strong></span>
+                <span className="text-slate-500">{d.serial}{d.model ? ` · ${d.model}` : ''}</span>
+                <span className="text-slate-500">{d.status === 'online' ? 'Hazır' : d.status}</span>
+              </div>
+            ))}
+            <p className="pt-1 text-xs text-slate-500">{ready.length}/{list.length} cihaz hazır. Kayıt/emeklilik için Ayarlar → Mali Cihazlar.</p>
+          </div>
         )}
       </CardContent>
     </Card>
