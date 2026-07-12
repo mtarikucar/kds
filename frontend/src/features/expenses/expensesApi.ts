@@ -72,6 +72,24 @@ export const useCreateExpense = () => {
   });
 };
 
+export type UpdateExpenseInput = Partial<CreateExpenseInput> & { id: string };
+
+/**
+ * PATCH /expenses/:id — edit a recorded expense in place.
+ * NOTE: the backend endpoint ships in a separate expenses PR; this hook (and
+ * the row-edit UI it powers) must be merged only after that PR lands.
+ */
+export const useUpdateExpense = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: UpdateExpenseInput): Promise<Expense> => {
+      const response = await api.patch(`/expenses/${id}`, input);
+      return response.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+  });
+};
+
 export const useDeleteExpense = () => {
   const qc = useQueryClient();
   return useMutation({

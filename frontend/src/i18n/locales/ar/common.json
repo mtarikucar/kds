@@ -621,7 +621,13 @@
     "table_two": "طاولتان",
     "table_few": "{{count}} طاولات",
     "table_many": "{{count}} طاولة",
-    "table_other": "{{count}} طاولة"
+    "table_other": "{{count}} طاولة",
+    "vsYesterday": "مقارنة بالأمس",
+    "kpiError": "تعذّر تحميل ملخص اليوم.",
+    "quotaUsers": "المستخدمون",
+    "quotaBranches": "الفروع",
+    "quotaProducts": "المنتجات",
+    "quotaMonthlyOrders": "الطلبات الشهرية"
   },
   "admin": {
     "userManagement": "إدارة المستخدمين",

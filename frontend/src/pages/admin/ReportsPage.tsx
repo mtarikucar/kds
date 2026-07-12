@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
-import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
+import { toast } from 'sonner';
+import {
+  useSalesReport,
+  useTopProducts,
+  useSalesComparison,
+  metricTrend,
+  downloadSalesCsv,
+} from '../../features/reports/reportsApi';
 import FinanceTab from './reports/FinanceTab';
 import {
   BudgetTab,
@@ -35,6 +42,7 @@ import {
   FileText,
   PiggyBank,
   Building2,
+  Download,
 } from 'lucide-react';
 
 interface DateRangeForm {
@@ -67,9 +75,25 @@ const ReportsPage = () => {
 
   const { data: salesReport, isLoading: salesLoading } = useSalesReport(dateRange);
   const { data: topProducts, isLoading: productsLoading } = useTopProducts(dateRange);
+  // Period-over-period trends for the headline cards. Decorative enhancement:
+  // while loading (or on failure) the cards simply render without a trend
+  // badge — the absolute numbers must never be blocked by the comparison call.
+  const { data: comparison } = useSalesComparison(dateRange);
 
   const onSubmit = (data: DateRangeForm) => {
-    setDateRange(data);
+    setDateRange((prev) => ({ ...prev, ...data }));
+  };
+
+  const [csvDownloading, setCsvDownloading] = useState(false);
+  const onDownloadCsv = async () => {
+    setCsvDownloading(true);
+    try {
+      await downloadSalesCsv(dateRange);
+    } catch {
+      toast.error(t('reports.csvDownloadError'));
+    } finally {
+      setCsvDownloading(false);
+    }
   };
 
   // v2.8.91: inventory + staff tabs are feature-gated server-side (the
@@ -98,11 +122,13 @@ const ReportsPage = () => {
     value,
     icon: Icon,
     color,
+    trend,
   }: {
     title: string;
     value: string | number;
     icon: React.ComponentType<{ className?: string }>;
     color: string;
+    trend?: { value: number; isPositive: boolean };
   }) => (
     <Card>
       <CardContent className="pt-6">
@@ -110,6 +136,16 @@ const ReportsPage = () => {
           <div>
             <p className="text-sm text-slate-500 mb-1">{title}</p>
             <p className="text-2xl font-bold">{value}</p>
+            {trend && (
+              <p
+                className={`text-xs mt-1 ${
+                  trend.isPositive ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {trend.isPositive ? '↑' : '↓'} %{trend.value}{' '}
+                {t('reports.vsPreviousPeriod')}
+              </p>
+            )}
           </div>
           <div className={`p-3 rounded-full ${color}`}>
             <Icon className="h-6 w-6 text-white" />
@@ -149,8 +185,8 @@ const ReportsPage = () => {
         </nav>
       </div>
 
-      {/* Date Range Filter - shown for sales, hourly, customers, and staff tabs */}
-      {(activeTab === 'sales' || activeTab === 'hourly' || activeTab === 'customers' || activeTab === 'staff') && (
+      {/* Date Range Filter - shown for sales, finance, hourly, customers, and staff tabs */}
+      {(activeTab === 'sales' || activeTab === 'finance' || activeTab === 'hourly' || activeTab === 'customers' || activeTab === 'staff') && (
         <Card className="mb-4 md:mb-6">
           <CardContent className="pt-4 md:pt-6">
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end">
@@ -192,18 +228,21 @@ const ReportsPage = () => {
                   value={formatCurrency(salesReport?.totalSales || 0)}
                   icon={DollarSign}
                   color="bg-green-500"
+                  trend={metricTrend(comparison, 'totalSales')}
                 />
                 <StatCard
                   title={t('reports.totalOrders')}
                   value={salesReport?.totalOrders || 0}
                   icon={ShoppingCart}
                   color="bg-blue-500"
+                  trend={metricTrend(comparison, 'totalOrders')}
                 />
                 <StatCard
                   title={t('reports.averageOrderValue')}
                   value={formatCurrency(salesReport?.averageOrderValue || 0)}
                   icon={TrendingUp}
                   color="bg-purple-500"
+                  trend={metricTrend(comparison, 'averageOrderValue')}
                 />
                 <StatCard
                   title={t('reports.totalDiscounts')}
@@ -228,7 +267,7 @@ const ReportsPage = () => {
                         <div>
                           <p className="font-semibold capitalize">{method.method}</p>
                           <p className="text-sm text-slate-500">
-                            {method.count} transactions
+                            {method.count} {t('reports.transactions')}
                           </p>
                         </div>
                         <div className="text-right">
@@ -253,8 +292,21 @@ const ReportsPage = () => {
 
               {/* Daily Sales Chart */}
               <Card className="mb-4 md:mb-6">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t('reports.dailyBreakdown')}</CardTitle>
+                  {/* CSV of exactly these daily rows (GET /reports/sales.csv) —
+                      accountant export for the selected window/branch. */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onDownloadCsv}
+                    disabled={csvDownloading}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Download className="h-4 w-4" />
+                    {csvDownloading ? t('reports.downloading') : t('reports.downloadCsv')}
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">

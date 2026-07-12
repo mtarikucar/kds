@@ -609,7 +609,13 @@
     "order_one": "{{count}} ta buyurtma",
     "order_other": "{{count}} ta buyurtma",
     "table_one": "{{count}} ta stol",
-    "table_other": "{{count}} ta stol"
+    "table_other": "{{count}} ta stol",
+    "vsYesterday": "kechagiga nisbatan",
+    "kpiError": "Bugungi xulosa yuklanmadi.",
+    "quotaUsers": "Foydalanuvchilar",
+    "quotaBranches": "Filiallar",
+    "quotaProducts": "Mahsulotlar",
+    "quotaMonthlyOrders": "Oylik buyurtmalar"
   },
   "admin": {
     "userManagement": "Foydalanuvchilarni boshqarish",

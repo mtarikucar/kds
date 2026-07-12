@@ -609,7 +609,13 @@
     "order_one": "{{count}} order",
     "order_other": "{{count}} orders",
     "table_one": "{{count}} table",
-    "table_other": "{{count}} tables"
+    "table_other": "{{count}} tables",
+    "vsYesterday": "vs yesterday",
+    "kpiError": "Today's summary could not be loaded.",
+    "quotaUsers": "Users",
+    "quotaBranches": "Branches",
+    "quotaProducts": "Products",
+    "quotaMonthlyOrders": "Monthly orders"
   },
   "admin": {
     "userManagement": "User Management",
