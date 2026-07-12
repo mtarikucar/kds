@@ -615,7 +615,13 @@
     "table_many": "{{count}} столов",
     "item_other": "{{count}} позиций",
     "order_other": "{{count}} заказов",
-    "table_other": "{{count}} столиков"
+    "table_other": "{{count}} столиков",
+    "vsYesterday": "ко вчера",
+    "kpiError": "Не удалось загрузить сводку за сегодня.",
+    "quotaUsers": "Пользователи",
+    "quotaBranches": "Филиалы",
+    "quotaProducts": "Товары",
+    "quotaMonthlyOrders": "Заказы за месяц"
   },
   "admin": {
     "userManagement": "Управление пользователями",

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { format, addDays } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import {
   ShoppingCart,
@@ -15,10 +16,19 @@ import {
   ArrowRight,
   Building2,
   Package,
+  Banknote,
+  Receipt,
 } from 'lucide-react';
 import { UserRole } from '../types';
 import SetupChecklist from '../features/onboarding/SetupChecklist';
 import { useGetUsageSnapshot, type UsageDimension } from '../features/plan/planApi';
+import {
+  useSalesReport,
+  useSalesComparison,
+  metricTrend,
+} from '../features/reports/reportsApi';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { useFormatCurrency } from '../hooks/useFormatCurrency';
 
 interface QuickAction {
   to: string;
@@ -126,7 +136,13 @@ const DashboardPage = () => {
           "products" / "monthly orders" so the tenant sees a 403 coming
           before they hit it. */}
       {user?.role && [UserRole.ADMIN, UserRole.MANAGER].includes(user.role as UserRole) && (
-        <QuotaStrip />
+        <>
+          {/* UX-8: today's revenue + order count with a vs-yesterday trend.
+              Reuses /reports/sales + /reports/sales-comparison; hidden for
+              tenants without the advancedReports feature (the endpoints 403). */}
+          <TodayKpiStrip />
+          <QuotaStrip />
+        </>
       )}
 
       {/* POS Hero Card */}
@@ -183,18 +199,104 @@ const DashboardPage = () => {
   );
 };
 
+// UX-8 — today's headline numbers, gated on the advancedReports feature so
+// tenants whose plan lacks /reports/* never fire (and 403) the queries. The
+// feature check lives in this wrapper so the inner component can call its
+// query hooks unconditionally (rules of hooks).
+function TodayKpiStrip() {
+  const { hasFeature } = useSubscription();
+  if (!hasFeature('advancedReports')) return null;
+  return <TodayKpiStripInner />;
+}
+
+function TodayKpiStripInner() {
+  const { t } = useTranslation('common');
+  const formatCurrency = useFormatCurrency();
+  // Window = [today 00:00, tomorrow 00:00]; the comparison endpoint mirrors
+  // the same span backwards, so "previous" is exactly yesterday.
+  const now = new Date();
+  const range = {
+    startDate: format(now, 'yyyy-MM-dd'),
+    endDate: format(addDays(now, 1), 'yyyy-MM-dd'),
+  };
+  const { data: sales, isLoading, isError } = useSalesReport(range);
+  const { data: comparison } = useSalesComparison(range);
+
+  if (isError) {
+    return (
+      <p className="mb-4 flex-shrink-0 text-xs text-slate-400">
+        {t('dashboard.kpiError')}
+      </p>
+    );
+  }
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-2 flex-shrink-0">
+      <KpiPill
+        icon={Banknote}
+        label={t('dashboard.todaysSales')}
+        value={isLoading ? '…' : formatCurrency(sales?.totalSales ?? 0)}
+        trend={metricTrend(comparison, 'totalSales')}
+        vsLabel={t('dashboard.vsYesterday')}
+      />
+      <KpiPill
+        icon={Receipt}
+        label={t('dashboard.todaysOrders')}
+        value={isLoading ? '…' : String(sales?.totalOrders ?? 0)}
+        trend={metricTrend(comparison, 'totalOrders')}
+        vsLabel={t('dashboard.vsYesterday')}
+      />
+    </div>
+  );
+}
+
+function KpiPill({
+  icon: Icon,
+  label,
+  value,
+  trend,
+  vsLabel,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  trend?: { value: number; isPositive: boolean };
+  vsLabel: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <Icon className="h-4 w-4 text-slate-700" />
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 truncate">{label}</div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs font-semibold text-slate-700 tabular-nums">{value}</span>
+          {trend && (
+            <span
+              className={`text-[10px] tabular-nums ${
+                trend.isPositive ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
+              {trend.isPositive ? '↑' : '↓'} %{trend.value} {vsLabel}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // v2.8.88 — quota strip surfaced on the dashboard top section. Same
 // endpoint feeds Plan & Erişim sayfası; React Query caches it per
 // session so the dashboard doesn't double-fetch.
 function QuotaStrip() {
+  const { t } = useTranslation('common');
   const { data: snapshot } = useGetUsageSnapshot();
   if (!snapshot) return null;
   return (
     <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2 flex-shrink-0">
-      <QuotaPill icon={Users} label="Kullanıcılar" dim={snapshot.users} />
-      <QuotaPill icon={Building2} label="Şubeler" dim={snapshot.branches} />
-      <QuotaPill icon={Package} label="Ürünler" dim={snapshot.products} />
-      <QuotaPill icon={ShoppingCart} label="Aylık siparişler" dim={snapshot.monthlyOrders} />
+      <QuotaPill icon={Users} label={t('dashboard.quotaUsers')} dim={snapshot.users} />
+      <QuotaPill icon={Building2} label={t('dashboard.quotaBranches')} dim={snapshot.branches} />
+      <QuotaPill icon={Package} label={t('dashboard.quotaProducts')} dim={snapshot.products} />
+      <QuotaPill icon={ShoppingCart} label={t('dashboard.quotaMonthlyOrders')} dim={snapshot.monthlyOrders} />
     </div>
   );
 }

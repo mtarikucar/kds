@@ -31,7 +31,7 @@ describe('CostingPage — menu tab plan-gate handling', () => {
       error: { response: { status: 403 } },
     };
     render(<CostingPage />);
-    expect(screen.getByText(/Gelişmiş Raporlar/)).toBeTruthy();
+    expect(screen.getByText(/costing\.upgradeRequired/)).toBeTruthy();
   });
 
   it('shows a retry message (not purchase advice) on a 500', () => {
@@ -41,8 +41,8 @@ describe('CostingPage — menu tab plan-gate handling', () => {
       error: { response: { status: 500 } },
     };
     render(<CostingPage />);
-    expect(screen.getByText(/Rapor yüklenemedi/)).toBeTruthy();
-    expect(screen.queryByText(/Gelişmiş Raporlar/)).toBeNull();
+    expect(screen.getByText(/reports\.loadError/)).toBeTruthy();
+    expect(screen.queryByText(/costing\.upgradeRequired/)).toBeNull();
   });
 
   it('surfaces the uncosted-products count', () => {
@@ -52,6 +52,6 @@ describe('CostingPage — menu tab plan-gate handling', () => {
       data: { items: [], counts: { uncosted: 3 } },
     };
     render(<CostingPage />);
-    expect(screen.getByText(/3 satılan ürünün maliyeti tanımlı değil/)).toBeTruthy();
+    expect(screen.getByText(/costing\.uncosted/)).toBeTruthy();
   });
 });

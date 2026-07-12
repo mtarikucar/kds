@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { format, subDays } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { ChefHat, Scale, Layers } from 'lucide-react';
 import {
   Card,
@@ -8,6 +9,7 @@ import {
   CardContent,
 } from '../../components/ui/Card';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import DateRangeBar from './reports/DateRangeBar';
 import {
   useMenuEngineering,
   useUsageVariance,
@@ -23,19 +25,25 @@ const CLASS_TONE: Record<string, string> = {
   DOG: 'bg-rose-100 text-rose-700',
 };
 
+const defaultRange = () => ({
+  startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+  endDate: format(new Date(), 'yyyy-MM-dd'),
+});
+
 export default function CostingPage() {
+  const { t } = useTranslation('reports');
   const fmt = useFormatCurrency();
   const [tab, setTab] = useState<Tab>('menu');
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'menu', label: 'Menü Mühendisliği', icon: ChefHat },
-    { id: 'variance', label: 'Kullanım Varyansı', icon: Scale },
-    { id: 'recipes', label: 'Reçete Maliyetleri', icon: Layers },
+    { id: 'menu', label: t('costing.tabMenu'), icon: ChefHat },
+    { id: 'variance', label: t('costing.tabVariance'), icon: Scale },
+    { id: 'recipes', label: t('costing.tabRecipes'), icon: Layers },
   ];
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Reçete & Maliyet</h1>
-        <p className="text-sm text-slate-500">Menü mühendisliği (Star/Plowhorse/Puzzle/Dog), teorik-fiili varyans ve reçete başı maliyet.</p>
+        <h1 className="text-2xl font-bold">{t('costing.title')}</h1>
+        <p className="text-sm text-slate-500">{t('costing.subtitle')}</p>
       </div>
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((tb) => {
@@ -59,8 +67,8 @@ export default function CostingPage() {
 type Fmt = (n: number) => string;
 
 function MenuTab({ fmt }: { fmt: Fmt }) {
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const [range] = useState({ startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), endDate: today });
+  const { t } = useTranslation('reports');
+  const [range, setRange] = useState(defaultRange);
   const { data, isLoading, isError, error } = useMenuEngineering(range);
   if (isLoading) return <Loading />;
   // Backend gates menu-engineering on ADVANCED_REPORTS while this page is
@@ -72,8 +80,8 @@ function MenuTab({ fmt }: { fmt: Fmt }) {
       <Card>
         <CardContent className="py-8 text-center text-sm text-amber-700">
           {(error as any)?.response?.status === 403
-            ? 'Menü mühendisliği için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.'
-            : 'Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.'}
+            ? t('costing.upgradeRequired')
+            : t('reports.loadError')}
         </CardContent>
       </Card>
     );
@@ -81,20 +89,28 @@ function MenuTab({ fmt }: { fmt: Fmt }) {
   const uncostedCount = data?.counts?.uncosted ?? (data?.uncosted?.length ?? 0);
   return (
     <Card>
-      <CardHeader><CardTitle>Menü mühendisliği (son 30 gün)</CardTitle></CardHeader>
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <CardTitle>{t('costing.menuTitle')}</CardTitle>
+        <DateRangeBar value={range} onApply={setRange} />
+      </CardHeader>
       <CardContent>
         {uncostedCount > 0 && (
           <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            {uncostedCount} satılan ürünün maliyeti tanımlı değil — sınıflandırılamadıkları için tabloda görünmüyorlar. Reçete/maliyet girin.
+            {t('costing.uncosted', { count: uncostedCount })}
           </p>
         )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-slate-500">
-              <th className="py-2 pr-4">Ürün</th><th>Adet</th><th>Maliyet</th><th>Fiyat</th><th>Marj</th><th>Sınıf</th>
+              <th className="py-2 pr-4">{t('costing.headProduct')}</th>
+              <th>{t('costing.headUnits')}</th>
+              <th>{t('costing.headCost')}</th>
+              <th>{t('costing.headPrice')}</th>
+              <th>{t('costing.headMargin')}</th>
+              <th>{t('costing.headClass')}</th>
             </tr></thead>
             <tbody>
-              {items.length === 0 ? <tr><td colSpan={6} className="py-6 text-center text-slate-400">Kayıt yok.</td></tr>
+              {items.length === 0 ? <tr><td colSpan={6} className="py-6 text-center text-slate-400">{t('reports.noRecords')}</td></tr>
               : items.map((it: any, i: number) => (
                 <tr key={i} className="border-t border-slate-100">
                   <td className="py-2 pr-4">{it.productName ?? it.name}</td>
@@ -114,17 +130,36 @@ function MenuTab({ fmt }: { fmt: Fmt }) {
 }
 
 function VarianceTab({ fmt }: { fmt: Fmt }) {
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const [range] = useState({ startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading } = useUsageVariance(range);
+  const { t } = useTranslation('reports');
+  const [range, setRange] = useState(defaultRange);
+  const { data, isLoading, isError } = useUsageVariance(range);
   if (isLoading) return <Loading />;
+  if (isError)
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-amber-700">
+          {t('reports.loadError')}
+        </CardContent>
+      </Card>
+    );
   const rows: any[] = data?.items ?? data ?? [];
   return (
     <Card>
-      <CardHeader><CardTitle>Teorik vs fiili kullanım varyansı</CardTitle></CardHeader>
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <CardTitle>{t('costing.varianceTitle')}</CardTitle>
+        <DateRangeBar value={range} onApply={setRange} />
+      </CardHeader>
       <CardContent>
         {/* Backend keys: theoreticalUsage, wasteUsage, countVarianceQty, varianceValue, variancePct */}
-        <Table head={['Kalem', 'Teorik kullanım', 'Fire', 'Sayım varyansı', 'Maliyet etkisi', '%']}
+        <Table
+          head={[
+            t('costing.headItem'),
+            t('costing.headTheoretical'),
+            t('costing.headWaste'),
+            t('costing.headCountVariance'),
+            t('costing.headCostImpact'),
+            '%',
+          ]}
           rows={rows.map((r: any) => [
             r.name ?? r.stockItemName ?? '—',
             r.theoreticalUsage != null ? String(r.theoreticalUsage) : '—',
@@ -139,14 +174,29 @@ function VarianceTab({ fmt }: { fmt: Fmt }) {
 }
 
 function RecipesTab({ fmt }: { fmt: Fmt }) {
-  const { data, isLoading } = useRecipes();
+  const { t } = useTranslation('reports');
+  const { data, isLoading, isError } = useRecipes();
   if (isLoading) return <Loading />;
+  if (isError)
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-amber-700">
+          {t('reports.loadError')}
+        </CardContent>
+      </Card>
+    );
   const recipes: any[] = (data as any) ?? [];
   return (
     <Card>
-      <CardHeader><CardTitle>Reçete başı maliyet</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{t('costing.recipesTitle')}</CardTitle></CardHeader>
       <CardContent>
-        <Table head={['Reçete', 'Porsiyon maliyeti', 'Food-cost %', 'Brüt marj']}
+        <Table
+          head={[
+            t('costing.headRecipe'),
+            t('costing.headPortionCost'),
+            t('costing.headFoodCostPct'),
+            t('costing.headGrossMargin'),
+          ]}
           rows={recipes.map((r: any) => [
             r.name ?? r.product?.name ?? '—',
             r.costing?.costPerPortion != null ? fmt(r.costing.costPerPortion) : '—',
@@ -158,14 +208,18 @@ function RecipesTab({ fmt }: { fmt: Fmt }) {
   );
 }
 
-function Loading() { return <div className="py-12 text-center text-slate-400">Yükleniyor…</div>; }
+function Loading() {
+  const { t } = useTranslation('reports');
+  return <div className="py-12 text-center text-slate-400">{t('reports.loading')}</div>;
+}
 function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
+  const { t } = useTranslation('reports');
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead><tr className="text-left text-slate-500">{head.map((h) => <th key={h} className="py-2 pr-4">{h}</th>)}</tr></thead>
         <tbody>
-          {rows.length === 0 ? <tr><td colSpan={head.length} className="py-6 text-center text-slate-400">Kayıt yok.</td></tr>
+          {rows.length === 0 ? <tr><td colSpan={head.length} className="py-6 text-center text-slate-400">{t('reports.noRecords')}</td></tr>
           : rows.map((r, i) => <tr key={i} className="border-t border-slate-100">{r.map((c, j) => <td key={j} className="py-2 pr-4 tabular-nums">{c}</td>)}</tr>)}
         </tbody>
       </table>
