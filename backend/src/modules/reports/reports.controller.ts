@@ -321,8 +321,15 @@ export class ReportsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.INVENTORY_TRACKING)
   @ApiOperation({ summary: "Get inventory report (ADMIN, MANAGER)" })
-  async getInventoryReport(@Request() req) {
-    return this.reportsService.getInventoryReport(req.tenantId);
+  async getInventoryReport(@Request() req, @Query() query: DateRangeQueryDto) {
+    // Branch-scope parity with every other report: pre-fix this was the ONLY
+    // endpoint ignoring branchFor, so a branch-restricted MANAGER could read
+    // tenant-wide stock movements. Product stock levels remain tenant-level
+    // by data model (Product has no branchId); movements are branch-scoped.
+    return this.reportsService.getInventoryReport(
+      req.tenantId,
+      this.branchFor(req, query),
+    );
   }
 
   @Get("staff-performance")
