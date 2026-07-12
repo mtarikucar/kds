@@ -362,6 +362,32 @@ export const useDeleteCamera = () => {
   });
 };
 
+// Backend route is PUT /analytics/cameras/:id/calibration (see
+// analytics.controller.ts updateCameraCalibration). Goes through the shared
+// api client so auth + X-Branch-Id headers are attached — a bare fetch()
+// here would be rejected by the BranchGuard.
+export const useSaveCameraCalibration = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Record<string, unknown>;
+    }): Promise<Camera> => {
+      const response = await api.put(`/analytics/cameras/${id}/calibration`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      // analyticsKeys.camera(id) nests under cameras(), so this covers both
+      // the list and the detail entry.
+      queryClient.invalidateQueries({ queryKey: analyticsKeys.cameras() });
+    },
+  });
+};
+
 // ==================== MOCK DATA HOOKS (DEV ONLY) ====================
 
 export const useGenerateMockData = () => {

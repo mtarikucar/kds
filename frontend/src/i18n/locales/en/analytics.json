@@ -1,4 +1,179 @@
 {
+  "page": {
+    "title": "Restaurant Analytics",
+    "subtitle": "AI-powered insights and space utilization analysis",
+    "tabsAriaLabel": "Analytics tabs"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "tables": "Table Analytics",
+    "traffic": "Traffic Flow",
+    "behavior": "Customer Behavior",
+    "insights": "AI Insights",
+    "cameras": "Cameras"
+  },
+  "dateFilter": {
+    "from": "From",
+    "to": "To",
+    "apply": "Apply"
+  },
+  "devTools": {
+    "generate": "Generate Mock Data",
+    "generating": "Generating...",
+    "clear": "Clear Data",
+    "generated": "Mock data generated: {{records}} occupancy records, {{insights}} insights",
+    "generateFailed": "Failed to generate mock data",
+    "cleared": "All analytics data cleared",
+    "clearFailed": "Failed to clear analytics data"
+  },
+  "stats": {
+    "avgTableUtilization": "Average Table Utilization",
+    "tablesCount": "{{value}} tables",
+    "totalRevenuePeriod": "Total Revenue (Period)",
+    "tableTurns": "{{value}} table turns",
+    "congestionScore": "Congestion Score",
+    "hotspotsCount": "{{value}} hotspots",
+    "activeInsights": "Active Insights",
+    "totalInsightsCount": "{{value}} total insights",
+    "totalTables": "Total Tables",
+    "avgUtilization": "Average Utilization",
+    "peakHour": "Peak Hour",
+    "peakOccupancy": "{{percent}}% occupancy",
+    "totalSessions": "Total Sessions",
+    "higherIsBetter": "Higher is better",
+    "congestionHotspots": "Congestion Hotspots",
+    "highTrafficAreas": "Areas with high traffic",
+    "recommendations": "Recommendations",
+    "flowSuggestions": "Suggestions to improve flow",
+    "avgDiningTime": "Avg Dining Time",
+    "avgIdleTime": "Avg Idle Time",
+    "timeAfterDining": "Time after dining",
+    "avgPartySize": "Avg Party Size",
+    "avgOrderValue": "Avg Order Value",
+    "totalInsights": "Total Insights",
+    "new": "New",
+    "inProgress": "In Progress",
+    "implemented": "Implemented",
+    "minutesValue": "{{minutes}} min"
+  },
+  "columns": {
+    "table": "Table",
+    "section": "Section",
+    "capacity": "Capacity",
+    "utilization": "Utilization",
+    "revenue": "Revenue",
+    "sessions": "Sessions",
+    "avgOrder": "Avg Order",
+    "location": "Location",
+    "severity": "Severity",
+    "avgWaitTime": "Avg Wait Time",
+    "peakHour": "Peak Hour"
+  },
+  "tableLabel": "Table {{number}}",
+  "overview": {
+    "actionableInsights": "Actionable Insights",
+    "underutilizedTables": "Underutilized Tables",
+    "noInsightsTitle": "No actionable insights right now",
+    "noInsightsDescription": "Insights are generated automatically every night from your order and table data. You can also trigger generation manually from the AI Insights tab."
+  },
+  "insightCard": {
+    "potentialImpact": "Potential impact: {{impact}}",
+    "impact": "Impact: {{impact}}",
+    "confidence": "Confidence: {{percent}}%",
+    "created": "Created: {{date}}",
+    "markImplemented": "Mark as implemented",
+    "markInProgress": "Mark as in progress",
+    "dismiss": "Dismiss",
+    "statusUpdated": "Insight status updated",
+    "statusUpdateFailed": "Failed to update insight status"
+  },
+  "tableDetails": {
+    "title": "Table Utilization Details",
+    "emptyTitle": "No table activity in this date range",
+    "emptyDescription": "Utilization is calculated from POS table sessions. Once orders are taken on tables — or after widening the date range — the details appear here."
+  },
+  "traffic": {
+    "recommendationsTitle": "Traffic Flow Recommendations",
+    "hotspotsTitle": "Congestion Hotspots",
+    "gridCell": "Grid ({{x}}, {{z}})",
+    "emptyTitle": "Traffic analysis requires occupancy cameras",
+    "emptyDescription": "No camera telemetry exists for this period, so hotspots and flow recommendations cannot be computed. Table analytics and AI insights work without cameras, using your POS data.",
+    "goToCameras": "Set up cameras"
+  },
+  "behavior": {
+    "journeyTitle": "Customer Journey Insights",
+    "peakHours": "Peak Hours",
+    "peakArrival": "Peak Arrival",
+    "peakDeparture": "Peak Departure",
+    "timeBreakdown": "Time Breakdown",
+    "dining": "Dining",
+    "idlePostDining": "Idle (post-dining)",
+    "idleDiningRatio": "Idle/Dining Ratio",
+    "highIdleTitle": "High Idle Time Detected",
+    "highIdleDescription": "Customers are spending {{minutes}} minutes at tables after dining. Consider presenting the bill proactively or offering takeaway desserts to improve table turnover.",
+    "emptyTitle": "No customer behavior data yet",
+    "emptyDescription": "Dining-time metrics are derived from POS table sessions; presence metrics additionally need occupancy cameras. Data appears here once table orders flow in."
+  },
+  "insightsTab": {
+    "allTitle": "All Insights",
+    "refresh": "Refresh Insights",
+    "refreshing": "Generating...",
+    "generatedCount": "{{value}} insight(s) generated",
+    "generateFailed": "Failed to generate insights",
+    "emptyTitle": "No insights generated yet",
+    "emptyDescription": "The system generates insights automatically every night from your order and table data. Click below to generate them now.",
+    "generateNow": "Generate now"
+  },
+  "cameras": {
+    "title": "Cameras",
+    "add": "Add Camera",
+    "emptyTitle": "No cameras connected yet",
+    "emptyDescription": "Space analytics (traffic flow, occupancy, dwell time) requires an on-site camera installation. Table analytics and AI insights already work without cameras, using your POS data.",
+    "neverSeen": "Never seen",
+    "calibrate": "Calibrate",
+    "calibrationSaved": "Camera calibration saved",
+    "addTitle": "Add Camera",
+    "editTitle": "Edit Camera",
+    "deleteTitle": "Delete Camera",
+    "deleteConfirm": "Are you sure you want to delete the camera \"{{name}}\"? Its occupancy stream will stop being processed. This action cannot be undone.",
+    "created": "Camera added",
+    "createFailed": "Failed to add camera",
+    "updated": "Camera updated",
+    "updateFailed": "Failed to update camera",
+    "deleted": "Camera deleted",
+    "deleteFailed": "Failed to delete camera",
+    "health": {
+      "total": "Total",
+      "online": "Online",
+      "offline": "Offline",
+      "error": "Error",
+      "calibrating": "Calibrating"
+    },
+    "columns": {
+      "name": "Name",
+      "location": "Location",
+      "status": "Status",
+      "lastSeen": "Last Seen",
+      "actions": "Actions"
+    },
+    "statusValues": {
+      "ONLINE": "Online",
+      "OFFLINE": "Offline",
+      "ERROR": "Error",
+      "CALIBRATING": "Calibrating"
+    },
+    "form": {
+      "name": "Camera name",
+      "namePlaceholder": "e.g. Main entrance camera",
+      "nameRequired": "Camera name is required",
+      "location": "Location / description",
+      "locationPlaceholder": "e.g. Dining hall, above the entrance",
+      "streamUrl": "Stream URL",
+      "streamUrlHint": "RTSP/ONVIF address of the camera on your local network",
+      "streamUrlRequired": "Stream URL is required",
+      "streamType": "Stream type"
+    }
+  },
   "cvDisclosure": {
     "requiresCameras": "Requires occupancy cameras",
     "noData": "No camera data",

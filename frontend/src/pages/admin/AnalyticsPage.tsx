@@ -11,12 +11,15 @@ import {
   useGenerateMockData,
   useClearMockData,
   useUpdateInsightStatus,
+  useGenerateInsights,
+  CameraManagement,
 } from '../../features/analytics';
 import { InsightSeverity, InsightStatus } from '../../features/analytics/types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
+import EmptyState from '../../components/ui/EmptyState';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { toast } from 'sonner';
 import {
@@ -33,6 +36,8 @@ import {
   Activity,
   Database,
   Trash2,
+  Video,
+  RefreshCw,
 } from 'lucide-react';
 
 interface DateRangeForm {
@@ -40,7 +45,7 @@ interface DateRangeForm {
   endDate: string;
 }
 
-type TabType = 'overview' | 'tables' | 'traffic' | 'behavior' | 'insights';
+type TabType = 'overview' | 'tables' | 'traffic' | 'behavior' | 'insights' | 'cameras';
 
 const AnalyticsPage = () => {
   const { t } = useTranslation(['analytics', 'common']);
@@ -72,6 +77,7 @@ const AnalyticsPage = () => {
   const generateMockData = useGenerateMockData();
   const clearMockData = useClearMockData();
   const updateInsightStatus = useUpdateInsightStatus();
+  const generateInsights = useGenerateInsights();
 
   const onSubmit = (data: DateRangeForm) => {
     setDateRange(data);
@@ -88,36 +94,51 @@ const AnalyticsPage = () => {
   const handleGenerateMockData = async () => {
     try {
       const result = await generateMockData.mutateAsync(7);
-      toast.success(`Generated mock data: ${result.occupancyRecords} occupancy records, ${result.insights} insights`);
+      toast.success(
+        t('analytics:devTools.generated', {
+          records: result.occupancyRecords,
+          insights: result.insights,
+        }),
+      );
     } catch {
-      toast.error('Failed to generate mock data');
+      toast.error(t('analytics:devTools.generateFailed'));
     }
   };
 
   const handleClearMockData = async () => {
     try {
       await clearMockData.mutateAsync();
-      toast.success('Cleared all analytics data');
+      toast.success(t('analytics:devTools.cleared'));
     } catch {
-      toast.error('Failed to clear analytics data');
+      toast.error(t('analytics:devTools.clearFailed'));
     }
   };
 
   const handleInsightAction = async (insightId: string, status: InsightStatus) => {
     try {
       await updateInsightStatus.mutateAsync({ id: insightId, status });
-      toast.success('Insight status updated');
+      toast.success(t('analytics:insightCard.statusUpdated'));
     } catch {
-      toast.error('Failed to update insight status');
+      toast.error(t('analytics:insightCard.statusUpdateFailed'));
+    }
+  };
+
+  const handleGenerateInsights = async () => {
+    try {
+      const result = await generateInsights.mutateAsync();
+      toast.success(t('analytics:insightsTab.generatedCount', { value: result.generated }));
+    } catch {
+      toast.error(t('analytics:insightsTab.generateFailed'));
     }
   };
 
   const tabs = [
-    { id: 'overview' as TabType, label: 'Overview', icon: BarChart3 },
-    { id: 'tables' as TabType, label: 'Table Analytics', icon: Table2 },
-    { id: 'traffic' as TabType, label: 'Traffic Flow', icon: Map },
-    { id: 'behavior' as TabType, label: 'Customer Behavior', icon: Users },
-    { id: 'insights' as TabType, label: 'AI Insights', icon: Lightbulb },
+    { id: 'overview' as TabType, label: t('analytics:tabs.overview'), icon: BarChart3 },
+    { id: 'tables' as TabType, label: t('analytics:tabs.tables'), icon: Table2 },
+    { id: 'traffic' as TabType, label: t('analytics:tabs.traffic'), icon: Map },
+    { id: 'behavior' as TabType, label: t('analytics:tabs.behavior'), icon: Users },
+    { id: 'insights' as TabType, label: t('analytics:tabs.insights'), icon: Lightbulb },
+    { id: 'cameras' as TabType, label: t('analytics:tabs.cameras'), icon: Video },
   ];
 
   const getSeverityColor = (severity: InsightSeverity) => {
@@ -148,14 +169,12 @@ const AnalyticsPage = () => {
     subtitle,
     icon: Icon,
     color,
-    trend,
   }: {
     title: string;
     value: string | number;
     subtitle?: string;
     icon: React.ComponentType<{ className?: string }>;
     color: string;
-    trend?: { value: number; isPositive: boolean };
   }) => (
     <Card>
       <CardContent className="pt-6">
@@ -164,11 +183,6 @@ const AnalyticsPage = () => {
             <p className="text-sm text-slate-500 mb-1">{title}</p>
             <p className="text-2xl font-bold">{value}</p>
             {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
-            {trend && (
-              <p className={`text-xs mt-1 ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}% vs last period
-              </p>
-            )}
           </div>
           <div className={`p-3 rounded-full ${color}`}>
             <Icon className="h-6 w-6 text-white" />
@@ -182,8 +196,10 @@ const AnalyticsPage = () => {
     <div>
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-slate-900">Restaurant Analytics</h1>
-          <p className="text-slate-500 mt-1">AI-powered insights and space utilization analysis</p>
+          <h1 className="text-2xl font-heading font-bold text-slate-900">
+            {t('analytics:page.title')}
+          </h1>
+          <p className="text-slate-500 mt-1">{t('analytics:page.subtitle')}</p>
         </div>
         {/* Dev tools - only show in development */}
         {import.meta.env.DEV && (
@@ -195,7 +211,9 @@ const AnalyticsPage = () => {
               disabled={generateMockData.isPending}
             >
               <Database className="h-4 w-4 mr-2" />
-              {generateMockData.isPending ? 'Generating...' : 'Generate Mock Data'}
+              {generateMockData.isPending
+                ? t('analytics:devTools.generating')
+                : t('analytics:devTools.generate')}
             </Button>
             <Button
               variant="outline"
@@ -205,7 +223,7 @@ const AnalyticsPage = () => {
               className="text-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Clear Data
+              {t('analytics:devTools.clear')}
             </Button>
           </div>
         )}
@@ -213,7 +231,7 @@ const AnalyticsPage = () => {
 
       {/* Tabs */}
       <div className="mb-4 md:mb-6 border-b border-slate-200/60 overflow-x-auto">
-        <nav className="flex space-x-4 min-w-max" aria-label="Analytics tabs">
+        <nav className="flex space-x-4 min-w-max" aria-label={t('analytics:page.tabsAriaLabel')}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -235,25 +253,27 @@ const AnalyticsPage = () => {
       </div>
 
       {/* Date Range Filter */}
-      {activeTab !== 'insights' && (
+      {activeTab !== 'insights' && activeTab !== 'cameras' && (
         <Card className="mb-4 md:mb-6">
           <CardContent className="pt-4 md:pt-6">
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end">
               <div className="flex-1">
                 <Input
-                  label="From"
+                  label={t('analytics:dateFilter.from')}
                   type="date"
                   {...register('startDate')}
                 />
               </div>
               <div className="flex-1">
                 <Input
-                  label="To"
+                  label={t('analytics:dateFilter.to')}
                   type="date"
                   {...register('endDate')}
                 />
               </div>
-              <Button type="submit" className="w-full sm:w-auto">Apply</Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                {t('analytics:dateFilter.apply')}
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -269,30 +289,42 @@ const AnalyticsPage = () => {
               {/* Summary Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
-                  title="Average Table Utilization"
+                  title={t('analytics:stats.avgTableUtilization')}
                   value={`${tableUtilization?.summary?.avgUtilization?.toFixed(1) || 0}%`}
-                  subtitle={`${tableUtilization?.summary?.totalTables || 0} tables`}
+                  subtitle={t('analytics:stats.tablesCount', {
+                    value: tableUtilization?.summary?.totalTables || 0,
+                  })}
                   icon={Table2}
                   color="bg-blue-500"
                 />
                 <StatCard
-                  title="Total Revenue (Period)"
+                  title={t('analytics:stats.totalRevenuePeriod')}
                   value={formatCurrency(tableUtilization?.summary?.totalRevenue || 0)}
-                  subtitle={`${tableUtilization?.summary?.totalSessions || 0} table turns`}
+                  subtitle={t('analytics:stats.tableTurns', {
+                    value: tableUtilization?.summary?.totalSessions || 0,
+                  })}
                   icon={TrendingUp}
                   color="bg-green-500"
                 />
                 <StatCard
-                  title="Congestion Score"
+                  title={t('analytics:stats.congestionScore')}
                   value={hasCameraData ? `${congestion?.overallScore ?? 0}/100` : t('analytics:cvDisclosure.noData')}
-                  subtitle={hasCameraData ? `${congestion?.congestionPoints?.length || 0} hotspots` : t('analytics:cvDisclosure.requiresCameras')}
+                  subtitle={
+                    hasCameraData
+                      ? t('analytics:stats.hotspotsCount', {
+                          value: congestion?.congestionPoints?.length || 0,
+                        })
+                      : t('analytics:cvDisclosure.requiresCameras')
+                  }
                   icon={Activity}
                   color={!hasCameraData ? 'bg-slate-400' : congestion?.overallScore && congestion.overallScore < 70 ? 'bg-yellow-500' : 'bg-green-500'}
                 />
                 <StatCard
-                  title="Active Insights"
+                  title={t('analytics:stats.activeInsights')}
                   value={insightSummary?.byStatus?.NEW || 0}
-                  subtitle={`${insightSummary?.total || 0} total insights`}
+                  subtitle={t('analytics:stats.totalInsightsCount', {
+                    value: insightSummary?.total || 0,
+                  })}
                   icon={Lightbulb}
                   color="bg-purple-500"
                 />
@@ -303,7 +335,7 @@ const AnalyticsPage = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Lightbulb className="h-5 w-5 text-yellow-500" />
-                    Actionable Insights
+                    {t('analytics:overview.actionableInsights')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -324,7 +356,9 @@ const AnalyticsPage = () => {
                               </p>
                               {insight.potentialImpact && (
                                 <p className="text-xs mt-2 text-green-700">
-                                  Potential Impact: {insight.potentialImpact}
+                                  {t('analytics:insightCard.potentialImpact', {
+                                    impact: insight.potentialImpact,
+                                  })}
                                 </p>
                               )}
                             </div>
@@ -332,14 +366,14 @@ const AnalyticsPage = () => {
                               <button
                                 onClick={() => handleInsightAction(insight.id, InsightStatus.IMPLEMENTED)}
                                 className="p-2 hover:bg-green-100 rounded-lg transition-colors"
-                                title="Mark as implemented"
+                                title={t('analytics:insightCard.markImplemented')}
                               >
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               </button>
                               <button
                                 onClick={() => handleInsightAction(insight.id, InsightStatus.DISMISSED)}
                                 className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Dismiss"
+                                title={t('analytics:insightCard.dismiss')}
                               >
                                 <XCircle className="h-4 w-4 text-red-600" />
                               </button>
@@ -349,9 +383,11 @@ const AnalyticsPage = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-slate-500 text-center py-8">
-                      No actionable insights at this time. Generate mock data to see sample insights.
-                    </p>
+                    <EmptyState
+                      icon={Lightbulb}
+                      title={t('analytics:overview.noInsightsTitle')}
+                      description={t('analytics:overview.noInsightsDescription')}
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -362,7 +398,7 @@ const AnalyticsPage = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                      Underutilized Tables
+                      {t('analytics:overview.underutilizedTables')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -370,16 +406,18 @@ const AnalyticsPage = () => {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-3 px-4">Table</th>
-                            <th className="text-right py-3 px-4">Utilization</th>
-                            <th className="text-right py-3 px-4">Revenue</th>
-                            <th className="text-right py-3 px-4">Sessions</th>
+                            <th className="text-left py-3 px-4">{t('analytics:columns.table')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.utilization')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.revenue')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.sessions')}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {tableUtilization.summary.underutilizedTables.map((table) => (
                             <tr key={table.tableId} className="border-b">
-                              <td className="py-3 px-4 font-medium">Table {table.tableNumber}</td>
+                              <td className="py-3 px-4 font-medium">
+                                {t('analytics:tableLabel', { number: table.tableNumber })}
+                              </td>
                               <td className="py-3 px-4 text-right">
                                 <span className="text-red-600 font-semibold">
                                   {table.utilizationScore.toFixed(1)}%
@@ -410,26 +448,28 @@ const AnalyticsPage = () => {
               {/* Table Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
-                  title="Total Tables"
+                  title={t('analytics:stats.totalTables')}
                   value={tableUtilization?.summary?.totalTables || 0}
                   icon={Table2}
                   color="bg-blue-500"
                 />
                 <StatCard
-                  title="Average Utilization"
+                  title={t('analytics:stats.avgUtilization')}
                   value={`${tableUtilization?.summary?.avgUtilization?.toFixed(1) || 0}%`}
                   icon={BarChart3}
                   color="bg-green-500"
                 />
                 <StatCard
-                  title="Peak Hour"
+                  title={t('analytics:stats.peakHour')}
                   value={`${tableUtilization?.summary?.peakHour || 0}:00`}
-                  subtitle={`${tableUtilization?.summary?.peakOccupancy?.toFixed(0) || 0}% occupancy`}
+                  subtitle={t('analytics:stats.peakOccupancy', {
+                    percent: tableUtilization?.summary?.peakOccupancy?.toFixed(0) || 0,
+                  })}
                   icon={Clock}
                   color="bg-purple-500"
                 />
                 <StatCard
-                  title="Total Sessions"
+                  title={t('analytics:stats.totalSessions')}
                   value={tableUtilization?.summary?.totalSessions || 0}
                   icon={Users}
                   color="bg-orange-500"
@@ -439,59 +479,69 @@ const AnalyticsPage = () => {
               {/* All Tables */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Table Utilization Details</CardTitle>
+                  <CardTitle>{t('analytics:tableDetails.title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-4">Table</th>
-                          <th className="text-left py-3 px-4">Section</th>
-                          <th className="text-center py-3 px-4">Capacity</th>
-                          <th className="text-right py-3 px-4">Utilization</th>
-                          <th className="text-right py-3 px-4">Revenue</th>
-                          <th className="text-right py-3 px-4">Sessions</th>
-                          <th className="text-right py-3 px-4">Avg Order</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tableUtilization?.tables?.map((table) => (
-                          <tr key={table.tableId} className="border-b hover:bg-slate-50">
-                            <td className="py-3 px-4 font-medium">Table {table.tableNumber}</td>
-                            <td className="py-3 px-4 text-slate-500">{table.section || '-'}</td>
-                            <td className="py-3 px-4 text-center">{table.capacity}</td>
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 bg-slate-200 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full ${
-                                      table.utilizationScore >= 70
-                                        ? 'bg-green-500'
-                                        : table.utilizationScore >= 50
-                                          ? 'bg-yellow-500'
-                                          : 'bg-red-500'
-                                    }`}
-                                    style={{ width: `${Math.min(table.utilizationScore, 100)}%` }}
-                                  />
-                                </div>
-                                <span className="font-semibold w-12 text-right">
-                                  {table.utilizationScore.toFixed(0)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-right font-medium text-green-600">
-                              {formatCurrency(table.revenue)}
-                            </td>
-                            <td className="py-3 px-4 text-right">{table.sessions}</td>
-                            <td className="py-3 px-4 text-right">
-                              {table.avgOrderValue ? formatCurrency(table.avgOrderValue) : '-'}
-                            </td>
+                  {tableUtilization?.tables && tableUtilization.tables.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-3 px-4">{t('analytics:columns.table')}</th>
+                            <th className="text-left py-3 px-4">{t('analytics:columns.section')}</th>
+                            <th className="text-center py-3 px-4">{t('analytics:columns.capacity')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.utilization')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.revenue')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.sessions')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.avgOrder')}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {tableUtilization.tables.map((table) => (
+                            <tr key={table.tableId} className="border-b hover:bg-slate-50">
+                              <td className="py-3 px-4 font-medium">
+                                {t('analytics:tableLabel', { number: table.tableNumber })}
+                              </td>
+                              <td className="py-3 px-4 text-slate-500">{table.section || '-'}</td>
+                              <td className="py-3 px-4 text-center">{table.capacity}</td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="w-16 bg-slate-200 rounded-full h-2">
+                                    <div
+                                      className={`h-2 rounded-full ${
+                                        table.utilizationScore >= 70
+                                          ? 'bg-green-500'
+                                          : table.utilizationScore >= 50
+                                            ? 'bg-yellow-500'
+                                            : 'bg-red-500'
+                                      }`}
+                                      style={{ width: `${Math.min(table.utilizationScore, 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className="font-semibold w-12 text-right">
+                                    {table.utilizationScore.toFixed(0)}%
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right font-medium text-green-600">
+                                {formatCurrency(table.revenue)}
+                              </td>
+                              <td className="py-3 px-4 text-right">{table.sessions}</td>
+                              <td className="py-3 px-4 text-right">
+                                {table.avgOrderValue ? formatCurrency(table.avgOrderValue) : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={Table2}
+                      title={t('analytics:tableDetails.emptyTitle')}
+                      description={t('analytics:tableDetails.emptyDescription')}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </>
@@ -509,33 +559,49 @@ const AnalyticsPage = () => {
               {/* Congestion Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
-                  title="Congestion Score"
+                  title={t('analytics:stats.congestionScore')}
                   value={hasCameraData ? `${congestion?.overallScore ?? 0}/100` : t('analytics:cvDisclosure.noData')}
-                  subtitle={hasCameraData ? 'Higher is better' : t('analytics:cvDisclosure.requiresCameras')}
+                  subtitle={hasCameraData ? t('analytics:stats.higherIsBetter') : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Activity}
                   color={!hasCameraData ? 'bg-slate-400' : congestion?.overallScore && congestion.overallScore < 70 ? 'bg-yellow-500' : 'bg-green-500'}
                 />
                 <StatCard
-                  title="Congestion Hotspots"
+                  title={t('analytics:stats.congestionHotspots')}
                   value={congestion?.congestionPoints?.length || 0}
-                  subtitle="Areas with high traffic"
+                  subtitle={t('analytics:stats.highTrafficAreas')}
                   icon={Map}
                   color="bg-red-500"
                 />
                 <StatCard
-                  title="Recommendations"
+                  title={t('analytics:stats.recommendations')}
                   value={congestion?.recommendations?.length || 0}
-                  subtitle="Suggestions to improve flow"
+                  subtitle={t('analytics:stats.flowSuggestions')}
                   icon={Lightbulb}
                   color="bg-blue-500"
                 />
               </div>
 
+              {/* No camera telemetry: explain honestly what this tab needs
+                  and point to the software-only analytics that work today. */}
+              {!hasCameraData && (
+                <Card className="mb-4 md:mb-6">
+                  <CardContent>
+                    <EmptyState
+                      icon={Video}
+                      title={t('analytics:traffic.emptyTitle')}
+                      description={t('analytics:traffic.emptyDescription')}
+                      actionLabel={t('analytics:traffic.goToCameras')}
+                      onAction={() => setActiveTab('cameras')}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Recommendations */}
               {congestion?.recommendations && congestion.recommendations.length > 0 && (
                 <Card className="mb-4 md:mb-6">
                   <CardHeader>
-                    <CardTitle>Traffic Flow Recommendations</CardTitle>
+                    <CardTitle>{t('analytics:traffic.recommendationsTitle')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-3">
@@ -551,27 +617,27 @@ const AnalyticsPage = () => {
               )}
 
               {/* Congestion Points */}
-              {congestion?.congestionPoints && congestion.congestionPoints.length > 0 && (
+              {hasCameraData && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Congestion Hotspots</CardTitle>
+                    <CardTitle>{t('analytics:traffic.hotspotsTitle')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-3 px-4">Location</th>
-                            <th className="text-right py-3 px-4">Severity</th>
-                            <th className="text-right py-3 px-4">Avg Wait Time</th>
-                            <th className="text-right py-3 px-4">Peak Hour</th>
+                            <th className="text-left py-3 px-4">{t('analytics:columns.location')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.severity')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.avgWaitTime')}</th>
+                            <th className="text-right py-3 px-4">{t('analytics:columns.peakHour')}</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {congestion.congestionPoints.map((point, index) => (
+                          {congestion?.congestionPoints?.map((point, index) => (
                             <tr key={index} className="border-b">
                               <td className="py-3 px-4">
-                                Grid ({point.x}, {point.z})
+                                {t('analytics:traffic.gridCell', { x: point.x, z: point.z })}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <span
@@ -629,27 +695,35 @@ const AnalyticsPage = () => {
               {/* Behavior Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
-                  title="Avg Dining Time"
-                  value={`${customerBehavior.avgDiningTime.toFixed(0)} min`}
+                  title={t('analytics:stats.avgDiningTime')}
+                  value={t('analytics:stats.minutesValue', {
+                    minutes: customerBehavior.avgDiningTime.toFixed(0),
+                  })}
                   icon={Clock}
                   color="bg-blue-500"
                 />
                 <StatCard
-                  title="Avg Idle Time"
-                  value={hasCameraData ? `${customerBehavior.avgIdleTime.toFixed(0)} min` : t('analytics:cvDisclosure.noData')}
-                  subtitle={hasCameraData ? 'Time after dining' : t('analytics:cvDisclosure.requiresCameras')}
+                  title={t('analytics:stats.avgIdleTime')}
+                  value={
+                    hasCameraData
+                      ? t('analytics:stats.minutesValue', {
+                          minutes: customerBehavior.avgIdleTime.toFixed(0),
+                        })
+                      : t('analytics:cvDisclosure.noData')
+                  }
+                  subtitle={hasCameraData ? t('analytics:stats.timeAfterDining') : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Clock}
                   color={hasCameraData ? 'bg-yellow-500' : 'bg-slate-400'}
                 />
                 <StatCard
-                  title="Avg Party Size"
+                  title={t('analytics:stats.avgPartySize')}
                   value={hasCameraData ? customerBehavior.avgPartySize.toFixed(1) : t('analytics:cvDisclosure.noData')}
                   subtitle={hasCameraData ? undefined : t('analytics:cvDisclosure.requiresCameras')}
                   icon={Users}
                   color={hasCameraData ? 'bg-green-500' : 'bg-slate-400'}
                 />
                 <StatCard
-                  title="Avg Order Value"
+                  title={t('analytics:stats.avgOrderValue')}
                   value={formatCurrency(customerBehavior.avgOrderValue)}
                   icon={TrendingUp}
                   color="bg-purple-500"
@@ -659,37 +733,45 @@ const AnalyticsPage = () => {
               {/* Customer Journey Insights */}
               <Card className="mb-4 md:mb-6">
                 <CardHeader>
-                  <CardTitle>Customer Journey Insights</CardTitle>
+                  <CardTitle>{t('analytics:behavior.journeyTitle')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="p-4 bg-slate-50 rounded-xl">
-                      <h4 className="font-semibold mb-3">Peak Hours</h4>
+                      <h4 className="font-semibold mb-3">{t('analytics:behavior.peakHours')}</h4>
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-slate-600">Peak Arrival</span>
+                          <span className="text-slate-600">{t('analytics:behavior.peakArrival')}</span>
                           <span className="font-medium">{customerBehavior.peakArrivalHour}:00</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-600">Peak Departure</span>
+                          <span className="text-slate-600">{t('analytics:behavior.peakDeparture')}</span>
                           <span className="font-medium">{customerBehavior.peakDepartureHour}:00</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="p-4 bg-slate-50 rounded-xl">
-                      <h4 className="font-semibold mb-3">Time Breakdown</h4>
+                      <h4 className="font-semibold mb-3">{t('analytics:behavior.timeBreakdown')}</h4>
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-slate-600">Dining</span>
-                          <span className="font-medium">{customerBehavior.avgDiningTime.toFixed(0)} min</span>
+                          <span className="text-slate-600">{t('analytics:behavior.dining')}</span>
+                          <span className="font-medium">
+                            {t('analytics:stats.minutesValue', {
+                              minutes: customerBehavior.avgDiningTime.toFixed(0),
+                            })}
+                          </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-600">Idle (post-dining)</span>
-                          <span className="font-medium">{customerBehavior.avgIdleTime.toFixed(0)} min</span>
+                          <span className="text-slate-600">{t('analytics:behavior.idlePostDining')}</span>
+                          <span className="font-medium">
+                            {t('analytics:stats.minutesValue', {
+                              minutes: customerBehavior.avgIdleTime.toFixed(0),
+                            })}
+                          </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-600">Idle/Dining Ratio</span>
+                          <span className="text-slate-600">{t('analytics:behavior.idleDiningRatio')}</span>
                           <span className={`font-medium ${customerBehavior.idleToDiningRatio > 0.5 ? 'text-yellow-600' : 'text-green-600'}`}>
                             {(customerBehavior.idleToDiningRatio * 100).toFixed(0)}%
                           </span>
@@ -703,10 +785,13 @@ const AnalyticsPage = () => {
                       <div className="flex items-start gap-3">
                         <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
                         <div>
-                          <h4 className="font-semibold text-yellow-800">High Idle Time Detected</h4>
+                          <h4 className="font-semibold text-yellow-800">
+                            {t('analytics:behavior.highIdleTitle')}
+                          </h4>
                           <p className="text-sm text-yellow-700 mt-1">
-                            Customers are spending {customerBehavior.avgIdleTime.toFixed(0)} minutes at tables after dining.
-                            Consider presenting the bill proactively or offering takeaway desserts to improve table turnover.
+                            {t('analytics:behavior.highIdleDescription', {
+                              minutes: customerBehavior.avgIdleTime.toFixed(0),
+                            })}
                           </p>
                         </div>
                       </div>
@@ -717,10 +802,12 @@ const AnalyticsPage = () => {
             </>
           ) : (
             <Card>
-              <CardContent className="py-12">
-                <p className="text-center text-slate-500">
-                  No customer behavior data available. Generate mock data to see analytics.
-                </p>
+              <CardContent>
+                <EmptyState
+                  icon={Users}
+                  title={t('analytics:behavior.emptyTitle')}
+                  description={t('analytics:behavior.emptyDescription')}
+                />
               </CardContent>
             </Card>
           )}
@@ -737,25 +824,25 @@ const AnalyticsPage = () => {
               {/* Insight Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
                 <StatCard
-                  title="Total Insights"
+                  title={t('analytics:stats.totalInsights')}
                   value={insightSummary?.total || 0}
                   icon={Lightbulb}
                   color="bg-blue-500"
                 />
                 <StatCard
-                  title="New"
+                  title={t('analytics:stats.new')}
                   value={insightSummary?.byStatus?.NEW || 0}
                   icon={AlertTriangle}
                   color="bg-yellow-500"
                 />
                 <StatCard
-                  title="In Progress"
+                  title={t('analytics:stats.inProgress')}
                   value={insightSummary?.byStatus?.IN_PROGRESS || 0}
                   icon={Activity}
                   color="bg-purple-500"
                 />
                 <StatCard
-                  title="Implemented"
+                  title={t('analytics:stats.implemented')}
                   value={insightSummary?.byStatus?.IMPLEMENTED || 0}
                   icon={CheckCircle}
                   color="bg-green-500"
@@ -765,7 +852,22 @@ const AnalyticsPage = () => {
               {/* All Actionable Insights */}
               <Card>
                 <CardHeader>
-                  <CardTitle>All Insights</CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle>{t('analytics:insightsTab.allTitle')}</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateInsights}
+                      disabled={generateInsights.isPending}
+                    >
+                      <RefreshCw
+                        className={`h-4 w-4 mr-2 ${generateInsights.isPending ? 'animate-spin' : ''}`}
+                      />
+                      {generateInsights.isPending
+                        ? t('analytics:insightsTab.refreshing')
+                        : t('analytics:insightsTab.refresh')}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {actionableInsights && actionableInsights.length > 0 ? (
@@ -790,33 +892,43 @@ const AnalyticsPage = () => {
                               </p>
                               {insight.potentialImpact && (
                                 <p className="text-xs mt-2 opacity-70">
-                                  Impact: {insight.potentialImpact}
+                                  {t('analytics:insightCard.impact', {
+                                    impact: insight.potentialImpact,
+                                  })}
                                 </p>
                               )}
                               <div className="flex items-center gap-4 mt-3 text-xs opacity-60">
-                                <span>Confidence: {(insight.confidenceScore * 100).toFixed(0)}%</span>
-                                <span>Created: {format(new Date(insight.createdAt), 'MMM d, yyyy')}</span>
+                                <span>
+                                  {t('analytics:insightCard.confidence', {
+                                    percent: (insight.confidenceScore * 100).toFixed(0),
+                                  })}
+                                </span>
+                                <span>
+                                  {t('analytics:insightCard.created', {
+                                    date: format(new Date(insight.createdAt), 'MMM d, yyyy'),
+                                  })}
+                                </span>
                               </div>
                             </div>
                             <div className="flex flex-col gap-2">
                               <button
                                 onClick={() => handleInsightAction(insight.id, InsightStatus.IMPLEMENTED)}
                                 className="p-2 hover:bg-green-100 rounded-lg transition-colors"
-                                title="Mark as implemented"
+                                title={t('analytics:insightCard.markImplemented')}
                               >
                                 <CheckCircle className="h-4 w-4 text-green-600" />
                               </button>
                               <button
                                 onClick={() => handleInsightAction(insight.id, InsightStatus.IN_PROGRESS)}
                                 className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
-                                title="Mark as in progress"
+                                title={t('analytics:insightCard.markInProgress')}
                               >
                                 <Activity className="h-4 w-4 text-blue-600" />
                               </button>
                               <button
                                 onClick={() => handleInsightAction(insight.id, InsightStatus.DISMISSED)}
                                 className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Dismiss"
+                                title={t('analytics:insightCard.dismiss')}
                               >
                                 <XCircle className="h-4 w-4 text-red-600" />
                               </button>
@@ -826,9 +938,13 @@ const AnalyticsPage = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-slate-500 text-center py-8">
-                      No insights available. Generate mock data to see AI-powered insights.
-                    </p>
+                    <EmptyState
+                      icon={Lightbulb}
+                      title={t('analytics:insightsTab.emptyTitle')}
+                      description={t('analytics:insightsTab.emptyDescription')}
+                      actionLabel={t('analytics:insightsTab.generateNow')}
+                      onAction={handleGenerateInsights}
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -836,6 +952,9 @@ const AnalyticsPage = () => {
           )}
         </>
       )}
+
+      {/* Cameras Tab */}
+      {activeTab === 'cameras' && <CameraManagement />}
     </div>
   );
 };

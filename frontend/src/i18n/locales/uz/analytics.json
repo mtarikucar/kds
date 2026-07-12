@@ -1,72 +1,247 @@
 {
+  "page": {
+    "title": "Restoran analitikasi",
+    "subtitle": "Sun'iy intellektga asoslangan tahlillar va makon foydalanish tahlili",
+    "tabsAriaLabel": "Analitika bo'limlari"
+  },
+  "tabs": {
+    "overview": "Umumiy ko'rinish",
+    "tables": "Stol analitikasi",
+    "traffic": "Trafik oqimi",
+    "behavior": "Mijoz xatti-harakati",
+    "insights": "AI tahlillari",
+    "cameras": "Kameralar"
+  },
+  "dateFilter": {
+    "from": "Boshlanish",
+    "to": "Tugash",
+    "apply": "Qo'llash"
+  },
+  "devTools": {
+    "generate": "Namuna ma'lumot yaratish",
+    "generating": "Yaratilmoqda...",
+    "clear": "Ma'lumotlarni tozalash",
+    "generated": "Namuna ma'lumot yaratildi: {{records}} bandlik yozuvi, {{insights}} tahlil",
+    "generateFailed": "Namuna ma'lumot yaratib bo'lmadi",
+    "cleared": "Barcha analitika ma'lumotlari tozalandi",
+    "clearFailed": "Analitika ma'lumotlarini tozalab bo'lmadi"
+  },
+  "stats": {
+    "avgTableUtilization": "O'rtacha stol bandligi",
+    "tablesCount": "{{value}} ta stol",
+    "totalRevenuePeriod": "Umumiy tushum (davr)",
+    "tableTurns": "{{value}} ta stol aylanishi",
+    "congestionScore": "Tirbandlik ko'rsatkichi",
+    "hotspotsCount": "{{value}} ta tirband nuqta",
+    "activeInsights": "Faol tahlillar",
+    "totalInsightsCount": "jami {{value}} ta tahlil",
+    "totalTables": "Jami stollar",
+    "avgUtilization": "O'rtacha bandlik",
+    "peakHour": "Eng gavjum soat",
+    "peakOccupancy": "{{percent}}% bandlik",
+    "totalSessions": "Jami seanslar",
+    "higherIsBetter": "Yuqori bo'lgani yaxshi",
+    "congestionHotspots": "Tirband nuqtalar",
+    "highTrafficAreas": "Trafigi yuqori hududlar",
+    "recommendations": "Tavsiyalar",
+    "flowSuggestions": "Oqimni yaxshilash bo'yicha takliflar",
+    "avgDiningTime": "O'rt. ovqatlanish vaqti",
+    "avgIdleTime": "O'rt. bo'sh o'tirish",
+    "timeAfterDining": "Ovqatdan keyingi vaqt",
+    "avgPartySize": "O'rt. guruh hajmi",
+    "avgOrderValue": "O'rt. buyurtma summasi",
+    "totalInsights": "Jami tahlillar",
+    "new": "Yangi",
+    "inProgress": "Jarayonda",
+    "implemented": "Amalga oshirilgan",
+    "minutesValue": "{{minutes}} daqiqa"
+  },
+  "columns": {
+    "table": "Stol",
+    "section": "Bo'lim",
+    "capacity": "Sig'im",
+    "utilization": "Bandlik",
+    "revenue": "Tushum",
+    "sessions": "Seanslar",
+    "avgOrder": "O'rt. buyurtma",
+    "location": "Joylashuv",
+    "severity": "Darajasi",
+    "avgWaitTime": "O'rt. kutish",
+    "peakHour": "Eng gavjum soat"
+  },
+  "tableLabel": "Stol {{number}}",
+  "overview": {
+    "actionableInsights": "Amaliy tahlillar",
+    "underutilizedTables": "Kam ishlatiladigan stollar",
+    "noInsightsTitle": "Hozircha amaliy tahlillar yo'q",
+    "noInsightsDescription": "Tahlillar buyurtma va stol ma'lumotlaringiz asosida har kecha avtomatik yaratiladi. Ularni AI tahlillari bo'limidan qo'lda ham yaratishingiz mumkin."
+  },
+  "insightCard": {
+    "potentialImpact": "Kutilayotgan ta'sir: {{impact}}",
+    "impact": "Ta'sir: {{impact}}",
+    "confidence": "Ishonchlilik: {{percent}}%",
+    "created": "Yaratilgan: {{date}}",
+    "markImplemented": "Amalga oshirilgan deb belgilash",
+    "markInProgress": "Jarayonda deb belgilash",
+    "dismiss": "Rad etish",
+    "statusUpdated": "Tahlil holati yangilandi",
+    "statusUpdateFailed": "Tahlil holatini yangilab bo'lmadi"
+  },
+  "tableDetails": {
+    "title": "Stol bandligi tafsilotlari",
+    "emptyTitle": "Bu sana oralig'ida stol faoliyati yo'q",
+    "emptyDescription": "Bandlik POS stol seanslaridan hisoblanadi. Stollarda buyurtma olinganda — yoki sana oralig'ini kengaytirganingizda — tafsilotlar shu yerda ko'rinadi."
+  },
+  "traffic": {
+    "recommendationsTitle": "Trafik oqimi tavsiyalari",
+    "hotspotsTitle": "Tirband nuqtalar",
+    "gridCell": "Katak ({{x}}, {{z}})",
+    "emptyTitle": "Trafik tahlili bandlik kameralarini talab qiladi",
+    "emptyDescription": "Bu davr uchun kamera ma'lumotlari yo'q, shuning uchun tirband nuqtalar va oqim tavsiyalarini hisoblab bo'lmaydi. Stol analitikasi va AI tahlillari POS ma'lumotlaringiz bilan kamerasiz ham ishlaydi.",
+    "goToCameras": "Kamera o'rnatish"
+  },
+  "behavior": {
+    "journeyTitle": "Mijoz yo'li tahlillari",
+    "peakHours": "Eng gavjum soatlar",
+    "peakArrival": "Kelish cho'qqisi",
+    "peakDeparture": "Ketish cho'qqisi",
+    "timeBreakdown": "Vaqt taqsimoti",
+    "dining": "Ovqatlanish",
+    "idlePostDining": "Bo'sh (ovqatdan keyin)",
+    "idleDiningRatio": "Bo'sh/Ovqatlanish nisbati",
+    "highIdleTitle": "Uzoq bo'sh o'tirish aniqlandi",
+    "highIdleDescription": "Mijozlar ovqatdan keyin stollarda {{minutes}} daqiqa o'tirmoqda. Stol aylanishini oshirish uchun hisobni oldindan taqdim etishni yoki olib ketish uchun shirinlik taklif qilishni ko'rib chiqing.",
+    "emptyTitle": "Hozircha mijoz xatti-harakati ma'lumotlari yo'q",
+    "emptyDescription": "Ovqatlanish vaqti ko'rsatkichlari POS stol seanslaridan olinadi; makondagi ko'rsatkichlar uchun qo'shimcha bandlik kameralari kerak. Stollardan buyurtmalar kela boshlagach, ma'lumotlar shu yerda ko'rinadi."
+  },
+  "insightsTab": {
+    "allTitle": "Barcha tahlillar",
+    "refresh": "Tahlillarni yangilash",
+    "refreshing": "Yaratilmoqda...",
+    "generatedCount": "{{value}} ta tahlil yaratildi",
+    "generateFailed": "Tahlillarni yaratib bo'lmadi",
+    "emptyTitle": "Hozircha tahlil yaratilmagan",
+    "emptyDescription": "Tizim buyurtma va stol ma'lumotlaringiz asosida har kecha avtomatik tahlil yaratadi. Hozir yaratish uchun pastga bosing.",
+    "generateNow": "Hozir yaratish"
+  },
+  "cameras": {
+    "title": "Kameralar",
+    "add": "Kamera qo'shish",
+    "emptyTitle": "Hali kamera ulanmagan",
+    "emptyDescription": "Makon analitikasi (trafik oqimi, bandlik, o'tirish vaqti) uchun joyda kamera o'rnatilishi kerak. Stol analitikasi va AI tahlillari POS ma'lumotlaringiz bilan kamerasiz ham ishlaydi.",
+    "neverSeen": "Hech ko'rinmagan",
+    "calibrate": "Kalibrlash",
+    "calibrationSaved": "Kamera kalibrlanishi saqlandi",
+    "addTitle": "Kamera qo'shish",
+    "editTitle": "Kamerani tahrirlash",
+    "deleteTitle": "Kamerani o'chirish",
+    "deleteConfirm": "\"{{name}}\" kamerasini o'chirishga ishonchingiz komilmi? Uning bandlik oqimi endi qayta ishlanmaydi. Bu amalni bekor qilib bo'lmaydi.",
+    "created": "Kamera qo'shildi",
+    "createFailed": "Kamerani qo'shib bo'lmadi",
+    "updated": "Kamera yangilandi",
+    "updateFailed": "Kamerani yangilab bo'lmadi",
+    "deleted": "Kamera o'chirildi",
+    "deleteFailed": "Kamerani o'chirib bo'lmadi",
+    "health": {
+      "total": "Jami",
+      "online": "Onlayn",
+      "offline": "Oflayn",
+      "error": "Xato",
+      "calibrating": "Kalibrlanmoqda"
+    },
+    "columns": {
+      "name": "Nomi",
+      "location": "Joylashuv",
+      "status": "Holati",
+      "lastSeen": "Oxirgi ko'rinish",
+      "actions": "Amallar"
+    },
+    "statusValues": {
+      "ONLINE": "Onlayn",
+      "OFFLINE": "Oflayn",
+      "ERROR": "Xato",
+      "CALIBRATING": "Kalibrlanmoqda"
+    },
+    "form": {
+      "name": "Kamera nomi",
+      "namePlaceholder": "mas. Asosiy kirish kamerasi",
+      "nameRequired": "Kamera nomi majburiy",
+      "location": "Joylashuv / tavsif",
+      "locationPlaceholder": "mas. Ovqatlanish zali, kirish tepasida",
+      "streamUrl": "Oqim URL manzili",
+      "streamUrlHint": "Kameraning mahalliy tarmog'ingizdagi RTSP/ONVIF manzili",
+      "streamUrlRequired": "Oqim URL manzili majburiy",
+      "streamType": "Oqim turi"
+    }
+  },
   "cvDisclosure": {
     "requiresCameras": "Bandlik kameralari talab qilinadi",
     "noData": "Kamera ma'lumotlari yo'q",
     "noOccupancyTelemetry": "Bu ko'rsatkichlarni o'lchash uchun joyda bandlik kameralari kerak. Kamera uskunasisiz ular nol/standart qiymat sifatida ko'rinadi va haqiqiy faollikni aks ettirmaydi."
   },
   "heatmap": {
-    "settings": "Heatmap Settings",
-    "visualizationType": "Visualization Type",
-    "colorScheme": "Color Scheme",
-    "opacity": "Opacity: {{percent}}%",
-    "loadingData": "Loading heatmap data...",
+    "settings": "Issiqlik xaritasi sozlamalari",
+    "visualizationType": "Vizualizatsiya turi",
+    "colorScheme": "Rang sxemasi",
+    "opacity": "Shaffoflik: {{percent}}%",
+    "loadingData": "Issiqlik xaritasi ma'lumotlari yuklanmoqda...",
     "types": {
-      "none": { "label": "None", "description": "Hide heatmap" },
-      "occupancy": { "label": "Occupancy", "description": "Show customer density" },
-      "traffic": { "label": "Traffic Flow", "description": "Show movement patterns" },
-      "dwellTime": { "label": "Dwell Time", "description": "Show time spent in areas" }
+      "none": { "label": "Yo'q", "description": "Issiqlik xaritasini yashirish" },
+      "occupancy": { "label": "Bandlik", "description": "Mijozlar zichligini ko'rsatish" },
+      "traffic": { "label": "Trafik oqimi", "description": "Harakat yo'nalishlarini ko'rsatish" },
+      "dwellTime": { "label": "O'tirish vaqti", "description": "Hududlarda o'tkazilgan vaqtni ko'rsatish" }
     },
     "schemes": {
-      "heat": "Heat (Red)",
-      "viridis": "Viridis (Green-Purple)",
-      "plasma": "Plasma (Yellow-Purple)",
-      "coolwarm": "Cool-Warm (Blue-Red)",
-      "blues": "Blues"
+      "heat": "Issiqlik (qizil)",
+      "viridis": "Viridis (yashil-binafsha)",
+      "plasma": "Plasma (sariq-binafsha)",
+      "coolwarm": "Sovuq-issiq (ko'k-qizil)",
+      "blues": "Ko'k ranglar"
     },
     "legend": {
-      "customerDensity": "Customer Density",
-      "trafficVolume": "Traffic Volume",
-      "dwellTime": "Dwell Time",
-      "low": "Low",
-      "high": "High"
+      "customerDensity": "Mijozlar zichligi",
+      "trafficVolume": "Trafik hajmi",
+      "dwellTime": "O'tirish vaqti",
+      "low": "Past",
+      "high": "Yuqori"
     }
   },
   "calibration": {
-    "title": "Camera Calibration",
-    "saveFailed": "Failed to save calibration",
+    "title": "Kamera kalibrlanishi",
+    "saveFailed": "Kalibrlanishni saqlab bo'lmadi",
     "pointLabels": {
-      "topLeft": "Top-Left",
-      "topRight": "Top-Right",
-      "bottomRight": "Bottom-Right",
-      "bottomLeft": "Bottom-Left"
+      "topLeft": "Yuqori chap",
+      "topRight": "Yuqori o'ng",
+      "bottomRight": "Pastki o'ng",
+      "bottomLeft": "Pastki chap"
     },
     "step1": {
-      "heading": "Step 1: Select Camera Points",
-      "instructions": "Click on 4 corners of a rectangular area in the camera view. Start from the top-left corner and go clockwise."
+      "heading": "1-qadam: Kamera nuqtalarini tanlang",
+      "instructions": "Kamera ko'rinishida to'rtburchak hududning 4 burchagiga bosing. Yuqori chap burchakdan boshlab, soat yo'nalishida davom eting."
     },
     "step2": {
-      "heading": "Step 2: Select Floor Plan Points",
-      "instructions": "Click on the corresponding 4 points on the floor plan grid. Match the same order as the camera points (top-left, top-right, bottom-right, bottom-left).",
-      "cameraView": "Camera View",
-      "floorPlan": "Floor Plan"
+      "heading": "2-qadam: Qavat rejasi nuqtalarini tanlang",
+      "instructions": "Qavat rejasi katagida mos keladigan 4 nuqtaga bosing. Kamera nuqtalari bilan bir xil tartibda (yuqori chap, yuqori o'ng, pastki o'ng, pastki chap).",
+      "cameraView": "Kamera ko'rinishi",
+      "floorPlan": "Qavat rejasi"
     },
     "step3": {
-      "heading": "Step 3: Review Calibration",
-      "instructions": "Verify that the camera and floor plan points are correctly aligned. The transformation will map positions from the camera view to the floor plan.",
-      "cameraPoints": "Camera Points",
-      "floorPlanPoints": "Floor Plan Points"
+      "heading": "3-qadam: Kalibrlanishni tekshiring",
+      "instructions": "Kamera va qavat rejasi nuqtalari to'g'ri moslanganini tekshiring. O'zgartirish pozitsiyalarni kamera ko'rinishidan qavat rejasiga o'tkazadi.",
+      "cameraPoints": "Kamera nuqtalari",
+      "floorPlanPoints": "Qavat rejasi nuqtalari"
     },
     "complete": {
-      "heading": "Calibration Complete",
-      "message": "The camera has been successfully calibrated. Position data will now be mapped to the floor plan coordinates."
+      "heading": "Kalibrlash yakunlandi",
+      "message": "Kamera muvaffaqiyatli kalibrlandi. Pozitsiya ma'lumotlari endi qavat rejasi koordinatalariga bog'lanadi."
     },
-    "pointsSelected": "Points selected: {{count}} / {{total}}",
-    "captureFrame": "Capture Frame",
-    "undo": "Undo",
-    "reset": "Reset",
-    "back": "Back",
-    "next": "Next",
-    "save": "Save Calibration",
-    "saving": "Saving..."
+    "pointsSelected": "Tanlangan nuqtalar: {{count}} / {{total}}",
+    "captureFrame": "Kadrni olish",
+    "undo": "Bekor qilish",
+    "reset": "Qayta boshlash",
+    "back": "Orqaga",
+    "next": "Keyingi",
+    "save": "Kalibrlanishni saqlash",
+    "saving": "Saqlanmoqda..."
   }
 }

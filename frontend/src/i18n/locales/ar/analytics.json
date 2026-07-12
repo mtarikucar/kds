@@ -1,72 +1,247 @@
 {
+  "page": {
+    "title": "تحليلات المطعم",
+    "subtitle": "رؤى مدعومة بالذكاء الاصطناعي وتحليل استخدام المساحة",
+    "tabsAriaLabel": "علامات تبويب التحليلات"
+  },
+  "tabs": {
+    "overview": "نظرة عامة",
+    "tables": "تحليلات الطاولات",
+    "traffic": "حركة الزوار",
+    "behavior": "سلوك العملاء",
+    "insights": "رؤى الذكاء الاصطناعي",
+    "cameras": "الكاميرات"
+  },
+  "dateFilter": {
+    "from": "من",
+    "to": "إلى",
+    "apply": "تطبيق"
+  },
+  "devTools": {
+    "generate": "إنشاء بيانات تجريبية",
+    "generating": "جارٍ الإنشاء...",
+    "clear": "مسح البيانات",
+    "generated": "تم إنشاء بيانات تجريبية: {{records}} سجل إشغال، {{insights}} رؤية",
+    "generateFailed": "تعذّر إنشاء البيانات التجريبية",
+    "cleared": "تم مسح جميع بيانات التحليلات",
+    "clearFailed": "تعذّر مسح بيانات التحليلات"
+  },
+  "stats": {
+    "avgTableUtilization": "متوسط استخدام الطاولات",
+    "tablesCount": "{{value}} طاولة",
+    "totalRevenuePeriod": "إجمالي الإيرادات (الفترة)",
+    "tableTurns": "{{value}} دورة طاولة",
+    "congestionScore": "مؤشر الازدحام",
+    "hotspotsCount": "{{value}} نقطة ازدحام",
+    "activeInsights": "الرؤى النشطة",
+    "totalInsightsCount": "إجمالي الرؤى: {{value}}",
+    "totalTables": "إجمالي الطاولات",
+    "avgUtilization": "متوسط الاستخدام",
+    "peakHour": "ساعة الذروة",
+    "peakOccupancy": "إشغال {{percent}}%",
+    "totalSessions": "إجمالي الجلسات",
+    "higherIsBetter": "الأعلى أفضل",
+    "congestionHotspots": "نقاط الازدحام",
+    "highTrafficAreas": "مناطق ذات حركة مرتفعة",
+    "recommendations": "التوصيات",
+    "flowSuggestions": "اقتراحات لتحسين الحركة",
+    "avgDiningTime": "متوسط مدة تناول الطعام",
+    "avgIdleTime": "متوسط وقت الخمول",
+    "timeAfterDining": "الوقت بعد تناول الطعام",
+    "avgPartySize": "متوسط حجم المجموعة",
+    "avgOrderValue": "متوسط قيمة الطلب",
+    "totalInsights": "إجمالي الرؤى",
+    "new": "جديدة",
+    "inProgress": "قيد التنفيذ",
+    "implemented": "منفّذة",
+    "minutesValue": "{{minutes}} دقيقة"
+  },
+  "columns": {
+    "table": "الطاولة",
+    "section": "القسم",
+    "capacity": "السعة",
+    "utilization": "الاستخدام",
+    "revenue": "الإيرادات",
+    "sessions": "الجلسات",
+    "avgOrder": "متوسط الطلب",
+    "location": "الموقع",
+    "severity": "الشدة",
+    "avgWaitTime": "متوسط الانتظار",
+    "peakHour": "ساعة الذروة"
+  },
+  "tableLabel": "طاولة {{number}}",
+  "overview": {
+    "actionableInsights": "رؤى قابلة للتنفيذ",
+    "underutilizedTables": "طاولات قليلة الاستخدام",
+    "noInsightsTitle": "لا توجد رؤى قابلة للتنفيذ حاليًا",
+    "noInsightsDescription": "تُنشأ الرؤى تلقائيًا كل ليلة من بيانات طلباتك وطاولاتك. يمكنك أيضًا إنشاؤها يدويًا من علامة تبويب رؤى الذكاء الاصطناعي."
+  },
+  "insightCard": {
+    "potentialImpact": "التأثير المحتمل: {{impact}}",
+    "impact": "التأثير: {{impact}}",
+    "confidence": "الثقة: {{percent}}%",
+    "created": "تاريخ الإنشاء: {{date}}",
+    "markImplemented": "وضع علامة \"منفّذة\"",
+    "markInProgress": "وضع علامة \"قيد التنفيذ\"",
+    "dismiss": "تجاهل",
+    "statusUpdated": "تم تحديث حالة الرؤية",
+    "statusUpdateFailed": "تعذّر تحديث حالة الرؤية"
+  },
+  "tableDetails": {
+    "title": "تفاصيل استخدام الطاولات",
+    "emptyTitle": "لا يوجد نشاط للطاولات في هذه الفترة",
+    "emptyDescription": "يُحسب الاستخدام من جلسات الطاولات في نقطة البيع. بمجرد استلام طلبات على الطاولات — أو بعد توسيع الفترة الزمنية — ستظهر التفاصيل هنا."
+  },
+  "traffic": {
+    "recommendationsTitle": "توصيات حركة الزوار",
+    "hotspotsTitle": "نقاط الازدحام",
+    "gridCell": "الشبكة ({{x}}، {{z}})",
+    "emptyTitle": "يتطلب تحليل الحركة كاميرات إشغال",
+    "emptyDescription": "لا توجد بيانات كاميرا لهذه الفترة، لذا يتعذّر حساب نقاط الازدحام وتوصيات الحركة. تعمل تحليلات الطاولات ورؤى الذكاء الاصطناعي دون كاميرات باستخدام بيانات نقطة البيع.",
+    "goToCameras": "إعداد الكاميرات"
+  },
+  "behavior": {
+    "journeyTitle": "رؤى رحلة العميل",
+    "peakHours": "ساعات الذروة",
+    "peakArrival": "ذروة الوصول",
+    "peakDeparture": "ذروة المغادرة",
+    "timeBreakdown": "توزيع الوقت",
+    "dining": "تناول الطعام",
+    "idlePostDining": "خمول (بعد تناول الطعام)",
+    "idleDiningRatio": "نسبة الخمول/تناول الطعام",
+    "highIdleTitle": "تم رصد وقت خمول مرتفع",
+    "highIdleDescription": "يقضي العملاء {{minutes}} دقيقة على الطاولات بعد تناول الطعام. فكّر في تقديم الفاتورة استباقيًا أو عرض حلويات خارجية لتحسين دوران الطاولات.",
+    "emptyTitle": "لا توجد بيانات سلوك عملاء بعد",
+    "emptyDescription": "تُشتق مقاييس مدة تناول الطعام من جلسات الطاولات في نقطة البيع؛ وتحتاج مقاييس التواجد إضافةً إلى ذلك إلى كاميرات إشغال. ستظهر البيانات هنا بمجرد تدفق طلبات الطاولات."
+  },
+  "insightsTab": {
+    "allTitle": "جميع الرؤى",
+    "refresh": "تحديث الرؤى",
+    "refreshing": "جارٍ الإنشاء...",
+    "generatedCount": "تم إنشاء {{value}} رؤية",
+    "generateFailed": "تعذّر إنشاء الرؤى",
+    "emptyTitle": "لم تُنشأ أي رؤى بعد",
+    "emptyDescription": "يُنشئ النظام الرؤى تلقائيًا كل ليلة من بيانات طلباتك وطاولاتك. انقر أدناه لإنشائها الآن.",
+    "generateNow": "إنشاء الآن"
+  },
+  "cameras": {
+    "title": "الكاميرات",
+    "add": "إضافة كاميرا",
+    "emptyTitle": "لا توجد كاميرات متصلة بعد",
+    "emptyDescription": "تتطلب تحليلات المساحة (حركة الزوار، الإشغال، وقت البقاء) تركيب كاميرات في الموقع. تعمل تحليلات الطاولات ورؤى الذكاء الاصطناعي بالفعل دون كاميرات باستخدام بيانات نقطة البيع.",
+    "neverSeen": "لم تُرَ مطلقًا",
+    "calibrate": "معايرة",
+    "calibrationSaved": "تم حفظ معايرة الكاميرا",
+    "addTitle": "إضافة كاميرا",
+    "editTitle": "تعديل الكاميرا",
+    "deleteTitle": "حذف الكاميرا",
+    "deleteConfirm": "هل أنت متأكد من حذف الكاميرا \"{{name}}\"؟ سيتوقف معالجة بث الإشغال الخاص بها. لا يمكن التراجع عن هذا الإجراء.",
+    "created": "تمت إضافة الكاميرا",
+    "createFailed": "تعذّرت إضافة الكاميرا",
+    "updated": "تم تحديث الكاميرا",
+    "updateFailed": "تعذّر تحديث الكاميرا",
+    "deleted": "تم حذف الكاميرا",
+    "deleteFailed": "تعذّر حذف الكاميرا",
+    "health": {
+      "total": "الإجمالي",
+      "online": "متصلة",
+      "offline": "غير متصلة",
+      "error": "خطأ",
+      "calibrating": "قيد المعايرة"
+    },
+    "columns": {
+      "name": "الاسم",
+      "location": "الموقع",
+      "status": "الحالة",
+      "lastSeen": "آخر ظهور",
+      "actions": "الإجراءات"
+    },
+    "statusValues": {
+      "ONLINE": "متصلة",
+      "OFFLINE": "غير متصلة",
+      "ERROR": "خطأ",
+      "CALIBRATING": "قيد المعايرة"
+    },
+    "form": {
+      "name": "اسم الكاميرا",
+      "namePlaceholder": "مثال: كاميرا المدخل الرئيسي",
+      "nameRequired": "اسم الكاميرا مطلوب",
+      "location": "الموقع / الوصف",
+      "locationPlaceholder": "مثال: صالة الطعام، فوق المدخل",
+      "streamUrl": "رابط البث",
+      "streamUrlHint": "عنوان RTSP/ONVIF للكاميرا على شبكتك المحلية",
+      "streamUrlRequired": "رابط البث مطلوب",
+      "streamType": "نوع البث"
+    }
+  },
   "cvDisclosure": {
     "requiresCameras": "يتطلب كاميرات إشغال",
     "noData": "لا توجد بيانات كاميرا",
     "noOccupancyTelemetry": "تتطلب هذه المقاييس كاميرات إشغال في الموقع لقياسها. بدون أجهزة الكاميرا تظهر كصفر/قيمة افتراضية ولا تعكس النشاط الفعلي."
   },
   "heatmap": {
-    "settings": "Heatmap Settings",
-    "visualizationType": "Visualization Type",
-    "colorScheme": "Color Scheme",
-    "opacity": "Opacity: {{percent}}%",
-    "loadingData": "Loading heatmap data...",
+    "settings": "إعدادات الخريطة الحرارية",
+    "visualizationType": "نوع العرض",
+    "colorScheme": "نظام الألوان",
+    "opacity": "الشفافية: {{percent}}%",
+    "loadingData": "جارٍ تحميل بيانات الخريطة الحرارية...",
     "types": {
-      "none": { "label": "None", "description": "Hide heatmap" },
-      "occupancy": { "label": "Occupancy", "description": "Show customer density" },
-      "traffic": { "label": "Traffic Flow", "description": "Show movement patterns" },
-      "dwellTime": { "label": "Dwell Time", "description": "Show time spent in areas" }
+      "none": { "label": "بدون", "description": "إخفاء الخريطة الحرارية" },
+      "occupancy": { "label": "الإشغال", "description": "عرض كثافة العملاء" },
+      "traffic": { "label": "حركة الزوار", "description": "عرض أنماط الحركة" },
+      "dwellTime": { "label": "وقت البقاء", "description": "عرض الوقت المُمضى في المناطق" }
     },
     "schemes": {
-      "heat": "Heat (Red)",
-      "viridis": "Viridis (Green-Purple)",
-      "plasma": "Plasma (Yellow-Purple)",
-      "coolwarm": "Cool-Warm (Blue-Red)",
-      "blues": "Blues"
+      "heat": "حراري (أحمر)",
+      "viridis": "فيريديس (أخضر-بنفسجي)",
+      "plasma": "بلازما (أصفر-بنفسجي)",
+      "coolwarm": "بارد-دافئ (أزرق-أحمر)",
+      "blues": "درجات الأزرق"
     },
     "legend": {
-      "customerDensity": "Customer Density",
-      "trafficVolume": "Traffic Volume",
-      "dwellTime": "Dwell Time",
-      "low": "Low",
-      "high": "High"
+      "customerDensity": "كثافة العملاء",
+      "trafficVolume": "حجم الحركة",
+      "dwellTime": "وقت البقاء",
+      "low": "منخفض",
+      "high": "مرتفع"
     }
   },
   "calibration": {
-    "title": "Camera Calibration",
-    "saveFailed": "Failed to save calibration",
+    "title": "معايرة الكاميرا",
+    "saveFailed": "تعذّر حفظ المعايرة",
     "pointLabels": {
-      "topLeft": "Top-Left",
-      "topRight": "Top-Right",
-      "bottomRight": "Bottom-Right",
-      "bottomLeft": "Bottom-Left"
+      "topLeft": "أعلى اليسار",
+      "topRight": "أعلى اليمين",
+      "bottomRight": "أسفل اليمين",
+      "bottomLeft": "أسفل اليسار"
     },
     "step1": {
-      "heading": "Step 1: Select Camera Points",
-      "instructions": "Click on 4 corners of a rectangular area in the camera view. Start from the top-left corner and go clockwise."
+      "heading": "الخطوة 1: حدد نقاط الكاميرا",
+      "instructions": "انقر على 4 زوايا لمنطقة مستطيلة في عرض الكاميرا. ابدأ من الزاوية العلوية اليسرى وتحرك باتجاه عقارب الساعة."
     },
     "step2": {
-      "heading": "Step 2: Select Floor Plan Points",
-      "instructions": "Click on the corresponding 4 points on the floor plan grid. Match the same order as the camera points (top-left, top-right, bottom-right, bottom-left).",
-      "cameraView": "Camera View",
-      "floorPlan": "Floor Plan"
+      "heading": "الخطوة 2: حدد نقاط مخطط الطابق",
+      "instructions": "انقر على النقاط الأربع المقابلة على شبكة مخطط الطابق. اتبع نفس ترتيب نقاط الكاميرا (أعلى اليسار، أعلى اليمين، أسفل اليمين، أسفل اليسار).",
+      "cameraView": "عرض الكاميرا",
+      "floorPlan": "مخطط الطابق"
     },
     "step3": {
-      "heading": "Step 3: Review Calibration",
-      "instructions": "Verify that the camera and floor plan points are correctly aligned. The transformation will map positions from the camera view to the floor plan.",
-      "cameraPoints": "Camera Points",
-      "floorPlanPoints": "Floor Plan Points"
+      "heading": "الخطوة 3: راجع المعايرة",
+      "instructions": "تحقق من محاذاة نقاط الكاميرا ومخطط الطابق بشكل صحيح. سيحوّل التحويل المواقع من عرض الكاميرا إلى مخطط الطابق.",
+      "cameraPoints": "نقاط الكاميرا",
+      "floorPlanPoints": "نقاط مخطط الطابق"
     },
     "complete": {
-      "heading": "Calibration Complete",
-      "message": "The camera has been successfully calibrated. Position data will now be mapped to the floor plan coordinates."
+      "heading": "اكتملت المعايرة",
+      "message": "تمت معايرة الكاميرا بنجاح. سيتم الآن ربط بيانات المواقع بإحداثيات مخطط الطابق."
     },
-    "pointsSelected": "Points selected: {{count}} / {{total}}",
-    "captureFrame": "Capture Frame",
-    "undo": "Undo",
-    "reset": "Reset",
-    "back": "Back",
-    "next": "Next",
-    "save": "Save Calibration",
-    "saving": "Saving..."
+    "pointsSelected": "النقاط المحددة: {{count}} / {{total}}",
+    "captureFrame": "التقاط إطار",
+    "undo": "تراجع",
+    "reset": "إعادة تعيين",
+    "back": "رجوع",
+    "next": "التالي",
+    "save": "حفظ المعايرة",
+    "saving": "جارٍ الحفظ..."
   }
 }
