@@ -684,6 +684,25 @@
       "empty": "Ma'lumot yo'q",
       "syncedAt": "Sinxronlash vaqti",
       "externalId": "Provayder hujjat raqami"
+    },
+    "backoffice": {
+      "title": "Buxgalteriya",
+      "subtitle": "Fakturalar, e-Hujjat holati va integrator sozlamalari — hammasi bir joyda.",
+      "tabInvoices": "Fakturalar",
+      "tabEdoc": "e-Hujjat holati",
+      "tabSettings": "Sozlamalar",
+      "readinessTitle": "Ishga tushirishga tayyorlik tekshiruvi",
+      "rowMukellef": "GİB soliq to‘lovchi so‘rovi (integrator)",
+      "rowSigner": "e-Imzo / moliyaviy muhr sertifikati",
+      "readyBanner": "Barcha provayderlar sozlangan — e-Hujjatlar ishga tayyor.",
+      "notReadyBanner": "Kod yo‘li tayyor va sinovdan o‘tgan. Ishga tushirish uchun Sozlamalar bo‘limidan integrator identifikatori + moliyaviy muhr sertifikatini ulang (tashqi ta’minot).",
+      "resyncTitle": "Rad etilgan (FAILED) e-Hujjatlarni qayta yuborish",
+      "resyncButton": "Qayta yuborish",
+      "resyncSending": "Yuborilmoqda…",
+      "resyncDone": "{{count}} ta hujjat qayta urinildi.",
+      "resyncForbidden": "Qayta yuborish uchun ADMIN huquqlari kerak.",
+      "resyncFailed": "Qayta yuborish muvaffaqiyatsiz — yana urinib ko‘ring.",
+      "resyncHint": "Soatlik rejalashtiruvchi FAILED hujjatlarni avtomatik ham qayta urinadi."
     }
   },
   "emailChannel": {

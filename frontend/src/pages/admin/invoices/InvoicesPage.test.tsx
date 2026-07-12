@@ -46,6 +46,11 @@ vi.mock('../../../features/accounting/eBelgeApi', () => ({
 vi.mock('../../../features/orders/ordersApi', () => ({
   useOrders: () => h.ordersResult,
 }));
+// useFormatCurrencyExtended -> useCurrency -> react-query; stub the currency
+// hook so the panel renders without a QueryClientProvider.
+vi.mock('../../../hooks/useCurrency', () => ({
+  useCurrency: () => 'TRY',
+}));
 vi.mock('sonner', () => ({
   toast: {
     success: (m: string) => h.toastSuccess(m),

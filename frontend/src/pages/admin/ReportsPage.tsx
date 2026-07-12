@@ -28,6 +28,7 @@ import InventorySection from '../../components/reports/InventorySection';
 import StaffPerformanceSection from '../../components/reports/StaffPerformanceSection';
 import ZReportsSection from '../../components/reports/ZReportsSection';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../hooks/useFormatDate';
 import {
   DollarSign,
   ShoppingCart,
@@ -55,6 +56,7 @@ type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'h
 const ReportsPage = () => {
   const { t } = useTranslation('reports');
   const formatCurrency = useFormatCurrency();
+  const { formatDate } = useFormatDate();
   const today = format(new Date(), 'yyyy-MM-dd');
   const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
@@ -317,7 +319,7 @@ const ReportsPage = () => {
                       >
                         <div>
                           <p className="font-medium text-sm sm:text-base">
-                            {format(new Date(day.date), 'MMM dd, yyyy')}
+                            {formatDate(day.date, 'PP')}
                           </p>
                           <p className="text-xs sm:text-sm text-slate-500">
                             {day.orders} {t('reports.orders')}

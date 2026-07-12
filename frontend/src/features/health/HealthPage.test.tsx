@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import type { BranchHealth } from './healthApi';
 
 // HealthPage is driven entirely by useGetHealthOverview + the two pure
@@ -8,7 +8,13 @@ import type { BranchHealth } from './healthApi';
 // score, the pill colour class chosen by the pill, and the age strings the
 // formatter produces.
 
-let overview: { data?: BranchHealth[]; isLoading: boolean };
+let overview: {
+  data?: BranchHealth[];
+  isLoading: boolean;
+  isError?: boolean;
+  error?: unknown;
+  refetch?: () => void;
+};
 vi.mock('./healthApi', () => ({
   useGetHealthOverview: () => overview,
 }));
@@ -62,9 +68,9 @@ describe('HealthPage', () => {
     expect(screen.getByText('87')).toBeInTheDocument();
     expect(screen.getByText('/ 100')).toBeInTheDocument();
 
-    // The pill text equals the pill enum and carries the green colour classes
-    // resolved by pillClass('green').
-    const pill = screen.getByText('green');
+    // The pill renders the translated label (en) and carries the green colour
+    // classes resolved by pillClass('green').
+    const pill = screen.getByText('Good');
     expect(pill.className).toContain('bg-green-100');
     expect(pill.className).toContain('text-green-800');
   });
@@ -122,7 +128,7 @@ describe('HealthPage', () => {
     // null order age renders the em-dash from formatAge.
     expect(screen.getByText('—')).toBeInTheDocument();
 
-    const pill = screen.getByText('yellow');
+    const pill = screen.getByText('Warning');
     expect(pill.className).toContain('bg-amber-100');
     expect(pill.className).toContain('text-amber-800');
   });
@@ -130,8 +136,23 @@ describe('HealthPage', () => {
   it('uses the red pill classes for a red branch', () => {
     overview = { data: [makeBranch({ health: { ...makeBranch().health, pill: 'red' } })], isLoading: false };
     render(<HealthPage />);
-    const pill = screen.getByText('red');
+    const pill = screen.getByText('Critical');
     expect(pill.className).toContain('bg-red-100');
     expect(pill.className).toContain('text-red-800');
+  });
+
+  it('shows an error state with a retry button when the overview query fails', () => {
+    const refetch = vi.fn();
+    overview = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('boom'),
+      refetch,
+    };
+    render(<HealthPage />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

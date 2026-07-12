@@ -46,7 +46,8 @@
     "vsPreviousPeriod": "vs previous period",
     "loading": "Loading…",
     "noRecords": "No records.",
-    "loadError": "The report could not be loaded — refresh the page and try again."
+    "loadError": "The report could not be loaded — refresh the page and try again.",
+    "ordersCount": "{{count}} orders"
   },
   "zReports": {
     "title": "Z-Reports",
@@ -91,7 +92,8 @@
     "expected": "Expected",
     "counted": "Counted",
     "difference": "Difference",
-    "topProducts": "Top Products"
+    "topProducts": "Top Products",
+    "soldCount": "{{count}} sold"
   },
   "customerAnalytics": {
     "title": "Customer Analytics",
@@ -101,7 +103,12 @@
     "tierDistribution": "Tier Distribution",
     "topCustomers": "Top Customers",
     "averageLifetimeValue": "Average Lifetime Value",
-    "totalLoyaltyPoints": "Total Loyalty Points"
+    "totalLoyaltyPoints": "Total Loyalty Points",
+    "colName": "Name",
+    "colTier": "Tier",
+    "colOrders": "Orders",
+    "colTotalSpent": "Total spent",
+    "colPoints": "Points"
   },
   "inventoryReport": {
     "title": "Inventory Report",
@@ -112,7 +119,18 @@
     "stockLevels": "Stock Levels",
     "recentMovements": "Recent Movements",
     "lowStock": "Low Stock",
-    "outOfStock": "Out of Stock"
+    "outOfStock": "Out of Stock",
+    "colProduct": "Product",
+    "colCategory": "Category",
+    "colStock": "Stock",
+    "colPrice": "Price",
+    "colValue": "Value",
+    "colStatus": "Status",
+    "statusInStock": "In stock",
+    "statusLowStock": "Low stock",
+    "statusOutOfStock": "Out of stock",
+    "unitsLeft": "{{count}} units left",
+    "unitsCount": "{{count}} units"
   },
   "staffPerformance": {
     "title": "Staff Performance",
@@ -124,7 +142,9 @@
     "summary": "Summary",
     "totalStaff": "Total Staff",
     "averageOrdersPerStaff": "Avg. Orders/Staff",
-    "averageSalesPerStaff": "Avg. Sales/Staff"
+    "averageSalesPerStaff": "Avg. Sales/Staff",
+    "topPerformer": "Top performer",
+    "salesDistribution": "Sales distribution"
   },
   "finance": {
     "revenue": "Revenue",

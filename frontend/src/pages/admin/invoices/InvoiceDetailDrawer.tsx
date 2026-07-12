@@ -2,9 +2,8 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Undo2 } from 'lucide-react';
 import { useInvoice } from '../../../features/accounting/accountingApi';
-
-const formatCurrency = (amount: number | string | null | undefined, currency = 'TRY') =>
-  Number(amount ?? 0).toLocaleString('tr-TR', { style: 'currency', currency: currency || 'TRY' });
+import { useFormatCurrencyExtended } from '../../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../../hooks/useFormatDate';
 
 interface Props {
   invoiceId: string;
@@ -38,6 +37,11 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 export default function InvoiceDetailDrawer({ invoiceId, onClose }: Props) {
   const { t } = useTranslation('settings');
   const { data: invoice, isLoading, isError } = useInvoice(invoiceId);
+  // Locale-aware money/date rendering (the invoice carries its own currency).
+  const { formatWithCurrency } = useFormatCurrencyExtended();
+  const { formatDateIntl } = useFormatDate();
+  const formatCurrency = (amount: number | string | null | undefined, curr = 'TRY') =>
+    formatWithCurrency(Number(amount ?? 0), curr || 'TRY');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -99,7 +103,10 @@ export default function InvoiceDetailDrawer({ invoiceId, onClose }: Props) {
               <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                 <Field
                   label={t('accounting.date')}
-                  value={new Date(invoice.issueDate).toLocaleString('tr-TR')}
+                  value={formatDateIntl(invoice.issueDate, {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
                 />
                 <Field
                   label={t('accounting.drawer.status')}
@@ -254,7 +261,14 @@ export default function InvoiceDetailDrawer({ invoiceId, onClose }: Props) {
                   </div>
                   <Field
                     label={t('accounting.drawer.syncedAt')}
-                    value={invoice.syncedAt ? new Date(invoice.syncedAt).toLocaleString('tr-TR') : undefined}
+                    value={
+                      invoice.syncedAt
+                        ? formatDateIntl(invoice.syncedAt, {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })
+                        : undefined
+                    }
                   />
                   <Field label={t('accounting.provider')} value={invoice.externalProvider} />
                   <Field label={t('accounting.drawer.externalId')} value={invoice.externalId} />

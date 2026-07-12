@@ -15,6 +15,7 @@ import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Spinner from '../ui/Spinner';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../hooks/useFormatDate';
 import {
   FileText,
   Download,
@@ -34,6 +35,7 @@ const ZReportsSection = () => {
   const { t } = useTranslation(['reports', 'common']);
   const queryClient = useQueryClient();
   const formatCurrency = useFormatCurrency();
+  const { formatDate } = useFormatDate();
 
   const [page, setPage] = useState(1);
   const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
@@ -207,7 +209,7 @@ const ZReportsSection = () => {
                         {report.reportNumber}
                       </td>
                       <td className="py-3 px-4">
-                        {format(new Date(report.reportDate), 'MMM dd, yyyy')}
+                        {formatDate(report.reportDate, 'PP')}
                       </td>
                       <td className="py-3 px-4 text-right font-semibold text-green-600">
                         {formatCurrency(report.netSales)}
@@ -420,7 +422,9 @@ const ZReportsSection = () => {
                       <span className="text-slate-600">{product.name}</span>
                       <div className="text-right">
                         <span className="font-medium">{formatCurrency(product.revenue)}</span>
-                        <span className="text-xs text-slate-500 ml-2">({product.quantity} sold)</span>
+                        <span className="text-xs text-slate-500 ml-2">
+                          ({t('zReports.soldCount', { defaultValue: '{{count}} sold', count: product.quantity })})
+                        </span>
                       </div>
                     </div>
                   ))}

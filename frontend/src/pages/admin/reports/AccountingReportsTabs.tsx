@@ -33,7 +33,7 @@ export function BudgetTab() {
     year: now.getUTCFullYear(),
     month: now.getUTCMonth() + 1,
   });
-  const { data, isLoading, isError } = useBudgetVsActual(ym.year, ym.month);
+  const { data, isLoading, isError, refetch } = useBudgetVsActual(ym.year, ym.month);
   const setBudget = useSetBudget();
   const [category, setCategory] = useState('OTHER');
   const [amount, setAmount] = useState('');
@@ -46,7 +46,7 @@ export function BudgetTab() {
     );
   };
   if (isLoading) return <Loading />;
-  if (isError) return <LoadError />;
+  if (isError) return <LoadError onRetry={() => refetch()} />;
   return (
     <Card>
       <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -121,20 +121,21 @@ export function ConsolidatedTab() {
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     endDate: today,
   });
-  const { data, isLoading, isError, error } = useConsolidatedPnl(range);
+  const { data, isLoading, isError, error, refetch } = useConsolidatedPnl(range);
   if (isLoading) return <Loading />;
-  // Only a 403 means a permissions problem; a 500/network failure gets an
-  // honest retry message instead of a misleading access claim.
-  if (isError)
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-sm text-amber-700">
-          {(error as any)?.response?.status === 403
-            ? t('consolidated.forbidden')
-            : t('reports.loadError')}
-        </CardContent>
-      </Card>
-    );
+  // Only a 403 means a permissions problem (no point retrying); a 500/network
+  // failure gets an honest retry message instead of a misleading access claim.
+  if (isError) {
+    if ((error as any)?.response?.status === 403)
+      return (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-amber-700">
+            {t('consolidated.forbidden')}
+          </CardContent>
+        </Card>
+      );
+    return <LoadError onRetry={() => refetch()} />;
+  }
   return (
     <Card>
       <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -171,9 +172,9 @@ export function ConsolidatedTab() {
 export function ForecastTab() {
   const { t } = useTranslation('reports');
   const fmt = useFormatCurrency();
-  const { data, isLoading, isError } = useSalesForecast();
+  const { data, isLoading, isError, refetch } = useSalesForecast();
   if (isLoading) return <Loading />;
-  if (isError) return <LoadError />;
+  if (isError) return <LoadError onRetry={() => refetch()} />;
   return (
     <Card>
       <CardHeader>
@@ -209,12 +210,20 @@ function Loading() {
     <div className="py-12 text-center text-slate-400">{t('reports.loading')}</div>
   );
 }
-function LoadError() {
+function LoadError({ onRetry }: { onRetry?: () => void }) {
   const { t } = useTranslation('reports');
   return (
     <Card>
       <CardContent className="py-8 text-center text-sm text-amber-700">
-        {t('reports.loadError')}
+        <p>{t('reports.loadError')}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="mt-3 rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-50"
+          >
+            {t('common:app.retry')}
+          </button>
+        )}
       </CardContent>
     </Card>
   );

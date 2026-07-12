@@ -46,7 +46,8 @@
     "vsPreviousPeriod": "к пред. периоду",
     "loading": "Загрузка…",
     "noRecords": "Нет записей.",
-    "loadError": "Не удалось загрузить отчёт — обновите страницу и попробуйте ещё раз."
+    "loadError": "Не удалось загрузить отчёт — обновите страницу и попробуйте ещё раз.",
+    "ordersCount": "{{count}} заказов"
   },
   "zReports": {
     "title": "Z-отчеты",
@@ -91,7 +92,8 @@
     "expected": "Ожидается",
     "counted": "Подсчитано",
     "difference": "Разница",
-    "topProducts": "Топ продуктов"
+    "topProducts": "Топ продуктов",
+    "soldCount": "Продано: {{count}}"
   },
   "customerAnalytics": {
     "title": "Аналитика клиентов",
@@ -101,7 +103,12 @@
     "tierDistribution": "Распределение по уровням",
     "topCustomers": "Топ клиентов",
     "averageLifetimeValue": "Средняя пожизненная ценность",
-    "totalLoyaltyPoints": "Всего баллов лояльности"
+    "totalLoyaltyPoints": "Всего баллов лояльности",
+    "colName": "Имя",
+    "colTier": "Уровень",
+    "colOrders": "Заказы",
+    "colTotalSpent": "Всего потрачено",
+    "colPoints": "Баллы"
   },
   "inventoryReport": {
     "title": "Отчет о запасах",
@@ -112,7 +119,18 @@
     "stockLevels": "Уровни запасов",
     "recentMovements": "Недавние движения",
     "lowStock": "Низкий запас",
-    "outOfStock": "Нет в наличии"
+    "outOfStock": "Нет в наличии",
+    "colProduct": "Товар",
+    "colCategory": "Категория",
+    "colStock": "Запас",
+    "colPrice": "Цена",
+    "colValue": "Стоимость",
+    "colStatus": "Статус",
+    "statusInStock": "В наличии",
+    "statusLowStock": "Мало на складе",
+    "statusOutOfStock": "Нет в наличии",
+    "unitsLeft": "Осталось {{count}} ед.",
+    "unitsCount": "{{count}} ед."
   },
   "staffPerformance": {
     "title": "Эффективность персонала",
@@ -124,7 +142,9 @@
     "summary": "Сводка",
     "totalStaff": "Всего сотрудников",
     "averageOrdersPerStaff": "Среднее заказов/сотрудник",
-    "averageSalesPerStaff": "Средние продажи/сотрудник"
+    "averageSalesPerStaff": "Средние продажи/сотрудник",
+    "topPerformer": "Лучший сотрудник",
+    "salesDistribution": "Распределение продаж"
   },
   "finance": {
     "revenue": "Выручка",

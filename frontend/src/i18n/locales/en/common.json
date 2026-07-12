@@ -54,7 +54,8 @@
     "create": "Create",
     "changeLanguage": "Change Language",
     "active": "Active",
-    "inactive": "Inactive"
+    "inactive": "Inactive",
+    "retry": "Try again"
   },
   "common": {
     "browseMenu": "Browse Menu",
@@ -209,7 +210,12 @@
       "score": "{{score}} / 100",
       "devicesOnline": "Devices online",
       "fiscalAge": "Fiscal age",
-      "orderAge": "Order age"
+      "orderAge": "Order age",
+      "pill": {
+        "green": "Good",
+        "yellow": "Warning",
+        "red": "Critical"
+      }
     },
     "branches": {
       "title": "Branches",
@@ -278,7 +284,16 @@
         "total": "Total",
         "lastError": "Last error"
       },
-      "retry": "Retry"
+      "retry": "Retry",
+      "status": {
+        "queued": "Queued",
+        "failed": "Failed",
+        "issued": "Issued",
+        "cancelled": "Cancelled"
+      },
+      "toastIssued": "Receipt issued ({{no}}).",
+      "toastRetryFailed": "Retry failed: {{error}}",
+      "toastRetryError": "Retry failed"
     },
     "fiscalDevices": {
       "title": "Fiscal Devices",
@@ -288,7 +303,14 @@
       "model": "Model",
       "register": "Register",
       "retire": "Retire",
-      "empty": "No fiscal devices registered."
+      "empty": "No fiscal devices registered.",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "error": "Error",
+        "maintenance": "Maintenance",
+        "retired": "Retired"
+      }
     },
     "callerFeed": {
       "title": "Phone Calls",

@@ -1,15 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Spinner from '../ui/Spinner';
+import { ErrorState } from '../ui/ErrorState';
 import { useInventoryReport } from '../../api/enhancedReportsApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../hooks/useFormatDate';
 import { Package, AlertTriangle, XCircle, Wallet, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
-import { format } from 'date-fns';
 
 const InventorySection = () => {
   const { t } = useTranslation('reports');
   const formatCurrency = useFormatCurrency();
-  const { data, isLoading, error } = useInventoryReport();
+  const { formatDateIntl } = useFormatDate();
+  const { data, isLoading, error, refetch } = useInventoryReport();
 
   if (isLoading) {
     return (
@@ -19,7 +21,17 @@ const InventorySection = () => {
     );
   }
 
-  if (error || !data) {
+  // A failed request gets an honest error + retry; only a clean-but-empty
+  // response falls through to the "no data" card.
+  if (error) {
+    return (
+      <Card>
+        <ErrorState error={error} onRetry={() => refetch()} />
+      </Card>
+    );
+  }
+
+  if (!data) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -111,7 +123,7 @@ const InventorySection = () => {
                     <p className="text-sm text-slate-500">{item.categoryName}</p>
                   )}
                   <p className="text-lg font-bold text-amber-600 mt-1">
-                    {item.currentStock} units left
+                    {t('inventoryReport.unitsLeft', { count: item.currentStock })}
                   </p>
                 </div>
               ))}
@@ -160,12 +172,12 @@ const InventorySection = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4">Product</th>
-                    <th className="text-left py-3 px-4">Category</th>
-                    <th className="text-right py-3 px-4">Stock</th>
-                    <th className="text-right py-3 px-4">Price</th>
-                    <th className="text-right py-3 px-4">Value</th>
-                    <th className="text-center py-3 px-4">Status</th>
+                    <th className="text-left py-3 px-4">{t('inventoryReport.colProduct')}</th>
+                    <th className="text-left py-3 px-4">{t('inventoryReport.colCategory')}</th>
+                    <th className="text-right py-3 px-4">{t('inventoryReport.colStock')}</th>
+                    <th className="text-right py-3 px-4">{t('inventoryReport.colPrice')}</th>
+                    <th className="text-right py-3 px-4">{t('inventoryReport.colValue')}</th>
+                    <th className="text-center py-3 px-4">{t('inventoryReport.colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,15 +193,15 @@ const InventorySection = () => {
                       <td className="py-3 px-4 text-center">
                         {item.isOutOfStock ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                            Out of Stock
+                            {t('inventoryReport.statusOutOfStock')}
                           </span>
                         ) : item.isLowStock ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                            Low Stock
+                            {t('inventoryReport.statusLowStock')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                            In Stock
+                            {t('inventoryReport.statusInStock')}
                           </span>
                         )}
                       </td>
@@ -238,14 +250,19 @@ const InventorySection = () => {
                     <p className="font-medium">{movement.productName}</p>
                     <p className="text-sm text-slate-500">
                       {movement.type === 'IN' ? '+' : movement.type === 'OUT' ? '-' : ''}
-                      {movement.quantity} units
+                      {t('inventoryReport.unitsCount', { count: movement.quantity })}
                       {movement.reason && ` - ${movement.reason}`}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-slate-500">{movement.performedBy}</p>
                     <p className="text-xs text-slate-400">
-                      {format(new Date(movement.createdAt), 'MMM dd, HH:mm')}
+                      {formatDateIntl(movement.createdAt, {
+                        month: 'short',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
                   </div>
                 </div>

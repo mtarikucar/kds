@@ -11,6 +11,8 @@ import {
 } from '../../../features/accounting/accountingApi';
 import { useIssueCreditNote } from '../../../features/accounting/eBelgeApi';
 import type { SalesInvoice } from '../../../features/accounting/types';
+import { useFormatCurrencyExtended } from '../../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../../hooks/useFormatDate';
 import CreateInvoiceFromOrderModal from './CreateInvoiceFromOrderModal';
 import InvoiceDetailDrawer from './InvoiceDetailDrawer';
 
@@ -34,6 +36,9 @@ const syncColors: Record<string, string> = {
 // /admin/invoices route AND the Muhasebe page's "Faturalar" tab render it.
 export const InvoicesPanel = () => {
   const { t } = useTranslation('settings');
+  // Locale-aware money/date rendering (invoices carry their own currency).
+  const { formatWithCurrency } = useFormatCurrencyExtended();
+  const { formatDateIntl } = useFormatDate();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [syncFilter, setSyncFilter] = useState('');
@@ -141,7 +146,7 @@ export const InvoicesPanel = () => {
   };
 
   const formatCurrency = (amount: number | string, currency: string) =>
-    Number(amount).toLocaleString('tr-TR', { style: 'currency', currency: currency || 'TRY' });
+    formatWithCurrency(Number(amount), currency || 'TRY');
 
   return (
     <>
@@ -284,7 +289,7 @@ export const InvoicesPanel = () => {
                     </td>
                     <td className="px-4 py-3 text-slate-600">{inv.customerName || '-'}</td>
                     <td className="px-4 py-3 text-slate-600">
-                      {new Date(inv.issueDate).toLocaleDateString('tr-TR')}
+                      {formatDateIntl(inv.issueDate)}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-900 font-medium">
                       {formatCurrency(inv.totalAmount, inv.currency)}

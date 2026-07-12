@@ -684,6 +684,25 @@
       "empty": "Bilgi yok",
       "syncedAt": "Senkronizasyon zamanı",
       "externalId": "Sağlayıcı belge no"
+    },
+    "backoffice": {
+      "title": "Muhasebe",
+      "subtitle": "Faturalar, e-Belge durumu ve entegratör ayarları — hepsi tek yerde.",
+      "tabInvoices": "Faturalar",
+      "tabEdoc": "e-Belge Durumu",
+      "tabSettings": "Ayarlar",
+      "readinessTitle": "Canlıya-hazırlık kontrolü",
+      "rowMukellef": "GİB mükellef sorgusu (entegratör)",
+      "rowSigner": "e-İmza / mali mühür sertifikası",
+      "readyBanner": "Tüm sağlayıcılar yapılandırılmış — e-Belge canlı kesime hazır.",
+      "notReadyBanner": "Kod yolu tamam ve test edildi. Canlıya geçmek için Ayarlar sekmesinden entegratör kimliği + mali mühür sertifikası bağlanmalı (harici tedarik).",
+      "resyncTitle": "Reddedilen (FAILED) e-Belgeleri yeniden gönder",
+      "resyncButton": "Yeniden gönder",
+      "resyncSending": "Gönderiliyor…",
+      "resyncDone": "{{count}} belge yeniden denendi.",
+      "resyncForbidden": "Yeniden gönderme için ADMIN yetkisi gerekli.",
+      "resyncFailed": "Yeniden gönderme başarısız — tekrar deneyin.",
+      "resyncHint": "Saatlik zamanlayıcı FAILED belgeleri otomatik de dener."
     }
   },
   "emailChannel": {

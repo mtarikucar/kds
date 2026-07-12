@@ -20,7 +20,9 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
+import QueryStateGate from '../../components/ui/QueryStateGate';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../hooks/useFormatDate';
 import { toast } from 'sonner';
 import {
   Map,
@@ -50,6 +52,7 @@ type TabType = 'overview' | 'tables' | 'traffic' | 'behavior' | 'insights' | 'ca
 const AnalyticsPage = () => {
   const { t } = useTranslation(['analytics', 'common']);
   const formatCurrency = useFormatCurrency();
+  const { formatDate } = useFormatDate();
   const today = format(new Date(), 'yyyy-MM-dd');
   const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
@@ -66,12 +69,18 @@ const AnalyticsPage = () => {
     },
   });
 
-  // API hooks
-  const { data: tableUtilization, isLoading: tablesLoading } = useTableUtilization(dateRange);
-  const { data: actionableInsights, isLoading: insightsLoading } = useActionableInsights();
-  const { data: insightSummary } = useInsightSummary();
-  const { data: customerBehavior, isLoading: behaviorLoading } = useCustomerBehavior(dateRange);
-  const { data: congestion, isLoading: congestionLoading } = useCongestionAnalysis(dateRange);
+  // API hooks — keep the full query objects so each tab can gate on
+  // loading/error (with retry) via the shared QueryStateGate.
+  const tableUtilizationQuery = useTableUtilization(dateRange);
+  const actionableInsightsQuery = useActionableInsights();
+  const insightSummaryQuery = useInsightSummary();
+  const customerBehaviorQuery = useCustomerBehavior(dateRange);
+  const congestionQuery = useCongestionAnalysis(dateRange);
+  const { data: tableUtilization } = tableUtilizationQuery;
+  const { data: actionableInsights } = actionableInsightsQuery;
+  const { data: insightSummary } = insightSummaryQuery;
+  const { data: customerBehavior } = customerBehaviorQuery;
+  const { data: congestion } = congestionQuery;
 
   // Mutations
   const generateMockData = useGenerateMockData();
@@ -281,10 +290,10 @@ const AnalyticsPage = () => {
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <>
-          {tablesLoading || insightsLoading ? (
-            <Spinner />
-          ) : (
+        <QueryStateGate
+          query={[tableUtilizationQuery, actionableInsightsQuery, insightSummaryQuery]}
+          loading={<Spinner />}
+        >
             <>
               {/* Summary Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
@@ -434,16 +443,12 @@ const AnalyticsPage = () => {
                 </Card>
               )}
             </>
-          )}
-        </>
+        </QueryStateGate>
       )}
 
       {/* Tables Tab */}
       {activeTab === 'tables' && (
-        <>
-          {tablesLoading ? (
-            <Spinner />
-          ) : (
+        <QueryStateGate query={tableUtilizationQuery} loading={<Spinner />}>
             <>
               {/* Table Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
@@ -545,16 +550,12 @@ const AnalyticsPage = () => {
                 </CardContent>
               </Card>
             </>
-          )}
-        </>
+        </QueryStateGate>
       )}
 
       {/* Traffic Tab */}
       {activeTab === 'traffic' && (
-        <>
-          {congestionLoading ? (
-            <Spinner />
-          ) : (
+        <QueryStateGate query={congestionQuery} loading={<Spinner />}>
             <>
               {/* Congestion Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
@@ -667,16 +668,28 @@ const AnalyticsPage = () => {
 
               {/* 3D Heatmap visualisation removed with voxel-world */}
             </>
-          )}
-        </>
+        </QueryStateGate>
       )}
 
       {/* Behavior Tab */}
       {activeTab === 'behavior' && (
-        <>
-          {behaviorLoading ? (
-            <Spinner />
-          ) : customerBehavior ? (
+        <QueryStateGate
+          query={customerBehaviorQuery}
+          loading={<Spinner />}
+          isEmpty={!customerBehavior}
+          empty={
+            <Card>
+              <CardContent>
+                <EmptyState
+                  icon={Users}
+                  title={t('analytics:behavior.emptyTitle')}
+                  description={t('analytics:behavior.emptyDescription')}
+                />
+              </CardContent>
+            </Card>
+          }
+        >
+          {customerBehavior && (
             <>
               {/* CV/occupancy telemetry disclosure — idle time and party size
                   are camera-derived and read as 0/2.5 defaults without
@@ -800,26 +813,16 @@ const AnalyticsPage = () => {
                 </CardContent>
               </Card>
             </>
-          ) : (
-            <Card>
-              <CardContent>
-                <EmptyState
-                  icon={Users}
-                  title={t('analytics:behavior.emptyTitle')}
-                  description={t('analytics:behavior.emptyDescription')}
-                />
-              </CardContent>
-            </Card>
           )}
-        </>
+        </QueryStateGate>
       )}
 
       {/* Insights Tab */}
       {activeTab === 'insights' && (
-        <>
-          {insightsLoading ? (
-            <Spinner />
-          ) : (
+        <QueryStateGate
+          query={[actionableInsightsQuery, insightSummaryQuery]}
+          loading={<Spinner />}
+        >
             <>
               {/* Insight Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
@@ -905,7 +908,7 @@ const AnalyticsPage = () => {
                                 </span>
                                 <span>
                                   {t('analytics:insightCard.created', {
-                                    date: format(new Date(insight.createdAt), 'MMM d, yyyy'),
+                                    date: formatDate(insight.createdAt, 'PP'),
                                   })}
                                 </span>
                               </div>
@@ -949,8 +952,7 @@ const AnalyticsPage = () => {
                 </CardContent>
               </Card>
             </>
-          )}
-        </>
+        </QueryStateGate>
       )}
 
       {/* Cameras Tab */}

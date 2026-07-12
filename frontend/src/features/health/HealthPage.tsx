@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import QueryStateGate from '../../components/ui/QueryStateGate';
 import { useGetHealthOverview } from './healthApi';
 import { pillClass, formatAge } from './healthFormat';
 
@@ -9,7 +10,8 @@ import { pillClass, formatAge } from './healthFormat';
  */
 export default function HealthPage() {
   const { t } = useTranslation('common');
-  const { data: branches = [], isLoading } = useGetHealthOverview();
+  const overviewQuery = useGetHealthOverview();
+  const { data: branches = [] } = overviewQuery;
 
   return (
     <div className="space-y-4 p-6">
@@ -18,19 +20,24 @@ export default function HealthPage() {
         <p className="text-sm text-gray-600">{t('hummytummy.health.subtitle')}</p>
       </header>
 
-      {isLoading ? (
-        <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
-      ) : branches.length === 0 ? (
-        <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
-          {t('hummytummy.health.empty')}
-        </div>
-      ) : (
+      <QueryStateGate
+        query={overviewQuery}
+        loading={<div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>}
+        isEmpty={branches.length === 0}
+        empty={
+          <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
+            {t('hummytummy.health.empty')}
+          </div>
+        }
+      >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {branches.map((b) => (
             <article key={b.id} className="rounded-lg border bg-white p-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">{b.name}</h3>
-                <span className={pillClass(b.health.pill)}>{b.health.pill}</span>
+                <span className={pillClass(b.health.pill)}>
+                  {t(`hummytummy.health.pill.${b.health.pill}`, { defaultValue: b.health.pill })}
+                </span>
               </div>
               <div className="my-3 text-4xl font-light tabular-nums">
                 {b.health.score}
@@ -53,7 +60,7 @@ export default function HealthPage() {
             </article>
           ))}
         </div>
-      )}
+      </QueryStateGate>
     </div>
   );
 }

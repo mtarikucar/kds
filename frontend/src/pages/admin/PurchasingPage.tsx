@@ -17,6 +17,8 @@ import {
   CardTitle,
   CardContent,
 } from '../../components/ui/Card';
+import QueryStateGate from '../../components/ui/QueryStateGate';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { toast } from 'sonner';
 import {
@@ -101,7 +103,8 @@ export default function PurchasingPage() {
 }
 
 function MoreTab({ fmt }: { fmt: Fmt }) {
-  const { data: templates, isLoading } = usePoTemplates();
+  const templatesQuery = usePoTemplates();
+  const { data: templates } = templatesQuery;
   const createOrder = useCreateOrderFromTemplate();
   const deleteTpl = useDeletePoTemplate();
   const [barcode, setBarcode] = useState('');
@@ -124,11 +127,14 @@ function MoreTab({ fmt }: { fmt: Fmt }) {
       <Card>
         <CardHeader><CardTitle>Sipariş şablonları</CardTitle></CardHeader>
         <CardContent>
-          {isLoading ? <Loading /> : (!templates || templates.length === 0) ? (
-            <Empty text="Kayıtlı şablon yok." />
-          ) : (
+          <QueryStateGate
+            query={templatesQuery}
+            loading={<Loading />}
+            isEmpty={!templates || templates.length === 0}
+            empty={<Empty text="Kayıtlı şablon yok." />}
+          >
             <ul className="divide-y divide-slate-100">
-              {templates.map((t) => (
+              {(templates ?? []).map((t) => (
                 <li key={t.id} className="flex items-center justify-between py-2 text-sm">
                   <span>{t.name} <span className="text-slate-400">({t.items?.length ?? 0} kalem)</span></span>
                   <span className="space-x-3">
@@ -138,7 +144,7 @@ function MoreTab({ fmt }: { fmt: Fmt }) {
                 </li>
               ))}
             </ul>
-          )}
+          </QueryStateGate>
           {createOrder.isSuccess && <p className="mt-3 text-sm text-emerald-600">Taslak sipariş oluşturuldu.</p>}
           {(createOrder.isError || deleteTpl.isError) && <p className="mt-3 text-sm text-rose-600">İşlem başarısız — şablondaki bir kalem/tedarikçi silinmiş olabilir.</p>}
         </CardContent>
@@ -234,8 +240,10 @@ function SupplierReturnForm({ stockItemId, stockItemName, onReturned }: { stockI
 type Fmt = (n: number) => string;
 
 function ReorderTab({ fmt }: { fmt: Fmt }) {
-  const { data, isLoading } = useReorderSuggestions();
+  const query = useReorderSuggestions();
+  const { data, isLoading, isError, error, refetch } = query;
   if (isLoading) return <Loading />;
+  if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
   // Backend shape: { draftOrders: [{ supplierName, items: [...] }], unassigned, totalItemsBelowPar }
   const draftOrders: any[] = data?.draftOrders ?? [];
   const unassigned: any[] = data?.unassigned ?? [];
@@ -270,8 +278,9 @@ function ReorderTab({ fmt }: { fmt: Fmt }) {
 }
 
 function ApAgingTab({ fmt }: { fmt: Fmt }) {
-  const { data, isLoading } = useApAging();
+  const { data, isLoading, isError, error, refetch } = useApAging();
   if (isLoading) return <Loading />;
+  if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
   const b = data?.buckets ?? {};
   return (
     <div className="space-y-4">
@@ -295,8 +304,9 @@ function ApAgingTab({ fmt }: { fmt: Fmt }) {
 }
 
 function SuppliersTab({ fmt }: { fmt: Fmt }) {
-  const { data, isLoading } = useSupplierScorecard();
+  const { data, isLoading, isError, error, refetch } = useSupplierScorecard();
   if (isLoading) return <Loading />;
+  if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
   return (
     <Card>
       <CardHeader><CardTitle>Tedarikçi performansı</CardTitle></CardHeader>
@@ -317,12 +327,13 @@ function SuppliersTab({ fmt }: { fmt: Fmt }) {
 }
 
 function TransfersTab() {
-  const { data, isLoading } = useStockTransfers();
+  const { data, isLoading, isError, error, refetch } = useStockTransfers();
   const complete = useCompleteStockTransfer();
   const cancel = useCancelStockTransfer();
   const busy = complete.isPending || cancel.isPending;
   const onErr = () => toast.error('Transfer işlemi başarısız — sayfayı yenileyip tekrar deneyin.');
   if (isLoading) return <Loading />;
+  if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
   return (
     <div className="space-y-4">
     <CreateTransferForm />
@@ -445,8 +456,9 @@ function CreateTransferForm() {
 }
 
 function ValuationTab({ fmt }: { fmt: Fmt }) {
-  const { data, isLoading } = useBatchValuation();
+  const { data, isLoading, isError, error, refetch } = useBatchValuation();
   if (isLoading) return <Loading />;
+  if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
   return (
     <Card>
       <CardHeader><CardTitle>FIFO batch değerleme — toplam {fmt(data?.totalValue ?? 0)} ({data?.itemCount ?? 0} kalem)</CardTitle></CardHeader>

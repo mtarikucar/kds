@@ -54,7 +54,8 @@
     "create": "Oluştur",
     "changeLanguage": "Dili Değiştir",
     "active": "Aktif",
-    "inactive": "Pasif"
+    "inactive": "Pasif",
+    "retry": "Tekrar dene"
   },
   "common": {
     "browseMenu": "Menüyü Gözat",
@@ -209,7 +210,12 @@
       "score": "{{score}} / 100",
       "devicesOnline": "Cihaz Online",
       "fiscalAge": "Son Fiş",
-      "orderAge": "Son Sipariş"
+      "orderAge": "Son Sipariş",
+      "pill": {
+        "green": "İyi",
+        "yellow": "Uyarı",
+        "red": "Kritik"
+      }
     },
     "branches": {
       "title": "Şubeler",
@@ -278,7 +284,16 @@
         "total": "Toplam",
         "lastError": "Son Hata"
       },
-      "retry": "Yeniden Dene"
+      "retry": "Yeniden Dene",
+      "status": {
+        "queued": "Sırada",
+        "failed": "Başarısız",
+        "issued": "Kesildi",
+        "cancelled": "İptal edildi"
+      },
+      "toastIssued": "Fiş kesildi ({{no}}).",
+      "toastRetryFailed": "Yeniden deneme başarısız: {{error}}",
+      "toastRetryError": "Yeniden deneme başarısız"
     },
     "fiscalDevices": {
       "title": "Mali Cihazlar",
@@ -288,7 +303,14 @@
       "model": "Model",
       "register": "Kaydet",
       "retire": "Emekliye ayır",
-      "empty": "Kayıtlı mali cihaz yok."
+      "empty": "Kayıtlı mali cihaz yok.",
+      "status": {
+        "online": "Çevrimiçi",
+        "offline": "Çevrimdışı",
+        "error": "Hata",
+        "maintenance": "Bakımda",
+        "retired": "Emekli"
+      }
     },
     "callerFeed": {
       "title": "Telefon Çağrıları",

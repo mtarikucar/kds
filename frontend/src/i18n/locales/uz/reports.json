@@ -46,7 +46,8 @@
     "vsPreviousPeriod": "o‘tgan davrga nisbatan",
     "loading": "Yuklanmoqda…",
     "noRecords": "Yozuvlar yo‘q.",
-    "loadError": "Hisobot yuklanmadi — sahifani yangilab, qayta urinib ko‘ring."
+    "loadError": "Hisobot yuklanmadi — sahifani yangilab, qayta urinib ko‘ring.",
+    "ordersCount": "{{count}} ta buyurtma"
   },
   "zReports": {
     "title": "Z-hisobotlar",
@@ -91,7 +92,8 @@
     "expected": "Kutilgan",
     "counted": "Hisoblangan",
     "difference": "Farq",
-    "topProducts": "Top mahsulotlar"
+    "topProducts": "Top mahsulotlar",
+    "soldCount": "{{count}} sotildi"
   },
   "customerAnalytics": {
     "title": "Mijozlar tahlili",
@@ -101,7 +103,12 @@
     "tierDistribution": "Daraja taqsimoti",
     "topCustomers": "Top mijozlar",
     "averageLifetimeValue": "O'rtacha umrbod qiymat",
-    "totalLoyaltyPoints": "Jami sadoqat ballari"
+    "totalLoyaltyPoints": "Jami sadoqat ballari",
+    "colName": "Ism",
+    "colTier": "Daraja",
+    "colOrders": "Buyurtmalar",
+    "colTotalSpent": "Jami sarflangan",
+    "colPoints": "Ballar"
   },
   "inventoryReport": {
     "title": "Inventar hisoboti",
@@ -112,7 +119,18 @@
     "stockLevels": "Zaxira darajalari",
     "recentMovements": "So'nggi harakatlar",
     "lowStock": "Kam zaxira",
-    "outOfStock": "Mavjud emas"
+    "outOfStock": "Mavjud emas",
+    "colProduct": "Mahsulot",
+    "colCategory": "Kategoriya",
+    "colStock": "Zaxira",
+    "colPrice": "Narx",
+    "colValue": "Qiymat",
+    "colStatus": "Holat",
+    "statusInStock": "Mavjud",
+    "statusLowStock": "Kam qoldi",
+    "statusOutOfStock": "Tugagan",
+    "unitsLeft": "{{count}} birlik qoldi",
+    "unitsCount": "{{count}} birlik"
   },
   "staffPerformance": {
     "title": "Xodimlar samaradorligi",
@@ -124,7 +142,9 @@
     "summary": "Xulosa",
     "totalStaff": "Jami xodimlar",
     "averageOrdersPerStaff": "O'rtacha buyurtma/xodim",
-    "averageSalesPerStaff": "O'rtacha savdo/xodim"
+    "averageSalesPerStaff": "O'rtacha savdo/xodim",
+    "topPerformer": "Eng yaxshi xodim",
+    "salesDistribution": "Sotuvlar taqsimoti"
   },
   "finance": {
     "revenue": "Tushum",
