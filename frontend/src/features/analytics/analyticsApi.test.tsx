@@ -31,6 +31,7 @@ import {
   useGenerateInsights,
   useCreateCamera,
   useDeleteCamera,
+  useSaveCameraCalibration,
   useGenerateMockData,
 } from './analyticsApi';
 
@@ -125,6 +126,23 @@ describe('analytics mutations', () => {
     const { result } = renderHook(() => useCreateCamera(), { wrapper });
     await result.current.mutateAsync({ name: 'Lobby' } as never);
     expect(h.post).toHaveBeenCalledWith('/analytics/cameras', { name: 'Lobby' });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: analyticsKeys.cameras(),
+    });
+  });
+
+  it('useSaveCameraCalibration PUTs the calibration endpoint and invalidates cameras', async () => {
+    // Backend route is PUT /analytics/cameras/:id/calibration — this hook
+    // replaced a bare fetch() that POSTed (wrong method, no auth/branch
+    // headers). The method + URL here are the contract.
+    h.put.mockResolvedValue({ data: { id: 'c1' } });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useSaveCameraCalibration(), { wrapper });
+    await result.current.mutateAsync({ id: 'c1', data: { points: [] } });
+    expect(h.put).toHaveBeenCalledWith('/analytics/cameras/c1/calibration', {
+      points: [],
+    });
+    expect(h.post).not.toHaveBeenCalled();
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: analyticsKeys.cameras(),
     });

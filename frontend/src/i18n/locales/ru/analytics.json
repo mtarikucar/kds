@@ -1,72 +1,247 @@
 {
+  "page": {
+    "title": "Аналитика ресторана",
+    "subtitle": "Инсайты на базе ИИ и анализ использования пространства",
+    "tabsAriaLabel": "Вкладки аналитики"
+  },
+  "tabs": {
+    "overview": "Обзор",
+    "tables": "Аналитика столов",
+    "traffic": "Поток посетителей",
+    "behavior": "Поведение клиентов",
+    "insights": "ИИ-инсайты",
+    "cameras": "Камеры"
+  },
+  "dateFilter": {
+    "from": "С",
+    "to": "По",
+    "apply": "Применить"
+  },
+  "devTools": {
+    "generate": "Сгенерировать тестовые данные",
+    "generating": "Генерация...",
+    "clear": "Очистить данные",
+    "generated": "Тестовые данные созданы: {{records}} записей заполняемости, {{insights}} инсайтов",
+    "generateFailed": "Не удалось сгенерировать тестовые данные",
+    "cleared": "Все данные аналитики очищены",
+    "clearFailed": "Не удалось очистить данные аналитики"
+  },
+  "stats": {
+    "avgTableUtilization": "Средняя загрузка столов",
+    "tablesCount": "Столов: {{value}}",
+    "totalRevenuePeriod": "Общая выручка (период)",
+    "tableTurns": "Оборотов столов: {{value}}",
+    "congestionScore": "Индекс загруженности",
+    "hotspotsCount": "Горячих точек: {{value}}",
+    "activeInsights": "Активные инсайты",
+    "totalInsightsCount": "Всего инсайтов: {{value}}",
+    "totalTables": "Всего столов",
+    "avgUtilization": "Средняя загрузка",
+    "peakHour": "Пиковый час",
+    "peakOccupancy": "Заполняемость {{percent}}%",
+    "totalSessions": "Всего сессий",
+    "higherIsBetter": "Чем выше, тем лучше",
+    "congestionHotspots": "Точки скопления",
+    "highTrafficAreas": "Зоны с высоким трафиком",
+    "recommendations": "Рекомендации",
+    "flowSuggestions": "Советы по улучшению потока",
+    "avgDiningTime": "Ср. время трапезы",
+    "avgIdleTime": "Ср. время простоя",
+    "timeAfterDining": "Время после трапезы",
+    "avgPartySize": "Ср. размер компании",
+    "avgOrderValue": "Ср. чек",
+    "totalInsights": "Всего инсайтов",
+    "new": "Новые",
+    "inProgress": "В работе",
+    "implemented": "Внедрено",
+    "minutesValue": "{{minutes}} мин"
+  },
+  "columns": {
+    "table": "Стол",
+    "section": "Зона",
+    "capacity": "Вместимость",
+    "utilization": "Загрузка",
+    "revenue": "Выручка",
+    "sessions": "Сессии",
+    "avgOrder": "Ср. заказ",
+    "location": "Расположение",
+    "severity": "Серьёзность",
+    "avgWaitTime": "Ср. ожидание",
+    "peakHour": "Пиковый час"
+  },
+  "tableLabel": "Стол {{number}}",
+  "overview": {
+    "actionableInsights": "Практические инсайты",
+    "underutilizedTables": "Недозагруженные столы",
+    "noInsightsTitle": "Сейчас нет практических инсайтов",
+    "noInsightsDescription": "Инсайты генерируются автоматически каждую ночь на основе данных о заказах и столах. Их также можно сгенерировать вручную на вкладке «ИИ-инсайты»."
+  },
+  "insightCard": {
+    "potentialImpact": "Потенциальный эффект: {{impact}}",
+    "impact": "Эффект: {{impact}}",
+    "confidence": "Достоверность: {{percent}}%",
+    "created": "Создан: {{date}}",
+    "markImplemented": "Отметить как внедрённый",
+    "markInProgress": "Отметить как «в работе»",
+    "dismiss": "Отклонить",
+    "statusUpdated": "Статус инсайта обновлён",
+    "statusUpdateFailed": "Не удалось обновить статус инсайта"
+  },
+  "tableDetails": {
+    "title": "Детали загрузки столов",
+    "emptyTitle": "Нет активности столов за этот период",
+    "emptyDescription": "Загрузка рассчитывается по сессиям столов в POS. Как только на столах появятся заказы — или после расширения периода — детали отобразятся здесь."
+  },
+  "traffic": {
+    "recommendationsTitle": "Рекомендации по потоку посетителей",
+    "hotspotsTitle": "Точки скопления",
+    "gridCell": "Сетка ({{x}}, {{z}})",
+    "emptyTitle": "Для анализа трафика нужны камеры заполняемости",
+    "emptyDescription": "За этот период нет данных с камер, поэтому точки скопления и рекомендации по потоку рассчитать невозможно. Аналитика столов и ИИ-инсайты работают без камер — на данных POS.",
+    "goToCameras": "Настроить камеры"
+  },
+  "behavior": {
+    "journeyTitle": "Инсайты клиентского пути",
+    "peakHours": "Пиковые часы",
+    "peakArrival": "Пик прихода",
+    "peakDeparture": "Пик ухода",
+    "timeBreakdown": "Распределение времени",
+    "dining": "Трапеза",
+    "idlePostDining": "Простой (после трапезы)",
+    "idleDiningRatio": "Отношение простой/трапеза",
+    "highIdleTitle": "Обнаружен долгий простой",
+    "highIdleDescription": "Клиенты проводят за столами {{minutes}} минут после трапезы. Чтобы ускорить оборот столов, предлагайте счёт заранее или десерты навынос.",
+    "emptyTitle": "Данных о поведении клиентов пока нет",
+    "emptyDescription": "Метрики времени трапезы рассчитываются по сессиям столов в POS; для метрик присутствия дополнительно нужны камеры заполняемости. Данные появятся здесь, как только пойдут заказы на столах."
+  },
+  "insightsTab": {
+    "allTitle": "Все инсайты",
+    "refresh": "Обновить инсайты",
+    "refreshing": "Генерация...",
+    "generatedCount": "Сгенерировано инсайтов: {{value}}",
+    "generateFailed": "Не удалось сгенерировать инсайты",
+    "emptyTitle": "Инсайты ещё не сгенерированы",
+    "emptyDescription": "Система автоматически генерирует инсайты каждую ночь на основе данных о заказах и столах. Нажмите ниже, чтобы сгенерировать их сейчас.",
+    "generateNow": "Сгенерировать сейчас"
+  },
+  "cameras": {
+    "title": "Камеры",
+    "add": "Добавить камеру",
+    "emptyTitle": "Камеры ещё не подключены",
+    "emptyDescription": "Для пространственной аналитики (поток, заполняемость, время пребывания) требуется установка камер на объекте. Аналитика столов и ИИ-инсайты уже работают без камер — на данных POS.",
+    "neverSeen": "Не выходила на связь",
+    "calibrate": "Калибровать",
+    "calibrationSaved": "Калибровка камеры сохранена",
+    "addTitle": "Добавить камеру",
+    "editTitle": "Изменить камеру",
+    "deleteTitle": "Удалить камеру",
+    "deleteConfirm": "Удалить камеру «{{name}}»? Её поток заполняемости перестанет обрабатываться. Это действие необратимо.",
+    "created": "Камера добавлена",
+    "createFailed": "Не удалось добавить камеру",
+    "updated": "Камера обновлена",
+    "updateFailed": "Не удалось обновить камеру",
+    "deleted": "Камера удалена",
+    "deleteFailed": "Не удалось удалить камеру",
+    "health": {
+      "total": "Всего",
+      "online": "В сети",
+      "offline": "Не в сети",
+      "error": "Ошибка",
+      "calibrating": "Калибровка"
+    },
+    "columns": {
+      "name": "Название",
+      "location": "Расположение",
+      "status": "Статус",
+      "lastSeen": "Последняя активность",
+      "actions": "Действия"
+    },
+    "statusValues": {
+      "ONLINE": "В сети",
+      "OFFLINE": "Не в сети",
+      "ERROR": "Ошибка",
+      "CALIBRATING": "Калибровка"
+    },
+    "form": {
+      "name": "Название камеры",
+      "namePlaceholder": "напр. Камера главного входа",
+      "nameRequired": "Укажите название камеры",
+      "location": "Расположение / описание",
+      "locationPlaceholder": "напр. Зал, над входом",
+      "streamUrl": "URL потока",
+      "streamUrlHint": "RTSP/ONVIF-адрес камеры в вашей локальной сети",
+      "streamUrlRequired": "Укажите URL потока",
+      "streamType": "Тип потока"
+    }
+  },
   "cvDisclosure": {
     "requiresCameras": "Требуются камеры заполняемости",
     "noData": "Нет данных с камер",
     "noOccupancyTelemetry": "Для измерения этих показателей нужны камеры заполняемости на объекте. Без камер они отображаются как ноль/значение по умолчанию и не отражают реальную активность."
   },
   "heatmap": {
-    "settings": "Heatmap Settings",
-    "visualizationType": "Visualization Type",
-    "colorScheme": "Color Scheme",
-    "opacity": "Opacity: {{percent}}%",
-    "loadingData": "Loading heatmap data...",
+    "settings": "Настройки тепловой карты",
+    "visualizationType": "Тип визуализации",
+    "colorScheme": "Цветовая схема",
+    "opacity": "Непрозрачность: {{percent}}%",
+    "loadingData": "Загрузка данных тепловой карты...",
     "types": {
-      "none": { "label": "None", "description": "Hide heatmap" },
-      "occupancy": { "label": "Occupancy", "description": "Show customer density" },
-      "traffic": { "label": "Traffic Flow", "description": "Show movement patterns" },
-      "dwellTime": { "label": "Dwell Time", "description": "Show time spent in areas" }
+      "none": { "label": "Нет", "description": "Скрыть тепловую карту" },
+      "occupancy": { "label": "Заполняемость", "description": "Показать плотность клиентов" },
+      "traffic": { "label": "Поток посетителей", "description": "Показать схемы перемещения" },
+      "dwellTime": { "label": "Время пребывания", "description": "Показать время, проведённое в зонах" }
     },
     "schemes": {
-      "heat": "Heat (Red)",
-      "viridis": "Viridis (Green-Purple)",
-      "plasma": "Plasma (Yellow-Purple)",
-      "coolwarm": "Cool-Warm (Blue-Red)",
-      "blues": "Blues"
+      "heat": "Тепло (красный)",
+      "viridis": "Viridis (зелёно-фиолетовый)",
+      "plasma": "Plasma (жёлто-фиолетовый)",
+      "coolwarm": "Холод-тепло (сине-красный)",
+      "blues": "Оттенки синего"
     },
     "legend": {
-      "customerDensity": "Customer Density",
-      "trafficVolume": "Traffic Volume",
-      "dwellTime": "Dwell Time",
-      "low": "Low",
-      "high": "High"
+      "customerDensity": "Плотность клиентов",
+      "trafficVolume": "Объём трафика",
+      "dwellTime": "Время пребывания",
+      "low": "Низк.",
+      "high": "Выс."
     }
   },
   "calibration": {
-    "title": "Camera Calibration",
-    "saveFailed": "Failed to save calibration",
+    "title": "Калибровка камеры",
+    "saveFailed": "Не удалось сохранить калибровку",
     "pointLabels": {
-      "topLeft": "Top-Left",
-      "topRight": "Top-Right",
-      "bottomRight": "Bottom-Right",
-      "bottomLeft": "Bottom-Left"
+      "topLeft": "Верх-лево",
+      "topRight": "Верх-право",
+      "bottomRight": "Низ-право",
+      "bottomLeft": "Низ-лево"
     },
     "step1": {
-      "heading": "Step 1: Select Camera Points",
-      "instructions": "Click on 4 corners of a rectangular area in the camera view. Start from the top-left corner and go clockwise."
+      "heading": "Шаг 1: выберите точки на камере",
+      "instructions": "Кликните по 4 углам прямоугольной области в изображении камеры. Начните с левого верхнего угла и двигайтесь по часовой стрелке."
     },
     "step2": {
-      "heading": "Step 2: Select Floor Plan Points",
-      "instructions": "Click on the corresponding 4 points on the floor plan grid. Match the same order as the camera points (top-left, top-right, bottom-right, bottom-left).",
-      "cameraView": "Camera View",
-      "floorPlan": "Floor Plan"
+      "heading": "Шаг 2: выберите точки на плане зала",
+      "instructions": "Кликните по соответствующим 4 точкам на сетке плана зала. Соблюдайте тот же порядок, что и на камере (верх-лево, верх-право, низ-право, низ-лево).",
+      "cameraView": "Вид с камеры",
+      "floorPlan": "План зала"
     },
     "step3": {
-      "heading": "Step 3: Review Calibration",
-      "instructions": "Verify that the camera and floor plan points are correctly aligned. The transformation will map positions from the camera view to the floor plan.",
-      "cameraPoints": "Camera Points",
-      "floorPlanPoints": "Floor Plan Points"
+      "heading": "Шаг 3: проверьте калибровку",
+      "instructions": "Убедитесь, что точки камеры и плана зала выровнены правильно. Преобразование будет переносить позиции из вида камеры на план зала.",
+      "cameraPoints": "Точки камеры",
+      "floorPlanPoints": "Точки плана зала"
     },
     "complete": {
-      "heading": "Calibration Complete",
-      "message": "The camera has been successfully calibrated. Position data will now be mapped to the floor plan coordinates."
+      "heading": "Калибровка завершена",
+      "message": "Камера успешно откалибрована. Данные о позициях теперь будут привязаны к координатам плана зала."
     },
-    "pointsSelected": "Points selected: {{count}} / {{total}}",
-    "captureFrame": "Capture Frame",
-    "undo": "Undo",
-    "reset": "Reset",
-    "back": "Back",
-    "next": "Next",
-    "save": "Save Calibration",
-    "saving": "Saving..."
+    "pointsSelected": "Выбрано точек: {{count}} / {{total}}",
+    "captureFrame": "Захватить кадр",
+    "undo": "Отменить",
+    "reset": "Сбросить",
+    "back": "Назад",
+    "next": "Далее",
+    "save": "Сохранить калибровку",
+    "saving": "Сохранение..."
   }
 }

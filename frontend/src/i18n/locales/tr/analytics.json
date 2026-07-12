@@ -1,4 +1,179 @@
 {
+  "page": {
+    "title": "Restoran Analitiği",
+    "subtitle": "Yapay zekâ destekli içgörüler ve mekân kullanımı analizi",
+    "tabsAriaLabel": "Analitik sekmeleri"
+  },
+  "tabs": {
+    "overview": "Genel Bakış",
+    "tables": "Masa Analitiği",
+    "traffic": "Trafik Akışı",
+    "behavior": "Müşteri Davranışı",
+    "insights": "Yapay Zekâ İçgörüleri",
+    "cameras": "Kameralar"
+  },
+  "dateFilter": {
+    "from": "Başlangıç",
+    "to": "Bitiş",
+    "apply": "Uygula"
+  },
+  "devTools": {
+    "generate": "Örnek Veri Üret",
+    "generating": "Üretiliyor...",
+    "clear": "Verileri Temizle",
+    "generated": "Örnek veri üretildi: {{records}} doluluk kaydı, {{insights}} içgörü",
+    "generateFailed": "Örnek veri üretilemedi",
+    "cleared": "Tüm analitik verileri temizlendi",
+    "clearFailed": "Analitik verileri temizlenemedi"
+  },
+  "stats": {
+    "avgTableUtilization": "Ortalama Masa Kullanımı",
+    "tablesCount": "{{value}} masa",
+    "totalRevenuePeriod": "Toplam Ciro (Dönem)",
+    "tableTurns": "{{value}} masa devri",
+    "congestionScore": "Yoğunluk Skoru",
+    "hotspotsCount": "{{value}} yoğun nokta",
+    "activeInsights": "Aktif İçgörüler",
+    "totalInsightsCount": "toplam {{value}} içgörü",
+    "totalTables": "Toplam Masa",
+    "avgUtilization": "Ortalama Kullanım",
+    "peakHour": "Yoğun Saat",
+    "peakOccupancy": "%{{percent}} doluluk",
+    "totalSessions": "Toplam Oturum",
+    "higherIsBetter": "Yüksek olması iyidir",
+    "congestionHotspots": "Yoğunluk Noktaları",
+    "highTrafficAreas": "Trafiği yüksek alanlar",
+    "recommendations": "Öneriler",
+    "flowSuggestions": "Akışı iyileştirme önerileri",
+    "avgDiningTime": "Ort. Yemek Süresi",
+    "avgIdleTime": "Ort. Boşta Kalma",
+    "timeAfterDining": "Yemek sonrası süre",
+    "avgPartySize": "Ort. Grup Büyüklüğü",
+    "avgOrderValue": "Ort. Sipariş Tutarı",
+    "totalInsights": "Toplam İçgörü",
+    "new": "Yeni",
+    "inProgress": "Devam Ediyor",
+    "implemented": "Uygulandı",
+    "minutesValue": "{{minutes}} dk"
+  },
+  "columns": {
+    "table": "Masa",
+    "section": "Bölüm",
+    "capacity": "Kapasite",
+    "utilization": "Kullanım",
+    "revenue": "Ciro",
+    "sessions": "Oturum",
+    "avgOrder": "Ort. Sipariş",
+    "location": "Konum",
+    "severity": "Şiddet",
+    "avgWaitTime": "Ort. Bekleme",
+    "peakHour": "Yoğun Saat"
+  },
+  "tableLabel": "Masa {{number}}",
+  "overview": {
+    "actionableInsights": "Uygulanabilir İçgörüler",
+    "underutilizedTables": "Az Kullanılan Masalar",
+    "noInsightsTitle": "Şu anda uygulanabilir içgörü yok",
+    "noInsightsDescription": "İçgörüler, sipariş ve masa verilerinizden her gece otomatik üretilir. Yapay Zekâ İçgörüleri sekmesinden elle de üretebilirsiniz."
+  },
+  "insightCard": {
+    "potentialImpact": "Olası etki: {{impact}}",
+    "impact": "Etki: {{impact}}",
+    "confidence": "Güven: %{{percent}}",
+    "created": "Oluşturulma: {{date}}",
+    "markImplemented": "Uygulandı olarak işaretle",
+    "markInProgress": "Devam ediyor olarak işaretle",
+    "dismiss": "Yok say",
+    "statusUpdated": "İçgörü durumu güncellendi",
+    "statusUpdateFailed": "İçgörü durumu güncellenemedi"
+  },
+  "tableDetails": {
+    "title": "Masa Kullanım Detayları",
+    "emptyTitle": "Bu tarih aralığında masa hareketi yok",
+    "emptyDescription": "Kullanım, POS masa oturumlarından hesaplanır. Masalarda sipariş alındığında — veya tarih aralığını genişlettiğinizde — detaylar burada görünür."
+  },
+  "traffic": {
+    "recommendationsTitle": "Trafik Akışı Önerileri",
+    "hotspotsTitle": "Yoğunluk Noktaları",
+    "gridCell": "Izgara ({{x}}, {{z}})",
+    "emptyTitle": "Trafik analizi doluluk kameraları gerektirir",
+    "emptyDescription": "Bu dönem için kamera verisi yok; yoğun noktalar ve akış önerileri hesaplanamıyor. Masa analitiği ve yapay zekâ içgörüleri, POS verilerinizle kamerasız da çalışır.",
+    "goToCameras": "Kamera kur"
+  },
+  "behavior": {
+    "journeyTitle": "Müşteri Yolculuğu İçgörüleri",
+    "peakHours": "Yoğun Saatler",
+    "peakArrival": "Yoğun Geliş",
+    "peakDeparture": "Yoğun Ayrılış",
+    "timeBreakdown": "Süre Dağılımı",
+    "dining": "Yemek",
+    "idlePostDining": "Boşta (yemek sonrası)",
+    "idleDiningRatio": "Boşta/Yemek Oranı",
+    "highIdleTitle": "Yüksek Boşta Kalma Tespit Edildi",
+    "highIdleDescription": "Müşteriler yemek sonrası masalarda {{minutes}} dakika kalıyor. Masa devrini artırmak için hesabı önceden sunmayı veya paket tatlı ikram etmeyi değerlendirin.",
+    "emptyTitle": "Henüz müşteri davranışı verisi yok",
+    "emptyDescription": "Yemek süresi metrikleri POS masa oturumlarından türetilir; mekân içi metrikler için ayrıca doluluk kamerası gerekir. Masalardan sipariş akmaya başlayınca veriler burada görünür."
+  },
+  "insightsTab": {
+    "allTitle": "Tüm İçgörüler",
+    "refresh": "İçgörüleri Yenile",
+    "refreshing": "Üretiliyor...",
+    "generatedCount": "{{value}} içgörü üretildi",
+    "generateFailed": "İçgörüler üretilemedi",
+    "emptyTitle": "Henüz içgörü üretilmedi",
+    "emptyDescription": "Sistem, sipariş ve masa verilerinizden her gece otomatik içgörü üretir. Şimdi üretmek için aşağıya tıklayın.",
+    "generateNow": "Şimdi üret"
+  },
+  "cameras": {
+    "title": "Kameralar",
+    "add": "Kamera Ekle",
+    "emptyTitle": "Henüz kamera bağlı değil",
+    "emptyDescription": "Mekân analitiği (trafik akışı, doluluk, bekleme süresi) için sahada kamera kurulumu gerekir. Masa analitiği ve yapay zekâ içgörüleri, POS verilerinizle kamerasız da çalışır.",
+    "neverSeen": "Hiç görülmedi",
+    "calibrate": "Kalibre et",
+    "calibrationSaved": "Kamera kalibrasyonu kaydedildi",
+    "addTitle": "Kamera Ekle",
+    "editTitle": "Kamerayı Düzenle",
+    "deleteTitle": "Kamerayı Sil",
+    "deleteConfirm": "\"{{name}}\" kamerasını silmek istediğinizden emin misiniz? Doluluk akışı artık işlenmeyecek. Bu işlem geri alınamaz.",
+    "created": "Kamera eklendi",
+    "createFailed": "Kamera eklenemedi",
+    "updated": "Kamera güncellendi",
+    "updateFailed": "Kamera güncellenemedi",
+    "deleted": "Kamera silindi",
+    "deleteFailed": "Kamera silinemedi",
+    "health": {
+      "total": "Toplam",
+      "online": "Çevrimiçi",
+      "offline": "Çevrimdışı",
+      "error": "Hatalı",
+      "calibrating": "Kalibre ediliyor"
+    },
+    "columns": {
+      "name": "Ad",
+      "location": "Konum",
+      "status": "Durum",
+      "lastSeen": "Son Görülme",
+      "actions": "İşlemler"
+    },
+    "statusValues": {
+      "ONLINE": "Çevrimiçi",
+      "OFFLINE": "Çevrimdışı",
+      "ERROR": "Hata",
+      "CALIBRATING": "Kalibre ediliyor"
+    },
+    "form": {
+      "name": "Kamera adı",
+      "namePlaceholder": "örn. Ana giriş kamerası",
+      "nameRequired": "Kamera adı zorunludur",
+      "location": "Konum / açıklama",
+      "locationPlaceholder": "örn. Yemek salonu, giriş üstü",
+      "streamUrl": "Yayın URL'si",
+      "streamUrlHint": "Kameranın yerel ağınızdaki RTSP/ONVIF adresi",
+      "streamUrlRequired": "Yayın URL'si zorunludur",
+      "streamType": "Yayın türü"
+    }
+  },
   "cvDisclosure": {
     "requiresCameras": "Doluluk kameraları gerektirir",
     "noData": "Kamera verisi yok",

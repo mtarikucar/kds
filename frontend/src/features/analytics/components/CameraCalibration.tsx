@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { scalePointerToCanvas } from './calibrationGeometry';
+import { useSaveCameraCalibration } from '../analyticsApi';
 
 // Types
 interface CalibrationPoint {
@@ -39,7 +39,6 @@ export function CameraCalibration({
   onCalibrationComplete,
   onCancel,
 }: CameraCalibrationProps) {
-  const queryClient = useQueryClient();
   const { t } = useTranslation('analytics');
 
   // State
@@ -291,42 +290,29 @@ export function CameraCalibration({
     return { points };
   }, [imagePoints, floorPoints]);
 
-  // Save calibration to backend
-  const saveCalibrationMutation = useMutation({
-    mutationFn: async (data: CameraCalibrationData) => {
-      const response = await fetch(`/api/analytics/cameras/${cameraId}/calibration`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          t('calibration.saveFailed'),
-        );
-      }
-
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['cameras', cameraId] });
-      setStep('complete');
-      onCalibrationComplete?.(data);
-    },
-    onError: (err) => {
-      setError(
-        err instanceof Error ? err.message : t('calibration.saveFailed'),
-      );
-    },
-  });
+  // Save calibration to backend (shared api client, PUT — matches the
+  // backend route and carries auth/branch headers; invalidation of the
+  // camera query keys happens inside the hook).
+  const saveCalibrationMutation = useSaveCameraCalibration();
 
   // Handle save
   const handleSave = useCallback(() => {
     const data = calculateHomography();
-    if (data) {
-      saveCalibrationMutation.mutate(data);
-    }
-  }, [calculateHomography, saveCalibrationMutation]);
+    if (!data) return;
+    setError(null);
+    saveCalibrationMutation.mutate(
+      { id: cameraId, data: data as unknown as Record<string, unknown> },
+      {
+        onSuccess: () => {
+          setStep('complete');
+          onCalibrationComplete?.(data);
+        },
+        onError: () => {
+          setError(t('calibration.saveFailed'));
+        },
+      },
+    );
+  }, [calculateHomography, saveCalibrationMutation, cameraId, onCalibrationComplete, t]);
 
   // Render step content
   const renderStepContent = () => {
