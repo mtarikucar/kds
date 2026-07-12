@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
@@ -12,6 +16,8 @@ interface CreateExpenseInput {
   supplierId?: string;
   notes?: string;
 }
+
+type UpdateExpenseInput = Partial<CreateExpenseInput>;
 
 const centsOf = (d: Prisma.Decimal | number | null | undefined) =>
   d == null ? 0 : new Prisma.Decimal(d as any).mul(100).round().toNumber();
@@ -28,6 +34,7 @@ export class ExpensesService {
   constructor(private prisma: PrismaService) {}
 
   async create(scope: BranchScope, userId: string, dto: CreateExpenseInput) {
+    await this.assertPeriodUnlocked(scope.tenantId, new Date(dto.expenseDate));
     return this.prisma.expense.create({
       data: {
         tenantId: scope.tenantId,
@@ -68,12 +75,125 @@ export class ExpensesService {
     });
   }
 
+  /**
+   * Partial update. Same compound-WHERE IDOR guard as remove(): the mutation
+   * itself carries (tenantId, branchId) so a cross-tenant/cross-branch id can
+   * never be claimed even if the pre-read regresses. Period-lock is enforced
+   * on BOTH sides of a date move: the month the record currently sits in and
+   * the month it is being moved into.
+   */
+  async update(scope: BranchScope, id: string, dto: UpdateExpenseInput) {
+    const existing = await this.prisma.expense.findFirst({
+      where: { id, ...branchScope(scope) },
+      select: { expenseDate: true },
+    });
+    if (!existing) throw new NotFoundException("Expense not found");
+
+    await this.assertPeriodUnlocked(scope.tenantId, existing.expenseDate);
+    if (dto.expenseDate !== undefined) {
+      await this.assertPeriodUnlocked(
+        scope.tenantId,
+        new Date(dto.expenseDate),
+      );
+    }
+
+    const data: Prisma.ExpenseUpdateManyMutationInput = {};
+    if (dto.category !== undefined) data.category = dto.category;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.amount !== undefined) data.amount = new Prisma.Decimal(dto.amount);
+    if (dto.taxAmount !== undefined) {
+      data.taxAmount =
+        dto.taxAmount != null ? new Prisma.Decimal(dto.taxAmount) : null;
+    }
+    if (dto.expenseDate !== undefined) {
+      data.expenseDate = new Date(dto.expenseDate);
+    }
+    if (dto.supplierId !== undefined) data.supplierId = dto.supplierId ?? null;
+    if (dto.notes !== undefined) data.notes = dto.notes ?? null;
+
+    const claim = await this.prisma.expense.updateMany({
+      where: { id, ...branchScope(scope) },
+      data,
+    });
+    if (claim.count === 0) throw new NotFoundException("Expense not found");
+    return this.prisma.expense.findUnique({ where: { id } });
+  }
+
   async remove(scope: BranchScope, id: string) {
+    const existing = await this.prisma.expense.findFirst({
+      where: { id, ...branchScope(scope) },
+      select: { expenseDate: true },
+    });
+    if (!existing) throw new NotFoundException("Expense not found");
+    await this.assertPeriodUnlocked(scope.tenantId, existing.expenseDate);
+
     const claim = await this.prisma.expense.deleteMany({
       where: { id, ...branchScope(scope) },
     });
     if (claim.count === 0) throw new NotFoundException("Expense not found");
     return { id };
+  }
+
+  // ── Accounting period locks ────────────────────────────────────────────
+  // Tenant-wide (the accountant closes the month for the whole company).
+  // While a (year, month) is locked, any expense create/update/delete whose
+  // expenseDate falls in that month is rejected with 400 "Dönem kilitli".
+
+  /** Lock a month. Idempotent: re-locking an already-locked month is a no-op. */
+  async lockPeriod(scope: BranchScope, dto: { year: number; month: number }) {
+    return this.prisma.expensePeriodLock.upsert({
+      where: {
+        tenantId_year_month: {
+          tenantId: scope.tenantId,
+          year: dto.year,
+          month: dto.month,
+        },
+      },
+      create: {
+        tenantId: scope.tenantId,
+        year: dto.year,
+        month: dto.month,
+        lockedByUserId: scope.userId,
+      },
+      update: {},
+    });
+  }
+
+  /** Unlock a month. Compound WHERE keeps it tenant-scoped (IDOR guard). */
+  async unlockPeriod(scope: BranchScope, year: number, month: number) {
+    const claim = await this.prisma.expensePeriodLock.deleteMany({
+      where: { tenantId: scope.tenantId, year, month },
+    });
+    if (claim.count === 0) throw new NotFoundException("Period lock not found");
+    return { year, month };
+  }
+
+  /** List this tenant's locked months, newest first. */
+  async listPeriodLocks(scope: BranchScope) {
+    return this.prisma.expensePeriodLock.findMany({
+      where: { tenantId: scope.tenantId },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+    });
+  }
+
+  /**
+   * Reject the mutation when `date` falls inside a locked month. Uses the
+   * UTC calendar month — expenseDate arrives as an ISO date string
+   * ("2026-06-01" → UTC midnight), so UTC is the axis the row was bucketed
+   * on when it was written.
+   */
+  private async assertPeriodUnlocked(tenantId: string, date: Date) {
+    const lock = await this.prisma.expensePeriodLock.findUnique({
+      where: {
+        tenantId_year_month: {
+          tenantId,
+          year: date.getUTCFullYear(),
+          month: date.getUTCMonth() + 1,
+        },
+      },
+      select: { id: true },
+    });
+    if (lock) throw new BadRequestException("Dönem kilitli");
   }
 
   /** Set (upsert) a monthly budget for a category. */
