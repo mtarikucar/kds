@@ -48,6 +48,36 @@ describe("SalesInvoiceService.findAll (iter-33)", () => {
     const args = (prisma.salesInvoice.findMany as any).mock.calls[0][0];
     expect(args.take).toBe(20);
   });
+
+  // syncStatus filter — the derived tri-state must map onto the same
+  // syncedAt/syncError predicates the list badges are computed from.
+  it("maps syncStatus=SYNCED to syncedAt NOT NULL", async () => {
+    await svc.findAll("t1", { syncStatus: "SYNCED" } as any);
+    const args = (prisma.salesInvoice.findMany as any).mock.calls[0][0];
+    expect(args.where.syncedAt).toEqual({ not: null });
+    expect(args.where.syncError).toBeUndefined();
+  });
+
+  it("maps syncStatus=FAILED to syncedAt NULL + syncError NOT NULL", async () => {
+    await svc.findAll("t1", { syncStatus: "FAILED" } as any);
+    const args = (prisma.salesInvoice.findMany as any).mock.calls[0][0];
+    expect(args.where.syncedAt).toBeNull();
+    expect(args.where.syncError).toEqual({ not: null });
+  });
+
+  it("maps syncStatus=PENDING to syncedAt NULL + syncError NULL", async () => {
+    await svc.findAll("t1", { syncStatus: "PENDING" } as any);
+    const args = (prisma.salesInvoice.findMany as any).mock.calls[0][0];
+    expect(args.where.syncedAt).toBeNull();
+    expect(args.where.syncError).toBeNull();
+  });
+
+  it("ignores syncStatus when absent (no sync predicates added)", async () => {
+    await svc.findAll("t1", {} as any);
+    const args = (prisma.salesInvoice.findMany as any).mock.calls[0][0];
+    expect(args.where.syncedAt).toBeUndefined();
+    expect(args.where.syncError).toBeUndefined();
+  });
 });
 
 /**
