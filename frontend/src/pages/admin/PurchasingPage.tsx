@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ShoppingCart,
   AlertTriangle,
@@ -6,6 +7,7 @@ import {
   ArrowLeftRight,
   Boxes,
   FileStack,
+  Receipt,
   ScanLine,
   Trash2,
 } from 'lucide-react';
@@ -39,15 +41,18 @@ import {
 } from '../../features/stock-management/stockManagementApi';
 import { useListBranches } from '../../features/branches/branchesApi';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
+import VendorBillsTab from '../../features/stock-management/components/VendorBillsTab';
 
-type Tab = 'reorder' | 'ap' | 'suppliers' | 'transfers' | 'valuation' | 'more';
+type Tab = 'reorder' | 'bills' | 'ap' | 'suppliers' | 'transfers' | 'valuation' | 'more';
 
 export default function PurchasingPage() {
+  const { t } = useTranslation('stock');
   const fmt = useFormatCurrency();
   const [tab, setTab] = useState<Tab>('reorder');
 
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'reorder', label: 'Sipariş Önerileri', icon: ShoppingCart },
+    { id: 'bills', label: t('vendorBills.tab'), icon: Receipt },
     { id: 'ap', label: 'Borç Yaşlandırma', icon: AlertTriangle },
     { id: 'suppliers', label: 'Tedarikçi Karnesi', icon: Award },
     { id: 'transfers', label: 'Şube Transferleri', icon: ArrowLeftRight },
@@ -85,6 +90,7 @@ export default function PurchasingPage() {
       </div>
 
       {tab === 'reorder' && <ReorderTab fmt={fmt} />}
+      {tab === 'bills' && <VendorBillsTab />}
       {tab === 'ap' && <ApAgingTab fmt={fmt} />}
       {tab === 'suppliers' && <SuppliersTab fmt={fmt} />}
       {tab === 'transfers' && <TransfersTab />}
