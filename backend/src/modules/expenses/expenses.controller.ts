@@ -4,8 +4,11 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
+  Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -17,6 +20,8 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 import { ExpensesService } from "./expenses.service";
 import { CreateExpenseDto } from "./dto/create-expense.dto";
+import { UpdateExpenseDto } from "./dto/update-expense.dto";
+import { LockPeriodDto } from "./dto/lock-period.dto";
 import { SetBudgetDto } from "./dto/set-budget.dto";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../common/scoping/branch-scope";
@@ -83,6 +88,42 @@ export class ExpensesController {
       parseInt(year, 10),
       parseInt(month, 10),
     );
+  }
+
+  @Put("period-lock")
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: "Lock an accounting period (year + month)" })
+  lockPeriod(@CurrentScope() scope: BranchScope, @Body() dto: LockPeriodDto) {
+    return this.service.lockPeriod(scope, dto);
+  }
+
+  @Delete("period-lock/:year/:month")
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: "Unlock an accounting period" })
+  unlockPeriod(
+    @CurrentScope() scope: BranchScope,
+    @Param("year", ParseIntPipe) year: number,
+    @Param("month", ParseIntPipe) month: number,
+  ) {
+    return this.service.unlockPeriod(scope, year, month);
+  }
+
+  @Get("period-locks")
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: "List locked accounting periods" })
+  listPeriodLocks(@CurrentScope() scope: BranchScope) {
+    return this.service.listPeriodLocks(scope);
+  }
+
+  @Patch(":id")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Update an expense" })
+  update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: UpdateExpenseDto,
+  ) {
+    return this.service.update(scope, id, dto);
   }
 
   @Delete(":id")
