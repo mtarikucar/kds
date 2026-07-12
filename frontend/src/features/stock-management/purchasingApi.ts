@@ -136,6 +136,114 @@ export const useCancelStockTransfer = () => {
   });
 };
 
+// ── Vendor bills (AP purchase invoices, 3-way match) ────────────────────────
+export interface VendorBill {
+  id: string;
+  invoiceNumber: string;
+  supplierId: string;
+  purchaseOrderId: string | null;
+  invoiceDate: string;
+  /** Prisma Decimal — arrives serialized as string. */
+  subtotal: string | number;
+  taxAmount: string | number;
+  total: string | number;
+  /** RECEIVED | MATCHED | DISCREPANCY | APPROVED | PAID */
+  status: string;
+  matchVariance: string | number | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface VendorBillMatch {
+  linked: boolean;
+  invoiceTotal: number;
+  orderedTotal?: number;
+  receivedTotal?: number;
+  variance?: number;
+  tolerance?: number;
+  matched?: boolean;
+  status?: 'MATCHED' | 'DISCREPANCY';
+}
+
+export interface CreateVendorBillInput {
+  supplierId: string;
+  purchaseOrderId?: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  subtotal: number;
+  taxAmount: number;
+  notes?: string;
+}
+
+export const useVendorBills = (filters?: {
+  status?: string;
+  supplierId?: string;
+}) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<VendorBill[]>({
+    queryKey: ['purchasing', 'vendor-bills', filters ?? null, branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/purchase-invoices`, { params: filters });
+      return r.data;
+    },
+  });
+};
+
+export const useCreateVendorBill = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateVendorBillInput): Promise<VendorBill> => {
+      const r = await api.post(`${BASE}/purchase-invoices`, input);
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchasing', 'vendor-bills'] });
+      // A new bill changes what we owe — refresh the AP-aging tab too.
+      qc.invalidateQueries({ queryKey: ['purchasing', 'ap-aging'] });
+    },
+  });
+};
+
+export const useVendorBillMatch = (billId?: string) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<VendorBillMatch>({
+    queryKey: ['purchasing', 'vendor-bill-match', billId, branchId],
+    queryFn: async () => {
+      const r = await api.get(`${BASE}/purchase-invoices/${billId}/match`);
+      return r.data;
+    },
+    enabled: !!billId,
+  });
+};
+
+export const useApproveVendorBill = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<VendorBill> => {
+      const r = await api.patch(`${BASE}/purchase-invoices/${id}/approve`);
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchasing', 'vendor-bills'] });
+      qc.invalidateQueries({ queryKey: ['purchasing', 'ap-aging'] });
+    },
+  });
+};
+
+export const useMarkVendorBillPaid = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<VendorBill> => {
+      const r = await api.patch(`${BASE}/purchase-invoices/${id}/mark-paid`);
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchasing', 'vendor-bills'] });
+      qc.invalidateQueries({ queryKey: ['purchasing', 'ap-aging'] });
+    },
+  });
+};
+
 export const useApprovePurchaseOrder = () => {
   const qc = useQueryClient();
   return useMutation({
