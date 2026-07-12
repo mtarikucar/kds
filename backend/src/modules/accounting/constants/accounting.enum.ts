@@ -25,3 +25,12 @@ export enum InvoiceType {
   SALES = "SALES",
   REFUND = "REFUND",
 }
+
+/**
+ * A sales invoice stuck in externalStatus=SYNCING for longer than this is
+ * considered crash-stuck (audit A6): the worker died between the SYNCING
+ * claim and the outcome write, so nothing will ever move the row again.
+ * Shared by the resync recovery sweep and the sync-status "stuck" counter
+ * so both use the same definition of "stuck".
+ */
+export const STUCK_SYNCING_THRESHOLD_MS = 15 * 60 * 1000;

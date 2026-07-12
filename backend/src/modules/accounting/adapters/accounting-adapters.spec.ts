@@ -337,3 +337,33 @@ describe('ForibaEfaturaAdapter.setApiBase', () => {
     expect(http.post.mock.calls[0][0]).toContain('https://sandbox.foriba.example');
   });
 });
+
+/**
+ * A3 — cancelInvoice GATED stubs. Until the providers' real void/cancel
+ * APIs are integrated, every adapter must HONESTLY refuse (success:false +
+ * a manual-cancel instruction) and must never touch the network — a stub
+ * that pretended success would silently leave live documents at GİB.
+ */
+describe('cancelInvoice — honest GATED stubs (A3)', () => {
+  it.each([
+    ['ParasutAdapter', () => new ParasutAdapter(), /Parasut panel/],
+    ['LogoAdapter', () => new LogoAdapter(), /Logo panel/],
+    [
+      'ForibaEfaturaAdapter',
+      () => new ForibaEfaturaAdapter(),
+      /Foriba panel/,
+    ],
+  ])('%s refuses with a manual-cancel error and no HTTP call', async (_name, make, panelRe) => {
+    const adapter: any = make();
+    const http = fakeHttp();
+    adapter.httpClient = http;
+
+    const out = await adapter.cancelInvoice('tok', 'co-1', 'EXT-1');
+
+    expect(out.success).toBe(false);
+    expect(out.error).toMatch(/cancel API not yet integrated/i);
+    expect(out.error).toMatch(panelRe);
+    expect(http.post).not.toHaveBeenCalled();
+    expect(http.get).not.toHaveBeenCalled();
+  });
+});

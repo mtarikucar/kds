@@ -106,6 +106,21 @@ export class ParasutAdapter implements AccountingAdapter {
     return { externalId: salesInvoiceId };
   }
 
+  // GATED: gerçek void API'si sandbox erişimi gelince doldurulacak — Paraşüt
+  // sales_invoices #cancel endpoint'i entegre edilene kadar DÜRÜST stub:
+  // asla "iptal edildi" diye yalan söylemez, operatöre manuel iptali bildirir.
+  async cancelInvoice(
+    _accessToken: string,
+    _companyId: string,
+    _externalInvoiceId: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    return {
+      success: false,
+      error:
+        "Provider cancel API not yet integrated — cancel manually in the Parasut panel",
+    };
+  }
+
   async testConnection(credentials: Record<string, string>): Promise<boolean> {
     try {
       await this.authenticate(credentials);

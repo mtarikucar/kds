@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AccountingSettingsService } from "./accounting-settings.service";
-import { resolveEDocumentType } from "../e-document-routing";
+import { resolveEDocumentType, validateBuyerFor } from "../e-document-routing";
 import {
   MUKELLEF_QUERY,
   MukellefQueryProvider,
@@ -17,7 +17,10 @@ import {
 import { ParasutAdapter } from "../adapters/parasut.adapter";
 import { ForibaEfaturaAdapter } from "../adapters/foriba-efatura.adapter";
 import { LogoAdapter } from "../adapters/logo.adapter";
-import { AccountingProvider } from "../constants/accounting.enum";
+import {
+  AccountingProvider,
+  STUCK_SYNCING_THRESHOLD_MS,
+} from "../constants/accounting.enum";
 
 @Injectable()
 export class AccountingSyncService {
@@ -41,11 +44,42 @@ export class AccountingSyncService {
   }
 
   /**
-   * Re-sync invoices the provider previously rejected (externalStatus=FAILED).
+   * Re-sync invoices the provider previously rejected (externalStatus=FAILED),
+   * plus crash-stuck SYNCING rows past the staleness threshold (audit A6).
    * Bounded batch; each retried independently so one failure doesn't stop the
    * rest. Driven by a scheduler + callable on demand.
    */
   async resyncFailedInvoices(tenantId: string, limit = 50): Promise<number> {
+    // A6: release crash-stuck SYNCING claims first. A worker that died
+    // between the SYNCING claim and the outcome write leaves the row
+    // unclaimable forever (the claim allow-list deliberately excludes
+    // SYNCING). Past the staleness threshold we flip it back to FAILED —
+    // with an explicit syncError — so the ordinary FAILED retry below
+    // re-claims it. `updatedAt` in the WHERE means a genuinely in-flight
+    // sync (fresh SYNCING) is never touched. Residual risk, accepted by the
+    // A6 audit decision: if the crash happened AFTER the provider accepted
+    // the push but BEFORE the local SYNCED write (F-Acc-7), the retry can
+    // duplicate the document at the provider — the syncError text records
+    // the recovery so provider-side reconciliation can spot it.
+    const stuckBefore = new Date(Date.now() - STUCK_SYNCING_THRESHOLD_MS);
+    const released = await this.prisma.salesInvoice.updateMany({
+      where: {
+        tenantId,
+        externalStatus: "SYNCING",
+        updatedAt: { lt: stuckBefore },
+      },
+      data: {
+        externalStatus: "FAILED",
+        syncError:
+          "Recovered from stuck SYNCING (worker crashed mid-sync); queued for retry — verify at the provider that no duplicate was pushed",
+      },
+    });
+    if (released.count > 0) {
+      this.logger.warn(
+        `Released ${released.count} crash-stuck SYNCING invoice(s) for tenant ${tenantId} back to FAILED for retry`,
+      );
+    }
+
     const failed = await this.prisma.salesInvoice.findMany({
       where: { tenantId, externalStatus: "FAILED" },
       select: { id: true },
@@ -127,6 +161,35 @@ export class AccountingSyncService {
       const adapter = this.getAdapter(settings.provider);
       if (!adapter) return;
 
+      // Route e-Fatura (B2B) vs e-Arşiv (B2C). isRegisteredEFaturaUser comes
+      // from a GİB mükellef query via the pluggable provider (mock in dev,
+      // HTTP in prod). Registered VKN → e-Fatura, otherwise e-Arşiv — the
+      // safe final-consumer default that never wrongly issues a B2B e-Fatura
+      // the buyer can't receive.
+      const eDocumentType = resolveEDocumentType({
+        taxId: invoice.customerTaxId,
+        taxOffice: invoice.customerTaxOffice,
+        isRegisteredEFaturaUser: invoice.customerTaxId
+          ? await this.mukellefQuery.isRegisteredEFaturaUser(
+              invoice.customerTaxId,
+            )
+          : false,
+      });
+
+      // A5: validate the buyer party for the chosen document type BEFORE any
+      // provider traffic. An e-Fatura with an incomplete
+      // AccountingCustomerParty produces invalid XML that GİB rejects — fail
+      // the sync locally (the throw lands in the FAILED + syncError catch
+      // below, the same re-claimable path as an adapter error) instead of
+      // transmitting a document we already know is bad.
+      const buyerProblems = validateBuyerFor(eDocumentType, {
+        taxId: invoice.customerTaxId,
+        taxOffice: invoice.customerTaxOffice,
+      });
+      if (buyerProblems.length > 0) {
+        throw new Error(`Buyer validation failed: ${buyerProblems.join("; ")}`);
+      }
+
       // The secret credential fields (parasutClientSecret/parasutPassword/
       // logoPassword/foribaPassword) are stored AES-256-GCM encrypted (`v1:…`).
       // findByTenant returns them encrypted; we MUST decrypt before handing
@@ -152,21 +215,8 @@ export class AccountingSyncService {
         customerName: invoice.customerName || undefined,
         customerTaxId: invoice.customerTaxId || undefined,
         customerTaxOffice: invoice.customerTaxOffice || undefined,
-        // Route e-Fatura (B2B) vs e-Arşiv (B2C). isRegisteredEFaturaUser comes
-        // from a GİB mükellef query (needs integrator credentials); unset here
-        // → e-Arşiv, the safe final-consumer default. Wire the query result in
-        // to enable automatic B2B e-Fatura routing.
-        eDocumentType: resolveEDocumentType({
-          taxId: invoice.customerTaxId,
-          taxOffice: invoice.customerTaxOffice,
-          // GİB mükellef check via the pluggable provider (mock in dev, HTTP in
-          // prod). Registered VKN → e-Fatura, otherwise e-Arşiv.
-          isRegisteredEFaturaUser: invoice.customerTaxId
-            ? await this.mukellefQuery.isRegisteredEFaturaUser(
-                invoice.customerTaxId,
-              )
-            : false,
-        }),
+        // Resolved + buyer-validated above (A5) before any provider traffic.
+        eDocumentType,
         withholdingTaxAmount:
           invoice.withholdingTaxAmount != null
             ? Number(invoice.withholdingTaxAmount)
@@ -268,6 +318,96 @@ export class AccountingSyncService {
     }
   }
 
+  /**
+   * A3 — best-effort provider-side void of a locally cancelled invoice.
+   * Locally cancelling a fatura that was already SYNCED leaves the provider
+   * (and thus GİB) holding it as a live document; this pushes the cancel to
+   * the provider it was synced to. Never throws for a provider refusal:
+   * on failure the row is flagged externalStatus=CANCEL_PENDING with a
+   * "Manuel iptal gerekli" syncError so the operator cancels it in the
+   * provider panel. CANCEL_PENDING is deliberately NOT in the sync claim
+   * allow-list, so the resync loop can never re-push a cancelled invoice.
+   *
+   * NOTE: all current adapters ship an honest GATED stub (success:false),
+   * so today every synced cancel lands in CANCEL_PENDING — by design, until
+   * the providers' real void APIs are integrated.
+   */
+  async cancelInvoiceAtProvider(
+    invoiceId: string,
+    tenantId: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const invoice = await this.prisma.salesInvoice.findFirst({
+      where: { id: invoiceId, tenantId },
+    });
+    if (!invoice) return { success: false, error: "Invoice not found" };
+    // Never reached a provider — nothing external to void.
+    if (!invoice.externalId || !invoice.externalProvider) {
+      return { success: true };
+    }
+
+    // The document lives at the provider it was SYNCED to — which after a
+    // provider swap may differ from the tenant's CURRENT settings.provider —
+    // so the adapter + credentials resolve from the invoice's own
+    // externalProvider, not the settings row's active one.
+    const provider = invoice.externalProvider;
+    const adapter = this.getAdapter(provider);
+    let outcome: { success: boolean; error?: string };
+    if (!adapter) {
+      outcome = {
+        success: false,
+        error: `No adapter available for provider ${provider}`,
+      };
+    } else {
+      try {
+        const settings = await this.settingsService.findByTenant(tenantId);
+        const creds =
+          await this.settingsService.getDecryptedCredentials(tenantId);
+        if (adapter instanceof ForibaEfaturaAdapter) {
+          adapter.setApiBase(((creds ?? settings) as any).foribaApiUrl || "");
+        }
+        const token = await this.getToken(
+          tenantId,
+          creds ?? settings,
+          adapter,
+          provider,
+        );
+        const companyId = this.getCompanyId(creds ?? settings, provider);
+        outcome = await adapter.cancelInvoice(
+          token,
+          companyId,
+          invoice.externalId,
+        );
+      } catch (err: any) {
+        // Auth/setup failure — the provider still holds the document, so it
+        // needs the same manual-cancel flag as an explicit refusal.
+        outcome = { success: false, error: err?.message ?? String(err) };
+      }
+    }
+
+    if (!outcome.success) {
+      this.logger.warn(
+        `Provider-side cancel failed for invoice ${invoice.invoiceNumber} at ${provider}: ${outcome.error}`,
+      );
+      await this.prisma.salesInvoice.updateMany({
+        where: { id: invoiceId, tenantId },
+        data: {
+          externalStatus: "CANCEL_PENDING",
+          syncError: `Manuel iptal gerekli: ${outcome.error ?? "unknown provider error"}`,
+        },
+      });
+      return outcome;
+    }
+
+    await this.prisma.salesInvoice.updateMany({
+      where: { id: invoiceId, tenantId },
+      data: { externalStatus: "CANCELLED", syncError: null },
+    });
+    this.logger.log(
+      `Invoice ${invoice.invoiceNumber} cancelled at ${provider}`,
+    );
+    return outcome;
+  }
+
   private getAdapter(provider: string): AccountingAdapter | null {
     switch (provider) {
       case AccountingProvider.PARASUT:
@@ -286,12 +426,16 @@ export class AccountingSyncService {
     tenantId: string,
     settings: any,
     adapter: AccountingAdapter,
+    // Which provider's credentials to read off the settings row; defaults to
+    // the active settings.provider. cancelInvoiceAtProvider passes the
+    // invoice's own externalProvider (may differ after a provider swap).
+    provider?: string,
   ): Promise<string> {
     const cacheKey = `${tenantId}:${adapter.name}`;
     const cached = this.tokenCache.get(cacheKey);
     if (cached && cached.expiresAt > new Date()) return cached.token;
 
-    const credentials = this.getCredentials(settings);
+    const credentials = this.getCredentials(settings, provider);
     const result = await adapter.authenticate(credentials);
     this.tokenCache.set(cacheKey, {
       token: result.accessToken,
@@ -300,8 +444,11 @@ export class AccountingSyncService {
     return result.accessToken;
   }
 
-  private getCredentials(settings: any): Record<string, string> {
-    switch (settings.provider) {
+  private getCredentials(
+    settings: any,
+    provider: string = settings?.provider,
+  ): Record<string, string> {
+    switch (provider) {
       case AccountingProvider.PARASUT:
         return {
           clientId: settings.parasutClientId || "",
@@ -327,8 +474,11 @@ export class AccountingSyncService {
     }
   }
 
-  private getCompanyId(settings: any): string {
-    switch (settings.provider) {
+  private getCompanyId(
+    settings: any,
+    provider: string = settings?.provider,
+  ): string {
+    switch (provider) {
       case AccountingProvider.PARASUT:
         return settings.parasutCompanyId || "";
       case AccountingProvider.LOGO:

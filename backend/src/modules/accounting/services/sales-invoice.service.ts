@@ -624,6 +624,21 @@ export class SalesInvoiceService {
     if (claim.count === 0) {
       throw new BadRequestException("Invoice already cancelled");
     }
+    // A3: after the local cancel, best-effort void at the accounting
+    // provider — a SYNCED fatura left standing at the provider stays a live
+    // legal document there. Failure must never roll back or block the local
+    // cancel; cancelInvoiceAtProvider itself records CANCEL_PENDING +
+    // "Manuel iptal gerekli" on the row for the operator, and any unexpected
+    // throw is only logged.
+    if (this.syncService) {
+      try {
+        await this.syncService.cancelInvoiceAtProvider(id, tenantId);
+      } catch (err: any) {
+        this.logger.error(
+          `Provider-side cancel failed for invoice ${id}: ${err?.message ?? err}`,
+        );
+      }
+    }
     return this.prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
   }
 

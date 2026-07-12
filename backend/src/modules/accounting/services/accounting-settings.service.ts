@@ -6,6 +6,7 @@ import {
   encryptString,
   decryptString,
 } from "../../../common/helpers/encryption.helper";
+import { STUCK_SYNCING_THRESHOLD_MS } from "../constants/accounting.enum";
 
 /**
  * Field names that contain secrets and must be encrypted at rest with
@@ -69,13 +70,23 @@ export class AccountingSettingsService {
    */
   async getSyncStatus(tenantId: string) {
     const settings = await this.findByTenant(tenantId);
-    const [total, synced, failed, last] = await Promise.all([
+    const [total, synced, failed, stuck, last] = await Promise.all([
       this.prisma.salesInvoice.count({ where: { tenantId } }),
       this.prisma.salesInvoice.count({
         where: { tenantId, syncedAt: { not: null } },
       }),
       this.prisma.salesInvoice.count({
         where: { tenantId, syncedAt: null, syncError: { not: null } },
+      }),
+      // A6: crash-stuck mid-flight rows — SYNCING with no write since the
+      // staleness threshold. Same definition the resync recovery sweep uses,
+      // so a non-zero stuck count here self-heals on the next hourly run.
+      this.prisma.salesInvoice.count({
+        where: {
+          tenantId,
+          externalStatus: "SYNCING",
+          updatedAt: { lt: new Date(Date.now() - STUCK_SYNCING_THRESHOLD_MS) },
+        },
       }),
       this.prisma.salesInvoice.findFirst({
         where: { tenantId, syncedAt: { not: null } },
@@ -90,6 +101,7 @@ export class AccountingSettingsService {
       total,
       synced,
       failed,
+      stuck,
       // total - synced - failed; never negative if counts race.
       pending: Math.max(0, total - synced - failed),
       lastSyncedAt: last?.syncedAt ?? null,
