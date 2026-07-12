@@ -567,6 +567,18 @@ export class SalesInvoiceService {
   async findAll(tenantId: string, query: InvoiceQueryDto) {
     const where: any = { tenantId };
     if (query.status) where.status = query.status;
+    // Derived sync-state filter — same tri-state the list badges render:
+    // SYNCED (reached provider), FAILED (attempt errored, not synced),
+    // PENDING (no attempt recorded yet).
+    if (query.syncStatus === "SYNCED") {
+      where.syncedAt = { not: null };
+    } else if (query.syncStatus === "FAILED") {
+      where.syncedAt = null;
+      where.syncError = { not: null };
+    } else if (query.syncStatus === "PENDING") {
+      where.syncedAt = null;
+      where.syncError = null;
+    }
     if (query.startDate || query.endDate) {
       where.issueDate = {};
       if (query.startDate) where.issueDate.gte = new Date(query.startDate);

@@ -18,6 +18,7 @@ interface AccountingSettingsState {
   provider: string;
   autoSync: boolean;
   invoicePrefix: string;
+  nextInvoiceNumber: number;
   defaultPaymentTermDays: number;
   // Parasut credentials
   parasutCompanyId: string;
@@ -37,6 +38,10 @@ interface AccountingSettingsState {
   foribaServiceType: string;
 }
 
+// TR VKN = exactly 10 digits (legal entity), TCKN = 11 digits (individual).
+// Mirrors the backend CreateSalesInvoiceDto customerTaxId validation.
+const TAX_ID_RE = /^\d{10,11}$/;
+
 const defaultSettings: AccountingSettingsState = {
   autoGenerateInvoice: false,
   companyName: '',
@@ -48,6 +53,7 @@ const defaultSettings: AccountingSettingsState = {
   provider: 'NONE',
   autoSync: false,
   invoicePrefix: 'INV',
+  nextInvoiceNumber: 1,
   defaultPaymentTermDays: 0,
   parasutCompanyId: '',
   parasutClientId: '',
@@ -88,6 +94,7 @@ export const AccountingSettingsPanel = () => {
         provider: accountingSettings.provider || 'NONE',
         autoSync: accountingSettings.autoSync,
         invoicePrefix: accountingSettings.invoicePrefix || 'INV',
+        nextInvoiceNumber: accountingSettings.nextInvoiceNumber || 1,
         defaultPaymentTermDays: accountingSettings.defaultPaymentTermDays || 0,
       }));
     }
@@ -96,7 +103,7 @@ export const AccountingSettingsPanel = () => {
   const saveSettings = useCallback(
     async (newSettings: AccountingSettingsState) => {
       // Don't send empty credential fields (they would wipe stored values)
-      const payload = { ...newSettings };
+      const payload: Partial<AccountingSettingsState> = { ...newSettings };
       const credentialFields = [
         'parasutClientSecret', 'parasutPassword',
         'logoPassword', 'foribaPassword',
@@ -105,6 +112,20 @@ export const AccountingSettingsPanel = () => {
         if (!payload[field]) {
           delete payload[field];
         }
+      }
+      // Never persist a half-typed VKN/TCKN — the field autosaves per
+      // keystroke, so hold it back until it's empty (clearing is fine)
+      // or a valid 10/11-digit value.
+      if (payload.companyTaxId && !TAX_ID_RE.test(payload.companyTaxId)) {
+        delete payload.companyTaxId;
+      }
+      // Backend requires an integer >= 1; skip transient invalid values
+      // (cleared field, 0) instead of failing the whole autosave.
+      if (
+        !Number.isInteger(payload.nextInvoiceNumber) ||
+        (payload.nextInvoiceNumber as number) < 1
+      ) {
+        delete payload.nextInvoiceNumber;
       }
       await updateSettings(payload);
     },
@@ -168,11 +189,30 @@ export const AccountingSettingsPanel = () => {
               onChange={(val) => handleChange('companyName', val)}
             />
             <SettingsDivider />
-            <SettingsInput
-              label={t('accounting.companyTaxId')}
-              value={settings.companyTaxId}
-              onChange={(val) => handleChange('companyTaxId', val)}
-            />
+            {/* VKN/TCKN — digits only, 10 (VKN) or 11 (TCKN); inline error
+                while incomplete (invalid values are held back from autosave). */}
+            <div className="flex items-start justify-between gap-4 py-3 px-1">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900">{t('accounting.companyTaxId')}</p>
+                {settings.companyTaxId !== '' && !TAX_ID_RE.test(settings.companyTaxId) && (
+                  <p className="text-xs text-red-600 mt-0.5">{t('accounting.taxIdError')}</p>
+                )}
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={11}
+                pattern="\d{10,11}"
+                value={settings.companyTaxId}
+                onChange={(e) => handleChange('companyTaxId', e.target.value.replace(/\D/g, ''))}
+                aria-invalid={settings.companyTaxId !== '' && !TAX_ID_RE.test(settings.companyTaxId)}
+                className={`flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
+                  settings.companyTaxId !== '' && !TAX_ID_RE.test(settings.companyTaxId)
+                    ? 'border-red-400'
+                    : 'border-slate-300'
+                }`}
+              />
+            </div>
             <SettingsDivider />
             <SettingsInput
               label={t('accounting.companyTaxOffice')}
@@ -221,6 +261,30 @@ export const AccountingSettingsPanel = () => {
               value={settings.invoicePrefix}
               onChange={(val) => handleChange('invoicePrefix', val)}
             />
+            <SettingsDivider />
+            {/* Sıradaki fatura numarası — integer >= 1 (backend @Min(1)). */}
+            <div className="flex items-start justify-between gap-4 py-3 px-1">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900">{t('accounting.nextInvoiceNumber')}</p>
+                <p className="text-sm text-slate-500 mt-0.5">{t('accounting.nextInvoiceNumberDesc')}</p>
+                {(!Number.isInteger(settings.nextInvoiceNumber) || settings.nextInvoiceNumber < 1) && (
+                  <p className="text-xs text-red-600 mt-0.5">{t('accounting.nextInvoiceNumberError')}</p>
+                )}
+              </div>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={settings.nextInvoiceNumber || ''}
+                onChange={(e) => handleChange('nextInvoiceNumber', Math.floor(Number(e.target.value)))}
+                aria-invalid={!Number.isInteger(settings.nextInvoiceNumber) || settings.nextInvoiceNumber < 1}
+                className={`flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
+                  !Number.isInteger(settings.nextInvoiceNumber) || settings.nextInvoiceNumber < 1
+                    ? 'border-red-400'
+                    : 'border-slate-300'
+                }`}
+              />
+            </div>
             <SettingsDivider />
             <SettingsInput
               label={t('accounting.defaultPaymentTermDays')}
@@ -449,6 +513,16 @@ function SyncStatusCard() {
         {stat(t('accounting.syncStatusCard.failed'), data.failed, 'text-red-700')}
         {stat(t('accounting.syncStatusCard.pending'), data.pending, 'text-amber-700')}
       </div>
+      {/* Invoices stuck mid-flight (SYNCING claimed, never resolved). The
+          counter ships in a separate backend change — optional-chain so
+          older deployments simply don't render the badge. */}
+      {(data?.stuck ?? 0) > 0 && (
+        <div className="mt-2">
+          <span className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
+            {t('accounting.syncStatusCard.stuck', { n: data.stuck })}
+          </span>
+        </div>
+      )}
       <div className="mt-2 text-xs text-slate-500">
         {t('accounting.syncStatusCard.lastSynced')}:{' '}
         {data.lastSyncedAt

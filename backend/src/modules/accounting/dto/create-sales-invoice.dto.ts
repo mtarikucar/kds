@@ -1,6 +1,7 @@
 import {
   IsDateString,
   IsEmail,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -94,6 +95,14 @@ export class CreateSalesInvoiceDto {
  */
 export class InvoiceQueryDto {
   @IsOptional() @IsString() @MaxLength(32) status?: string;
+
+  // Derived sync state (list-filter): SYNCED = reached the provider
+  // (syncedAt set), FAILED = last attempt errored (syncError set, not
+  // synced), PENDING = generated but no attempt recorded. Mirrors the
+  // badge logic the invoice list renders.
+  @IsOptional()
+  @IsIn(["SYNCED", "FAILED", "PENDING"])
+  syncStatus?: "SYNCED" | "FAILED" | "PENDING";
 
   @IsOptional() @IsDateString() startDate?: string;
   @IsOptional() @IsDateString() endDate?: string;

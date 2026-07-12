@@ -21,6 +21,8 @@ import {
   useUpdateAccountingSettings,
   useTestAccountingConnection,
   useGetSalesInvoices,
+  useInvoice,
+  useCreateInvoiceFromOrder,
   useSyncInvoice,
   useCancelInvoice,
 } from './accountingApi';
@@ -85,11 +87,44 @@ describe('accountingApi', () => {
     );
   });
 
-  it('useSyncInvoice POSTs the sync endpoint by id', async () => {
-    h.post.mockResolvedValue({ data: {} });
+  it('useInvoice GETs the invoice by id and stays idle without one', async () => {
+    h.get.mockResolvedValue({ data: { id: 'inv-9', items: [] } });
+    const { result } = renderHook(() => useInvoice('inv-9'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(h.get).toHaveBeenCalledWith('/sales-invoices/inv-9');
+
+    h.get.mockClear();
+    renderHook(() => useInvoice(null), { wrapper });
+    expect(h.get).not.toHaveBeenCalled();
+  });
+
+  it('useCreateInvoiceFromOrder POSTs from-order with the body and invalidates the list', async () => {
+    h.post.mockResolvedValue({ data: { id: 'inv-new' } });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateInvoiceFromOrder(), { wrapper });
+    const created = await result.current.mutateAsync({
+      orderId: 'order-1',
+      customerTaxId: '1234567890',
+      customerTaxOffice: 'Kadıköy',
+      customerName: 'Acme A.Ş.',
+    });
+    expect(h.post).toHaveBeenCalledWith('/sales-invoices/from-order/order-1', {
+      customerTaxId: '1234567890',
+      customerTaxOffice: 'Kadıköy',
+      customerName: 'Acme A.Ş.',
+    });
+    expect(created.id).toBe('inv-new');
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['salesInvoices'] });
+  });
+
+  it('useSyncInvoice POSTs the sync endpoint by id and returns the re-read invoice', async () => {
+    h.post.mockResolvedValue({ data: { id: 'inv-1', syncedAt: null, syncError: null } });
     const { result } = renderHook(() => useSyncInvoice(), { wrapper });
-    await result.current.mutateAsync('inv-1');
+    const updated = await result.current.mutateAsync('inv-1');
     expect(h.post).toHaveBeenCalledWith('/sales-invoices/inv-1/sync');
+    // Callers gate the success toast on syncedAt — a no-op sync (NONE
+    // provider) must come back untouched, not "successful".
+    expect(updated.syncedAt).toBeNull();
   });
 
   it('useCancelInvoice PATCHes the cancel endpoint by id', async () => {
