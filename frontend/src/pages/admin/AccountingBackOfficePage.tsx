@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Receipt, FileCheck, Settings2, RefreshCw } from 'lucide-react';
 import {
   Card,
@@ -6,6 +7,7 @@ import {
   CardTitle,
   CardContent,
 } from '../../components/ui/Card';
+import QueryStateGate from '../../components/ui/QueryStateGate';
 import {
   useEDocumentReadiness,
   useResyncFailedEDocuments,
@@ -23,23 +25,22 @@ type Tab = 'invoices' | 'edoc' | 'settings';
  * Management reports (budget / consolidated P&L / forecast) live under Raporlar.
  */
 export default function AccountingBackOfficePage() {
+  const { t } = useTranslation('settings');
   const [tab, setTab] = useState<Tab>('invoices');
   const tabs: {
     id: Tab;
     label: string;
     icon: React.ComponentType<{ className?: string }>;
   }[] = [
-    { id: 'invoices', label: 'Faturalar', icon: Receipt },
-    { id: 'edoc', label: 'e-Belge Durumu', icon: FileCheck },
-    { id: 'settings', label: 'Ayarlar', icon: Settings2 },
+    { id: 'invoices', label: t('accounting.backoffice.tabInvoices'), icon: Receipt },
+    { id: 'edoc', label: t('accounting.backoffice.tabEdoc'), icon: FileCheck },
+    { id: 'settings', label: t('accounting.backoffice.tabSettings'), icon: Settings2 },
   ];
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Muhasebe</h1>
-        <p className="text-sm text-slate-500">
-          Faturalar, e-Belge durumu ve entegratör ayarları — hepsi tek yerde.
-        </p>
+        <h1 className="text-2xl font-bold">{t('accounting.backoffice.title')}</h1>
+        <p className="text-sm text-slate-500">{t('accounting.backoffice.subtitle')}</p>
       </div>
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((tb) => {
@@ -68,81 +69,91 @@ export default function AccountingBackOfficePage() {
 }
 
 function EDocTab() {
-  const { data, isLoading } = useEDocumentReadiness();
+  const { t } = useTranslation('settings');
+  const readinessQuery = useEDocumentReadiness();
+  const { data } = readinessQuery;
   const resync = useResyncFailedEDocuments();
-  if (isLoading) return <Loading />;
   const ready = data?.signerConfigured && data?.mukellefQuery !== 'NONE';
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Canlıya-hazırlık kontrolü</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2 text-sm">
-            <Row
-              ok={data?.mukellefQuery !== 'NONE'}
-              label="GİB mükellef sorgusu (entegratör)"
-              detail={data?.mukellefQuery ?? '—'}
-            />
-            <Row
-              ok={!!data?.signerConfigured}
-              label="e-İmza / mali mühür sertifikası"
-              detail={data?.signer ?? '—'}
-            />
-          </ul>
-          <div
-            className={`mt-4 rounded-lg p-3 text-sm ${
-              ready
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-amber-50 text-amber-700'
-            }`}
-          >
-            {ready
-              ? 'Tüm sağlayıcılar yapılandırılmış — e-Belge canlı kesime hazır.'
-              : 'Kod yolu tamam ve test edildi. Canlıya geçmek için Ayarlar sekmesinden entegratör kimliği + mali mühür sertifikası bağlanmalı (harici tedarik).'}
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Reddedilen (FAILED) e-Belgeleri yeniden gönder</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <button
-            onClick={() => resync.mutate()}
-            disabled={resync.isPending}
-            className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${resync.isPending ? 'animate-spin' : ''}`}
-            />
-            {resync.isPending ? 'Gönderiliyor…' : 'Yeniden gönder'}
-          </button>
-          {resync.isSuccess && (
-            <p className="mt-3 text-sm text-emerald-600">
-              {resync.data?.retried ?? 0} belge yeniden denendi.
+    <QueryStateGate query={readinessQuery} loading={<Loading />}>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('accounting.backoffice.readinessTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              <Row
+                ok={data?.mukellefQuery !== 'NONE'}
+                label={t('accounting.backoffice.rowMukellef')}
+                detail={data?.mukellefQuery ?? '—'}
+              />
+              <Row
+                ok={!!data?.signerConfigured}
+                label={t('accounting.backoffice.rowSigner')}
+                detail={data?.signer ?? '—'}
+              />
+            </ul>
+            <div
+              className={`mt-4 rounded-lg p-3 text-sm ${
+                ready
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-amber-50 text-amber-700'
+              }`}
+            >
+              {ready
+                ? t('accounting.backoffice.readyBanner')
+                : t('accounting.backoffice.notReadyBanner')}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('accounting.backoffice.resyncTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <button
+              onClick={() => resync.mutate()}
+              disabled={resync.isPending}
+              className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${resync.isPending ? 'animate-spin' : ''}`}
+              />
+              {resync.isPending
+                ? t('accounting.backoffice.resyncSending')
+                : t('accounting.backoffice.resyncButton')}
+            </button>
+            {resync.isSuccess && (
+              <p className="mt-3 text-sm text-emerald-600">
+                {t('accounting.backoffice.resyncDone', {
+                  count: resync.data?.retried ?? 0,
+                })}
+              </p>
+            )}
+            {resync.isError && (
+              <p className="mt-3 text-sm text-rose-600">
+                {(resync.error as any)?.response?.status === 403
+                  ? t('accounting.backoffice.resyncForbidden')
+                  : t('accounting.backoffice.resyncFailed')}
+              </p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              {t('accounting.backoffice.resyncHint')}
             </p>
-          )}
-          {resync.isError && (
-            <p className="mt-3 text-sm text-rose-600">
-              {(resync.error as any)?.response?.status === 403
-                ? 'Yeniden gönderme için ADMIN yetkisi gerekli.'
-                : 'Yeniden gönderme başarısız — tekrar deneyin.'}
-            </p>
-          )}
-          <p className="mt-2 text-xs text-slate-500">
-            Saatlik zamanlayıcı FAILED belgeleri otomatik de dener.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+    </QueryStateGate>
   );
 }
 
 function Loading() {
+  const { t } = useTranslation('settings');
   return (
-    <div className="py-12 text-center text-slate-400">Yükleniyor…</div>
+    <div className="py-12 text-center text-slate-400">
+      {t('accounting.loading')}
+    </div>
   );
 }
 function Row({

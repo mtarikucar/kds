@@ -8,14 +8,14 @@ import {
   useGenerateZReport,
   useSendZReportEmail,
   downloadZReportPdf,
-  ZReport,
 } from '../../api/zReportsApi';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Card, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../hooks/useFormatDate';
 import { getApiErrorMessage } from '../../lib/api-error';
 import {
   FileText,
@@ -23,10 +23,8 @@ import {
   Mail,
   Plus,
   Eye,
-  Calendar,
   CheckCircle,
   AlertCircle,
-  X,
   DollarSign,
   ShoppingCart,
   CreditCard,
@@ -38,6 +36,7 @@ const ZReportsPage = () => {
   const { t } = useTranslation(['reports', 'common']);
   const queryClient = useQueryClient();
   const formatCurrency = useFormatCurrency();
+  const { formatDate } = useFormatDate();
 
   const [page, setPage] = useState(1);
   const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
@@ -213,7 +212,7 @@ const ZReportsPage = () => {
                         {report.reportNumber}
                       </td>
                       <td className="py-3 px-4">
-                        {format(new Date(report.reportDate), 'MMM dd, yyyy')}
+                        {formatDate(report.reportDate, 'PP')}
                       </td>
                       <td className="py-3 px-4 text-right font-semibold text-green-600">
                         {formatCurrency(report.netSales)}
@@ -426,7 +425,9 @@ const ZReportsPage = () => {
                       <span className="text-slate-600">{product.name}</span>
                       <div className="text-right">
                         <span className="font-medium">{formatCurrency(product.revenue)}</span>
-                        <span className="text-xs text-slate-500 ml-2">({product.quantity} sold)</span>
+                        <span className="text-xs text-slate-500 ml-2">
+                          ({t('zReports.soldCount', { defaultValue: '{{count}} sold', count: product.quantity })})
+                        </span>
                       </div>
                     </div>
                   ))}

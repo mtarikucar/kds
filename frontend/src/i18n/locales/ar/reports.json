@@ -46,7 +46,8 @@
     "vsPreviousPeriod": "مقارنة بالفترة السابقة",
     "loading": "جارٍ التحميل…",
     "noRecords": "لا توجد سجلات.",
-    "loadError": "تعذّر تحميل التقرير — حدّث الصفحة وحاول مرة أخرى."
+    "loadError": "تعذّر تحميل التقرير — حدّث الصفحة وحاول مرة أخرى.",
+    "ordersCount": "{{count}} طلب"
   },
   "zReports": {
     "title": "تقارير Z",
@@ -91,7 +92,8 @@
     "expected": "المتوقع",
     "counted": "المحسوب",
     "difference": "الفرق",
-    "topProducts": "أفضل المنتجات"
+    "topProducts": "أفضل المنتجات",
+    "soldCount": "بيع {{count}}"
   },
   "customerAnalytics": {
     "title": "تحليلات العملاء",
@@ -101,7 +103,12 @@
     "tierDistribution": "توزيع المستويات",
     "topCustomers": "أفضل العملاء",
     "averageLifetimeValue": "متوسط القيمة مدى الحياة",
-    "totalLoyaltyPoints": "إجمالي نقاط الولاء"
+    "totalLoyaltyPoints": "إجمالي نقاط الولاء",
+    "colName": "الاسم",
+    "colTier": "المستوى",
+    "colOrders": "الطلبات",
+    "colTotalSpent": "إجمالي الإنفاق",
+    "colPoints": "النقاط"
   },
   "inventoryReport": {
     "title": "تقرير المخزون",
@@ -112,7 +119,18 @@
     "stockLevels": "مستويات المخزون",
     "recentMovements": "الحركات الأخيرة",
     "lowStock": "مخزون منخفض",
-    "outOfStock": "نفذ من المخزون"
+    "outOfStock": "نفذ من المخزون",
+    "colProduct": "المنتج",
+    "colCategory": "الفئة",
+    "colStock": "المخزون",
+    "colPrice": "السعر",
+    "colValue": "القيمة",
+    "colStatus": "الحالة",
+    "statusInStock": "متوفر",
+    "statusLowStock": "مخزون منخفض",
+    "statusOutOfStock": "نفد المخزون",
+    "unitsLeft": "متبقٍ {{count}} وحدة",
+    "unitsCount": "{{count}} وحدة"
   },
   "staffPerformance": {
     "title": "أداء الموظفين",
@@ -124,7 +142,9 @@
     "summary": "الملخص",
     "totalStaff": "إجمالي الموظفين",
     "averageOrdersPerStaff": "متوسط الطلبات/الموظف",
-    "averageSalesPerStaff": "متوسط المبيعات/الموظف"
+    "averageSalesPerStaff": "متوسط المبيعات/الموظف",
+    "topPerformer": "الأفضل أداءً",
+    "salesDistribution": "توزيع المبيعات"
   },
   "finance": {
     "revenue": "الإيرادات",

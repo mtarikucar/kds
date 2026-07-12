@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import { api } from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-error';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
@@ -120,9 +121,20 @@ export const useRetryReceipt = () => {
     },
     onSuccess: (out) => {
       qc.invalidateQueries({ queryKey: fiscalKeys.pendingPrefix });
-      if (out.status === 'issued') toast.success(`Receipt issued (${out.fiscalNo}).`);
-      else toast.error(`Retry failed: ${out.lastError ?? 'unknown'}`);
+      if (out.status === 'issued')
+        toast.success(
+          i18n.t('common:hummytummy.fiscalRecovery.toastIssued', { no: out.fiscalNo }),
+        );
+      else
+        toast.error(
+          i18n.t('common:hummytummy.fiscalRecovery.toastRetryFailed', {
+            error: out.lastError ?? '—',
+          }),
+        );
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Retry failed')),
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(e, i18n.t('common:hummytummy.fiscalRecovery.toastRetryError')),
+      ),
   });
 };

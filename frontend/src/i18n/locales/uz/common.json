@@ -54,7 +54,8 @@
     "create": "Yaratish",
     "changeLanguage": "Tilni o'zgartirish",
     "active": "Faol",
-    "inactive": "Nofaol"
+    "inactive": "Nofaol",
+    "retry": "Qayta urinib ko‘rish"
   },
   "common": {
     "browseMenu": "Menyuni ko'rish",
@@ -209,7 +210,12 @@
       "score": "{{score}} / 100",
       "devicesOnline": "Qurilmalar onlayn",
       "fiscalAge": "Oxirgi chek",
-      "orderAge": "Oxirgi buyurtma"
+      "orderAge": "Oxirgi buyurtma",
+      "pill": {
+        "green": "Yaxshi",
+        "yellow": "Ogohlantirish",
+        "red": "Kritik"
+      }
     },
     "branches": {
       "title": "Filiallar",
@@ -278,7 +284,16 @@
         "total": "Jami",
         "lastError": "Oxirgi xato"
       },
-      "retry": "Qayta urinish"
+      "retry": "Qayta urinish",
+      "status": {
+        "queued": "Navbatda",
+        "failed": "Muvaffaqiyatsiz",
+        "issued": "Berilgan",
+        "cancelled": "Bekor qilingan"
+      },
+      "toastIssued": "Chek berildi ({{no}}).",
+      "toastRetryFailed": "Qayta urinish muvaffaqiyatsiz: {{error}}",
+      "toastRetryError": "Qayta urinish muvaffaqiyatsiz"
     },
     "fiscalDevices": {
       "title": "Fiskal qurilmalar",
@@ -288,7 +303,14 @@
       "model": "Model",
       "register": "Ro'yxatdan o'tkazish",
       "retire": "Ishdan chiqarish",
-      "empty": "Ro'yxatdan o'tgan fiskal qurilma yo'q."
+      "empty": "Ro'yxatdan o'tgan fiskal qurilma yo'q.",
+      "status": {
+        "online": "Onlayn",
+        "offline": "Oflayn",
+        "error": "Xato",
+        "maintenance": "Texnik xizmatda",
+        "retired": "Chiqarilgan"
+      }
     },
     "callerFeed": {
       "title": "Telefon qo'ng'iroqlari",

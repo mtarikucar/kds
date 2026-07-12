@@ -684,6 +684,25 @@
       "empty": "No details",
       "syncedAt": "Synced at",
       "externalId": "Provider document no."
+    },
+    "backoffice": {
+      "title": "Accounting",
+      "subtitle": "Invoices, e-Document status and integrator settings — all in one place.",
+      "tabInvoices": "Invoices",
+      "tabEdoc": "e-Document Status",
+      "tabSettings": "Settings",
+      "readinessTitle": "Go-live readiness check",
+      "rowMukellef": "GİB taxpayer lookup (integrator)",
+      "rowSigner": "e-Signature / fiscal seal certificate",
+      "readyBanner": "All providers are configured — e-Documents are ready to go live.",
+      "notReadyBanner": "The code path is complete and tested. To go live, connect the integrator identity + fiscal seal certificate from the Settings tab (external procurement).",
+      "resyncTitle": "Resend rejected (FAILED) e-Documents",
+      "resyncButton": "Resend",
+      "resyncSending": "Sending…",
+      "resyncDone": "{{count}} document(s) retried.",
+      "resyncForbidden": "Resending requires ADMIN privileges.",
+      "resyncFailed": "Resend failed — try again.",
+      "resyncHint": "An hourly scheduler also retries FAILED documents automatically."
     }
   },
   "emailChannel": {

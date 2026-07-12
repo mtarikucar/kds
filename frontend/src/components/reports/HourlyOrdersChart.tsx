@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Spinner from '../ui/Spinner';
+import { ErrorState } from '../ui/ErrorState';
 import { useOrdersByHour, HourlyData } from '../../api/enhancedReportsApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useDateTimeFormat } from '../../hooks/useLocale';
 
 interface HourlyOrdersChartProps {
   date?: string;
@@ -11,7 +13,10 @@ interface HourlyOrdersChartProps {
 const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
   const { t } = useTranslation('reports');
   const formatCurrency = useFormatCurrency();
-  const { data, isLoading, error } = useOrdersByHour(date);
+  // Locale-aware hour labels ("9 AM" in en, "09" in tr) instead of
+  // hardcoded English AM/PM strings.
+  const hourFormatter = useDateTimeFormat({ hour: 'numeric' });
+  const { data, isLoading, error, refetch } = useOrdersByHour(date);
 
   if (isLoading) {
     return (
@@ -23,7 +28,17 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
     );
   }
 
-  if (error || !data) {
+  // A failed request gets an honest error + retry; only a clean-but-empty
+  // response falls through to the "no data" card.
+  if (error) {
+    return (
+      <Card>
+        <ErrorState error={error} onRetry={() => refetch()} />
+      </Card>
+    );
+  }
+
+  if (!data) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -35,12 +50,8 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
 
   const maxOrders = Math.max(...data.hourlyData.map((h: HourlyData) => h.orderCount), 1);
 
-  // Format hour for display (e.g., "9 AM", "2 PM")
-  const formatHour = (hour: number): string => {
-    if (hour === 0) return '12 AM';
-    if (hour === 12) return '12 PM';
-    return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
-  };
+  const formatHour = (hour: number): string =>
+    hourFormatter.format(new Date(2000, 0, 1, hour));
 
   return (
     <Card>
@@ -67,7 +78,7 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
                   />
                   <div className="absolute inset-0 flex items-center px-2">
                     <span className="text-xs font-medium text-slate-700">
-                      {hourData.orderCount} orders
+                      {t('reports.ordersCount', { count: hourData.orderCount })}
                     </span>
                   </div>
                 </div>
@@ -82,13 +93,13 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
         {/* Summary */}
         <div className="mt-4 pt-4 border-t flex justify-between text-sm">
           <div>
-            <span className="text-slate-600">Total Orders: </span>
+            <span className="text-slate-600">{t('reports.totalOrders')}: </span>
             <span className="font-bold">
               {data.hourlyData.reduce((sum: number, h: HourlyData) => sum + h.orderCount, 0)}
             </span>
           </div>
           <div>
-            <span className="text-slate-600">Total Sales: </span>
+            <span className="text-slate-600">{t('reports.totalSales')}: </span>
             <span className="font-bold text-green-600">
               {formatCurrency(
                 data.hourlyData.reduce((sum: number, h: HourlyData) => sum + h.totalSales, 0)

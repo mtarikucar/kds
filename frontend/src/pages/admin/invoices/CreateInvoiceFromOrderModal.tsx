@@ -9,11 +9,10 @@ import {
 } from '../../../features/accounting/accountingApi';
 import type { SalesInvoice } from '../../../features/accounting/types';
 import { getApiErrorMessage } from '../../../lib/api-error';
+import { useFormatCurrency } from '../../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../../hooks/useFormatDate';
 
 const TAX_ID_RE = /^\d{10,11}$/;
-
-const formatCurrency = (amount: number | string) =>
-  Number(amount).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
 
 interface Props {
   onClose: () => void;
@@ -28,6 +27,9 @@ interface Props {
  */
 export default function CreateInvoiceFromOrderModal({ onClose, onCreated }: Props) {
   const { t } = useTranslation('settings');
+  // Locale-aware money/date rendering (orders are in the tenant currency).
+  const formatCurrency = useFormatCurrency();
+  const { formatDateIntl } = useFormatDate();
   // Recent PAID orders — the only ones the backend will invoice.
   const { data: orders, isLoading, isError } = useOrders({ status: 'PAID', limit: 50 });
   const createInvoice = useCreateInvoiceFromOrder();
@@ -97,11 +99,11 @@ export default function CreateInvoiceFromOrderModal({ onClose, onCreated }: Prop
                       {order.customerName ? ` — ${order.customerName}` : ''}
                     </span>
                     <span className="block text-xs text-slate-500">
-                      {new Date(order.createdAt).toLocaleString('tr-TR')}
+                      {formatDateIntl(order.createdAt, { dateStyle: 'short', timeStyle: 'short' })}
                     </span>
                   </span>
                   <span className="text-sm font-medium text-slate-900 whitespace-nowrap">
-                    {formatCurrency(order.finalAmount)}
+                    {formatCurrency(Number(order.finalAmount))}
                   </span>
                 </label>
               ))}

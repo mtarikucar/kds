@@ -46,7 +46,8 @@
     "vsPreviousPeriod": "önceki döneme göre",
     "loading": "Yükleniyor…",
     "noRecords": "Kayıt yok.",
-    "loadError": "Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin."
+    "loadError": "Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.",
+    "ordersCount": "{{count}} sipariş"
   },
   "zReports": {
     "title": "Z-Raporları",
@@ -91,7 +92,8 @@
     "expected": "Beklenen",
     "counted": "Sayılan",
     "difference": "Fark",
-    "topProducts": "En Çok Satılanlar"
+    "topProducts": "En Çok Satılanlar",
+    "soldCount": "{{count}} satıldı"
   },
   "customerAnalytics": {
     "title": "Müşteri Analitikleri",
@@ -101,7 +103,12 @@
     "tierDistribution": "Seviye Dağılımı",
     "topCustomers": "En İyi Müşteriler",
     "averageLifetimeValue": "Ortalama Müşteri Değeri",
-    "totalLoyaltyPoints": "Toplam Sadakat Puanları"
+    "totalLoyaltyPoints": "Toplam Sadakat Puanları",
+    "colName": "İsim",
+    "colTier": "Seviye",
+    "colOrders": "Sipariş",
+    "colTotalSpent": "Toplam harcama",
+    "colPoints": "Puan"
   },
   "inventoryReport": {
     "title": "Envanter Raporu",
@@ -112,7 +119,18 @@
     "stockLevels": "Stok Seviyeleri",
     "recentMovements": "Son Hareketler",
     "lowStock": "Düşük Stok",
-    "outOfStock": "Stokta Yok"
+    "outOfStock": "Stokta Yok",
+    "colProduct": "Ürün",
+    "colCategory": "Kategori",
+    "colStock": "Stok",
+    "colPrice": "Fiyat",
+    "colValue": "Değer",
+    "colStatus": "Durum",
+    "statusInStock": "Stokta",
+    "statusLowStock": "Düşük stok",
+    "statusOutOfStock": "Stokta yok",
+    "unitsLeft": "{{count}} birim kaldı",
+    "unitsCount": "{{count}} birim"
   },
   "staffPerformance": {
     "title": "Personel Performansı",
@@ -124,7 +142,9 @@
     "summary": "Özet",
     "totalStaff": "Toplam Personel",
     "averageOrdersPerStaff": "Ort. Sipariş/Personel",
-    "averageSalesPerStaff": "Ort. Satış/Personel"
+    "averageSalesPerStaff": "Ort. Satış/Personel",
+    "topPerformer": "En iyi performans",
+    "salesDistribution": "Satış dağılımı"
   },
   "finance": {
     "revenue": "Ciro",

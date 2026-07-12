@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Spinner from '../ui/Spinner';
+import { ErrorState } from '../ui/ErrorState';
 import { useStaffPerformance } from '../../api/enhancedReportsApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Users, ShoppingCart, TrendingUp, Award } from 'lucide-react';
@@ -13,7 +14,7 @@ interface StaffPerformanceSectionProps {
 const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSectionProps) => {
   const { t } = useTranslation('reports');
   const formatCurrency = useFormatCurrency();
-  const { data, isLoading, error } = useStaffPerformance({ startDate, endDate });
+  const { data, isLoading, error, refetch } = useStaffPerformance({ startDate, endDate });
 
   if (isLoading) {
     return (
@@ -23,7 +24,17 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
     );
   }
 
-  if (error || !data) {
+  // A failed request gets an honest error + retry; only a clean-but-empty
+  // response falls through to the "no data" card.
+  if (error) {
+    return (
+      <Card>
+        <ErrorState error={error} onRetry={() => refetch()} />
+      </Card>
+    );
+  }
+
+  if (!data) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -107,7 +118,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                 <Award className="h-8 w-8 text-white" />
               </div>
               <div className="flex-1">
-                <p className="text-sm text-amber-700 font-medium">Top Performer</p>
+                <p className="text-sm text-amber-700 font-medium">{t('staffPerformance.topPerformer')}</p>
                 <p className="text-xl font-bold text-slate-900">{topPerformer.staffName}</p>
                 <p className="text-sm text-slate-600 capitalize">{topPerformer.role.toLowerCase()}</p>
               </div>
@@ -116,7 +127,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                   {formatCurrency(topPerformer.totalSales)}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {topPerformer.totalOrders} orders
+                  {t('reports.ordersCount', { count: topPerformer.totalOrders })}
                 </p>
               </div>
             </div>
@@ -190,7 +201,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
       {/* Performance Bar Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Sales Distribution</CardTitle>
+          <CardTitle>{t('staffPerformance.salesDistribution')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

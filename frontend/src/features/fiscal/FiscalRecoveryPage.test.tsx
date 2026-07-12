@@ -16,12 +16,18 @@ vi.mock('./fiscalApi', () => ({
   useRegisterFiscalDevice: () => h.register,
   useRetireFiscalDevice: () => h.retire,
 }));
+// useFormatCurrencyExtended -> useCurrency -> react-query; stub the currency
+// hook so the page renders without a QueryClientProvider.
+vi.mock('../../hooks/useCurrency', () => ({
+  useCurrency: () => 'TRY',
+}));
 
 import FiscalRecoveryPage from './FiscalRecoveryPage';
 
 beforeEach(() => {
   h.list.data = [];
   h.list.isLoading = false;
+  (h.list as any).isError = false;
   h.list.refetch = vi.fn();
   h.retry.mutate = vi.fn();
   h.retry.isPending = false;
@@ -62,7 +68,8 @@ describe('FiscalRecoveryPage', () => {
     h.list.data = [makeReceipt()];
     render(<FiscalRecoveryPage />);
     const row = screen.getByText('prov-1').closest('tr')!;
-    expect(within(row).getByText('failed')).toBeInTheDocument();
+    // The status pill is translated now (en common namespace is loaded).
+    expect(within(row).getByText('Failed')).toBeInTheDocument();
     expect(within(row).getByText('×2')).toBeInTheDocument();
     expect(within(row).getByText('device offline')).toBeInTheDocument();
   });
@@ -78,6 +85,15 @@ describe('FiscalRecoveryPage', () => {
   it('refetches when the refresh button is clicked', () => {
     render(<FiscalRecoveryPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(h.list.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error state with a retry button when the list query fails', () => {
+    (h.list as any).isError = true;
+    (h.list as any).error = new Error('boom');
+    render(<FiscalRecoveryPage />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(h.list.refetch).toHaveBeenCalledTimes(1);
   });
 });

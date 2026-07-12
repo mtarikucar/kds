@@ -20,28 +20,32 @@ vi.mock('../../../features/accounting/eBelgeApi', () => ({
   useResyncFailedEDocuments: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, isError: false }),
 }));
 
+// The page went through the t() migration: labels now come from the
+// `settings` namespace. This suite's import graph pulls i18n/config (via the
+// shared QueryStateGate -> ErrorState -> api-error), which registers the full
+// locale bundle, so t() resolves to the ENGLISH values below.
 describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
   it('shows the three e-Belge tabs and defaults to Faturalar', () => {
     render(<AccountingBackOfficePage />);
-    expect(screen.getByRole('button', { name: /Faturalar/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /e-Belge Durumu/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Ayarlar/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Invoices/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /e-Document Status/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Settings/ })).toBeTruthy();
     // default tab
     expect(screen.getByText('FATURA-PANEL')).toBeTruthy();
   });
 
   it('switches to the Ayarlar tab (settings panel) and the e-Belge status tab', () => {
     render(<AccountingBackOfficePage />);
-    fireEvent.click(screen.getByRole('button', { name: /Ayarlar/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
     expect(screen.getByText('AYAR-PANEL')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /e-Belge Durumu/ }));
-    expect(screen.getByText(/Canlıya-hazırlık kontrolü/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /e-Document Status/ }));
+    expect(screen.getByText(/Go-live readiness check/)).toBeTruthy();
   });
 
   it('no longer hosts the management-report tabs (moved to Raporlar)', () => {
     render(<AccountingBackOfficePage />);
-    expect(screen.queryByRole('button', { name: /Bütçe/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Konsolide/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Tahmin/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Budget|Bütçe/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Consolidated|Konsolide/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Forecast|Tahmin/ })).toBeNull();
   });
 });

@@ -54,7 +54,8 @@
     "create": "إنشاء",
     "changeLanguage": "تغيير اللغة",
     "active": "نشط",
-    "inactive": "غير نشط"
+    "inactive": "غير نشط",
+    "retry": "حاول مرة أخرى"
   },
   "common": {
     "browseMenu": "تصفح القائمة",
@@ -209,7 +210,12 @@
       "score": "{{score}} / 100",
       "devicesOnline": "الأجهزة المتصلة",
       "fiscalAge": "آخر إيصال",
-      "orderAge": "آخر طلب"
+      "orderAge": "آخر طلب",
+      "pill": {
+        "green": "جيد",
+        "yellow": "تحذير",
+        "red": "حرج"
+      }
     },
     "branches": {
       "title": "الفروع",
@@ -278,7 +284,16 @@
         "total": "الإجمالي",
         "lastError": "آخر خطأ"
       },
-      "retry": "إعادة المحاولة"
+      "retry": "إعادة المحاولة",
+      "status": {
+        "queued": "في الانتظار",
+        "failed": "فشل",
+        "issued": "صادر",
+        "cancelled": "ملغى"
+      },
+      "toastIssued": "تم إصدار الإيصال ({{no}}).",
+      "toastRetryFailed": "فشلت إعادة المحاولة: {{error}}",
+      "toastRetryError": "فشلت إعادة المحاولة"
     },
     "fiscalDevices": {
       "title": "الأجهزة المالية",
@@ -288,7 +303,14 @@
       "model": "الطراز",
       "register": "تسجيل",
       "retire": "إيقاف",
-      "empty": "لا توجد أجهزة مالية مسجلة."
+      "empty": "لا توجد أجهزة مالية مسجلة.",
+      "status": {
+        "online": "متصل",
+        "offline": "غير متصل",
+        "error": "خطأ",
+        "maintenance": "صيانة",
+        "retired": "متقاعد"
+      }
     },
     "callerFeed": {
       "title": "سجل المكالمات",

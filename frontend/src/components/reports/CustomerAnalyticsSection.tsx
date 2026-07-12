@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Spinner from '../ui/Spinner';
+import { ErrorState } from '../ui/ErrorState';
 import { useCustomerAnalytics } from '../../api/enhancedReportsApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Users, UserPlus, UserCheck, Award, Star, Wallet } from 'lucide-react';
@@ -13,7 +14,7 @@ interface CustomerAnalyticsSectionProps {
 const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSectionProps) => {
   const { t } = useTranslation('reports');
   const formatCurrency = useFormatCurrency();
-  const { data, isLoading, error } = useCustomerAnalytics({ startDate, endDate });
+  const { data, isLoading, error, refetch } = useCustomerAnalytics({ startDate, endDate });
 
   if (isLoading) {
     return (
@@ -23,7 +24,17 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
     );
   }
 
-  if (error || !data) {
+  // A failed request gets an honest error + retry; only a clean-but-empty
+  // response falls through to the "no data" card.
+  if (error) {
+    return (
+      <Card>
+        <ErrorState error={error} onRetry={() => refetch()} />
+      </Card>
+    );
+  }
+
+  if (!data) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -160,11 +171,11 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4">#</th>
-                    <th className="text-left py-3 px-4">Name</th>
-                    <th className="text-left py-3 px-4">Tier</th>
-                    <th className="text-right py-3 px-4">Orders</th>
-                    <th className="text-right py-3 px-4">Total Spent</th>
-                    <th className="text-right py-3 px-4">Points</th>
+                    <th className="text-left py-3 px-4">{t('customerAnalytics.colName')}</th>
+                    <th className="text-left py-3 px-4">{t('customerAnalytics.colTier')}</th>
+                    <th className="text-right py-3 px-4">{t('customerAnalytics.colOrders')}</th>
+                    <th className="text-right py-3 px-4">{t('customerAnalytics.colTotalSpent')}</th>
+                    <th className="text-right py-3 px-4">{t('customerAnalytics.colPoints')}</th>
                   </tr>
                 </thead>
                 <tbody>

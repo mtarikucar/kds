@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types';
+import QueryStateGate from '../../components/ui/QueryStateGate';
+import { useFormatCurrencyExtended } from '../../hooks/useFormatCurrency';
+import { useFormatDate } from '../../hooks/useFormatDate';
 import {
   useListPendingReceipts,
   useRetryReceipt,
@@ -24,8 +27,11 @@ import {
  */
 export default function FiscalRecoveryPage() {
   const { t } = useTranslation('common');
-  const { data: rows = [], isLoading, refetch } = useListPendingReceipts();
+  const receiptsQuery = useListPendingReceipts();
+  const { data: rows = [], refetch } = receiptsQuery;
   const retry = useRetryReceipt();
+  const { formatWithCurrency } = useFormatCurrencyExtended();
+  const { formatDateIntl } = useFormatDate();
 
   return (
     <div className="space-y-4 p-6">
@@ -42,13 +48,16 @@ export default function FiscalRecoveryPage() {
       <FiscalDevicesPanel />
 
       <h2 className="pt-2 text-lg font-semibold">{t('hummytummy.fiscalRecovery.title')}</h2>
-      {isLoading ? (
-        <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
-      ) : rows.length === 0 ? (
-        <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
-          {t('hummytummy.fiscalRecovery.empty')}
-        </div>
-      ) : (
+      <QueryStateGate
+        query={receiptsQuery}
+        loading={<div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>}
+        isEmpty={rows.length === 0}
+        empty={
+          <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
+            {t('hummytummy.fiscalRecovery.empty')}
+          </div>
+        }
+      >
         <table className="w-full divide-y rounded border text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
@@ -64,14 +73,16 @@ export default function FiscalRecoveryPage() {
           <tbody className="divide-y">
             {rows.map((r: FiscalReceipt) => (
               <tr key={r.id} className="align-top">
-                <td className="px-3 py-2 text-xs">{new Date(r.createdAt).toLocaleString()}</td>
+                <td className="px-3 py-2 text-xs">
+                  {formatDateIntl(r.createdAt, { dateStyle: 'short', timeStyle: 'short' })}
+                </td>
                 <td className="px-3 py-2 font-mono text-xs">{r.providerId}</td>
                 <td className="px-3 py-2 font-mono text-xs">{r.orderId ?? '—'}</td>
                 <td className="px-3 py-2">
                   <StatusPill status={r.status} attempts={r.attempts} />
                 </td>
                 <td className="px-3 py-2 tabular-nums">
-                  {(r.totalCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: r.currency })}
+                  {formatWithCurrency(r.totalCents / 100, r.currency)}
                 </td>
                 <td className="px-3 py-2 text-xs text-red-700 max-w-sm break-words">
                   {r.lastError ?? '—'}
@@ -89,7 +100,7 @@ export default function FiscalRecoveryPage() {
             ))}
           </tbody>
         </table>
-      )}
+      </QueryStateGate>
     </div>
   );
 }
@@ -105,7 +116,8 @@ export default function FiscalRecoveryPage() {
  */
 function FiscalDevicesPanel() {
   const { t } = useTranslation('common');
-  const { data: devices = [], isLoading } = useListFiscalDevices();
+  const devicesQuery = useListFiscalDevices();
+  const { data: devices = [] } = devicesQuery;
   const register = useRegisterFiscalDevice();
   const retire = useRetireFiscalDevice();
   // Register / retire are ADMIN-only on the backend; don't show controls that
@@ -180,11 +192,12 @@ function FiscalDevicesPanel() {
       </form>
       )}
 
-      {isLoading ? (
-        <div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>
-      ) : devices.length === 0 ? (
-        <div className="text-sm text-gray-500">{t('hummytummy.fiscalDevices.empty')}</div>
-      ) : (
+      <QueryStateGate
+        query={devicesQuery}
+        loading={<div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>}
+        isEmpty={devices.length === 0}
+        empty={<div className="text-sm text-gray-500">{t('hummytummy.fiscalDevices.empty')}</div>}
+      >
         <ul className="divide-y rounded border text-sm">
           {devices.map((d: FiscalDevice) => (
             <li key={d.id} className="flex items-center justify-between px-3 py-2">
@@ -194,7 +207,7 @@ function FiscalDevicesPanel() {
                 <span>{d.serial}</span>
                 {d.model && <span className="ml-2 text-gray-500">{d.model}</span>}
                 <span className="ml-2 inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs">
-                  {d.status}
+                  {t(`hummytummy.fiscalDevices.status.${d.status}`, { defaultValue: d.status })}
                 </span>
               </div>
               {isAdmin && d.status !== 'retired' && (
@@ -209,19 +222,20 @@ function FiscalDevicesPanel() {
             </li>
           ))}
         </ul>
-      )}
+      </QueryStateGate>
     </section>
   );
 }
 
 function StatusPill({ status, attempts }: { status: string; attempts: number }) {
+  const { t } = useTranslation('common');
   const colors: Record<string, string> = {
     queued: 'bg-blue-100 text-blue-800',
     failed: 'bg-red-100 text-red-800',
   };
   return (
     <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100'}`}>
-      {status}
+      {t(`hummytummy.fiscalRecovery.status.${status}`, { defaultValue: status })}
       {attempts > 0 && <span className="opacity-60">×{attempts}</span>}
     </span>
   );
