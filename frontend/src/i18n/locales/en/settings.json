@@ -650,7 +650,7 @@
       "optionalFields": "Invoice details (optional)",
       "optionalFieldsHint": "Fields left blank are filled from the order.",
       "customerName": "Company / customer name",
-      "customerTaxId": "VKN / TCKN",
+      "customerTaxId": "Tax ID (VKN / TCKN)",
       "customerTaxOffice": "Tax office",
       "cancel": "Cancel",
       "submit": "Create Invoice",

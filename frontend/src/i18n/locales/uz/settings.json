@@ -650,7 +650,7 @@
       "optionalFields": "Hisob-faktura ma'lumotlari (ixtiyoriy)",
       "optionalFieldsHint": "Bo'sh qoldirilgan maydonlar buyurtma ma'lumotlari bilan to'ldiriladi.",
       "customerName": "Kompaniya / mijoz nomi",
-      "customerTaxId": "VKN / TCKN",
+      "customerTaxId": "Soliq raqami (VKN / TCKN)",
       "customerTaxOffice": "Soliq idorasi",
       "cancel": "Bekor qilish",
       "submit": "Hisob-faktura yaratish",

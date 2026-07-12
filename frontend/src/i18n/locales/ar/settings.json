@@ -650,7 +650,7 @@
       "optionalFields": "بيانات الفاتورة (اختياري)",
       "optionalFieldsHint": "تُملأ الحقول الفارغة من بيانات الطلب.",
       "customerName": "اسم الشركة / العميل",
-      "customerTaxId": "VKN / TCKN",
+      "customerTaxId": "الرقم الضريبي (VKN / TCKN)",
       "customerTaxOffice": "مكتب الضرائب",
       "cancel": "إلغاء",
       "submit": "إنشاء فاتورة",

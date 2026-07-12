@@ -650,7 +650,7 @@
       "optionalFields": "Данные счёта (необязательно)",
       "optionalFieldsHint": "Пустые поля будут заполнены данными заказа.",
       "customerName": "Название компании / имя клиента",
-      "customerTaxId": "VKN / TCKN",
+      "customerTaxId": "Налоговый номер (VKN / TCKN)",
       "customerTaxOffice": "Налоговая инспекция",
       "cancel": "Отмена",
       "submit": "Создать счёт",
