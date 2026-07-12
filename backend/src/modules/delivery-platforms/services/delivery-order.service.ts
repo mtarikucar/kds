@@ -23,6 +23,7 @@ import { CommandQueueService } from "../../device-mesh/command-queue.service";
 import { EscPosBuilderService } from "../../device-mesh/printing/escpos-builder.service";
 import { ReceiptSnapshotBuilder } from "../../orders/services/receipt-snapshot.builder";
 import { OutboxService } from "../../outbox/outbox.service";
+import { SalesInvoiceService } from "../../accounting/services/sales-invoice.service";
 import { captureSwallowedEmit } from "../../../common/observability/capture-swallowed-emit";
 
 /**
@@ -93,6 +94,9 @@ export class DeliveryOrderService {
     // this service bare keep working and a missing bus can never break a
     // refund/amendment write path — the domain-event emit is best-effort.
     @Optional() private readonly outbox?: OutboxService,
+    // @Optional for the same bare-unit-test reason; the credit-note emit on a
+    // platform full-refund is best-effort and must never break the refund write.
+    @Optional() private readonly salesInvoiceService?: SalesInvoiceService,
   ) {}
 
   /**
@@ -876,6 +880,30 @@ export class DeliveryOrderService {
     });
     if (refreshed) {
       this.kdsGateway.emitNewOrder(tenantId, refreshed.branchId, refreshed);
+    }
+
+    // Fiscal reversal: a NEWLY-applied full refund that moved the order to
+    // CANCELLED must reverse any ISSUED fatura with an İade faturası (credit
+    // note), exactly like the POS refund rail (payments.service). Best-effort
+    // + idempotent — an un-invoiced order or missing accounting config no-ops,
+    // and a failure never breaks the already-committed refund write. Without
+    // this, a platform-initiated refund left the sales invoice standing with
+    // no reversing record (GİB compliance gap the POS rail already closed).
+    if (
+      outcome.applied &&
+      (outcome as any).statusChangedToCancelled &&
+      this.salesInvoiceService
+    ) {
+      try {
+        await this.salesInvoiceService.createRefundCreditNote(
+          (outcome as any).orderId,
+          tenantId,
+        );
+      } catch (err: any) {
+        this.logger.error(
+          `Credit-note (İade faturası) generation failed for platform-refunded order ${(outcome as any).orderId}: ${err.message}`,
+        );
+      }
     }
 
     await this.logService.log({

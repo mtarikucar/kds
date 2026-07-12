@@ -3500,6 +3500,23 @@ model Budget {
   @@map("budgets")
 }
 
+// Accounting period lock for the OpEx ledger. Once a (tenant, year, month) is
+// locked, any expense create/update/delete whose expenseDate falls in that
+// month is rejected (400 "Dönem kilitli") so closed books can't drift.
+// Tenant-wide by design: the accountant closes the month for the whole
+// company, not per branch. Scalar tenantId (no DB FK) like Expense/Budget.
+model ExpensePeriodLock {
+  id             String   @id @default(uuid())
+  tenantId       String
+  year           Int
+  month          Int // 1-12
+  lockedAt       DateTime @default(now())
+  lockedByUserId String?
+
+  @@unique([tenantId, year, month])
+  @@map("expense_period_locks")
+}
+
 // Accounts-Payable vendor bill. Optionally linked to a PurchaseOrder for the
 // 3-way match (ordered ↔ received/GRN ↔ invoiced): a mismatch beyond tolerance
 // flags DISCREPANCY so it can't be paid blind. taxAmount is the indirilecek KDV

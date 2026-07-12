@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AnalyticsController } from "./analytics.controller";
+import { AnalyticsScheduler } from "./analytics.scheduler";
 import { AnalyticsGateway } from "./gateways/analytics.gateway";
 import {
   MockDataGeneratorService,
@@ -41,6 +42,7 @@ import {
     InsightsService,
     CameraService,
     AnalyticsGateway,
+    AnalyticsScheduler,
   ],
   exports: [
     MockDataGeneratorService,
