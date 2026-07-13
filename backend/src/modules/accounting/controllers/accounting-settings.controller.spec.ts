@@ -9,8 +9,12 @@ import { AccountingSyncService } from "../services/accounting-sync.service";
  * test-connection routes through the sync service.
  */
 describe("AccountingSettingsController", () => {
-  let service: { findByTenant: jest.Mock; update: jest.Mock; sanitize: jest.Mock };
-  let sync: { testConnection: jest.Mock };
+  let service: {
+    findByTenant: jest.Mock;
+    update: jest.Mock;
+    sanitize: jest.Mock;
+  };
+  let sync: { testConnection: jest.Mock; clearTokenCache: jest.Mock };
   let ctrl: AccountingSettingsController;
   const req = { tenantId: "t1" };
 
@@ -20,7 +24,10 @@ describe("AccountingSettingsController", () => {
       update: jest.fn().mockResolvedValue({ raw: "secret" }),
       sanitize: jest.fn().mockReturnValue({ safe: true }),
     };
-    sync = { testConnection: jest.fn().mockResolvedValue(true) };
+    sync = {
+      testConnection: jest.fn().mockResolvedValue(true),
+      clearTokenCache: jest.fn(),
+    };
     ctrl = new AccountingSettingsController(
       service as unknown as AccountingSettingsService,
       sync as unknown as AccountingSyncService,
@@ -40,6 +47,11 @@ describe("AccountingSettingsController", () => {
     expect(service.update).toHaveBeenCalledWith("t1", dto);
     expect(service.sanitize).toHaveBeenCalled();
     expect(out).toEqual({ safe: true });
+  });
+
+  it("update drops the tenant's cached provider tokens so rotated/corrected creds apply immediately", async () => {
+    await ctrl.update(req, { nilveraApiKey: "new-key" } as any);
+    expect(sync.clearTokenCache).toHaveBeenCalledWith("t1");
   });
 
   it("testConnection routes through the sync service", () => {

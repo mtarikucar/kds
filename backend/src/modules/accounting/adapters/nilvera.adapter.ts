@@ -50,6 +50,19 @@ export class NilveraAdapter implements AccountingAdapter {
     return this;
   }
 
+  /**
+   * Pin the dispatch host to the tenant-configured apiUrl. Must be called on
+   * EVERY sync/cancel (mirrors ForibaEfaturaAdapter.setApiBase): the sync
+   * service builds a fresh adapter per call and getToken() skips
+   * authenticate() on a warm token cache — authenticate() is otherwise the
+   * only place baseURL gets set, so without this pin every call after the
+   * first would fail "apiUrl is not configured" for the whole 24h token TTL.
+   */
+  setApiBase(url: string): this {
+    if (url) this.httpClient.defaults.baseURL = url;
+    return this;
+  }
+
   private authHeaders(token: string) {
     return { Authorization: `Bearer ${token}` };
   }

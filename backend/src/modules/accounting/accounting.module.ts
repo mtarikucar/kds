@@ -20,6 +20,18 @@ import {
 } from "./providers/e-document-signer";
 import { AccountingResyncScheduler } from "./schedulers/accounting-resync.scheduler";
 
+/** Fail fast if the mock e-belge providers are about to boot in production. */
+function assertMockAllowed(): void {
+  if (
+    process.env.EBELGE_PROVIDER === "mock" &&
+    process.env.NODE_ENV === "production"
+  ) {
+    throw new Error(
+      "EBELGE_PROVIDER=mock is not allowed in production — mock mükellef/signer providers would corrupt real e-belge dispatches",
+    );
+  }
+}
+
 @Module({
   imports: [PrismaModule, SubscriptionsModule],
   controllers: [
@@ -37,19 +49,26 @@ import { AccountingResyncScheduler } from "./schedulers/accounting-resync.schedu
     // in-memory mükellef query + signer for the full flow; otherwise the Null
     // providers keep issuance safe (route to e-Arşiv, refuse to sign) until the
     // real integrator creds + certificate are installed under these tokens.
+    // The mock binding is REFUSED in production: a lingering EBELGE_PROVIDER=mock
+    // env var would fake mükellef answers and inject mock signatures into real
+    // integrator dispatches.
     {
       provide: MUKELLEF_QUERY,
-      useFactory: () =>
-        process.env.EBELGE_PROVIDER === "mock"
+      useFactory: () => {
+        assertMockAllowed();
+        return process.env.EBELGE_PROVIDER === "mock"
           ? new MockMukellefQueryProvider()
-          : new NullMukellefQueryProvider(),
+          : new NullMukellefQueryProvider();
+      },
     },
     {
       provide: E_DOCUMENT_SIGNER,
-      useFactory: () =>
-        process.env.EBELGE_PROVIDER === "mock"
+      useFactory: () => {
+        assertMockAllowed();
+        return process.env.EBELGE_PROVIDER === "mock"
           ? new MockEDocumentSigner()
-          : new NullEDocumentSigner(),
+          : new NullEDocumentSigner();
+      },
     },
   ],
   exports: [

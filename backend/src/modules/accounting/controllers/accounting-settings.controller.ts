@@ -47,6 +47,11 @@ export class AccountingSettingsController {
   @Roles(UserRole.ADMIN)
   async update(@Request() req, @Body() dto: UpdateAccountingSettingsDto) {
     const settings = await this.service.update(req.tenantId, dto);
+    // Corrected/rotated credentials must take effect immediately: the sync
+    // service caches provider tokens (Nilvera's static key for 24h), so
+    // without this a fixed key keeps failing — and a rotated key keeps being
+    // used — until the cache TTL lapses.
+    this.syncService.clearTokenCache(req.tenantId);
     return this.service.sanitize(settings);
   }
 

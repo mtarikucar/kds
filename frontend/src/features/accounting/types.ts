@@ -13,6 +13,19 @@ export interface AccountingSettings {
   hasParasutCredentials: boolean;
   hasLogoCredentials: boolean;
   hasForibaCredentials: boolean;
+  hasNilveraCredentials: boolean;
+  // Non-secret provider credential fields — returned by sanitize() so the
+  // settings form can hydrate them (secrets are never returned).
+  parasutCompanyId?: string;
+  parasutClientId?: string;
+  parasutUsername?: string;
+  logoApiUrl?: string;
+  logoUsername?: string;
+  logoFirmNumber?: string;
+  foribaApiUrl?: string;
+  foribaUsername?: string;
+  foribaServiceType?: string;
+  nilveraApiUrl?: string;
   invoicePrefix: string;
   nextInvoiceNumber: number;
   defaultPaymentTermDays: number;

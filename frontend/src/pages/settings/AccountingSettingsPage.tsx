@@ -100,6 +100,22 @@ export const AccountingSettingsPanel = () => {
         invoicePrefix: accountingSettings.invoicePrefix || 'INV',
         nextInvoiceNumber: accountingSettings.nextInvoiceNumber || 1,
         defaultPaymentTermDays: accountingSettings.defaultPaymentTermDays || 0,
+        // Non-secret provider credential fields MUST hydrate too: saveSettings
+        // PATCHes the whole state object and only skips the 5 SECRET fields,
+        // so leaving these unhydrated meant any autosave after a reload
+        // silently wiped the stored values (e.g. nilveraApiUrl → '' broke the
+        // whole e-invoice rail). Secrets stay blank by design — sanitize()
+        // never returns them; the has*Credentials placeholders signal storage.
+        parasutCompanyId: accountingSettings.parasutCompanyId || '',
+        parasutClientId: accountingSettings.parasutClientId || '',
+        parasutUsername: accountingSettings.parasutUsername || '',
+        logoApiUrl: accountingSettings.logoApiUrl || '',
+        logoUsername: accountingSettings.logoUsername || '',
+        logoFirmNumber: accountingSettings.logoFirmNumber || '',
+        foribaApiUrl: accountingSettings.foribaApiUrl || '',
+        foribaUsername: accountingSettings.foribaUsername || '',
+        foribaServiceType: accountingSettings.foribaServiceType || '',
+        nilveraApiUrl: accountingSettings.nilveraApiUrl || '',
       }));
     }
   }, [accountingSettings]);
@@ -140,6 +156,7 @@ export const AccountingSettingsPanel = () => {
     status: saveStatus,
     setValue: triggerSave,
     retry: retrySave,
+    save: flushSave,
   } = useAutoSave(settings, saveSettings, {
     debounceMs: 500,
     onSuccess: () => {
@@ -158,6 +175,11 @@ export const AccountingSettingsPanel = () => {
 
   const handleTestConnection = async () => {
     try {
+      // The probe tests the credentials STORED in the DB (the endpoint takes
+      // no body). Flush the debounced autosave first, otherwise a test click
+      // right after typing validates the PREVIOUS credentials and reports a
+      // misleading result.
+      await flushSave();
       const result = await testConnection();
       if (result.success) {
         toast.success(t('accounting.testSuccess'));
@@ -354,6 +376,7 @@ export const AccountingSettingsPanel = () => {
                     type="password"
                     value={settings.parasutClientSecret}
                     onChange={(e) => handleChange('parasutClientSecret', e.target.value)}
+                    placeholder={accountingSettings?.hasParasutCredentials && !settings.parasutClientSecret ? t('accounting.credentialStored') : undefined}
                     className="flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
@@ -372,6 +395,7 @@ export const AccountingSettingsPanel = () => {
                     type="password"
                     value={settings.parasutPassword}
                     onChange={(e) => handleChange('parasutPassword', e.target.value)}
+                    placeholder={accountingSettings?.hasParasutCredentials && !settings.parasutPassword ? t('accounting.credentialStored') : undefined}
                     className="flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
@@ -402,6 +426,7 @@ export const AccountingSettingsPanel = () => {
                     type="password"
                     value={settings.logoPassword}
                     onChange={(e) => handleChange('logoPassword', e.target.value)}
+                    placeholder={accountingSettings?.hasLogoCredentials && !settings.logoPassword ? t('accounting.credentialStored') : undefined}
                     className="flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
@@ -438,6 +463,7 @@ export const AccountingSettingsPanel = () => {
                     type="password"
                     value={settings.foribaPassword}
                     onChange={(e) => handleChange('foribaPassword', e.target.value)}
+                    placeholder={accountingSettings?.hasForibaCredentials && !settings.foribaPassword ? t('accounting.credentialStored') : undefined}
                     className="flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
@@ -456,7 +482,7 @@ export const AccountingSettingsPanel = () => {
                 <SettingsDivider />
                 <SettingsInput
                   label={t('accounting.nilveraApiUrl')}
-                  description={t('accounting.nilveraHint')}
+                  description={t('accounting.nilveraApiUrlHint')}
                   value={settings.nilveraApiUrl}
                   onChange={(val) => handleChange('nilveraApiUrl', val)}
                 />
@@ -464,11 +490,13 @@ export const AccountingSettingsPanel = () => {
                 <div className="flex items-start justify-between gap-4 py-3 px-1">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900">{t('accounting.nilveraApiKey')}</p>
+                    <p className="text-sm text-slate-500 mt-0.5">{t('accounting.nilveraApiKeyHint')}</p>
                   </div>
                   <input
                     type="password"
                     value={settings.nilveraApiKey}
                     onChange={(e) => handleChange('nilveraApiKey', e.target.value)}
+                    placeholder={accountingSettings?.hasNilveraCredentials && !settings.nilveraApiKey ? t('accounting.credentialStored') : undefined}
                     className="flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
@@ -483,10 +511,10 @@ export const AccountingSettingsPanel = () => {
                 <div className="flex justify-end py-2">
                   <button
                     onClick={handleTestConnection}
-                    disabled={isTesting}
+                    disabled={isTesting || saveStatus === 'saving'}
                     className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isTesting ? '...' : t('accounting.testConnection')}
+                    {isTesting || saveStatus === 'saving' ? '...' : t('accounting.testConnection')}
                   </button>
                 </div>
               </>

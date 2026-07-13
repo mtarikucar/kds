@@ -707,7 +707,9 @@
     "providerNilvera": "Nilvera",
     "nilveraApiUrl": "Nilvera API manzili",
     "nilveraApiKey": "Nilvera API kaliti",
-    "nilveraHint": "Nilvera panelida yaratilgan doimiy kalit (Persisted Access Token). API manzilini paneldan tasdiqlang."
+    "nilveraApiUrlHint": "API manzilini Nilvera panelidan tasdiqlang (https, *.nilvera.com).",
+    "nilveraApiKeyHint": "Nilvera panelida yaratilgan doimiy kalit (Persisted Access Token).",
+    "credentialStored": "Saqlangan — almashtirish uchun yangi qiymat kiriting"
   },
   "emailChannel": {
     "reservationSection": "Email — Bron hodisalari",

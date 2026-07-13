@@ -17,9 +17,11 @@ import { AccountingProvider } from '../constants/accounting.enum';
  * to serialize concurrent pushes. These specs LOCK that dedupe contract:
  *
  *   - a row already mid-flight / SYNCED is NOT pushed again (claim count 0)
- *   - only null / FAILED / PENDING rows are claimable
- *   - the same-provider externalId short-circuit skips already-synced rows
- *   - a provider swap REOPENS sync (old externalId is a stale FK)
+ *   - only null / FAILED / PENDING rows are claimable (null via its own OR
+ *     branch — Prisma rejects null inside an `in` list at runtime)
+ *   - ANY externalId short-circuits: same provider = dedupe; a DIFFERENT
+ *     provider (post-swap) is deliberately NOT re-issued (fiscal-safe — a
+ *     second dispatch would duplicate a legal e-belge)
  *   - on push failure the row is recorded FAILED + syncError (claimable again)
  *   - all writes carry tenantId (cross-tenant defence-in-depth)
  */
@@ -46,9 +48,7 @@ describe('AccountingSyncService.syncInvoice', () => {
     externalId: null,
     externalProvider: null,
     externalStatus: null,
-    items: [
-      { description: 'Burger', quantity: 2, unitPrice: 50, taxRate: 10 },
-    ],
+    items: [{ description: 'Burger', quantity: 2, unitPrice: 50, taxRate: 10 }],
   };
 
   const foribaSettings = {
@@ -78,7 +78,16 @@ describe('AccountingSyncService.syncInvoice', () => {
       // the decrypted creds are what reach the adapter.
       getDecryptedCredentials: jest.fn().mockResolvedValue(null),
     };
-    svc = new AccountingSyncService(prisma as any, settings as any, { name: "MOCK", isRegisteredEFaturaUser: async () => false } as any, { name: "MOCK", isConfigured: () => true, sign: async (x: string) => x } as any);
+    svc = new AccountingSyncService(
+      prisma as any,
+      settings as any,
+      { name: 'MOCK', isRegisteredEFaturaUser: async () => false } as any,
+      {
+        name: 'MOCK',
+        isConfigured: () => true,
+        sign: async (x: string) => x,
+      } as any,
+    );
   });
 
   it('is a no-op when the tenant has no accounting provider configured', async () => {
@@ -120,20 +129,25 @@ describe('AccountingSyncService.syncInvoice', () => {
     expect(adapterSpy).not.toHaveBeenCalled();
   });
 
-  it('RE-OPENS sync after a provider swap (stale externalId is a foreign FK)', async () => {
+  it('does NOT re-issue a document already issued at ANOTHER provider (fiscal-safe swap)', async () => {
+    // The document legally exists at Parasut. Re-dispatching it at the new
+    // provider would create a duplicate e-belge; only rows that never reached
+    // a provider (externalId null) sync after a swap. (Previously the guard
+    // fell through here and the claim silently rejected the SYNCED row — the
+    // "re-open" promise was dead code.)
     settings.findByTenant.mockResolvedValue(foribaSettings);
     (prisma.salesInvoice.findFirst as any).mockResolvedValue({
       ...baseInvoice,
       externalId: 'PARASUT-123',
       externalProvider: AccountingProvider.PARASUT, // different from current FORIBA
+      externalStatus: 'SYNCED',
     });
-    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
-    const adapter = fakeAdapter();
-    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+    const adapterSpy = jest.spyOn(svc as any, 'getAdapter');
 
     await svc.syncInvoice(INVOICE_ID, TENANT);
 
-    expect(adapter.pushInvoice).toHaveBeenCalled();
+    expect(prisma.salesInvoice.updateMany).not.toHaveBeenCalled();
+    expect(adapterSpy).not.toHaveBeenCalled();
   });
 
   it('authenticates with the DECRYPTED secret, never the stored v1: blob (M14 regression)', async () => {
@@ -147,7 +161,9 @@ describe('AccountingSyncService.syncInvoice', () => {
       ...foribaSettings,
       foribaPassword: 'real-plaintext-pass',
     });
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
     const adapter = fakeAdapter();
     jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
@@ -163,7 +179,9 @@ describe('AccountingSyncService.syncInvoice', () => {
 
   it('claims only null/FAILED/PENDING rows and aborts when the claim loses the race (count 0)', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     // Another worker already owns it → claim transitions zero rows.
     (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 0 });
     const adapter = fakeAdapter();
@@ -172,14 +190,21 @@ describe('AccountingSyncService.syncInvoice', () => {
     await svc.syncInvoice(INVOICE_ID, TENANT);
 
     // The claim where-clause only targets reclaimable states, never SYNCING.
+    // Shape matters: `null` must be its OWN OR branch — Prisma throws a
+    // PrismaClientValidationError at runtime for null inside an `in` list
+    // (the old `in: [null as any, ...]` killed every sync in production).
     const claimWhere = (prisma.salesInvoice.updateMany as any).mock.calls[0][0]
       .where;
     expect(claimWhere.tenantId).toBe(TENANT);
-    expect(claimWhere.externalStatus.in).toEqual(
-      expect.arrayContaining([null, 'FAILED', 'PENDING']),
-    );
-    expect(claimWhere.externalStatus.in).not.toContain('SYNCING');
-    expect(claimWhere.externalStatus.in).not.toContain('SYNCED');
+    expect(claimWhere.externalStatus).toBeUndefined();
+    expect(claimWhere.OR).toEqual([
+      { externalStatus: null },
+      { externalStatus: { in: ['FAILED', 'PENDING'] } },
+    ]);
+    const inList = claimWhere.OR[1].externalStatus.in;
+    expect(inList).not.toContain(null);
+    expect(inList).not.toContain('SYNCING');
+    expect(inList).not.toContain('SYNCED');
     // The claim flips to SYNCING (the serializing marker) and clears errors.
     const claimData = (prisma.salesInvoice.updateMany as any).mock.calls[0][0]
       .data;
@@ -191,9 +216,61 @@ describe('AccountingSyncService.syncInvoice', () => {
     expect((prisma.salesInvoice.updateMany as any).mock.calls.length).toBe(1);
   });
 
+  it('NILVERA: pins apiBase + feeds the mükellef bridge DECRYPTED creds; a registered VKN routes to EFATURA', async () => {
+    // Regression for two go-live killers: (1) the bridge previously received
+    // the raw settings row, so Nilvera got the AES `v1:` ciphertext as its
+    // Bearer key → 401 → silent e-Arşiv fallback for every B2B buyer;
+    // (2) the fresh-per-call adapter never had its baseURL pinned, so every
+    // push after the first (warm token cache) failed "apiUrl is not
+    // configured" for the whole 24h TTL.
+    const { NilveraAdapter } = require('../adapters/nilvera.adapter');
+    const nilveraSettings = {
+      provider: AccountingProvider.NILVERA,
+      nilveraApiUrl: 'https://apitest.nilvera.com',
+      nilveraApiKey: 'v1:nonce:tag:ciphertext',
+    };
+    settings.findByTenant.mockResolvedValue(nilveraSettings);
+    settings.getDecryptedCredentials.mockResolvedValue({
+      ...nilveraSettings,
+      nilveraApiKey: 'plain-nilvera-key',
+    });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
+    (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
+
+    const adapter = new NilveraAdapter();
+    const setApiBase = jest.spyOn(adapter, 'setApiBase');
+    adapter.isRegisteredEFaturaUser = jest.fn().mockResolvedValue(true);
+    adapter.authenticate = jest
+      .fn()
+      .mockResolvedValue({ accessToken: 'plain-nilvera-key' });
+    adapter.pushInvoice = jest.fn().mockResolvedValue({ externalId: 'NLV-1' });
+    jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
+
+    await svc.syncInvoice(INVOICE_ID, TENANT);
+
+    // Bridge received the DECRYPTED key + configured host, never the blob.
+    const [bridgeKey, bridgeUrl, bridgeTaxId] = (
+      adapter.isRegisteredEFaturaUser as jest.Mock
+    ).mock.calls[0];
+    expect(bridgeKey).toBe('plain-nilvera-key');
+    expect(bridgeKey).not.toMatch(/^v1:/);
+    expect(bridgeUrl).toBe('https://apitest.nilvera.com');
+    expect(bridgeTaxId).toBe('1234567890');
+    // apiBase pinned on this fresh instance (cached-token path stays safe).
+    expect(setApiBase).toHaveBeenCalledWith('https://apitest.nilvera.com');
+    // Authoritative bridge answer (true) routed the document to e-Fatura.
+    expect(
+      (adapter.pushInvoice as jest.Mock).mock.calls[0][2].eDocumentType,
+    ).toBe('EFATURA');
+  });
+
   it('on a successful push records externalId + provider + SYNCED, scoped to tenant', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
     const adapter = fakeAdapter();
     jest.spyOn(svc as any, 'getAdapter').mockReturnValue(adapter);
@@ -208,7 +285,8 @@ describe('AccountingSyncService.syncInvoice', () => {
     expect(pushedData.items).toHaveLength(1);
 
     // Second updateMany is the success write.
-    const successCall = (prisma.salesInvoice.updateMany as any).mock.calls[1][0];
+    const successCall = (prisma.salesInvoice.updateMany as any).mock
+      .calls[1][0];
     expect(successCall.where.tenantId).toBe(TENANT);
     expect(successCall.data.externalId).toBe('EXT-999');
     expect(successCall.data.externalProvider).toBe(AccountingProvider.FORIBA);
@@ -269,7 +347,9 @@ describe('AccountingSyncService.syncInvoice', () => {
 
   it('records FAILED + syncError (so the row is reclaimable) when the adapter throws', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
     const adapter = fakeAdapter();
     adapter.pushInvoice.mockRejectedValue(new Error('foriba 503'));
@@ -285,7 +365,9 @@ describe('AccountingSyncService.syncInvoice', () => {
 
   it('does NOT flip to FAILED when the push SUCCEEDED but the local SYNCED write fails (avoids a duplicate e-fatura)', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     // 1st updateMany = the claim (→ SYNCING) succeeds; 2nd = the post-push
     // SYNCED write fails (DB hiccup). The remote provider already holds the
     // invoice, so a FAILED (reclaimable) status would let a retry duplicate it.
@@ -309,7 +391,9 @@ describe('AccountingSyncService.syncInvoice', () => {
 
   it('aborts after claiming when no adapter resolves for the provider', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
     jest.spyOn(svc as any, 'getAdapter').mockReturnValue(null);
 
@@ -321,7 +405,9 @@ describe('AccountingSyncService.syncInvoice', () => {
 
   it('caches the auth token per tenant+adapter so a second sync does not re-authenticate', async () => {
     settings.findByTenant.mockResolvedValue(foribaSettings);
-    (prisma.salesInvoice.findFirst as any).mockResolvedValue({ ...baseInvoice });
+    (prisma.salesInvoice.findFirst as any).mockResolvedValue({
+      ...baseInvoice,
+    });
     (prisma.salesInvoice.updateMany as any).mockResolvedValue({ count: 1 });
     const adapter = fakeAdapter();
     adapter.authenticate.mockResolvedValue({
@@ -352,7 +438,16 @@ describe('AccountingSyncService.testConnection', () => {
       // the decrypted creds are what reach the adapter.
       getDecryptedCredentials: jest.fn().mockResolvedValue(null),
     };
-    svc = new AccountingSyncService(prisma as any, settings as any, { name: "MOCK", isRegisteredEFaturaUser: async () => false } as any, { name: "MOCK", isConfigured: () => true, sign: async (x: string) => x } as any);
+    svc = new AccountingSyncService(
+      prisma as any,
+      settings as any,
+      { name: 'MOCK', isRegisteredEFaturaUser: async () => false } as any,
+      {
+        name: 'MOCK',
+        isConfigured: () => true,
+        sign: async (x: string) => x,
+      } as any,
+    );
   });
 
   it('returns a clean failure when no provider is configured', async () => {
@@ -433,8 +528,15 @@ describe('AccountingSyncService.testConnection', () => {
 });
 
 describe('AccountingSyncService — e-document readiness + FAILED re-sync', () => {
-  const mukellef: any = { name: 'MOCK', isRegisteredEFaturaUser: async () => true };
-  const signer: any = { name: 'MOCK', isConfigured: () => true, sign: async (x: string) => x };
+  const mukellef: any = {
+    name: 'MOCK',
+    isRegisteredEFaturaUser: async () => true,
+  };
+  const signer: any = {
+    name: 'MOCK',
+    isConfigured: () => true,
+    sign: async (x: string) => x,
+  };
 
   it('reports external-provisioning readiness', () => {
     const prisma: any = { salesInvoice: {} };
@@ -454,13 +556,17 @@ describe('AccountingSyncService — e-document readiness + FAILED re-sync', () =
       },
     };
     const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
-    const syncSpy = jest.spyOn(svc, 'syncInvoice').mockResolvedValue(undefined as any);
+    const syncSpy = jest
+      .spyOn(svc, 'syncInvoice')
+      .mockResolvedValue(undefined as any);
 
     const retried = await svc.resyncFailedInvoices('t1');
     expect(retried).toBe(2);
     expect(syncSpy).toHaveBeenCalledTimes(2);
     // only FAILED invoices queried
-    expect(prisma.salesInvoice.findMany.mock.calls[0][0].where.externalStatus).toBe('FAILED');
+    expect(
+      prisma.salesInvoice.findMany.mock.calls[0][0].where.externalStatus,
+    ).toBe('FAILED');
   });
 
   it('keeps going when one invoice re-sync throws', async () => {
@@ -471,7 +577,8 @@ describe('AccountingSyncService — e-document readiness + FAILED re-sync', () =
       },
     };
     const svc = new AccountingSyncService(prisma, {} as any, mukellef, signer);
-    jest.spyOn(svc, 'syncInvoice')
+    jest
+      .spyOn(svc, 'syncInvoice')
       .mockRejectedValueOnce(new Error('still failing'))
       .mockResolvedValueOnce(undefined as any);
 
@@ -576,7 +683,11 @@ describe('AccountingSyncService — A5 buyer validation', () => {
       prisma as any,
       settings as any,
       { name: 'MOCK', isRegisteredEFaturaUser: async () => true } as any,
-      { name: 'MOCK', isConfigured: () => true, sign: async (x: string) => x } as any,
+      {
+        name: 'MOCK',
+        isConfigured: () => true,
+        sign: async (x: string) => x,
+      } as any,
     );
   });
 
@@ -695,7 +806,11 @@ describe('AccountingSyncService.cancelInvoiceAtProvider (A3)', () => {
       prisma as any,
       settings as any,
       { name: 'MOCK', isRegisteredEFaturaUser: async () => false } as any,
-      { name: 'MOCK', isConfigured: () => true, sign: async (x: string) => x } as any,
+      {
+        name: 'MOCK',
+        isConfigured: () => true,
+        sign: async (x: string) => x,
+      } as any,
     );
   });
 
@@ -755,7 +870,7 @@ describe('AccountingSyncService.cancelInvoiceAtProvider (A3)', () => {
     expect(write.data.syncError).toBeNull();
   });
 
-  it('resolves adapter + credentials from the invoice\'s externalProvider, not the CURRENT settings.provider', async () => {
+  it("resolves adapter + credentials from the invoice's externalProvider, not the CURRENT settings.provider", async () => {
     // Tenant has since swapped to Parasut, but the document lives at Foriba.
     settings.findByTenant.mockResolvedValue({
       ...foribaSettings,

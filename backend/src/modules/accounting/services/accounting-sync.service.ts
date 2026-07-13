@@ -119,10 +119,21 @@ export class AccountingSyncService {
       return;
     }
 
-    // M4: only skip when the existing externalId is for the SAME provider.
-    // After a provider swap (e.g. Parasut → Logo) the old externalId is
-    // a foreign key to a different system; re-sync must run.
-    if (invoice.externalId && invoice.externalProvider === settings.provider) {
+    // M4 (revised): an externalId means the document was ALREADY issued at an
+    // integrator. Same provider → plain dedupe skip. DIFFERENT provider (after
+    // a swap, e.g. Foriba → Nilvera) → deliberately NOT re-issued either:
+    // pushing it again would create a duplicate legal e-belge at a second
+    // integrator. Only rows that never reached a provider (externalId null —
+    // i.e. null/FAILED/PENDING states) sync after a swap; migrated documents
+    // need a manual/provider-side move. (Previously this branch fell through
+    // to the claim, which rejected SYNCED rows anyway — the re-sync promise
+    // was dead code with a misleading "duplicate push" debug line.)
+    if (invoice.externalId) {
+      if (invoice.externalProvider !== settings.provider) {
+        this.logger.warn(
+          `Invoice ${invoiceId} already issued at ${invoice.externalProvider}; NOT re-issuing at ${settings.provider} — manual/provider-side migration required`,
+        );
+      }
       return;
     }
 
@@ -146,7 +157,13 @@ export class AccountingSyncService {
         // Don't re-claim a row already mid-flight: SYNCING is itself a
         // serializing marker. If two `syncInvoice` calls race, the loser
         // sees count===0 here and skips. We also re-claim FAILED rows.
-        externalStatus: { in: [null as any, "FAILED", "PENDING"] },
+        // NOTE: `null` may NOT appear inside an `in` list — Prisma rejects it
+        // at runtime (PrismaClientValidationError), which silently killed
+        // every sync. The null state needs its own OR branch.
+        OR: [
+          { externalStatus: null },
+          { externalStatus: { in: ["FAILED", "PENDING"] } },
+        ],
       },
       data: { externalStatus: "SYNCING", syncError: null },
     });
@@ -162,6 +179,16 @@ export class AccountingSyncService {
       const adapter = this.getAdapter(settings.provider);
       if (!adapter) return;
 
+      // The secret credential fields (parasutClientSecret/parasutPassword/
+      // logoPassword/foribaPassword/nilveraApiKey) are stored AES-256-GCM
+      // encrypted (`v1:…`). findByTenant returns them encrypted; we MUST
+      // decrypt BEFORE the mükellef bridge below — otherwise Nilvera receives
+      // the ciphertext as its Bearer key, 401s, and every B2B buyer silently
+      // misroutes to e-Arşiv. Non-secret fields (companyId/firmNumber/apiUrl)
+      // pass through unchanged.
+      const creds =
+        await this.settingsService.getDecryptedCredentials(tenantId);
+
       // Route e-Fatura (B2B) vs e-Arşiv (B2C). isRegisteredEFaturaUser comes
       // from a GİB mükellef query via the pluggable provider (mock in dev,
       // HTTP in prod). Registered VKN → e-Fatura, otherwise e-Arşiv — the
@@ -176,7 +203,7 @@ export class AccountingSyncService {
       const registered = invoice.customerTaxId
         ? ((await this.nilveraMukellefCheck(
             adapter,
-            settings,
+            creds ?? settings,
             invoice.customerTaxId,
           )) ??
           (await this.mukellefQuery.isRegisteredEFaturaUser(
@@ -203,20 +230,16 @@ export class AccountingSyncService {
         throw new Error(`Buyer validation failed: ${buyerProblems.join("; ")}`);
       }
 
-      // The secret credential fields (parasutClientSecret/parasutPassword/
-      // logoPassword/foribaPassword) are stored AES-256-GCM encrypted (`v1:…`).
-      // findByTenant returns them encrypted; we MUST decrypt before handing
-      // them to the adapter or every authenticate() fails and the invoice
-      // never reaches the provider. Non-secret fields (companyId/firmNumber/
-      // apiUrl) pass through unchanged.
-      const creds =
-        await this.settingsService.getDecryptedCredentials(tenantId);
-      // Pin Foriba's dispatch host to the configured apiUrl on EVERY sync — the
+      // Pin the dispatch host to the configured apiUrl on EVERY sync — the
       // adapter is freshly constructed per call and getToken() may skip
-      // authenticate() on a cached token, so the baseURL set inside authenticate
-      // wouldn't be applied to this instance (would fall back to prod).
+      // authenticate() on a cached token, so the baseURL set inside
+      // authenticate wouldn't be applied to this instance. Foriba would fall
+      // back to its hardcoded prod host; Nilvera has NO fallback and would
+      // fail closed ("apiUrl is not configured") for the whole 24h token TTL.
       if (adapter instanceof ForibaEfaturaAdapter) {
         adapter.setApiBase(((creds ?? settings) as any).foribaApiUrl || "");
+      } else if (adapter instanceof NilveraAdapter) {
+        adapter.setApiBase(((creds ?? settings) as any).nilveraApiUrl || "");
       }
       const token = await this.getToken(tenantId, creds ?? settings, adapter);
       const companyId = this.getCompanyId(creds ?? settings);
@@ -377,6 +400,8 @@ export class AccountingSyncService {
           await this.settingsService.getDecryptedCredentials(tenantId);
         if (adapter instanceof ForibaEfaturaAdapter) {
           adapter.setApiBase(((creds ?? settings) as any).foribaApiUrl || "");
+        } else if (adapter instanceof NilveraAdapter) {
+          adapter.setApiBase(((creds ?? settings) as any).nilveraApiUrl || "");
         }
         const token = await this.getToken(
           tenantId,
@@ -431,9 +456,14 @@ export class AccountingSyncService {
       case AccountingProvider.LOGO:
         return new LogoAdapter();
       case AccountingProvider.NILVERA:
-        // Signer optional: when unconfigured, Nilvera seals with its own
-        // mali mühür (integrator-side signing) — adapter sends unsigned.
-        return new NilveraAdapter().setSigner(this.signer);
+        // Per-provider signing policy: Nilvera seals server-side with its OWN
+        // mali mühür, so the local signer is deliberately NOT attached. When
+        // one IS configured (e.g. EBELGE_PROVIDER=mock on a staging box, or a
+        // future cert-backed Foriba signer), attaching it here would inject a
+        // local signature into the dispatch — the mock even emits an
+        // undeclared-namespace element that corrupts the XML — and a real one
+        // would double-sign what Nilvera seals itself.
+        return new NilveraAdapter();
       default:
         return null;
     }
@@ -465,6 +495,19 @@ export class AccountingSyncService {
       );
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Drop cached provider tokens for a tenant. Called on accounting-settings
+   * updates so a corrected/rotated credential takes effect immediately —
+   * without this, Nilvera's 24h static-key cache keeps replaying the OLD key
+   * (a wrong first entry keeps failing, a rotated key keeps leaking) until
+   * the fake expiry lapses.
+   */
+  clearTokenCache(tenantId: string): void {
+    for (const key of this.tokenCache.keys()) {
+      if (key.startsWith(`${tenantId}:`)) this.tokenCache.delete(key);
     }
   }
 
