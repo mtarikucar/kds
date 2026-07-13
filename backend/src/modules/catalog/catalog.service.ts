@@ -12,10 +12,10 @@ import {
   SaleMode,
 } from "./dto/create-hardware-product.dto";
 
-// Hardware-quote event type. Kept as a literal (not an import from the
-// marketing module) so the core catalog stays decoupled from marketing for
-// the Phase-5 split. Must match MarketingEventTypes.HardwareQuoteRequested in
-// src/modules/marketing/events/marketing-event-types.ts (the consumer side).
+// Hardware-quote event type. Kept as a literal so the core catalog stays
+// decoupled from marketing. Must match MarketingEventTypes.HardwareQuoteRequested
+// on the consumer side, which now lives in the standalone kds-marketing service
+// (backend/src/modules/marketing/events/marketing-event-types.ts in that repo).
 const HARDWARE_QUOTE_EVENT = "marketing.lead.hardware_quote.v1";
 
 /**

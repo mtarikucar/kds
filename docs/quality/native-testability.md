@@ -22,7 +22,6 @@ and mark the rest honestly as HIL.
 | `desktop/src-tauri` | Rust | hardware config parse/merge, `DeviceStatus` state transitions, ESC/POS byte encoding + CP-857 transcode | `#[cfg(test)] mod tests` (in-crate) | BLE scan/connect/write (btleplug), Tauri event emit |
 | `apps/local-bridge-agent` | Rust | config TOML parse, env-var resolution, CLI arg parse, driver-registry routing, SQLite command-queue FIFO/retry | `#[cfg(test)] mod tests` + `tests/` integration | real printer / yazarkasa / Ingenico I/O, cloud WSS/REST |
 | `edge-device-cpp` | C++ | CLI `parse_args`, `Config::merge_env`/`from_env`/`validate`/`to_json` | standalone `tests/CMakeLists.txt` + assert-based runner | CUDA, TensorRT, GStreamer/RTSP, OpenCV, WebSocket |
-| `segmentation-service` | (none) | — | — | empty stub: only `requirements.txt`, no source code to test |
 
 ---
 
@@ -201,19 +200,6 @@ pure-logic test target was built, which is the point of decoupling it.
 
 ---
 
-## segmentation-service
-
-**Empty stub.** The directory contains **only `requirements.txt`** (Python ML
-dependencies: torch, SAM-2, GroundingDINO, supervision, fastapi, etc.). There is
-**no source code** — no modules, no entrypoint, nothing to unit-test. When the
-service is implemented, mirror the pattern above: keep pure logic (mask/polygon
-geometry, config parsing, request/response schemas) separable from the
-GPU-bound model inference, and unit-test the pure layer with fixtures while the
-inference path stays integration/HIL. Until then, this component is
-intentionally out of scope for a test harness.
-
----
-
 ## What could / could not be run in this environment
 
 | Component | Built? | Tests run? | Result |
@@ -223,4 +209,3 @@ intentionally out of scope for a test harness.
 | `edge-device-cpp` pure-logic test target | yes | yes | 54/54 checks, ctest 100% |
 | `desktop/src-tauri` (full `cargo test`) | **no** | no | blocked: pre-existing Tauri/`brotli-decompressor` `alloc_no_stdlib` v2-vs-v3 conflict (unrelated to changes) |
 | `desktop/src-tauri` pure modules (verbatim-copy harness) | yes | yes | 7 passed (validates the new `status.rs` tests + clock-injection refactor) |
-| `segmentation-service` | n/a | n/a | empty stub, no code |
