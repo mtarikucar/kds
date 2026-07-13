@@ -513,7 +513,15 @@ jobs:
               git reset --hard ${VERSION}
               export GHCR_USER='${GHCR_USER}'
               export GHCR_TOKEN='${GHCR_TOKEN}'
-              ./scripts/deploy.sh prod ${VERSION}
+              # Zero-downtime blue-green once vars.PROD_BLUEGREEN=true — set that
+              # repo variable ONLY after the one-time server prep in
+              # docs/deploy/blue-green-runbook.md §2-3. Until then this defaults
+              # to the legacy in-place deploy, so merging changes nothing.
+              if [ '${{ vars.PROD_BLUEGREEN }}' = 'true' ]; then
+                ./scripts/deploy-blue-green.sh prod ${VERSION}
+              else
+                ./scripts/deploy.sh prod ${VERSION}
+              fi
             "
 
       # Post-deploy public probe lives in scripts/deploy.sh
@@ -577,7 +585,11 @@ jobs:
             git stash --include-untracked --quiet || true
             git fetch --all --tags --force
             git reset --hard ${VERSION}
-            ./scripts/deploy.sh prod-rollback
+            if [ '${{ vars.PROD_BLUEGREEN }}' = 'true' ]; then
+              ./scripts/deploy-blue-green.sh prod rollback
+            else
+              ./scripts/deploy.sh prod-rollback
+            fi
           "
 
       - name: Cleanup workspace

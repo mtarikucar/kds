@@ -151,18 +151,20 @@ From here every deploy is a green/blue flip with **no downtime**.
 
 ## §5 — Steady-state deploys (wire CI when ready)
 
-`scripts/deploy.sh` (the current force-recreate path) still works and is the
-default. To switch prod to zero-downtime, change **two lines** in
-`.github/workflows/release-deploy.yml` (do this as a deliberate, separate change
-once §2–§4 are verified on the box):
+`scripts/deploy.sh` (the current force-recreate path) is still the DEFAULT — CI
+already has the blue-green toggle wired (this PR), gated on a repo variable so
+merging changes nothing. To switch prod to zero-downtime, after §2–§4 are
+verified on the box, set ONE repo variable:
 
-```diff
-- ./scripts/deploy.sh prod ${VERSION}          # deploy step (~L514)
-+ ./scripts/deploy-blue-green.sh prod ${VERSION}
+> **GitHub → repo Settings → Secrets and variables → Actions → Variables →**
+> **New variable:** `PROD_BLUEGREEN` = `true`
 
-- ./scripts/deploy.sh prod-rollback            # failure/rollback step (~L566)
-+ ./scripts/deploy-blue-green.sh prod rollback
-```
+Every `vX.Y.Z` tag then runs `scripts/deploy-blue-green.sh` (deploy + rollback);
+unset/any-other value keeps the legacy `scripts/deploy.sh` path. Revert any time
+by deleting the variable — no code change, no redeploy.
+
+Staging's target host is likewise the repo variable `STAGING_SERVER_HOST` (unset
+→ current shared box; set to Server-2's IP → staging deploys there, §7).
 
 Everything else in the pipeline (GHCR build/push of `:vX.Y.Z`, env render + scp,
 `git reset --hard <tag>`, the SSH channel + secrets) is unchanged. CI keeps
