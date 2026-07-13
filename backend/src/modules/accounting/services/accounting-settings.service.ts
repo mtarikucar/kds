@@ -20,6 +20,7 @@ const ENCRYPTED_FIELDS = [
   "parasutPassword",
   "logoPassword",
   "foribaPassword",
+  "nilveraApiKey",
 ] as const;
 
 function encryptDto<T extends Record<string, any>>(dto: T): T {
@@ -174,6 +175,7 @@ export class AccountingSettingsService {
       parasutPassword,
       logoPassword,
       foribaPassword,
+      nilveraApiKey,
       ...safe
     } = settings;
     return {
@@ -183,6 +185,8 @@ export class AccountingSettingsService {
       ),
       hasLogoCredentials: !!(logoPassword && settings.logoUsername),
       hasForibaCredentials: !!(foribaPassword && settings.foribaUsername),
+      // Nilvera'da kullanıcı adı yok — statik API anahtarı tek başına yeter.
+      hasNilveraCredentials: !!nilveraApiKey,
     };
   }
 

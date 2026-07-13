@@ -19,6 +19,7 @@ export enum AccountingProvider {
   PARASUT = "PARASUT",
   LOGO = "LOGO",
   FORIBA = "FORIBA",
+  NILVERA = "NILVERA",
 }
 
 export enum InvoiceType {

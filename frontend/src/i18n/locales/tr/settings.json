@@ -703,7 +703,11 @@
       "resyncForbidden": "Yeniden gönderme için ADMIN yetkisi gerekli.",
       "resyncFailed": "Yeniden gönderme başarısız — tekrar deneyin.",
       "resyncHint": "Saatlik zamanlayıcı FAILED belgeleri otomatik de dener."
-    }
+    },
+    "providerNilvera": "Nilvera",
+    "nilveraApiUrl": "Nilvera API Adresi",
+    "nilveraApiKey": "Nilvera API Anahtarı",
+    "nilveraHint": "Nilvera panelinizden üretilen sabit anahtar (Persisted Access Token). API adresini panelden teyit edin."
   },
   "emailChannel": {
     "reservationSection": "E-posta — Rezervasyon olayları",

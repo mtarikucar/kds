@@ -703,7 +703,11 @@
       "resyncForbidden": "Для повторной отправки нужны права ADMIN.",
       "resyncFailed": "Повторная отправка не удалась — попробуйте ещё раз.",
       "resyncHint": "Ежечасный планировщик также автоматически повторяет FAILED-документы."
-    }
+    },
+    "providerNilvera": "Nilvera",
+    "nilveraApiUrl": "Адрес API Nilvera",
+    "nilveraApiKey": "API-ключ Nilvera",
+    "nilveraHint": "Статический ключ из панели Nilvera (Persisted Access Token). Подтвердите адрес API в панели."
   },
   "emailChannel": {
     "reservationSection": "Email — события брони",

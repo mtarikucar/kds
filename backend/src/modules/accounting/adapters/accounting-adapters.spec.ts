@@ -367,3 +367,182 @@ describe('cancelInvoice — honest GATED stubs (A3)', () => {
     expect(http.get).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * NilveraAdapter — statik API-anahtarı (Persisted Access Token) modeli.
+ * Kilitlenen sözleşmeler: authenticate ağa çıkmaz (anahtar=token);
+ * pushInvoice eDocumentType'a göre earchive/einvoice Send/Xml yoluna Bearer
+ * ile POST'lar ve UUID'yi savunmacı ayrıştırır; cancelInvoice ASLA throw
+ * etmez (gerçek DELETE denemesi — Foriba/Logo/Parasut'un GATED stub'ından
+ * farklı); VKN sorgusu true/false/null (bilinmiyor) üçlüsünü döndürür.
+ */
+describe("NilveraAdapter", () => {
+  const { NilveraAdapter } = require("./nilvera.adapter");
+
+  function nilvera() {
+    const adapter = new NilveraAdapter();
+    const http = {
+      post: jest.fn(),
+      get: jest.fn(),
+      delete: jest.fn(),
+      defaults: { baseURL: "" } as { baseURL?: string },
+    };
+    (adapter as any).httpClient = http;
+    return { adapter, http };
+  }
+
+  it("authenticate returns the static key as token WITHOUT network traffic", async () => {
+    const { adapter, http } = nilvera();
+    const out = await adapter.authenticate({
+      apiKey: "nlv-key",
+      apiUrl: "https://api.example",
+    });
+    expect(out.accessToken).toBe("nlv-key");
+    expect(out.expiresAt!.getTime()).toBeGreaterThan(Date.now());
+    expect(http.post).not.toHaveBeenCalled();
+    expect(http.defaults.baseURL).toBe("https://api.example");
+  });
+
+  it("authenticate throws when the API key is missing", async () => {
+    const { adapter } = nilvera();
+    await expect(adapter.authenticate({})).rejects.toThrow(/API key/i);
+  });
+
+  it("pushInvoice defaults to the e-Arşiv path with a Bearer header and parses UUID", async () => {
+    const { adapter, http } = nilvera();
+    http.defaults.baseURL = "https://api.example";
+    http.post.mockResolvedValue({ data: { UUID: "uuid-1" } });
+
+    const out = await adapter.pushInvoice("tok", "", invoice);
+
+    expect(out.externalId).toBe("uuid-1");
+    const [url, body, opts] = http.post.mock.calls[0];
+    expect(url).toBe("https://api.example/earchive/Send/Xml");
+    expect(opts.headers.Authorization).toBe("Bearer tok");
+    // Node 18+ global FormData ile multipart dosya gönderilir.
+    expect(body).toBeInstanceOf(FormData);
+  });
+
+  it("pushInvoice routes EFATURA to the e-Fatura path and accepts array responses", async () => {
+    const { adapter, http } = nilvera();
+    http.defaults.baseURL = "https://api.example";
+    http.post.mockResolvedValue({ data: [{ uuid: "uuid-b2b" }] });
+
+    const out = await adapter.pushInvoice("tok", "", {
+      ...invoice,
+      eDocumentType: "EFATURA",
+    });
+
+    expect(out.externalId).toBe("uuid-b2b");
+    expect(http.post.mock.calls[0][0]).toBe(
+      "https://api.example/einvoice/Send/Xml",
+    );
+  });
+
+  it("pushInvoice fails CLOSED without a configured apiUrl (never posts to a guessed host)", async () => {
+    const { adapter, http } = nilvera();
+    await expect(adapter.pushInvoice("tok", "", invoice)).rejects.toThrow(
+      /apiUrl/i,
+    );
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it("pushInvoice throws a clear error when the response carries no UUID", async () => {
+    const { adapter, http } = nilvera();
+    http.defaults.baseURL = "https://api.example";
+    http.post.mockResolvedValue({ data: { ok: true } });
+    await expect(adapter.pushInvoice("tok", "", invoice)).rejects.toThrow(
+      /no invoice UUID/i,
+    );
+  });
+
+  it("cancelInvoice really calls the e-Arşiv cancel endpoint and reports success", async () => {
+    const { adapter, http } = nilvera();
+    http.defaults.baseURL = "https://api.example";
+    http.delete.mockResolvedValue({ data: {} });
+
+    const out = await adapter.cancelInvoice("tok", "", "uuid-1");
+
+    expect(out).toEqual({ success: true });
+    const [url, opts] = http.delete.mock.calls[0];
+    expect(url).toBe("https://api.example/earchive/Cancel");
+    expect(opts.data).toEqual(["uuid-1"]);
+    expect(opts.headers.Authorization).toBe("Bearer tok");
+  });
+
+  it("cancelInvoice NEVER throws — provider refusal maps to success:false with a manual-cancel hint", async () => {
+    const { adapter, http } = nilvera();
+    http.defaults.baseURL = "https://api.example";
+    http.delete.mockRejectedValue({
+      response: { status: 422, data: { Message: "already reported to GİB" } },
+    });
+
+    const out = await adapter.cancelInvoice("tok", "", "uuid-1");
+
+    expect(out.success).toBe(false);
+    expect(out.error).toMatch(/already reported/);
+    expect(out.error).toMatch(/manually/i);
+  });
+
+  it("testConnection is true on a 2xx company read and false on failure (no throw into UI)", async () => {
+    const { adapter, http } = nilvera();
+    http.get.mockResolvedValue({ data: {} });
+    await expect(
+      adapter.testConnection({ apiKey: "k", apiUrl: "https://api.example" }),
+    ).resolves.toBe(true);
+    expect(http.get.mock.calls[0][0]).toBe(
+      "https://api.example/general/Company",
+    );
+
+    http.get.mockRejectedValue(new Error("401"));
+    await expect(
+      adapter.testConnection({ apiKey: "k", apiUrl: "https://api.example" }),
+    ).resolves.toBe(false);
+  });
+
+  it("isRegisteredEFaturaUser: boolean body → verbatim; 404 → false; unknown shape → null; network error → null", async () => {
+    const { adapter, http } = nilvera();
+    const url = "https://api.example";
+
+    http.get.mockResolvedValueOnce({ data: true });
+    await expect(
+      adapter.isRegisteredEFaturaUser("k", url, "1234567890"),
+    ).resolves.toBe(true);
+    expect(http.get.mock.calls[0][0]).toBe(
+      "https://api.example/general/GlobalCompany/Check/TaxNumber/1234567890",
+    );
+
+    http.get.mockRejectedValueOnce({ response: { status: 404 } });
+    await expect(
+      adapter.isRegisteredEFaturaUser("k", url, "1234567890"),
+    ).resolves.toBe(false);
+
+    http.get.mockResolvedValueOnce({ data: { weird: "shape" } });
+    await expect(
+      adapter.isRegisteredEFaturaUser("k", url, "1234567890"),
+    ).resolves.toBeNull();
+
+    http.get.mockRejectedValueOnce(new Error("ECONNRESET"));
+    await expect(
+      adapter.isRegisteredEFaturaUser("k", url, "1234567890"),
+    ).resolves.toBeNull();
+  });
+
+  it("signs the UBL before dispatch when a signer is configured (Foriba parity)", async () => {
+    const { adapter, http } = nilvera();
+    http.defaults.baseURL = "https://api.example";
+    http.post.mockResolvedValue({ data: { UUID: "uuid-signed" } });
+    adapter.setSigner({
+      name: "test-signer",
+      isConfigured: () => true,
+      sign: async (xml: string) => `<signed>${xml.length}</signed>`,
+    } as any);
+
+    await adapter.pushInvoice("tok", "", invoice);
+
+    const form = http.post.mock.calls[0][1] as FormData;
+    const file = form.get("file") as Blob;
+    const text = await file.text();
+    expect(text).toMatch(/^<signed>\d+<\/signed>$/);
+  });
+});

@@ -703,7 +703,11 @@
       "resyncForbidden": "Resending requires ADMIN privileges.",
       "resyncFailed": "Resend failed — try again.",
       "resyncHint": "An hourly scheduler also retries FAILED documents automatically."
-    }
+    },
+    "providerNilvera": "Nilvera",
+    "nilveraApiUrl": "Nilvera API URL",
+    "nilveraApiKey": "Nilvera API Key",
+    "nilveraHint": "Static key generated in your Nilvera panel (Persisted Access Token). Confirm the API URL from the panel."
   },
   "emailChannel": {
     "reservationSection": "Email — Reservation events",

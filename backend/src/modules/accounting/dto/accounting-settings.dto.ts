@@ -44,7 +44,7 @@ export class UpdateAccountingSettingsDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  @IsIn(["NONE", "PARASUT", "LOGO", "FORIBA"])
+  @IsIn(["NONE", "PARASUT", "LOGO", "FORIBA", "NILVERA"])
   provider?: string;
   @ApiPropertyOptional()
   @StringToBoolean()
@@ -67,6 +67,11 @@ export class UpdateAccountingSettingsDto {
   @ApiPropertyOptional() @IsString() @IsOptional() foribaUsername?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() foribaPassword?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() foribaServiceType?: string;
+
+  // Nilvera: statik "Persisted Access Token" modeli — kullanıcı adı/şifre yok,
+  // panelden üretilen API anahtarı + tenant'ın panelinden teyit edilen apiUrl.
+  @ApiPropertyOptional() @IsString() @IsOptional() nilveraApiUrl?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() nilveraApiKey?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() invoicePrefix?: string;
   @ApiPropertyOptional()

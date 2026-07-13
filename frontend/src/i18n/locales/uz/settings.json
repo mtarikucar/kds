@@ -703,7 +703,11 @@
       "resyncForbidden": "Qayta yuborish uchun ADMIN huquqlari kerak.",
       "resyncFailed": "Qayta yuborish muvaffaqiyatsiz — yana urinib ko‘ring.",
       "resyncHint": "Soatlik rejalashtiruvchi FAILED hujjatlarni avtomatik ham qayta urinadi."
-    }
+    },
+    "providerNilvera": "Nilvera",
+    "nilveraApiUrl": "Nilvera API manzili",
+    "nilveraApiKey": "Nilvera API kaliti",
+    "nilveraHint": "Nilvera panelida yaratilgan doimiy kalit (Persisted Access Token). API manzilini paneldan tasdiqlang."
   },
   "emailChannel": {
     "reservationSection": "Email — Bron hodisalari",
