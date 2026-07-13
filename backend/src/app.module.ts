@@ -51,7 +51,6 @@ import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CheckoutModule } from "./modules/checkout/checkout.module";
 import { CashDrawerModule } from "./modules/cash-drawer/cash-drawer.module";
 import { ExpensesModule } from "./modules/expenses/expenses.module";
-import { OkcModule } from "./modules/okc/okc.module";
 import { PaymentsCoreModule } from "./modules/payments-core/payments-core.module";
 import { FiscalCoreModule } from "./modules/fiscal-core/fiscal-core.module";
 import { PaymentTerminalModule } from "./modules/payment-terminal/payment-terminal.module";
@@ -159,8 +158,10 @@ import { validate } from "./config/env.validation";
     CheckoutModule,
     CashDrawerModule,
     ExpensesModule,
-    OkcModule,
     // HummyTummy Phase 6 & 7: payment + fiscal abstractions (vendor-neutral).
+    // NOTE: the legacy `okc` module was retired here — its on-demand fiscal-print
+    // path was unused (no frontend caller) and lacked persistence/idempotency/
+    // double-fiscalization guards. FiscalCoreModule is the single fiscal rail.
     PaymentsCoreModule,
     FiscalCoreModule,
     PaymentTerminalModule,

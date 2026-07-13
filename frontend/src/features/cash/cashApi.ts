@@ -54,25 +54,6 @@ export const useTipDistribution = (params: {
   });
 };
 
-export const useOkcDevice = () => {
-  return useQuery({
-    queryKey: ['okc', 'device'],
-    queryFn: async () => {
-      const r = await api.get('/okc/device');
-      return r.data;
-    },
-  });
-};
-
-export const usePrintOkcReceipt = () => {
-  return useMutation({
-    mutationFn: async (orderId: string) => {
-      const r = await api.post(`/okc/orders/${orderId}/print`);
-      return r.data;
-    },
-  });
-};
-
 export const downloadSessionsCsv = async () => {
   // Z-history = closed sessions only (OPEN rows have empty reconciliation cols).
   const r = await api.get('/cash-drawer/sessions.csv', {
