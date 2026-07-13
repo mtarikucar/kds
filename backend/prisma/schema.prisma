@@ -4349,6 +4349,11 @@ model AccountingSettings {
   foribaPassword    String?
   foribaServiceType String?
 
+  // Nilvera (statik API-anahtarı modeli). apiKey KMS ile şifreli saklanır
+  // (accounting-settings.service ENCRYPTED_FIELDS).
+  nilveraApiUrl String?
+  nilveraApiKey String?
+
   invoicePrefix          String @default("FTR")
   nextInvoiceNumber      Int    @default(1)
   defaultPaymentTermDays Int    @default(0)

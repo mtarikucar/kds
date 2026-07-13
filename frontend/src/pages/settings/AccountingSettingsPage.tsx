@@ -36,6 +36,8 @@ interface AccountingSettingsState {
   foribaUsername: string;
   foribaPassword: string;
   foribaServiceType: string;
+  nilveraApiUrl: string;
+  nilveraApiKey: string;
 }
 
 // TR VKN = exactly 10 digits (legal entity), TCKN = 11 digits (individual).
@@ -68,6 +70,8 @@ const defaultSettings: AccountingSettingsState = {
   foribaUsername: '',
   foribaPassword: '',
   foribaServiceType: '',
+  nilveraApiUrl: '',
+  nilveraApiKey: '',
 };
 
 // Reusable settings body (no page chrome) so both the standalone route AND
@@ -106,7 +110,7 @@ export const AccountingSettingsPanel = () => {
       const payload: Partial<AccountingSettingsState> = { ...newSettings };
       const credentialFields = [
         'parasutClientSecret', 'parasutPassword',
-        'logoPassword', 'foribaPassword',
+        'logoPassword', 'foribaPassword', 'nilveraApiKey',
       ] as const;
       for (const field of credentialFields) {
         if (!payload[field]) {
@@ -312,6 +316,7 @@ export const AccountingSettingsPanel = () => {
                 { value: 'PARASUT', label: t('accounting.providerParasut') },
                 { value: 'LOGO', label: t('accounting.providerLogo') },
                 { value: 'FORIBA', label: t('accounting.providerForiba') },
+                { value: 'NILVERA', label: t('accounting.providerNilvera') },
               ]}
             />
 
@@ -442,6 +447,31 @@ export const AccountingSettingsPanel = () => {
                   value={settings.foribaServiceType}
                   onChange={(val) => handleChange('foribaServiceType', val)}
                 />
+              </>
+            )}
+
+            {/* Nilvera Credentials — statik API anahtarı (Persisted Access Token) */}
+            {settings.provider === 'NILVERA' && (
+              <>
+                <SettingsDivider />
+                <SettingsInput
+                  label={t('accounting.nilveraApiUrl')}
+                  description={t('accounting.nilveraHint')}
+                  value={settings.nilveraApiUrl}
+                  onChange={(val) => handleChange('nilveraApiUrl', val)}
+                />
+                <SettingsDivider />
+                <div className="flex items-start justify-between gap-4 py-3 px-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900">{t('accounting.nilveraApiKey')}</p>
+                  </div>
+                  <input
+                    type="password"
+                    value={settings.nilveraApiKey}
+                    onChange={(e) => handleChange('nilveraApiKey', e.target.value)}
+                    className="flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  />
+                </div>
               </>
             )}
 

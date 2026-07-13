@@ -17,6 +17,7 @@ import {
 import { ParasutAdapter } from "../adapters/parasut.adapter";
 import { ForibaEfaturaAdapter } from "../adapters/foriba-efatura.adapter";
 import { LogoAdapter } from "../adapters/logo.adapter";
+import { NilveraAdapter } from "../adapters/nilvera.adapter";
 import {
   AccountingProvider,
   STUCK_SYNCING_THRESHOLD_MS,
@@ -166,14 +167,26 @@ export class AccountingSyncService {
       // HTTP in prod). Registered VKN → e-Fatura, otherwise e-Arşiv — the
       // safe final-consumer default that never wrongly issues a B2B e-Fatura
       // the buyer can't receive.
+      //
+      // Nilvera bridge: when the tenant's provider is Nilvera, its own
+      // GlobalCompany/Check endpoint IS the authoritative mükellef query —
+      // prefer it over the injected (mock/null) provider. `null` means the
+      // HTTP check couldn't answer; fall back to the injected provider so
+      // behaviour degrades to the pre-Nilvera path instead of guessing.
+      const registered = invoice.customerTaxId
+        ? ((await this.nilveraMukellefCheck(
+            adapter,
+            settings,
+            invoice.customerTaxId,
+          )) ??
+          (await this.mukellefQuery.isRegisteredEFaturaUser(
+            invoice.customerTaxId,
+          )))
+        : false;
       const eDocumentType = resolveEDocumentType({
         taxId: invoice.customerTaxId,
         taxOffice: invoice.customerTaxOffice,
-        isRegisteredEFaturaUser: invoice.customerTaxId
-          ? await this.mukellefQuery.isRegisteredEFaturaUser(
-              invoice.customerTaxId,
-            )
-          : false,
+        isRegisteredEFaturaUser: registered,
       });
 
       // A5: validate the buyer party for the chosen document type BEFORE any
@@ -417,8 +430,41 @@ export class AccountingSyncService {
         return new ForibaEfaturaAdapter().setSigner(this.signer);
       case AccountingProvider.LOGO:
         return new LogoAdapter();
+      case AccountingProvider.NILVERA:
+        // Signer optional: when unconfigured, Nilvera seals with its own
+        // mali mühür (integrator-side signing) — adapter sends unsigned.
+        return new NilveraAdapter().setSigner(this.signer);
       default:
         return null;
+    }
+  }
+
+  /**
+   * Nilvera-backed mükellef (VKN) query. Returns null (= "couldn't answer")
+   * unless the active provider is Nilvera with usable credentials — the
+   * caller then falls back to the injected MukellefQueryProvider. Never
+   * throws: a lookup hiccup must not fail the sync, only degrade routing to
+   * the safe e-Arşiv default.
+   */
+  private async nilveraMukellefCheck(
+    adapter: AccountingAdapter | null,
+    settings: any,
+    taxId: string,
+  ): Promise<boolean | null> {
+    if (!(adapter instanceof NilveraAdapter)) return null;
+    try {
+      const credentials = this.getCredentials(
+        settings,
+        AccountingProvider.NILVERA,
+      );
+      if (!credentials.apiKey || !credentials.apiUrl) return null;
+      return await adapter.isRegisteredEFaturaUser(
+        credentials.apiKey,
+        credentials.apiUrl,
+        taxId,
+      );
+    } catch {
+      return null;
     }
   }
 
@@ -468,6 +514,11 @@ export class AccountingSyncService {
           apiUrl: settings.foribaApiUrl || "",
           username: settings.foribaUsername || "",
           password: settings.foribaPassword || "",
+        };
+      case AccountingProvider.NILVERA:
+        return {
+          apiUrl: settings.nilveraApiUrl || "",
+          apiKey: settings.nilveraApiKey || "",
         };
       default:
         return {};

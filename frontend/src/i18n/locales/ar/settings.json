@@ -703,7 +703,11 @@
       "resyncForbidden": "تتطلب إعادة الإرسال صلاحيات ADMIN.",
       "resyncFailed": "فشلت إعادة الإرسال — حاول مرة أخرى.",
       "resyncHint": "يقوم مجدول كل ساعة أيضًا بإعادة محاولة مستندات FAILED تلقائيًا."
-    }
+    },
+    "providerNilvera": "Nilvera",
+    "nilveraApiUrl": "عنوان API الخاص بـ Nilvera",
+    "nilveraApiKey": "مفتاح API الخاص بـ Nilvera",
+    "nilveraHint": "مفتاح ثابت يتم إنشاؤه من لوحة Nilvera (رمز وصول دائم). تأكد من عنوان API من اللوحة."
   },
   "emailChannel": {
     "reservationSection": "البريد الإلكتروني — أحداث الحجز",
