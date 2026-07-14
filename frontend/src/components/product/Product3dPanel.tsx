@@ -13,6 +13,7 @@ import {
   useGenerate3d,
 } from "../../features/menu/product3dApi";
 import AiLockedTeaser from "./AiLockedTeaser";
+import FeatureGate from "../subscriptions/FeatureGate";
 
 interface Props {
   productId?: string;
@@ -27,12 +28,20 @@ interface Props {
  * Phase 2 UI: turn a dish photo into a 3D model (Meshy) so the QR menu can offer
  * "view in AR on your table". Renders nothing unless the backend is configured
  * (MESHY_API_KEY / simulator) and we're editing a saved product.
+ *
+ * PRO+ only (feature.aiContentGeneration) — backend 403s /generate for lower
+ * plans, so the gate here keeps the UI honest instead of failing on click.
+ * No quota: Meshy jobs are idempotent per product (unlike photo/video).
  */
-export default function Product3dPanel({
-  productId,
-  hasImage,
-  ensureProductId,
-}: Props) {
+export default function Product3dPanel(props: Props) {
+  return (
+    <FeatureGate feature="aiContentGeneration">
+      <Product3dPanelInner {...props} />
+    </FeatureGate>
+  );
+}
+
+function Product3dPanelInner({ productId, hasImage, ensureProductId }: Props) {
   const { t } = useTranslation(["menu", "common"]);
   const { data: config } = useProduct3dConfig();
   const { data: state } = useProduct3dStatus(productId, !!productId);

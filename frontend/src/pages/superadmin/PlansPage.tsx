@@ -291,6 +291,8 @@ function PlanModal({
     maxProducts: (plan?.maxProducts ?? 50) as number | '',
     maxCategories: (plan?.maxCategories ?? 10) as number | '',
     maxMonthlyOrders: (plan?.maxMonthlyOrders ?? 100) as number | '',
+    maxMonthlyAiPhotos: (plan?.maxMonthlyAiPhotos ?? 0) as number | '',
+    maxMonthlyAiVideos: (plan?.maxMonthlyAiVideos ?? 0) as number | '',
     advancedReports: plan?.advancedReports || false,
     multiLocation: plan?.multiLocation || false,
     customBranding: plan?.customBranding || false,
@@ -307,6 +309,7 @@ function PlanModal({
     deliveryIntegration: plan?.deliveryIntegration || false,
     externalDisplay: plan?.externalDisplay || false,
     posAccess: plan?.posAccess ?? true,
+    aiContentGeneration: plan?.aiContentGeneration || false,
     isActive: plan?.isActive ?? true,
     discountPercentage: plan?.discountPercentage || 0,
     discountLabel: plan?.discountLabel || '',
@@ -328,6 +331,8 @@ function PlanModal({
       'maxProducts',
       'maxCategories',
       'maxMonthlyOrders',
+      'maxMonthlyAiPhotos',
+      'maxMonthlyAiVideos',
     ] as const;
     const cleaned: Record<string, unknown> = { ...formData };
     for (const key of LIMIT_KEYS) {
@@ -479,6 +484,26 @@ function PlanModal({
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.aiPhotosPerMonth', 'AI foto / ay')}</label>
+                <input
+                  type="number"
+                  min={-1}
+                  value={formData.maxMonthlyAiPhotos}
+                  onChange={(e) => setFormData({ ...formData, maxMonthlyAiPhotos: e.target.value === '' ? '' : Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.aiVideosPerMonth', 'AI video / ay')}</label>
+                <input
+                  type="number"
+                  min={-1}
+                  value={formData.maxMonthlyAiVideos}
+                  onChange={(e) => setFormData({ ...formData, maxMonthlyAiVideos: e.target.value === '' ? '' : Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                />
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2">
@@ -589,6 +614,15 @@ function PlanModal({
                   className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                 />
                 <span className="text-sm text-zinc-700">{t('plans.modal.posAccess', 'POS erişimi')}</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.aiContentGeneration}
+                  onChange={(e) => setFormData({ ...formData, aiContentGeneration: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">{t('plans.modal.aiContentGeneration', 'AI içerik üretimi (menü stüdyosu)')}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input

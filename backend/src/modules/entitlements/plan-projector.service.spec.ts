@@ -291,6 +291,8 @@ describe("PlanProjectorService.projectTenant", () => {
       "posAccess",
       // Partner Display API gate — feature.externalDisplay.
       "externalDisplay",
+      // AI menu studio gate — feature.aiContentGeneration.
+      "aiContentGeneration",
     ];
     // Same intent for numeric limit columns.
     const EXPECTED_LIMITS = [
@@ -302,6 +304,9 @@ describe("PlanProjectorService.projectTenant", () => {
       "maxProducts",
       "maxCategories",
       "maxMonthlyOrders",
+      // AI menu-studio monthly generation caps.
+      "maxMonthlyAiPhotos",
+      "maxMonthlyAiVideos",
     ];
     // `as any` to reach the private static — guard is a test-only escape.
     expect((PlanProjectorService as any).FEATURE_COLUMNS).toEqual(

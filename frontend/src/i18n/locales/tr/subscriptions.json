@@ -230,7 +230,9 @@
         "maxBranches": "Şube sayısı",
         "maxProducts": "Ürün sayısı",
         "maxCategories": "Kategori sayısı",
-        "maxMonthlyOrders": "Aylık sipariş"
+        "maxMonthlyOrders": "Aylık sipariş",
+        "maxMonthlyAiPhotos": "AI fotoğraf / ay",
+        "maxMonthlyAiVideos": "AI video / ay"
       },
       "features": {
         "kdsIntegration": "KDS entegrasyonu",
@@ -244,7 +246,8 @@
         "multiLocation": "Çoklu şube",
         "customBranding": "Özel marka",
         "apiAccess": "API erişimi",
-        "prioritySupport": "Öncelikli destek"
+        "prioritySupport": "Öncelikli destek",
+        "aiContentGeneration": "Yapay Zeka Menü Stüdyosu"
       }
     },
     "payNow": "Şimdi öde",
@@ -338,6 +341,7 @@
     "featureApiAccess": "API Erişimi",
     "featurePrioritySupport": "Öncelikli Destek",
     "featureInventoryTracking": "Stok Takibi",
-    "featureKdsIntegration": "KDS Entegrasyonu"
+    "featureKdsIntegration": "KDS Entegrasyonu",
+    "featureAiContentGeneration": "Yapay Zeka Menü Stüdyosu (fotoğraf ve video üretimi)"
   }
 }

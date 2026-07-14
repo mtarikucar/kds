@@ -230,7 +230,9 @@
         "maxBranches": "Branches",
         "maxProducts": "Products",
         "maxCategories": "Categories",
-        "maxMonthlyOrders": "Monthly orders"
+        "maxMonthlyOrders": "Monthly orders",
+        "maxMonthlyAiPhotos": "AI photos / month",
+        "maxMonthlyAiVideos": "AI videos / month"
       },
       "features": {
         "kdsIntegration": "KDS integration",
@@ -244,7 +246,8 @@
         "multiLocation": "Multi-location",
         "customBranding": "Custom branding",
         "apiAccess": "API access",
-        "prioritySupport": "Priority support"
+        "prioritySupport": "Priority support",
+        "aiContentGeneration": "AI Menu Studio"
       }
     },
     "payNow": "Pay now",
@@ -338,6 +341,7 @@
     "featureApiAccess": "API Access",
     "featurePrioritySupport": "Priority Support",
     "featureInventoryTracking": "Inventory Tracking",
-    "featureKdsIntegration": "KDS Integration"
+    "featureKdsIntegration": "KDS Integration",
+    "featureAiContentGeneration": "AI Menu Studio (photo & video generation)"
   }
 }

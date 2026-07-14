@@ -79,6 +79,10 @@ export enum PlanFeature {
   // tablets that replicate the QR menu). Gates partner API-key issuance +
   // screen-session minting. Mirrored as feature.externalDisplay on the engine.
   EXTERNAL_DISPLAY = "externalDisplay",
+  // AI menu studio (photo/frame/video generation, Meshy 3D, OCR menu import).
+  // PRO+ only; monthly photo/video caps live in maxMonthlyAiPhotos /
+  // maxMonthlyAiVideos. Mirrored as feature.aiContentGeneration on the engine.
+  AI_CONTENT_GENERATION = "aiContentGeneration",
 }
 
 export enum TenantStatus {

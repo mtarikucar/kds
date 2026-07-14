@@ -67,8 +67,18 @@ describe("ProductMediaService", () => {
     });
   });
 
+  // Quota stub: always grants (quota behavior has its own spec —
+  // menu-ai-quota.service.spec.ts); these tests exercise the fal lifecycle.
+  const quotaStub = () => ({
+    claim: jest.fn().mockResolvedValue("usage1"),
+    attachJob: jest.fn().mockResolvedValue(undefined),
+    voidUsage: jest.fn().mockResolvedValue(undefined),
+    voidByJob: jest.fn().mockResolvedValue(undefined),
+    getUsage: jest.fn().mockResolvedValue({ used: 0, limit: -1, remaining: -1 }),
+  });
+
   const make = (over: Record<string, string> = {}) =>
-    new ProductMediaService(prisma as any, cfg(over) as any);
+    new ProductMediaService(prisma as any, cfg(over) as any, quotaStub() as any);
 
   describe("gate", () => {
     it("throws when not configured", async () => {

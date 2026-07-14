@@ -315,6 +315,28 @@ export class PlanFeatureGuard implements CanActivate {
           },
         });
         break;
+
+      // AI menu-studio caps. The authoritative gate is the atomic claim in
+      // MenuAiQuotaService (advisory-locked check+insert); these cases exist
+      // so a @CheckLimit pre-check on some future route counts the same
+      // ledger instead of silently passing with currentCount=0.
+      case LimitType.AI_PHOTOS:
+      case LimitType.AI_VIDEOS: {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const agg = await this.prisma.aiGenerationUsage.aggregate({
+          _sum: { units: true },
+          where: {
+            tenantId,
+            kind: limitType === LimitType.AI_PHOTOS ? "PHOTO" : "VIDEO",
+            voided: false,
+            createdAt: { gte: monthStart },
+          },
+        });
+        currentCount = agg._sum.units ?? 0;
+        break;
+      }
     }
 
     if (currentCount >= limit) {

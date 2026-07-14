@@ -1015,6 +1015,11 @@ export interface PlanLimits {
   maxProducts: number;
   maxCategories: number;
   maxMonthlyOrders: number;
+  /** AI menu-studio monthly generation caps (calendar month). PHOTO+FRAME
+   *  draw from the photo cap, VIDEO from the video cap. 0 = none (BASIC),
+   *  -1 = unlimited. PRO 50/5, BUSINESS 200/20, TRIAL taster 3/1. */
+  maxMonthlyAiPhotos: number;
+  maxMonthlyAiVideos: number;
 }
 
 export interface PlanFeatures {
@@ -1039,6 +1044,11 @@ export interface PlanFeatures {
    *  a tenant-issued API key. Gates the /admin/settings/partner-keys page and
    *  the /v1/partner/* + /v1/display/* backend surface. */
   externalDisplay: boolean;
+  /** AI menu studio (photo/frame/video generation, Meshy 3D, OCR menu
+   *  import). PRO+ only; monthly caps live in PlanLimits.maxMonthlyAiPhotos /
+   *  maxMonthlyAiVideos. Gates the AI Studio panel + the generate endpoints
+   *  server-side. */
+  aiContentGeneration: boolean;
 }
 
 export interface Plan {

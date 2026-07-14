@@ -14,6 +14,8 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
+import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { UserRole } from "../../../common/constants/roles.enum";
 
 @ApiTags("product-3d")
@@ -32,6 +34,9 @@ export class Product3dController {
 
   @Post(":id/generate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  // AI studio is PRO+ (feature-flag only — Meshy generations are idempotent
+  // per product, so no monthly cap; photo/video quotas don't apply here).
+  @RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)
   @ApiOperation({ summary: "Start 3D-model generation from a product's photo" })
   generate(
     @Param("id") id: string,

@@ -342,7 +342,10 @@
       "create": "Create",
       "deliveryIntegration": "Yetkazib berish integratsiyasi",
       "externalDisplay": "Tashqi displey (hamkor displey)",
-      "posAccess": "POS kirish"
+      "posAccess": "POS kirish",
+      "aiPhotosPerMonth": "AI surat/oy",
+      "aiVideosPerMonth": "AI video/oy",
+      "aiContentGeneration": "AI kontent yaratish"
     }
   },
   "marketplace": {

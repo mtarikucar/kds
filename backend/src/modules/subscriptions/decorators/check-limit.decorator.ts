@@ -9,6 +9,12 @@ export enum LimitType {
   PRODUCTS = "maxProducts",
   CATEGORIES = "maxCategories",
   MONTHLY_ORDERS = "maxMonthlyOrders",
+  // AI menu-studio monthly caps. Real enforcement is the atomic claim inside
+  // MenuAiQuotaService (a guard-level pre-check would race on parallel
+  // submits); these members exist so limitOverrides keys, the FE PlanLimits
+  // mirror and the guard's usage switch share the same column names.
+  AI_PHOTOS = "maxMonthlyAiPhotos",
+  AI_VIDEOS = "maxMonthlyAiVideos",
 }
 
 /**

@@ -56,6 +56,8 @@ export class PlanResponseDto {
     maxProducts: number;
     maxCategories: number;
     maxMonthlyOrders: number;
+    maxMonthlyAiPhotos: number;
+    maxMonthlyAiVideos: number;
   };
 
   features: {
@@ -70,6 +72,7 @@ export class PlanResponseDto {
     reservationSystem: boolean;
     personnelManagement: boolean;
     deliveryIntegration: boolean;
+    aiContentGeneration: boolean;
   };
 
   isActive: boolean;

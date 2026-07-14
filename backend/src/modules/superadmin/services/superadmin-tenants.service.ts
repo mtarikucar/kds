@@ -28,7 +28,8 @@ type PlanFeatureKey =
   | "reservationSystem"
   | "personnelManagement"
   | "deliveryIntegration"
-  | "posAccess";
+  | "posAccess"
+  | "aiContentGeneration";
 const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "advancedReports",
   "multiLocation",
@@ -42,6 +43,7 @@ const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "personnelManagement",
   "deliveryIntegration",
   "posAccess",
+  "aiContentGeneration",
 ];
 
 type PlanLimitKey =
@@ -50,7 +52,9 @@ type PlanLimitKey =
   | "maxBranches"
   | "maxProducts"
   | "maxCategories"
-  | "maxMonthlyOrders";
+  | "maxMonthlyOrders"
+  | "maxMonthlyAiPhotos"
+  | "maxMonthlyAiVideos";
 const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxUsers",
   "maxTables",
@@ -58,6 +62,8 @@ const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxProducts",
   "maxCategories",
   "maxMonthlyOrders",
+  "maxMonthlyAiPhotos",
+  "maxMonthlyAiVideos",
 ];
 
 @Injectable()

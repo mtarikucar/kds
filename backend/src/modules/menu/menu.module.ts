@@ -7,6 +7,7 @@ import { MenuCacheService } from "./services/menu-cache.service";
 import { MenuImportService } from "./services/menu-import.service";
 import { Product3dService } from "./services/product-3d.service";
 import { ProductMediaService } from "./services/product-media.service";
+import { MenuAiQuotaService } from "./services/menu-ai-quota.service";
 import { CategoriesController } from "./controllers/categories.controller";
 import { ProductsController } from "./controllers/products.controller";
 import { QrMenuController } from "./controllers/qr-menu.controller";
@@ -42,6 +43,7 @@ import { UploadModule } from "../upload/upload.module";
     MenuImportService,
     Product3dService,
     ProductMediaService,
+    MenuAiQuotaService,
   ],
   exports: [CategoriesService, ProductsService, MenuQueryService],
 })

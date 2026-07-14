@@ -162,6 +162,9 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 200,
+      maxMonthlyAiVideos: 20,
       isActive: true,
     },
   });

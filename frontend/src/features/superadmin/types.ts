@@ -186,6 +186,10 @@ export interface SubscriptionPlan {
   maxProducts: number;
   maxCategories: number;
   maxMonthlyOrders: number;
+  // AI menu-studio monthly caps (0 = none, -1 = unlimited). Optional so
+  // older cached payloads without the fields still typecheck.
+  maxMonthlyAiPhotos?: number;
+  maxMonthlyAiVideos?: number;
   advancedReports: boolean;
   multiLocation: boolean;
   customBranding: boolean;
@@ -205,6 +209,8 @@ export interface SubscriptionPlan {
   deliveryIntegration?: boolean;
   externalDisplay?: boolean;
   posAccess?: boolean;
+  // AI menu studio gate (photo/frame/video + 3D + OCR import). PRO+.
+  aiContentGeneration?: boolean;
   isActive: boolean;
   discountPercentage?: number;
   discountLabel?: string;

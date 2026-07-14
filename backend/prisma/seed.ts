@@ -40,6 +40,11 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      // AI studio: full feature access but a deliberately small taster quota
+      // (unlike the -1 limits above) — generations cost real money per unit.
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 3,
+      maxMonthlyAiVideos: 1,
     },
     create: {
       name: "TRIAL",
@@ -68,6 +73,9 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 3,
+      maxMonthlyAiVideos: 1,
       isActive: true,
     },
   });
@@ -94,6 +102,9 @@ async function main() {
       personnelManagement: false,
       deliveryIntegration: false,
       posAccess: true,
+      aiContentGeneration: false,
+      maxMonthlyAiPhotos: 0,
+      maxMonthlyAiVideos: 0,
     },
     create: {
       name: "BASIC",
@@ -124,6 +135,9 @@ async function main() {
       personnelManagement: false,
       deliveryIntegration: false,
       posAccess: true,
+      aiContentGeneration: false,
+      maxMonthlyAiPhotos: 0,
+      maxMonthlyAiVideos: 0,
       isActive: true,
     },
   });
@@ -151,6 +165,9 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 50,
+      maxMonthlyAiVideos: 5,
     },
     create: {
       name: "PRO",
@@ -182,6 +199,9 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 50,
+      maxMonthlyAiVideos: 5,
       isActive: true,
     },
   });
@@ -209,6 +229,9 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 200,
+      maxMonthlyAiVideos: 20,
     },
     create: {
       name: "BUSINESS",
@@ -240,6 +263,9 @@ async function main() {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
+      maxMonthlyAiPhotos: 200,
+      maxMonthlyAiVideos: 20,
       isActive: true,
     },
   });

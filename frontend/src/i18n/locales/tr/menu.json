@@ -170,6 +170,10 @@
     "genVideo": "Videoyu oluştur",
     "regenVideo": "Videoyu yeniden oluştur",
     "videoNeeds": "Video için başlangıç fotoğrafı ve son kare gerekli.",
-    "finalizing": "İndiriliyor / kaydediliyor…"
+    "finalizing": "İndiriliyor / kaydediliyor…",
+    "quotaPhotos": "Fotoğraf",
+    "quotaVideos": "Video",
+    "quotaExhaustedPhotos": "Aylık fotoğraf üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin.",
+    "quotaExhaustedVideos": "Aylık video üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin."
   }
 }

@@ -59,6 +59,8 @@ export class PlanProjectorService {
     "posAccess",
     // Partner Display API gate — see PlanFeature.EXTERNAL_DISPLAY.
     "externalDisplay",
+    // AI menu studio gate — see PlanFeature.AI_CONTENT_GENERATION.
+    "aiContentGeneration",
   ] as const;
 
   private static readonly LIMIT_COLUMNS = [
@@ -71,6 +73,9 @@ export class PlanProjectorService {
     "maxProducts",
     "maxCategories",
     "maxMonthlyOrders",
+    // AI menu-studio monthly generation caps (photo+frame vs video).
+    "maxMonthlyAiPhotos",
+    "maxMonthlyAiVideos",
   ] as const;
 
   constructor(

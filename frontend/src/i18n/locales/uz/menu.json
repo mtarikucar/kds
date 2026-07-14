@@ -170,6 +170,10 @@
     "videoHint2": "Videoga yo'nalish bering — o'tishni tasvirlang (ixtiyoriy)",
     "genVideo": "Video yaratish",
     "regenVideo": "Videoni qayta yaratish",
-    "videoNeeds": "Video uchun boshlang'ich rasm va oxirgi kadr kerak."
+    "videoNeeds": "Video uchun boshlang'ich rasm va oxirgi kadr kerak.",
+    "quotaPhotos": "Suratlar",
+    "quotaVideos": "Videolar",
+    "quotaExhaustedPhotos": "Oylik AI surat limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring.",
+    "quotaExhaustedVideos": "Oylik AI video limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring."
   }
 }

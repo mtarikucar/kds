@@ -12,6 +12,7 @@ import * as path from "path";
 import axios from "axios";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
+import { MenuAiQuotaService } from "./menu-ai-quota.service";
 
 const FAL_QUEUE = "https://queue.fal.run";
 const MAX_POLL_ATTEMPTS = 40; // ~20 min at 30s ticks → FAILED (timeout)
@@ -39,6 +40,7 @@ export class ProductMediaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly quota: MenuAiQuotaService,
   ) {
     this.baseUrl =
       this.config.get<string>("BACKEND_URL") || "http://localhost:3000";
@@ -133,7 +135,17 @@ export class ProductMediaService {
       }, professionally plated on a clean plate, restaurant menu food photography, natural soft light, 45-degree angle, high detail, no text, no watermark`;
     const count = this.clampCount(opts.count);
 
-    return this.submitImageJob("PHOTO", product.id, tenantId, prompt, count);
+    // Atomic quota claim BEFORE any fal traffic; submitImageJob refunds it
+    // if the submit never becomes a job.
+    const usageId = await this.quota.claim(tenantId, "PHOTO", count);
+    return this.submitImageJob(
+      "PHOTO",
+      product.id,
+      tenantId,
+      prompt,
+      count,
+      usageId,
+    );
   }
 
   // ── FRAME (ingredients last frame) ──────────────────────────────────────────
@@ -163,60 +175,80 @@ export class ProductMediaService {
       }: the finished dish rests on a rustic plate at the bottom, and ALL of its raw ingredients — ${english.join(", ")} — fly and float UP in the air above and around the plate; EVERY one of these ingredients is clearly visible and present, well separated and spread apart across the frame, with dynamic sauce splashes; dark moody background, dramatic side light, professional food photography, sharp focus, high detail, absolutely no text, no labels, no writing`;
     }
     const count = this.clampCount(opts.count);
-    return this.submitImageJob("FRAME", product.id, tenantId, prompt, count);
+    // FRAME draws from the PHOTO allowance — same image model, same cost.
+    const usageId = await this.quota.claim(tenantId, "PHOTO", count);
+    return this.submitImageJob(
+      "FRAME",
+      product.id,
+      tenantId,
+      prompt,
+      count,
+      usageId,
+    );
   }
 
   /** Submit an image (PHOTO/FRAME) job to the fal queue (or finish inline in
-      the simulator). */
+      the simulator). `usageId` is the already-claimed quota ledger row: it is
+      linked to the job on success and refunded if no job ever materialises. */
   private async submitImageJob(
     kind: "PHOTO" | "FRAME",
     productId: string,
     tenantId: string,
     prompt: string,
     count: number,
+    usageId: string,
   ) {
-    if (!this.key && this.simulator) {
-      const files = await Promise.all(
-        Array.from({ length: count }, (_, i) =>
-          this.storeFromUrl(
-            this.sample("image"),
-            `${productId}-${kind.toLowerCase()}-${Date.now()}-${i}.png`,
+    try {
+      if (!this.key && this.simulator) {
+        const files = await Promise.all(
+          Array.from({ length: count }, (_, i) =>
+            this.storeFromUrl(
+              this.sample("image"),
+              `${productId}-${kind.toLowerCase()}-${Date.now()}-${i}.png`,
+            ),
           ),
-        ),
-      );
-      const urls = files.map((f) => this.hosted(f));
+        );
+        const urls = files.map((f) => this.hosted(f));
+        const job = await this.prisma.productMediaJob.create({
+          data: {
+            productId,
+            tenantId,
+            kind,
+            status: "COMPLETED",
+            prompt,
+            count,
+            percent: 100,
+            resultUrls: urls,
+          },
+        });
+        await this.quota.attachJob(usageId, job.id);
+        await this.finalizeImageJob(job, urls);
+        return this.jobView(await this.reload(job.id));
+      }
+      const requestId = await this.submitQueue(this.imageModel, {
+        prompt,
+        image_size: "square_hd",
+        num_images: count,
+      });
       const job = await this.prisma.productMediaJob.create({
         data: {
           productId,
           tenantId,
           kind,
-          status: "COMPLETED",
+          status: "IN_QUEUE",
+          falRequestId: requestId,
           prompt,
           count,
-          percent: 100,
-          resultUrls: urls,
         },
       });
-      await this.finalizeImageJob(job, urls);
-      return this.jobView(await this.reload(job.id));
+      await this.quota.attachJob(usageId, job.id);
+      return this.jobView(job);
+    } catch (err) {
+      // No job row exists (or the job never left our hands) — refund the
+      // claim so a fal outage doesn't burn the tenant's monthly allowance.
+      await this.quota.voidUsage(usageId).catch(() => undefined);
+      throw err;
     }
-    const requestId = await this.submitQueue(this.imageModel, {
-      prompt,
-      image_size: "square_hd",
-      num_images: count,
-    });
-    const job = await this.prisma.productMediaJob.create({
-      data: {
-        productId,
-        tenantId,
-        kind,
-        status: "IN_QUEUE",
-        falRequestId: requestId,
-        prompt,
-        count,
-      },
-    });
-    return this.jobView(job);
   }
 
   // ── VIDEO ──────────────────────────────────────────────────────────────────
@@ -254,50 +286,60 @@ export class ProductMediaService {
       opts.prompt?.trim() ||
       `Smooth cinematic transition from the finished plated dish to a display of its fresh raw ingredients. Photorealistic appetising food video, soft light, gentle motion, no text, no letters.`;
 
-    if (!this.key && this.simulator) {
-      const stored = await this.storeFromUrl(
-        this.sample("video"),
-        `${productId}-video-${Date.now()}.mp4`,
-      );
+    // Atomic quota claim BEFORE any fal traffic; refunded below if the
+    // submit never becomes a job.
+    const usageId = await this.quota.claim(tenantId, "VIDEO", 1);
+    try {
+      if (!this.key && this.simulator) {
+        const stored = await this.storeFromUrl(
+          this.sample("video"),
+          `${productId}-video-${Date.now()}.mp4`,
+        );
+        const job = await this.prisma.productMediaJob.create({
+          data: {
+            productId,
+            tenantId,
+            kind: "VIDEO",
+            status: "COMPLETED",
+            prompt,
+            percent: 100,
+            resultUrls: [stored],
+          },
+        });
+        await this.quota.attachJob(usageId, job.id);
+        await this.finalizeVideoJob(job, stored);
+        return this.jobView(await this.reload(job.id));
+      }
+
+      const requestId = await this.submitQueue(this.videoModel, {
+        prompt,
+        start_image_url: dishPhoto,
+        end_image_url: endFrame,
+      });
       const job = await this.prisma.productMediaJob.create({
         data: {
           productId,
           tenantId,
           kind: "VIDEO",
-          status: "COMPLETED",
+          status: "IN_QUEUE",
+          falRequestId: requestId,
           prompt,
-          percent: 100,
-          resultUrls: [stored],
         },
       });
-      await this.finalizeVideoJob(job, stored);
-      return this.jobView(await this.reload(job.id));
+      await this.quota.attachJob(usageId, job.id);
+      await this.prisma.product.update({
+        where: { id: product.id },
+        data: {
+          videoStatus: "PENDING",
+          videoTaskId: requestId,
+          videoError: null,
+        },
+      });
+      return this.jobView(job);
+    } catch (err) {
+      await this.quota.voidUsage(usageId).catch(() => undefined);
+      throw err;
     }
-
-    const requestId = await this.submitQueue(this.videoModel, {
-      prompt,
-      start_image_url: dishPhoto,
-      end_image_url: endFrame,
-    });
-    const job = await this.prisma.productMediaJob.create({
-      data: {
-        productId,
-        tenantId,
-        kind: "VIDEO",
-        status: "IN_QUEUE",
-        falRequestId: requestId,
-        prompt,
-      },
-    });
-    await this.prisma.product.update({
-      where: { id: product.id },
-      data: {
-        videoStatus: "PENDING",
-        videoTaskId: requestId,
-        videoError: null,
-      },
-    });
-    return this.jobView(job);
   }
 
   // ── set the product's primary image (pick a variation, by URL) ──────────────
@@ -547,6 +589,8 @@ export class ProductMediaService {
       where: { id: job.id },
       data: { status: "FAILED", error: reason.slice(0, 500) },
     });
+    // Failed generation = refund the quota claim (adapter error, timeout).
+    await this.quota.voidByJob(job.id).catch(() => undefined);
     if (job.kind === "VIDEO") {
       await this.prisma.product.update({
         where: { id: job.productId },

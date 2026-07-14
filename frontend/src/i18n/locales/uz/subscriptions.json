@@ -268,7 +268,9 @@
         "maxBranches": "Filiallar soni",
         "maxProducts": "Mahsulotlar",
         "maxCategories": "Kategoriyalar",
-        "maxMonthlyOrders": "Oylik buyurtmalar"
+        "maxMonthlyOrders": "Oylik buyurtmalar",
+        "maxMonthlyAiPhotos": "AI surat / oy",
+        "maxMonthlyAiVideos": "AI video / oy"
       },
       "features": {
         "kdsIntegration": "KDS integratsiyasi",
@@ -282,7 +284,8 @@
         "multiLocation": "Bir nechta filial",
         "customBranding": "Maxsus brending",
         "apiAccess": "API ruxsati",
-        "prioritySupport": "Ustuvor qo'llab-quvvatlash"
+        "prioritySupport": "Ustuvor qo'llab-quvvatlash",
+        "aiContentGeneration": "AI menyu studiyasi"
       }
     },
     "payNow": "Hozir to'lash",
@@ -357,6 +360,7 @@
       "error": "Xatolik yuz berdi",
       "missingInfo": "Ma'lumotlar yetishmayapti",
       "upgradeFrom": "Yangilanmoqda:"
-    }
+    },
+    "featureAiContentGeneration": "AI menyu studiyasi (surat va video yaratish)"
   }
 }

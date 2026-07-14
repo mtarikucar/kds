@@ -18,7 +18,7 @@ import { foldPlanGrants, PlanGrantSource } from "./effective-features.fold";
  * projector / fallback) that hid POS on fresh BUSINESS tenants.
  */
 
-// 11 features + 6 limits, every plan, transcribed from seed.ts.
+// 13 features + 8 limits, every plan, transcribed from seed.ts.
 type FeatureFlags = Omit<
   PlanGrantSource,
   | "maxUsers"
@@ -27,6 +27,8 @@ type FeatureFlags = Omit<
   | "maxProducts"
   | "maxCategories"
   | "maxMonthlyOrders"
+  | "maxMonthlyAiPhotos"
+  | "maxMonthlyAiVideos"
 >;
 type LimitFlags = Pick<
   PlanGrantSource,
@@ -36,6 +38,8 @@ type LimitFlags = Pick<
   | "maxProducts"
   | "maxCategories"
   | "maxMonthlyOrders"
+  | "maxMonthlyAiPhotos"
+  | "maxMonthlyAiVideos"
 >;
 
 const F = false;
@@ -55,6 +59,7 @@ const FEATURE_MATRIX: Record<SubscriptionPlanType, FeatureFlags> = {
     personnelManagement: F,
     deliveryIntegration: F,
     posAccess: F,
+    aiContentGeneration: F,
   },
   [SubscriptionPlanType.BASIC]: {
     advancedReports: F,
@@ -69,6 +74,7 @@ const FEATURE_MATRIX: Record<SubscriptionPlanType, FeatureFlags> = {
     personnelManagement: F,
     deliveryIntegration: F,
     posAccess: T,
+    aiContentGeneration: F,
   },
   [SubscriptionPlanType.PRO]: {
     advancedReports: T,
@@ -83,6 +89,7 @@ const FEATURE_MATRIX: Record<SubscriptionPlanType, FeatureFlags> = {
     personnelManagement: T,
     deliveryIntegration: T,
     posAccess: T,
+    aiContentGeneration: T,
   },
   [SubscriptionPlanType.BUSINESS]: {
     advancedReports: T,
@@ -97,6 +104,7 @@ const FEATURE_MATRIX: Record<SubscriptionPlanType, FeatureFlags> = {
     personnelManagement: T,
     deliveryIntegration: T,
     posAccess: T,
+    aiContentGeneration: T,
   },
 };
 
@@ -108,6 +116,8 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxProducts: 25,
     maxCategories: 5,
     maxMonthlyOrders: 50,
+    maxMonthlyAiPhotos: 0,
+    maxMonthlyAiVideos: 0,
   },
   [SubscriptionPlanType.BASIC]: {
     maxUsers: 5,
@@ -116,6 +126,8 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxProducts: 100,
     maxCategories: 20,
     maxMonthlyOrders: 500,
+    maxMonthlyAiPhotos: 0,
+    maxMonthlyAiVideos: 0,
   },
   [SubscriptionPlanType.PRO]: {
     maxUsers: 15,
@@ -124,6 +136,8 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxProducts: 500,
     maxCategories: 50,
     maxMonthlyOrders: 2000,
+    maxMonthlyAiPhotos: 50,
+    maxMonthlyAiVideos: 5,
   },
   [SubscriptionPlanType.BUSINESS]: {
     maxUsers: -1,
@@ -132,6 +146,10 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxProducts: -1,
     maxCategories: -1,
     maxMonthlyOrders: -1,
+    // Deliberately capped (not -1): AI generations carry a hard per-unit
+    // vendor cost — see subscription-plans.const.ts.
+    maxMonthlyAiPhotos: 200,
+    maxMonthlyAiVideos: 20,
   },
 };
 
@@ -191,7 +209,7 @@ describe("Feature × Plan matrix (every feature, every plan)", () => {
   });
 
   // ── 3. No feature is silently absent from the fold for any plan ──────────
-  it("the fold emits exactly the 11 known feature keys for every plan", () => {
+  it("the fold emits exactly the 13 known feature keys for every plan", () => {
     for (const tier of PLAN_TIERS) {
       const folded = foldPlanGrants(planSource(tier), [], null, null);
       expect(Object.keys(folded.features).sort()).toEqual(

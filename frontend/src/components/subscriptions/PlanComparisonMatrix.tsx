@@ -23,7 +23,7 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
   const sorted = [...plans].sort((a, b) => Number(a.monthlyPrice) - Number(b.monthlyPrice));
 
   // Feature keys mapped to readable labels. The plan object stores each
-  // flag as a top-level boolean on `plan.features`. All 12 features are
+  // flag as a top-level boolean on `plan.features`. All 13 features are
   // listed so the matrix is an exhaustive, accurate side-by-side.
   const featureRows: Array<{ key: keyof Plan['features']; label: string }> = [
     { key: 'kdsIntegration', label: t('subscriptions.comparison.features.kdsIntegration') },
@@ -34,6 +34,7 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
     { key: 'personnelManagement', label: t('subscriptions.comparison.features.personnelManagement') },
     { key: 'deliveryIntegration', label: t('subscriptions.comparison.features.deliveryIntegration') },
     { key: 'externalDisplay', label: t('subscriptions.comparison.features.externalDisplay') },
+    { key: 'aiContentGeneration', label: t('subscriptions.comparison.features.aiContentGeneration') },
     { key: 'multiLocation', label: t('subscriptions.comparison.features.multiLocation') },
     { key: 'customBranding', label: t('subscriptions.comparison.features.customBranding') },
     { key: 'apiAccess', label: t('subscriptions.comparison.features.apiAccess') },
@@ -47,6 +48,8 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
     { key: 'maxProducts', label: t('subscriptions.comparison.limits.maxProducts') },
     { key: 'maxCategories', label: t('subscriptions.comparison.limits.maxCategories') },
     { key: 'maxMonthlyOrders', label: t('subscriptions.comparison.limits.maxMonthlyOrders') },
+    { key: 'maxMonthlyAiPhotos', label: t('subscriptions.comparison.limits.maxMonthlyAiPhotos') },
+    { key: 'maxMonthlyAiVideos', label: t('subscriptions.comparison.limits.maxMonthlyAiVideos') },
   ];
 
   const fmtLimit = (n: number) =>
