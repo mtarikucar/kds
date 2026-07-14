@@ -23,7 +23,11 @@ concurrency:
 
 env:
   NODE_VERSION: '18.x'
-  SERVER_HOST: '38.242.233.166'
+  # Staging host. Set repo variable STAGING_SERVER_HOST to move staging onto its
+  # own box (docs/deploy/blue-green-runbook.md §7); it also needs the deploy SSH
+  # key installed there + its host key in known_hosts. Defaults to the current
+  # shared box until the variable is set, so this change is a no-op on its own.
+  SERVER_HOST: ${{ vars.STAGING_SERVER_HOST || '38.242.233.166' }}
   GHCR_BASE: 'ghcr.io/mtarikucar/kds'
 
 jobs:

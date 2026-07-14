@@ -1,0 +1,115 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ONE colour (blue OR green) of the STATELESS app tier for blue-green prod.
+#
+# postgres/redis are NOT here — they live in docker-compose.data.yml (shared,
+# never recreated). This file duplicates only the stateless-compute services
+# (backend + frontend) so two colours can run side-by-side on distinct
+# container_names + loopback host ports while sharing the one DB/Redis and the
+# same invoice/upload volumes.
+#
+# Brought up by scripts/deploy-blue-green.sh (do NOT run by hand in prod):
+#   docker compose -p kds-prod-${COLOR} \
+#     --env-file .env.production \
+#     --env-file ops/deploy/color.${COLOR}.env \
+#     -f docker-compose.color.yml up -d
+#
+# The project name (`-p kds-prod-blue` / `-p kds-prod-green`) keeps the two
+# colours' compose state isolated; container_names + host ports are already
+# distinct via ${COLOR}/${BACKEND_HOST_PORT}/${FRONTEND_HOST_PORT}.
+# Host ports bind to 127.0.0.1 ONLY — the inactive colour warming up must not be
+# reachable from the internet; the host nginx reaches it via loopback.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  backend:
+    env_file:
+      - .env.production
+    # Pinned to the immutable :vX.Y.Z tag by the deploy script (IMAGE_TAG),
+    # NOT the movable :current pointer — each colour runs an exact version.
+    image: ghcr.io/mtarikucar/kds/backend:${IMAGE_TAG:?IMAGE_TAG must be set by the deploy script (never boot the movable :current tag)}
+    container_name: kds_backend_${COLOR:?COLOR must be set (blue|green)}
+    restart: always
+    environment:
+      NODE_ENV: production
+      TZ: ${TZ:-Europe/Istanbul}
+      PORT: 3000
+      # connection_limit caps THIS colour's Prisma pool so blue+green together
+      # stay under Postgres max_connections during the deploy overlap window.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}?connection_limit=${DB_CONNECTION_LIMIT:-10}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      SUPERADMIN_JWT_SECRET: ${SUPERADMIN_JWT_SECRET:-${JWT_SECRET}}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN must be set in production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      PAYTR_MERCHANT_ID: ${PAYTR_MERCHANT_ID}
+      PAYTR_MERCHANT_KEY: ${PAYTR_MERCHANT_KEY}
+      PAYTR_MERCHANT_SALT: ${PAYTR_MERCHANT_SALT}
+      PAYTR_BASE_URL: ${PAYTR_BASE_URL:-https://www.paytr.com}
+      PAYTR_TEST_MODE: ${PAYTR_TEST_MODE:-false}
+      BACKEND_URL: ${BACKEND_URL:-https://hummytummy.com}
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      DESKTOP_RELEASE_API_KEY: ${DESKTOP_RELEASE_API_KEY}
+      DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
+      TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      INTEGRATION_KEY: ${INTEGRATION_KEY:?INTEGRATION_KEY must be set in production}
+      KMS_PROVIDER: ${KMS_PROVIDER:-env}
+      KMS_MASTER_KEY: ${KMS_MASTER_KEY:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-hummytummy-backend}
+      # Surface the running colour in logs/metrics for cutover observability.
+      DEPLOY_COLOR: ${COLOR}
+    ports:
+      - '127.0.0.1:${BACKEND_HOST_PORT:?BACKEND_HOST_PORT must be set}:3000'
+    volumes:
+      - kds_invoice_storage:/app/storage
+      - kds_uploads_storage:/app/uploads
+    # Give socket.io / Redis pub-sub a chance to drain on colour retire instead
+    # of hard-cutting live kitchen-display clients.
+    stop_grace_period: 60s
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 240s
+    networks:
+      - kds_bluegreen
+
+  frontend:
+    env_file:
+      - .env.production
+    image: ghcr.io/mtarikucar/kds/frontend:${IMAGE_TAG:?IMAGE_TAG must be set by the deploy script (never boot the movable :current tag)}
+    container_name: kds_frontend_${COLOR:?COLOR must be set (blue|green)}
+    restart: always
+    ports:
+      - '127.0.0.1:${FRONTEND_HOST_PORT:?FRONTEND_HOST_PORT must be set}:80'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:80']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - kds_bluegreen
+
+volumes:
+  kds_invoice_storage:
+    external: true
+  kds_uploads_storage:
+    external: true
+
+networks:
+  kds_bluegreen:
+    external: true

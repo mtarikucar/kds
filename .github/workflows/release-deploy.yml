@@ -65,13 +65,24 @@ jobs:
           # every healthy production as "down".
           ssh -n root@${{ env.SERVER_HOST }} 'bash -s' <<'PROBE'
             set -euo pipefail
+            # Colour-aware: under blue-green the active backend may be on green's
+            # loopback port (3010), not blue's 3000. Read the state file the
+            # deploy script writes; default to 3000 for the legacy/pre-adoption
+            # single stack. Probe both as a fallback so a mid-migration box or a
+            # missing state file still passes when either colour is healthy.
+            active=blue
+            [ -f /var/lib/kds-deploy/active-color-prod ] && \
+              active="$(. /var/lib/kds-deploy/active-color-prod 2>/dev/null; echo "${ACTIVE_COLOR:-blue}")"
+            [ "$active" = green ] && port=3010 || port=3000
             attempt=1
             while [ $attempt -le 3 ]; do
-              if curl -fsS --max-time 10 http://localhost:3000/api/health > /dev/null; then
-                echo "Production /api/health (loopback) is healthy."
+              if curl -fsS --max-time 10 "http://localhost:${port}/api/health" > /dev/null \
+                 || curl -fsS --max-time 10 http://localhost:3000/api/health > /dev/null \
+                 || curl -fsS --max-time 10 http://localhost:3010/api/health > /dev/null; then
+                echo "Production /api/health (loopback, active=${active}) is healthy."
                 exit 0
               fi
-              echo "Attempt $attempt: backend not responding on localhost, retrying in 10s..."
+              echo "Attempt $attempt: backend not responding on localhost (tried ${port}/3000/3010), retrying in 10s..."
               attempt=$((attempt + 1))
               sleep 10
             done
@@ -488,12 +499,24 @@ jobs:
             'mv /root/kds/.env.production.new /root/kds/.env.production'
 
       - name: Run deploy.sh on the server
+        id: deploy
         env:
           VERSION: ${{ needs.build.outputs.version }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Mapped through env: (NOT inlined into the remote root shell string)
+          # so an attacker-influenceable variable value can never break out of
+          # the quoting and run as root@prod — same hardening the tag step uses.
+          PROD_BLUEGREEN: ${{ vars.PROD_BLUEGREEN }}
         run: |
           set -euo pipefail
+          # Decide the deploy command HERE, on the runner, from the env var —
+          # the value never reaches the remote shell parser.
+          if [ "${PROD_BLUEGREEN:-}" = 'true' ]; then
+            DEPLOY_CMD='./scripts/deploy-blue-green.sh prod'
+          else
+            DEPLOY_CMD='./scripts/deploy.sh prod'
+          fi
           # Single SSH session, set -euo pipefail at the top so any
           # failed line aborts immediately. The previous workflow used
           # a heredoc without set -e and silently continued on
@@ -507,13 +530,17 @@ jobs:
               git stash --include-untracked --quiet || true
               # --force on --tags overwrites any local tag the deploy
               # box rewrote during earlier manual debugging. Without
-              # --force, fetch dies with "would clobber existing tag"
+              # --force, fetch dies with 'would clobber existing tag'
               # and the whole deploy is aborted.
               git fetch --all --tags --force
               git reset --hard ${VERSION}
               export GHCR_USER='${GHCR_USER}'
               export GHCR_TOKEN='${GHCR_TOKEN}'
-              ./scripts/deploy.sh prod ${VERSION}
+              # Zero-downtime blue-green once vars.PROD_BLUEGREEN=true — set that
+              # repo variable ONLY after the one-time server prep in
+              # docs/deploy/blue-green-runbook.md §2-4. Until then this defaults
+              # to the legacy in-place deploy, so merging changes nothing.
+              ${DEPLOY_CMD} ${VERSION}
             "
 
       # Post-deploy public probe lives in scripts/deploy.sh
@@ -564,21 +591,42 @@ jobs:
           '
 
       - name: Rollback on failure
-        if: failure()
+        # ONLY when the DEPLOY step itself failed — not for a later step (SSL
+        # guard / perf smoke), which must never flip prod traffic. Scoped to
+        # steps.deploy so an unrelated post-deploy failure can't trigger a
+        # traffic change.
+        if: failure() && steps.deploy.conclusion == 'failure'
         env:
           VERSION: ${{ needs.build.outputs.version }}
+          PROD_BLUEGREEN: ${{ vars.PROD_BLUEGREEN }}
         run: |
-          # Re-sync before invoking deploy.sh — if the deploy step
-          # crashed before its own reset, scripts/deploy.sh may not be
-          # present on disk in the version we're rolling back to.
-          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} "
-            set -euo pipefail
-            cd /root/kds
-            git stash --include-untracked --quiet || true
-            git fetch --all --tags --force
-            git reset --hard ${VERSION}
-            ./scripts/deploy.sh prod-rollback
-          "
+          set -euo pipefail
+          if [ "${PROD_BLUEGREEN:-}" = 'true' ]; then
+            # The blue-green script ALREADY self-handles failure: a pre-flip
+            # failure tears down the un-promoted colour (active untouched); a
+            # post-flip failure reverts nginx to the active colour AND rewrites
+            # state. Re-invoking `rollback` here would boot the OTHER colour and
+            # flip onto it — turning a safely-contained failure into an outage.
+            # So we only LOG status; a real rollback is a deliberate manual call.
+            ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} '
+              set -euo pipefail
+              cd /root/kds
+              echo "::warning::blue-green deploy failed; script self-reverted. Current status:"
+              ./scripts/deploy-blue-green.sh prod status || true
+            '
+          else
+            # Legacy path: deploy.sh owns its own rollback. Re-sync first — if the
+            # deploy step crashed before its own reset, the script may not be on
+            # disk at the version we roll back to.
+            ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} "
+              set -euo pipefail
+              cd /root/kds
+              git stash --include-untracked --quiet || true
+              git fetch --all --tags --force
+              git reset --hard ${VERSION}
+              ./scripts/deploy.sh prod-rollback
+            "
+          fi
 
       - name: Cleanup workspace
         if: always()

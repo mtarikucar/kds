@@ -1,0 +1,81 @@
+version: '3.8'
+
+name: kds-data
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared DATA layer for the blue-green prod topology.
+#
+# postgres + redis live here ONCE and are NEVER recreated by an app deploy. Both
+# colour app stacks (blue/green, see docker-compose.color.yml) attach to the same
+# EXTERNAL network + EXTERNAL volumes, so they share exactly one database, one
+# Redis (socket.io adapter stays coherent across colours), and the same on-disk
+# invoice/upload files.
+#
+# ONE-TIME server prep (operator — see docs/deploy/blue-green-runbook.md §2):
+#   docker network create kds_bluegreen
+#   docker volume  create kds_postgres_data     # then migrate data in from kds-prod_postgres_data
+#   docker volume  create kds_redis_data
+#   docker volume  create kds_invoice_storage
+#   docker volume  create kds_uploads_storage
+#
+# Bring up (once, never on app deploys):
+#   docker compose -p kds-data --env-file .env.production -f docker-compose.data.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    env_file:
+      - .env.production
+    image: postgres:15-alpine
+    container_name: kds_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_pos_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ:-Europe/Istanbul}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - kds_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      kds_bluegreen:
+        # Explicit alias so BOTH colour projects resolve `postgres` across the
+        # shared external network (service-name aliases are otherwise per-project).
+        aliases:
+          - postgres
+
+  redis:
+    env_file:
+      - .env.production
+    image: redis:7-alpine
+    container_name: kds_redis_prod
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    volumes:
+      - kds_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      kds_bluegreen:
+        aliases:
+          - redis
+
+volumes:
+  kds_postgres_data:
+    external: true
+  kds_redis_data:
+    external: true
+
+networks:
+  kds_bluegreen:
+    external: true
