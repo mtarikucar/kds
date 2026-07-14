@@ -707,7 +707,9 @@
     "providerNilvera": "Nilvera",
     "nilveraApiUrl": "Nilvera API URL",
     "nilveraApiKey": "Nilvera API Key",
-    "nilveraHint": "Static key generated in your Nilvera panel (Persisted Access Token). Confirm the API URL from the panel."
+    "nilveraApiUrlHint": "Confirm the API URL from your Nilvera panel (https, *.nilvera.com).",
+    "nilveraApiKeyHint": "Static key generated in your Nilvera panel (Persisted Access Token).",
+    "credentialStored": "Stored — enter a new value to replace"
   },
   "emailChannel": {
     "reservationSection": "Email — Reservation events",

@@ -28,9 +28,12 @@ export class MockEDocumentSigner implements EDocumentSigner {
 
   async sign(xml: string): Promise<string> {
     if (xml.includes("</Invoice>")) {
+      // Namespace declared inline so even a misrouted mock-signed dispatch is
+      // namespace-VALID XML — it fails at the provider for a debuggable
+      // reason (unknown element) instead of as an XML parse error.
       return xml.replace(
         "</Invoice>",
-        "  <ext:MockSignature>SIGNED</ext:MockSignature>\n</Invoice>",
+        '  <ext:MockSignature xmlns:ext="urn:hummytummy:mock-signature">SIGNED</ext:MockSignature>\n</Invoice>',
       );
     }
     return `${xml}\n<!-- MockSignature: SIGNED -->`;

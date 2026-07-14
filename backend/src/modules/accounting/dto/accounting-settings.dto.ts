@@ -52,26 +52,64 @@ export class UpdateAccountingSettingsDto {
   @IsOptional()
   autoSync?: boolean;
 
+  // SECRET fields carry @EmptyStringToUndefined: "" means "unchanged", never
+  // "clear". The FE already skips empty secrets, but any non-UI client
+  // (Swagger try-it-out, ops script round-tripping the settings object) would
+  // otherwise silently overwrite the stored encrypted credential with "" —
+  // and sanitize() never returns it, so it would be unrecoverable.
   @ApiPropertyOptional() @IsString() @IsOptional() parasutCompanyId?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() parasutClientId?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() parasutClientSecret?: string;
+  @ApiPropertyOptional()
+  @EmptyStringToUndefined()
+  @IsString()
+  @IsOptional()
+  parasutClientSecret?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() parasutUsername?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() parasutPassword?: string;
+  @ApiPropertyOptional()
+  @EmptyStringToUndefined()
+  @IsString()
+  @IsOptional()
+  parasutPassword?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() logoApiUrl?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() logoUsername?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() logoPassword?: string;
+  @ApiPropertyOptional()
+  @EmptyStringToUndefined()
+  @IsString()
+  @IsOptional()
+  logoPassword?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() logoFirmNumber?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() foribaApiUrl?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() foribaUsername?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() foribaPassword?: string;
+  @ApiPropertyOptional()
+  @EmptyStringToUndefined()
+  @IsString()
+  @IsOptional()
+  foribaPassword?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() foribaServiceType?: string;
 
   // Nilvera: statik "Persisted Access Token" modeli — kullanıcı adı/şifre yok,
   // panelden üretilen API anahtarı + tenant'ın panelinden teyit edilen apiUrl.
-  @ApiPropertyOptional() @IsString() @IsOptional() nilveraApiUrl?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() nilveraApiKey?: string;
+  // apiUrl https-zorunlu ve nilvera.com host'una kilitli: baseURL her isteğe
+  // Bearer anahtar + fatura içeriği taşır — serbest bir URL, anahtar
+  // sızdırma/SSRF hedefi olurdu. Bilinçli olarak EmptyStringToUndefined YOK:
+  // "" gönderimi sessiz silme yerine net bir 400 doğrulama hatası üretir
+  // (URL'siz Nilvera zaten çalışamaz; sağlayıcıyı kapatmak için provider=NONE).
+  @ApiPropertyOptional({
+    description: "Nilvera API host (https, *.nilvera.com)",
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^https:\/\/([a-z0-9-]+\.)*nilvera\.com(\/|$)/i, {
+    message: "nilveraApiUrl must be an https URL on the nilvera.com domain",
+  })
+  nilveraApiUrl?: string;
+  @ApiPropertyOptional()
+  @EmptyStringToUndefined()
+  @IsString()
+  @IsOptional()
+  nilveraApiKey?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() invoicePrefix?: string;
   @ApiPropertyOptional()

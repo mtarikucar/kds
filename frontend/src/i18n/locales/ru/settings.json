@@ -707,7 +707,9 @@
     "providerNilvera": "Nilvera",
     "nilveraApiUrl": "Адрес API Nilvera",
     "nilveraApiKey": "API-ключ Nilvera",
-    "nilveraHint": "Статический ключ из панели Nilvera (Persisted Access Token). Подтвердите адрес API в панели."
+    "nilveraApiUrlHint": "Подтвердите адрес API в панели Nilvera (https, *.nilvera.com).",
+    "nilveraApiKeyHint": "Статический ключ из панели Nilvera (Persisted Access Token).",
+    "credentialStored": "Сохранено — введите новое значение для замены"
   },
   "emailChannel": {
     "reservationSection": "Email — события брони",

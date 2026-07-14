@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   updateAsync: vi.fn(),
   testConnection: vi.fn(),
   triggerSave: vi.fn(),
+  flushSave: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -23,7 +24,12 @@ vi.mock('../../features/accounting/accountingApi', () => ({
   useAccountingSyncStatus: () => ({ data: undefined }),
 }));
 vi.mock('../../hooks/useAutoSave', () => ({
-  useAutoSave: () => ({ status: 'idle', setValue: h.triggerSave, retry: vi.fn() }),
+  useAutoSave: () => ({
+    status: 'idle',
+    setValue: h.triggerSave,
+    retry: vi.fn(),
+    save: h.flushSave,
+  }),
 }));
 vi.mock('sonner', () => ({
   toast: {
@@ -52,6 +58,8 @@ beforeEach(() => {
   h.accounting.data = { provider: 'NONE' };
   h.accounting.isLoading = false;
   h.testConnection.mockReset();
+  h.flushSave.mockReset();
+  h.flushSave.mockResolvedValue(undefined);
   h.toastSuccess.mockReset();
   h.toastError.mockReset();
 });
@@ -93,6 +101,19 @@ describe('AccountingSettingsPage', () => {
     await userEvent.click(screen.getByText('accounting.testConnection'));
     expect(h.toastError).toHaveBeenCalledWith(
       expect.stringContaining('bad creds'),
+    );
+  });
+
+  it('flushes the pending autosave BEFORE probing the connection (no stale-creds test)', async () => {
+    // The probe validates the credentials stored in the DB; without the flush
+    // a click inside the 500ms debounce window tested the PREVIOUS values.
+    h.accounting.data = { provider: 'PARASUT' };
+    h.testConnection.mockResolvedValue({ success: true });
+    render(<AccountingSettingsPage />);
+    await userEvent.click(screen.getByText('accounting.testConnection'));
+    expect(h.flushSave).toHaveBeenCalledTimes(1);
+    expect(h.flushSave.mock.invocationCallOrder[0]).toBeLessThan(
+      h.testConnection.mock.invocationCallOrder[0],
     );
   });
 });

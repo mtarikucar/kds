@@ -16,9 +16,7 @@ const invoice: AccountingInvoiceData = {
   issueDate: "2026-06-15",
   currency: "TRY",
   totalAmount: 120,
-  items: [
-    { description: "Coffee", quantity: 2, unitPrice: 50, taxRate: 20 },
-  ],
+  items: [{ description: "Coffee", quantity: 2, unitPrice: 50, taxRate: 20 }],
 };
 
 function fakeHttp() {
@@ -237,7 +235,7 @@ describe("ForibaEfaturaAdapter", () => {
     expect(xml).toContain("601"); // tevkifat code
     // payable reduced by the withheld amount: 118 − 9 = 109.00
     expect(xml).toContain(
-      "<cbc:PayableAmount currencyID=\"TRY\">109.00</cbc:PayableAmount>",
+      '<cbc:PayableAmount currencyID="TRY">109.00</cbc:PayableAmount>',
     );
   });
 
@@ -260,81 +258,116 @@ describe("ForibaEfaturaAdapter", () => {
   });
 });
 
-describe('ForibaEfaturaAdapter — signing before dispatch', () => {
-  it('signs the UBL with the configured signer before base64-encoding', async () => {
+describe("ForibaEfaturaAdapter — signing before dispatch", () => {
+  it("signs the UBL with the configured signer before base64-encoding", async () => {
     const adapter = new ForibaEfaturaAdapter();
     const signer: any = {
-      name: 'MOCK',
+      name: "MOCK",
       isConfigured: () => true,
-      sign: jest.fn().mockImplementation(async (xml: string) =>
-        xml.replace('</Invoice>', '<Signed/></Invoice>'),
-      ),
+      sign: jest
+        .fn()
+        .mockImplementation(async (xml: string) =>
+          xml.replace("</Invoice>", "<Signed/></Invoice>"),
+        ),
     };
     adapter.setSigner(signer);
     const http = fakeHttp();
-    http.post.mockResolvedValue({ data: { uuid: 'fb-signed' } });
+    http.post.mockResolvedValue({ data: { uuid: "fb-signed" } });
     (adapter as any).httpClient = http;
 
-    await adapter.pushInvoice('tok', 'co-1', invoice);
+    await adapter.pushInvoice("tok", "co-1", invoice);
 
     expect(signer.sign).toHaveBeenCalledTimes(1);
-    const dispatched = Buffer.from(http.post.mock.calls[0][1].content, 'base64').toString();
-    expect(dispatched).toContain('<Signed/>'); // the signed artifact is what gets dispatched
+    const dispatched = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(dispatched).toContain("<Signed/>"); // the signed artifact is what gets dispatched
   });
 
-  it('dispatches unsigned when no signer is configured (isConfigured=false)', async () => {
+  it("dispatches unsigned when no signer is configured (isConfigured=false)", async () => {
     const adapter = new ForibaEfaturaAdapter();
-    adapter.setSigner({ name: 'NONE', isConfigured: () => false, sign: jest.fn() } as any);
+    adapter.setSigner({
+      name: "NONE",
+      isConfigured: () => false,
+      sign: jest.fn(),
+    } as any);
     const http = fakeHttp();
-    http.post.mockResolvedValue({ data: { uuid: 'fb-unsigned' } });
+    http.post.mockResolvedValue({ data: { uuid: "fb-unsigned" } });
     (adapter as any).httpClient = http;
 
-    const out = await adapter.pushInvoice('tok', 'co-1', invoice);
-    expect(out.externalId).toBe('fb-unsigned');
+    const out = await adapter.pushInvoice("tok", "co-1", invoice);
+    expect(out.externalId).toBe("fb-unsigned");
   });
 });
 
-describe('ForibaEfaturaAdapter — total reconciliation + configured host', () => {
-  it('emits the stored net line subtotal/tax (not unitPrice×qty) so totals reconcile', async () => {
+describe("ForibaEfaturaAdapter — total reconciliation + configured host", () => {
+  it("emits the stored net line subtotal/tax (not unitPrice×qty) so totals reconcile", async () => {
     const adapter = new ForibaEfaturaAdapter();
     const http = fakeHttp();
-    http.post.mockResolvedValue({ data: { uuid: 'fb-recon' } });
+    http.post.mockResolvedValue({ data: { uuid: "fb-recon" } });
     (adapter as any).httpClient = http;
     // unitPrice 8.33 × 3 = 24.99, but the stored net subtotal is 25.00.
-    await adapter.pushInvoice('tok', 'co-1', {
+    await adapter.pushInvoice("tok", "co-1", {
       ...invoice,
       totalAmount: 30,
-      items: [{ description: 'X', quantity: 3, unitPrice: 8.33, taxRate: 20, lineSubtotal: 25, lineTax: 5 }],
+      items: [
+        {
+          description: "X",
+          quantity: 3,
+          unitPrice: 8.33,
+          taxRate: 20,
+          lineSubtotal: 25,
+          lineTax: 5,
+        },
+      ],
     });
-    const xml = Buffer.from(http.post.mock.calls[0][1].content, 'base64').toString();
-    expect(xml).toContain('<cbc:LineExtensionAmount currencyID="TRY">25.00</cbc:LineExtensionAmount>');
+    const xml = Buffer.from(
+      http.post.mock.calls[0][1].content,
+      "base64",
+    ).toString();
+    expect(xml).toContain(
+      '<cbc:LineExtensionAmount currencyID="TRY">25.00</cbc:LineExtensionAmount>',
+    );
     // header TaxExclusive 25.00 + TaxTotal 5.00 == TaxInclusive 30.00 (reconciles)
-    expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="TRY">25.00</cbc:TaxExclusiveAmount>');
-    expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="TRY">30.00</cbc:TaxInclusiveAmount>');
+    expect(xml).toContain(
+      '<cbc:TaxExclusiveAmount currencyID="TRY">25.00</cbc:TaxExclusiveAmount>',
+    );
+    expect(xml).toContain(
+      '<cbc:TaxInclusiveAmount currencyID="TRY">30.00</cbc:TaxInclusiveAmount>',
+    );
   });
 
-  it('pins the client to the tenant apiUrl on authenticate (dispatch same host as auth)', async () => {
+  it("pins the client to the tenant apiUrl on authenticate (dispatch same host as auth)", async () => {
     const adapter = new ForibaEfaturaAdapter();
     const http = fakeHttp();
-    http.post.mockResolvedValue({ data: { access_token: 't', expires_in: 100 } });
+    http.post.mockResolvedValue({
+      data: { access_token: "t", expires_in: 100 },
+    });
     (adapter as any).httpClient = http;
-    await adapter.authenticate({ apiUrl: 'https://sandbox.foriba.example', username: 'u', password: 'p' });
-    expect(http.defaults.baseURL).toBe('https://sandbox.foriba.example');
+    await adapter.authenticate({
+      apiUrl: "https://sandbox.foriba.example",
+      username: "u",
+      password: "p",
+    });
+    expect(http.defaults.baseURL).toBe("https://sandbox.foriba.example");
   });
 });
 
-describe('ForibaEfaturaAdapter.setApiBase', () => {
-  it('pins the dispatch baseURL independent of authenticate (cached-token path)', async () => {
+describe("ForibaEfaturaAdapter.setApiBase", () => {
+  it("pins the dispatch baseURL independent of authenticate (cached-token path)", async () => {
     const adapter = new ForibaEfaturaAdapter();
-    adapter.setApiBase('https://sandbox.foriba.example');
+    adapter.setApiBase("https://sandbox.foriba.example");
     const http = fakeHttp();
-    http.post.mockResolvedValue({ data: { uuid: 'fb-x' } });
+    http.post.mockResolvedValue({ data: { uuid: "fb-x" } });
     // preserve the pinned baseURL on the injected client
-    http.defaults.baseURL = 'https://sandbox.foriba.example';
+    http.defaults.baseURL = "https://sandbox.foriba.example";
     (adapter as any).httpClient = http;
-    await adapter.pushInvoice('tok', 'co-1', invoice);
+    await adapter.pushInvoice("tok", "co-1", invoice);
     // dispatch URL resolves against the pinned host, not the hardcoded prod one
-    expect(http.post.mock.calls[0][0]).toContain('https://sandbox.foriba.example');
+    expect(http.post.mock.calls[0][0]).toContain(
+      "https://sandbox.foriba.example",
+    );
   });
 });
 
@@ -344,28 +377,27 @@ describe('ForibaEfaturaAdapter.setApiBase', () => {
  * a manual-cancel instruction) and must never touch the network — a stub
  * that pretended success would silently leave live documents at GİB.
  */
-describe('cancelInvoice — honest GATED stubs (A3)', () => {
+describe("cancelInvoice — honest GATED stubs (A3)", () => {
   it.each([
-    ['ParasutAdapter', () => new ParasutAdapter(), /Parasut panel/],
-    ['LogoAdapter', () => new LogoAdapter(), /Logo panel/],
-    [
-      'ForibaEfaturaAdapter',
-      () => new ForibaEfaturaAdapter(),
-      /Foriba panel/,
-    ],
-  ])('%s refuses with a manual-cancel error and no HTTP call', async (_name, make, panelRe) => {
-    const adapter: any = make();
-    const http = fakeHttp();
-    adapter.httpClient = http;
+    ["ParasutAdapter", () => new ParasutAdapter(), /Parasut panel/],
+    ["LogoAdapter", () => new LogoAdapter(), /Logo panel/],
+    ["ForibaEfaturaAdapter", () => new ForibaEfaturaAdapter(), /Foriba panel/],
+  ])(
+    "%s refuses with a manual-cancel error and no HTTP call",
+    async (_name, make, panelRe) => {
+      const adapter: any = make();
+      const http = fakeHttp();
+      adapter.httpClient = http;
 
-    const out = await adapter.cancelInvoice('tok', 'co-1', 'EXT-1');
+      const out = await adapter.cancelInvoice("tok", "co-1", "EXT-1");
 
-    expect(out.success).toBe(false);
-    expect(out.error).toMatch(/cancel API not yet integrated/i);
-    expect(out.error).toMatch(panelRe);
-    expect(http.post).not.toHaveBeenCalled();
-    expect(http.get).not.toHaveBeenCalled();
-  });
+      expect(out.success).toBe(false);
+      expect(out.error).toMatch(/cancel API not yet integrated/i);
+      expect(out.error).toMatch(panelRe);
+      expect(http.post).not.toHaveBeenCalled();
+      expect(http.get).not.toHaveBeenCalled();
+    },
+  );
 });
 
 /**
@@ -445,6 +477,30 @@ describe("NilveraAdapter", () => {
       /apiUrl/i,
     );
     expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it("setApiBase pins the host independent of authenticate (cached-token path — Foriba parity)", async () => {
+    // The sync service builds a FRESH adapter per call and skips authenticate()
+    // on a warm token cache; authenticate() is otherwise the only baseURL
+    // writer. Without setApiBase every call after the first failed
+    // "apiUrl is not configured" for the whole 24h token TTL.
+    const { adapter, http } = nilvera();
+    http.post.mockResolvedValue({ data: { UUID: "uuid-pinned" } });
+    http.delete.mockResolvedValue({ data: {} });
+
+    adapter.setApiBase("https://apitest.nilvera.com");
+
+    const pushed = await adapter.pushInvoice("tok", "", invoice);
+    expect(pushed.externalId).toBe("uuid-pinned");
+    expect(http.post.mock.calls[0][0]).toBe(
+      "https://apitest.nilvera.com/earchive/Send/Xml",
+    );
+
+    const cancelled = await adapter.cancelInvoice("tok", "", "uuid-pinned");
+    expect(cancelled.success).toBe(true);
+    expect(http.delete.mock.calls[0][0]).toBe(
+      "https://apitest.nilvera.com/earchive/Cancel",
+    );
   });
 
   it("pushInvoice throws a clear error when the response carries no UUID", async () => {

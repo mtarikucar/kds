@@ -707,7 +707,9 @@
     "providerNilvera": "Nilvera",
     "nilveraApiUrl": "عنوان API الخاص بـ Nilvera",
     "nilveraApiKey": "مفتاح API الخاص بـ Nilvera",
-    "nilveraHint": "مفتاح ثابت يتم إنشاؤه من لوحة Nilvera (رمز وصول دائم). تأكد من عنوان API من اللوحة."
+    "nilveraApiUrlHint": "تأكد من عنوان API من لوحة Nilvera (https، ‎*.nilvera.com).",
+    "nilveraApiKeyHint": "مفتاح ثابت يتم إنشاؤه من لوحة Nilvera (رمز وصول دائم).",
+    "credentialStored": "محفوظ — أدخل قيمة جديدة للاستبدال"
   },
   "emailChannel": {
     "reservationSection": "البريد الإلكتروني — أحداث الحجز",

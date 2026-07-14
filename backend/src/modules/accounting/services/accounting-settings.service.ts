@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { UpdateAccountingSettingsDto } from "../dto/accounting-settings.dto";
@@ -36,6 +36,8 @@ function encryptDto<T extends Record<string, any>>(dto: T): T {
 
 @Injectable()
 export class AccountingSettingsService {
+  private readonly logger = new Logger(AccountingSettingsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   // v3.0.1 — findFirst + opportunistic create/update. The compound
@@ -160,8 +162,15 @@ export class AccountingSettingsService {
         try {
           (out as any)[k] = decryptString(v);
         } catch {
-          // Decryption failed (corrupted blob or rotated key) — surface
-          // as null so the caller can prompt re-entry instead of crashing.
+          // Decryption failed (corrupted blob or rotated master key) —
+          // surface as null so the caller can prompt re-entry instead of
+          // crashing. Logged loudly because downstream only sees a generic
+          // "credential missing" while sanitize() keeps reporting
+          // has*Credentials=true (the raw blob still exists) — without this
+          // line the operator has no signal that re-entry is what's needed.
+          this.logger.warn(
+            `Stored ${k} for tenant ${tenantId} could not be decrypted (master key rotated or row copied across environments) — treating as missing; re-enter it in accounting settings`,
+          );
           (out as any)[k] = null;
         }
       }
