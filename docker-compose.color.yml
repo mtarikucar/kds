@@ -28,7 +28,7 @@ services:
       - .env.production
     # Pinned to the immutable :vX.Y.Z tag by the deploy script (IMAGE_TAG),
     # NOT the movable :current pointer — each colour runs an exact version.
-    image: ghcr.io/mtarikucar/kds/backend:${IMAGE_TAG:-current}
+    image: ghcr.io/mtarikucar/kds/backend:${IMAGE_TAG:?IMAGE_TAG must be set by the deploy script (never boot the movable :current tag)}
     container_name: kds_backend_${COLOR:?COLOR must be set (blue|green)}
     restart: always
     environment:
@@ -90,7 +90,7 @@ services:
   frontend:
     env_file:
       - .env.production
-    image: ghcr.io/mtarikucar/kds/frontend:${IMAGE_TAG:-current}
+    image: ghcr.io/mtarikucar/kds/frontend:${IMAGE_TAG:?IMAGE_TAG must be set by the deploy script (never boot the movable :current tag)}
     container_name: kds_frontend_${COLOR:?COLOR must be set (blue|green)}
     restart: always
     ports:
