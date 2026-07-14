@@ -61,7 +61,9 @@
       "users": "Пользователи",
       "tables": "Столы",
       "products": "Продукты",
-      "monthlyOrders": "Заказов в месяц"
+      "monthlyOrders": "Заказов в месяц",
+      "aiPhotos": "ИИ-фото",
+      "aiVideos": "ИИ-видео"
     },
     "unlimited": "Безлимитно",
     "billingHistory": "История платежей",

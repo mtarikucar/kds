@@ -61,7 +61,9 @@
       "users": "Foydalanuvchilar",
       "tables": "Stollar",
       "products": "Mahsulotlar",
-      "monthlyOrders": "Oylik buyurtmalar"
+      "monthlyOrders": "Oylik buyurtmalar",
+      "aiPhotos": "AI suratlar",
+      "aiVideos": "AI videolar"
     },
     "unlimited": "Cheksiz",
     "billingHistory": "Hisob-kitob tarixi",

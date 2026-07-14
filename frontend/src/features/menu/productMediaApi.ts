@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import i18n from "../../i18n/config";
@@ -78,8 +79,9 @@ export const useProductMediaConfig = () =>
   });
 
 /** Media + job status; polls every 2s while ANY job is active. */
-export const useProductMediaStatus = (productId?: string, enabled = true) =>
-  useQuery({
+export const useProductMediaStatus = (productId?: string, enabled = true) => {
+  const qc = useQueryClient();
+  const query = useQuery({
     queryKey: ["product-media", productId],
     enabled: !!productId && enabled,
     queryFn: async () => {
@@ -93,6 +95,25 @@ export const useProductMediaStatus = (productId?: string, enabled = true) =>
       return s?.jobs?.some((j) => isJobActive(j)) ? 2000 : false;
     },
   });
+
+  // A job the poll watched ending FAILED/CANCELED was REFUNDED server-side —
+  // refresh the X/Y quota counters so the generate button re-enables with the
+  // returned unit. Seeded on first observation so pre-existing failed jobs
+  // don't trigger a spurious refetch on mount.
+  const failedKey = (query.data?.jobs ?? [])
+    .filter((j) => j.status === "FAILED" || j.status === "CANCELED")
+    .map((j) => j.id)
+    .join(",");
+  const prevFailedKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevFailedKey.current !== null && prevFailedKey.current !== failedKey) {
+      qc.invalidateQueries({ queryKey: ["product-media-config"] });
+    }
+    prevFailedKey.current = failedKey;
+  }, [failedKey, qc]);
+
+  return query;
+};
 
 const onErr = (error: any) =>
   toast.error(

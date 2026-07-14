@@ -187,9 +187,30 @@ export class ProductMediaService {
     );
   }
 
+  /** Create the job row AND link it to the quota claim atomically. A
+      non-atomic create→attach pair had a real failure window: attach throws
+      after the job row exists → the catch refunds the claim while the poller
+      later delivers the media (quota-free generation). One transaction means
+      either "job exists and is linked (refundable via failJob→voidByJob)" or
+      "nothing exists (refundable via voidUsage)". */
+  private createLinkedJob(
+    usageId: string,
+    data: Parameters<PrismaService["productMediaJob"]["create"]>[0]["data"],
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.productMediaJob.create({ data });
+      await tx.aiGenerationUsage.update({
+        where: { id: usageId },
+        data: { jobId: job.id },
+      });
+      return job;
+    });
+  }
+
   /** Submit an image (PHOTO/FRAME) job to the fal queue (or finish inline in
       the simulator). `usageId` is the already-claimed quota ledger row: it is
-      linked to the job on success and refunded if no job ever materialises. */
+      linked to the job atomically at job creation and refunded only when no
+      job row ever materialised. */
   private async submitImageJob(
     kind: "PHOTO" | "FRAME",
     productId: string,
@@ -198,6 +219,7 @@ export class ProductMediaService {
     count: number,
     usageId: string,
   ) {
+    let job: { id: string } | null = null;
     try {
       if (!this.key && this.simulator) {
         const files = await Promise.all(
@@ -209,19 +231,16 @@ export class ProductMediaService {
           ),
         );
         const urls = files.map((f) => this.hosted(f));
-        const job = await this.prisma.productMediaJob.create({
-          data: {
-            productId,
-            tenantId,
-            kind,
-            status: "COMPLETED",
-            prompt,
-            count,
-            percent: 100,
-            resultUrls: urls,
-          },
+        job = await this.createLinkedJob(usageId, {
+          productId,
+          tenantId,
+          kind,
+          status: "COMPLETED",
+          prompt,
+          count,
+          percent: 100,
+          resultUrls: urls,
         });
-        await this.quota.attachJob(usageId, job.id);
         await this.finalizeImageJob(job, urls);
         return this.jobView(await this.reload(job.id));
       }
@@ -230,23 +249,25 @@ export class ProductMediaService {
         image_size: "square_hd",
         num_images: count,
       });
-      const job = await this.prisma.productMediaJob.create({
-        data: {
-          productId,
-          tenantId,
-          kind,
-          status: "IN_QUEUE",
-          falRequestId: requestId,
-          prompt,
-          count,
-        },
+      job = await this.createLinkedJob(usageId, {
+        productId,
+        tenantId,
+        kind,
+        status: "IN_QUEUE",
+        falRequestId: requestId,
+        prompt,
+        count,
       });
-      await this.quota.attachJob(usageId, job.id);
       return this.jobView(job);
     } catch (err) {
-      // No job row exists (or the job never left our hands) — refund the
-      // claim so a fal outage doesn't burn the tenant's monthly allowance.
-      await this.quota.voidUsage(usageId).catch(() => undefined);
+      if (!job) {
+        // Nothing pollable exists — refund so a fal outage doesn't burn the
+        // tenant's monthly allowance.
+        await this.quota.voidUsage(usageId).catch(() => undefined);
+      }
+      // else: the job row exists and is linked — the media may still be
+      // delivered by the poller, so the claim stays consumed; a genuine
+      // failure refunds later via failJob → voidByJob.
       throw err;
     }
   }
@@ -286,27 +307,25 @@ export class ProductMediaService {
       opts.prompt?.trim() ||
       `Smooth cinematic transition from the finished plated dish to a display of its fresh raw ingredients. Photorealistic appetising food video, soft light, gentle motion, no text, no letters.`;
 
-    // Atomic quota claim BEFORE any fal traffic; refunded below if the
-    // submit never becomes a job.
+    // Atomic quota claim BEFORE any fal traffic; refunded below only if no
+    // job row ever materialised.
     const usageId = await this.quota.claim(tenantId, "VIDEO", 1);
+    let job: { id: string } | null = null;
     try {
       if (!this.key && this.simulator) {
         const stored = await this.storeFromUrl(
           this.sample("video"),
           `${productId}-video-${Date.now()}.mp4`,
         );
-        const job = await this.prisma.productMediaJob.create({
-          data: {
-            productId,
-            tenantId,
-            kind: "VIDEO",
-            status: "COMPLETED",
-            prompt,
-            percent: 100,
-            resultUrls: [stored],
-          },
+        job = await this.createLinkedJob(usageId, {
+          productId,
+          tenantId,
+          kind: "VIDEO",
+          status: "COMPLETED",
+          prompt,
+          percent: 100,
+          resultUrls: [stored],
         });
-        await this.quota.attachJob(usageId, job.id);
         await this.finalizeVideoJob(job, stored);
         return this.jobView(await this.reload(job.id));
       }
@@ -316,28 +335,36 @@ export class ProductMediaService {
         start_image_url: dishPhoto,
         end_image_url: endFrame,
       });
-      const job = await this.prisma.productMediaJob.create({
-        data: {
-          productId,
-          tenantId,
-          kind: "VIDEO",
-          status: "IN_QUEUE",
-          falRequestId: requestId,
-          prompt,
-        },
+      job = await this.createLinkedJob(usageId, {
+        productId,
+        tenantId,
+        kind: "VIDEO",
+        status: "IN_QUEUE",
+        falRequestId: requestId,
+        prompt,
       });
-      await this.quota.attachJob(usageId, job.id);
-      await this.prisma.product.update({
-        where: { id: product.id },
-        data: {
-          videoStatus: "PENDING",
-          videoTaskId: requestId,
-          videoError: null,
-        },
-      });
+      // Best-effort UI mirror OUTSIDE the refund path: a P2025 here (e.g.
+      // concurrent product delete) must not refund a claim whose fal job is
+      // live — the poller/failJob rails own the outcome from this point.
+      await this.prisma.product
+        .update({
+          where: { id: product.id },
+          data: {
+            videoStatus: "PENDING",
+            videoTaskId: requestId,
+            videoError: null,
+          },
+        })
+        .catch((e) =>
+          this.logger.warn(
+            `videoStatus mirror update failed for ${product.id}: ${e?.message}`,
+          ),
+        );
       return this.jobView(job);
     } catch (err) {
-      await this.quota.voidUsage(usageId).catch(() => undefined);
+      if (!job) {
+        await this.quota.voidUsage(usageId).catch(() => undefined);
+      }
       throw err;
     }
   }

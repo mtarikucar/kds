@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { EntitlementService } from "../../entitlements/entitlement.service";
 import { BusinessException } from "../../../common/exceptions/business.exception";
@@ -194,6 +195,30 @@ export class MenuAiQuotaService {
     });
     if (res.count > 0) {
       this.logger.log(`Refunded AI quota for failed job ${jobId}`);
+    }
+  }
+
+  /** Refund claims that never became jobs. A hard process kill between
+      claim() and the job insert (deploys happen per change here) strands a
+      voided=false row with jobId=null that neither voidUsage (process died)
+      nor voidByJob (nothing to match) can ever reach. Live claims attach
+      within seconds, so the 1-hour grace makes racing a real claim
+      impossible; the updateMany is idempotent, so multi-replica double-runs
+      are harmless (no advisory lock needed). */
+  @Cron(CronExpression.EVERY_HOUR)
+  async sweepOrphanClaims(): Promise<void> {
+    const res = await this.prisma.aiGenerationUsage.updateMany({
+      where: {
+        voided: false,
+        jobId: null,
+        createdAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+      data: { voided: true },
+    });
+    if (res.count > 0) {
+      this.logger.warn(
+        `Voided ${res.count} orphan AI-quota claim(s) that never became jobs`,
+      );
     }
   }
 }

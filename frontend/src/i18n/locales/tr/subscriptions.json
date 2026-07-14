@@ -62,7 +62,9 @@
       "users": "Kullanıcı",
       "tables": "Masa",
       "products": "Ürün",
-      "monthlyOrders": "Aylık Sipariş"
+      "monthlyOrders": "Aylık Sipariş",
+      "aiPhotos": "AI Fotoğraf",
+      "aiVideos": "AI Video"
     },
     "unlimited": "Sınırsız",
     "billingHistory": "Fatura Geçmişi",

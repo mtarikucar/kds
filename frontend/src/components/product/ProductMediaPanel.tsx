@@ -52,8 +52,14 @@ const PHOTO_CHIPS = [
     PRO+ only (feature.aiContentGeneration): lower plans see the upgrade
     prompt. Monthly photo/video quotas (PRO 50/5, Kurumsal 200/20) render as
     X/Y counters in the header; exhausted → buttons disable with a renewal
-    note. The backend enforces both independently (403 flag / 402 quota). */
+    note. The backend enforces both independently (403 flag / 402 quota).
+
+    Order matters: the configured check runs BEFORE the FeatureGate — the AI
+    backend ships INERT until FAL_KEY is set, and upselling a feature that
+    isn't live would be a broken promise. */
 export default function ProductMediaPanel(props: Props) {
+  const { data: config } = useProductMediaConfig();
+  if (!config?.configured) return null;
   return (
     <FeatureGate feature="aiContentGeneration" showUpgradePrompt>
       <ProductMediaPanelInner {...props} />
@@ -108,6 +114,13 @@ function ProductMediaPanelInner({
   const videoJob = latestJob(state, "VIDEO");
   const photoQuotaLeft = hasQuotaLeft(config?.photos);
   const videoQuotaLeft = hasQuotaLeft(config?.videos);
+  // The claim is all-or-nothing (4 variations with 2 left → the whole request
+  // 402s), so variation options beyond the remaining allowance are disabled
+  // and the submitted count is clamped as a stale-state safety net.
+  const photosRemaining =
+    !config?.photos || config.photos.limit === -1
+      ? Infinity
+      : config.photos.remaining;
   const photoBusy = isJobActive(photoJob) || genPhoto.isPending;
   const frameBusy = isJobActive(frameJob) || genFrame.isPending;
   const videoBusy = isJobActive(videoJob) || genVideo.isPending;
@@ -120,7 +133,9 @@ function ProductMediaPanelInner({
       genPhoto.mutate({
         productId: id,
         prompt: photoPrompt.trim() || undefined,
-        count: photoCount,
+        count: Number.isFinite(photosRemaining)
+          ? Math.min(photoCount, Math.max(1, photosRemaining))
+          : photoCount,
       });
   };
   const onFrame = async () => {
@@ -225,11 +240,13 @@ function ProductMediaPanelInner({
                   key={n}
                   type="button"
                   onClick={() => setPhotoCount(n)}
+                  disabled={n > photosRemaining}
                   className={cn(
                     "h-6 w-6 rounded text-xs font-medium",
                     photoCount === n
                       ? "bg-primary-500 text-white"
                       : "bg-white text-gray-600 ring-1 ring-gray-200",
+                    n > photosRemaining && "cursor-not-allowed opacity-40",
                   )}
                 >
                   {n}

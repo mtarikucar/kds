@@ -62,7 +62,9 @@
       "users": "Users",
       "tables": "Tables",
       "products": "Products",
-      "monthlyOrders": "Monthly Orders"
+      "monthlyOrders": "Monthly Orders",
+      "aiPhotos": "AI Photos",
+      "aiVideos": "AI Videos"
     },
     "unlimited": "Unlimited",
     "billingHistory": "Billing History",

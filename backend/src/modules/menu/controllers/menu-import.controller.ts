@@ -51,12 +51,15 @@ export class MenuImportController {
       limits: { fileSize: 8 * 1024 * 1024, files: 10 },
     }),
   )
-  async parse(@UploadedFiles() files: Array<Express.Multer.File>) {
+  async parse(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Request() req,
+  ) {
     const images = (files ?? []).map((f) => ({
       buffer: f.buffer,
       mimetype: f.mimetype,
     }));
-    return this.menuImport.parseMenuPhotos(images);
+    return this.menuImport.parseMenuPhotos(req.tenantId, images);
   }
 
   @Post("commit")

@@ -572,6 +572,7 @@ export class SuperAdminTenantsService {
           // is the canonical grant path for posAccess (no plan-form toggle by
           // default), so the plan default must be surfaced here.
           posAccess: plan.posAccess,
+          aiContentGeneration: plan.aiContentGeneration,
         }
       : {};
 
@@ -586,6 +587,8 @@ export class SuperAdminTenantsService {
           maxProducts: plan.maxProducts,
           maxCategories: plan.maxCategories,
           maxMonthlyOrders: plan.maxMonthlyOrders,
+          maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
+          maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
         }
       : {};
 

@@ -34,8 +34,10 @@ export class Product3dController {
 
   @Post(":id/generate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  // AI studio is PRO+ (feature-flag only — Meshy generations are idempotent
-  // per product, so no monthly cap; photo/video quotas don't apply here).
+  // AI studio is PRO+. Every real Meshy submit also consumes one unit of the
+  // PHOTO allowance inside requestModel — ?force=true bypasses the
+  // PENDING/READY idempotency short-circuit, so without a quota claim this
+  // route would be an unmetered vendor-spend loop.
   @RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)
   @ApiOperation({ summary: "Start 3D-model generation from a product's photo" })
   generate(

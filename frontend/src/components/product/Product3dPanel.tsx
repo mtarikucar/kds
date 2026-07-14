@@ -31,11 +31,14 @@ interface Props {
  *
  * PRO+ only (feature.aiContentGeneration) — backend 403s /generate for lower
  * plans, so the gate here keeps the UI honest instead of failing on click.
- * No quota: Meshy jobs are idempotent per product (unlike photo/video).
+ * Each real Meshy submit consumes one PHOTO quota unit server-side.
+ * showUpgradePrompt is OFF: ProductMediaPanel (same editor section, same
+ * feature) already renders the single upsell card — two identical prompts
+ * side by side would be noise.
  */
 export default function Product3dPanel(props: Props) {
   return (
-    <FeatureGate feature="aiContentGeneration">
+    <FeatureGate feature="aiContentGeneration" showUpgradePrompt={false}>
       <Product3dPanelInner {...props} />
     </FeatureGate>
   );

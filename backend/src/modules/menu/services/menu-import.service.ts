@@ -10,6 +10,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { CategoriesService } from "./categories.service";
 import { ProductsService } from "./products.service";
 import { EntitlementService } from "../../entitlements/entitlement.service";
+import { MenuAiQuotaService } from "./menu-ai-quota.service";
 import { isUnlimited } from "../../../common/constants/subscription-plans.const";
 import {
   CommitMenuImportDto,
@@ -65,6 +66,7 @@ export class MenuImportService {
     private readonly categories: CategoriesService,
     private readonly products: ProductsService,
     private readonly entitlements: EntitlementService,
+    private readonly quota: MenuAiQuotaService,
   ) {}
 
   /** Whether the AI menu-import feature is wired (an API key is present). */
@@ -76,8 +78,14 @@ export class MenuImportService {
    * Send the uploaded menu photo(s) to Claude vision and parse the returned
    * draft. Pure read — persists nothing. The operator reviews/edits the draft
    * before commit().
+   *
+   * Metered: each parse is a real Anthropic vision call (up to 10×8MB
+   * images), so it consumes one unit of the tenant's monthly PHOTO
+   * allowance — the feature flag alone would leave the spend unbounded. A
+   * failed call refunds the claim.
    */
   async parseMenuPhotos(
+    tenantId: string,
     images: { buffer: Buffer; mimetype: string }[],
   ): Promise<CommitMenuImportDto> {
     const apiKey = this.config.get<string>("ANTHROPIC_API_KEY");
@@ -91,6 +99,10 @@ export class MenuImportService {
     if (!images.length) {
       throw new BadRequestException("At least one menu photo is required");
     }
+    const usageId = await this.quota.claim(tenantId, "PHOTO", 1);
+    await this.quota
+      .attachJob(usageId, `menu-import:${usageId}`)
+      .catch(() => undefined);
 
     const imageBlocks = images.map((img) => {
       const mediaType = SUPPORTED_IMAGE_TYPES.includes(img.mimetype)
@@ -140,6 +152,8 @@ export class MenuImportService {
         .map((b: any) => b.text)
         .join("\n");
     } catch (err: any) {
+      // Failed vision call — refund the claim.
+      await this.quota.voidUsage(usageId).catch(() => undefined);
       const detail = err?.response?.data?.error?.message ?? err?.message;
       this.logger.error(`Anthropic menu-parse failed: ${detail}`);
       throw new ServiceUnavailableException(
@@ -147,7 +161,14 @@ export class MenuImportService {
       );
     }
 
-    return this.normaliseDraft(text);
+    try {
+      return this.normaliseDraft(text);
+    } catch (err) {
+      // The model answered but with an unusable draft — the user got
+      // nothing, so give the unit back.
+      await this.quota.voidUsage(usageId).catch(() => undefined);
+      throw err;
+    }
   }
 
   /** Robustly parse + clamp the model's JSON into the commit DTO shape. */

@@ -61,7 +61,9 @@
       "users": "المستخدمون",
       "tables": "الطاولات",
       "products": "المنتجات",
-      "monthlyOrders": "الطلبات الشهرية"
+      "monthlyOrders": "الطلبات الشهرية",
+      "aiPhotos": "صور الذكاء الاصطناعي",
+      "aiVideos": "فيديوهات الذكاء الاصطناعي"
     },
     "unlimited": "غير محدود",
     "billingHistory": "سجل الفوترة",
