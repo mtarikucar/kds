@@ -11,6 +11,7 @@ import { promises as fs } from "fs";
 import * as path from "path";
 import axios from "axios";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { MenuAiQuotaService } from "./menu-ai-quota.service";
 import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 const MESHY_BASE = "https://api.meshy.ai/openapi/v1/image-to-3d";
@@ -34,6 +35,7 @@ export class Product3dService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly quota: MenuAiQuotaService,
   ) {
     this.baseUrl =
       this.config.get<string>("BACKEND_URL") || "http://localhost:3000";
@@ -104,6 +106,12 @@ export class Product3dService {
       );
     }
 
+    // Every Meshy submit is a real vendor charge, and ?force=true (plus
+    // TRIAL's unlimited products) would otherwise make it an unmetered loop.
+    // 3D draws from the PHOTO allowance — no separate 3D cap, but every
+    // generation consumes ledger units; a FAILED task refunds via markFailed.
+    const usageId = await this.quota.claim(tenantId, "PHOTO", 1);
+
     // Simulator: skip Meshy, mark READY immediately with a sample model so the
     // whole request → AR-viewer path is exercisable without the API/credits.
     if (!this.apiKey && this.simulator) {
@@ -123,6 +131,9 @@ export class Product3dService {
           model3dError: null,
         },
       });
+      await this.quota
+        .attachJob(usageId, `meshy:sim:${product.id}`)
+        .catch(() => undefined);
       return this.view(updated);
     }
 
@@ -144,6 +155,8 @@ export class Product3dService {
       taskId = res.data?.result;
       if (!taskId) throw new Error("no task id in Meshy response");
     } catch (err: any) {
+      // No Meshy task exists — refund the claim.
+      await this.quota.voidUsage(usageId).catch(() => undefined);
       const detail = err?.response?.data?.message ?? err?.message;
       this.logger.error(`Meshy create-task failed (${product.id}): ${detail}`);
       throw new ServiceUnavailableException(
@@ -151,6 +164,11 @@ export class Product3dService {
       );
     }
 
+    // Soft link (jobId is a plain string ref) so a later FAILED/CANCELED task
+    // refunds via markFailed → voidByJob("meshy:<taskId>").
+    await this.quota
+      .attachJob(usageId, `meshy:${taskId}`)
+      .catch(() => undefined);
     const updated = await this.prisma.product.update({
       where: { id: product.id },
       data: {
@@ -208,7 +226,7 @@ export class Product3dService {
       const glbUrl = res.data?.model_urls?.glb;
       const usdzUrl = res.data?.model_urls?.usdz;
       if (!glbUrl) {
-        await this.markFailed(productId, "Meshy returned no GLB");
+        await this.markFailed(productId, "Meshy returned no GLB", taskId);
         return;
       }
       // Re-host locally so the AR viewer survives Meshy's signed-URL expiry.
@@ -232,16 +250,25 @@ export class Product3dService {
       await this.markFailed(
         productId,
         res.data?.task_error?.message ?? `Meshy task ${status}`,
+        taskId,
       );
     }
     // PENDING / IN_PROGRESS: leave it; the next tick re-checks.
   }
 
-  private async markFailed(productId: string, reason: string): Promise<void> {
+  private async markFailed(
+    productId: string,
+    reason: string,
+    taskId?: string,
+  ): Promise<void> {
     await this.prisma.product.update({
       where: { id: productId },
       data: { model3dStatus: "FAILED", model3dError: reason.slice(0, 500) },
     });
+    // Failed generation = refund the quota claim (soft-linked at submit).
+    if (taskId) {
+      await this.quota.voidByJob(`meshy:${taskId}`).catch(() => undefined);
+    }
   }
 
   private async download(url: string, filename: string): Promise<string> {

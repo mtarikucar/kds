@@ -163,6 +163,22 @@ export class CreatePlanDto {
   @Min(-1)
   maxMonthlyOrders?: number = 100;
 
+  @ApiPropertyOptional({ default: 0 })
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(-1)
+  maxMonthlyAiPhotos?: number = 0;
+
+  @ApiPropertyOptional({ default: 0 })
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(-1)
+  maxMonthlyAiVideos?: number = 0;
+
   @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()
@@ -226,6 +242,11 @@ export class CreatePlanDto {
   @IsOptional()
   @IsBoolean()
   posAccess?: boolean = true;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  aiContentGeneration?: boolean = false;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

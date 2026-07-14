@@ -342,7 +342,10 @@
       "create": "Oluştur",
       "deliveryIntegration": "Teslimat Entegrasyonu",
       "externalDisplay": "Harici Ekran (Partner Display)",
-      "posAccess": "POS Erişimi"
+      "posAccess": "POS Erişimi",
+      "aiPhotosPerMonth": "AI foto/ay",
+      "aiVideosPerMonth": "AI video/ay",
+      "aiContentGeneration": "AI içerik üretimi"
     }
   },
   "marketplace": {

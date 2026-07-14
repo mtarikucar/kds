@@ -24,31 +24,31 @@ vi.mock('./UpgradePrompt', () => ({
 const F = false;
 const T = true;
 
-// 11 features × 4 plans — identical to the backend matrix (seed.ts source).
+// 12 features × 4 plans — identical to the backend matrix (seed.ts source).
 const FEATURE_MATRIX: Record<string, Record<string, boolean>> = {
   FREE: {
     advancedReports: F, multiLocation: F, customBranding: F, apiAccess: F,
     prioritySupport: F, inventoryTracking: F, kdsIntegration: T,
     reservationSystem: F, personnelManagement: F, deliveryIntegration: F,
-    posAccess: F,
+    posAccess: F, aiContentGeneration: F,
   },
   BASIC: {
     advancedReports: F, multiLocation: F, customBranding: F, apiAccess: F,
     prioritySupport: F, inventoryTracking: T, kdsIntegration: T,
     reservationSystem: F, personnelManagement: F, deliveryIntegration: F,
-    posAccess: T,
+    posAccess: T, aiContentGeneration: F,
   },
   PRO: {
     advancedReports: T, multiLocation: T, customBranding: T, apiAccess: F,
     prioritySupport: T, inventoryTracking: T, kdsIntegration: T,
     reservationSystem: T, personnelManagement: T, deliveryIntegration: T,
-    posAccess: T,
+    posAccess: T, aiContentGeneration: T,
   },
   BUSINESS: {
     advancedReports: T, multiLocation: T, customBranding: T, apiAccess: T,
     prioritySupport: T, inventoryTracking: T, kdsIntegration: T,
     reservationSystem: T, personnelManagement: T, deliveryIntegration: T,
-    posAccess: T,
+    posAccess: T, aiContentGeneration: T,
   },
 };
 

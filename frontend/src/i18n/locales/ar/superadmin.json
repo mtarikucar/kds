@@ -342,7 +342,10 @@
       "create": "Create",
       "deliveryIntegration": "تكامل التوصيل",
       "externalDisplay": "شاشة خارجية (شاشة الشريك)",
-      "posAccess": "وصول نقطة البيع"
+      "posAccess": "وصول نقطة البيع",
+      "aiPhotosPerMonth": "صور AI/شهر",
+      "aiVideosPerMonth": "فيديو AI/شهر",
+      "aiContentGeneration": "إنشاء المحتوى بالذكاء الاصطناعي"
     }
   },
   "marketplace": {

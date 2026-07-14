@@ -71,6 +71,11 @@ export class FeatureOverridesDto {
   @IsOptional()
   @IsBoolean()
   posAccess?: boolean | null;
+
+  @StringToBoolean()
+  @IsOptional()
+  @IsBoolean()
+  aiContentGeneration?: boolean | null;
 }
 
 // A limit override REPLACES the plan value in the entitlement engine, so the
@@ -121,6 +126,20 @@ export class LimitOverridesDto {
   @IsInt()
   @Min(-1)
   maxMonthlyOrders?: number | null;
+
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(-1)
+  maxMonthlyAiPhotos?: number | null;
+
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(-1)
+  maxMonthlyAiVideos?: number | null;
 }
 
 export class UpdateTenantOverridesDto {

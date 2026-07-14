@@ -342,7 +342,10 @@
       "create": "Create",
       "deliveryIntegration": "Delivery Integration",
       "externalDisplay": "External Display (Partner Display)",
-      "posAccess": "POS Access"
+      "posAccess": "POS Access",
+      "aiPhotosPerMonth": "AI photos/mo",
+      "aiVideosPerMonth": "AI videos/mo",
+      "aiContentGeneration": "AI Content Generation"
     }
   },
   "marketplace": {

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import i18n from "../../i18n/config";
@@ -47,22 +48,40 @@ export const latestJob = (
   kind: MediaJobKind,
 ): ProductMediaJob | undefined => state?.jobs?.find((j) => j.kind === kind);
 
-/** Whether the backend has an AI key wired (gates the UI). */
+/** Monthly AI quota usage for one kind. limit/remaining -1 = unlimited. */
+export interface AiQuotaUsage {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface ProductMediaConfig {
+  configured: boolean;
+  photos: AiQuotaUsage;
+  videos: AiQuotaUsage;
+}
+
+export const hasQuotaLeft = (q?: AiQuotaUsage | null) =>
+  !!q && (q.limit === -1 || q.remaining > 0);
+
+/** Whether the backend has an AI key wired + the tenant's monthly AI quota
+    (gates the UI and feeds the X/Y counters in the studio header). */
 export const useProductMediaConfig = () =>
   useQuery({
     queryKey: ["product-media-config"],
     queryFn: async () => {
-      const res = await api.get<{ configured: boolean }>(
+      const res = await api.get<ProductMediaConfig>(
         "/menu/product-media/status",
       );
       return res.data;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
 /** Media + job status; polls every 2s while ANY job is active. */
-export const useProductMediaStatus = (productId?: string, enabled = true) =>
-  useQuery({
+export const useProductMediaStatus = (productId?: string, enabled = true) => {
+  const qc = useQueryClient();
+  const query = useQuery({
     queryKey: ["product-media", productId],
     enabled: !!productId && enabled,
     queryFn: async () => {
@@ -76,6 +95,25 @@ export const useProductMediaStatus = (productId?: string, enabled = true) =>
       return s?.jobs?.some((j) => isJobActive(j)) ? 2000 : false;
     },
   });
+
+  // A job the poll watched ending FAILED/CANCELED was REFUNDED server-side —
+  // refresh the X/Y quota counters so the generate button re-enables with the
+  // returned unit. Seeded on first observation so pre-existing failed jobs
+  // don't trigger a spurious refetch on mount.
+  const failedKey = (query.data?.jobs ?? [])
+    .filter((j) => j.status === "FAILED" || j.status === "CANCELED")
+    .map((j) => j.id)
+    .join(",");
+  const prevFailedKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevFailedKey.current !== null && prevFailedKey.current !== failedKey) {
+      qc.invalidateQueries({ queryKey: ["product-media-config"] });
+    }
+    prevFailedKey.current = failedKey;
+  }, [failedKey, qc]);
+
+  return query;
+};
 
 const onErr = (error: any) =>
   toast.error(
@@ -111,6 +149,8 @@ const useMediaMutation = <V extends { productId: string }>(
       qc.invalidateQueries({ queryKey: ["product-media", v.productId] });
       qc.invalidateQueries({ queryKey: ["product-images"] });
       qc.invalidateQueries({ queryKey: ["products"] });
+      // A successful generate consumed quota — refresh the X/Y counters.
+      qc.invalidateQueries({ queryKey: ["product-media-config"] });
     },
     onError: onErr,
   });

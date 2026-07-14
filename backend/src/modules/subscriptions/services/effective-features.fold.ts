@@ -24,12 +24,15 @@ export interface PlanGrantSource {
   deliveryIntegration: boolean;
   posAccess: boolean;
   externalDisplay: boolean;
+  aiContentGeneration: boolean;
   maxUsers: number;
   maxTables: number;
   maxBranches: number;
   maxProducts: number;
   maxCategories: number;
   maxMonthlyOrders: number;
+  maxMonthlyAiPhotos: number;
+  maxMonthlyAiVideos: number;
 }
 
 export interface ActiveAddOnGrant {
@@ -62,6 +65,7 @@ export function foldPlanGrants(
     deliveryIntegration: plan.deliveryIntegration,
     posAccess: plan.posAccess,
     externalDisplay: plan.externalDisplay,
+    aiContentGeneration: plan.aiContentGeneration,
   };
   const limits: Record<string, number> = {
     maxUsers: plan.maxUsers,
@@ -70,6 +74,8 @@ export function foldPlanGrants(
     maxProducts: plan.maxProducts,
     maxCategories: plan.maxCategories,
     maxMonthlyOrders: plan.maxMonthlyOrders,
+    maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
+    maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
   };
   const integrations: Record<string, string[]> = {};
 

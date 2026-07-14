@@ -61,7 +61,9 @@
       "users": "Пользователи",
       "tables": "Столы",
       "products": "Продукты",
-      "monthlyOrders": "Заказов в месяц"
+      "monthlyOrders": "Заказов в месяц",
+      "aiPhotos": "ИИ-фото",
+      "aiVideos": "ИИ-видео"
     },
     "unlimited": "Безлимитно",
     "billingHistory": "История платежей",
@@ -268,7 +270,9 @@
         "maxBranches": "Филиалы",
         "maxProducts": "Товары",
         "maxCategories": "Категории",
-        "maxMonthlyOrders": "Заказы в месяц"
+        "maxMonthlyOrders": "Заказы в месяц",
+        "maxMonthlyAiPhotos": "ИИ-фото / месяц",
+        "maxMonthlyAiVideos": "ИИ-видео / месяц"
       },
       "features": {
         "kdsIntegration": "Интеграция с KDS",
@@ -282,7 +286,8 @@
         "multiLocation": "Несколько локаций",
         "customBranding": "Свой брендинг",
         "apiAccess": "Доступ к API",
-        "prioritySupport": "Приоритетная поддержка"
+        "prioritySupport": "Приоритетная поддержка",
+        "aiContentGeneration": "ИИ-студия меню"
       }
     },
     "payNow": "Оплатить сейчас",
@@ -357,6 +362,7 @@
       "error": "Произошла ошибка",
       "missingInfo": "Отсутствуют данные",
       "upgradeFrom": "Повышение с:"
-    }
+    },
+    "featureAiContentGeneration": "ИИ-студия меню (генерация фото и видео)"
   }
 }

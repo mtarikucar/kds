@@ -170,6 +170,10 @@
     "genVideo": "Generate video",
     "regenVideo": "Regenerate video",
     "videoNeeds": "The video needs a start photo and a last frame.",
-    "finalizing": "Downloading / saving…"
+    "finalizing": "Downloading / saving…",
+    "quotaPhotos": "Photos",
+    "quotaVideos": "Videos",
+    "quotaExhaustedPhotos": "Your monthly AI photo allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap.",
+    "quotaExhaustedVideos": "Your monthly AI video allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap."
   }
 }

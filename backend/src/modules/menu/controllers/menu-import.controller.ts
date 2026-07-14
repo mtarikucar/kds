@@ -17,6 +17,8 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
+import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { UserRole } from "../../../common/constants/roles.enum";
 
 @ApiTags("menu-import")
@@ -33,8 +35,13 @@ export class MenuImportController {
     return { configured: this.menuImport.isConfigured() };
   }
 
+  // parse is the AI call (Claude OCR) → PRO+ only. commit below is
+  // deliberately NOT gated: BulkAddModal drives the same commit endpoint for
+  // hand-typed (non-AI) bulk entry, and a downgraded tenant must still be
+  // able to commit a draft it already parsed.
   @Post("parse")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)
   @ApiConsumes("multipart/form-data")
   @ApiOperation({
     summary: "Digitise menu photo(s) into an editable draft (no persistence)",
@@ -44,12 +51,15 @@ export class MenuImportController {
       limits: { fileSize: 8 * 1024 * 1024, files: 10 },
     }),
   )
-  async parse(@UploadedFiles() files: Array<Express.Multer.File>) {
+  async parse(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Request() req,
+  ) {
     const images = (files ?? []).map((f) => ({
       buffer: f.buffer,
       mimetype: f.mimetype,
     }));
-    return this.menuImport.parseMenuPhotos(images);
+    return this.menuImport.parseMenuPhotos(req.tenantId, images);
   }
 
   @Post("commit")

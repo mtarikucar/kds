@@ -53,6 +53,7 @@ const FEATURE_LABELS: Record<string, string> = {
   deliveryIntegration: 'Delivery Integration',
   externalDisplay: 'External Display (Partner Display)',
   posAccess: 'POS Access',
+  aiContentGeneration: 'AI Content Generation (Menu Studio)',
 };
 
 const LIMIT_LABELS: Record<string, string> = {
@@ -62,6 +63,8 @@ const LIMIT_LABELS: Record<string, string> = {
   maxProducts: 'Max Products',
   maxCategories: 'Max Categories',
   maxMonthlyOrders: 'Max Monthly Orders',
+  maxMonthlyAiPhotos: 'AI Photos / month',
+  maxMonthlyAiVideos: 'AI Videos / month',
 };
 
 export default function TenantDetailPage() {

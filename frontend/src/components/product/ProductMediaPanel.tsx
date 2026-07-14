@@ -13,6 +13,7 @@ import { cn } from "../../lib/utils";
 import AiLockedTeaser from "./AiLockedTeaser";
 import GenerationProgress from "./GenerationProgress";
 import VariationGrid from "./VariationGrid";
+import FeatureGate from "../subscriptions/FeatureGate";
 import {
   useProductMediaConfig,
   useProductMediaStatus,
@@ -22,6 +23,8 @@ import {
   useSetPrimaryImage,
   latestJob,
   isJobActive,
+  hasQuotaLeft,
+  type AiQuotaUsage,
 } from "../../features/menu/productMediaApi";
 
 interface Props {
@@ -44,8 +47,27 @@ const PHOTO_CHIPS = [
 /** The product editor's AI Studio: a two-tab console (Fotoğraf / İçindekiler
     videosu). Every generation is an async job with REAL progress; the operator
     steers with a prompt, picks among photo variations, and reviews the video's
-    last frame before rendering. */
-export default function ProductMediaPanel({
+    last frame before rendering.
+
+    PRO+ only (feature.aiContentGeneration): lower plans see the upgrade
+    prompt. Monthly photo/video quotas (PRO 50/5, Kurumsal 200/20) render as
+    X/Y counters in the header; exhausted → buttons disable with a renewal
+    note. The backend enforces both independently (403 flag / 402 quota).
+
+    Order matters: the configured check runs BEFORE the FeatureGate — the AI
+    backend ships INERT until FAL_KEY is set, and upselling a feature that
+    isn't live would be a broken promise. */
+export default function ProductMediaPanel(props: Props) {
+  const { data: config } = useProductMediaConfig();
+  if (!config?.configured) return null;
+  return (
+    <FeatureGate feature="aiContentGeneration" showUpgradePrompt>
+      <ProductMediaPanelInner {...props} />
+    </FeatureGate>
+  );
+}
+
+function ProductMediaPanelInner({
   productId,
   hasIngredients,
   ensureProductId,
@@ -90,6 +112,15 @@ export default function ProductMediaPanel({
   const photoJob = latestJob(state, "PHOTO");
   const frameJob = latestJob(state, "FRAME");
   const videoJob = latestJob(state, "VIDEO");
+  const photoQuotaLeft = hasQuotaLeft(config?.photos);
+  const videoQuotaLeft = hasQuotaLeft(config?.videos);
+  // The claim is all-or-nothing (4 variations with 2 left → the whole request
+  // 402s), so variation options beyond the remaining allowance are disabled
+  // and the submitted count is clamped as a stale-state safety net.
+  const photosRemaining =
+    !config?.photos || config.photos.limit === -1
+      ? Infinity
+      : config.photos.remaining;
   const photoBusy = isJobActive(photoJob) || genPhoto.isPending;
   const frameBusy = isJobActive(frameJob) || genFrame.isPending;
   const videoBusy = isJobActive(videoJob) || genVideo.isPending;
@@ -102,7 +133,9 @@ export default function ProductMediaPanel({
       genPhoto.mutate({
         productId: id,
         prompt: photoPrompt.trim() || undefined,
-        count: photoCount,
+        count: Number.isFinite(photosRemaining)
+          ? Math.min(photoCount, Math.max(1, photosRemaining))
+          : photoCount,
       });
   };
   const onFrame = async () => {
@@ -140,9 +173,19 @@ export default function ProductMediaPanel({
 
   return (
     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-900">
         <Sparkles className="h-4 w-4 text-primary-600" />
         {t("media.title", "Yapay zeka stüdyo")}
+        <span className="ml-auto flex items-center gap-1.5">
+          <QuotaChip
+            label={t("media.quotaPhotos", "Fotoğraf")}
+            quota={config?.photos}
+          />
+          <QuotaChip
+            label={t("media.quotaVideos", "Video")}
+            quota={config?.videos}
+          />
+        </span>
       </div>
 
       <Tabs defaultValue="photo">
@@ -197,11 +240,13 @@ export default function ProductMediaPanel({
                   key={n}
                   type="button"
                   onClick={() => setPhotoCount(n)}
+                  disabled={n > photosRemaining}
                   className={cn(
                     "h-6 w-6 rounded text-xs font-medium",
                     photoCount === n
                       ? "bg-primary-500 text-white"
                       : "bg-white text-gray-600 ring-1 ring-gray-200",
+                    n > photosRemaining && "cursor-not-allowed opacity-40",
                   )}
                 >
                   {n}
@@ -212,7 +257,7 @@ export default function ProductMediaPanel({
               type="button"
               size="sm"
               onClick={onPhoto}
-              disabled={photoBusy}
+              disabled={photoBusy || !photoQuotaLeft}
             >
               {photoJob?.status === "COMPLETED" ? (
                 <RefreshCw className="mr-2 h-4 w-4" />
@@ -225,6 +270,14 @@ export default function ProductMediaPanel({
             </Button>
           </div>
 
+          {!photoQuotaLeft && (
+            <QuotaExhaustedNote
+              text={t(
+                "media.quotaExhaustedPhotos",
+                "Aylık fotoğraf üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin.",
+              )}
+            />
+          )}
           {photoBusy && photoJob && <GenerationProgress job={photoJob} />}
           {photoJob?.status === "FAILED" && (
             <FailedNote text={photoJob.error} />
@@ -294,7 +347,7 @@ export default function ProductMediaPanel({
                   size="sm"
                   variant="outline"
                   onClick={onFrame}
-                  disabled={frameBusy}
+                  disabled={frameBusy || !photoQuotaLeft}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   {state?.ingredientsImageUrl
@@ -336,7 +389,10 @@ export default function ProductMediaPanel({
                 size="sm"
                 onClick={onVideo}
                 disabled={
-                  !hasDishPhoto || !state?.ingredientsImageUrl || videoBusy
+                  !hasDishPhoto ||
+                  !state?.ingredientsImageUrl ||
+                  videoBusy ||
+                  !videoQuotaLeft
                 }
               >
                 <Clapperboard className="mr-2 h-4 w-4" />
@@ -344,6 +400,14 @@ export default function ProductMediaPanel({
                   ? t("media.regenVideo", "Videoyu yeniden oluştur")
                   : t("media.genVideo", "Videoyu oluştur")}
               </Button>
+              {!videoQuotaLeft && (
+                <QuotaExhaustedNote
+                  text={t(
+                    "media.quotaExhaustedVideos",
+                    "Aylık video üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin.",
+                  )}
+                />
+              )}
               {(!hasDishPhoto || !state?.ingredientsImageUrl) && (
                 <p className="text-xs text-gray-400">
                   {t(
@@ -402,6 +466,39 @@ function FailedNote({ text }: { text?: string | null }) {
     <div className="flex items-center gap-1 text-xs text-amber-700">
       <AlertTriangle className="h-3.5 w-3.5" />
       {text || t("media.failed", "Son deneme başarısız oldu")}
+    </div>
+  );
+}
+
+/** "Fotoğraf 12/50" pill; unlimited (-1) renders as ∞. Amber when exhausted. */
+function QuotaChip({
+  label,
+  quota,
+}: {
+  label: string;
+  quota?: AiQuotaUsage | null;
+}) {
+  if (!quota) return null;
+  const exhausted = quota.limit !== -1 && quota.remaining <= 0;
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-xs font-medium ring-1",
+        exhausted
+          ? "bg-amber-50 text-amber-700 ring-amber-200"
+          : "bg-white text-gray-500 ring-gray-200",
+      )}
+    >
+      {label} {quota.used}/{quota.limit === -1 ? "∞" : quota.limit}
+    </span>
+  );
+}
+
+function QuotaExhaustedNote({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      {text}
     </div>
   );
 }

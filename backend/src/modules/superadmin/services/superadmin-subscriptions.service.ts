@@ -115,6 +115,8 @@ export class SuperAdminSubscriptionsService {
         maxProducts: createDto.maxProducts ?? 50,
         maxCategories: createDto.maxCategories ?? 10,
         maxMonthlyOrders: createDto.maxMonthlyOrders ?? 100,
+        maxMonthlyAiPhotos: createDto.maxMonthlyAiPhotos ?? 0,
+        maxMonthlyAiVideos: createDto.maxMonthlyAiVideos ?? 0,
         advancedReports: createDto.advancedReports ?? false,
         multiLocation: createDto.multiLocation ?? false,
         customBranding: createDto.customBranding ?? false,
@@ -129,6 +131,7 @@ export class SuperAdminSubscriptionsService {
         // posAccess defaults to true (schema parity) so omitting it doesn't
         // silently strip POS from a newly-created plan.
         posAccess: createDto.posAccess ?? true,
+        aiContentGeneration: createDto.aiContentGeneration ?? false,
         isActive: createDto.isActive ?? true,
         // Discount block — previously omitted, so plan discounts created via
         // the superadmin form silently never persisted. Dates arrive as ISO
@@ -189,6 +192,8 @@ export class SuperAdminSubscriptionsService {
         maxProducts: updateDto.maxProducts,
         maxCategories: updateDto.maxCategories,
         maxMonthlyOrders: updateDto.maxMonthlyOrders,
+        maxMonthlyAiPhotos: updateDto.maxMonthlyAiPhotos,
+        maxMonthlyAiVideos: updateDto.maxMonthlyAiVideos,
         advancedReports: updateDto.advancedReports,
         multiLocation: updateDto.multiLocation,
         customBranding: updateDto.customBranding,
@@ -203,6 +208,7 @@ export class SuperAdminSubscriptionsService {
         // PATCH: undefined leaves posAccess untouched; an explicit false
         // disables POS on this plan.
         posAccess: updateDto.posAccess,
+        aiContentGeneration: updateDto.aiContentGeneration,
         isActive: updateDto.isActive,
         // Discount block — previously omitted, so discount edits returned 200
         // but never saved. PATCH semantics: undefined leaves the column

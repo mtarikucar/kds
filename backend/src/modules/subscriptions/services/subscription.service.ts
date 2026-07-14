@@ -1245,6 +1245,8 @@ export class SubscriptionService {
           maxProducts: plan.maxProducts,
           maxCategories: plan.maxCategories,
           maxMonthlyOrders: plan.maxMonthlyOrders,
+          maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
+          maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
         },
         features: {
           advancedReports: plan.advancedReports,
@@ -1258,6 +1260,7 @@ export class SubscriptionService {
           reservationSystem: plan.reservationSystem,
           personnelManagement: plan.personnelManagement,
           deliveryIntegration: plan.deliveryIntegration,
+          aiContentGeneration: plan.aiContentGeneration,
         },
         discount: isDiscountActive
           ? {

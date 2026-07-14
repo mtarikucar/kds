@@ -61,7 +61,9 @@
       "users": "المستخدمون",
       "tables": "الطاولات",
       "products": "المنتجات",
-      "monthlyOrders": "الطلبات الشهرية"
+      "monthlyOrders": "الطلبات الشهرية",
+      "aiPhotos": "صور الذكاء الاصطناعي",
+      "aiVideos": "فيديوهات الذكاء الاصطناعي"
     },
     "unlimited": "غير محدود",
     "billingHistory": "سجل الفوترة",
@@ -268,7 +270,9 @@
         "maxBranches": "عدد الفروع",
         "maxProducts": "المنتجات",
         "maxCategories": "الفئات",
-        "maxMonthlyOrders": "الطلبات الشهرية"
+        "maxMonthlyOrders": "الطلبات الشهرية",
+        "maxMonthlyAiPhotos": "صور الذكاء الاصطناعي / شهر",
+        "maxMonthlyAiVideos": "فيديوهات الذكاء الاصطناعي / شهر"
       },
       "features": {
         "kdsIntegration": "تكامل KDS",
@@ -282,7 +286,8 @@
         "multiLocation": "تعدد الفروع",
         "customBranding": "علامة تجارية مخصصة",
         "apiAccess": "الوصول إلى API",
-        "prioritySupport": "دعم ذو أولوية"
+        "prioritySupport": "دعم ذو أولوية",
+        "aiContentGeneration": "استوديو القائمة بالذكاء الاصطناعي"
       }
     },
     "payNow": "ادفع الآن",
@@ -357,6 +362,7 @@
       "error": "حدث خطأ",
       "missingInfo": "معلومات ناقصة",
       "upgradeFrom": "ترقية من:"
-    }
+    },
+    "featureAiContentGeneration": "استوديو القائمة بالذكاء الاصطناعي (إنشاء الصور والفيديو)"
   }
 }

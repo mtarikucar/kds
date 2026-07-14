@@ -90,7 +90,7 @@ const PlanCard = ({
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  // All 12 plan features mapped to localized labels so every flag renders a
+  // All 13 plan features mapped to localized labels so every flag renders a
   // real, accurate label (no blank rows for the newer flags).
   const featureLabels: Record<string, string> = {
     advancedReports: t('subscriptions.featureAdvancedReports'),
@@ -105,6 +105,7 @@ const PlanCard = ({
     personnelManagement: t('subscriptions.featurePersonnelManagement'),
     deliveryIntegration: t('subscriptions.featureDeliveryIntegration'),
     externalDisplay: t('subscriptions.featureExternalDisplay'),
+    aiContentGeneration: t('subscriptions.featureAiContentGeneration'),
   };
 
   // Disabled / dead-end CTA → keep it non-actionable, otherwise the

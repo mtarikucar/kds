@@ -15,6 +15,8 @@ export interface PlanConfig {
     maxProducts: number;
     maxCategories: number;
     maxMonthlyOrders: number;
+    maxMonthlyAiPhotos: number;
+    maxMonthlyAiVideos: number;
   };
   features: {
     advancedReports: boolean;
@@ -29,6 +31,7 @@ export interface PlanConfig {
     personnelManagement: boolean;
     deliveryIntegration: boolean;
     posAccess: boolean;
+    aiContentGeneration: boolean;
   };
 }
 
@@ -51,6 +54,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       maxProducts: -1,
       maxCategories: -1,
       maxMonthlyOrders: -1,
+      // AI taster: deliberately capped (not -1) — generations cost real
+      // money per unit; trial gets a taste, not the fal.ai bill.
+      maxMonthlyAiPhotos: 3,
+      maxMonthlyAiVideos: 1,
     },
     features: {
       advancedReports: true,
@@ -65,6 +72,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
     },
   },
   [SubscriptionPlanType.FREE]: {
@@ -82,6 +90,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       maxProducts: 25,
       maxCategories: 5,
       maxMonthlyOrders: 50,
+      maxMonthlyAiPhotos: 0,
+      maxMonthlyAiVideos: 0,
     },
     features: {
       advancedReports: false,
@@ -96,6 +106,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       personnelManagement: false,
       deliveryIntegration: false,
       posAccess: false,
+      aiContentGeneration: false,
     },
   },
   [SubscriptionPlanType.BASIC]: {
@@ -115,6 +126,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       maxProducts: 100,
       maxCategories: 20,
       maxMonthlyOrders: 500,
+      // AI is PRO+ — Başlangıç has no generation allowance.
+      maxMonthlyAiPhotos: 0,
+      maxMonthlyAiVideos: 0,
     },
     features: {
       advancedReports: false,
@@ -129,6 +143,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       personnelManagement: false,
       deliveryIntegration: false,
       posAccess: true,
+      aiContentGeneration: false,
     },
   },
   [SubscriptionPlanType.PRO]: {
@@ -147,6 +162,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       maxProducts: 500,
       maxCategories: 50,
       maxMonthlyOrders: 2000,
+      // Cost-calibrated 2026-07: photo ≈ $0.03, 5s Kling video ≈ $0.42.
+      // 50/5 caps the worst-case fal.ai bill at ~12% of the plan price.
+      maxMonthlyAiPhotos: 50,
+      maxMonthlyAiVideos: 5,
     },
     features: {
       advancedReports: true,
@@ -161,6 +180,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
     },
   },
   [SubscriptionPlanType.BUSINESS]: {
@@ -179,6 +199,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       maxProducts: -1,
       maxCategories: -1,
       maxMonthlyOrders: -1,
+      // NOT -1: every other Kurumsal limit is unlimited, but AI generations
+      // have a hard per-unit vendor cost — 200/20 caps the worst-case
+      // fal.ai bill at ~22% of the plan price.
+      maxMonthlyAiPhotos: 200,
+      maxMonthlyAiVideos: 20,
     },
     features: {
       advancedReports: true,
@@ -193,6 +218,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       personnelManagement: true,
       deliveryIntegration: true,
       posAccess: true,
+      aiContentGeneration: true,
     },
   },
 };

@@ -28,7 +28,8 @@ type PlanFeatureKey =
   | "reservationSystem"
   | "personnelManagement"
   | "deliveryIntegration"
-  | "posAccess";
+  | "posAccess"
+  | "aiContentGeneration";
 const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "advancedReports",
   "multiLocation",
@@ -42,6 +43,7 @@ const FEATURE_KEYS: readonly PlanFeatureKey[] = [
   "personnelManagement",
   "deliveryIntegration",
   "posAccess",
+  "aiContentGeneration",
 ];
 
 type PlanLimitKey =
@@ -50,7 +52,9 @@ type PlanLimitKey =
   | "maxBranches"
   | "maxProducts"
   | "maxCategories"
-  | "maxMonthlyOrders";
+  | "maxMonthlyOrders"
+  | "maxMonthlyAiPhotos"
+  | "maxMonthlyAiVideos";
 const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxUsers",
   "maxTables",
@@ -58,6 +62,8 @@ const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxProducts",
   "maxCategories",
   "maxMonthlyOrders",
+  "maxMonthlyAiPhotos",
+  "maxMonthlyAiVideos",
 ];
 
 @Injectable()
@@ -566,6 +572,7 @@ export class SuperAdminTenantsService {
           // is the canonical grant path for posAccess (no plan-form toggle by
           // default), so the plan default must be surfaced here.
           posAccess: plan.posAccess,
+          aiContentGeneration: plan.aiContentGeneration,
         }
       : {};
 
@@ -580,6 +587,8 @@ export class SuperAdminTenantsService {
           maxProducts: plan.maxProducts,
           maxCategories: plan.maxCategories,
           maxMonthlyOrders: plan.maxMonthlyOrders,
+          maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
+          maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
         }
       : {};
 

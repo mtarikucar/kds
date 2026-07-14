@@ -35,6 +35,8 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
       maxProducts: 200,
       maxCategories: 50,
       maxMonthlyOrders: 5000,
+      maxMonthlyAiPhotos: 50,
+      maxMonthlyAiVideos: 5,
     },
     features: {
       advancedReports: true,
@@ -49,6 +51,7 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
       deliveryIntegration: false,
       posAccess: true,
       externalDisplay: false,
+      aiContentGeneration: true,
     },
     isActive: true,
     createdAt: '2026-01-01T00:00:00.000Z',

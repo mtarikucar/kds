@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import FeatureGate from "../../../components/subscriptions/FeatureGate";
 import {
   useParseMenuPhotos,
   useCommitMenuImport,
@@ -28,8 +29,19 @@ const cellCls =
  * Phase 1 of the menu AI/AR feature: capture photos of a paper menu, have
  * Claude vision digitise them into an editable draft, review/correct it, then
  * bulk-create the categories + products.
+ *
+ * PRO+ only (feature.aiContentGeneration): the /parse endpoint 403s on lower
+ * plans (the non-AI bulk-add path stays open to everyone via BulkAddModal).
  */
 export default function MenuImportTab() {
+  return (
+    <FeatureGate feature="aiContentGeneration" showUpgradePrompt>
+      <MenuImportTabInner />
+    </FeatureGate>
+  );
+}
+
+function MenuImportTabInner() {
   const { t } = useTranslation(["menu", "common"]);
   const parse = useParseMenuPhotos();
   const commit = useCommitMenuImport();

@@ -31,11 +31,18 @@ describe("Product3dService", () => {
     ),
   });
 
+  const quotaStub = () => ({
+    claim: jest.fn().mockResolvedValue("usage1"),
+    attachJob: jest.fn().mockResolvedValue(undefined),
+    voidUsage: jest.fn().mockResolvedValue(undefined),
+    voidByJob: jest.fn().mockResolvedValue(undefined),
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     prisma = mockPrismaClient();
     config = makeConfig();
-    svc = new Product3dService(prisma as any, config as any);
+    svc = new Product3dService(prisma as any, config as any, quotaStub() as any);
     // pollPendingModels now runs under a Postgres advisory lock (multi-replica
     // guard). Grant it by default so the poll body runs.
     (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
@@ -55,17 +62,11 @@ describe("Product3dService", () => {
       );
     });
     it("is configured with an API key", () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       expect(svc.isConfigured()).toBe(true);
     });
     it("is configured in simulator mode", () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_SIMULATOR: "true" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_SIMULATOR: "true" }) as any, quotaStub() as any);
       expect(svc.isConfigured()).toBe(true);
     });
   });
@@ -81,10 +82,7 @@ describe("Product3dService", () => {
     });
 
     it("throws NotFound for a product outside the tenant", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (prisma.product.findFirst as any).mockResolvedValue(null);
       await expect(svc.requestModel("p1", TENANT)).rejects.toThrow(
         /not found/i,
@@ -92,10 +90,7 @@ describe("Product3dService", () => {
     });
 
     it("requires a dish photo", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (prisma.product.findFirst as any).mockResolvedValue({
         id: "p1",
         image: null,
@@ -106,10 +101,7 @@ describe("Product3dService", () => {
     });
 
     it("simulator marks the product READY with sample models (no API call)", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_SIMULATOR: "true" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_SIMULATOR: "true" }) as any, quotaStub() as any);
       const out = await svc.requestModel("p1", TENANT);
       expect(axios.post).not.toHaveBeenCalled();
       expect(out.status).toBe("READY");
@@ -118,10 +110,7 @@ describe("Product3dService", () => {
     });
 
     it("real mode POSTs a Meshy task (with absolute image url) and flips to PENDING", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (axios.post as any).mockResolvedValue({ data: { result: "task-123" } });
       const out = await svc.requestModel("p1", TENANT);
       expect(axios.post).toHaveBeenCalledWith(
@@ -146,10 +135,7 @@ describe("Product3dService", () => {
     });
 
     it("does not re-request a product already PENDING", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (prisma.product.findFirst as any).mockResolvedValue({
         id: "p1",
         image: "/x.jpg",
@@ -164,20 +150,14 @@ describe("Product3dService", () => {
 
   describe("pollPendingModels → SUCCEEDED downloads + re-hosts", () => {
     it("skips polling when the advisory lock is held by another replica", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: false }]);
       await svc.pollPendingModels();
       expect(prisma.product.findMany).not.toHaveBeenCalled();
     });
 
     it("downloads GLB+USDZ and marks READY with local URLs", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (prisma.product.findMany as any).mockResolvedValue([
         { id: "p1", model3dTaskId: "task-123" },
       ]);
@@ -210,10 +190,7 @@ describe("Product3dService", () => {
     });
 
     it("marks FAILED when Meshy reports the task failed", async () => {
-      svc = new Product3dService(
-        prisma as any,
-        makeConfig({ MESHY_API_KEY: "k" }) as any,
-      );
+      svc = new Product3dService(prisma as any, makeConfig({ MESHY_API_KEY: "k" }) as any, quotaStub() as any);
       (prisma.product.findMany as any).mockResolvedValue([
         { id: "p1", model3dTaskId: "task-123" },
       ]);

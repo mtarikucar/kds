@@ -25,12 +25,19 @@ describe("MenuImportService", () => {
     entitlements = {
       getForTenant: jest.fn().mockResolvedValue({ limits: {} }),
     };
+    const quota = {
+      claim: jest.fn().mockResolvedValue("usage1"),
+      attachJob: jest.fn().mockResolvedValue(undefined),
+      voidUsage: jest.fn().mockResolvedValue(undefined),
+      voidByJob: jest.fn().mockResolvedValue(undefined),
+    };
     svc = new MenuImportService(
       prisma as any,
       config as any,
       categories as any,
       products as any,
       entitlements as any,
+      quota as any,
     );
     (prisma.category.findMany as any).mockResolvedValue([]);
     (prisma.product.count as any).mockResolvedValue(0);
@@ -42,7 +49,7 @@ describe("MenuImportService", () => {
       config.get.mockReturnValue(undefined);
       expect(svc.isConfigured()).toBe(false);
       await expect(
-        svc.parseMenuPhotos([{ buffer: Buffer.from("x"), mimetype: "image/png" }]),
+        svc.parseMenuPhotos("t1", [{ buffer: Buffer.from("x"), mimetype: "image/png" }]),
       ).rejects.toThrow(/not configured/i);
       expect(axios.post).not.toHaveBeenCalled();
     });
@@ -81,7 +88,7 @@ describe("MenuImportService", () => {
           ],
         }),
       );
-      const draft = await svc.parseMenuPhotos([
+      const draft = await svc.parseMenuPhotos("t1", [
         { buffer: Buffer.from("img"), mimetype: "image/jpeg" },
       ]);
       expect(draft.categories).toHaveLength(1);
@@ -101,7 +108,7 @@ describe("MenuImportService", () => {
           }) +
           "\n```",
       );
-      const draft = await svc.parseMenuPhotos([
+      const draft = await svc.parseMenuPhotos("t1", [
         { buffer: Buffer.from("img"), mimetype: "image/png" },
       ]);
       // "Boş" had only a nameless product → dropped; only İçecekler survives.
@@ -116,7 +123,7 @@ describe("MenuImportService", () => {
           ],
         }),
       );
-      const draft = await svc.parseMenuPhotos([
+      const draft = await svc.parseMenuPhotos("t1", [
         { buffer: Buffer.from("img"), mimetype: "image/webp" },
       ]);
       expect(draft.categories[0].products[0].price).toBe(0);
@@ -126,7 +133,7 @@ describe("MenuImportService", () => {
     it("throws a friendly error when no JSON object is present", async () => {
       mockAnthropic("Sorry, I could not read the image.");
       await expect(
-        svc.parseMenuPhotos([{ buffer: Buffer.from("img"), mimetype: "image/jpeg" }]),
+        svc.parseMenuPhotos("t1", [{ buffer: Buffer.from("img"), mimetype: "image/jpeg" }]),
       ).rejects.toThrow(/clearer/i);
     });
   });

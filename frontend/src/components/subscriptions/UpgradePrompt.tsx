@@ -19,6 +19,8 @@ const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
   deliveryIntegration: SubscriptionPlanType.PRO,
   apiAccess: SubscriptionPlanType.BUSINESS,
   externalDisplay: SubscriptionPlanType.BUSINESS,
+  // AI menu studio (photo/video generation, 3D, OCR import) — PRO and above.
+  aiContentGeneration: SubscriptionPlanType.PRO,
 };
 
 // Map limit types to their display names
@@ -30,6 +32,8 @@ const limitDisplayNames: Record<keyof PlanLimits, string> = {
   maxProducts: 'products',
   maxCategories: 'categories',
   maxMonthlyOrders: 'monthlyOrders',
+  maxMonthlyAiPhotos: 'aiPhotos',
+  maxMonthlyAiVideos: 'aiVideos',
 };
 
 interface UpgradePromptProps {

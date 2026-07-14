@@ -14,6 +14,8 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
+import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { UserRole } from "../../../common/constants/roles.enum";
 
 @ApiTags("product-3d")
@@ -32,6 +34,11 @@ export class Product3dController {
 
   @Post(":id/generate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  // AI studio is PRO+. Every real Meshy submit also consumes one unit of the
+  // PHOTO allowance inside requestModel — ?force=true bypasses the
+  // PENDING/READY idempotency short-circuit, so without a quota claim this
+  // route would be an unmetered vendor-spend loop.
+  @RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)
   @ApiOperation({ summary: "Start 3D-model generation from a product's photo" })
   generate(
     @Param("id") id: string,
