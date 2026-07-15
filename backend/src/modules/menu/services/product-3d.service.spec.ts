@@ -46,6 +46,10 @@ describe("Product3dService", () => {
     // pollPendingModels now runs under a Postgres advisory lock (multi-replica
     // guard). Grant it by default so the poll body runs.
     (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      typeof cb === "function" ? cb(prisma) : Promise.all(cb),
+    );
+
     (prisma.product.update as any).mockImplementation(
       async ({ data }: any) => ({
         id: "p1",

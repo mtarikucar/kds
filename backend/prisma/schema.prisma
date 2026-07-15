@@ -4897,7 +4897,10 @@ model Device {
   pairCodeExpiresAt DateTime?
   // Rotating bearer token (sha256 hashed) issued post-pair. Refreshed via
   // /devices/:id/token/refresh. Never store the raw token at rest.
-  tokenHash         String?
+  // @unique: every device auth is a lookup by tokenHash — without the index
+  // it was a seq scan per request, and nothing guaranteed one-token-one-device
+  // (PG unique treats NULLs as distinct, so unprovisioned rows are fine).
+  tokenHash         String?           @unique
   tokenExpiresAt    DateTime?
   // Free-form provisioning config — e.g. printer width, kitchen station id.
   config            Json?
@@ -4981,7 +4984,9 @@ model LocalBridgeAgent {
   // Hashed at rest (sha256); never raw.
   provisioningTokenHash String?
   // Rotating bearer token (sha256 hashed) post-claim.
-  tokenHash             String?
+  // @unique: same rationale as Device.tokenHash — indexed auth lookup +
+  // one-token-one-agent guarantee (NULLs distinct).
+  tokenHash             String?   @unique
   tokenExpiresAt        DateTime?
   hostname              String?
   os                    String?

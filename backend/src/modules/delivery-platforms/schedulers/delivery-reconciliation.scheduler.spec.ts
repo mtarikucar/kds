@@ -13,6 +13,10 @@ describe('DeliveryReconciliationScheduler', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      typeof cb === "function" ? cb(prisma) : Promise.all(cb),
+    );
+
     reconciliationService = {
       reconcile: jest
         .fn()
@@ -28,7 +32,7 @@ describe('DeliveryReconciliationScheduler', () => {
     let lockQueried = false;
     let unlockQueried = false;
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) {
+      if (sql.includes('pg_try_advisory')) {
         lockQueried = true;
         return [{ locked: true }];
       }
@@ -42,13 +46,14 @@ describe('DeliveryReconciliationScheduler', () => {
     await svc.runReconciliation();
 
     expect(lockQueried).toBe(true);
-    expect(unlockQueried).toBe(true);
+    // v2 lock: xact variant releases at commit — no unlock statement exists.
+    expect(unlockQueried).toBe(false);
     expect(reconciliationService.reconcile).toHaveBeenCalledTimes(1);
   });
 
   it('skips the pass when the advisory lock is held by another replica', async () => {
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) return [{ locked: false }];
+      if (sql.includes('pg_try_advisory')) return [{ locked: false }];
       return [];
     });
 
@@ -59,7 +64,7 @@ describe('DeliveryReconciliationScheduler', () => {
 
   it('swallows a reconciliation failure so the tick never crashes', async () => {
     (prisma.$queryRawUnsafe as any).mockImplementation(async (sql: string) => {
-      if (sql.includes('pg_try_advisory_lock')) return [{ locked: true }];
+      if (sql.includes('pg_try_advisory')) return [{ locked: true }];
       return [];
     });
     reconciliationService.reconcile.mockRejectedValueOnce(new Error('db blip'));

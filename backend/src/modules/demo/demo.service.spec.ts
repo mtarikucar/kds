@@ -30,6 +30,9 @@ describe('DemoService', () => {
     // guard). Grant it by default so the body runs; a dedicated test overrides
     // this to assert the lock actually gates the destructive wipe.
     (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ locked: true }]);
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      typeof cb === "function" ? cb(prisma) : Promise.all(cb),
+    );
   });
 
   it('short-circuits to the existing demo admin without re-seeding', async () => {
@@ -145,7 +148,8 @@ describe('DemoService', () => {
   it('resetDemoData is a no-op before the demo tenant exists', async () => {
     (prisma.tenant.findFirst as jest.Mock).mockResolvedValue(null);
     await service.resetDemoData();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    // v2 advisory lock itself opens a $transaction, so assert on the
+    // destructive writes instead of the transaction wrapper.
     expect(prisma.order.deleteMany).not.toHaveBeenCalled();
   });
 
@@ -153,8 +157,9 @@ describe('DemoService', () => {
     // Another replica already holds the lock this tick.
     (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ locked: false }]);
     await service.resetDemoData();
-    // The body never ran: no tenant lookup, no wipe.
+    // The body never ran: no tenant lookup, no wipe. ($transaction itself
+    // fires once as the v2 lock holder — assert on the body's calls.)
     expect(prisma.tenant.findFirst).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.order.deleteMany).not.toHaveBeenCalled();
   });
 });

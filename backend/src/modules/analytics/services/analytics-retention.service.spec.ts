@@ -15,8 +15,9 @@ describe("AnalyticsRetentionService", () => {
     delete process.env.ANALYTICS_OCCUPANCY_RETENTION_DAYS;
     delete process.env.ANALYTICS_TRAFFIC_RETENTION_DAYS;
     prisma = {
-      // withAdvisoryLock: grant by default (two raw queries: lock + unlock)
+      // withAdvisoryLock v2: xact lock inside a $transaction; grant by default
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ locked: true }]),
+      $transaction: jest.fn(async (cb: any) => cb(prisma)),
       $executeRawUnsafe: jest.fn().mockResolvedValue(0),
       analyticsHeatmapCache: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),

@@ -12,13 +12,17 @@ import { LocalBridgeService } from "../local-bridge/local-bridge.service";
  */
 describe("DeviceMeshScheduler.sweep", () => {
   function makePrismaWithLock() {
-    return {
+    const prisma: any = {
       $queryRawUnsafe: jest.fn((sql: string) =>
-        sql.includes("pg_try_advisory_lock")
+        sql.includes("pg_try_advisory")
           ? Promise.resolve([{ locked: true }])
           : Promise.resolve([]),
       ),
-    } as unknown as PrismaService;
+    };
+    prisma.$transaction = jest.fn(async (cb: any) =>
+      typeof cb === "function" ? cb(prisma) : Promise.all(cb),
+    );
+    return prisma as PrismaService;
   }
 
   it("runs all three sweeps when the advisory lock is held", async () => {
@@ -57,9 +61,11 @@ describe("DeviceMeshScheduler.sweep", () => {
   });
 
   it("skips the sweeps when another replica holds the lock", async () => {
-    const prisma = {
+    const denied: any = {
       $queryRawUnsafe: jest.fn(() => Promise.resolve([{ locked: false }])),
-    } as unknown as PrismaService;
+    };
+    denied.$transaction = jest.fn(async (cb: any) => cb(denied));
+    const prisma = denied as unknown as PrismaService;
     const devices = { sweepStale: jest.fn() } as unknown as DeviceService;
     const sched = new DeviceMeshScheduler(
       prisma,
