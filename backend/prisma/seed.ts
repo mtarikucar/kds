@@ -45,6 +45,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 3,
       maxMonthlyAiVideos: 1,
+      maxMonthlyAi3dModels: 1,
     },
     create: {
       name: "TRIAL",
@@ -76,6 +77,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 3,
       maxMonthlyAiVideos: 1,
+      maxMonthlyAi3dModels: 1,
       isActive: true,
     },
   });
@@ -105,6 +107,7 @@ async function main() {
       aiContentGeneration: false,
       maxMonthlyAiPhotos: 0,
       maxMonthlyAiVideos: 0,
+      maxMonthlyAi3dModels: 0,
     },
     create: {
       name: "BASIC",
@@ -138,6 +141,7 @@ async function main() {
       aiContentGeneration: false,
       maxMonthlyAiPhotos: 0,
       maxMonthlyAiVideos: 0,
+      maxMonthlyAi3dModels: 0,
       isActive: true,
     },
   });
@@ -168,6 +172,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 50,
       maxMonthlyAiVideos: 5,
+      maxMonthlyAi3dModels: 10,
     },
     create: {
       name: "PRO",
@@ -202,6 +207,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 50,
       maxMonthlyAiVideos: 5,
+      maxMonthlyAi3dModels: 10,
       isActive: true,
     },
   });
@@ -232,6 +238,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 200,
       maxMonthlyAiVideos: 20,
+      maxMonthlyAi3dModels: 30,
     },
     create: {
       name: "BUSINESS",
@@ -266,6 +273,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 200,
       maxMonthlyAiVideos: 20,
+      maxMonthlyAi3dModels: 30,
       isActive: true,
     },
   });

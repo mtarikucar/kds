@@ -15,6 +15,7 @@ export enum LimitType {
   // mirror and the guard's usage switch share the same column names.
   AI_PHOTOS = "maxMonthlyAiPhotos",
   AI_VIDEOS = "maxMonthlyAiVideos",
+  AI_3D_MODELS = "maxMonthlyAi3dModels",
 }
 
 /**

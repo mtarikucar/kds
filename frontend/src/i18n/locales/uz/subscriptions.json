@@ -63,7 +63,8 @@
       "products": "Mahsulotlar",
       "monthlyOrders": "Oylik buyurtmalar",
       "aiPhotos": "AI suratlar",
-      "aiVideos": "AI videolar"
+      "aiVideos": "AI videolar",
+      "ai3dModels": "AI 3D modellar"
     },
     "unlimited": "Cheksiz",
     "billingHistory": "Hisob-kitob tarixi",
@@ -272,7 +273,8 @@
         "maxCategories": "Kategoriyalar",
         "maxMonthlyOrders": "Oylik buyurtmalar",
         "maxMonthlyAiPhotos": "AI surat / oy",
-        "maxMonthlyAiVideos": "AI video / oy"
+        "maxMonthlyAiVideos": "AI video / oy",
+        "maxMonthlyAi3dModels": "AI 3D modellar / oy"
       },
       "features": {
         "kdsIntegration": "KDS integratsiyasi",

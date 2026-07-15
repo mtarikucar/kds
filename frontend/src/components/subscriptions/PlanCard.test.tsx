@@ -37,6 +37,7 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
       maxMonthlyOrders: 5000,
       maxMonthlyAiPhotos: 50,
       maxMonthlyAiVideos: 5,
+      maxMonthlyAi3dModels: 10,
     },
     features: {
       advancedReports: true,

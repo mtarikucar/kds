@@ -80,8 +80,8 @@ export enum PlanFeature {
   // screen-session minting. Mirrored as feature.externalDisplay on the engine.
   EXTERNAL_DISPLAY = "externalDisplay",
   // AI menu studio (photo/frame/video generation, Meshy 3D, OCR menu import).
-  // PRO+ only; monthly photo/video caps live in maxMonthlyAiPhotos /
-  // maxMonthlyAiVideos. Mirrored as feature.aiContentGeneration on the engine.
+  // PRO+ only; monthly caps live in maxMonthlyAiPhotos / maxMonthlyAiVideos /
+  // maxMonthlyAi3dModels. Mirrored as feature.aiContentGeneration on the engine.
   AI_CONTENT_GENERATION = "aiContentGeneration",
 }
 

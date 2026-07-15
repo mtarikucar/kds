@@ -64,7 +64,8 @@
       "products": "Products",
       "monthlyOrders": "Monthly Orders",
       "aiPhotos": "AI Photos",
-      "aiVideos": "AI Videos"
+      "aiVideos": "AI Videos",
+      "ai3dModels": "AI 3D Models"
     },
     "unlimited": "Unlimited",
     "billingHistory": "Billing History",
@@ -234,7 +235,8 @@
         "maxCategories": "Categories",
         "maxMonthlyOrders": "Monthly orders",
         "maxMonthlyAiPhotos": "AI photos / month",
-        "maxMonthlyAiVideos": "AI videos / month"
+        "maxMonthlyAiVideos": "AI videos / month",
+        "maxMonthlyAi3dModels": "AI 3D models / month"
       },
       "features": {
         "kdsIntegration": "KDS integration",

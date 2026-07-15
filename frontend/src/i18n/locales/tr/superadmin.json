@@ -345,7 +345,8 @@
       "posAccess": "POS Erişimi",
       "aiPhotosPerMonth": "AI foto/ay",
       "aiVideosPerMonth": "AI video/ay",
-      "aiContentGeneration": "AI içerik üretimi"
+      "aiContentGeneration": "AI içerik üretimi",
+      "ai3dPerMonth": "AI 3D/ay"
     }
   },
   "marketplace": {

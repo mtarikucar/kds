@@ -140,6 +140,13 @@ export class LimitOverridesDto {
   @IsInt()
   @Min(-1)
   maxMonthlyAiVideos?: number | null;
+
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(-1)
+  maxMonthlyAi3dModels?: number | null;
 }
 
 export class UpdateTenantOverridesDto {

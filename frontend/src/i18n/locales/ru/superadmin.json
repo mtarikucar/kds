@@ -345,7 +345,8 @@
       "posAccess": "Доступ к POS",
       "aiPhotosPerMonth": "ИИ-фото/мес",
       "aiVideosPerMonth": "ИИ-видео/мес",
-      "aiContentGeneration": "Генерация ИИ-контента"
+      "aiContentGeneration": "Генерация ИИ-контента",
+      "ai3dPerMonth": "ИИ 3D/мес"
     }
   },
   "marketplace": {

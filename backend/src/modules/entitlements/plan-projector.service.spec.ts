@@ -307,6 +307,7 @@ describe("PlanProjectorService.projectTenant", () => {
       // AI menu-studio monthly generation caps.
       "maxMonthlyAiPhotos",
       "maxMonthlyAiVideos",
+      "maxMonthlyAi3dModels",
     ];
     // `as any` to reach the private static — guard is a test-only escape.
     expect((PlanProjectorService as any).FEATURE_COLUMNS).toEqual(

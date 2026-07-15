@@ -345,7 +345,8 @@
       "posAccess": "POS kirish",
       "aiPhotosPerMonth": "AI surat/oy",
       "aiVideosPerMonth": "AI video/oy",
-      "aiContentGeneration": "AI kontent yaratish"
+      "aiContentGeneration": "AI kontent yaratish",
+      "ai3dPerMonth": "AI 3D/oy"
     }
   },
   "marketplace": {

@@ -293,6 +293,7 @@ function PlanModal({
     maxMonthlyOrders: (plan?.maxMonthlyOrders ?? 100) as number | '',
     maxMonthlyAiPhotos: (plan?.maxMonthlyAiPhotos ?? 0) as number | '',
     maxMonthlyAiVideos: (plan?.maxMonthlyAiVideos ?? 0) as number | '',
+    maxMonthlyAi3dModels: (plan?.maxMonthlyAi3dModels ?? 0) as number | '',
     advancedReports: plan?.advancedReports || false,
     multiLocation: plan?.multiLocation || false,
     customBranding: plan?.customBranding || false,
@@ -333,6 +334,7 @@ function PlanModal({
       'maxMonthlyOrders',
       'maxMonthlyAiPhotos',
       'maxMonthlyAiVideos',
+      'maxMonthlyAi3dModels',
     ] as const;
     const cleaned: Record<string, unknown> = { ...formData };
     for (const key of LIMIT_KEYS) {
@@ -501,6 +503,16 @@ function PlanModal({
                   min={-1}
                   value={formData.maxMonthlyAiVideos}
                   onChange={(e) => setFormData({ ...formData, maxMonthlyAiVideos: e.target.value === '' ? '' : Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1.5">{t('plans.modal.ai3dPerMonth', 'AI 3D / ay')}</label>
+                <input
+                  type="number"
+                  min={-1}
+                  value={formData.maxMonthlyAi3dModels}
+                  onChange={(e) => setFormData({ ...formData, maxMonthlyAi3dModels: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
                 />
               </div>

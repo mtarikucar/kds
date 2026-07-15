@@ -175,5 +175,9 @@
     "quotaVideos": "Videos",
     "quotaExhaustedPhotos": "Your monthly AI photo allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap.",
     "quotaExhaustedVideos": "Your monthly AI video allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap."
+  },
+  "threeD": {
+    "quotaLabel": "3D",
+    "quotaExhausted": "Your monthly AI 3D-model allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap."
   }
 }

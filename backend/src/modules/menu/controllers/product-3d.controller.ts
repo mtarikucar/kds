@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Product3dService } from "../services/product-3d.service";
+import { MenuAiQuotaService } from "../services/menu-ai-quota.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -22,22 +23,29 @@ import { UserRole } from "../../../common/constants/roles.enum";
 @Controller("menu/product-3d")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
 export class Product3dController {
-  constructor(private readonly product3d: Product3dService) {}
+  constructor(
+    private readonly product3d: Product3dService,
+    private readonly quota: MenuAiQuotaService,
+  ) {}
 
-  /** Lets the product editor show/hide the "generate 3D" action. */
+  /** Lets the product editor show/hide the "generate 3D" action.
+      Deliberately NOT feature-gated (mirrors product-media /status). */
   @Get("status")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: "Whether Meshy 3D generation is configured" })
-  status() {
-    return { configured: this.product3d.isConfigured() };
+  @ApiOperation({
+    summary: "Meshy config + the tenant's monthly 3D quota usage",
+  })
+  async status(@Request() req) {
+    const models3d = await this.quota.getUsage(req.tenantId, "MODEL3D");
+    return { configured: this.product3d.isConfigured(), models3d };
   }
 
   @Post(":id/generate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  // AI studio is PRO+. Every real Meshy submit also consumes one unit of the
-  // PHOTO allowance inside requestModel — ?force=true bypasses the
-  // PENDING/READY idempotency short-circuit, so without a quota claim this
-  // route would be an unmetered vendor-spend loop.
+  // AI studio is PRO+. Every Meshy submit consumes one unit of the dedicated
+  // 3D allowance (maxMonthlyAi3dModels) inside requestModel — ?force=true
+  // bypasses the PENDING/READY idempotency short-circuit, so without a quota
+  // claim this route would be an unmetered ~₺12-per-call vendor-spend loop.
   @RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)
   @ApiOperation({ summary: "Start 3D-model generation from a product's photo" })
   generate(

@@ -12,17 +12,27 @@ export interface Product3dState {
   error?: string | null;
 }
 
-/** Whether Meshy 3D generation is wired on the backend (gates the UI). */
+/** Monthly 3D quota usage. limit/remaining -1 = unlimited. */
+export interface Product3dConfig {
+  configured: boolean;
+  models3d: { used: number; limit: number; remaining: number };
+}
+
+export const has3dQuotaLeft = (c?: Product3dConfig | null) =>
+  !!c?.models3d && (c.models3d.limit === -1 || c.models3d.remaining > 0);
+
+/** Whether Meshy 3D generation is wired on the backend (gates the UI) + the
+    tenant's monthly 3D allowance for the X/Y counter. */
 export const useProduct3dConfig = () =>
   useQuery({
     queryKey: ["product-3d-config"],
     queryFn: async () => {
-      const response = await api.get<{ configured: boolean }>(
+      const response = await api.get<Product3dConfig>(
         "/menu/product-3d/status",
       );
       return response.data;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
 /**
@@ -57,6 +67,8 @@ export const useGenerate3d = () => {
     },
     onSuccess: (_data, productId) => {
       queryClient.invalidateQueries({ queryKey: ["product-3d", productId] });
+      // A successful submit consumed a 3D quota unit — refresh the counter.
+      queryClient.invalidateQueries({ queryKey: ["product-3d-config"] });
     },
     onError: (error: any) => {
       toast.error(

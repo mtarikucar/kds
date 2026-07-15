@@ -175,5 +175,9 @@
     "quotaVideos": "Video",
     "quotaExhaustedPhotos": "Aylık fotoğraf üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin.",
     "quotaExhaustedVideos": "Aylık video üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin."
+  },
+  "threeD": {
+    "quotaLabel": "3D",
+    "quotaExhausted": "Aylık 3D model üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin."
   }
 }

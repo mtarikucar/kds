@@ -58,6 +58,7 @@ export class PlanResponseDto {
     maxMonthlyOrders: number;
     maxMonthlyAiPhotos: number;
     maxMonthlyAiVideos: number;
+    maxMonthlyAi3dModels: number;
   };
 
   features: {

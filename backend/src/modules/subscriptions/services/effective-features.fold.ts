@@ -33,6 +33,7 @@ export interface PlanGrantSource {
   maxMonthlyOrders: number;
   maxMonthlyAiPhotos: number;
   maxMonthlyAiVideos: number;
+  maxMonthlyAi3dModels: number;
 }
 
 export interface ActiveAddOnGrant {
@@ -76,6 +77,7 @@ export function foldPlanGrants(
     maxMonthlyOrders: plan.maxMonthlyOrders,
     maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
     maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
+    maxMonthlyAi3dModels: plan.maxMonthlyAi3dModels,
   };
   const integrations: Record<string, string[]> = {};
 

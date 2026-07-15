@@ -18,7 +18,7 @@ import { foldPlanGrants, PlanGrantSource } from "./effective-features.fold";
  * projector / fallback) that hid POS on fresh BUSINESS tenants.
  */
 
-// 13 features + 8 limits, every plan, transcribed from seed.ts.
+// 13 features + 9 limits, every plan, transcribed from seed.ts.
 type FeatureFlags = Omit<
   PlanGrantSource,
   | "maxUsers"
@@ -29,6 +29,7 @@ type FeatureFlags = Omit<
   | "maxMonthlyOrders"
   | "maxMonthlyAiPhotos"
   | "maxMonthlyAiVideos"
+  | "maxMonthlyAi3dModels"
 >;
 type LimitFlags = Pick<
   PlanGrantSource,
@@ -40,6 +41,7 @@ type LimitFlags = Pick<
   | "maxMonthlyOrders"
   | "maxMonthlyAiPhotos"
   | "maxMonthlyAiVideos"
+  | "maxMonthlyAi3dModels"
 >;
 
 const F = false;
@@ -118,6 +120,7 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxMonthlyOrders: 50,
     maxMonthlyAiPhotos: 0,
     maxMonthlyAiVideos: 0,
+    maxMonthlyAi3dModels: 0,
   },
   [SubscriptionPlanType.BASIC]: {
     maxUsers: 5,
@@ -128,6 +131,7 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxMonthlyOrders: 500,
     maxMonthlyAiPhotos: 0,
     maxMonthlyAiVideos: 0,
+    maxMonthlyAi3dModels: 0,
   },
   [SubscriptionPlanType.PRO]: {
     maxUsers: 15,
@@ -138,6 +142,7 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     maxMonthlyOrders: 2000,
     maxMonthlyAiPhotos: 50,
     maxMonthlyAiVideos: 5,
+    maxMonthlyAi3dModels: 10,
   },
   [SubscriptionPlanType.BUSINESS]: {
     maxUsers: -1,
@@ -150,6 +155,7 @@ const LIMIT_MATRIX: Record<SubscriptionPlanType, LimitFlags> = {
     // vendor cost — see subscription-plans.const.ts.
     maxMonthlyAiPhotos: 200,
     maxMonthlyAiVideos: 20,
+    maxMonthlyAi3dModels: 30,
   },
 };
 

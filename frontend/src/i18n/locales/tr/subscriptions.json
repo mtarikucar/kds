@@ -64,7 +64,8 @@
       "products": "Ürün",
       "monthlyOrders": "Aylık Sipariş",
       "aiPhotos": "AI Fotoğraf",
-      "aiVideos": "AI Video"
+      "aiVideos": "AI Video",
+      "ai3dModels": "AI 3D Model"
     },
     "unlimited": "Sınırsız",
     "billingHistory": "Fatura Geçmişi",
@@ -234,7 +235,8 @@
         "maxCategories": "Kategori sayısı",
         "maxMonthlyOrders": "Aylık sipariş",
         "maxMonthlyAiPhotos": "AI fotoğraf / ay",
-        "maxMonthlyAiVideos": "AI video / ay"
+        "maxMonthlyAiVideos": "AI video / ay",
+        "maxMonthlyAi3dModels": "AI 3D model / ay"
       },
       "features": {
         "kdsIntegration": "KDS entegrasyonu",

@@ -34,6 +34,7 @@ const limitDisplayNames: Record<keyof PlanLimits, string> = {
   maxMonthlyOrders: 'monthlyOrders',
   maxMonthlyAiPhotos: 'aiPhotos',
   maxMonthlyAiVideos: 'aiVideos',
+  maxMonthlyAi3dModels: 'ai3dModels',
 };
 
 interface UpgradePromptProps {

@@ -54,7 +54,8 @@ type PlanLimitKey =
   | "maxCategories"
   | "maxMonthlyOrders"
   | "maxMonthlyAiPhotos"
-  | "maxMonthlyAiVideos";
+  | "maxMonthlyAiVideos"
+  | "maxMonthlyAi3dModels";
 const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxUsers",
   "maxTables",
@@ -64,6 +65,7 @@ const LIMIT_KEYS: readonly PlanLimitKey[] = [
   "maxMonthlyOrders",
   "maxMonthlyAiPhotos",
   "maxMonthlyAiVideos",
+  "maxMonthlyAi3dModels",
 ];
 
 @Injectable()
@@ -589,6 +591,7 @@ export class SuperAdminTenantsService {
           maxMonthlyOrders: plan.maxMonthlyOrders,
           maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
           maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
+          maxMonthlyAi3dModels: plan.maxMonthlyAi3dModels,
         }
       : {};
 

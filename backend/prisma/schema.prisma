@@ -609,7 +609,7 @@ model AiGenerationUsage {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  kind  String // PHOTO | VIDEO (FRAME jobs draw from PHOTO)
+  kind  String // PHOTO | VIDEO | MODEL3D (FRAME + OCR-parse draw from PHOTO)
   units Int     @default(1) // image variations requested; video always 1
   jobId String? // ProductMediaJob id, soft reference (no FK — survives cascades)
 
@@ -1275,18 +1275,20 @@ model SubscriptionPlan {
   trialDays Int @default(0)
 
   // Feature limits
-  maxUsers           Int @default(1)
-  maxTables          Int @default(5)
-  maxBranches        Int @default(1)
-  maxProducts        Int @default(50)
-  maxCategories      Int @default(10)
-  maxMonthlyOrders   Int @default(100)
+  maxUsers             Int @default(1)
+  maxTables            Int @default(5)
+  maxBranches          Int @default(1)
+  maxProducts          Int @default(50)
+  maxCategories        Int @default(10)
+  maxMonthlyOrders     Int @default(100)
   // AI menu-studio monthly generation caps (calendar month, counted against
-  // non-failed ProductMediaJob rows: PHOTO+FRAME jobs draw `count` units from
-  // the photo cap, VIDEO one unit from the video cap). 0 = none,
+  // the ai_generation_usage ledger: PHOTO+FRAME+OCR-parse draw from the photo
+  // cap, VIDEO from the video cap, Meshy 3D from its own cap — a 3D model is
+  // a ~₺12 vendor charge, ~9× a photo, so it gets a separate pool). 0 = none,
   // -1 = unlimited. Gated behind the aiContentGeneration flag below.
-  maxMonthlyAiPhotos Int @default(0)
-  maxMonthlyAiVideos Int @default(0)
+  maxMonthlyAiPhotos   Int @default(0)
+  maxMonthlyAiVideos   Int @default(0)
+  maxMonthlyAi3dModels Int @default(0)
 
   // Feature flags
   advancedReports     Boolean @default(false)
@@ -1309,7 +1311,7 @@ model SubscriptionPlan {
   externalDisplay     Boolean @default(false)
   // AI menu studio (photo/frame/video generation, Meshy 3D, OCR menu import).
   // PRO and above; TRIAL gets a taster quota. Monthly caps live in
-  // maxMonthlyAiPhotos / maxMonthlyAiVideos above.
+  // maxMonthlyAiPhotos / maxMonthlyAiVideos / maxMonthlyAi3dModels above.
   aiContentGeneration Boolean @default(false)
 
   // Discount settings

@@ -179,6 +179,14 @@ export class CreatePlanDto {
   @Min(-1)
   maxMonthlyAiVideos?: number = 0;
 
+  @ApiPropertyOptional({ default: 0 })
+  @Type(() => String)
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(-1)
+  maxMonthlyAi3dModels?: number = 0;
+
   @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()
