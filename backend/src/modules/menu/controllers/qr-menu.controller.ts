@@ -26,7 +26,9 @@ export class QrMenuController {
   ) {}
 
   @Public()
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  // NAT-aware limit: customers share the venue WiFi's single IP, so this
+  // read/poll cap is sized for a BUSY venue's whole clientele, not one user.
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @Get("by-subdomain/:subdomain")
   @ApiOperation({
     summary: "Get public menu by subdomain (no authentication required)",
@@ -63,7 +65,7 @@ export class QrMenuController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @Get(":tenantId")
   @ApiOperation({
     summary: "Get public menu for QR code access (no authentication required)",

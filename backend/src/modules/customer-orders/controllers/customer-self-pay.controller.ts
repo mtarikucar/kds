@@ -27,7 +27,9 @@ export class CustomerSelfPayController {
   constructor(private readonly service: CustomerSelfPayService) {}
 
   @Get("payable-items")
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  // NAT-aware limit: customers share the venue WiFi's single IP, so this
+  // read/poll cap is sized for a BUSY venue's whole clientele, not one user.
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({
     summary: "List unpaid items across all open orders at the session's table",
   })
@@ -77,7 +79,7 @@ export class CustomerSelfPayController {
   }
 
   @Get("pay-status")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @ApiOperation({
     summary: "Poll the PendingSelfPayment row + return current remaining items",
   })

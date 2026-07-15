@@ -68,14 +68,16 @@ export class CustomerPublicController {
   }
 
   @Get("sessions/:sessionId")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  // NAT-aware limit: customers share the venue WiFi's single IP, so this
+  // read/poll cap is sized for a BUSY venue's whole clientele, not one user.
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @ApiOperation({ summary: "Get session information" })
   async getSession(@Param("sessionId") sessionId: string) {
     return this.sessionService.getSession(sessionId);
   }
 
   @Post("sessions/validate")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @ApiOperation({ summary: "Validate a session" })
   async validateSession(@Body("sessionId") sessionId: string) {
     const isValid = await this.sessionService.validateSession(sessionId);
@@ -127,7 +129,7 @@ export class CustomerPublicController {
   // ========================================
 
   @Get("profile")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 180, ttl: 60_000 } })
   @ApiOperation({ summary: "Get customer profile by session" })
   async getProfile(@Query("sessionId") sessionId: string) {
     const session = await this.sessionService.requireSession(sessionId);
@@ -141,7 +143,7 @@ export class CustomerPublicController {
   }
 
   @Get("loyalty/balance")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 180, ttl: 60_000 } })
   @ApiOperation({ summary: "Get loyalty points balance" })
   async getLoyaltyBalance(@Query("sessionId") sessionId: string) {
     const session = await this.sessionService.requireSession(sessionId);
@@ -161,7 +163,7 @@ export class CustomerPublicController {
   }
 
   @Get("loyalty/transactions")
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: "Get loyalty transaction history" })
   async getLoyaltyTransactions(
     @Query("sessionId") sessionId: string,
@@ -180,14 +182,14 @@ export class CustomerPublicController {
   }
 
   @Get("loyalty/config")
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 180, ttl: 60_000 } })
   @ApiOperation({ summary: "Get loyalty program configuration" })
   async getLoyaltyConfig() {
     return this.loyaltyService.getLoyaltyConfig();
   }
 
   @Get("loyalty/tier")
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: "Get customer tier status" })
   async getTierStatus(@Query("sessionId") sessionId: string) {
     const session = await this.sessionService.requireSession(sessionId);
@@ -245,7 +247,7 @@ export class CustomerPublicController {
   }
 
   @Get("phone/verification-status/:verificationId")
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: "Get verification status" })
   async getVerificationStatus(
     @Param("verificationId") verificationId: string,
@@ -296,7 +298,7 @@ export class CustomerPublicController {
   }
 
   @Get("referral/stats")
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 90, ttl: 60_000 } })
   @ApiOperation({ summary: "Get referral statistics" })
   async getReferralStats(@Query("sessionId") sessionId: string) {
     const session = await this.sessionService.requireSession(sessionId);

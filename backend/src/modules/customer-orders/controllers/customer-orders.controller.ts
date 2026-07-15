@@ -63,7 +63,9 @@ export class CustomerOrdersController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  // NAT-aware limit: customers share the venue WiFi's single IP, so this
+  // read/poll cap is sized for a BUSY venue's whole clientele, not one user.
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @Get("session/:sessionId")
   @ApiOperation({ summary: "Get all orders for a session" })
   async getSessionOrders(@Param("sessionId") sessionId: string) {
@@ -71,7 +73,7 @@ export class CustomerOrdersController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @Get(":orderId")
   @ApiOperation({ summary: "Get order details by ID" })
   async getOrderById(
@@ -94,7 +96,7 @@ export class CustomerOrdersController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get("waiter-requests/session/:sessionId")
   @ApiOperation({ summary: "Get all waiter requests for a session" })
   async getSessionWaiterRequests(@Param("sessionId") sessionId: string) {
@@ -114,7 +116,7 @@ export class CustomerOrdersController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get("bill-requests/session/:sessionId")
   @ApiOperation({ summary: "Get all bill requests for a session" })
   async getSessionBillRequests(@Param("sessionId") sessionId: string) {
