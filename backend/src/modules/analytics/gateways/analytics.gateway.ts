@@ -32,6 +32,7 @@ import {
   PersonState,
 } from "../dto/edge-device";
 import { decryptString } from "../../../common/helpers/encryption.helper";
+import { cameraStreamContext } from "../services/camera.service";
 
 interface EdgeDeviceConnection {
   socketId: string;
@@ -726,7 +727,9 @@ export class AnalyticsGateway
       // decrypted here. The admin-facing API path already does this in
       // camera.service.ts; forgetting it here previously broke camera
       // analytics end-to-end.
-      cameraUrl: camera.streamUrl ? decryptString(camera.streamUrl) : "",
+      cameraUrl: camera.streamUrl
+        ? decryptString(camera.streamUrl, cameraStreamContext(tenantId))
+        : "",
       calibration: camera.calibrationData as EdgeDeviceConfigDto["calibration"],
     };
   }
