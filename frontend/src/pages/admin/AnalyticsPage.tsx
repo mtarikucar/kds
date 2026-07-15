@@ -15,6 +15,7 @@ import {
   CameraManagement,
 } from '../../features/analytics';
 import { InsightSeverity, InsightStatus } from '../../features/analytics/types';
+import { CAMERA_ANALYTICS_ENABLED } from '../../features/analytics/cameraAnalytics.config';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -75,7 +76,10 @@ const AnalyticsPage = () => {
   const actionableInsightsQuery = useActionableInsights();
   const insightSummaryQuery = useInsightSummary();
   const customerBehaviorQuery = useCustomerBehavior(dateRange);
-  const congestionQuery = useCongestionAnalysis(dateRange);
+  const congestionQuery = useCongestionAnalysis(
+    dateRange,
+    CAMERA_ANALYTICS_ENABLED,
+  );
   const { data: tableUtilization } = tableUtilizationQuery;
   const { data: actionableInsights } = actionableInsightsQuery;
   const { data: insightSummary } = insightSummaryQuery;
@@ -141,13 +145,20 @@ const AnalyticsPage = () => {
     }
   };
 
+  // Camera/CV analytics ships INERT (CAMERA_ANALYTICS_ENABLED). The traffic
+  // heatmap + camera-management tabs are hidden until cameras are provisioned;
+  // the order-derived tabs (overview/tables/behavior/insights) stay live.
   const tabs = [
     { id: 'overview' as TabType, label: t('analytics:tabs.overview'), icon: BarChart3 },
     { id: 'tables' as TabType, label: t('analytics:tabs.tables'), icon: Table2 },
-    { id: 'traffic' as TabType, label: t('analytics:tabs.traffic'), icon: Map },
+    ...(CAMERA_ANALYTICS_ENABLED
+      ? [{ id: 'traffic' as TabType, label: t('analytics:tabs.traffic'), icon: Map }]
+      : []),
     { id: 'behavior' as TabType, label: t('analytics:tabs.behavior'), icon: Users },
     { id: 'insights' as TabType, label: t('analytics:tabs.insights'), icon: Lightbulb },
-    { id: 'cameras' as TabType, label: t('analytics:tabs.cameras'), icon: Video },
+    ...(CAMERA_ANALYTICS_ENABLED
+      ? [{ id: 'cameras' as TabType, label: t('analytics:tabs.cameras'), icon: Video }]
+      : []),
   ];
 
   const getSeverityColor = (severity: InsightSeverity) => {

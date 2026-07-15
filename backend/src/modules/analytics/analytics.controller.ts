@@ -47,6 +47,7 @@ import {
   UpdateInsightStatusDto,
 } from "./dto";
 import { HeatmapGranularity } from "./enums/analytics.enum";
+import { CameraAnalyticsEnabledGuard } from "./camera-analytics.gate";
 
 // Iter-89: hard cap on the analytics date window. The heatmap, traffic,
 // dwell-time, and table-utilization queries scan AnalyticsEvent /
@@ -112,6 +113,7 @@ export class AnalyticsController {
 
   // ==================== HEATMAP ENDPOINTS ====================
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("heatmap/occupancy")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -148,6 +150,7 @@ export class AnalyticsController {
     );
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("heatmap/traffic")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -184,6 +187,7 @@ export class AnalyticsController {
     );
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("heatmap/dwell-time")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -222,6 +226,7 @@ export class AnalyticsController {
     );
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("traffic/flow")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -269,6 +274,7 @@ export class AnalyticsController {
     );
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("traffic/congestion")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -534,6 +540,7 @@ export class AnalyticsController {
 
   // ==================== CAMERA ENDPOINTS ====================
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("cameras")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -543,6 +550,7 @@ export class AnalyticsController {
     return this.cameraService.getCameras(scope);
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("cameras/health")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -552,6 +560,7 @@ export class AnalyticsController {
     return this.cameraService.getCameraHealthSummary(scope);
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Get("cameras/:id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -565,6 +574,7 @@ export class AnalyticsController {
     return this.cameraService.getCameraById(scope, id);
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Post("cameras")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -577,6 +587,7 @@ export class AnalyticsController {
     return this.cameraService.createCamera(scope, dto);
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Put("cameras/:id")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -591,6 +602,7 @@ export class AnalyticsController {
     return this.cameraService.updateCamera(scope, id, dto);
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Delete("cameras/:id")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -605,6 +617,7 @@ export class AnalyticsController {
     return { success: true };
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Put("cameras/:id/calibration")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -629,6 +642,7 @@ export class AnalyticsController {
     }
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Post("mock-data/generate")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -653,6 +667,7 @@ export class AnalyticsController {
     );
   }
 
+  @UseGuards(CameraAnalyticsEnabledGuard)
   @Delete("mock-data")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
