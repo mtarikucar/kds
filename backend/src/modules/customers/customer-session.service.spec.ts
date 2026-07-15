@@ -70,6 +70,10 @@ describe('CustomerSessionService (iter-77 cleanup + cap)', () => {
       // release. Stub to return the locked=true row Postgres would
       // emit for `SELECT pg_try_advisory_lock(...) AS locked`.
       (prisma.$queryRawUnsafe as any).mockResolvedValue([{ locked: true }]);
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      typeof cb === "function" ? cb(prisma) : Promise.all(cb),
+    );
+
       (prisma.customerSession.updateMany as any).mockResolvedValue({ count: 2 });
       (prisma.customerSession.deleteMany as any).mockResolvedValue({ count: 3 });
 

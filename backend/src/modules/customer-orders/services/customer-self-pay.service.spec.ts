@@ -252,11 +252,15 @@ describe("CustomerSelfPayService (characterization)", () => {
     it("transitions PENDING+expired rows to EXPIRED under advisory lock", async () => {
       (prisma.$queryRawUnsafe as unknown as jest.Mock).mockImplementation(
         (sql: string) => {
-          if (sql.includes("pg_try_advisory_lock")) {
+          if (sql.includes("pg_try_advisory")) {
             return Promise.resolve([{ locked: true }]);
           }
           return Promise.resolve([]);
         },
+      );
+      (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+        async (cb: any) =>
+          typeof cb === "function" ? cb(prisma) : Promise.all(cb),
       );
       (prisma.pendingSelfPayment.updateMany as any).mockResolvedValue({
         count: 3,
@@ -278,7 +282,7 @@ describe("CustomerSelfPayService (characterization)", () => {
     it("skips the sweep when the advisory lock is held by another replica", async () => {
       (prisma.$queryRawUnsafe as unknown as jest.Mock).mockImplementation(
         (sql: string) => {
-          if (sql.includes("pg_try_advisory_lock")) {
+          if (sql.includes("pg_try_advisory")) {
             return Promise.resolve([{ locked: false }]);
           }
           return Promise.resolve([]);

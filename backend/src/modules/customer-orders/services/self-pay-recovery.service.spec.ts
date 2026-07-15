@@ -180,10 +180,14 @@ describe("self-pay inquiry-recovery (sweep-3 #4)", () => {
     let svc: SelfPayRecoveryService;
 
     beforeEach(() => {
-      // Advisory lock acquired.
+      // Advisory lock acquired (v2: xact lock inside a $transaction).
       (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue([
         { locked: true },
       ]);
+      (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+        async (cb: any) => (typeof cb === "function" ? cb(prisma) : Promise.all(cb)),
+      );
+
       paytr = { inquiryStatus: jest.fn() };
       webhook = { handleWebhookSuccess: jest.fn().mockResolvedValue(undefined) };
       svc = new SelfPayRecoveryService(
