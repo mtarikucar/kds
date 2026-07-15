@@ -2784,6 +2784,9 @@ model OccupancyRecord {
   @@index([trackingId, timestamp])
   @@index([state])
   @@index([tenantId, branchId])
+  // Heatmap read path filters (tenantId, branchId, timestamp range); also
+  // serves the nightly retention sweep's cutoff subquery.
+  @@index([tenantId, branchId, timestamp])
   @@map("occupancy_records")
 }
 
