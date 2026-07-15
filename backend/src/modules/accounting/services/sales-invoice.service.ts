@@ -78,6 +78,23 @@ export class SalesInvoiceService {
     });
 
     if (!order) throw new NotFoundException("Paid order not found");
+
+    // Marketplace/delivery-platform orders are fiscalized BY the platform: the
+    // platform issues the customer's e-Arşiv/e-Fatura and owns the money rail
+    // (delivery Orders never create Payment rows — see delivery-order.service).
+    // Cutting a KDS invoice here would be a SECOND fiscal document for revenue
+    // the platform already invoiced. The POS payment rail already refuses these
+    // (payment-validator.assertOrderPayable); createFromOrder is a separate,
+    // manual admin entry point (POST from-order/:orderId, @Roles ADMIN/MANAGER)
+    // that must refuse them too. Gate on `source` (the marketplace:
+    // YEMEKSEPETI/GETIR/TRENDYOL/MIGROS), NOT `type` — a restaurant's OWN
+    // delivery (type=DELIVERY, source=null) is still self-invoiced here.
+    if (order.source != null && order.source.trim() !== "") {
+      throw new BadRequestException(
+        "This is a marketplace/delivery-platform order — it is fiscalized by the platform and cannot be invoiced through the POS.",
+      );
+    }
+
     if (order.salesInvoices.length > 0) {
       throw new BadRequestException("Invoice already exists for this order");
     }
