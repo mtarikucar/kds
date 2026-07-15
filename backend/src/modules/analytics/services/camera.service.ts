@@ -15,6 +15,17 @@ import {
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
 
 /**
+ * AAD context that binds a camera streamUrl ciphertext to its owning tenant,
+ * so a moved blob (another tenant's row, pasted in by a DB-write attacker)
+ * fails GCM auth on decrypt. Write and every read MUST use this same helper
+ * — an asymmetric context would make v2 rows undecryptable. Exported so the
+ * analytics gateway's edge-config path binds identically.
+ */
+export function cameraStreamContext(tenantId: string): string {
+  return `camera:streamUrl:${tenantId}`;
+}
+
+/**
  * Replace `user:pass` in an RTSP/ONVIF URL with `***:***` so responses
  * to the tenant admin UI don't leak NVR credentials. The plaintext
  * still lives (encrypted) on disk for the edge device to use.
@@ -83,9 +94,11 @@ export class CameraService {
         branchId: edgeDevice.branchId,
         name: dto.name,
         description: dto.description,
-        // Encrypted at rest; the edge device's config fetch decrypts on
-        // the fly. Only the redacted form flows back to the admin UI.
-        streamUrl: encryptString(dto.streamUrl),
+        // Encrypted at rest, context-bound to this tenant so a DB-write
+        // attacker can't paste another tenant's camera-URL ciphertext into
+        // this row (v2 AAD binding). The edge device's config fetch decrypts
+        // on the fly. Only the redacted form flows back to the admin UI.
+        streamUrl: encryptString(dto.streamUrl, cameraStreamContext(tenantId)),
         streamType: dto.streamType || "RTSP",
         rotationY: dto.rotationY ?? 0,
         fov: dto.fov ?? 90,
@@ -183,7 +196,10 @@ export class CameraService {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.streamUrl !== undefined && {
-          streamUrl: encryptString(dto.streamUrl),
+          streamUrl: encryptString(
+            dto.streamUrl,
+            cameraStreamContext(tenantId),
+          ),
         }),
         ...(dto.streamType !== undefined && { streamType: dto.streamType }),
         ...(dto.status !== undefined && { status: dto.status }),
@@ -368,6 +384,7 @@ export class CameraService {
 
   private mapToResponseDto(camera: {
     id: string;
+    tenantId: string;
     name: string;
     description: string | null;
     streamUrl: string;
@@ -381,9 +398,12 @@ export class CameraService {
     createdAt: Date;
     updatedAt: Date;
   }): CameraResponseDto {
-    // The stored streamUrl is encrypted (AES-GCM). We decrypt so we
-    // can build the redacted form but never return the plaintext.
-    const decrypted = camera.streamUrl ? decryptString(camera.streamUrl) : "";
+    // The stored streamUrl is encrypted (AES-GCM), context-bound to the
+    // tenant (v2). We decrypt so we can build the redacted form but never
+    // return the plaintext. v1 legacy rows decrypt with the context ignored.
+    const decrypted = camera.streamUrl
+      ? decryptString(camera.streamUrl, cameraStreamContext(camera.tenantId))
+      : "";
     return {
       id: camera.id,
       name: camera.name,
@@ -408,7 +428,7 @@ export class CameraService {
    * actually needs to reach the device. Never call from user-facing
    * endpoints.
    */
-  decryptStreamUrl(encrypted: string): string {
-    return decryptString(encrypted);
+  decryptStreamUrl(encrypted: string, tenantId: string): string {
+    return decryptString(encrypted, cameraStreamContext(tenantId));
   }
 }
