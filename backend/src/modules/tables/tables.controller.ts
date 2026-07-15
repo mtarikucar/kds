@@ -128,7 +128,9 @@ export class TablesController {
   // touches public routes but the lint rule needs the explicit marker.
   @Public()
   @SkipBranchScope()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  // NAT-aware limit: customers share the venue WiFi's single IP, so this
+  // read/poll cap is sized for a BUSY venue's whole clientele, not one user.
+  @Throttle({ default: { limit: 90, ttl: 60_000 } })
   @Get("public/:tenantId")
   @ApiOperation({
     summary: "Get available tables for customer selection (no auth required)",

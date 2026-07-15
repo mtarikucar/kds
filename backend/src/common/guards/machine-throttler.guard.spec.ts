@@ -30,6 +30,47 @@ describe("MachineThrottlerGuard.getTracker", () => {
     await expect(guard.track(req)).resolves.toBe("5.5.5.5:pk:pk_live_abc");
   });
 
+  it("keys a Device token by IP + a sha256 prefix (per-device bucket, secret never in the key)", async () => {
+    const req = {
+      headers: { authorization: "Device super-secret-token" },
+      ip: "5.5.5.5",
+    };
+    const tracker = await guard.track(req);
+    expect(tracker).toMatch(/^5\.5\.5\.5:device:[0-9a-f]{16}$/);
+    expect(tracker).not.toContain("super-secret-token");
+    // Stable: the same token always lands in the same bucket.
+    await expect(guard.track(req)).resolves.toBe(tracker);
+  });
+
+  it("two devices behind the same NAT IP get SEPARATE buckets", async () => {
+    const a = await guard.track({
+      headers: { authorization: "Device token-a" },
+      ip: "5.5.5.5",
+    });
+    const b = await guard.track({
+      headers: { authorization: "Device token-b" },
+      ip: "5.5.5.5",
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it("keys a Bridge token like a Device token (bridge: namespace)", async () => {
+    const tracker = await guard.track({
+      headers: { authorization: "Bridge bridge-secret" },
+      ip: "5.5.5.5",
+    });
+    expect(tracker).toMatch(/^5\.5\.5\.5:bridge:[0-9a-f]{16}$/);
+  });
+
+  it("a user Bearer JWT stays on the plain IP bucket (not machine traffic)", async () => {
+    await expect(
+      guard.track({
+        headers: { authorization: "Bearer eyJhbGciOi..." },
+        ip: "5.5.5.5",
+      }),
+    ).resolves.toBe("5.5.5.5");
+  });
+
   it("a single IP cycling forged Screen prefixes stays bucketed under that IP", async () => {
     const k1 = await guard.track({
       headers: { authorization: "Screen forged-1.x" },

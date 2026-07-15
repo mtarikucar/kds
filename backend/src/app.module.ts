@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerModule } from "@nestjs/throttler";
+import { THROTTLER_PROFILES } from "./common/config/throttler.config";
 import { MachineThrottlerGuard } from "./common/guards/machine-throttler.guard";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { RequestContextInterceptor } from "./common/context/request-context.interceptor";
@@ -81,23 +82,10 @@ import { validate } from "./config/env.validation";
     // submodules. Nest tolerated it but every replica still runs every job;
     // leader-election / distributed locks live in the schedulers themselves.
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      {
-        name: "short",
-        ttl: 1000,
-        limit: 10,
-      },
-      {
-        name: "medium",
-        ttl: 10000,
-        limit: 50,
-      },
-      {
-        name: "long",
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
+    // Profiles live in common/config/throttler.config.ts so a spec pins the
+    // `default` throttler's presence — without it, every route-level
+    // @Throttle({default:{...}}) (OTP, pairing, public lookups…) is INERT.
+    ThrottlerModule.forRoot(THROTTLER_PROFILES),
     PrismaModule,
     CommonModule,
     // Prometheus /api/metrics + the request-duration histogram fed by
