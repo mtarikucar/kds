@@ -284,29 +284,92 @@ export class DeliveryOrderService {
       return null;
     }
 
-    // 5. If autoAccept, also accept on the platform side. Config +
-    // autoAccept were resolved once before the txn (iter-39) — same
-    // snapshot drove both `requiresApproval` and this branch.
+    // 5. If autoAccept, also accept on the platform side — but BOUNDED so a
+    // slow/degraded platform can't hold the webhook 200 past the platform's
+    // ack window (a blown ack triggers redelivery / marks the integration
+    // unhealthy). Config + autoAccept were resolved once before the txn
+    // (iter-39). The accept runs inline with a short budget; if it exceeds
+    // that we stop blocking the response and hand the accept to the
+    // RetryScheduler, which re-dispatches the identical adapter.acceptOrder
+    // from an ORDER_ACCEPTED log row. Ack-first: the platform's prompt 200
+    // matters more than confirming the accept synchronously.
     if (autoAccept && config) {
-      try {
-        const freshConfig = await this.authService.ensureValidToken(config.id);
-        if (freshConfig) {
+      const budgetMs = this.autoAcceptInlineBudgetMs();
+      const TIMEOUT = Symbol("ack-budget");
+
+      // Wrapped so it NEVER rejects: once we stop awaiting it (timeout branch)
+      // a late rejection would otherwise be an unhandled promise rejection.
+      const acceptPromise: Promise<
+        { kind: "ok" } | { kind: "error"; error: string } | { kind: "skip" }
+      > = (async () => {
+        try {
+          const freshConfig = await this.authService.ensureValidToken(
+            config.id,
+          );
+          if (!freshConfig) return { kind: "skip" as const };
           const adapter = this.adapterFactory.getAdapter(platform);
           await adapter.acceptOrder(freshConfig, externalOrderId);
-
-          await this.logService.log({
-            tenantId,
-            platform,
-            direction: PlatformLogDirection.OUTBOUND,
-            action: PlatformLogAction.ORDER_ACCEPTED,
-            orderId: createdOrder.id,
-            externalId: externalOrderId,
-            success: true,
-          });
+          return { kind: "ok" as const };
+        } catch (error: any) {
+          return {
+            kind: "error" as const,
+            error: error?.message ?? String(error),
+          };
         }
-      } catch (error: any) {
+      })();
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const raced = await Promise.race([
+        acceptPromise,
+        new Promise<typeof TIMEOUT>((resolve) => {
+          timer = setTimeout(() => resolve(TIMEOUT), budgetMs);
+        }),
+      ]);
+      if (timer) clearTimeout(timer);
+
+      if (raced === TIMEOUT) {
+        // Over budget → defer. Enqueue an ORDER_ACCEPTED retry row the
+        // RetryScheduler drains on its next tick (nextRetryAt = now), then
+        // reconcile the still-running attempt: a late success marks the row
+        // done so the scheduler doesn't double-accept; a late failure trips
+        // the circuit breaker (same accounting the inline error path does).
+        const pending = await this.logService.log({
+          tenantId,
+          platform,
+          direction: PlatformLogDirection.OUTBOUND,
+          action: PlatformLogAction.ORDER_ACCEPTED,
+          orderId: createdOrder.id,
+          externalId: externalOrderId,
+          success: false,
+          error: "deferred: exceeded inline ack budget (ack-first)",
+          nextRetryAt: new Date(),
+        });
+        void acceptPromise
+          .then(async (result) => {
+            if (result.kind === "ok" && pending?.id) {
+              await this.logService
+                .markRetrySuccess(pending.id)
+                .catch(() => undefined);
+            } else if (result.kind === "error") {
+              await this.configService
+                .recordError(config.id, `accept_order: ${result.error}`)
+                .catch(() => undefined);
+            }
+          })
+          .catch(() => undefined);
+      } else if (raced.kind === "ok") {
+        await this.logService.log({
+          tenantId,
+          platform,
+          direction: PlatformLogDirection.OUTBOUND,
+          action: PlatformLogAction.ORDER_ACCEPTED,
+          orderId: createdOrder.id,
+          externalId: externalOrderId,
+          success: true,
+        });
+      } else if (raced.kind === "error") {
         this.logger.error(
-          `Failed to auto-accept order ${externalOrderId} on ${platform}: ${error.message}`,
+          `Failed to auto-accept order ${externalOrderId} on ${platform}: ${raced.error}`,
         );
         await this.logService.log({
           tenantId,
@@ -316,19 +379,21 @@ export class DeliveryOrderService {
           orderId: createdOrder.id,
           externalId: externalOrderId,
           success: false,
-          error: error.message,
+          error: raced.error,
           nextRetryAt: new Date(Date.now() + 30_000),
         });
 
-        // Circuit-breaker parity with iter-38 (menu/status sync). A
-        // platform whose acceptOrder endpoint is permanently broken
-        // (wrong API version, dropped credentials) would otherwise
-        // loop forever — every webhook bumps the retry queue but the
-        // config never auto-disables at CIRCUIT_BREAKER_THRESHOLD.
+        // Circuit-breaker parity with iter-38 (menu/status sync). A platform
+        // whose acceptOrder endpoint is permanently broken (wrong API version,
+        // dropped credentials) would otherwise loop forever — every webhook
+        // bumps the retry queue but the config never auto-disables at
+        // CIRCUIT_BREAKER_THRESHOLD.
         await this.configService
-          .recordError(config.id, `accept_order: ${error.message}`)
+          .recordError(config.id, `accept_order: ${raced.error}`)
           .catch((e) => this.logger.warn(`recordError failed: ${e.message}`));
       }
+      // raced.kind === "skip": no valid token this tick — do nothing (a later
+      // webhook/poll or the token-refresh cron reconciles), same as before.
     }
 
     // 6. Emit via KDS WebSocket
@@ -504,6 +569,22 @@ export class DeliveryOrderService {
       .join("\n");
 
     return { validItems, unmappedItems, totalsMismatch, orderNotes };
+  }
+
+  /**
+   * Inline budget (ms) the auto-accept outbound call may spend inside the
+   * webhook ack path before it is deferred to the RetryScheduler. Keeps the
+   * webhook 200 well within the platform's ack window even when the accept (or
+   * a token refresh it triggers) is slow. Env-overridable via
+   * DELIVERY_AUTOACCEPT_INLINE_BUDGET_MS (read per-call so an ops change takes
+   * effect without a restart); default 2500ms. A missing/garbage/non-positive
+   * value falls back to the default.
+   */
+  private autoAcceptInlineBudgetMs(): number {
+    const raw = process.env.DELIVERY_AUTOACCEPT_INLINE_BUDGET_MS;
+    const n = raw === undefined || raw.trim() === "" ? NaN : Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return 2500;
+    return Math.floor(n);
   }
 
   /**
