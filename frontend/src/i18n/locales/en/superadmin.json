@@ -345,7 +345,8 @@
       "posAccess": "POS Access",
       "aiPhotosPerMonth": "AI photos/mo",
       "aiVideosPerMonth": "AI videos/mo",
-      "aiContentGeneration": "AI Content Generation"
+      "aiContentGeneration": "AI Content Generation",
+      "ai3dPerMonth": "AI 3D/mo"
     }
   },
   "marketplace": {

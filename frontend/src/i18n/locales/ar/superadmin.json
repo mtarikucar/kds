@@ -345,7 +345,8 @@
       "posAccess": "وصول نقطة البيع",
       "aiPhotosPerMonth": "صور AI/شهر",
       "aiVideosPerMonth": "فيديو AI/شهر",
-      "aiContentGeneration": "إنشاء المحتوى بالذكاء الاصطناعي"
+      "aiContentGeneration": "إنشاء المحتوى بالذكاء الاصطناعي",
+      "ai3dPerMonth": "نماذج 3D/شهر"
     }
   },
   "marketplace": {

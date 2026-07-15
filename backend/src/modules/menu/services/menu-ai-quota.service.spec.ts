@@ -93,6 +93,23 @@ describe("MenuAiQuotaService", () => {
       expect(prisma.aiGenerationUsage.aggregate).not.toHaveBeenCalled();
     });
 
+    it("MODEL3D draws from its own pool (maxMonthlyAi3dModels), not the photo cap", async () => {
+      // Photo pool full, 3D pool open — the 3D claim must still succeed.
+      setEngineLimits({
+        "limit.maxMonthlyAiPhotos": 50,
+        "limit.maxMonthlyAi3dModels": 10,
+      });
+      setUsed(9);
+      await expect(svc.claim(TENANT, "MODEL3D", 1)).resolves.toBe("usage1");
+      const where = (prisma.aiGenerationUsage.aggregate as jest.Mock).mock
+        .calls[0][0].where;
+      expect(where.kind).toBe("MODEL3D");
+      setUsed(10);
+      await expect(svc.claim(TENANT, "MODEL3D", 1)).rejects.toThrow(
+        BusinessException,
+      );
+    });
+
     it("voided (refunded) rows do not count against the cap", async () => {
       setEngineLimits({ "limit.maxMonthlyAiVideos": 5 });
       setUsed(4); // 1 refunded row excluded by the voided:false filter

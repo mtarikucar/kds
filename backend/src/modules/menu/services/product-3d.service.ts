@@ -106,11 +106,11 @@ export class Product3dService {
       );
     }
 
-    // Every Meshy submit is a real vendor charge, and ?force=true (plus
-    // TRIAL's unlimited products) would otherwise make it an unmetered loop.
-    // 3D draws from the PHOTO allowance — no separate 3D cap, but every
-    // generation consumes ledger units; a FAILED task refunds via markFailed.
-    const usageId = await this.quota.claim(tenantId, "PHOTO", 1);
+    // Every Meshy submit is a ~₺12 vendor charge (~9× a photo), and
+    // ?force=true (plus TRIAL's unlimited products) would otherwise make it
+    // an unmetered loop — so 3D has its OWN monthly pool (maxMonthlyAi3dModels:
+    // TRIAL 1, PRO 10, BUSINESS 30). A FAILED task refunds via markFailed.
+    const usageId = await this.quota.claim(tenantId, "MODEL3D", 1);
 
     // Simulator: skip Meshy, mark READY immediately with a sample model so the
     // whole request → AR-viewer path is exercisable without the API/credits.

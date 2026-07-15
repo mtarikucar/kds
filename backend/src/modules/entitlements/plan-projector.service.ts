@@ -73,9 +73,10 @@ export class PlanProjectorService {
     "maxProducts",
     "maxCategories",
     "maxMonthlyOrders",
-    // AI menu-studio monthly generation caps (photo+frame vs video).
+    // AI menu-studio monthly generation caps (photo+frame vs video vs 3D).
     "maxMonthlyAiPhotos",
     "maxMonthlyAiVideos",
+    "maxMonthlyAi3dModels",
   ] as const;
 
   constructor(

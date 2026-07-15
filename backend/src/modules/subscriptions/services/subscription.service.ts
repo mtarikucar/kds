@@ -1247,6 +1247,7 @@ export class SubscriptionService {
           maxMonthlyOrders: plan.maxMonthlyOrders,
           maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
           maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
+          maxMonthlyAi3dModels: plan.maxMonthlyAi3dModels,
         },
         features: {
           advancedReports: plan.advancedReports,

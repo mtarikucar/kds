@@ -165,6 +165,7 @@ async function main() {
       aiContentGeneration: true,
       maxMonthlyAiPhotos: 200,
       maxMonthlyAiVideos: 20,
+      maxMonthlyAi3dModels: 30,
       isActive: true,
     },
   });

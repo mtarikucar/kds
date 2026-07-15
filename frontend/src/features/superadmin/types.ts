@@ -190,6 +190,7 @@ export interface SubscriptionPlan {
   // older cached payloads without the fields still typecheck.
   maxMonthlyAiPhotos?: number;
   maxMonthlyAiVideos?: number;
+  maxMonthlyAi3dModels?: number;
   advancedReports: boolean;
   multiLocation: boolean;
   customBranding: boolean;

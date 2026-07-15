@@ -6,13 +6,21 @@ import { BusinessException } from "../../../common/exceptions/business.exception
 import { ErrorCode } from "../../../common/interfaces/error-response.interface";
 import { isUnlimited } from "../../../common/constants/subscription-plans.const";
 
-/** Quota kinds. FRAME jobs draw from the PHOTO allowance (same image model,
-    same per-unit vendor cost). */
-export type AiQuotaKind = "PHOTO" | "VIDEO";
+/** Quota kinds. FRAME + OCR-parse draw from the PHOTO allowance (same
+    image-scale vendor cost); MODEL3D has its own pool — a Meshy model is a
+    ~₺12 charge, ~9× a photo. */
+export type AiQuotaKind = "PHOTO" | "VIDEO" | "MODEL3D";
 
 const KIND_TO_LIMIT_COLUMN: Record<AiQuotaKind, string> = {
   PHOTO: "maxMonthlyAiPhotos",
   VIDEO: "maxMonthlyAiVideos",
+  MODEL3D: "maxMonthlyAi3dModels",
+};
+
+const KIND_LABEL: Record<AiQuotaKind, string> = {
+  PHOTO: "photo",
+  VIDEO: "video",
+  MODEL3D: "3D model",
 };
 
 export interface AiQuotaUsage {
@@ -136,9 +144,7 @@ export class MenuAiQuotaService {
     const limit = await this.resolveLimit(tenantId, kind);
     if (limit === 0) {
       throw new BusinessException(
-        kind === "PHOTO"
-          ? "Your plan has no AI photo allowance. Upgrade to Profesyonel or Kurumsal to generate menu photos."
-          : "Your plan has no AI video allowance. Upgrade to Profesyonel or Kurumsal to generate menu videos.",
+        `Your plan has no AI ${KIND_LABEL[kind]} allowance. Upgrade to Profesyonel or Kurumsal to generate menu ${KIND_LABEL[kind]}s.`,
         ErrorCode.QUOTA_EXCEEDED,
         HttpStatus.PAYMENT_REQUIRED,
         { kind, used: 0, limit, requested: units },
@@ -153,7 +159,7 @@ export class MenuAiQuotaService {
         const used = await this.usedUnits(tx as any, tenantId, kind);
         if (used + units > limit) {
           throw new BusinessException(
-            `Monthly AI ${kind === "PHOTO" ? "photo" : "video"} allowance reached (${used}/${limit}). It renews at the start of next month — or upgrade your plan for a higher cap.`,
+            `Monthly AI ${KIND_LABEL[kind]} allowance reached (${used}/${limit}). It renews at the start of next month — or upgrade your plan for a higher cap.`,
             ErrorCode.QUOTA_EXCEEDED,
             HttpStatus.PAYMENT_REQUIRED,
             { kind, used, limit, requested: units },

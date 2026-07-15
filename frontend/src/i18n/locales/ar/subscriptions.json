@@ -63,7 +63,8 @@
       "products": "المنتجات",
       "monthlyOrders": "الطلبات الشهرية",
       "aiPhotos": "صور الذكاء الاصطناعي",
-      "aiVideos": "فيديوهات الذكاء الاصطناعي"
+      "aiVideos": "فيديوهات الذكاء الاصطناعي",
+      "ai3dModels": "نماذج ثلاثية الأبعاد بالذكاء الاصطناعي"
     },
     "unlimited": "غير محدود",
     "billingHistory": "سجل الفوترة",
@@ -272,7 +273,8 @@
         "maxCategories": "الفئات",
         "maxMonthlyOrders": "الطلبات الشهرية",
         "maxMonthlyAiPhotos": "صور الذكاء الاصطناعي / شهر",
-        "maxMonthlyAiVideos": "فيديوهات الذكاء الاصطناعي / شهر"
+        "maxMonthlyAiVideos": "فيديوهات الذكاء الاصطناعي / شهر",
+        "maxMonthlyAi3dModels": "نماذج ثلاثية الأبعاد / شهر"
       },
       "features": {
         "kdsIntegration": "تكامل KDS",

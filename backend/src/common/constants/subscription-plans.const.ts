@@ -17,6 +17,7 @@ export interface PlanConfig {
     maxMonthlyOrders: number;
     maxMonthlyAiPhotos: number;
     maxMonthlyAiVideos: number;
+    maxMonthlyAi3dModels: number;
   };
   features: {
     advancedReports: boolean;
@@ -58,6 +59,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       // money per unit; trial gets a taste, not the fal.ai bill.
       maxMonthlyAiPhotos: 3,
       maxMonthlyAiVideos: 1,
+      maxMonthlyAi3dModels: 1,
     },
     features: {
       advancedReports: true,
@@ -92,6 +94,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       maxMonthlyOrders: 50,
       maxMonthlyAiPhotos: 0,
       maxMonthlyAiVideos: 0,
+      maxMonthlyAi3dModels: 0,
     },
     features: {
       advancedReports: false,
@@ -129,6 +132,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       // AI is PRO+ — Başlangıç has no generation allowance.
       maxMonthlyAiPhotos: 0,
       maxMonthlyAiVideos: 0,
+      maxMonthlyAi3dModels: 0,
     },
     features: {
       advancedReports: false,
@@ -166,6 +170,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       // 50/5 caps the worst-case fal.ai bill at ~12% of the plan price.
       maxMonthlyAiPhotos: 50,
       maxMonthlyAiVideos: 5,
+      // 3D (Meshy) ≈ ₺12/model — 10/mo ≈ ₺120 worst-case.
+      maxMonthlyAi3dModels: 10,
     },
     features: {
       advancedReports: true,
@@ -204,6 +210,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       // fal.ai bill at ~22% of the plan price.
       maxMonthlyAiPhotos: 200,
       maxMonthlyAiVideos: 20,
+      maxMonthlyAi3dModels: 30,
     },
     features: {
       advancedReports: true,

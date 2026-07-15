@@ -65,6 +65,7 @@ const LIMIT_LABELS: Record<string, string> = {
   maxMonthlyOrders: 'Max Monthly Orders',
   maxMonthlyAiPhotos: 'AI Photos / month',
   maxMonthlyAiVideos: 'AI Videos / month',
+  maxMonthlyAi3dModels: 'AI 3D Models / month',
 };
 
 export default function TenantDetailPage() {

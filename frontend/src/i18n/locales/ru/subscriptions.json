@@ -63,7 +63,8 @@
       "products": "Продукты",
       "monthlyOrders": "Заказов в месяц",
       "aiPhotos": "ИИ-фото",
-      "aiVideos": "ИИ-видео"
+      "aiVideos": "ИИ-видео",
+      "ai3dModels": "ИИ 3D-модели"
     },
     "unlimited": "Безлимитно",
     "billingHistory": "История платежей",
@@ -272,7 +273,8 @@
         "maxCategories": "Категории",
         "maxMonthlyOrders": "Заказы в месяц",
         "maxMonthlyAiPhotos": "ИИ-фото / месяц",
-        "maxMonthlyAiVideos": "ИИ-видео / месяц"
+        "maxMonthlyAiVideos": "ИИ-видео / месяц",
+        "maxMonthlyAi3dModels": "ИИ 3D-модели / месяц"
       },
       "features": {
         "kdsIntegration": "Интеграция с KDS",

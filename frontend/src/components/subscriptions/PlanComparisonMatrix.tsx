@@ -50,6 +50,7 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
     { key: 'maxMonthlyOrders', label: t('subscriptions.comparison.limits.maxMonthlyOrders') },
     { key: 'maxMonthlyAiPhotos', label: t('subscriptions.comparison.limits.maxMonthlyAiPhotos') },
     { key: 'maxMonthlyAiVideos', label: t('subscriptions.comparison.limits.maxMonthlyAiVideos') },
+    { key: 'maxMonthlyAi3dModels', label: t('subscriptions.comparison.limits.maxMonthlyAi3dModels') },
   ];
 
   const fmtLimit = (n: number) =>

@@ -1020,6 +1020,9 @@ export interface PlanLimits {
    *  -1 = unlimited. PRO 50/5, BUSINESS 200/20, TRIAL taster 3/1. */
   maxMonthlyAiPhotos: number;
   maxMonthlyAiVideos: number;
+  /** Meshy 3D models / month — own pool (a model is ~9× a photo's cost).
+   *  TRIAL 1, PRO 10, BUSINESS 30. */
+  maxMonthlyAi3dModels: number;
 }
 
 export interface PlanFeatures {
@@ -1046,8 +1049,8 @@ export interface PlanFeatures {
   externalDisplay: boolean;
   /** AI menu studio (photo/frame/video generation, Meshy 3D, OCR menu
    *  import). PRO+ only; monthly caps live in PlanLimits.maxMonthlyAiPhotos /
-   *  maxMonthlyAiVideos. Gates the AI Studio panel + the generate endpoints
-   *  server-side. */
+   *  maxMonthlyAiVideos / maxMonthlyAi3dModels. Gates the AI Studio panel +
+   *  the generate endpoints server-side. */
   aiContentGeneration: boolean;
 }
 

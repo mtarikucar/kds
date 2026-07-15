@@ -11,7 +11,9 @@ import {
   useProduct3dConfig,
   useProduct3dStatus,
   useGenerate3d,
+  has3dQuotaLeft,
 } from "../../features/menu/product3dApi";
+import { cn } from "../../lib/utils";
 import AiLockedTeaser from "./AiLockedTeaser";
 import FeatureGate from "../subscriptions/FeatureGate";
 
@@ -58,6 +60,8 @@ function Product3dPanelInner({ productId, hasImage, ensureProductId }: Props) {
 
   const status = state?.status ?? null;
   const busy = status === "PENDING" || generate.isPending;
+  const quotaLeft = has3dQuotaLeft(config);
+  const q = config?.models3d;
 
   // Flush the current form (create/update) before generating so the backend
   // reads a fresh row (image, etc.), not stale DB state.
@@ -68,9 +72,22 @@ function Product3dPanelInner({ productId, hasImage, ensureProductId }: Props) {
 
   return (
     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-900">
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-900">
         <Box className="h-4 w-4 text-primary-600" />
         {t("menu:threeD.title", "3D / AR modeli")}
+        {q && (
+          <span
+            className={cn(
+              "ml-auto rounded-full px-2 py-0.5 text-xs font-medium ring-1",
+              !quotaLeft
+                ? "bg-amber-50 text-amber-700 ring-amber-200"
+                : "bg-white text-gray-500 ring-gray-200",
+            )}
+          >
+            {t("menu:threeD.quotaLabel", "3D")} {q.used}/
+            {q.limit === -1 ? "∞" : q.limit}
+          </span>
+        )}
       </div>
       <p className="mb-3 text-xs text-gray-500">
         {t(
@@ -89,7 +106,7 @@ function Product3dPanelInner({ productId, hasImage, ensureProductId }: Props) {
             size="sm"
             className="ml-auto"
             onClick={handleGenerate}
-            disabled={busy}
+            disabled={busy || !quotaLeft}
           >
             {t("menu:threeD.regenerate", "Yeniden oluştur")}
           </Button>
@@ -111,11 +128,20 @@ function Product3dPanelInner({ productId, hasImage, ensureProductId }: Props) {
                 t("menu:threeD.failed", "Son deneme başarısız oldu")}
             </div>
           )}
+          {!quotaLeft && (
+            <div className="flex items-start gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t(
+                "menu:threeD.quotaExhausted",
+                "Aylık 3D model hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin.",
+              )}
+            </div>
+          )}
           <Button
             type="button"
             size="sm"
             onClick={handleGenerate}
-            disabled={!hasImage || busy}
+            disabled={!hasImage || busy || !quotaLeft}
           >
             {generate.isPending ? (
               <>

@@ -175,5 +175,9 @@
     "quotaVideos": "Videolar",
     "quotaExhaustedPhotos": "Oylik AI surat limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring.",
     "quotaExhaustedVideos": "Oylik AI video limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring."
+  },
+  "threeD": {
+    "quotaLabel": "3D",
+    "quotaExhausted": "Oylik AI 3D model limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring."
   }
 }
