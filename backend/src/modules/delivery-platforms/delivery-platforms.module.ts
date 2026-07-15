@@ -41,6 +41,7 @@ import { OrderPollingScheduler } from "./schedulers/order-polling.scheduler";
 import { TokenRefreshScheduler } from "./schedulers/token-refresh.scheduler";
 import { RetryScheduler } from "./schedulers/retry.scheduler";
 import { DeliveryReconciliationScheduler } from "./schedulers/delivery-reconciliation.scheduler";
+import { DeliveryApprovalTimeoutScheduler } from "./schedulers/delivery-approval-timeout.scheduler";
 
 // Guards
 import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
@@ -83,6 +84,7 @@ import { WebhookAuthGuard } from "./guards/webhook-auth.guard";
     TokenRefreshScheduler,
     RetryScheduler,
     DeliveryReconciliationScheduler,
+    DeliveryApprovalTimeoutScheduler,
 
     // Guards
     WebhookAuthGuard,
