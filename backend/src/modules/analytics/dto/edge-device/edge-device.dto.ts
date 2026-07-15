@@ -9,6 +9,7 @@ import {
   Min,
   Max,
   IsObject,
+  ArrayMaxSize,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { EmptyStringToNumber } from "../../../../common/dto/transforms";
@@ -113,6 +114,12 @@ export class EdgeOccupancyDataDto {
   timestamp: string;
 
   @IsArray()
+  // A frame's detections = people visible to ONE camera — a real restaurant
+  // frame carries tens, not hundreds. The cap bounds the per-message
+  // createMany fan-out (each row is a DB insert on the pool the money
+  // transactions share); an oversized payload is a misbehaving/hostile
+  // device, not data.
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => DetectionDto)
   detections: DetectionDto[];

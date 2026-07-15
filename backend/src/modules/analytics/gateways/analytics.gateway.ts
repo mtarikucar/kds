@@ -65,6 +65,15 @@ export class AnalyticsGateway
 
   private readonly logger = new Logger(AnalyticsGateway.name);
 
+  /** Per-socket occupancy-ingest floor: max 1 accepted frame / 200ms (5/s).
+      The edge pipeline targets ~1fps; the floor bounds a misconfigured or
+      hostile device's write pressure on the shared Prisma pool. */
+  static readonly MIN_INGEST_INTERVAL_MS = 200;
+  /** How long the camera→branch resolution cached at edge:register stays
+      fresh before the ingest path re-reads it (camera moved to another
+      branch converges within this window without a reconnect). */
+  static readonly CAMERA_BRANCH_TTL_MS = 5 * 60 * 1000;
+
   // Track connected edge devices keyed by `${tenantId}:${deviceId}` so
   // two tenants with the same device id don't evict each other.
   private connectedDevices: Map<string, EdgeDeviceConnection> = new Map();
@@ -215,6 +224,26 @@ export class AnalyticsGateway
       client.data.deviceId = payload.deviceId;
       client.data.cameraId = payload.cameraId;
 
+      // Resolve the camera's branch ONCE at registration instead of once
+      // per occupancy frame (the ingest path runs at fps × cameras — a DB
+      // lookup per frame was pure hot-path waste). Cached on the socket
+      // with a TTL; the ingest refreshes it when stale so moving a camera
+      // to another branch converges within minutes, not reconnects.
+      if (payload.cameraId) {
+        const camera = await this.prisma.camera.findFirst({
+          where: { id: payload.cameraId, tenantId },
+          select: { branchId: true },
+        });
+        if (!camera) {
+          this.logger.warn(
+            `Edge device ${payload.deviceId} registration rejected: camera ${payload.cameraId} not found for tenant`,
+          );
+          return { success: false, error: "Camera not found for tenant" };
+        }
+        client.data.cameraBranchId = camera.branchId;
+        client.data.cameraBranchFetchedAt = Date.now();
+      }
+
       this.connectedDevices.set(
         this.deviceKey(payload.tenantId, payload.deviceId),
         {
@@ -356,23 +385,53 @@ export class AnalyticsGateway
         return { success: false, error: "Camera mismatch" };
       }
 
+      // Per-socket ingest floor: at most one accepted frame per 200ms
+      // (5/s). The edge device is configured around ~1fps; anything
+      // hammering faster is misconfigured or hostile, and every accepted
+      // frame costs inserts on the SAME Prisma pool the money
+      // transactions use. Dropped frames are cheap for the caller to
+      // retry-next-tick and are counted, not logged per-hit.
+      const now = Date.now();
+      const lastAccepted: number = client.data.lastOccupancyAcceptedAt ?? 0;
+      if (now - lastAccepted < AnalyticsGateway.MIN_INGEST_INTERVAL_MS) {
+        client.data.occupancyDropCount =
+          (client.data.occupancyDropCount ?? 0) + 1;
+        if (client.data.occupancyDropCount % 100 === 1) {
+          this.logger.warn(
+            `Rate-limiting occupancy ingest from ${client.id} (camera=${payload.cameraId}, dropped=${client.data.occupancyDropCount})`,
+          );
+        }
+        return { success: false, error: "Rate limited" };
+      }
+      client.data.lastOccupancyAcceptedAt = now;
+
       const timestamp = new Date(payload.timestamp);
 
       // Store occupancy records
       if (payload.detections.length > 0) {
-        // v3.0.0 — load the source camera's branchId once and propagate
-        // it to both the OccupancyRecord rows and the TrafficFlowRecord
-        // aggregation. OccupancyRecord/TrafficFlowRecord both now require
-        // branchId (NOT NULL, Restrict), and the source-of-truth for the
-        // branch is the camera entity, not the edge device JWT.
-        const camera = await this.prisma.camera.findFirst({
-          where: { id: payload.cameraId, tenantId },
-          select: { branchId: true },
-        });
-        if (!camera) {
-          return { success: false, error: "Camera not found for tenant" };
+        // v3.0.0 — OccupancyRecord/TrafficFlowRecord require branchId
+        // (NOT NULL, Restrict) and the source-of-truth for the branch is
+        // the camera entity, not the edge device JWT. The branch is
+        // resolved at edge:register and cached on the socket; refresh it
+        // here when the TTL lapses so a camera moved between branches
+        // converges without a reconnect.
+        let branchId: string | undefined = client.data.cameraBranchId;
+        const fetchedAt: number = client.data.cameraBranchFetchedAt ?? 0;
+        if (
+          !branchId ||
+          now - fetchedAt > AnalyticsGateway.CAMERA_BRANCH_TTL_MS
+        ) {
+          const camera = await this.prisma.camera.findFirst({
+            where: { id: payload.cameraId, tenantId },
+            select: { branchId: true },
+          });
+          if (!camera) {
+            return { success: false, error: "Camera not found for tenant" };
+          }
+          branchId = camera.branchId;
+          client.data.cameraBranchId = branchId;
+          client.data.cameraBranchFetchedAt = now;
         }
-        const branchId = camera.branchId;
 
         await this.prisma.occupancyRecord.createMany({
           data: payload.detections.map((detection) => ({

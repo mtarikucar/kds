@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AnalyticsController } from "./analytics.controller";
 import { AnalyticsScheduler } from "./analytics.scheduler";
+import { AnalyticsRetentionService } from "./services/analytics-retention.service";
 import { AnalyticsGateway } from "./gateways/analytics.gateway";
 import {
   MockDataGeneratorService,
@@ -43,6 +44,7 @@ import {
     CameraService,
     AnalyticsGateway,
     AnalyticsScheduler,
+    AnalyticsRetentionService,
   ],
   exports: [
     MockDataGeneratorService,
