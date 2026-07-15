@@ -86,6 +86,27 @@ describe("MachineThrottlerGuard.getTracker", () => {
     expect(k2.startsWith("9.9.9.9:")).toBe(true);
   });
 
+  it("prefers CF-Connecting-IP over req.ip (req.ip is the rotating CF edge behind the double proxy hop)", async () => {
+    const req = {
+      headers: { "cf-connecting-ip": "9.9.9.9" },
+      ip: "172.16.0.5", // nginx/CF-edge peer — must NOT be the key
+      ips: ["104.28.1.1"], // rotating CF edge
+    };
+    await expect(guard.track(req)).resolves.toBe("9.9.9.9");
+  });
+
+  it("two requests from the same real client stay in ONE bucket even as the CF edge (req.ip) rotates", async () => {
+    const a = await guard.track({
+      headers: { "cf-connecting-ip": "9.9.9.9" },
+      ip: "104.28.1.1",
+    });
+    const b = await guard.track({
+      headers: { "cf-connecting-ip": "9.9.9.9" },
+      ip: "104.28.9.9", // different CF edge, same real client
+    });
+    expect(a).toBe(b);
+  });
+
   it("falls back to client IP when no machine principal header is present", async () => {
     await expect(guard.track({ headers: {}, ip: "9.9.9.9" })).resolves.toBe(
       "9.9.9.9",

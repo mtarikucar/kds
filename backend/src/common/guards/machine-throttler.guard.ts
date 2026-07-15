@@ -16,13 +16,42 @@ import { ThrottlerGuard } from "@nestjs/throttler";
  *    a sha256 prefix of the token (the raw token is entirely secret, so it
  *    is hashed before becoming a bucket key; stable per device/bridge).
  *  - `X-Partner-Key: <keyId>` → `pk:<keyId>`.
- *  - otherwise the client IP (default behavior, preserving X-Forwarded-For
- *    handling via req.ips when trust proxy is configured).
+ *  - otherwise the client IP, resolved via CF-Connecting-IP behind
+ *    Cloudflare (see clientIp() — req.ip alone rotates per request behind
+ *    the CF+nginx double hop, which silently disables all throttling).
  */
 @Injectable()
 export class MachineThrottlerGuard extends ThrottlerGuard {
+  /**
+   * Resolve the true client IP behind Cloudflare → nginx → app.
+   *
+   * `req.ip` / `req.ips` depend on Express `trust proxy`, which is set to a
+   * fixed hop count (default 1). Prod sits behind TWO proxy hops (Cloudflare
+   * edge + nginx), so with one trusted hop `req.ip` resolves to the nginx-
+   * appended entry's predecessor — the Cloudflare EDGE ip, which ROTATES per
+   * request. That silently defeats per-IP throttling entirely: every request
+   * lands in a fresh bucket, so no global OR route-level limit ever
+   * accumulates (this is why the reservation 3/min lookup never 429'd in
+   * prod even after the default-profile fix).
+   *
+   * `CF-Connecting-IP` is Cloudflare's canonical true-client-IP header:
+   * Cloudflare always sets it and OVERWRITES any client-supplied value, so
+   * for a Cloudflare-fronted origin it is the correct, stable throttle key.
+   * We prefer it when present and fall back to req.ips/req.ip for
+   * dev/direct/non-Cloudflare deployments. (An attacker who bypasses
+   * Cloudflare to hit the origin directly could spoof it — but the same is
+   * already true of the X-Forwarded-For that req.ips trusts, so this is no
+   * weaker, and strictly correct when actually behind Cloudflare. Locking
+   * the origin to Cloudflare ingress is a separate infra concern.)
+   */
+  private clientIp(req: Record<string, any>): string {
+    const cf = req?.headers?.["cf-connecting-ip"];
+    if (typeof cf === "string" && cf.length > 0) return cf;
+    return req?.ips?.length ? req.ips[0] : req?.ip;
+  }
+
   protected async getTracker(req: Record<string, any>): Promise<string> {
-    const ip = req?.ips?.length ? req.ips[0] : req?.ip;
+    const ip = this.clientIp(req);
     // SECURITY: the throttler runs BEFORE the auth guards, so the principal id
     // here is UNVERIFIED (attacker-suppliable). If we keyed on it alone, an
     // attacker could rotate a fresh fake prefix per request and escape IP
