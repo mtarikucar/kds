@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
+import { isCameraAnalyticsEnabled } from "../camera-analytics.gate";
 
 /**
  * Nightly retention sweep for the camera-CV telemetry tables. The edge
@@ -37,6 +38,9 @@ export class AnalyticsRetentionService {
 
   @Cron("40 3 * * *")
   async sweep(): Promise<void> {
+    // Camera/CV telemetry is INERT until cameras are provisioned — no new
+    // occupancy/traffic rows accrue, so the retention sweep has nothing to do.
+    if (!isCameraAnalyticsEnabled()) return;
     await withAdvisoryLock(
       this.prisma,
       "analytics.retention-sweep",

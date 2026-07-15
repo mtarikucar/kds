@@ -10,10 +10,19 @@ describe("AnalyticsRetentionService", () => {
   let prisma: any;
   let svc: AnalyticsRetentionService;
 
+  const origFlag = process.env.CAMERA_ANALYTICS_ENABLED;
+  afterAll(() => {
+    if (origFlag === undefined) delete process.env.CAMERA_ANALYTICS_ENABLED;
+    else process.env.CAMERA_ANALYTICS_ENABLED = origFlag;
+  });
+
   beforeEach(() => {
     jest.restoreAllMocks();
     delete process.env.ANALYTICS_OCCUPANCY_RETENTION_DAYS;
     delete process.env.ANALYTICS_TRAFFIC_RETENTION_DAYS;
+    // The sweep no-ops when camera analytics is inert; the body-exercising
+    // tests need it enabled. A dedicated test flips it off.
+    process.env.CAMERA_ANALYTICS_ENABLED = "true";
     prisma = {
       // withAdvisoryLock v2: xact lock inside a $transaction; grant by default
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ locked: true }]),
@@ -54,6 +63,14 @@ describe("AnalyticsRetentionService", () => {
       { locked: false },
     ]);
     await svc.sweep();
+    expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(prisma.analyticsHeatmapCache.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("no-ops entirely when camera analytics is inert (no lock, no deletes)", async () => {
+    process.env.CAMERA_ANALYTICS_ENABLED = "false";
+    await svc.sweep();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
     expect(prisma.analyticsHeatmapCache.deleteMany).not.toHaveBeenCalled();
   });

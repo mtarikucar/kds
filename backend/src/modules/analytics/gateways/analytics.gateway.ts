@@ -33,6 +33,7 @@ import {
 } from "../dto/edge-device";
 import { decryptString } from "../../../common/helpers/encryption.helper";
 import { cameraStreamContext } from "../services/camera.service";
+import { isCameraAnalyticsEnabled } from "../camera-analytics.gate";
 
 interface EdgeDeviceConnection {
   socketId: string;
@@ -105,6 +106,15 @@ export class AnalyticsGateway
 
   async handleConnection(client: Socket) {
     try {
+      // Camera/CV analytics ships INERT until on-site cameras are provisioned
+      // (CAMERA_ANALYTICS_ENABLED). Refuse edge-device connections while
+      // disabled so no occupancy/traffic telemetry is ingested; the REST
+      // endpoints 404 in parallel via CameraAnalyticsEnabledGuard.
+      if (!isCameraAnalyticsEnabled()) {
+        client.disconnect();
+        return;
+      }
+
       // Check for JWT token or API key
       const token =
         client.handshake.auth.token ||

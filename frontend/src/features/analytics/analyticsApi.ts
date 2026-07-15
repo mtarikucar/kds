@@ -100,7 +100,10 @@ export const useTrafficFlow = (params: DateRangeParams & { limit?: number }) => 
   });
 };
 
-export const useCongestionAnalysis = (params: DateRangeParams) => {
+export const useCongestionAnalysis = (
+  params: DateRangeParams,
+  enabled = true,
+) => {
   const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery({
     queryKey: [...analyticsKeys.congestion(params), branchId],
@@ -108,7 +111,9 @@ export const useCongestionAnalysis = (params: DateRangeParams) => {
       const response = await api.get('/analytics/traffic/congestion', { params });
       return response.data;
     },
-    enabled: true,
+    // Gated off when camera analytics is inert — the endpoint 404s and the
+    // only consumer (hasCameraData) correctly reads "no camera data".
+    enabled,
     staleTime: 10 * 60 * 1000,
   });
 };
