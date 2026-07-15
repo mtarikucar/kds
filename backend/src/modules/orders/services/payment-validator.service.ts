@@ -34,6 +34,7 @@ export class PaymentValidator {
    * order is confirmed to exist, BEFORE any payment row is written or
    * the self-pay intent is consulted. Throws the exact BadRequestException
    * messages the inline code threw, in the same order:
+   *   0. marketplace `source` set (settled by the platform — never POS-payable)
    *   1. already PAID
    *   2. CANCELLED
    *   3. requiresApproval && PENDING_APPROVAL
@@ -41,7 +42,22 @@ export class PaymentValidator {
   assertOrderPayable(order: {
     status: string;
     requiresApproval: boolean;
+    source?: string | null;
   }): void {
+    // Marketplace/delivery-platform orders are settled BY the platform: they
+    // never create a Payment row (the platform owns the money rail — see
+    // delivery-order.service). Taking a POS payment on one would double-charge
+    // the customer AND fire a SECOND fiscal document (e-Arşiv/e-Fatura + ÖKC
+    // receipt) on top of the platform's own. Gate on `source` (the marketplace:
+    // YEMEKSEPETI/GETIR/TRENDYOL/MIGROS), NOT `type` — a restaurant's OWN
+    // delivery (type=DELIVERY, source=null) is still POS-payable at the door.
+    // Checked FIRST so the marketplace message surfaces regardless of status.
+    if (order.source != null && order.source.trim() !== "") {
+      throw new BadRequestException(
+        "This is a marketplace/delivery-platform order — it is settled by the platform and cannot be paid through the POS.",
+      );
+    }
+
     // Check if order is already paid (inside transaction to prevent race condition)
     if (order.status === OrderStatus.PAID) {
       throw new BadRequestException("Order is already paid");
