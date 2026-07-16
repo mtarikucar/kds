@@ -9,7 +9,9 @@
     "onlineOrders": "Onlayn buyurtmalar",
     "accounting": "Buxgalteriya",
     "partnerKeys": "Hamkor API kalitlari",
-    "paymentTerminals": "Karta terminallari"
+    "paymentTerminals": "Karta terminallari",
+    "shifts": "Smena shablonlari",
+    "schedule": "Jadval"
   },
   "paymentTerminals": {
     "title": "Karta terminallari",

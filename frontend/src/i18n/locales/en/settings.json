@@ -9,7 +9,9 @@
     "onlineOrders": "Online Orders",
     "accounting": "Accounting",
     "partnerKeys": "Partner API Keys",
-    "paymentTerminals": "Card Terminals"
+    "paymentTerminals": "Card Terminals",
+    "shifts": "Shift Templates",
+    "schedule": "Schedule"
   },
   "paymentTerminals": {
     "title": "Card Terminals",

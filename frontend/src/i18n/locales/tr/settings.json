@@ -9,7 +9,9 @@
     "onlineOrders": "Online Siparişler",
     "accounting": "Muhasebe",
     "partnerKeys": "Partner API Anahtarları",
-    "paymentTerminals": "Kart Terminalleri"
+    "paymentTerminals": "Kart Terminalleri",
+    "shifts": "Vardiya Şablonları",
+    "schedule": "Program"
   },
   "paymentTerminals": {
     "title": "Kart Terminalleri",

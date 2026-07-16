@@ -136,9 +136,7 @@ const TableManagementPage = lazyWithReload(
 const FloorPlanEditorPage = lazyWithReload(
   () => import("./pages/admin/FloorPlanEditorPage"),
 );
-const UserManagementPage = lazyWithReload(
-  () => import("./pages/admin/UserManagementPage"),
-);
+const TeamPage = lazyWithReload(() => import("./pages/admin/TeamPage"));
 const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
 );
@@ -156,9 +154,6 @@ const AnalyticsPage = lazyWithReload(
 );
 const ReservationsPage = lazyWithReload(
   () => import("./pages/admin/ReservationsPage"),
-);
-const PersonnelManagementPage = lazyWithReload(
-  () => import("./pages/admin/PersonnelManagementPage"),
 );
 const StockManagementPage = lazyWithReload(
   () => import("./pages/admin/StockManagementPage"),
@@ -208,6 +203,12 @@ const DesktopAppSettingsPage = lazyWithReload(
 );
 const ReservationSettingsPage = lazyWithReload(
   () => import("./pages/settings/ReservationSettingsPage"),
+);
+const ShiftTemplatesSettingsPage = lazyWithReload(
+  () => import("./pages/settings/ShiftTemplatesSettingsPage"),
+);
+const ScheduleSettingsPage = lazyWithReload(
+  () => import("./pages/settings/ScheduleSettingsPage"),
 );
 const DeliveryPlatformsSettingsPage = lazyWithReload(
   () => import("./pages/settings/DeliveryPlatformsSettingsPage"),
@@ -470,7 +471,12 @@ function App() {
             />
             <Route path="/admin/tables" element={<TableManagementPage />} />
             <Route path="/admin/floor-plan" element={<FloorPlanEditorPage />} />
-            <Route path="/admin/users" element={<UserManagementPage />} />
+            {/* Ekip (merged Users + Personnel). Old paths redirect. */}
+            <Route path="/admin/team" element={<TeamPage />} />
+            <Route
+              path="/admin/users"
+              element={<Navigate to="/admin/team" replace />}
+            />
             <Route path="/admin/qr-codes" element={<QRManagementPage />} />
             {/* v2.8.88 page-root FeatureGate: direct URL access shows an
             upsell instead of 403. Each fallback links to the matching
@@ -544,14 +550,7 @@ function App() {
             />
             <Route
               path="/admin/personnel"
-              element={
-                <FeatureGate
-                  feature="personnelManagement"
-                  fallback={<UpsellCard planName="PRO" />}
-                >
-                  <PersonnelManagementPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/team" replace />}
             />
             <Route
               path="/admin/stock"
@@ -664,6 +663,28 @@ function App() {
                     fallback={<UpsellCard planName="PRO" />}
                   >
                     <ReservationSettingsPage />
+                  </FeatureGate>
+                }
+              />
+              <Route
+                path="shifts"
+                element={
+                  <FeatureGate
+                    feature="personnelManagement"
+                    fallback={<UpsellCard planName="PRO" />}
+                  >
+                    <ShiftTemplatesSettingsPage />
+                  </FeatureGate>
+                }
+              />
+              <Route
+                path="schedule"
+                element={
+                  <FeatureGate
+                    feature="personnelManagement"
+                    fallback={<UpsellCard planName="PRO" />}
+                  >
+                    <ScheduleSettingsPage />
                   </FeatureGate>
                 }
               />

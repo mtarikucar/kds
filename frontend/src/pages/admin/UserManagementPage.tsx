@@ -1,14 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { UsersRound, UserPlus, Edit2, Trash2, AlertTriangle, Lock, Users, UserCheck, Shield, Briefcase, Clock, Check, X, UserX, RotateCcw, Search } from 'lucide-react';
+import { UsersRound, UserPlus, Edit2, Trash2, AlertTriangle, Lock, Users, UserCheck, Shield, Briefcase, Clock, Check, X, UserX, RotateCcw, Search, ChevronDown, ChevronRight, TrendingUp, Gauge } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usersApi, User, CreateUserData, UpdateUserData } from '../../api/usersApi';
 import { UserRole, UserStatus } from '../../types';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 import { useSubscription } from '../../contexts/SubscriptionContext';
+import { usePerformanceMetrics } from '../../features/personnel/personnelApi';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -16,8 +18,20 @@ import Input from '../../components/ui/Input';
 import FormSelect from '../../components/ui/FormSelect';
 import { getApiErrorMessage } from '../../lib/api-error';
 
-const UserManagementPage = () => {
-  const { t } = useTranslation(['common', 'subscriptions']);
+const scoreColor = (s: number) =>
+  s >= 80 ? 'text-green-700 bg-green-100' : s >= 60 ? 'text-amber-700 bg-amber-100' : 'text-red-700 bg-red-100';
+const scoreBar = (s: number) =>
+  s >= 80 ? 'bg-green-500' : s >= 60 ? 'bg-amber-500' : 'bg-red-500';
+
+interface UserManagementPageProps {
+  /** When embedded inside the Ekip (Team) page, skip the page-level header
+      (the Team page supplies its own title + tab bar). */
+  embedded?: boolean;
+}
+
+const UserManagementPage = ({ embedded = false }: UserManagementPageProps) => {
+  const { t } = useTranslation(['common', 'subscriptions', 'personnel']);
+  const formatCurrency = useFormatCurrency();
 
   // Zod schema for user form
   const userSchema = z.object({
@@ -40,8 +54,34 @@ const UserManagementPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [expandedPerf, setExpandedPerf] = useState<Set<string>>(new Set());
   const currentUser = useAuthStore((state) => state.user);
-  const { checkLimit } = useSubscription();
+  const { checkLimit, hasFeature } = useSubscription();
+
+  // Performance is a personnel feature — merged INTO the users table (score
+  // badge per row + expandable detail + aggregate strip) instead of a
+  // separate tab. Only fetch when the plan has personnel management.
+  const hasPersonnel = hasFeature('personnelManagement');
+  const { data: perfMetrics = [] } = usePerformanceMetrics(undefined, hasPersonnel);
+  const perfByUser = useMemo(
+    () => new Map(perfMetrics.map((m) => [m.user.id, m])),
+    [perfMetrics],
+  );
+  const perfAgg = useMemo(() => {
+    if (perfMetrics.length === 0) return null;
+    const totalOrders = perfMetrics.reduce((s, m) => s + m.totalOrders, 0);
+    const totalSales = perfMetrics.reduce((s, m) => s + m.totalSales, 0);
+    const avgScore = Math.round(
+      perfMetrics.reduce((s, m) => s + m.performanceScore, 0) / perfMetrics.length,
+    );
+    return { totalOrders, totalSales, avgScore, staff: perfMetrics.length };
+  }, [perfMetrics]);
+  const togglePerf = (id: string) =>
+    setExpandedPerf((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   // Check user limit
   const userLimit = checkLimit('maxUsers', users.length);
@@ -281,17 +321,22 @@ const UserManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Page Header — hidden when embedded in the Ekip page (which owns the
+          title + tab bar); the Add button stays, right-aligned. */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-            <UsersRound className="w-7 h-7 text-white" />
+        {!embedded ? (
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+              <UsersRound className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.userManagement')}</h1>
+              <p className="text-slate-500 mt-0.5">{t('admin.manageStaff')}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.userManagement')}</h1>
-            <p className="text-slate-500 mt-0.5">{t('admin.manageStaff')}</p>
-          </div>
-        </div>
+        ) : (
+          <div />
+        )}
         <Button onClick={() => handleOpenModal()} disabled={!canAddUser}>
           {canAddUser ? (
             <UserPlus className="h-4 w-4 mr-2" />
@@ -301,6 +346,37 @@ const UserManagementPage = () => {
           {t('admin.addUser')}
         </Button>
       </div>
+
+      {/* Aggregate performance strip — the team's roll-up, merged from the
+          personnel performance metrics. */}
+      {perfAgg && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="rounded-xl border border-slate-200/60 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wide">
+              <Gauge className="h-3.5 w-3.5" /> {t('personnel:performance.avgScore', 'Ort. Skor')}
+            </div>
+            <div className="mt-1 text-2xl font-bold text-slate-900">{perfAgg.avgScore}<span className="text-sm text-slate-400">/100</span></div>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wide">
+              <TrendingUp className="h-3.5 w-3.5" /> {t('personnel:performance.totalOrders', 'Toplam Sipariş')}
+            </div>
+            <div className="mt-1 text-2xl font-bold text-slate-900">{perfAgg.totalOrders}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wide">
+              <Briefcase className="h-3.5 w-3.5" /> {t('personnel:performance.totalSales', 'Toplam Ciro')}
+            </div>
+            <div className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(perfAgg.totalSales)}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wide">
+              <Users className="h-3.5 w-3.5" /> {t('personnel:performance.ratedStaff', 'Değerlendirilen')}
+            </div>
+            <div className="mt-1 text-2xl font-bold text-slate-900">{perfAgg.staff}</div>
+          </div>
+        </div>
+      )}
 
       {/* User Limit Info Banner */}
       {userLimit.limit !== -1 && (
@@ -522,14 +598,23 @@ const UserManagementPage = () => {
               <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 {t('admin.created')}
               </th>
+              {hasPersonnel && (
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  {t('personnel:tabs.performance', 'Performans')}
+                </th>
+              )}
               <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 {t('admin.actions')}
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredUsers.map((user) => (
-              <tr key={user.id} className="group hover:bg-slate-50/50 transition-colors">
+            {filteredUsers.map((user) => {
+              const perf = perfByUser.get(user.id);
+              const isExpanded = expandedPerf.has(user.id);
+              return (
+              <Fragment key={user.id}>
+              <tr className="group hover:bg-slate-50/50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-semibold shadow-sm">
@@ -561,6 +646,29 @@ const UserManagementPage = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                   {new Date(user.createdAt).toLocaleDateString()}
                 </td>
+                {hasPersonnel && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {perf ? (
+                      <button
+                        type="button"
+                        onClick={() => togglePerf(user.id)}
+                        className="inline-flex items-center gap-1.5"
+                        title={t('personnel:performance.viewDetail', 'Detayı gör')}
+                      >
+                        <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${scoreColor(perf.performanceScore)}`}>
+                          {perf.performanceScore}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-slate-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    )}
+                  </td>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
                     {user.status === 'PENDING_APPROVAL' ? (
@@ -617,7 +725,32 @@ const UserManagementPage = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+              {hasPersonnel && perf && isExpanded && (
+                <tr className="bg-slate-50/60">
+                  <td colSpan={7} className="px-6 py-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      <PerfStat label={t('personnel:performance.totalOrders', 'Sipariş')} value={String(perf.totalOrders)} />
+                      <PerfStat label={t('personnel:performance.totalSales', 'Ciro')} value={formatCurrency(perf.totalSales)} />
+                      <PerfStat label={t('personnel:performance.avgOrderValue', 'Ort. Sepet')} value={formatCurrency(perf.avgOrderValue)} />
+                      <PerfStat label={t('personnel:performance.avgPrepTime', 'Ort. Hazırlık')} value={`${Math.round(perf.avgPrepTime)} dk`} />
+                      <PerfStat label={t('personnel:performance.totalHours', 'Saat')} value={`${perf.totalHours.toFixed(1)}`} />
+                      <PerfStat label={t('personnel:performance.ordersPerHour', 'Sipariş/Saat')} value={perf.ordersPerHour.toFixed(1)} />
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                        <span>{t('personnel:tabs.performance', 'Performans')}</span>
+                        <span className="font-semibold">{perf.performanceScore}/100</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                        <div className={`h-full ${scoreBar(perf.performanceScore)}`} style={{ width: `${perf.performanceScore}%` }} />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
+              );
+            })}
           </tbody>
         </table>
         </div>
@@ -768,5 +901,14 @@ const UserManagementPage = () => {
     </div>
   );
 };
+
+function PerfStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-sm font-semibold text-slate-900">{value}</div>
+    </div>
+  );
+}
 
 export default UserManagementPage;

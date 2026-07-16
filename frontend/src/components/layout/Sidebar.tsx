@@ -9,7 +9,6 @@ import {
   BarChart3,
   Activity,
   Settings,
-  Users,
   QrCode,
   UserCircle,
   ChevronRight,
@@ -18,7 +17,7 @@ import {
   X,
   Code,
   CalendarCheck,
-  UserCog,
+  UsersRound,
   Package,
   Receipt,
   Wallet,
@@ -161,17 +160,14 @@ const SECTIONS: NavSection[] = [
     labelFallback: 'Operasyon',
     items: [
       {
-        to: '/admin/users',
-        icon: Users,
-        labelKey: 'navigation.users',
+        // Ekip: merged Users + Personnel. User-account management is available
+        // to all plans; the personnel surfaces (Puantaj tab, performance in the
+        // users table) gate themselves inside the page on personnelManagement.
+        to: '/admin/team',
+        icon: UsersRound,
+        labelKey: 'navigation.team',
+        labelFallback: 'Ekip',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/personnel',
-        icon: UserCog,
-        labelKey: 'navigation.personnel',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'personnelManagement' },
       },
       {
         to: '/admin/stock',
