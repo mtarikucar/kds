@@ -37,7 +37,17 @@ function useElementSize() {
   return { ref, size };
 }
 
-export default function FloorPlanEditorPage() {
+/**
+ * The 2D floor-plan editor. Rendered standalone (its own header) OR embedded
+ * inside the Tables page as the "Salon Planı" mode (`embedded` hides the header
+ * and drops the full-viewport negative margins so it fits under the mode
+ * switcher). Folding it into Tables removes the separate sidebar tab.
+ */
+export default function FloorPlanEditorPage({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { t } = useTranslation(['floorPlan', 'common']);
   const { data: plan, isLoading, refetch } = useFloorPlan();
 
@@ -58,6 +68,10 @@ export default function FloorPlanEditorPage() {
   const [newTable, setNewTable] = useState<{ shape: TableShape } | null>(null);
   const [newTableNumber, setNewTableNumber] = useState('');
   const [newTableCapacity, setNewTableCapacity] = useState(4);
+  // Zone-create modal — replaces the old window.prompt() (which offered no
+  // validation, no cancel affordance and looked jarring inside the app shell).
+  const [addingZone, setAddingZone] = useState(false);
+  const [newZoneName, setNewZoneName] = useState('');
 
   // Ingest the server plan into the working copy on first load + after a save
   // (when not mid-edit, so a background refetch can't clobber unsaved work).
@@ -135,10 +149,12 @@ export default function FloorPlanEditorPage() {
   };
 
   const handleAddZone = async () => {
-    const name = window.prompt(t('floorPlan:newZonePrompt'));
-    if (!name || !name.trim()) return;
+    const name = newZoneName.trim();
+    if (!name) return;
     try {
-      const zone = await createZone.mutateAsync({ name: name.trim() });
+      const zone = await createZone.mutateAsync({ name });
+      setAddingZone(false);
+      setNewZoneName('');
       const fresh = await refetch();
       if (fresh.data) store.load(fresh.data, zone.id);
     } catch {
@@ -178,17 +194,26 @@ export default function FloorPlanEditorPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] -m-4 md:-m-6">
-      {/* header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow">
-          <MapIcon className="w-6 h-6 text-white" />
+    <div
+      className={
+        embedded
+          ? 'flex flex-col h-[calc(100vh-15rem)] min-h-[28rem] rounded-2xl border border-slate-200/60 bg-white overflow-hidden'
+          : 'flex flex-col h-[calc(100vh-7rem)] -m-4 md:-m-6'
+      }
+    >
+      {/* header — hidden when embedded in the Tables page (which supplies its
+          own header + mode switcher). */}
+      {!embedded && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow">
+            <MapIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="font-heading font-bold text-slate-900 text-xl">{t('floorPlan:title')}</h1>
+            <p className="text-slate-500 text-sm">{t('floorPlan:subtitle')}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="font-heading font-bold text-slate-900 text-xl">{t('floorPlan:title')}</h1>
-          <p className="text-slate-500 text-sm">{t('floorPlan:subtitle')}</p>
-        </div>
-      </div>
+      )}
 
       <EditorToolbar
         dirty={store.dirty}
@@ -209,7 +234,10 @@ export default function FloorPlanEditorPage() {
         activeZoneId={activeZone?.id ?? null}
         editable
         onSelect={store.setActiveZone}
-        onAddZone={handleAddZone}
+        onAddZone={() => {
+          setNewZoneName('');
+          setAddingZone(true);
+        }}
         onOpenSettings={setSettingsZoneId}
       />
 
@@ -273,6 +301,44 @@ export default function FloorPlanEditorPage() {
           }}
         />
       )}
+
+      {/* new-area modal — replaces window.prompt() */}
+      <Modal
+        isOpen={addingZone}
+        onClose={() => setAddingZone(false)}
+        title={t('floorPlan:addZone')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <label className="block">
+            <span className="text-xs text-slate-500 mb-1 block">{t('floorPlan:zone.name')}</span>
+            <input
+              autoFocus
+              value={newZoneName}
+              onChange={(e) => setNewZoneName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newZoneName.trim()) handleAddZone();
+              }}
+              maxLength={64}
+              placeholder={t('floorPlan:newZonePrompt')}
+              className="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-sm focus:border-primary-400 focus:outline-none"
+            />
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAddingZone(false)}>
+              {t('common:app.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAddZone}
+              isLoading={createZone.isPending}
+              disabled={!newZoneName.trim()}
+            >
+              {t('common:app.add')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* quick "new table" modal */}
       <Modal isOpen={!!newTable} onClose={() => setNewTable(null)} title={t('floorPlan:newTable')} size="sm">

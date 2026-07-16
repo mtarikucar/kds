@@ -133,9 +133,6 @@ const ProductEditorPage = lazyWithReload(
 const TableManagementPage = lazyWithReload(
   () => import("./pages/admin/TableManagementPage"),
 );
-const FloorPlanEditorPage = lazyWithReload(
-  () => import("./pages/admin/FloorPlanEditorPage"),
-);
 const TeamPage = lazyWithReload(() => import("./pages/admin/TeamPage"));
 const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
@@ -463,7 +460,11 @@ function App() {
               element={<ProductEditorPage />}
             />
             <Route path="/admin/tables" element={<TableManagementPage />} />
-            <Route path="/admin/floor-plan" element={<FloorPlanEditorPage />} />
+            {/* Salon planı artık Masalar sayfasının içinde bir mod. */}
+            <Route
+              path="/admin/floor-plan"
+              element={<Navigate to="/admin/tables" replace />}
+            />
             {/* Ekip (merged Users + Personnel). Old paths redirect. */}
             <Route path="/admin/team" element={<TeamPage />} />
             <Route
