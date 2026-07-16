@@ -140,14 +140,13 @@ const TeamPage = lazyWithReload(() => import("./pages/admin/TeamPage"));
 const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
 );
-const ReportsPage = lazyWithReload(() => import("./pages/admin/ReportsPage"));
+const ReportsAnalyticsPage = lazyWithReload(
+  () => import("./pages/admin/ReportsAnalyticsPage"),
+);
 const StockPage = lazyWithReload(() => import("./pages/admin/StockPage"));
 const CashPage = lazyWithReload(() => import("./pages/admin/CashPage"));
 const AccountingBackOfficePage = lazyWithReload(
   () => import("./pages/admin/AccountingBackOfficePage"),
-);
-const AnalyticsPage = lazyWithReload(
-  () => import("./pages/admin/AnalyticsPage"),
 );
 const ReservationsPage = lazyWithReload(
   () => import("./pages/admin/ReservationsPage"),
@@ -475,6 +474,7 @@ function App() {
             {/* v2.8.88 page-root FeatureGate: direct URL access shows an
             upsell instead of 403. Each fallback links to the matching
             marketplace add-on. */}
+            {/* Analitik + Raporlar birleşik sayfası (grup anahtarlı). */}
             <Route
               path="/admin/reports"
               element={
@@ -482,7 +482,7 @@ function App() {
                   feature="advancedReports"
                   fallback={<UpsellCard addOnCode="advanced_reports" />}
                 >
-                  <ReportsPage />
+                  <ReportsAnalyticsPage />
                 </FeatureGate>
               }
             />
@@ -508,16 +508,10 @@ function App() {
               path="/admin/costing"
               element={<Navigate to="/admin/stock" replace />}
             />
+            {/* Analitik: Raporlar ile birleşti — eski yol yönlendirir. */}
             <Route
               path="/admin/analytics"
-              element={
-                <FeatureGate
-                  feature="advancedReports"
-                  fallback={<UpsellCard addOnCode="advanced_reports" />}
-                >
-                  <AnalyticsPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/reports" replace />}
             />
             <Route
               path="/admin/reservations"

@@ -7,7 +7,6 @@ import {
   UtensilsCrossed,
   Table,
   BarChart3,
-  Activity,
   Settings,
   QrCode,
   UserCircle,
@@ -177,9 +176,12 @@ const SECTIONS: NavSection[] = [
         gate: { feature: 'inventoryTracking' },
       },
       {
+        // Analitik & Raporlar birleşik bölümü — Raporlar + Analitik tek sayfada
+        // grup anahtarıyla (bkz. ReportsAnalyticsPage).
         to: '/admin/reports',
         icon: BarChart3,
-        labelKey: 'navigation.reports',
+        labelKey: 'navigation.reportsAnalytics',
+        labelFallback: 'Analitik & Raporlar',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
       },
@@ -198,13 +200,7 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
       },
-      {
-        to: '/admin/analytics',
-        icon: Activity,
-        labelKey: 'navigation.analytics',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'advancedReports' },
-      },
+      // Analitik: artık Raporlar ile birleşti (/admin/reports) — ayrı nav yok.
       // Paket Siparişleri: folded into the POS screen's "Paket Siparişleri"
       // panel — no separate nav entry.
       // Faturalar is now the "Faturalar" tab inside Muhasebe — no separate nav.
