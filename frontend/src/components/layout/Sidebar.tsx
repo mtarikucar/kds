@@ -28,7 +28,6 @@ import {
   PhoneIncoming,
   Download,
   FileWarning,
-  Truck,
   CreditCard,
   Building2,
   Sparkles,
@@ -226,14 +225,8 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
       },
-      {
-        to: '/admin/delivery-orders',
-        icon: Truck,
-        labelKey: 'navigation.deliveryOrders',
-        labelFallback: 'Paket Siparişleri',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'deliveryIntegration' },
-      },
+      // Paket Siparişleri: folded into the POS screen's "Paket Siparişleri"
+      // panel — no separate nav entry.
       // Faturalar is now the "Faturalar" tab inside Muhasebe — no separate nav.
     ],
   },

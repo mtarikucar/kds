@@ -166,9 +166,6 @@ const StockManagementPage = lazyWithReload(
 const InvoicesPage = lazyWithReload(
   () => import("./pages/admin/invoices/InvoicesPage"),
 );
-const DeliveryOrdersPage = lazyWithReload(
-  () => import("./pages/admin/DeliveryOrdersPage"),
-);
 
 // Onboarding (lazy-loaded)
 const WelcomePage = lazyWithReload(
@@ -568,12 +565,13 @@ function App() {
               }
             />
             <Route path="/admin/invoices" element={<InvoicesPage />} />
-            {/* Operator-facing delivery-orders moderation queue (accept / reject /
-            set prep-time on incoming Yemeksepeti/Getir/Trendyol/Migros orders).
-            Self-gates behind the deliveryIntegration plan feature. */}
+            {/* Delivery/package orders were folded into the POS screen's
+            "Paket Siparişleri" panel (accept / reject / prep-time). The
+            standalone queue is gone; keep the path as a redirect for
+            bookmarks/deep-links. */}
             <Route
               path="/admin/delivery-orders"
-              element={<DeliveryOrdersPage />}
+              element={<Navigate to="/pos" replace />}
             />
 
             {/* Settings Routes - Nested */}
