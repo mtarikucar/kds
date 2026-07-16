@@ -184,14 +184,6 @@ const SECTIONS: NavSection[] = [
         gate: { feature: 'advancedReports' },
       },
       {
-        to: '/admin/purchasing',
-        icon: ShoppingCart,
-        labelKey: 'navigation.purchasing',
-        labelFallback: 'Satın Alma & Stok',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'inventoryTracking' },
-      },
-      {
         to: '/admin/cash',
         icon: Wallet,
         labelKey: 'navigation.cash',
@@ -205,14 +197,6 @@ const SECTIONS: NavSection[] = [
         labelFallback: 'Muhasebe',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
-      },
-      {
-        to: '/admin/costing',
-        icon: ChefHat,
-        labelKey: 'navigation.costing',
-        labelFallback: 'Reçete & Maliyet',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'inventoryTracking' },
       },
       {
         to: '/admin/analytics',

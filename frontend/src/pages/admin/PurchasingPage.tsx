@@ -47,7 +47,7 @@ import VendorBillsTab from '../../features/stock-management/components/VendorBil
 
 type Tab = 'reorder' | 'bills' | 'ap' | 'suppliers' | 'transfers' | 'valuation' | 'more';
 
-export default function PurchasingPage() {
+export default function PurchasingPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation('stock');
   const fmt = useFormatCurrency();
   const [tab, setTab] = useState<Tab>('reorder');
@@ -63,13 +63,15 @@ export default function PurchasingPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Satın Alma & Stok</h1>
-        <p className="text-sm text-slate-500">
-          Sipariş önerileri, borç yaşlandırma, tedarikçi performansı, şube transferleri ve stok değerleme.
-        </p>
-      </div>
+    <div className={embedded ? 'space-y-6' : 'p-4 sm:p-6 space-y-6'}>
+      {!embedded && (
+        <div>
+          <h1 className="text-2xl font-bold">Satın Alma & Stok</h1>
+          <p className="text-sm text-slate-500">
+            Sipariş önerileri, borç yaşlandırma, tedarikçi performansı, şube transferleri ve stok değerleme.
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((tb) => {

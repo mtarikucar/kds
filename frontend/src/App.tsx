@@ -141,22 +141,16 @@ const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
 );
 const ReportsPage = lazyWithReload(() => import("./pages/admin/ReportsPage"));
-const PurchasingPage = lazyWithReload(
-  () => import("./pages/admin/PurchasingPage"),
-);
+const StockPage = lazyWithReload(() => import("./pages/admin/StockPage"));
 const CashPage = lazyWithReload(() => import("./pages/admin/CashPage"));
 const AccountingBackOfficePage = lazyWithReload(
   () => import("./pages/admin/AccountingBackOfficePage"),
 );
-const CostingPage = lazyWithReload(() => import("./pages/admin/CostingPage"));
 const AnalyticsPage = lazyWithReload(
   () => import("./pages/admin/AnalyticsPage"),
 );
 const ReservationsPage = lazyWithReload(
   () => import("./pages/admin/ReservationsPage"),
-);
-const StockManagementPage = lazyWithReload(
-  () => import("./pages/admin/StockManagementPage"),
 );
 const InvoicesPage = lazyWithReload(
   () => import("./pages/admin/invoices/InvoicesPage"),
@@ -492,16 +486,11 @@ function App() {
                 </FeatureGate>
               }
             />
+            {/* Satın Alma + Reçete & Maliyet folded into the unified Stok
+                page (/admin/stock). Old paths redirect. */}
             <Route
               path="/admin/purchasing"
-              element={
-                <FeatureGate
-                  feature="inventoryTracking"
-                  fallback={<UpsellCard />}
-                >
-                  <PurchasingPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/stock" replace />}
             />
             <Route path="/admin/cash" element={<CashPage />} />
             <Route
@@ -517,14 +506,7 @@ function App() {
             />
             <Route
               path="/admin/costing"
-              element={
-                <FeatureGate
-                  feature="inventoryTracking"
-                  fallback={<UpsellCard />}
-                >
-                  <CostingPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/stock" replace />}
             />
             <Route
               path="/admin/analytics"
@@ -559,7 +541,7 @@ function App() {
                   feature="inventoryTracking"
                   fallback={<UpsellCard planName="BASIC" />}
                 >
-                  <StockManagementPage />
+                  <StockPage />
                 </FeatureGate>
               }
             />

@@ -322,5 +322,10 @@
     "all": "Barchasi",
     "active": "Faol",
     "inactive": "Nofaol"
+  },
+  "groups": {
+    "inventory": "Inventar",
+    "purchasing": "Xaridlar",
+    "costing": "Tannarx va retseptlar"
   }
 }

@@ -322,5 +322,10 @@
     "all": "الكل",
     "active": "نشط",
     "inactive": "غير نشط"
+  },
+  "groups": {
+    "inventory": "المخزون",
+    "purchasing": "المشتريات",
+    "costing": "التكلفة والوصفات"
   }
 }
