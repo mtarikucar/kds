@@ -53,7 +53,7 @@ interface DateRangeForm {
 
 type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
 
-const ReportsPage = () => {
+const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation('reports');
   const formatCurrency = useFormatCurrency();
   const { formatDate } = useFormatDate();
@@ -159,10 +159,12 @@ const ReportsPage = () => {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-heading font-bold text-slate-900">{t('reports.title')}</h1>
-        <p className="text-slate-500 mt-1">{t('reports.viewReports')}</p>
-      </div>
+      {!embedded && (
+        <div className="mb-8">
+          <h1 className="text-2xl font-heading font-bold text-slate-900">{t('reports.title')}</h1>
+          <p className="text-slate-500 mt-1">{t('reports.viewReports')}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-4 md:mb-6 border-b border-slate-200/60 overflow-x-auto">

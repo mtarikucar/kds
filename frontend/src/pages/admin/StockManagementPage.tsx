@@ -12,7 +12,7 @@ import StockCountsTab from '../../features/stock-management/components/StockCoun
 
 type TabType = 'dashboard' | 'ingredients' | 'recipes' | 'suppliers' | 'purchaseOrders' | 'movements' | 'waste' | 'stockCount';
 
-const StockManagementPage = () => {
+const StockManagementPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation('stock');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
@@ -29,15 +29,17 @@ const StockManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-emerald-100 rounded-lg">
-          <Package className="h-6 w-6 text-emerald-600" />
+      {/* Header — hidden when embedded in the unified Stok page */}
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-100 rounded-lg">
+            <Package className="h-6 w-6 text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-        </div>
-      </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 overflow-x-auto">

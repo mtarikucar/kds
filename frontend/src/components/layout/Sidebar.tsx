@@ -7,9 +7,7 @@ import {
   UtensilsCrossed,
   Table,
   BarChart3,
-  Activity,
   Settings,
-  Users,
   QrCode,
   UserCircle,
   ChevronRight,
@@ -18,7 +16,7 @@ import {
   X,
   Code,
   CalendarCheck,
-  UserCog,
+  UsersRound,
   Package,
   Receipt,
   Wallet,
@@ -28,11 +26,9 @@ import {
   PhoneIncoming,
   Download,
   FileWarning,
-  Truck,
   CreditCard,
   Building2,
   Sparkles,
-  Map as MapIcon,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -130,15 +126,11 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
       {
+        // Salon planı (canlı harita + düzenleyici) artık Masalar sayfasının
+        // içinde bir mod — ayrı /admin/floor-plan sekmesi kaldırıldı.
         to: '/admin/tables',
         icon: Table,
         labelKey: 'navigation.tables',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/floor-plan',
-        icon: MapIcon,
-        labelKey: 'navigation.floorPlan',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
       {
@@ -162,17 +154,14 @@ const SECTIONS: NavSection[] = [
     labelFallback: 'Operasyon',
     items: [
       {
-        to: '/admin/users',
-        icon: Users,
-        labelKey: 'navigation.users',
+        // Ekip: merged Users + Personnel. User-account management is available
+        // to all plans; the personnel surfaces (Puantaj tab, performance in the
+        // users table) gate themselves inside the page on personnelManagement.
+        to: '/admin/team',
+        icon: UsersRound,
+        labelKey: 'navigation.team',
+        labelFallback: 'Ekip',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/personnel',
-        icon: UserCog,
-        labelKey: 'navigation.personnel',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'personnelManagement' },
       },
       {
         to: '/admin/stock',
@@ -182,19 +171,14 @@ const SECTIONS: NavSection[] = [
         gate: { feature: 'inventoryTracking' },
       },
       {
+        // Analitik & Raporlar birleşik bölümü — Raporlar + Analitik tek sayfada
+        // grup anahtarıyla (bkz. ReportsAnalyticsPage).
         to: '/admin/reports',
         icon: BarChart3,
-        labelKey: 'navigation.reports',
+        labelKey: 'navigation.reportsAnalytics',
+        labelFallback: 'Analitik & Raporlar',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
-      },
-      {
-        to: '/admin/purchasing',
-        icon: ShoppingCart,
-        labelKey: 'navigation.purchasing',
-        labelFallback: 'Satın Alma & Stok',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'inventoryTracking' },
       },
       {
         to: '/admin/cash',
@@ -211,29 +195,9 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
         gate: { feature: 'advancedReports' },
       },
-      {
-        to: '/admin/costing',
-        icon: ChefHat,
-        labelKey: 'navigation.costing',
-        labelFallback: 'Reçete & Maliyet',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'inventoryTracking' },
-      },
-      {
-        to: '/admin/analytics',
-        icon: Activity,
-        labelKey: 'navigation.analytics',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'advancedReports' },
-      },
-      {
-        to: '/admin/delivery-orders',
-        icon: Truck,
-        labelKey: 'navigation.deliveryOrders',
-        labelFallback: 'Paket Siparişleri',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'deliveryIntegration' },
-      },
+      // Analitik: artık Raporlar ile birleşti (/admin/reports) — ayrı nav yok.
+      // Paket Siparişleri: folded into the POS screen's "Paket Siparişleri"
+      // panel — no separate nav entry.
       // Faturalar is now the "Faturalar" tab inside Muhasebe — no separate nav.
     ],
   },

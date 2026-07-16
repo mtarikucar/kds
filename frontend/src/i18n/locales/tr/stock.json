@@ -322,5 +322,10 @@
     "all": "Tümü",
     "active": "Aktif",
     "inactive": "Pasif"
+  },
+  "groups": {
+    "inventory": "Envanter",
+    "purchasing": "Satın Alma",
+    "costing": "Maliyet & Reçete"
   }
 }

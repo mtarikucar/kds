@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt, KeyRound, CreditCard } from 'lucide-react';
+import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt, KeyRound, CreditCard, Clock, CalendarDays } from 'lucide-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import type { PlanFeatures } from '../../types';
 
@@ -69,6 +69,21 @@ const SettingsLayout = () => {
       icon: CalendarClock,
       label: t('nav.reservations'),
       gate: { feature: 'reservationSystem' },
+    },
+    {
+      // Moved out of the Ekip/Personnel page — shift templates + weekly
+      // schedule are branch-configuration, so they live in Settings
+      // (branch-scoped via the active-branch selector).
+      to: '/admin/settings/shifts',
+      icon: Clock,
+      label: t('nav.shifts', 'Vardiya Şablonları'),
+      gate: { feature: 'personnelManagement' },
+    },
+    {
+      to: '/admin/settings/schedule',
+      icon: CalendarDays,
+      label: t('nav.schedule', 'Program'),
+      gate: { feature: 'personnelManagement' },
     },
     {
       to: '/admin/settings/sms',

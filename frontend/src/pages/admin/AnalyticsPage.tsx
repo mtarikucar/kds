@@ -50,7 +50,7 @@ interface DateRangeForm {
 
 type TabType = 'overview' | 'tables' | 'traffic' | 'behavior' | 'insights' | 'cameras';
 
-const AnalyticsPage = () => {
+const AnalyticsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation(['analytics', 'common']);
   const formatCurrency = useFormatCurrency();
   const { formatDate } = useFormatDate();
@@ -214,13 +214,17 @@ const AnalyticsPage = () => {
 
   return (
     <div>
-      <div className="mb-8 flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-slate-900">
-            {t('analytics:page.title')}
-          </h1>
-          <p className="text-slate-500 mt-1">{t('analytics:page.subtitle')}</p>
-        </div>
+      <div className={`${embedded ? 'mb-4' : 'mb-8'} flex justify-between items-start`}>
+        {!embedded ? (
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-slate-900">
+              {t('analytics:page.title')}
+            </h1>
+            <p className="text-slate-500 mt-1">{t('analytics:page.subtitle')}</p>
+          </div>
+        ) : (
+          <div />
+        )}
         {/* Dev tools - only show in development */}
         {import.meta.env.DEV && (
           <div className="flex gap-2">

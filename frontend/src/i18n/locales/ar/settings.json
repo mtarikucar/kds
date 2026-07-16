@@ -9,7 +9,9 @@
     "onlineOrders": "الطلبات عبر الإنترنت",
     "accounting": "المحاسبة",
     "partnerKeys": "مفاتيح واجهة برمجة التطبيقات للشركاء",
-    "paymentTerminals": "أجهزة البطاقات"
+    "paymentTerminals": "أجهزة البطاقات",
+    "shifts": "قوالب الورديات",
+    "schedule": "الجدول"
   },
   "paymentTerminals": {
     "title": "أجهزة البطاقات",

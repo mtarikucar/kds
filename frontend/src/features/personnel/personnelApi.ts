@@ -361,7 +361,10 @@ export const useRejectSwap = () => {
 // PERFORMANCE
 // ========================================
 
-export const usePerformanceMetrics = (params?: { startDate?: string; endDate?: string; userId?: string }) => {
+export const usePerformanceMetrics = (
+  params?: { startDate?: string; endDate?: string; userId?: string },
+  enabled = true,
+) => {
   const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PerformanceMetrics[]>({
     queryKey: ['personnel', 'performance', 'metrics', params, branchId],
@@ -369,6 +372,7 @@ export const usePerformanceMetrics = (params?: { startDate?: string; endDate?: s
       const response = await api.get('/personnel/performance/metrics', { params });
       return response.data;
     },
+    enabled,
   });
 };
 

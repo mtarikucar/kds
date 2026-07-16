@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Edit,
@@ -15,6 +14,7 @@ import {
   Clock,
   Map as MapIcon,
   List as ListIcon,
+  Pencil,
 } from 'lucide-react';
 import {
   useTables,
@@ -24,6 +24,7 @@ import {
   useUpdateTableStatus,
 } from '../../features/tables/tablesApi';
 import LiveFloorMap from '../../features/floor-plan/components/LiveFloorMap';
+import FloorPlanEditorPage from './FloorPlanEditorPage';
 import { useFloorPlan } from '../../features/floor-plan/floorPlanApi';
 import { Table, TableStatus } from '../../types';
 import Button from '../../components/ui/Button';
@@ -48,9 +49,10 @@ const TableManagementPage = () => {
   });
 
   type TableFormData = z.infer<typeof tableSchema>;
-  const navigate = useNavigate();
-  // 'list' = the classic card grid; 'plan' = the live 2D floor map.
-  const [view, setView] = useState<'list' | 'plan'>('list');
+  // Masalar üç modda açılır — 'plan' (canlı 2D salon planı, VARSAYILAN) staff'ın
+  // masaları görsel olarak gördüğü mod; 'edit' salon planı düzenleyicisi (eski
+  // ayrı /admin/floor-plan sekmesi buraya taşındı); 'list' klasik kart ızgarası.
+  const [view, setView] = useState<'plan' | 'edit' | 'list'>('plan');
   // Table tapped on the live plan → opens the quick status action sheet. We hold
   // only the id and re-derive the live row from the (socket-refreshed) plan, so
   // the sheet's status/active-state can't go stale while it's open.
@@ -189,8 +191,25 @@ const TableManagementPage = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* List / live-plan view toggle */}
+          {/* Salon Planı / Düzenle / Liste mode switcher. Floor-plan editor is
+              folded in here (was a separate /admin/floor-plan tab). */}
           <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setView('plan')}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'plan' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+              aria-pressed={view === 'plan'}
+            >
+              <MapIcon className="w-4 h-4" /> {t('admin.viewPlan', 'Salon Planı')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('edit')}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'edit' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+              aria-pressed={view === 'edit'}
+            >
+              <Pencil className="w-4 h-4" /> {t('admin.viewEdit', 'Düzenle')}
+            </button>
             <button
               type="button"
               onClick={() => setView('list')}
@@ -199,28 +218,24 @@ const TableManagementPage = () => {
             >
               <ListIcon className="w-4 h-4" /> {t('admin.viewList', 'Liste')}
             </button>
-            <button
-              type="button"
-              onClick={() => setView('plan')}
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'plan' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
-              aria-pressed={view === 'plan'}
-            >
-              <MapIcon className="w-4 h-4" /> {t('admin.viewPlan', 'Plan')}
-            </button>
           </div>
-          <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
-            {canAddTable ? (
-              <Plus className="h-4 w-4 mr-2" />
-            ) : (
-              <Lock className="h-4 w-4 mr-2" />
-            )}
-            {t('admin.addTable')}
-          </Button>
+          {/* The editor mode has its own "add table" affordance in its toolbar —
+              hide the page-level button there to avoid two competing controls. */}
+          {view !== 'edit' && (
+            <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
+              {canAddTable ? (
+                <Plus className="h-4 w-4 mr-2" />
+              ) : (
+                <Lock className="h-4 w-4 mr-2" />
+              )}
+              {t('admin.addTable')}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Limit Info Banner */}
-      {tableLimit.limit !== -1 && (
+      {/* Limit Info Banner — hidden in the editor workspace */}
+      {view !== 'edit' && tableLimit.limit !== -1 && (
         <div
           className={`rounded-xl px-6 py-4 flex items-start gap-3 ${
             canAddTable
@@ -253,7 +268,7 @@ const TableManagementPage = () => {
       )}
 
       {/* Upgrade Prompt when limit reached */}
-      {!canAddTable && (
+      {view !== 'edit' && !canAddTable && (
         <UpgradePrompt
           limitType="maxTables"
           currentCount={tables?.length ?? 0}
@@ -325,7 +340,11 @@ const TableManagementPage = () => {
       )}
 
       {/* Main Content */}
-      {view === 'plan' ? (
+      {view === 'edit' ? (
+        /* Salon planı düzenleyicisi — eski ayrı /admin/floor-plan sekmesi buraya
+           gömüldü. Kendi araç çubuğu, bölge sekmeleri ve kaydet düğmesi var. */
+        <FloorPlanEditorPage embedded />
+      ) : view === 'plan' ? (
         /* Live 2D floor map — same plan as the editor, with real-time status.
            Tapping a table opens the quick status action sheet. The map drives
            its OWN useFloorPlan loading; don't gate it on the tables-list query. */
@@ -333,7 +352,7 @@ const TableManagementPage = () => {
           <LiveFloorMap
             onTableClick={(tbl) => setStatusTargetId(tbl.id)}
             emptyAction={
-              <Button onClick={() => navigate('/admin/floor-plan')}>
+              <Button onClick={() => setView('edit')}>
                 <MapIcon className="h-4 w-4 mr-2" />
                 {t('admin.openFloorPlanEditor', 'Salon planını düzenle')}
               </Button>

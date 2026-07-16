@@ -30,7 +30,7 @@ const defaultRange = () => ({
   endDate: format(new Date(), 'yyyy-MM-dd'),
 });
 
-export default function CostingPage() {
+export default function CostingPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation('reports');
   const fmt = useFormatCurrency();
   const [tab, setTab] = useState<Tab>('menu');
@@ -40,11 +40,13 @@ export default function CostingPage() {
     { id: 'recipes', label: t('costing.tabRecipes'), icon: Layers },
   ];
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t('costing.title')}</h1>
-        <p className="text-sm text-slate-500">{t('costing.subtitle')}</p>
-      </div>
+    <div className={embedded ? 'space-y-6' : 'p-4 sm:p-6 space-y-6'}>
+      {!embedded && (
+        <div>
+          <h1 className="text-2xl font-bold">{t('costing.title')}</h1>
+          <p className="text-sm text-slate-500">{t('costing.subtitle')}</p>
+        </div>
+      )}
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((tb) => {
           const Icon = tb.icon;

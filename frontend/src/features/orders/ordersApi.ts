@@ -30,6 +30,8 @@ export interface UseOrdersOptions {
   refetchInterval?: number | false;
   /** Retain the previous query result while a new fetch is in flight. */
   keepPreviousData?: boolean;
+  /** Skip fetching (and polling) while false — e.g. a closed slide-over. */
+  enabled?: boolean;
 }
 
 export const useOrders = (filters?: OrderFilters, options?: UseOrdersOptions) => {
@@ -40,6 +42,7 @@ export const useOrders = (filters?: OrderFilters, options?: UseOrdersOptions) =>
       const response = await api.get<Order[]>('/orders', { params: filters });
       return response.data;
     },
+    enabled: options?.enabled ?? true,
     refetchInterval: options?.refetchInterval ?? false,
     placeholderData: options?.keepPreviousData ? keepPreviousData : undefined,
   });

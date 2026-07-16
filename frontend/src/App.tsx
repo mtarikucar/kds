@@ -133,41 +133,23 @@ const ProductEditorPage = lazyWithReload(
 const TableManagementPage = lazyWithReload(
   () => import("./pages/admin/TableManagementPage"),
 );
-const FloorPlanEditorPage = lazyWithReload(
-  () => import("./pages/admin/FloorPlanEditorPage"),
-);
-const UserManagementPage = lazyWithReload(
-  () => import("./pages/admin/UserManagementPage"),
-);
+const TeamPage = lazyWithReload(() => import("./pages/admin/TeamPage"));
 const QRManagementPage = lazyWithReload(
   () => import("./pages/admin/QRManagementPage"),
 );
-const ReportsPage = lazyWithReload(() => import("./pages/admin/ReportsPage"));
-const PurchasingPage = lazyWithReload(
-  () => import("./pages/admin/PurchasingPage"),
+const ReportsAnalyticsPage = lazyWithReload(
+  () => import("./pages/admin/ReportsAnalyticsPage"),
 );
+const StockPage = lazyWithReload(() => import("./pages/admin/StockPage"));
 const CashPage = lazyWithReload(() => import("./pages/admin/CashPage"));
 const AccountingBackOfficePage = lazyWithReload(
   () => import("./pages/admin/AccountingBackOfficePage"),
 );
-const CostingPage = lazyWithReload(() => import("./pages/admin/CostingPage"));
-const AnalyticsPage = lazyWithReload(
-  () => import("./pages/admin/AnalyticsPage"),
-);
 const ReservationsPage = lazyWithReload(
   () => import("./pages/admin/ReservationsPage"),
 );
-const PersonnelManagementPage = lazyWithReload(
-  () => import("./pages/admin/PersonnelManagementPage"),
-);
-const StockManagementPage = lazyWithReload(
-  () => import("./pages/admin/StockManagementPage"),
-);
 const InvoicesPage = lazyWithReload(
   () => import("./pages/admin/invoices/InvoicesPage"),
-);
-const DeliveryOrdersPage = lazyWithReload(
-  () => import("./pages/admin/DeliveryOrdersPage"),
 );
 
 // Onboarding (lazy-loaded)
@@ -211,6 +193,12 @@ const DesktopAppSettingsPage = lazyWithReload(
 );
 const ReservationSettingsPage = lazyWithReload(
   () => import("./pages/settings/ReservationSettingsPage"),
+);
+const ShiftTemplatesSettingsPage = lazyWithReload(
+  () => import("./pages/settings/ShiftTemplatesSettingsPage"),
+);
+const ScheduleSettingsPage = lazyWithReload(
+  () => import("./pages/settings/ScheduleSettingsPage"),
 );
 const DeliveryPlatformsSettingsPage = lazyWithReload(
   () => import("./pages/settings/DeliveryPlatformsSettingsPage"),
@@ -472,12 +460,22 @@ function App() {
               element={<ProductEditorPage />}
             />
             <Route path="/admin/tables" element={<TableManagementPage />} />
-            <Route path="/admin/floor-plan" element={<FloorPlanEditorPage />} />
-            <Route path="/admin/users" element={<UserManagementPage />} />
+            {/* Salon planı artık Masalar sayfasının içinde bir mod. */}
+            <Route
+              path="/admin/floor-plan"
+              element={<Navigate to="/admin/tables" replace />}
+            />
+            {/* Ekip (merged Users + Personnel). Old paths redirect. */}
+            <Route path="/admin/team" element={<TeamPage />} />
+            <Route
+              path="/admin/users"
+              element={<Navigate to="/admin/team" replace />}
+            />
             <Route path="/admin/qr-codes" element={<QRManagementPage />} />
             {/* v2.8.88 page-root FeatureGate: direct URL access shows an
             upsell instead of 403. Each fallback links to the matching
             marketplace add-on. */}
+            {/* Analitik + Raporlar birleşik sayfası (grup anahtarlı). */}
             <Route
               path="/admin/reports"
               element={
@@ -485,20 +483,15 @@ function App() {
                   feature="advancedReports"
                   fallback={<UpsellCard addOnCode="advanced_reports" />}
                 >
-                  <ReportsPage />
+                  <ReportsAnalyticsPage />
                 </FeatureGate>
               }
             />
+            {/* Satın Alma + Reçete & Maliyet folded into the unified Stok
+                page (/admin/stock). Old paths redirect. */}
             <Route
               path="/admin/purchasing"
-              element={
-                <FeatureGate
-                  feature="inventoryTracking"
-                  fallback={<UpsellCard />}
-                >
-                  <PurchasingPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/stock" replace />}
             />
             <Route path="/admin/cash" element={<CashPage />} />
             <Route
@@ -514,25 +507,12 @@ function App() {
             />
             <Route
               path="/admin/costing"
-              element={
-                <FeatureGate
-                  feature="inventoryTracking"
-                  fallback={<UpsellCard />}
-                >
-                  <CostingPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/stock" replace />}
             />
+            {/* Analitik: Raporlar ile birleşti — eski yol yönlendirir. */}
             <Route
               path="/admin/analytics"
-              element={
-                <FeatureGate
-                  feature="advancedReports"
-                  fallback={<UpsellCard addOnCode="advanced_reports" />}
-                >
-                  <AnalyticsPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/reports" replace />}
             />
             <Route
               path="/admin/reservations"
@@ -547,14 +527,7 @@ function App() {
             />
             <Route
               path="/admin/personnel"
-              element={
-                <FeatureGate
-                  feature="personnelManagement"
-                  fallback={<UpsellCard planName="PRO" />}
-                >
-                  <PersonnelManagementPage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/team" replace />}
             />
             <Route
               path="/admin/stock"
@@ -563,17 +536,18 @@ function App() {
                   feature="inventoryTracking"
                   fallback={<UpsellCard planName="BASIC" />}
                 >
-                  <StockManagementPage />
+                  <StockPage />
                 </FeatureGate>
               }
             />
             <Route path="/admin/invoices" element={<InvoicesPage />} />
-            {/* Operator-facing delivery-orders moderation queue (accept / reject /
-            set prep-time on incoming Yemeksepeti/Getir/Trendyol/Migros orders).
-            Self-gates behind the deliveryIntegration plan feature. */}
+            {/* Delivery/package orders were folded into the POS screen's
+            "Paket Siparişleri" panel (accept / reject / prep-time). The
+            standalone queue is gone; keep the path as a redirect for
+            bookmarks/deep-links. */}
             <Route
               path="/admin/delivery-orders"
-              element={<DeliveryOrdersPage />}
+              element={<Navigate to="/pos" replace />}
             />
 
             {/* Settings Routes - Nested */}
@@ -666,6 +640,28 @@ function App() {
                     fallback={<UpsellCard planName="PRO" />}
                   >
                     <ReservationSettingsPage />
+                  </FeatureGate>
+                }
+              />
+              <Route
+                path="shifts"
+                element={
+                  <FeatureGate
+                    feature="personnelManagement"
+                    fallback={<UpsellCard planName="PRO" />}
+                  >
+                    <ShiftTemplatesSettingsPage />
+                  </FeatureGate>
+                }
+              />
+              <Route
+                path="schedule"
+                element={
+                  <FeatureGate
+                    feature="personnelManagement"
+                    fallback={<UpsellCard planName="PRO" />}
+                  >
+                    <ScheduleSettingsPage />
                   </FeatureGate>
                 }
               />
