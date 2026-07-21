@@ -26,7 +26,6 @@ import {
   Download,
   FileWarning,
   CreditCard,
-  Building2,
   Sparkles,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
@@ -200,28 +199,10 @@ const SECTIONS: NavSection[] = [
       // Faturalar is now the "Faturalar" tab inside Muhasebe — no separate nav.
     ],
   },
-  {
-    id: 'multiBranch',
-    labelKey: 'navigation.sections.multiBranch',
-    labelFallback: 'Şubeler ve Cihazlar',
-    items: [
-      {
-        // The branch hub manages each branch's devices + local network too, so
-        // it is NOT multiLocation-gated — single-location tenants provision
-        // their devices here. (Creating a 2nd branch is still server-gated.)
-        to: '/admin/branches',
-        icon: Building2,
-        labelKey: 'navigation.branches',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/health',
-        icon: Stethoscope,
-        labelKey: 'navigation.health',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-    ],
-  },
+  // 'Şubeler' left the sidebar (2026-07-22): switching lives on the
+  // full-screen /branch-select (navbar "Şube değiştir" button), and the
+  // device/network hub (/admin/branches) is linked from that screen.
+  // 'Sistem Sağlığı' moved into the Ayarlar & Erişim group below.
   // 'Pazaryeri' moved out of the sidebar → top-bar "Mağaza" icon (Header.tsx)
   // → consolidated /admin/store hub (add-ons + hardware + orders tabs).
   {
@@ -229,6 +210,12 @@ const SECTIONS: NavSection[] = [
     labelKey: 'navigation.sections.planAndAccess',
     labelFallback: 'Ayarlar & Erişim',
     items: [
+      {
+        to: '/admin/health',
+        icon: Stethoscope,
+        labelKey: 'navigation.health',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
       {
         to: '/admin/plan',
         icon: CreditCard,

@@ -1,4 +1,16 @@
 {
+  "branchSelect": {
+    "title": "Şube seçin",
+    "subtitle": "Çalışmak istediğiniz şubeyi seçin. Tüm ekranlar, siparişler ve raporlar bu şubeye göre filtrelenir.",
+    "activeBadge": "Aktif şube",
+    "headquarters": "Merkez",
+    "suspended": "Askıda",
+    "archived": "Arşivlenmiş",
+    "manageBranches": "Şubeleri Yönet",
+    "notSelectable": "Bu şube aktif değil",
+    "empty": "Erişebileceğiniz şube bulunamadı",
+    "emptyHint": "Yöneticinizden şube erişimi isteyin."
+  },
   "demo": {
     "enter": "Demo'yu keşfet",
     "entered": "Demo restoranına geçildi. Keşfetmeye başlayın!",

@@ -35,6 +35,13 @@ type BranchScopeState = {
   isPinned: boolean;
   /** Tenant the persisted state belongs to (cross-tenant guard). */
   tenantId: string | null;
+  /**
+   * True only after an EXPLICIT user selection (BranchPicker / the
+   * /branch-select screen). Auto-seeding primaryBranchId during
+   * hydration does NOT set it — the first-entry BranchSelectionGate
+   * forces /branch-select while this is false for multi-branch users.
+   */
+  branchChosen: boolean;
 
   hydrateFromUser: (user: User | null) => void;
   setBranchId: (id: string) => void;
@@ -48,6 +55,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
       allowedBranchIds: [],
       isPinned: false,
       tenantId: null,
+      branchChosen: false,
 
       hydrateFromUser: (user) => {
         if (!user) {
@@ -56,6 +64,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
             allowedBranchIds: [],
             isPinned: false,
             tenantId: null,
+            branchChosen: false,
           });
           return;
         }
@@ -70,6 +79,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
             allowedBranchIds: [],
             isPinned: false,
             tenantId: null,
+            branchChosen: false,
           });
         }
         const pinned = isHardRestrictedRole(user.role);
@@ -88,6 +98,9 @@ export const useBranchScopeStore = create<BranchScopeState>()(
           allowedBranchIds: allowed,
           isPinned: pinned,
           tenantId: user.tenantId,
+          // Preserved across same-tenant re-logins; the tenant-switch wipe
+          // above (and the null-user reset) are the only things clearing it.
+          branchChosen: get().branchChosen,
         });
       },
 
@@ -97,7 +110,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
         if (allowedBranchIds.length > 0 && !allowedBranchIds.includes(id)) {
           return; // outside allow-list: refuse.
         }
-        set({ branchId: id });
+        set({ branchId: id, branchChosen: true });
       },
 
       clear: () =>
@@ -106,15 +119,34 @@ export const useBranchScopeStore = create<BranchScopeState>()(
           allowedBranchIds: [],
           isPinned: false,
           tenantId: null,
+          branchChosen: false,
         }),
     }),
     {
       name: 'branch-scope-storage',
+      version: 1,
+      // v0 snapshots predate `branchChosen`. A device that already carries a
+      // branchId selected it under the old UI — count that as chosen so
+      // existing users never get the forced /branch-select screen.
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Partial<BranchScopeState>;
+        return {
+          branchId: state.branchId ?? null,
+          allowedBranchIds: state.allowedBranchIds ?? [],
+          isPinned: state.isPinned ?? false,
+          tenantId: state.tenantId ?? null,
+          branchChosen:
+            version === 0
+              ? state.branchId != null
+              : (state.branchChosen ?? false),
+        };
+      },
       partialize: (state) => ({
         branchId: state.branchId,
         allowedBranchIds: state.allowedBranchIds,
         isPinned: state.isPinned,
         tenantId: state.tenantId,
+        branchChosen: state.branchChosen,
       }),
     },
   ),
