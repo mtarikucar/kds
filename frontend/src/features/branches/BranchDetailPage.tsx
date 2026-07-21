@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -60,6 +60,21 @@ export default function BranchDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ name: '', code: '', timezone: '' });
 
+  // Terminal/fiscal/hardware panels write to the ACTIVE scope branch
+  // (X-Branch-Id), not necessarily the one this page is showing — an ADMIN
+  // roaming through /admin/branches/:id could otherwise register a terminal
+  // against the wrong branch. Hide (not 403) those tabs unless this branch
+  // IS the active one.
+  const isActiveBranch = branch ? activeBranchId === branch.id : false;
+
+  // Aktif şube değişince scope'a bağlı sekmeler kaybolur — seçili sekme onlardaysa
+  // güvenli varsayılana dön (yanlış şubeye yazma penceresini kapatır).
+  useEffect(() => {
+    if (!isActiveBranch && (tab === 'terminals' || tab === 'fiscal' || tab === 'hardware')) {
+      setTab('devices');
+    }
+  }, [isActiveBranch, tab]);
+
   const branchHealth = health?.find((h) => h.id === id)?.health;
 
   const openEdit = () => {
@@ -118,13 +133,6 @@ export default function BranchDetailPage() {
       </div>
     );
   }
-
-  // Terminal/fiscal/hardware panels write to the ACTIVE scope branch
-  // (X-Branch-Id), not necessarily the one this page is showing — an ADMIN
-  // roaming through /admin/branches/:id could otherwise register a terminal
-  // against the wrong branch. Hide (not 403) those tabs unless this branch
-  // IS the active one.
-  const isActiveBranch = branch ? activeBranchId === branch.id : false;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
@@ -226,9 +234,9 @@ export default function BranchDetailPage() {
 
       <Card variant="bordered" className="p-4 sm:p-5">
         {tab === 'devices' && <DeviceManagerSection branchId={branch.id} />}
-        {tab === 'terminals' && <PaymentTerminalsPanel />}
-        {tab === 'fiscal' && <FiscalDevicesPanel />}
-        {tab === 'hardware' && <HardwareDevicesSection />}
+        {tab === 'terminals' && isActiveBranch && <PaymentTerminalsPanel />}
+        {tab === 'fiscal' && isActiveBranch && hasIntegration('fiscal') && <FiscalDevicesPanel />}
+        {tab === 'hardware' && isActiveBranch && isTauri() && <HardwareDevicesSection />}
         {tab === 'network' && <BranchNetworkSection branchId={branch.id} />}
       </Card>
 
