@@ -3,7 +3,7 @@ import { usePendingOrders, useWaiterRequests, useBillRequests } from '../../feat
 import { Table, TableStatus } from '../../types';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
-import { Clock, User, Receipt, Combine } from 'lucide-react';
+import { Clock, User, Receipt, Combine, CalendarClock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getTableStatusConfig, getTableStatusLabel } from '../../lib/tableStatus';
 
@@ -91,6 +91,30 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
                   {getTableStatusLabel(table.status, t, `tableGrid.status.${table.status}`)}
                 </Badge>
               </div>
+
+              {/* Upcoming Reservation Chip — auto-hold annotation from
+                  GET /tables (next ~2 h). Amber matches the RESERVED
+                  palette; title/aria-label carry the customer name the
+                  chip is too small to show. */}
+              {table.upcomingReservation && (
+                <div className="mb-2">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold ring-1 ring-inset ring-amber-200/60"
+                    title={t('tableGrid.upcomingReservationTitle', {
+                      customerName: table.upcomingReservation.customerName,
+                    })}
+                    aria-label={t('tableGrid.upcomingReservationTitle', {
+                      customerName: table.upcomingReservation.customerName,
+                    })}
+                  >
+                    <CalendarClock className="h-3 w-3" />
+                    {t('tableGrid.reservationChip', {
+                      startTime: table.upcomingReservation.startTime,
+                      guestCount: table.upcomingReservation.guestCount,
+                    })}
+                  </span>
+                </div>
+              )}
 
               {/* Merged Group Indicator */}
               {table.groupId && (

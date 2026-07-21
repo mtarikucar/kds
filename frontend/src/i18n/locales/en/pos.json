@@ -67,7 +67,14 @@
     "guestsLabel": "Guests",
     "statusLabel": "Status",
     "seatButton": "Guest arrived — Seat",
-    "cancelButton": "Cancel"
+    "closeButton": "Close",
+    "noShowButton": "No-show",
+    "cancelReservationButton": "Cancel reservation",
+    "noShowConfirmPrompt": "Mark {{customerName}}'s reservation as a no-show? The table hold will be released.",
+    "cancelConfirmPrompt": "Cancel {{customerName}}'s reservation? The table hold will be released.",
+    "confirmNoShowButton": "Yes, mark no-show",
+    "confirmCancelButton": "Yes, cancel reservation",
+    "backButton": "Back"
   },
   "selectTableFirst": "Please select a table first",
   "orderCreatedSuccess": "Order #{{orderNumber}} created successfully",
@@ -196,7 +203,9 @@
       "OCCUPIED": "Occupied",
       "RESERVED": "Reserved"
     },
-    "capacity": "Capacity"
+    "capacity": "Capacity",
+    "reservationChip": "{{startTime}} · {{guestCount}}p",
+    "upcomingReservationTitle": "Upcoming reservation — {{customerName}}"
   },
   "stickyCart": {
     "item": "item",

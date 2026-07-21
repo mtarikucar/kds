@@ -67,7 +67,14 @@
     "guestsLabel": "Mehmonlar soni",
     "statusLabel": "Holat",
     "seatButton": "Mehmon keldi — O'tirtirish",
-    "cancelButton": "Bekor qilish"
+    "closeButton": "Yopish",
+    "noShowButton": "Kelmadi",
+    "cancelReservationButton": "Bronni bekor qilish",
+    "noShowConfirmPrompt": "{{customerName}} broni \"kelmadi\" deb belgilansinmi? Stol bandligi bo'shatiladi.",
+    "cancelConfirmPrompt": "{{customerName}} broni bekor qilinsinmi? Stol bandligi bo'shatiladi.",
+    "confirmNoShowButton": "Ha, kelmadi deb belgilash",
+    "confirmCancelButton": "Ha, bronni bekor qilish",
+    "backButton": "Orqaga"
   },
   "selectTableFirst": "Avval stolni tanlang",
   "orderCreatedSuccess": "№{{orderNumber}} buyurtma muvaffaqiyatli yaratildi",
@@ -191,7 +198,9 @@
       "OCCUPIED": "Band",
       "RESERVED": "Band qilingan"
     },
-    "capacity": "Sig'im"
+    "capacity": "Sig'im",
+    "reservationChip": "{{startTime}} · {{guestCount}} kishi",
+    "upcomingReservationTitle": "Yaqinlashayotgan bron — {{customerName}}"
   },
   "stickyCart": {
     "item": "mahsulot",

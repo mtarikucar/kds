@@ -67,7 +67,14 @@
     "guestsLabel": "Kişi sayısı",
     "statusLabel": "Durum",
     "seatButton": "Misafir geldi — Yerleştir",
-    "cancelButton": "Vazgeç"
+    "closeButton": "Kapat",
+    "noShowButton": "Gelmedi",
+    "cancelReservationButton": "Rezervasyonu iptal et",
+    "noShowConfirmPrompt": "{{customerName}} adlı misafirin rezervasyonu \"gelmedi\" olarak işaretlensin mi? Masa tutması serbest bırakılacak.",
+    "cancelConfirmPrompt": "{{customerName}} adlı misafirin rezervasyonu iptal edilsin mi? Masa tutması serbest bırakılacak.",
+    "confirmNoShowButton": "Evet, gelmedi işaretle",
+    "confirmCancelButton": "Evet, iptal et",
+    "backButton": "Geri"
   },
   "selectTableFirst": "Lütfen önce bir masa seçin",
   "orderCreatedSuccess": "Sipariş #{{orderNumber}} başarıyla oluşturuldu",
@@ -196,7 +203,9 @@
       "OCCUPIED": "Dolu",
       "RESERVED": "Rezerve"
     },
-    "capacity": "Kapasite"
+    "capacity": "Kapasite",
+    "reservationChip": "{{startTime}} · {{guestCount}} kişi",
+    "upcomingReservationTitle": "Yaklaşan rezervasyon — {{customerName}}"
   },
   "stickyCart": {
     "item": "ürün",

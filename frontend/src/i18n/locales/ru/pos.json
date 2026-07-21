@@ -67,7 +67,14 @@
     "guestsLabel": "Кол-во гостей",
     "statusLabel": "Статус",
     "seatButton": "Гость пришёл — Усадить",
-    "cancelButton": "Отмена"
+    "closeButton": "Закрыть",
+    "noShowButton": "Не пришёл",
+    "cancelReservationButton": "Отменить бронь",
+    "noShowConfirmPrompt": "Отметить бронь гостя {{customerName}} как неявку? Удержание стола будет снято.",
+    "cancelConfirmPrompt": "Отменить бронь гостя {{customerName}}? Удержание стола будет снято.",
+    "confirmNoShowButton": "Да, отметить неявку",
+    "confirmCancelButton": "Да, отменить бронь",
+    "backButton": "Назад"
   },
   "selectTableFirst": "Сначала выберите стол",
   "orderCreatedSuccess": "Заказ №{{orderNumber}} успешно создан",
@@ -191,7 +198,9 @@
       "OCCUPIED": "Занят",
       "RESERVED": "Забронирован"
     },
-    "capacity": "Вместимость"
+    "capacity": "Вместимость",
+    "reservationChip": "{{startTime}} · {{guestCount}} чел.",
+    "upcomingReservationTitle": "Ближайшая бронь — {{customerName}}"
   },
   "stickyCart": {
     "item": "позиция",

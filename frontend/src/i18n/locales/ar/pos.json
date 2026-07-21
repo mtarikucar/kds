@@ -67,7 +67,14 @@
     "guestsLabel": "عدد الضيوف",
     "statusLabel": "الحالة",
     "seatButton": "وصل الضيف — إجلاس",
-    "cancelButton": "إلغاء"
+    "closeButton": "إغلاق",
+    "noShowButton": "لم يحضر",
+    "cancelReservationButton": "إلغاء الحجز",
+    "noShowConfirmPrompt": "هل تريد وضع علامة \"لم يحضر\" على حجز {{customerName}}؟ سيتم تحرير حجز الطاولة.",
+    "cancelConfirmPrompt": "هل تريد إلغاء حجز {{customerName}}؟ سيتم تحرير حجز الطاولة.",
+    "confirmNoShowButton": "نعم، لم يحضر",
+    "confirmCancelButton": "نعم، إلغاء الحجز",
+    "backButton": "رجوع"
   },
   "selectTableFirst": "يرجى اختيار طاولة أولاً",
   "orderCreatedSuccess": "تم إنشاء الطلب #{{orderNumber}} بنجاح",
@@ -191,7 +198,9 @@
       "OCCUPIED": "مشغولة",
       "RESERVED": "محجوزة"
     },
-    "capacity": "السعة"
+    "capacity": "السعة",
+    "reservationChip": "{{startTime}} · {{guestCount}} ضيف",
+    "upcomingReservationTitle": "حجز قادم — {{customerName}}"
   },
   "stickyCart": {
     "item": "عنصر",
