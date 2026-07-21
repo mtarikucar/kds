@@ -8,6 +8,7 @@ import {
 } from '../../types';
 import {
   snap,
+  snapPoint,
   clampCoord,
   clampTableSize,
   clampElementSize,
@@ -44,9 +45,23 @@ interface Snapshot {
   deletedElementIds: string[];
 }
 
+/** Partial geometry patch in canvas terms (x/y map to posX/posY for tables). */
+export interface GeometryPatch {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+}
+
 interface FloorEditorState {
   loaded: boolean;
   activeZoneId: string | null;
+  /**
+   * Zone canvas dims captured at load — lets zone-targeted actions (e.g. the
+   * Inspector's move-to-zone re-center) run store-side without zone props.
+   */
+  zoneMeta: Record<string, { canvasWidth: number; canvasHeight: number; gridSize: number }>;
   tables: Record<string, EditorTable>;
   elements: Record<string, EditorElement>;
   /** Persisted element ids the user removed; flushed on save. */
@@ -91,8 +106,22 @@ interface FloorEditorState {
   transformElement: (id: string, geo: Partial<Pick<EditorElement, 'x' | 'y' | 'width' | 'height' | 'rotation'>>) => void;
   setElementLabel: (id: string, label: string) => void;
 
+  /** Inspector numeric fields — clamped exactly like transformTable/Element. */
+  setTableGeometry: (id: string, patch: GeometryPatch) => void;
+  setElementGeometry: (id: string, patch: GeometryPatch) => void;
+  /**
+   * Move every selected node by (dx, dy). `skipHistory` is for key-repeat: the
+   * initial press pushes one undo entry, held-key repeats mutate in place so a
+   * long nudge can't flood the 100-deep stack (one undo reverts the whole run).
+   */
+  nudgeSelected: (dx: number, dy: number, opts?: { skipHistory?: boolean }) => void;
+  /** Re-zone an already-placed table and re-center it on the target zone. */
+  moveTableToZone: (tableId: string, zoneId: string) => void;
+
   // structure
   addElement: (type: FloorElementType, zoneId: string, geo: { x: number; y: number; width: number; height: number; style?: Record<string, any>; label?: string }) => string;
+  /** Clone the selected ELEMENTS (+16px offset, temp ids) and select the clones. */
+  duplicateSelectedElements: () => void;
   deleteSelected: () => void;
 
   // history
@@ -163,6 +192,7 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
   return {
     loaded: false,
     activeZoneId: null,
+    zoneMeta: {},
     tables: {},
     elements: {},
     deletedElementIds: [],
@@ -177,9 +207,11 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
     load: (plan, preferredZoneId) => {
       const tables: Record<string, EditorTable> = {};
       const elements: Record<string, EditorElement> = {};
+      const zoneMeta: FloorEditorState['zoneMeta'] = {};
       for (const z of plan.zones) {
         for (const t of z.tables) tables[t.id] = { ...t };
         for (const e of z.elements) elements[e.id] = { ...e };
+        zoneMeta[z.id] = { canvasWidth: z.canvasWidth, canvasHeight: z.canvasHeight, gridSize: z.gridSize };
       }
       for (const t of plan.unplacedTables) tables[t.id] = { ...t };
       const zoneIds = plan.zones.map((z) => z.id);
@@ -200,6 +232,7 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
         touchedTableIds: new Set<string>(),
         touchedElementIds: new Set<string>(),
         activeZoneId,
+        zoneMeta,
       });
     },
 
@@ -322,6 +355,78 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
       pushHistory({ elements: { ...get().elements, [id]: { ...e, label } } });
     },
 
+    // The patches delegate to transform* (same clamps, touched + history). Only
+    // defined keys are copied — spreading an explicit `x: undefined` through
+    // would null the field out.
+    setTableGeometry: (id, patch) => {
+      const geo: Partial<Pick<EditorTable, 'posX' | 'posY' | 'width' | 'height' | 'rotation'>> = {};
+      if (patch.x !== undefined) geo.posX = patch.x;
+      if (patch.y !== undefined) geo.posY = patch.y;
+      if (patch.width !== undefined) geo.width = patch.width;
+      if (patch.height !== undefined) geo.height = patch.height;
+      if (patch.rotation !== undefined) geo.rotation = patch.rotation;
+      if (Object.keys(geo).length === 0) return;
+      get().transformTable(id, geo);
+    },
+
+    setElementGeometry: (id, patch) => {
+      const geo: Partial<Pick<EditorElement, 'x' | 'y' | 'width' | 'height' | 'rotation'>> = {};
+      if (patch.x !== undefined) geo.x = patch.x;
+      if (patch.y !== undefined) geo.y = patch.y;
+      if (patch.width !== undefined) geo.width = patch.width;
+      if (patch.height !== undefined) geo.height = patch.height;
+      if (patch.rotation !== undefined) geo.rotation = patch.rotation;
+      if (Object.keys(geo).length === 0) return;
+      get().transformElement(id, geo);
+    },
+
+    nudgeSelected: (dx, dy, opts) => {
+      const s = get();
+      if (s.selection.length === 0) return;
+      const tables = { ...s.tables };
+      const elements = { ...s.elements };
+      let changed = false;
+      for (const sel of s.selection) {
+        if (sel.kind === 'table') {
+          const t = tables[sel.id];
+          if (!t) continue;
+          tables[sel.id] = { ...t, posX: clampCoord(t.posX + dx), posY: clampCoord(t.posY + dy) };
+          touchTable(sel.id);
+          changed = true;
+        } else {
+          const e = elements[sel.id];
+          if (!e) continue;
+          elements[sel.id] = { ...e, x: clampCoord(e.x + dx), y: clampCoord(e.y + dy) };
+          touchElement(sel.id);
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      if (opts?.skipHistory) {
+        set({ tables, elements, dirty: true });
+      } else {
+        pushHistory({ tables, elements });
+      }
+    },
+
+    moveTableToZone: (tableId, zoneId) => {
+      const s = get();
+      const t = s.tables[tableId];
+      const meta = s.zoneMeta[zoneId];
+      if (!t || !meta || t.zoneId === zoneId) return;
+      touchTable(tableId);
+      const c = snapPoint(
+        { x: meta.canvasWidth / 2 - t.width / 2, y: meta.canvasHeight / 2 - t.height / 2 },
+        meta.gridSize,
+      );
+      pushHistory({
+        tables: {
+          ...s.tables,
+          [tableId]: { ...t, zoneId, posX: clampCoord(c.x), posY: clampCoord(c.y) },
+        },
+      });
+    },
+
     addElement: (type, zoneId, geo) => {
       const seq = get().tempSeq + 1;
       const tempId = `temp-el-${seq}`;
@@ -346,6 +451,31 @@ export const useFloorEditorStore = create<FloorEditorState>((set, get) => {
         selection: [{ kind: 'element', id: tempId }],
       });
       return tempId;
+    },
+
+    duplicateSelectedElements: () => {
+      const s = get();
+      const sources = s.selection
+        .filter((sel) => sel.kind === 'element')
+        .map((sel) => s.elements[sel.id])
+        .filter(Boolean) as EditorElement[];
+      if (sources.length === 0) return;
+      let seq = s.tempSeq;
+      const elements = { ...s.elements };
+      const selection: Selection[] = [];
+      for (const src of sources) {
+        seq += 1;
+        const tempId = `temp-el-${seq}`;
+        elements[tempId] = {
+          ...structuredClone(src),
+          id: tempId,
+          x: clampCoord(src.x + 16),
+          y: clampCoord(src.y + 16),
+          _new: true,
+        };
+        selection.push({ kind: 'element', id: tempId });
+      }
+      pushHistory({ elements, tempSeq: seq, selection });
     },
 
     deleteSelected: () => {

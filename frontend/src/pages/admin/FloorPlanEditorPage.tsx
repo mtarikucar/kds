@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Map as MapIcon, Loader2 } from 'lucide-react';
+import { Map as MapIcon, Loader2, MousePointerClick, X } from 'lucide-react';
 import {
   useFloorPlan, useCreateZone, useUpdateZone, useDeleteZone,
   useCreateElement, useDeleteElement, useSaveLayout,
@@ -72,6 +72,14 @@ export default function FloorPlanEditorPage({
   // validation, no cancel affordance and looked jarring inside the app shell).
   const [addingZone, setAddingZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState('');
+  // Zone-delete confirm modal — replaces the app's last window.confirm().
+  const [confirmingZoneDelete, setConfirmingZoneDelete] = useState(false);
+  // Click-to-place: a palette button ARMS an element type; the next canvas
+  // click drops it there (Shift+click keeps it armed for rapid multi-place).
+  const [armedElement, setArmedElement] = useState<FloorElementType | null>(null);
+  const [placeHintDismissed, setPlaceHintDismissed] = useState(false);
+  // Consecutive center drops cascade so repeated adds never stack invisibly.
+  const centerDropSeq = useRef(0);
 
   // Ingest the server plan into the working copy on first load + after a save
   // (when not mid-edit, so a background refetch can't clobber unsaved work).
@@ -81,6 +89,66 @@ export default function FloorPlanEditorPage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);
+
+  // Editor keyboard shortcuts. Reads store state via getState() so the handler
+  // never goes stale; suppressed while typing or while any modal is open (all
+  // app modals render role="dialog").
+  useEffect(() => {
+    const ARROW_DELTAS: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+    };
+    const isTypingTarget = (el: EventTarget | null) =>
+      el instanceof HTMLElement &&
+      (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target) || document.querySelector('[role="dialog"]')) return;
+      const s = useFloorEditorStore.getState();
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) s.redo();
+        else s.undo();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        s.redo();
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        s.deleteSelected();
+        return;
+      }
+      if (e.key === 'Escape') {
+        setArmedElement(null);
+        s.clearSelection();
+        return;
+      }
+      const delta = ARROW_DELTAS[e.key];
+      if (delta && s.selection.length > 0) {
+        e.preventDefault();
+        const zone = plan?.zones.find((z) => z.id === s.activeZoneId) ?? plan?.zones[0];
+        // Arrow = one grid cell, Shift+Arrow = fine 1-unit; key repeat skips
+        // history so a held key is a single undo step.
+        const step = e.shiftKey ? 1 : Math.max(1, zone?.gridSize ?? 1);
+        s.nudgeSelected(delta[0] * step, delta[1] * step, { skipHistory: e.repeat });
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [plan]);
+
+  // Warn before the tab unloads while there are unsaved edits.
+  useEffect(() => {
+    if (!store.dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [store.dirty]);
 
   if (isLoading) {
     return (
@@ -104,30 +172,63 @@ export default function FloorPlanEditorPage({
     : [];
   const unplaced = Object.values(store.tables).filter((tbl) => tbl.zoneId === null);
 
-  const centerOfZone = () =>
-    activeZone
-      ? snapPoint({ x: activeZone.canvasWidth / 2 - 40, y: activeZone.canvasHeight / 2 - 40 }, activeZone.gridSize)
-      : { x: 100, y: 100 };
+  // One props bag — the inspector renders twice (lg sidebar + mobile sheet).
+  const inspectorProps = {
+    selection: store.selection,
+    tables: store.tables,
+    elements: store.elements,
+    zones,
+    onSetTableShape: store.setTableShape,
+    onSetElementLabel: store.setElementLabel,
+    onSetTableGeometry: store.setTableGeometry,
+    onSetElementGeometry: store.setElementGeometry,
+    onMoveTableToZone: store.moveTableToZone,
+    onDuplicateElements: store.duplicateSelectedElements,
+    onDeleteSelected: store.deleteSelected,
+  };
 
-  const handleAddElement = (type: FloorElementType) => {
-    if (!activeZone) return;
-    const def = ELEMENT_PALETTE.find((e) => e.type === type)!;
-    const c = centerOfZone();
-    store.addElement(type, activeZone.id, {
-      x: c.x, y: c.y, width: def.defaultWidth, height: def.defaultHeight,
-      style: def.defaultStyle, label: type === 'TEXT' ? t('floorPlan:elements.text') : undefined,
+  // Center drop point with a per-drop cascade: each consecutive center drop
+  // shifts +24px (or one grid cell when the grid is coarser, so snapping can't
+  // collapse two drops onto the same cell).
+  const nextCenterDrop = () => {
+    if (!activeZone) return { x: 100, y: 100 };
+    const step = Math.max(24, activeZone.gridSize || 0);
+    const off = (centerDropSeq.current++ % 10) * step;
+    return snapPoint(
+      { x: activeZone.canvasWidth / 2 - 40 + off, y: activeZone.canvasHeight / 2 - 40 + off },
+      activeZone.gridSize,
+    );
+  };
+
+  // Palette buttons toggle the armed type; the actual add happens on canvas click.
+  const handleArmElement = (type: FloorElementType) => {
+    setArmedElement((cur) => (cur === type ? null : type));
+  };
+
+  const handleCanvasClick = (x: number, y: number, opts: { shiftKey: boolean }) => {
+    if (!armedElement || !activeZone) return;
+    const def = ELEMENT_PALETTE.find((p) => p.type === armedElement)!;
+    // center the new element on the click point, snapped to the grid
+    const p = snapPoint(
+      { x: x - def.defaultWidth / 2, y: y - def.defaultHeight / 2 },
+      activeZone.gridSize,
+    );
+    store.addElement(armedElement, activeZone.id, {
+      x: p.x, y: p.y, width: def.defaultWidth, height: def.defaultHeight,
+      style: def.defaultStyle, label: armedElement === 'TEXT' ? t('floorPlan:elements.text') : undefined,
     });
+    if (!opts.shiftKey) setArmedElement(null);
   };
 
   const handlePlaceTable = (tableId: string) => {
     if (!activeZone) return;
-    const c = centerOfZone();
+    const c = nextCenterDrop();
     store.assignTableToZone(tableId, activeZone.id, c.x, c.y);
   };
 
   const handleCreateTable = async () => {
     if (!activeZone || !newTable || !newTableNumber.trim()) return;
-    const c = centerOfZone();
+    const c = nextCenterDrop();
     try {
       await createTable.mutateAsync({
         number: newTableNumber.trim(),
@@ -159,6 +260,19 @@ export default function FloorPlanEditorPage({
       if (fresh.data) store.load(fresh.data, zone.id);
     } catch {
       /* handled */
+    }
+  };
+
+  const handleDeleteZone = async () => {
+    if (!settingsZone) return;
+    try {
+      await deleteZone.mutateAsync(settingsZone.id);
+      setConfirmingZoneDelete(false);
+      setSettingsZoneId(null);
+      const fresh = await refetch();
+      if (fresh.data) store.load(fresh.data, fresh.data.zones[0]?.id ?? null);
+    } catch {
+      /* toast handled by the mutation */
     }
   };
 
@@ -221,8 +335,9 @@ export default function FloorPlanEditorPage({
         canUndo={store.past.length > 0}
         canRedo={store.future.length > 0}
         showGrid={showGrid}
+        armedElement={armedElement}
         onAddTable={(shape) => setNewTable({ shape })}
-        onAddElement={handleAddElement}
+        onAddElement={handleArmElement}
         onUndo={store.undo}
         onRedo={store.redo}
         onToggleGrid={() => setShowGrid((g) => !g)}
@@ -233,7 +348,10 @@ export default function FloorPlanEditorPage({
         zones={zones}
         activeZoneId={activeZone?.id ?? null}
         editable
-        onSelect={store.setActiveZone}
+        onSelect={(zoneId) => {
+          centerDropSeq.current = 0; // cascade restarts per zone
+          store.setActiveZone(zoneId);
+        }}
         onAddZone={() => {
           setNewZoneName('');
           setAddingZone(true);
@@ -253,30 +371,58 @@ export default function FloorPlanEditorPage({
               showGrid={showGrid}
               width={size.width}
               height={size.height}
+              placing={!!armedElement}
               onSelect={(sel, additive) => store.select(sel, additive)}
               onTableDragEnd={(id, posX, posY) => store.moveTable(id, posX, posY, activeZone.gridSize)}
               onTableTransformEnd={(id, geo) => store.transformTable(id, geo)}
               onElementDragEnd={(id, x, y) => store.moveElement(id, x, y, activeZone.gridSize)}
               onElementTransformEnd={(id, geo) => store.transformElement(id, geo)}
+              onCanvasClick={handleCanvasClick}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-slate-400 text-sm px-6 text-center">
               {zones.length === 0 ? t('floorPlan:noZones') : t('common:loading', 'Loading…')}
             </div>
           )}
+          {armedElement && !placeHintDismissed && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-slate-900/85 text-white text-xs shadow-lg whitespace-nowrap">
+              <MousePointerClick className="w-3.5 h-3.5 shrink-0" />
+              <span>{t('floorPlan:placementHint')}</span>
+              <button
+                type="button"
+                onClick={() => setPlaceHintDismissed(true)}
+                aria-label={t('common:app.close')}
+                className="p-0.5 rounded-full text-white/70 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
         <aside className="w-72 shrink-0 border-l border-slate-200 bg-white overflow-y-auto hidden lg:block">
-          <InspectorPanel
-            selection={store.selection}
-            tables={store.tables}
-            elements={store.elements}
-            onSetTableShape={store.setTableShape}
-            onSetElementLabel={store.setElementLabel}
-            onDeleteSelected={store.deleteSelected}
-          />
+          <InspectorPanel {...inspectorProps} />
         </aside>
       </div>
+
+      {/* Below lg the sidebar is hidden — surface the inspector as a bottom
+          sheet whenever something is selected so it stays reachable on tablets. */}
+      {store.selection.length > 0 && (
+        <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.18)] max-h-[45vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+          <div className="sticky top-0 z-10 flex items-center bg-white px-4 pt-2 pb-1">
+            <span className="w-8 h-1 rounded-full bg-slate-200 mx-auto" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={store.clearSelection}
+              aria-label={t('common:app.close')}
+              className="absolute right-3 top-2 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <InspectorPanel {...inspectorProps} />
+        </div>
+      )}
 
       <UnplacedTray tables={unplaced} onPlace={handlePlaceTable} />
 
@@ -292,15 +438,31 @@ export default function FloorPlanEditorPage({
             const fresh = await refetch();
             if (fresh.data) store.load(fresh.data, settingsZone.id);
           }}
-          onDelete={async () => {
-            if (!window.confirm(t('floorPlan:zone.deleteConfirm', { name: settingsZone.name }))) return;
-            await deleteZone.mutateAsync(settingsZone.id);
-            setSettingsZoneId(null);
-            const fresh = await refetch();
-            if (fresh.data) store.load(fresh.data, fresh.data.zones[0]?.id ?? null);
-          }}
+          onDelete={() => setConfirmingZoneDelete(true)}
         />
       )}
+
+      {/* zone-delete confirm — styled like the new-area modal, no window.confirm */}
+      <Modal
+        isOpen={confirmingZoneDelete && !!settingsZone}
+        onClose={() => setConfirmingZoneDelete(false)}
+        title={t('floorPlan:zone.deleteTitle')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            {t('floorPlan:zone.deleteBody', { name: settingsZone?.name })}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmingZoneDelete(false)}>
+              {t('common:app.cancel')}
+            </Button>
+            <Button variant="danger" onClick={handleDeleteZone} isLoading={deleteZone.isPending}>
+              {t('floorPlan:zone.deleteAction')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* new-area modal — replaces window.prompt() */}
       <Modal

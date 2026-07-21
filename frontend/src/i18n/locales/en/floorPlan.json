@@ -9,6 +9,8 @@
   "saved": "Floor plan saved",
   "loading": "Loading…",
   "saving": "Saving…",
+  "unsavedChanges": "Unsaved changes",
+  "placementHint": "Click the canvas to place — Esc cancels",
   "addZone": "Add area",
   "zoneSettings": "Area settings",
   "newZonePrompt": "Name the new area (e.g. Floor 2, Garden)",
@@ -46,7 +48,17 @@
     "element": "Element",
     "label": "Label",
     "labelPlaceholder": "Optional label",
-    "deleteElement": "Delete element"
+    "deleteElement": "Delete element",
+    "duplicate": "Duplicate",
+    "moveToZone": "Move to area",
+    "geometry": {
+      "title": "Position & size",
+      "x": "X",
+      "y": "Y",
+      "width": "Width",
+      "height": "Height",
+      "rotation": "Rotation (°)"
+    }
   },
   "zone": {
     "name": "Name",
@@ -59,6 +71,9 @@
     "background": "Background image URL",
     "opacity": "Background opacity ({{value}}%)",
     "delete": "Delete area",
-    "deleteConfirm": "Delete the area \"{{name}}\"? Its tables move to unplaced."
+    "deleteConfirm": "Delete the area \"{{name}}\"? Its tables move to unplaced.",
+    "deleteTitle": "Delete area",
+    "deleteBody": "The area \"{{name}}\" will be deleted. Its tables move to unplaced.",
+    "deleteAction": "Delete"
   }
 }
