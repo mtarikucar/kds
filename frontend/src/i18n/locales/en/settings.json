@@ -691,7 +691,7 @@
       "title": "Accounting",
       "subtitle": "Invoices, e-Document status and integrator settings — all in one place.",
       "tabInvoices": "Invoices",
-      "tabEdoc": "e-Document Status",
+      "tabEdoc": "Undelivered & Status",
       "tabSettings": "Settings",
       "readinessTitle": "Go-live readiness check",
       "rowMukellef": "GİB taxpayer lookup (integrator)",

@@ -25,7 +25,7 @@ import {
  * Polls every 20s — the table is cheap (limited to the latest 100 pending
  * rows) and the live status feedback matters for ops during incidents.
  */
-export default function FiscalRecoveryPage() {
+export default function FiscalRecoveryPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation('common');
   const receiptsQuery = useListPendingReceipts();
   const { data: rows = [], refetch } = receiptsQuery;
@@ -34,20 +34,27 @@ export default function FiscalRecoveryPage() {
   const { formatDateIntl } = useFormatDate();
 
   return (
-    <div className="space-y-4 p-6">
-      <header className="flex items-center justify-between">
-        <div>
+    <div className={embedded ? 'space-y-4' : 'space-y-4 p-6'}>
+      {!embedded && (
+        <header>
           <h1 className="text-2xl font-semibold">{t('hummytummy.fiscalRecovery.title')}</h1>
           <p className="text-sm text-gray-600">{t('hummytummy.fiscalRecovery.subtitle')}</p>
-        </div>
-        <button onClick={() => refetch()} className="rounded border px-3 py-1.5 text-sm hover:bg-gray-50">
-          {t('hummytummy.fiscalRecovery.refresh')}
-        </button>
-      </header>
+        </header>
+      )}
 
       <FiscalDevicesPanel />
 
-      <h2 className="pt-2 text-lg font-semibold">{t('hummytummy.fiscalRecovery.title')}</h2>
+      {/* Refresh lives here (not in the header above) so it stays reachable
+          when embedded hides the header. */}
+      <h2 className="pt-2 text-lg font-semibold flex items-center justify-between">
+        {t('hummytummy.fiscalRecovery.title')}
+        <button
+          onClick={() => refetch()}
+          className="rounded border px-3 py-1.5 text-sm font-normal hover:bg-gray-50"
+        >
+          {t('hummytummy.fiscalRecovery.refresh')}
+        </button>
+      </h2>
       <QueryStateGate
         query={receiptsQuery}
         loading={<div className="text-sm text-gray-500">{t('hummytummy.common.loading')}</div>}

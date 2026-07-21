@@ -20,6 +20,12 @@ vi.mock('../../../features/accounting/eBelgeApi', () => ({
   }),
   useResyncFailedEDocuments: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, isError: false }),
 }));
+vi.mock('../../../features/fiscal/FiscalRecoveryPage', () => ({
+  default: () => <div>FIS-KURTARMA</div>,
+}));
+vi.mock('../../../contexts/SubscriptionContext', () => ({
+  useSubscription: () => ({ hasIntegration: (d: string) => d === 'fiscal' }),
+}));
 
 // The page went through the t() migration: labels now come from the
 // `settings` namespace. This suite's import graph pulls i18n/config (via the
@@ -29,7 +35,7 @@ describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
   it('shows the three e-Belge tabs and defaults to Faturalar', () => {
     render(<AccountingBackOfficePage />, { wrapper: MemoryRouter });
     expect(screen.getByRole('button', { name: /Invoices/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /e-Document Status/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Undelivered|Gönderilemeyen/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Settings/ })).toBeTruthy();
     // default tab
     expect(screen.getByText('FATURA-PANEL')).toBeTruthy();
@@ -39,7 +45,7 @@ describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
     render(<AccountingBackOfficePage />, { wrapper: MemoryRouter });
     fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
     expect(screen.getByText('AYAR-PANEL')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /e-Document Status/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Undelivered|Gönderilemeyen/ }));
     expect(screen.getByText(/Go-live readiness check/)).toBeTruthy();
   });
 
@@ -48,5 +54,11 @@ describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
     expect(screen.queryByRole('button', { name: /Budget|Bütçe/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Consolidated|Konsolide/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Forecast|Tahmin/ })).toBeNull();
+  });
+
+  it('e-Belge sekmesi fiscal entegrasyonu varken fiş kurtarma bölümünü içerir', () => {
+    render(<AccountingBackOfficePage />, { wrapper: MemoryRouter });
+    fireEvent.click(screen.getByRole('button', { name: /Undelivered|Gönderilemeyen/ }));
+    expect(screen.getByText('FIS-KURTARMA')).toBeTruthy();
   });
 });

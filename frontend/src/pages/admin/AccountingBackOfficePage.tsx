@@ -15,6 +15,8 @@ import {
 } from '../../features/accounting/eBelgeApi';
 import { InvoicesPanel } from './invoices/InvoicesPage';
 import { AccountingSettingsPanel } from '../settings/AccountingSettingsPage';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import FiscalRecoveryPage from '../../features/fiscal/FiscalRecoveryPage';
 
 type Tab = 'invoices' | 'edoc' | 'settings';
 const VALID_TABS: readonly Tab[] = ['invoices', 'edoc', 'settings'];
@@ -81,6 +83,7 @@ function EDocTab() {
   const readinessQuery = useEDocumentReadiness();
   const { data } = readinessQuery;
   const resync = useResyncFailedEDocuments();
+  const { hasIntegration } = useSubscription();
   const ready = data?.signerConfigured && data?.mukellefQuery !== 'NONE';
   return (
     <QueryStateGate query={readinessQuery} loading={<Loading />}>
@@ -151,6 +154,10 @@ function EDocTab() {
             </p>
           </CardContent>
         </Card>
+        {/* Yazarkasa fiş kuyruğu — yalnız fiscal entegrasyonu olan tenant'ta.
+            (Eski /admin/fiscal-recovery sayfası; cihaz kayıt paneli Faz 4'te
+            şube hub'ına ayrışacak.) */}
+        {hasIntegration('fiscal') && <FiscalRecoveryPage embedded />}
       </div>
     </QueryStateGate>
   );

@@ -691,7 +691,7 @@
       "title": "Muhasebe",
       "subtitle": "Faturalar, e-Belge durumu ve entegratör ayarları — hepsi tek yerde.",
       "tabInvoices": "Faturalar",
-      "tabEdoc": "e-Belge Durumu",
+      "tabEdoc": "Gönderilemeyenler & Durum",
       "tabSettings": "Ayarlar",
       "readinessTitle": "Canlıya-hazırlık kontrolü",
       "rowMukellef": "GİB mükellef sorgusu (entegratör)",
