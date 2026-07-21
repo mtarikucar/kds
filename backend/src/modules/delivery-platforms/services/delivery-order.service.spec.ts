@@ -29,6 +29,7 @@ describe('DeliveryOrderService (iter-39)', () => {
     logService = {
       log: jest.fn().mockResolvedValue(undefined),
       scrubPii: jest.fn((x: any) => x),
+      markRetrySuccess: jest.fn().mockResolvedValue(undefined),
     };
     authService = { ensureValidToken: jest.fn() };
     configService = { recordError: jest.fn().mockResolvedValue({}) };
@@ -190,6 +191,119 @@ describe('DeliveryOrderService (iter-39)', () => {
 
     expect(adapterMock.acceptOrder).not.toHaveBeenCalled();
     expect(configService.recordError).not.toHaveBeenCalled();
+  });
+
+  // ── Auto-accept ack-first inline budget ─────────────────────────────────
+  // The outbound accept must NOT hold the webhook 200 past the platform's ack
+  // window. It runs inline with a short budget; over budget it is deferred to
+  // the RetryScheduler (which re-dispatches the identical acceptOrder), and the
+  // still-running attempt is reconciled so the scheduler never double-accepts.
+  describe('auto-accept ack-first inline budget', () => {
+    const BUDGET_ENV = 'DELIVERY_AUTOACCEPT_INLINE_BUDGET_MS';
+    afterEach(() => {
+      delete process.env[BUDGET_ENV];
+    });
+
+    function wireAutoAccept(acceptImpl: () => Promise<void>) {
+      (prisma.deliveryPlatformConfig.findUnique as any).mockResolvedValue({
+        id: 'cfg-1',
+        isEnabled: true,
+        autoAccept: true,
+      });
+      (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({
+          order: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest
+              .fn()
+              .mockResolvedValue({ id: 'ord-1', tenantId: 't1', branchId: 'br-1' }),
+          },
+          menuItemMapping: { findMany: jest.fn().mockResolvedValue([]) },
+          deliveryPlatformConfig: { findUnique: jest.fn() },
+        }),
+      );
+      authService.ensureValidToken.mockResolvedValue({ id: 'cfg-1' });
+      adapterFactory.getAdapter.mockReturnValue({
+        acceptOrder: jest.fn(acceptImpl),
+      });
+    }
+
+    const deferredLog = () =>
+      (logService.log as jest.Mock).mock.calls.find(
+        ([e]: any[]) =>
+          e.success === false &&
+          typeof e.error === 'string' &&
+          e.error.includes('deferred'),
+      );
+
+    it('defers to the RetryScheduler when the accept exceeds the inline budget', async () => {
+      process.env[BUDGET_ENV] = '5';
+      // Accept takes far longer than the 5ms budget.
+      wireAutoAccept(() => new Promise<void>((res) => setTimeout(res, 120)));
+      (logService.log as jest.Mock).mockResolvedValue({ id: 'log-defer' });
+
+      await svc.processIncomingOrder('t1', normalizedOrder);
+
+      const call = deferredLog();
+      expect(call).toBeTruthy();
+      expect(call[0].nextRetryAt).toBeInstanceOf(Date);
+      // Ack-first: the order still reaches KDS immediately, not gated on accept.
+      expect(kdsGateway.emitNewOrder).toHaveBeenCalled();
+    });
+
+    it('reconciles a LATE-successful deferred accept so the scheduler will not double-accept', async () => {
+      process.env[BUDGET_ENV] = '5';
+      let resolveAccept!: () => void;
+      wireAutoAccept(
+        () => new Promise<void>((res) => (resolveAccept = () => res())),
+      );
+      (logService.log as jest.Mock).mockResolvedValue({ id: 'log-defer' });
+
+      await svc.processIncomingOrder('t1', normalizedOrder);
+      expect(deferredLog()).toBeTruthy();
+      // Not reconciled yet — the accept is still in flight.
+      expect(logService.markRetrySuccess).not.toHaveBeenCalled();
+
+      resolveAccept();
+      await new Promise((r) => setTimeout(r, 15)); // let the continuation run
+
+      // The deferred ORDER_ACCEPTED row is marked done so the RetryScheduler
+      // skips it (no second platform accept).
+      expect(logService.markRetrySuccess).toHaveBeenCalledWith('log-defer');
+    });
+
+    it('trips the circuit breaker when a deferred accept LATER fails', async () => {
+      process.env[BUDGET_ENV] = '5';
+      let rejectAccept!: (e: any) => void;
+      wireAutoAccept(
+        () => new Promise<void>((_res, rej) => (rejectAccept = rej)),
+      );
+      (logService.log as jest.Mock).mockResolvedValue({ id: 'log-defer' });
+
+      await svc.processIncomingOrder('t1', normalizedOrder);
+      expect(configService.recordError).not.toHaveBeenCalled();
+
+      rejectAccept(new Error('platform 503'));
+      await new Promise((r) => setTimeout(r, 15));
+
+      expect(configService.recordError).toHaveBeenCalledWith(
+        'cfg-1',
+        expect.stringContaining('accept_order:'),
+      );
+    });
+
+    it('keeps the fast happy path inline (success, no defer) within budget', async () => {
+      // Default budget (no env) — an instant accept resolves inline: no
+      // deferred row, no markRetrySuccess, no recordError.
+      wireAutoAccept(() => Promise.resolve());
+
+      await svc.processIncomingOrder('t1', normalizedOrder);
+
+      expect(deferredLog()).toBeFalsy();
+      expect(logService.markRetrySuccess).not.toHaveBeenCalled();
+      expect(configService.recordError).not.toHaveBeenCalled();
+    });
   });
 
   // ── Auto-print kitchen ticket ───────────────────────────────────────────

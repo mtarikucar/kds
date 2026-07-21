@@ -84,6 +84,42 @@ describe("PaymentValidator", () => {
         }),
       ).toThrow("Order is already paid");
     });
+
+    // Marketplace/delivery-platform orders are settled BY the platform —
+    // they never create a Payment row (the platform owns the money rail).
+    // Taking a POS payment on one would double-charge the customer AND fire
+    // a SECOND fiscal document (e-Arşiv + ÖKC) on top of the platform's own.
+    // Guard on `source` (the marketplace), NOT `type`: a restaurant's OWN
+    // delivery (type=DELIVERY, source=null) is still POS-payable at the door.
+    it("rejects a marketplace order (source set — settled by the platform)", () => {
+      expect(() =>
+        v.assertOrderPayable({
+          status: OrderStatus.SERVED,
+          requiresApproval: false,
+          source: "YEMEKSEPETI",
+        }),
+      ).toThrow("settled by the platform");
+    });
+
+    it("throws BadRequestException (type) for a marketplace order", () => {
+      expect(() =>
+        v.assertOrderPayable({
+          status: OrderStatus.SERVED,
+          requiresApproval: false,
+          source: "TRENDYOL",
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it("does NOT block an internal/POS order (source null)", () => {
+      expect(() =>
+        v.assertOrderPayable({
+          status: OrderStatus.SERVED,
+          requiresApproval: false,
+          source: null,
+        }),
+      ).not.toThrow();
+    });
   });
 
   describe("validateSplitTotal", () => {

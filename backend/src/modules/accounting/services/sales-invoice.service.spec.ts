@@ -297,6 +297,70 @@ describe("SalesInvoiceService.createFromOrder delivery reconciliation (CONCERN B
     );
     expect(Math.round(lineTotalSum * 100) / 100).toBe(invoice.totalAmount);
   });
+
+  // A marketplace/delivery-platform order (source set) is fiscalized BY the
+  // platform — it issues the customer's e-Arşiv and owns the money rail
+  // (delivery Orders never create Payment rows). A KDS invoice on top would be
+  // a SECOND fiscal document for revenue the platform already invoiced. The
+  // POS payment rail already blocks these (payment-validator); createFromOrder
+  // is a separate, manual admin entry point (POST from-order/:orderId) that
+  // must refuse them too.
+  it("REFUSES a marketplace order (source set — the platform already fiscalized it)", async () => {
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: "order-mp",
+      tenantId: "t1",
+      source: "YEMEKSEPETI",
+      externalOrderId: "ext-1",
+      customerName: "Marketplace Co",
+      customerPhone: null,
+      totalAmount: 100,
+      discount: 0,
+      finalAmount: 100,
+      payments: [{ method: "DIGITAL" }],
+      salesInvoices: [],
+      orderItems: [
+        {
+          id: "oi-1",
+          quantity: 1,
+          subtotal: 100,
+          taxRate: 10,
+          product: { name: "Burger" },
+        },
+      ],
+    });
+
+    await expect(svc.createFromOrder("order-mp", "t1")).rejects.toThrow(
+      "fiscalized by the platform",
+    );
+  });
+
+  it("still self-invoices a restaurant's OWN delivery (source null)", async () => {
+    // Own-delivery (type=DELIVERY, source=null) is NOT a marketplace order — it
+    // must stay invoiceable here (regression guard so the source check doesn't
+    // over-block the restaurant's own courier revenue).
+    (prisma.order.findFirst as any).mockResolvedValue({
+      id: "order-own",
+      tenantId: "t1",
+      source: null,
+      totalAmount: 100,
+      discount: 0,
+      finalAmount: 100,
+      payments: [{ method: "CASH" }],
+      salesInvoices: [],
+      orderItems: [
+        {
+          id: "oi-1",
+          quantity: 1,
+          subtotal: 100,
+          taxRate: 10,
+          product: { name: "Pizza" },
+        },
+      ],
+    });
+
+    const invoice: any = await svc.createFromOrder("order-own", "t1");
+    expect(invoice.totalAmount).toBe(100);
+  });
 });
 
 /**
