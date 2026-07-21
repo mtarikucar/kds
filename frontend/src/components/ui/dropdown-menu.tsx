@@ -4,6 +4,8 @@ import { cn } from '../../lib/utils';
 interface DropdownMenuContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
+  /** Wraps trigger AND content — outside-click/Escape logic anchors here. */
+  rootRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const DropdownMenuContext = createContext<DropdownMenuContextValue | undefined>(undefined);
@@ -18,14 +20,23 @@ const useDropdownMenuContext = () => {
 
 interface DropdownMenuProps {
   children: React.ReactNode;
+  /**
+   * Extra classes for the positioning wrapper. Needed e.g. for full-width
+   * triggers: a `w-full` child cannot widen the default shrink-to-fit
+   * `inline-block` wrapper, so pass `w-full` here as well.
+   */
+  className?: string;
 }
 
-const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
+const DropdownMenu: React.FC<DropdownMenuProps> = ({ children, className }) => {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   return (
-    <DropdownMenuContext.Provider value={{ open, setOpen }}>
-      <div className="relative inline-block text-left">{children}</div>
+    <DropdownMenuContext.Provider value={{ open, setOpen, rootRef }}>
+      <div ref={rootRef} className={cn('relative inline-block text-left', className)}>
+        {children}
+      </div>
     </DropdownMenuContext.Provider>
   );
 };
@@ -43,6 +54,8 @@ const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuTrig
 
     if (asChild && React.isValidElement(children)) {
       return React.cloneElement(children as React.ReactElement<React.HTMLAttributes<HTMLElement>>, {
+        'aria-haspopup': 'menu',
+        'aria-expanded': open,
         onClick: (e: React.MouseEvent) => {
           e.stopPropagation();
           setOpen(!open);
@@ -58,6 +71,8 @@ const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuTrig
       <button
         ref={ref}
         type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className={cn('inline-flex items-center justify-center', className)}
         onClick={(e) => {
           e.stopPropagation();
@@ -81,21 +96,37 @@ interface DropdownMenuContentProps extends React.HTMLAttributes<HTMLDivElement> 
 
 const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenuContentProps>(
   ({ className, align = 'end', sideOffset = 4, children, ...props }, ref) => {
-    const { open, setOpen } = useDropdownMenuContext();
+    const { open, setOpen, rootRef } = useDropdownMenuContext();
     const contentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+      // Anchor on the root (trigger + content): a mousedown on the trigger
+      // must NOT count as "outside", or its click-toggle re-opens the menu
+      // right after this closes it.
       const handleClickOutside = (event: MouseEvent) => {
-        if (contentRef.current && !contentRef.current.contains(event.target as Node)) {
+        const root = rootRef.current ?? contentRef.current;
+        if (root && !root.contains(event.target as Node)) {
           setOpen(false);
+        }
+      };
+
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setOpen(false);
+          // Return focus to the trigger so keyboard users aren't dropped.
+          rootRef.current?.querySelector<HTMLElement>('button, [role="button"]')?.focus();
         }
       };
 
       if (open) {
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+          document.removeEventListener('mousedown', handleClickOutside);
+          document.removeEventListener('keydown', handleKeyDown);
+        };
       }
-    }, [open, setOpen]);
+    }, [open, setOpen, rootRef]);
 
     if (!open) return null;
 
@@ -108,6 +139,7 @@ const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenuContent
     return (
       <div
         ref={contentRef}
+        role="menu"
         className={cn(
           'absolute z-50 min-w-[8rem] overflow-hidden rounded-xl border border-slate-200/60 bg-white p-1.5 text-slate-700 shadow-lg',
           'animate-in fade-in-0 zoom-in-95 duration-150',
@@ -139,6 +171,7 @@ const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenuItemPro
       <button
         ref={ref}
         type="button"
+        role="menuitem"
         className={cn(
           'relative flex w-full cursor-pointer select-none items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150',
           'hover:bg-slate-50 focus:bg-slate-50',

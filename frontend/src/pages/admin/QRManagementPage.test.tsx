@@ -224,4 +224,36 @@ describe('QRManagementPage (two-pane redesign)', () => {
     render(<QRManagementPage />);
     expect(screen.getByText('Restaurant QR Code')).toBeInTheDocument();
   });
+
+  it('shows the filtered count on the batch buttons while a search is active', () => {
+    render(<QRManagementPage />);
+    fireEvent.change(screen.getByPlaceholderText('Search tables…'), {
+      target: { value: 'table' },
+    });
+    expect(
+      screen.getByRole('button', { name: /Print Table QR Sheet \(2\)/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Download All QR Codes \(2\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('snapshots the SVGs at click time so later UI changes cannot drop downloads', () => {
+    vi.useFakeTimers();
+    try {
+      render(<QRManagementPage />);
+      fireEvent.change(screen.getByPlaceholderText('Search tables…'), {
+        target: { value: 'table' },
+      });
+      const serializeSpy = vi.spyOn(XMLSerializer.prototype, 'serializeToString');
+
+      fireEvent.click(screen.getByRole('button', { name: /Download All QR Codes/ }));
+
+      // Both filtered tables serialized synchronously at click — before any
+      // staggered timer fires and regardless of what unmounts afterwards.
+      expect(serializeSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

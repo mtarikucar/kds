@@ -35,6 +35,7 @@ const QRManagementPage = () => {
 
   // Batch print/download act on this filtered list: the DOM only holds the
   // visible cards, and printing exactly what you searched for is the point.
+  const filterActive = tableSearch.trim().length > 0;
   const filteredTableQRs = useMemo(() => {
     const query = tableSearch.trim().toLocaleLowerCase();
     if (!query) return tableQRs;
@@ -173,19 +174,25 @@ const QRManagementPage = () => {
       return;
     }
 
-    targets.forEach((qr, index) => {
-      setTimeout(() => {
+    // Snapshot every SVG synchronously at click time: the staggered timers
+    // below outlive the current DOM (search edits / tab switches unmount
+    // cards), and a late getElementById would silently drop those files.
+    const snapshots = targets
+      .map((qr) => {
         const svg = document.getElementById(`qr-${qr.id}-small`) ||
           document.getElementById(`qr-${qr.id}-medium`) ||
           document.getElementById(`qr-${qr.id}`);
-
         if (!svg) {
           console.warn(`QR element not found for ${qr.id}`);
-          return;
+          return null;
         }
+        return { qr, svgData: new XMLSerializer().serializeToString(svg) };
+      })
+      .filter((item): item is { qr: QrCodeData; svgData: string } => item !== null);
 
+    snapshots.forEach(({ qr, svgData }, index) => {
+      setTimeout(() => {
         try {
-          const svgData = new XMLSerializer().serializeToString(svg);
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
 
@@ -276,15 +283,16 @@ const QRManagementPage = () => {
         <div
           className={
             showTablePane
-              ? 'grid gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start'
+              ? 'grid gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:items-start'
               : ''
           }
           data-tour="qr-codes-list"
         >
-          {/* Restaurant-wide QR — the hero code */}
+          {/* Restaurant-wide QR — the hero code. No overflow-hidden here:
+              it would clip the download dropdown that extends past the card. */}
           <section
-            className={`bg-white rounded-2xl border border-slate-200/60 overflow-hidden ${
-              showTablePane ? 'lg:sticky lg:top-6' : 'max-w-xl mx-auto'
+            className={`bg-white rounded-2xl border border-slate-200/60 ${
+              showTablePane ? 'xl:sticky xl:top-6' : 'max-w-xl mx-auto'
             }`}
             data-tour="qr-download"
           >
@@ -334,7 +342,7 @@ const QRManagementPage = () => {
                   </div>
                 </div>
                 {tableQRs.length > 0 && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:flex-wrap gap-2">
                     <div className="relative flex-1 min-w-0 sm:max-w-xs">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                       <input
@@ -354,7 +362,7 @@ const QRManagementPage = () => {
                         </button>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 sm:ml-auto">
+                    <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                       <Button
                         onClick={() => printTableQRs(filteredTableQRs)}
                         variant="primary"
@@ -363,6 +371,7 @@ const QRManagementPage = () => {
                       >
                         <Printer className="h-4 w-4" />
                         {t('admin.printTableQRSheet')}
+                        {filterActive && ` (${filteredTableQRs.length})`}
                       </Button>
                       <Button
                         onClick={() => downloadTableQRs(filteredTableQRs)}
@@ -372,6 +381,7 @@ const QRManagementPage = () => {
                       >
                         <Download className="h-4 w-4" />
                         {t('admin.downloadAllQR')}
+                        {filterActive && ` (${filteredTableQRs.length})`}
                       </Button>
                     </div>
                   </div>
@@ -399,7 +409,7 @@ const QRManagementPage = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,10rem),1fr))] gap-3 md:gap-4">
                     {filteredTableQRs.map(qr => (
                       <QrCodeDisplay
                         key={qr.id}

@@ -289,7 +289,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
 
       {/* Actions */}
       <div className="mt-3 w-full space-y-2">
-        <DropdownMenu>
+        <DropdownMenu className="w-full">
           <DropdownMenuTrigger asChild>
             <Button variant="primary" className="w-full flex items-center justify-center gap-2">
               <Download className="h-4 w-4" />
