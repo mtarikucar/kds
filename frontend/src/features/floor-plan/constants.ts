@@ -30,12 +30,11 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
   {
     type: FloorElementType.DOOR,
     labelKey: 'floorPlan:elements.door',
-    // 1:1 to match the top-down swing-arc sprite (was a 60×12 sliver).
+    // Doors stay vector — the flat sliver is the clearest plan symbol.
     defaultWidth: 60,
-    defaultHeight: 60,
+    defaultHeight: 12,
     defaultStyle: { fill: '#a16207' },
     icon: 'DoorOpen',
-    spriteKey: 'door',
   },
   {
     type: FloorElementType.BAR,

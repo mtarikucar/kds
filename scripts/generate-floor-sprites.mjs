@@ -33,32 +33,43 @@ const ALL_KEYS = [
   'decor',
 ];
 
+// Written for a strict flat-lay read: describe the visible TOP SURFACE, not
+// the object — that is what keeps Recraft from drifting into 3/4 scene shots.
 const OBJECT_DESCRIPTIONS = {
-  'table-round': 'round wooden restaurant table',
-  'table-square': 'square wooden restaurant table',
-  'table-rect': 'long rectangular wooden restaurant table',
+  'table-round': 'round wooden restaurant table with plates of food on it',
+  'table-square':
+    'square wooden restaurant table with plates of food set on it, no chairs around it',
+  'table-rect':
+    'long rectangular wooden restaurant table with plates of food set on it, no chairs around it',
   plant: 'leafy potted plant',
-  bar: 'wooden bar counter with bottles',
-  kitchen: 'stainless commercial kitchen counter with stove',
-  door: 'open wooden door seen from above with swing arc',
-  decor: 'decorative rug or floor ornament',
+  bar: 'long wooden bar countertop seen looking straight down at it: an elongated flat wooden slab with glasses and bottles standing on top, strictly overhead view',
+  kitchen:
+    'rectangular commercial kitchen countertop with a built-in stove and pans, a flat stainless surface',
+  door: 'architectural floor-plan door symbol: a straight wooden door leaf with a quarter-circle swing arc',
+  decor: 'flat rectangular ornamental area rug with a simple geometric pattern',
 };
 
-// One shared skeleton so all 8 objects read as one asset set.
+// One shared skeleton so all 8 objects read as one asset set. Pure white
+// backdrop (cleanest birefnet cutouts), a single explicit camera angle, and
+// "nothing else in frame" — stray props/walls read as part of the sprite.
 const promptFor = (key) =>
-  `top-down 3/4 view 2D pixel art ${OBJECT_DESCRIPTIONS[key]}, retro game asset for ` +
-  'a restaurant floor plan, single object centered, entire object visible, ' +
-  'solid light beige background, no shadow, no text, crisp clean pixels';
+  `2D pixel art sprite of a single ${OBJECT_DESCRIPTIONS[key]}, flat lay viewed from ` +
+  "directly above (orthographic top-down bird's-eye view, like furniture on a " +
+  'video game floor plan, no perspective), clean retro game asset, one object ' +
+  'only, centered, the whole object fits inside the frame with empty margin ' +
+  'on all sides, not cropped, nothing else in frame, no floor, no wall, no ' +
+  'shadow, no text, isolated on a pure white background, crisp clean pixels';
 
-// One warm shared palette (wood browns, cream, leaf greens, slate, steel, accent red).
+// One warm shared palette. Deliberately NO greys (they get snapped onto
+// leftover backdrop/halo pixels) and a dark brown outline tone instead.
 const SHARED_PALETTE_HEX = [
+  '#3A2E27',
   '#8B5A2B',
   '#A9745B',
+  '#C89F6B',
   '#F2E8DA',
   '#4C9A4C',
   '#2F6B3A',
-  '#475569',
-  '#9AA5B1',
   '#C94F4F',
 ];
 const hexToRgb = (hex) => ({
@@ -92,11 +103,24 @@ function parseCli(argv) {
     scratch: 'scripts/.floor-sprites-scratch',
     out: 'frontend/public/floor-sprites/v1',
     picks: [],
+    pixelSnap: false,
+    engine: 'recraft',
+    seedBase: 42,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const eat = (name) => (arg.startsWith(`${name}=`) ? arg.slice(name.length + 1) : argv[++i]);
-    if (arg.startsWith('--objects')) {
+    if (arg === '--pixel-snap') {
+      opts.pixelSnap = true;
+    } else if (arg.startsWith('--seed-base')) {
+      opts.seedBase = Number(eat('--seed-base'));
+    } else if (arg.startsWith('--engine')) {
+      opts.engine = eat('--engine');
+      if (!['recraft', 'flux'].includes(opts.engine)) {
+        console.error(`--engine must be recraft|flux, got: ${opts.engine}`);
+        process.exit(1);
+      }
+    } else if (arg.startsWith('--objects')) {
       opts.objects = eat('--objects').split(',').map((s) => s.trim()).filter(Boolean);
     } else if (arg.startsWith('--candidates')) {
       opts.candidates = Number(eat('--candidates'));
@@ -136,6 +160,30 @@ const outDir = path.resolve(repoRoot, opts.out);
 // ------------------------------------------------------------------ pick mode
 
 if (opts.picks.length) {
+  // Post-process on promote when sharp is available (installed under
+  // frontend/node_modules): hard alpha threshold (kills cutout halo smears),
+  // trim transparent borders, nearest-neighbor downscale into a 256px box so
+  // the shipped asset is small and stays crisp. Falls back to a plain copy.
+  let sharp = null;
+  try {
+    const { createRequire } = await import('module');
+    sharp = createRequire(path.join(repoRoot, 'frontend', 'package.json'))('sharp');
+  } catch {
+    console.warn('sharp not available — promoting candidates without trim/resize');
+  }
+  const promote = async (src, dest) => {
+    if (!sharp) return copyFile(src, dest);
+    const { data, info } = await sharp(src)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let i = 3; i < data.length; i += 4) data[i] = data[i] < 140 ? 0 : 255;
+    await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .resize(256, 256, { fit: 'inside', kernel: 'nearest', withoutEnlargement: true })
+      .png({ compressionLevel: 9, palette: true })
+      .toFile(dest);
+  };
   await mkdir(outDir, { recursive: true });
   for (const { key, file } of opts.picks) {
     if (!ALL_KEYS.includes(key)) {
@@ -147,7 +195,7 @@ if (opts.picks.length) {
       console.error(`--pick: candidate file not found: ${src}`);
       process.exit(1);
     }
-    await copyFile(src, path.join(outDir, `${key}.png`));
+    await promote(src, path.join(outDir, `${key}.png`));
     console.log(`✓ promoted ${key} ← ${file}`);
   }
   console.log(
@@ -230,50 +278,86 @@ async function generateCandidate(key, candidate) {
   const prompt = promptFor(key);
   const tag = `${key} cand${candidate}`;
 
-  console.log(`  [1/3] ${tag}: recraft text-to-image…`);
   let recraft;
-  const recraftBody = {
-    prompt,
-    style: 'digital_illustration/pixel_art',
-    image_size: IMAGE_SIZE[key] ?? DEFAULT_IMAGE_SIZE,
-    colors: SHARED_PALETTE_RGB,
-  };
-  try {
-    recraft = await submitAndWait('fal-ai/recraft/v3/text-to-image', recraftBody);
-  } catch (err) {
-    if (err instanceof FalHttpError && err.status >= 400 && err.status < 500) {
-      const preset = PRESET_FALLBACK[key] ?? DEFAULT_PRESET;
-      console.warn(`  [1/3] ${tag}: exact size rejected (HTTP ${err.status}); retrying with preset ${preset}`);
-      recraft = await submitAndWait('fal-ai/recraft/v3/text-to-image', { ...recraftBody, image_size: preset });
-    } else {
-      throw err;
+  if (opts.engine === 'flux') {
+    // FLUX + pixel-art LoRA: stronger prompt adherence (top-down actually
+    // lands) and reproducible seeds; ~$0.035/MP.
+    console.log(`  [1/${opts.pixelSnap ? 3 : 2}] ${tag}: flux-lora text-to-image (seed ${opts.seedBase + candidate})…`);
+    recraft = await submitAndWait('fal-ai/flux-lora', {
+      prompt: `modern pixel art, ${prompt}`,
+      loras: [
+        {
+          path: 'https://huggingface.co/UmeAiRT/FLUX.1-dev-LoRA-Modern_Pixel_art/resolve/main/ume_modern_pixelart.safetensors',
+          scale: 1.0,
+        },
+      ],
+      image_size: IMAGE_SIZE[key] ?? DEFAULT_IMAGE_SIZE,
+      seed: opts.seedBase + candidate,
+      output_format: 'png',
+    });
+    recraftImages++;
+  } else {
+    console.log(`  [1/${opts.pixelSnap ? 3 : 2}] ${tag}: recraft text-to-image…`);
+    const recraftBody = {
+      prompt,
+      style: 'digital_illustration/pixel_art',
+      image_size: IMAGE_SIZE[key] ?? DEFAULT_IMAGE_SIZE,
+      colors: SHARED_PALETTE_RGB,
+    };
+    try {
+      recraft = await submitAndWait('fal-ai/recraft/v3/text-to-image', recraftBody);
+    } catch (err) {
+      if (err instanceof FalHttpError && err.status >= 400 && err.status < 500) {
+        const preset = PRESET_FALLBACK[key] ?? DEFAULT_PRESET;
+        console.warn(`  [1/3] ${tag}: exact size rejected (HTTP ${err.status}); retrying with preset ${preset}`);
+        recraft = await submitAndWait('fal-ai/recraft/v3/text-to-image', { ...recraftBody, image_size: preset });
+      } else {
+        throw err;
+      }
     }
+    recraftImages++;
   }
-  recraftImages++;
-  const rawUrl = firstImageUrl(recraft, 'recraft/v3');
+  const rawUrl = firstImageUrl(recraft, opts.engine === 'flux' ? 'flux-lora' : 'recraft/v3');
 
-  console.log(`  [2/3] ${tag}: birefnet background removal…`);
+  // Final stage returns the image as a data URI in the response body
+  // (sync_mode): fal's result CDN (v3.fal.media) is blocked by some corporate
+  // networks, while queue.fal.run is reachable. Intermediate stage URLs are
+  // fine — fal fetches those server-side.
+  console.log(`  [2/${opts.pixelSnap ? 3 : 2}] ${tag}: birefnet background removal…`);
   const cutout = await submitAndWait('fal-ai/birefnet/v2', {
     image_url: rawUrl,
     model: 'General Use (Heavy)',
     output_format: 'png',
     refine_foreground: true,
+    sync_mode: !opts.pixelSnap,
   });
-  const cutoutUrl = firstImageUrl(cutout, 'birefnet/v2');
+  let finalUrl = firstImageUrl(cutout, 'birefnet/v2');
 
-  console.log(`  [3/3] ${tag}: image2pixel palette snap…`);
-  const pixel = await submitAndWait('fal-ai/image2pixel', {
-    image_url: cutoutUrl,
-    fixed_palette: SHARED_PALETTE_HEX,
-    snap_grid: true,
-    transparent_background: true,
-    trim_borders: true,
-  });
-  const pixelUrl = firstImageUrl(pixel, 'image2pixel');
+  if (opts.pixelSnap) {
+    // Optional re-pixelization pass. Recraft's pixel_art output is already
+    // pixel art, and this pass coarsens it — off by default, kept for when a
+    // hard palette/grid normalization is wanted despite the detail loss.
+    console.log(`  [3/3] ${tag}: image2pixel palette snap…`);
+    const pixel = await submitAndWait('fal-ai/image2pixel', {
+      image_url: finalUrl,
+      fixed_palette: SHARED_PALETTE_HEX,
+      snap_grid: true,
+      transparent_background: true,
+      trim_borders: true,
+      sync_mode: true,
+    });
+    finalUrl = firstImageUrl(pixel, 'image2pixel');
+  }
 
-  const download = await fetch(pixelUrl, { signal: AbortSignal.timeout(60_000) });
-  if (!download.ok) throw new Error(`download failed with HTTP ${download.status}`);
-  const buf = Buffer.from(await download.arrayBuffer());
+  let buf;
+  if (finalUrl.startsWith('data:')) {
+    const base64 = finalUrl.slice(finalUrl.indexOf(',') + 1);
+    buf = Buffer.from(base64, 'base64');
+  } else {
+    const download = await fetch(finalUrl, { signal: AbortSignal.timeout(60_000) });
+    if (!download.ok) throw new Error(`download failed with HTTP ${download.status}`);
+    buf = Buffer.from(await download.arrayBuffer());
+  }
   const dest = path.join(scratchDir, `${key}-cand${candidate}.png`);
   await writeFile(dest, buf);
   console.log(`  ✓ ${tag} → ${path.relative(repoRoot, dest)} (${buf.length} bytes)`);

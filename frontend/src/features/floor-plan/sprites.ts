@@ -27,14 +27,16 @@ export const SPRITE_BASE = '/floor-sprites/v1';
  * `${SPRITE_BASE}/<key>.png` (existence is guarded by sprites.test.ts).
  */
 export const FLOOR_SPRITES: Record<FloorSpriteKey, string | null> = {
-  'table-round': null,
-  'table-square': null,
-  'table-rect': null,
-  plant: null,
-  bar: null,
-  kitchen: null,
+  'table-round': `${SPRITE_BASE}/table-round.png`,
+  'table-square': `${SPRITE_BASE}/table-square.png`,
+  'table-rect': `${SPRITE_BASE}/table-rect.png`,
+  plant: `${SPRITE_BASE}/plant.png`,
+  bar: `${SPRITE_BASE}/bar.png`,
+  kitchen: `${SPRITE_BASE}/kitchen.png`,
+  // door stays vector: the flat door sliver is the clearest floor-plan symbol,
+  // and generated door art only reads right in front view.
   door: null,
-  decor: null,
+  decor: `${SPRITE_BASE}/decor.png`,
 };
 
 const ELEMENT_SPRITE_KEY: Partial<Record<FloorElementType, FloorSpriteKey>> = {
