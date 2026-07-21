@@ -22,6 +22,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
+import StatCard from '../../components/ui/StatCard';
 import HourlyOrdersChart from '../../components/reports/HourlyOrdersChart';
 import CustomerAnalyticsSection from '../../components/reports/CustomerAnalyticsSection';
 import InventorySection from '../../components/reports/InventorySection';
@@ -119,44 +120,6 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   ];
   const tabs = allTabs.filter((t) => !t.gate || hasFeature(t.gate));
 
-  const StatCard = ({
-    title,
-    value,
-    icon: Icon,
-    color,
-    trend,
-  }: {
-    title: string;
-    value: string | number;
-    icon: React.ComponentType<{ className?: string }>;
-    color: string;
-    trend?: { value: number; isPositive: boolean };
-  }) => (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-slate-500 mb-1">{title}</p>
-            <p className="text-2xl font-bold">{value}</p>
-            {trend && (
-              <p
-                className={`text-xs mt-1 ${
-                  trend.isPositive ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {trend.isPositive ? '↑' : '↓'} %{trend.value}{' '}
-                {t('reports.vsPreviousPeriod')}
-              </p>
-            )}
-          </div>
-          <div className={`p-3 rounded-full ${color}`}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div>
       {!embedded && (
@@ -233,6 +196,7 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
                   icon={DollarSign}
                   color="bg-green-500"
                   trend={metricTrend(comparison, 'totalSales')}
+                  trendLabel={t('reports.vsPreviousPeriod')}
                 />
                 <StatCard
                   title={t('reports.totalOrders')}
@@ -240,6 +204,7 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
                   icon={ShoppingCart}
                   color="bg-blue-500"
                   trend={metricTrend(comparison, 'totalOrders')}
+                  trendLabel={t('reports.vsPreviousPeriod')}
                 />
                 <StatCard
                   title={t('reports.averageOrderValue')}
@@ -247,6 +212,7 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
                   icon={TrendingUp}
                   color="bg-purple-500"
                   trend={metricTrend(comparison, 'averageOrderValue')}
+                  trendLabel={t('reports.vsPreviousPeriod')}
                 />
                 <StatCard
                   title={t('reports.totalDiscounts')}
