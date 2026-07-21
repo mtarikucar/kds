@@ -47,7 +47,12 @@
     "loading": "Загрузка…",
     "noRecords": "Нет записей.",
     "loadError": "Не удалось загрузить отчёт — обновите страницу и попробуйте ещё раз.",
-    "ordersCount": "{{count}} заказов"
+    "ordersCount": "{{count}} заказов",
+    "themes": {
+      "sales": "Продажи",
+      "financeBudget": "Финансы и бюджет",
+      "operation": "Операции"
+    }
   },
   "zReports": {
     "title": "Z-отчеты",

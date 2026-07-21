@@ -47,7 +47,12 @@
     "loading": "جارٍ التحميل…",
     "noRecords": "لا توجد سجلات.",
     "loadError": "تعذّر تحميل التقرير — حدّث الصفحة وحاول مرة أخرى.",
-    "ordersCount": "{{count}} طلب"
+    "ordersCount": "{{count}} طلب",
+    "themes": {
+      "sales": "المبيعات",
+      "financeBudget": "المالية والميزانية",
+      "operation": "العمليات"
+    }
   },
   "zReports": {
     "title": "تقارير Z",

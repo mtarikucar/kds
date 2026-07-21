@@ -47,7 +47,12 @@
     "loading": "Loading…",
     "noRecords": "No records.",
     "loadError": "The report could not be loaded — refresh the page and try again.",
-    "ordersCount": "{{count}} orders"
+    "ordersCount": "{{count}} orders",
+    "themes": {
+      "sales": "Sales",
+      "financeBudget": "Finance & Budget",
+      "operation": "Operations"
+    }
   },
   "zReports": {
     "title": "Z-Reports",

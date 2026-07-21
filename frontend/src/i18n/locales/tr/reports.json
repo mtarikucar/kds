@@ -47,7 +47,12 @@
     "loading": "Yükleniyor…",
     "noRecords": "Kayıt yok.",
     "loadError": "Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.",
-    "ordersCount": "{{count}} sipariş"
+    "ordersCount": "{{count}} sipariş",
+    "themes": {
+      "sales": "Satış",
+      "financeBudget": "Finans & Bütçe",
+      "operation": "Operasyon"
+    }
   },
   "zReports": {
     "title": "Z-Raporları",

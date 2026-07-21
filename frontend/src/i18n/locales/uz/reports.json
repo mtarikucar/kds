@@ -47,7 +47,12 @@
     "loading": "Yuklanmoqda…",
     "noRecords": "Yozuvlar yo‘q.",
     "loadError": "Hisobot yuklanmadi — sahifani yangilab, qayta urinib ko‘ring.",
-    "ordersCount": "{{count}} ta buyurtma"
+    "ordersCount": "{{count}} ta buyurtma",
+    "themes": {
+      "sales": "Savdo",
+      "financeBudget": "Moliya va byudjet",
+      "operation": "Operatsiyalar"
+    }
   },
   "zReports": {
     "title": "Z-hisobotlar",
