@@ -489,8 +489,12 @@
       "notFound": "Filial topilmadi yoki kirish huquqingiz yo‘q.",
       "tabs": {
         "devices": "Qurilmalar",
+        "terminals": "To‘lov terminallari",
+        "fiscal": "Kassa apparati",
+        "hardware": "Printer va tortma",
         "network": "Mahalliy tarmoq"
-      }
+      },
+      "scopeHint": "Terminallar va kassani boshqarish uchun yuqori panelda ushbu filialga o‘ting."
     },
     "network": {
       "tokenTitle": "Ko‘prik tokeni (bir marta ko‘rsatiladi)",

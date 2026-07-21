@@ -489,8 +489,12 @@
       "notFound": "Şube bulunamadı veya erişiminiz yok.",
       "tabs": {
         "devices": "Cihazlar",
+        "terminals": "Ödeme Terminalleri",
+        "fiscal": "Yazarkasa",
+        "hardware": "Yazıcı & Çekmece",
         "network": "Yerel ağ"
-      }
+      },
+      "scopeHint": "Terminal ve yazarkasa yönetimi için üst çubuktan bu şubeye geçin."
     },
     "network": {
       "tokenTitle": "Köprü token’ı (bir kez gösterilir)",

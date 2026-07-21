@@ -489,8 +489,12 @@
       "notFound": "Branch not found, or you don't have access.",
       "tabs": {
         "devices": "Devices",
+        "terminals": "Payment Terminals",
+        "fiscal": "Cash Register",
+        "hardware": "Printer & Drawer",
         "network": "Local network"
-      }
+      },
+      "scopeHint": "Switch to this branch in the top bar to manage terminals and the cash register."
     },
     "network": {
       "tokenTitle": "Bridge token (shown once)",

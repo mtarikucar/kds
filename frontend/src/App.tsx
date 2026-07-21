@@ -200,12 +200,6 @@ const DeliveryPlatformsSettingsPage = lazyWithReload(
 const SmsSettingsPage = lazyWithReload(
   () => import("./pages/settings/SmsSettingsPage"),
 );
-const AccountingSettingsPage = lazyWithReload(
-  () => import("./pages/settings/AccountingSettingsPage"),
-);
-const PaymentTerminalsSettingsPage = lazyWithReload(
-  () => import("./pages/settings/PaymentTerminalsSettingsPage"),
-);
 import Layout from "./components/layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 // HummyTummy Phase 3–12 admin screens.
@@ -689,23 +683,13 @@ function App() {
                   </FeatureGate>
                 }
               />
+              {/* Cihaz yönetimi şube hub'ına taşındı (Şubeler → şube → sekmeler). */}
+              <Route path="payment-terminals" element={<Navigate to="/admin/branches" replace />} />
               <Route
                 path="accounting"
                 element={
-                  <FeatureGate
-                    feature="advancedReports"
-                    fallback={<UpsellCard addOnCode="advanced_reports" />}
-                  >
-                    <AccountingSettingsPage />
-                  </FeatureGate>
+                  <Navigate to="/admin/finance?group=documents&tab=settings" replace />
                 }
-              />
-              {/* Integrated card terminals — core POS hardware, no plan gate. The
-              rail is fail-closed: real adapters stay CONFIGURED_NOT_ACTIVE until
-              an operator activates certified hardware here. */}
-              <Route
-                path="payment-terminals"
-                element={<PaymentTerminalsSettingsPage />}
               />
             </Route>
 

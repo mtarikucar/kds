@@ -12,11 +12,20 @@ import {
   Pencil,
   Hash,
   Clock3,
+  CreditCard,
+  Printer,
+  HardDrive,
 } from 'lucide-react';
 import { useGetBranch, useUpdateBranch } from './branchesApi';
 import { useGetHealthOverview } from '../health/healthApi';
 import DeviceManagerSection from '../devices/DeviceManagerSection';
 import BranchNetworkSection from './BranchNetworkSection';
+import { PaymentTerminalsPanel } from '../../pages/settings/PaymentTerminalsSettingsPage';
+import { FiscalDevicesPanel } from '../fiscal/FiscalDevicesPanel';
+import HardwareDevicesSection from '../devices/HardwareDevicesSection';
+import { useBranchScopeStore } from '../../store/branchScopeStore';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import { isTauri } from '@/lib/tauri';
 import Card from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -36,7 +45,7 @@ const HEALTH_PILL: Record<string, string> = {
   red: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200/60',
 };
 
-type Tab = 'devices' | 'network';
+type Tab = 'devices' | 'terminals' | 'fiscal' | 'hardware' | 'network';
 
 export default function BranchDetailPage() {
   const { t } = useTranslation('common');
@@ -44,6 +53,8 @@ export default function BranchDetailPage() {
   const { data: branch, isLoading, isError } = useGetBranch(id);
   const { data: health } = useGetHealthOverview();
   const update = useUpdateBranch();
+  const activeBranchId = useBranchScopeStore((s) => s.branchId);
+  const { hasIntegration } = useSubscription();
 
   const [tab, setTab] = useState<Tab>('devices');
   const [editOpen, setEditOpen] = useState(false);
@@ -107,6 +118,13 @@ export default function BranchDetailPage() {
       </div>
     );
   }
+
+  // Terminal/fiscal/hardware panels write to the ACTIVE scope branch
+  // (X-Branch-Id), not necessarily the one this page is showing — an ADMIN
+  // roaming through /admin/branches/:id could otherwise register a terminal
+  // against the wrong branch. Hide (not 403) those tabs unless this branch
+  // IS the active one.
+  const isActiveBranch = branch ? activeBranchId === branch.id : false;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
@@ -178,17 +196,40 @@ export default function BranchDetailPage() {
         <TabButton active={tab === 'devices'} onClick={() => setTab('devices')} icon={Cpu}>
           {t('hummytummy.branchDetail.tabs.devices', { defaultValue: 'Cihazlar' })}
         </TabButton>
+        {isActiveBranch && (
+          <TabButton active={tab === 'terminals'} onClick={() => setTab('terminals')} icon={CreditCard}>
+            {t('hummytummy.branchDetail.tabs.terminals', { defaultValue: 'Ödeme Terminalleri' })}
+          </TabButton>
+        )}
+        {isActiveBranch && hasIntegration('fiscal') && (
+          <TabButton active={tab === 'fiscal'} onClick={() => setTab('fiscal')} icon={Printer}>
+            {t('hummytummy.branchDetail.tabs.fiscal', { defaultValue: 'Yazarkasa' })}
+          </TabButton>
+        )}
+        {isActiveBranch && isTauri() && (
+          <TabButton active={tab === 'hardware'} onClick={() => setTab('hardware')} icon={HardDrive}>
+            {t('hummytummy.branchDetail.tabs.hardware', { defaultValue: 'Yazıcı & Çekmece' })}
+          </TabButton>
+        )}
         <TabButton active={tab === 'network'} onClick={() => setTab('network')} icon={Router}>
           {t('hummytummy.branchDetail.tabs.network', { defaultValue: 'Yerel ağ' })}
         </TabButton>
       </div>
 
+      {!isActiveBranch && (
+        <p className="text-xs text-slate-500">
+          {t('hummytummy.branchDetail.scopeHint', {
+            defaultValue: 'Terminal ve yazarkasa yönetimi için üst çubuktan bu şubeye geçin.',
+          })}
+        </p>
+      )}
+
       <Card variant="bordered" className="p-4 sm:p-5">
-        {tab === 'devices' ? (
-          <DeviceManagerSection branchId={branch.id} />
-        ) : (
-          <BranchNetworkSection branchId={branch.id} />
-        )}
+        {tab === 'devices' && <DeviceManagerSection branchId={branch.id} />}
+        {tab === 'terminals' && <PaymentTerminalsPanel />}
+        {tab === 'fiscal' && <FiscalDevicesPanel />}
+        {tab === 'hardware' && <HardwareDevicesSection />}
+        {tab === 'network' && <BranchNetworkSection branchId={branch.id} />}
       </Card>
 
       <Modal
