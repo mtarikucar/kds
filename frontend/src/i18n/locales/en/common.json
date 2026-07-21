@@ -132,6 +132,58 @@
       "reconciliation": "{{count}} card charge(s) need reconciliation — review on the branch devices page."
     }
   },
+  "cash": {
+    "title": "Cash",
+    "subtitle": "Shift reconciliation, cash movements and day-end.",
+    "tabs": {
+      "sessions": "Shifts",
+      "safe": "Cash Movements",
+      "dayend": "Day-End",
+      "tips": "Tips"
+    },
+    "sessions": {
+      "open": "Open shifts",
+      "none": "No open shifts.",
+      "row": "Shift {{id}} — opening {{amount}}"
+    },
+    "xreport": {
+      "title": "Live drawer summary (without closing)",
+      "pick": "Pick a shift on the left.",
+      "opening": "Opening",
+      "cashSales": "Cash sales",
+      "cashIn": "Cash in",
+      "cashOut": "Cash out",
+      "expected": "Expected cash"
+    },
+    "safe": {
+      "title": "Cash movement",
+      "desc": "Money leaving the drawer — requires approval, counts as an outflow in shift reconciliation.",
+      "typeSafeDrop": "Transfer to main safe",
+      "typeBankDeposit": "Bank deposit",
+      "typePettyCash": "Petty cash",
+      "typeCashOut": "Cash out",
+      "amount": "Amount",
+      "reason": "Description",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Movement recorded (pending approval). Amount: {{amount}}",
+      "failed": "Could not record — check the amount and retry."
+    },
+    "tips": {
+      "title": "Tip distribution — pool {{pool}}, {{hours}} hours",
+      "error": "Could not load — refresh and retry.",
+      "staff": "Staff",
+      "hours": "Hours",
+      "share": "Share",
+      "undistributed": "Undistributed: {{amount}} (no hours entered)."
+    },
+    "dayend": {
+      "csv": "Closed-shift export (CSV)",
+      "csvError": "Download failed — retry."
+    },
+    "loading": "Loading…",
+    "empty": "No records."
+  },
   "hummytummy": {
     "common": {
       "loading": "Loading…",

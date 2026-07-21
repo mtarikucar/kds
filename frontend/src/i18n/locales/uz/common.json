@@ -132,6 +132,58 @@
       "reconciliation": "{{count}} karta to'lovi solishtiruvni kutmoqda — filial qurilmalar sahifasida ko'ring."
     }
   },
+  "cash": {
+    "title": "Kassa",
+    "subtitle": "Smena solishtiruvi, kassa harakatlari va kun yakuni.",
+    "tabs": {
+      "sessions": "Smenalar",
+      "safe": "Kassa harakatlari",
+      "dayend": "Kun yakuni",
+      "tips": "Choy puli"
+    },
+    "sessions": {
+      "open": "Ochiq smenalar",
+      "none": "Ochiq smena yo'q.",
+      "row": "Smena {{id}} — ochilish {{amount}}"
+    },
+    "xreport": {
+      "title": "Jonli kassa xulosasi (yopmasdan)",
+      "pick": "Chapdan bir smenani tanlang.",
+      "opening": "Ochilish",
+      "cashSales": "Naqd savdo",
+      "cashIn": "Kassaga kirim",
+      "cashOut": "Kassadan chiqim",
+      "expected": "Kutilgan naqd"
+    },
+    "safe": {
+      "title": "Kassa harakati",
+      "desc": "Kassadan chiqadigan pul — tasdiqlashga tushadi, smena solishtiruvida chiqim sifatida hisoblanadi.",
+      "typeSafeDrop": "Asosiy seyfga o'tkazma",
+      "typeBankDeposit": "Bank depoziti",
+      "typePettyCash": "Mayda xarajatlar kassasi",
+      "typeCashOut": "Naqd chiqim",
+      "amount": "Summa",
+      "reason": "Izoh",
+      "save": "Saqlash",
+      "saving": "Saqlanmoqda…",
+      "saved": "Harakat saqlandi (tasdiq kutilmoqda). Summa: {{amount}}",
+      "failed": "Harakatni saqlab bo'lmadi — summani tekshirib qayta urinib ko'ring."
+    },
+    "tips": {
+      "title": "Choy puli taqsimoti — jamg'arma {{pool}}, {{hours}} soat",
+      "error": "Hisobotni yuklab bo'lmadi — sahifani yangilab qayta urinib ko'ring.",
+      "staff": "Xodim",
+      "hours": "Soat",
+      "share": "Ulush",
+      "undistributed": "Taqsimlanmagan: {{amount}} (soat kiritilmagan)."
+    },
+    "dayend": {
+      "csv": "Yopilgan smenalar eksporti (CSV)",
+      "csvError": "CSV yuklab bo'lmadi — qayta urinib ko'ring."
+    },
+    "loading": "Yuklanmoqda…",
+    "empty": "Yozuvlar yo'q."
+  },
   "hummytummy": {
     "common": {
       "loading": "Yuklanmoqda…",
