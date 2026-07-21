@@ -30,7 +30,7 @@ const FinancePage = () => {
   ];
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-heading font-bold text-slate-900">
           {t('navigation.finance', 'Finans')}
