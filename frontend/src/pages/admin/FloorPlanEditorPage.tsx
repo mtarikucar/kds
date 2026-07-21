@@ -65,7 +65,7 @@ export default function FloorPlanEditorPage({
   const [showGrid, setShowGrid] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settingsZoneId, setSettingsZoneId] = useState<string | null>(null);
-  const [newTable, setNewTable] = useState<{ shape: TableShape } | null>(null);
+  const [newTable, setNewTable] = useState<{ shape: TableShape; pos?: { x: number; y: number } } | null>(null);
   const [newTableNumber, setNewTableNumber] = useState('');
   const [newTableCapacity, setNewTableCapacity] = useState(4);
   // Zone-create modal — replaces the old window.prompt() (which offered no
@@ -74,9 +74,17 @@ export default function FloorPlanEditorPage({
   const [newZoneName, setNewZoneName] = useState('');
   // Zone-delete confirm modal — replaces the app's last window.confirm().
   const [confirmingZoneDelete, setConfirmingZoneDelete] = useState(false);
-  // Click-to-place: a palette button ARMS an element type; the next canvas
-  // click drops it there (Shift+click keeps it armed for rapid multi-place).
-  const [armedElement, setArmedElement] = useState<FloorElementType | null>(null);
+  // Click-to-place: a palette button ARMS an element type (or a table shape);
+  // the next canvas click drops the element there (Shift+click keeps it armed
+  // for rapid multi-place) or, for tables, captures the spot and opens the
+  // create modal so the new table lands where the user pointed.
+  const [armed, setArmed] = useState<
+    { kind: 'element'; type: FloorElementType } | { kind: 'table'; shape: TableShape } | null
+  >(null);
+  const armedElement = armed?.kind === 'element' ? armed.type : null;
+  // True while a keyboard-nudge hold is in progress (reset on arrow keyup) —
+  // lets the first EFFECTIVE nudge of a hold push history even under e.repeat.
+  const nudgeRun = useRef(false);
   const [placeHintDismissed, setPlaceHintDismissed] = useState(false);
   // Consecutive center drops cascade so repeated adds never stack invisibly.
   const centerDropSeq = useRef(0);
@@ -121,7 +129,7 @@ export default function FloorPlanEditorPage({
         return;
       }
       if (e.key === 'Escape') {
-        setArmedElement(null);
+        setArmed(null);
         s.clearSelection();
         return;
       }
@@ -130,13 +138,25 @@ export default function FloorPlanEditorPage({
         e.preventDefault();
         const zone = plan?.zones.find((z) => z.id === s.activeZoneId) ?? plan?.zones[0];
         // Arrow = one grid cell, Shift+Arrow = fine 1-unit; key repeat skips
-        // history so a held key is a single undo step.
+        // history so a held key is a single undo step. The run flag (reset on
+        // keyup) guarantees the FIRST effective nudge of a hold pushes history
+        // even when the hold started with an empty selection (e.repeat alone
+        // can't tell — the selection may have changed mid-hold).
         const step = e.shiftKey ? 1 : Math.max(1, zone?.gridSize ?? 1);
-        s.nudgeSelected(delta[0] * step, delta[1] * step, { skipHistory: e.repeat });
+        const firstOfRun = !e.repeat || !nudgeRun.current;
+        s.nudgeSelected(delta[0] * step, delta[1] * step, { skipHistory: !firstOfRun });
+        nudgeRun.current = true;
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (ARROW_DELTAS[e.key]) nudgeRun.current = false;
+    };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, [plan]);
 
   // Warn before the tab unloads while there are unsaved edits.
@@ -202,22 +222,36 @@ export default function FloorPlanEditorPage({
 
   // Palette buttons toggle the armed type; the actual add happens on canvas click.
   const handleArmElement = (type: FloorElementType) => {
-    setArmedElement((cur) => (cur === type ? null : type));
+    setArmed((cur) => (cur?.kind === 'element' && cur.type === type ? null : { kind: 'element', type }));
+  };
+
+  const handleArmTable = (shape: TableShape) => {
+    setArmed((cur) => (cur?.kind === 'table' && cur.shape === shape ? null : { kind: 'table', shape }));
   };
 
   const handleCanvasClick = (x: number, y: number, opts: { shiftKey: boolean }) => {
-    if (!armedElement || !activeZone) return;
-    const def = ELEMENT_PALETTE.find((p) => p.type === armedElement)!;
+    if (!armed || !activeZone) return;
+    if (armed.kind === 'table') {
+      // Capture the pointed spot and let the modal finish the create there.
+      const p = snapPoint(
+        { x: x - DEFAULT_TABLE_SIZE.width / 2, y: y - DEFAULT_TABLE_SIZE.height / 2 },
+        activeZone.gridSize,
+      );
+      setNewTable({ shape: armed.shape, pos: p });
+      setArmed(null);
+      return;
+    }
+    const def = ELEMENT_PALETTE.find((p) => p.type === armed.type)!;
     // center the new element on the click point, snapped to the grid
     const p = snapPoint(
       { x: x - def.defaultWidth / 2, y: y - def.defaultHeight / 2 },
       activeZone.gridSize,
     );
-    store.addElement(armedElement, activeZone.id, {
+    store.addElement(armed.type, activeZone.id, {
       x: p.x, y: p.y, width: def.defaultWidth, height: def.defaultHeight,
-      style: def.defaultStyle, label: armedElement === 'TEXT' ? t('floorPlan:elements.text') : undefined,
+      style: def.defaultStyle, label: armed.type === 'TEXT' ? t('floorPlan:elements.text') : undefined,
     });
-    if (!opts.shiftKey) setArmedElement(null);
+    if (!opts.shiftKey) setArmed(null);
   };
 
   const handlePlaceTable = (tableId: string) => {
@@ -228,7 +262,9 @@ export default function FloorPlanEditorPage({
 
   const handleCreateTable = async () => {
     if (!activeZone || !newTable || !newTableNumber.trim()) return;
-    const c = nextCenterDrop();
+    // Armed click-to-place captured a spot; otherwise fall back to the
+    // center-cascade drop.
+    const c = newTable.pos ?? nextCenterDrop();
     try {
       await createTable.mutateAsync({
         number: newTableNumber.trim(),
@@ -336,7 +372,8 @@ export default function FloorPlanEditorPage({
         canRedo={store.future.length > 0}
         showGrid={showGrid}
         armedElement={armedElement}
-        onAddTable={(shape) => setNewTable({ shape })}
+        armedTableShape={armed?.kind === 'table' ? armed.shape : null}
+        onAddTable={handleArmTable}
         onAddElement={handleArmElement}
         onUndo={store.undo}
         onRedo={store.redo}
@@ -371,7 +408,7 @@ export default function FloorPlanEditorPage({
               showGrid={showGrid}
               width={size.width}
               height={size.height}
-              placing={!!armedElement}
+              placing={!!armed}
               onSelect={(sel, additive) => store.select(sel, additive)}
               onTableDragEnd={(id, posX, posY) => store.moveTable(id, posX, posY, activeZone.gridSize)}
               onTableTransformEnd={(id, geo) => store.transformTable(id, geo)}
@@ -384,7 +421,7 @@ export default function FloorPlanEditorPage({
               {zones.length === 0 ? t('floorPlan:noZones') : t('common:loading', 'Loading…')}
             </div>
           )}
-          {armedElement && !placeHintDismissed && (
+          {armed && !placeHintDismissed && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-slate-900/85 text-white text-xs shadow-lg whitespace-nowrap">
               <MousePointerClick className="w-3.5 h-3.5 shrink-0" />
               <span>{t('floorPlan:placementHint')}</span>

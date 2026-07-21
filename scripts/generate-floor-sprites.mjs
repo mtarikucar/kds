@@ -221,6 +221,11 @@ function pngDims(buf) {
   return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
 }
 
+// Billed Recraft generations — counted the moment the generation SUCCEEDS,
+// not when the whole pipeline does: a later-stage failure (bg removal,
+// pixelation, download) does not refund the already-billed image.
+let recraftImages = 0;
+
 async function generateCandidate(key, candidate) {
   const prompt = promptFor(key);
   const tag = `${key} cand${candidate}`;
@@ -244,6 +249,7 @@ async function generateCandidate(key, candidate) {
       throw err;
     }
   }
+  recraftImages++;
   const rawUrl = firstImageUrl(recraft, 'recraft/v3');
 
   console.log(`  [2/3] ${tag}: birefnet background removal…`);
@@ -280,13 +286,11 @@ console.log(
 );
 
 const rows = [];
-let recraftImages = 0;
 for (const key of opts.objects) {
   console.log(`▸ ${key}`);
   for (let n = 1; n <= opts.candidates; n++) {
     try {
       const { bytes, dims } = await generateCandidate(key, n);
-      recraftImages++;
       rows.push({
         key,
         candidate: n,

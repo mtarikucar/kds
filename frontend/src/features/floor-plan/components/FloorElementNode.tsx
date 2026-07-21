@@ -30,7 +30,18 @@ export default function FloorElementNode({
 }: Props) {
   const style = element.style ?? {};
   const isText = element.type === FloorElementType.TEXT;
-  const sprite = useSpriteImage(spriteForElementType(element.type));
+  const loadedSprite = useSpriteImage(spriteForElementType(element.type));
+  // Aspect guard: sprites are authored at each type's DEFAULT footprint aspect,
+  // but persisted elements may carry older defaults (e.g. pre-sprite 60×12
+  // doors) or extreme user resizes. Past ~1.6× mismatch a stretched sprite
+  // reads as a smear — fall back to the vector rendering instead.
+  const sprite = (() => {
+    if (!loadedSprite) return null;
+    const boxAspect = element.width / Math.max(1, element.height);
+    const imgAspect = loadedSprite.width / Math.max(1, loadedSprite.height);
+    const mismatch = boxAspect > imgAspect ? boxAspect / imgAspect : imgAspect / boxAspect;
+    return mismatch <= 1.6 ? loadedSprite : null;
+  })();
 
   const handleTransformEnd = (e: KonvaEventObject<Event>) => {
     const node = e.target;
@@ -69,12 +80,12 @@ export default function FloorElementNode({
           fill={(style.color as string) || '#0f172a'}
         />
       ) : sprite ? (
-        // Pixel-art sprite; smoothing off keeps pixels crisp when scaled.
+        // Pixel-art sprite; the node layer draws with smoothing disabled
+        // (Konva only honors imageSmoothingEnabled at the Layer level).
         <KonvaImage
           image={sprite}
           width={element.width}
           height={element.height}
-          imageSmoothingEnabled={false}
           opacity={(style.opacity as number) ?? 1}
         />
       ) : (

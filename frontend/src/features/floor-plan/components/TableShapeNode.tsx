@@ -85,7 +85,8 @@ export default function TableShapeNode({
       {/* table body: sprite (status ring + tint) or vector fallback */}
       {sprite ? (
         <>
-          <KonvaImage image={sprite} width={w} height={h} imageSmoothingEnabled={false} />
+          {/* smoothing is disabled layer-wide (Konva ignores the attr on Image) */}
+          <KonvaImage image={sprite} width={w} height={h} />
           {isRound ? (
             <>
               {tinted && (

@@ -159,7 +159,10 @@ export default function FloorCanvas({
           if (e.target === e.target.getStage()) setPos({ x: e.target.x(), y: e.target.y() });
         }}
       >
-        <Layer ref={layerRef}>
+        {/* Surface layer keeps default smoothing (zone background photos must
+            stay interpolated); the bg Rect stays listening — stage-click
+            detection matches on its name. */}
+        <Layer>
           {/* canvas surface */}
           <Rect name="bg" x={0} y={0} width={zone.canvasWidth} height={zone.canvasHeight} fill="#ffffff" stroke="#e2e8f0" strokeWidth={1} />
           {bgImage && (
@@ -169,6 +172,11 @@ export default function FloorCanvas({
           {gridLines.map((pts, i) => (
             <Line key={i} points={pts} stroke="#eef2f7" strokeWidth={1} listening={false} />
           ))}
+        </Layer>
+        {/* Node layer draws unsmoothed: Konva only honors imageSmoothingEnabled
+            at the Layer level, and the pixel-art sprites need nearest-neighbor
+            scaling to stay crisp (vector shapes are unaffected). */}
+        <Layer ref={layerRef} imageSmoothingEnabled={false}>
           {/* elements (behind tables) */}
           {elements.map((el) => (
             <FloorElementNode

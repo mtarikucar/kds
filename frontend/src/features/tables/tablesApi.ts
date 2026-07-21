@@ -38,6 +38,9 @@ export const useCreateTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // Creates can carry a zone placement now — the plan must show it even if
+      // LiveFloorMap (and its socket) isn't mounted when the create happens.
+      queryClient.invalidateQueries({ queryKey: ['floorPlan'] });
       toast.success(i18n.t('common:notifications.tableCreatedSuccessfully'));
     },
     onError: (error: any) => {
@@ -83,6 +86,9 @@ export const useDeleteTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // A placed table must also disappear from the cached plan, not linger as
+      // a ghost node until the next socket-driven refetch.
+      queryClient.invalidateQueries({ queryKey: ['floorPlan'] });
       toast.success(i18n.t('common:notifications.tableDeletedSuccessfully'));
     },
     onError: (error: any) => {

@@ -18,6 +18,8 @@ interface Props {
   showGrid: boolean;
   /** Element type currently armed for click-to-place (null = none). */
   armedElement: FloorElementType | null;
+  /** Table shape currently armed for click-to-place (null = none). */
+  armedTableShape: TableShape | null;
   onAddTable: (shape: TableShape) => void;
   onAddElement: (type: FloorElementType) => void;
   onUndo: () => void;
@@ -44,24 +46,29 @@ const TbBtn = ({ onClick, disabled, title, children, active, pressed }: any) => 
 );
 
 export default function EditorToolbar({
-  dirty, saving, canUndo, canRedo, showGrid, armedElement,
+  dirty, saving, canUndo, canRedo, showGrid, armedElement, armedTableShape,
   onAddTable, onAddElement, onUndo, onRedo, onToggleGrid, onSave,
 }: Props) {
   const { t } = useTranslation(['floorPlan', 'common']);
+
+  const TABLE_SHAPE_BUTTONS: Array<{ shape: TableShape; labelKey: string; Icon: typeof Circle }> = [
+    { shape: TableShape.ROUND, labelKey: 'floorPlan:shapes.round', Icon: Circle },
+    { shape: TableShape.SQUARE, labelKey: 'floorPlan:shapes.square', Icon: Square },
+    { shape: TableShape.RECT, labelKey: 'floorPlan:shapes.rect', Icon: RectangleHorizontal },
+  ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-white border-b border-slate-200">
       {/* Tables */}
       <span className="text-xs font-medium text-slate-400 uppercase tracking-wide mr-1">{t('floorPlan:addTable')}</span>
-      <TbBtn onClick={() => onAddTable(TableShape.ROUND)} title={t('floorPlan:shapes.round')}>
-        <Circle className="w-4 h-4" />
-      </TbBtn>
-      <TbBtn onClick={() => onAddTable(TableShape.SQUARE)} title={t('floorPlan:shapes.square')}>
-        <Square className="w-4 h-4" />
-      </TbBtn>
-      <TbBtn onClick={() => onAddTable(TableShape.RECT)} title={t('floorPlan:shapes.rect')}>
-        <RectangleHorizontal className="w-4 h-4" />
-      </TbBtn>
+      {TABLE_SHAPE_BUTTONS.map(({ shape, labelKey, Icon }) => {
+        const armed = armedTableShape === shape;
+        return (
+          <TbBtn key={shape} onClick={() => onAddTable(shape)} title={t(labelKey)} active={armed} pressed={armed}>
+            <Icon className="w-4 h-4" />
+          </TbBtn>
+        );
+      })}
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
