@@ -1,8 +1,10 @@
-import { Group, Circle, Rect, Text } from 'react-konva';
+import { Group, Circle, Image as KonvaImage, Rect, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { TableShape, TableStatus } from '../../../types';
 import type { EditorTable } from '../floorEditorStore';
 import { computeSeatPositions } from '../geometry';
+import { spriteForTableShape } from '../sprites';
+import useSpriteImage from '../useSpriteImage';
 
 /** Status → fill, matching lib/tableStatus.ts (emerald / red / amber 500). */
 const STATUS_FILL: Record<TableStatus, string> = {
@@ -23,9 +25,11 @@ interface Props {
 }
 
 /**
- * A table rendered on the canvas: status-colored silhouette (round/square/
- * rect), auto seat dots from capacity, the table number, and an active-order
- * badge. Used in both the editor (editable) and the live map (read-only).
+ * A table rendered on the canvas: pixel-art sprite per shape when loaded
+ * (status shown as a colored ring + soft tint), status-colored silhouette
+ * (round/square/rect) as fallback, auto seat dots from capacity, the table
+ * number, and an active-order badge. Used in both the editor (editable) and
+ * the live map (read-only).
  */
 export default function TableShapeNode({
   table,
@@ -38,6 +42,11 @@ export default function TableShapeNode({
   const { width: w, height: h } = table;
   const fill = STATUS_FILL[table.status] ?? '#10b981';
   const seats = computeSeatPositions(table.tableShape, w, h, table.capacity);
+  const sprite = useSpriteImage(spriteForTableShape(table.tableShape));
+  // AVAILABLE stays clean (green ring only); busy states get a soft tint too.
+  const tinted = table.status === TableStatus.OCCUPIED || table.status === TableStatus.RESERVED;
+  const isRound = table.tableShape === TableShape.ROUND;
+  const corner = table.tableShape === TableShape.SQUARE ? 8 : 6;
 
   const handleTransformEnd = (e: KonvaEventObject<Event>) => {
     const node = e.target;
@@ -73,8 +82,32 @@ export default function TableShapeNode({
         <Circle key={i} x={s.x} y={s.y} radius={6} fill={SEAT_FILL} stroke={SEAT_STROKE} strokeWidth={1} />
       ))}
 
-      {/* table body */}
-      {table.tableShape === TableShape.ROUND ? (
+      {/* table body: sprite (status ring + tint) or vector fallback */}
+      {sprite ? (
+        <>
+          {/* smoothing is disabled layer-wide (Konva ignores the attr on Image) */}
+          <KonvaImage image={sprite} width={w} height={h} />
+          {isRound ? (
+            <>
+              {tinted && (
+                <Circle x={w / 2} y={h / 2} radius={Math.min(w, h) / 2} fill={fill} opacity={0.28} listening={false} />
+              )}
+              <Circle x={w / 2} y={h / 2} radius={Math.min(w, h) / 2} stroke={fill} strokeWidth={4} listening={false} />
+              {selected && (
+                <Circle x={w / 2} y={h / 2} radius={Math.min(w, h) / 2 + 3} stroke="#0ea5e9" strokeWidth={3} listening={false} />
+              )}
+            </>
+          ) : (
+            <>
+              {tinted && <Rect width={w} height={h} cornerRadius={corner} fill={fill} opacity={0.28} listening={false} />}
+              <Rect width={w} height={h} cornerRadius={corner} stroke={fill} strokeWidth={4} listening={false} />
+              {selected && (
+                <Rect x={-3} y={-3} width={w + 6} height={h + 6} cornerRadius={corner + 3} stroke="#0ea5e9" strokeWidth={3} listening={false} />
+              )}
+            </>
+          )}
+        </>
+      ) : isRound ? (
         <Circle
           x={w / 2}
           y={h / 2}
@@ -91,7 +124,7 @@ export default function TableShapeNode({
         <Rect
           width={w}
           height={h}
-          cornerRadius={table.tableShape === TableShape.SQUARE ? 8 : 6}
+          cornerRadius={corner}
           fill={fill}
           stroke={selected ? '#0ea5e9' : '#0f172a'}
           strokeWidth={selected ? 3 : 1}

@@ -25,6 +25,18 @@ const plan = (): FloorPlan => ({
         { id: 't1', number: '1', capacity: 4, status: TableStatus.AVAILABLE, zoneId: 'z1', posX: 100, posY: 100, width: 80, height: 80, rotation: 0, tableShape: TableShape.ROUND, activeOrderCount: 0 },
       ],
     },
+    {
+      id: 'z2',
+      name: 'Bahçe',
+      sortOrder: 1,
+      kind: 'OUTDOOR' as any,
+      canvasWidth: 1000,
+      canvasHeight: 600,
+      gridSize: 10,
+      backgroundOpacity: 1,
+      elements: [],
+      tables: [],
+    },
   ],
   unplacedTables: [
     { id: 't2', number: '2', capacity: 2, status: TableStatus.AVAILABLE, zoneId: null, posX: 0, posY: 0, width: 80, height: 80, rotation: 0, tableShape: TableShape.SQUARE, activeOrderCount: 0 },
@@ -158,5 +170,102 @@ describe('floorEditorStore', () => {
     store().markSavedClean();
     expect(store().touchedTableIds.size).toBe(0);
     expect(store().buildSavePayload().layout.tables).toHaveLength(0);
+  });
+
+  it('nudgeSelected moves every selected node, marks touched + dirty, one history entry', () => {
+    store().select({ kind: 'table', id: 't1' });
+    store().select({ kind: 'element', id: 'e1' }, true);
+    store().nudgeSelected(20, -10);
+    expect(store().tables.t1.posX).toBe(120);
+    expect(store().tables.t1.posY).toBe(90);
+    expect(store().elements.e1.x).toBe(30);
+    expect(store().elements.e1.y).toBe(0);
+    expect(store().dirty).toBe(true);
+    expect(store().touchedTableIds.has('t1')).toBe(true);
+    expect(store().touchedElementIds.has('e1')).toBe(true);
+    expect(store().past).toHaveLength(1);
+  });
+
+  it('nudgeSelected with skipHistory mutates in place — one undo reverts a held-key run', () => {
+    store().select({ kind: 'table', id: 't1' });
+    store().nudgeSelected(20, 0); // initial press → one history entry
+    store().nudgeSelected(20, 0, { skipHistory: true });
+    store().nudgeSelected(20, 0, { skipHistory: true });
+    expect(store().tables.t1.posX).toBe(160);
+    expect(store().past).toHaveLength(1);
+    store().undo();
+    expect(store().tables.t1.posX).toBe(100);
+  });
+
+  it('nudgeSelected clamps to the coordinate bounds and no-ops without a selection', () => {
+    store().nudgeSelected(20, 20);
+    expect(store().dirty).toBe(false);
+    expect(store().past).toHaveLength(0);
+    store().select({ kind: 'table', id: 't1' });
+    store().nudgeSelected(-99999, 99999);
+    expect(store().tables.t1.posX).toBe(-2000);
+    expect(store().tables.t1.posY).toBe(12000);
+  });
+
+  it('duplicateSelectedElements clones elements (+16px, temp id, _new) and selects the clones', () => {
+    store().select({ kind: 'element', id: 'e1' });
+    store().duplicateSelectedElements();
+    const s = store();
+    const clone = Object.values(s.elements).find((e) => e._new)!;
+    expect(clone.id).toMatch(/^temp-el-/);
+    expect(clone).toMatchObject({ type: FloorElementType.WALL, x: 26, y: 26, zoneId: 'z1' });
+    expect(s.elements.e1).toBeDefined(); // source untouched
+    expect(s.selection).toEqual([{ kind: 'element', id: clone.id }]);
+    // clone follows addElement's _new semantics → next save POSTs it
+    const payload = s.buildSavePayload();
+    expect(payload.creates).toHaveLength(1);
+    expect(payload.creates[0].tempId).toBe(clone.id);
+    expect(payload.layout.elements.find((e) => e.id === clone.id)).toBeUndefined();
+  });
+
+  it('duplicateSelectedElements ignores tables', () => {
+    store().select({ kind: 'table', id: 't1' });
+    store().duplicateSelectedElements();
+    expect(store().buildSavePayload().creates).toHaveLength(0);
+    expect(store().dirty).toBe(false);
+  });
+
+  it('setTableGeometry maps x/y to posX/posY, clamps like transformTable, leaves other fields', () => {
+    store().setTableGeometry('t1', { x: 99999, rotation: 370 });
+    const t = store().tables.t1;
+    expect(t.posX).toBe(12000);
+    expect(t.posY).toBe(100); // untouched by the partial patch
+    expect(t.rotation).toBe(10);
+    expect(store().dirty).toBe(true);
+    expect(store().touchedTableIds.has('t1')).toBe(true);
+    expect(store().past).toHaveLength(1);
+  });
+
+  it('setElementGeometry clamps like transformElement', () => {
+    store().setElementGeometry('e1', { width: 99999, height: 0 });
+    const e = store().elements.e1;
+    expect(e.width).toBe(12000);
+    expect(e.height).toBe(1);
+    expect(store().touchedElementIds.has('e1')).toBe(true);
+  });
+
+  it('moveTableToZone re-zones a placed table and re-centers it on the target zone', () => {
+    store().moveTableToZone('t1', 'z2');
+    const t = store().tables.t1;
+    expect(t.zoneId).toBe('z2');
+    // (1000/2 - 80/2, 600/2 - 80/2) snapped to grid 10
+    expect(t.posX).toBe(460);
+    expect(t.posY).toBe(260);
+    expect(store().dirty).toBe(true);
+    expect(store().touchedTableIds.has('t1')).toBe(true);
+    store().undo();
+    expect(store().tables.t1.zoneId).toBe('z1');
+  });
+
+  it('moveTableToZone to the current zone or an unknown zone is a no-op', () => {
+    store().moveTableToZone('t1', 'z1');
+    store().moveTableToZone('t1', 'nope');
+    expect(store().dirty).toBe(false);
+    expect(store().past).toHaveLength(0);
   });
 });

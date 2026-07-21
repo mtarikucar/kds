@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,7 +27,13 @@ import {
 import LiveFloorMap from '../../features/floor-plan/components/LiveFloorMap';
 import FloorPlanEditorPage from './FloorPlanEditorPage';
 import { useFloorPlan } from '../../features/floor-plan/floorPlanApi';
-import { Table, TableStatus } from '../../types';
+import { useFloorEditorStore } from '../../features/floor-plan/floorEditorStore';
+import {
+  parseTableViewMode,
+  serializeTableViewMode,
+  type TableViewMode,
+} from './tableViewMode';
+import { CreateTableDto, Table, TableStatus } from '../../types';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
@@ -38,21 +45,128 @@ import {
   getTableStatusConfig,
   getTableStatusLabel,
 } from '../../lib/tableStatus';
+
+/** Occupancy stats strip — same useTables()-derived totals, rendered in
+ *  BOTH plan and list modes (the plan view previously had no numbers). */
+const TableStatsStrip = ({
+  stats,
+}: {
+  stats: {
+    total: number;
+    available: number;
+    occupied: number;
+    reserved: number;
+    occupancyPct: number;
+  };
+}) => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+            <LayoutGrid className="w-5 h-5 text-slate-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+            <p className="text-xs text-slate-500">{t('admin.totalTables')}</p>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+            <span className="w-3 h-3 rounded-full bg-emerald-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-emerald-600">{stats.available}</p>
+            <p className="text-xs text-slate-500">{t('admin.available')}</p>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+            <span className="w-3 h-3 rounded-full bg-red-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-red-600">{stats.occupied}</p>
+            <p className="text-xs text-slate-500">{t('admin.occupied')}</p>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+              <span className="w-3 h-3 rounded-full bg-amber-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-600">{stats.reserved}</p>
+              <p className="text-xs text-slate-500">{t('admin.reserved')}</p>
+            </div>
+          </div>
+          {/* Occupancy % indicator */}
+          <div className="text-right">
+            <p className="text-2xl font-bold text-slate-900">{stats.occupancyPct}%</p>
+            <p className="text-xs text-slate-500">{t('admin.occupancy')}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const TableManagementPage = () => {
   const { t } = useTranslation(['common', 'subscriptions']);
   const { checkLimit } = useSubscription();
 
   const tableSchema = z.object({
     number: z.string().min(1, t('admin.tableNumberRequired')),
-    capacity: z.number().min(1, t('admin.capacityMin')),
+    // Upper bound mirrors the floor-plan editor's clamp — a 4-digit typo
+    // here used to create a giant table the plan couldn't render sanely.
+    capacity: z
+      .number()
+      .min(1, t('admin.capacityRange'))
+      .max(200, t('admin.capacityRange')),
     status: z.nativeEnum(TableStatus),
+    // '' = unplaced (no zoneId sent). Only rendered while creating.
+    zoneId: z.string().optional(),
   });
 
   type TableFormData = z.infer<typeof tableSchema>;
   // Masalar üç modda açılır — 'plan' (canlı 2D salon planı, VARSAYILAN) staff'ın
   // masaları görsel olarak gördüğü mod; 'edit' salon planı düzenleyicisi (eski
   // ayrı /admin/floor-plan sekmesi buraya taşındı); 'list' klasik kart ızgarası.
-  const [view, setView] = useState<'plan' | 'edit' | 'list'>('plan');
+  // Mod URL'de yaşar (?view=edit|list) — yenileme/deep-link/back güvenli.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = parseTableViewMode(searchParams.get('view'));
+  // Mode requested while the floor editor holds unsaved work — kept until
+  // the user confirms discarding (null when the guard dialog is closed).
+  const [pendingView, setPendingView] = useState<TableViewMode | null>(null);
+  const editorDirty = useFloorEditorStore((s) => s.dirty);
+
+  const applyView = (mode: TableViewMode) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        const serialized = serializeTableViewMode(mode);
+        if (serialized === null) next.delete('view');
+        else next.set('view', serialized);
+        return next;
+      },
+      // replace: mode flips are not navigations — keep the back button sane.
+      { replace: true },
+    );
+  };
+
+  const requestView = (mode: TableViewMode) => {
+    if (mode !== view && view === 'edit' && editorDirty) {
+      setPendingView(mode);
+      return;
+    }
+    applyView(mode);
+  };
   // Table tapped on the live plan → opens the quick status action sheet. We hold
   // only the id and re-derive the live row from the (socket-refreshed) plan, so
   // the sheet's status/active-state can't go stale while it's open.
@@ -64,6 +178,10 @@ const TableManagementPage = () => {
         .concat(livePlan?.unplacedTables ?? [])
         .find((tbl) => tbl.id === statusTargetId) ?? null)
     : null;
+  const statusTargetZoneName =
+    (statusTarget?.zoneId &&
+      livePlan?.zones.find((z) => z.id === statusTarget.zoneId)?.name) ||
+    null;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   // Styled delete confirmation replaces the native confirm(); holds the
@@ -118,17 +236,35 @@ const TableManagementPage = () => {
         number: '',
         capacity: 4,
         status: TableStatus.AVAILABLE,
+        // Default to the first zone so a new table lands VISIBLE on the
+        // default plan view instead of silently in the unplaced tray.
+        zoneId: livePlan?.zones[0]?.id ?? '',
       });
     }
     setModalOpen(true);
   };
 
   const handleSubmit = (data: TableFormData) => {
-    const submitData = {
-      ...data,
-      capacity: Number(data.capacity),
-      status: data.status as TableStatus,
+    const { zoneId, ...rest } = data;
+    const submitData: CreateTableDto = {
+      ...rest,
+      capacity: Number(rest.capacity),
+      status: rest.status as TableStatus,
     };
+    if (!editingTable && zoneId) {
+      const zone = livePlan?.zones.find((z) => z.id === zoneId);
+      if (zone) {
+        // Drop at the zone's center with a ±40px jitter so consecutive
+        // creates don't stack invisibly on the exact same point.
+        submitData.zoneId = zone.id;
+        submitData.posX = Math.round(
+          zone.canvasWidth / 2 + (Math.random() - 0.5) * 80,
+        );
+        submitData.posY = Math.round(
+          zone.canvasHeight / 2 + (Math.random() - 0.5) * 80,
+        );
+      }
+    }
 
     if (editingTable) {
       updateTable(
@@ -154,6 +290,12 @@ const TableManagementPage = () => {
     { value: TableStatus.AVAILABLE, label: t('admin.available') },
     { value: TableStatus.OCCUPIED, label: t('admin.occupied') },
     { value: TableStatus.RESERVED, label: t('admin.reserved') },
+  ];
+
+  // Zone choices for the create modal — '' keeps the unplaced behavior.
+  const zoneOptions = [
+    ...(livePlan?.zones ?? []).map((z) => ({ value: z.id, label: z.name })),
+    { value: '', label: t('admin.zoneUnplaced') },
   ];
 
   // One-tap status control: the segmented Free/Seated/Reserved order
@@ -196,7 +338,7 @@ const TableManagementPage = () => {
           <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
             <button
               type="button"
-              onClick={() => setView('plan')}
+              onClick={() => requestView('plan')}
               className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'plan' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
               aria-pressed={view === 'plan'}
             >
@@ -204,7 +346,7 @@ const TableManagementPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => setView('edit')}
+              onClick={() => requestView('edit')}
               className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'edit' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
               aria-pressed={view === 'edit'}
             >
@@ -212,7 +354,7 @@ const TableManagementPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => setView('list')}
+              onClick={() => requestView('list')}
               className={`flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors ${view === 'list' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
               aria-pressed={view === 'list'}
             >
@@ -256,7 +398,7 @@ const TableManagementPage = () => {
               className={`text-sm ${canAddTable ? 'text-blue-700' : 'text-amber-700'}`}
             >
               {canAddTable
-                ? t('admin.subscriptionLimitInfo')
+                ? t('admin.tableLimitInfo')
                 : t('subscriptions:subscriptions.limitReachedDescription', {
                     resource: t('subscriptions:subscriptions.planLimits.tables'),
                     current: tables?.length ?? 0,
@@ -276,67 +418,11 @@ const TableManagementPage = () => {
         />
       )}
 
-      {/* Stats strip — surfaces the already-computed totals (was never
-          rendered before) using the shared status palette. Includes a
-          live occupancy % indicator. Hidden while empty/loading. */}
-      {view === 'list' && !isLoading && tables && tables.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                <LayoutGrid className="w-5 h-5 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
-                <p className="text-xs text-slate-500">
-                  {t('admin.totalTables', 'Toplam Masa')}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-emerald-600">{stats.available}</p>
-                <p className="text-xs text-slate-500">{t('admin.available')}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                <span className="w-3 h-3 rounded-full bg-red-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-red-600">{stats.occupied}</p>
-                <p className="text-xs text-slate-500">{t('admin.occupied')}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                  <span className="w-3 h-3 rounded-full bg-amber-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-amber-600">{stats.reserved}</p>
-                  <p className="text-xs text-slate-500">{t('admin.reserved')}</p>
-                </div>
-              </div>
-              {/* Occupancy % indicator */}
-              <div className="text-right">
-                <p className="text-2xl font-bold text-slate-900">{stats.occupancyPct}%</p>
-                <p className="text-xs text-slate-500">
-                  {t('admin.occupancy', 'Doluluk')}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Stats strip — shared status palette + live occupancy %, rendered
+          in BOTH plan and list modes (the plan is the default screen staff
+          glance at). Hidden while empty/loading and in the editor. */}
+      {view !== 'edit' && !isLoading && tables && tables.length > 0 && (
+        <TableStatsStrip stats={stats} />
       )}
 
       {/* Main Content */}
@@ -352,7 +438,7 @@ const TableManagementPage = () => {
           <LiveFloorMap
             onTableClick={(tbl) => setStatusTargetId(tbl.id)}
             emptyAction={
-              <Button onClick={() => setView('edit')}>
+              <Button onClick={() => requestView('edit')}>
                 <MapIcon className="h-4 w-4 mr-2" />
                 {t('admin.openFloorPlanEditor', 'Salon planını düzenle')}
               </Button>
@@ -514,6 +600,7 @@ const TableManagementPage = () => {
           <Input
             label={t('admin.tableNumber')}
             placeholder={t('admin.tableNumberPlaceholder')}
+            maxLength={32}
             error={form.formState.errors.number?.message}
             {...form.register('number')}
           />
@@ -521,6 +608,7 @@ const TableManagementPage = () => {
             label={t('admin.capacity')}
             type="number"
             min="1"
+            max="200"
             error={form.formState.errors.capacity?.message}
             {...form.register('capacity', { valueAsNumber: true })}
           />
@@ -530,6 +618,20 @@ const TableManagementPage = () => {
             error={form.formState.errors.status?.message}
             {...form.register('status')}
           />
+          {/* Zone placement — create only (editing keeps the table where it
+              is; moving zones is the floor editor's job). Defaulting to the
+              first zone means a new table lands VISIBLE on the plan. */}
+          {!editingTable &&
+            (livePlan?.zones.length ? (
+              <FormSelect
+                label={t('admin.tableZone')}
+                options={zoneOptions}
+                error={form.formState.errors.zoneId?.message}
+                {...form.register('zoneId')}
+              />
+            ) : (
+              <p className="text-xs text-slate-500">{t('admin.noZonesHint')}</p>
+            ))}
           <div className="flex gap-3">
             <Button
               type="button"
@@ -553,7 +655,7 @@ const TableManagementPage = () => {
       <Modal
         isOpen={!!tableToDelete}
         onClose={() => setTableToDelete(null)}
-        title={t('admin.deleteTable', 'Masayı Sil')}
+        title={t('admin.deleteTable')}
       >
         {tableToDelete && (
           <div className="space-y-4">
@@ -575,12 +677,7 @@ const TableManagementPage = () => {
             {tableToDelete.status === TableStatus.OCCUPIED && (
               <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
                 <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>
-                  {t(
-                    'admin.deleteOccupiedWarning',
-                    'Bu masa şu anda dolu. Silmek aktif bir oturumu etkileyebilir.',
-                  )}
-                </span>
+                <span>{t('admin.deleteOccupiedWarning')}</span>
               </div>
             )}
 
@@ -589,10 +686,7 @@ const TableManagementPage = () => {
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                 <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>
-                  {t(
-                    'admin.deleteReservationWarning',
-                    'Bu masada yaklaşan bir rezervasyon var',
-                  )}
+                  {t('admin.deleteReservationWarning')}
                   : {tableToDelete.upcomingReservation.startTime} ·{' '}
                   {tableToDelete.upcomingReservation.customerName}
                 </span>
@@ -636,6 +730,19 @@ const TableManagementPage = () => {
       >
         {statusTarget && (
           <div className="space-y-3">
+            {/* Info line — capacity + zone, so the sheet answers "which
+                table is this?" without leaving the plan. */}
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-slate-400" />
+                {statusTarget.capacity} {t('admin.people')}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <MapIcon className="w-4 h-4 text-slate-400" />
+                {statusTargetZoneName ?? t('admin.zoneUnplaced')}
+              </span>
+            </div>
             <p className="text-sm text-slate-500">{t('admin.setStatus', 'Durumu değiştir')}</p>
             <div className="grid grid-cols-1 gap-2">
               {(Object.values(TableStatus) as TableStatus[]).map((s) => {
@@ -670,8 +777,75 @@ const TableManagementPage = () => {
                 );
               })}
             </div>
+            {/* Full edit (number/capacity/status) — reuses the list-mode
+                modal. The full Table row comes from the tables cache; the
+                plan payload alone doesn't carry everything the form edits.
+                Disabled if the row isn't in the cache (still loading). */}
+            {(() => {
+              const row = tables?.find((tbl) => tbl.id === statusTarget.id);
+              return (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={!row}
+                  onClick={() => {
+                    if (!row) return;
+                    setStatusTargetId(null);
+                    handleOpenModal(row);
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {t('admin.editTable')}
+                </Button>
+              );
+            })()}
           </div>
         )}
+      </Modal>
+
+      {/* Leaving-edit guard — switching away from the editor with unsaved
+          floor-plan changes needs an explicit choice (discard vs stay).
+          Mirrors the styled-confirm pattern of the delete modal above. */}
+      <Modal
+        isOpen={!!pendingView}
+        onClose={() => setPendingView(null)}
+        title={t('admin.unsavedChangesTitle')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
+            <p className="text-sm text-slate-700">{t('admin.unsavedChangesBody')}</p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setPendingView(null)}
+            >
+              {t('admin.stayInEditor')}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              onClick={() => {
+                // Discard = drop the working copy for real: un-dirty the store so
+                // the editor's mount effect reloads the server plan on re-entry
+                // (and the beforeunload guard disarms while browsing plan/list).
+                useFloorEditorStore.getState().markSavedClean();
+                if (pendingView) applyView(pendingView);
+                setPendingView(null);
+              }}
+            >
+              {t('admin.discardAndLeave')}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

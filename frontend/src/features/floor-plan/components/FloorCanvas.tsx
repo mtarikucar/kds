@@ -24,7 +24,9 @@ interface Props {
   onElementDragEnd: (id: string, x: number, y: number) => void;
   onElementTransformEnd: (id: string, geo: { x: number; y: number; width: number; height: number; rotation: number }) => void;
   /** Click on empty canvas at design-space coords (used to drop a new item). */
-  onCanvasClick?: (x: number, y: number) => void;
+  onCanvasClick?: (x: number, y: number, opts: { shiftKey: boolean }) => void;
+  /** Armed click-to-place mode: show a crosshair cursor over the stage. */
+  placing?: boolean;
 }
 
 function useBackgroundImage(url?: string | null) {
@@ -43,7 +45,7 @@ function useBackgroundImage(url?: string | null) {
 
 export default function FloorCanvas({
   zone, tables, elements, selection, editable, showGrid, width, height,
-  onSelect, onTableDragEnd, onTableTransformEnd, onElementDragEnd, onElementTransformEnd, onCanvasClick,
+  onSelect, onTableDragEnd, onTableTransformEnd, onElementDragEnd, onElementTransformEnd, onCanvasClick, placing,
 }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const layerRef = useRef<Konva.Layer>(null);
@@ -122,7 +124,9 @@ export default function FloorCanvas({
         const stage = stageRef.current;
         const pointer = stage?.getPointerPosition();
         if (pointer) {
-          onCanvasClick((pointer.x - pos.x) / scale, (pointer.y - pos.y) / scale);
+          // onTap hands a TouchEvent (no shiftKey) — coerce to false there.
+          const shiftKey = (e.evt as MouseEvent).shiftKey ?? false;
+          onCanvasClick((pointer.x - pos.x) / scale, (pointer.y - pos.y) / scale, { shiftKey });
         }
       }
     }
@@ -137,7 +141,7 @@ export default function FloorCanvas({
   const selectedIds = new Set(selection.map((s) => s.id));
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-slate-100">
+    <div className={['relative w-full h-full overflow-hidden bg-slate-100', placing ? 'cursor-crosshair' : ''].join(' ')}>
       <Stage
         ref={stageRef}
         width={width}
@@ -155,7 +159,10 @@ export default function FloorCanvas({
           if (e.target === e.target.getStage()) setPos({ x: e.target.x(), y: e.target.y() });
         }}
       >
-        <Layer ref={layerRef}>
+        {/* Surface layer keeps default smoothing (zone background photos must
+            stay interpolated); the bg Rect stays listening — stage-click
+            detection matches on its name. */}
+        <Layer>
           {/* canvas surface */}
           <Rect name="bg" x={0} y={0} width={zone.canvasWidth} height={zone.canvasHeight} fill="#ffffff" stroke="#e2e8f0" strokeWidth={1} />
           {bgImage && (
@@ -165,6 +172,11 @@ export default function FloorCanvas({
           {gridLines.map((pts, i) => (
             <Line key={i} points={pts} stroke="#eef2f7" strokeWidth={1} listening={false} />
           ))}
+        </Layer>
+        {/* Node layer draws unsmoothed: Konva only honors imageSmoothingEnabled
+            at the Layer level, and the pixel-art sprites need nearest-neighbor
+            scaling to stay crisp (vector shapes are unaffected). */}
+        <Layer ref={layerRef} imageSmoothingEnabled={false}>
           {/* elements (behind tables) */}
           {elements.map((el) => (
             <FloorElementNode

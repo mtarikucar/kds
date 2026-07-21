@@ -1,4 +1,6 @@
 import { FloorElementType, TableShape } from '../../types';
+// Import direction is constants → sprites only (sprites.ts must stay cycle-free).
+import type { FloorSpriteKey } from './sprites';
 
 /** Default footprint for a newly-dropped table (design units). */
 export const DEFAULT_TABLE_SIZE = { width: 80, height: 80 };
@@ -12,6 +14,8 @@ export interface ElementPaletteItem {
   defaultStyle: Record<string, any>;
   /** Lucide icon name (resolved in the toolbar). */
   icon: string;
+  /** Pixel-art sprite for this type (types without one stay vector). */
+  spriteKey?: FloorSpriteKey;
 }
 
 export const ELEMENT_PALETTE: ElementPaletteItem[] = [
@@ -26,6 +30,7 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
   {
     type: FloorElementType.DOOR,
     labelKey: 'floorPlan:elements.door',
+    // Doors stay vector — the flat sliver is the clearest plan symbol.
     defaultWidth: 60,
     defaultHeight: 12,
     defaultStyle: { fill: '#a16207' },
@@ -38,6 +43,7 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
     defaultHeight: 60,
     defaultStyle: { fill: '#1e293b' },
     icon: 'Wine',
+    spriteKey: 'bar',
   },
   {
     type: FloorElementType.KITCHEN,
@@ -46,6 +52,7 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
     defaultHeight: 140,
     defaultStyle: { fill: '#334155' },
     icon: 'CookingPot',
+    spriteKey: 'kitchen',
   },
   {
     type: FloorElementType.PLANT,
@@ -54,6 +61,7 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
     defaultHeight: 48,
     defaultStyle: { fill: '#15803d' },
     icon: 'Sprout',
+    spriteKey: 'plant',
   },
   {
     type: FloorElementType.DECOR,
@@ -62,6 +70,7 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
     defaultHeight: 80,
     defaultStyle: { fill: '#7c3aed' },
     icon: 'Shapes',
+    spriteKey: 'decor',
   },
   {
     type: FloorElementType.TEXT,

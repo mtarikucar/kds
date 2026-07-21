@@ -16,6 +16,10 @@ interface Props {
   canUndo: boolean;
   canRedo: boolean;
   showGrid: boolean;
+  /** Element type currently armed for click-to-place (null = none). */
+  armedElement: FloorElementType | null;
+  /** Table shape currently armed for click-to-place (null = none). */
+  armedTableShape: TableShape | null;
   onAddTable: (shape: TableShape) => void;
   onAddElement: (type: FloorElementType) => void;
   onUndo: () => void;
@@ -24,12 +28,13 @@ interface Props {
   onSave: () => void;
 }
 
-const TbBtn = ({ onClick, disabled, title, children, active }: any) => (
+const TbBtn = ({ onClick, disabled, title, children, active, pressed }: any) => (
   <button
     type="button"
     onClick={onClick}
     disabled={disabled}
     title={title}
+    aria-pressed={pressed}
     className={[
       'h-9 px-2.5 rounded-lg border text-sm flex items-center gap-1.5 transition-colors',
       active ? 'bg-primary-50 border-primary-300 text-primary-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
@@ -41,24 +46,29 @@ const TbBtn = ({ onClick, disabled, title, children, active }: any) => (
 );
 
 export default function EditorToolbar({
-  dirty, saving, canUndo, canRedo, showGrid,
+  dirty, saving, canUndo, canRedo, showGrid, armedElement, armedTableShape,
   onAddTable, onAddElement, onUndo, onRedo, onToggleGrid, onSave,
 }: Props) {
   const { t } = useTranslation(['floorPlan', 'common']);
+
+  const TABLE_SHAPE_BUTTONS: Array<{ shape: TableShape; labelKey: string; Icon: typeof Circle }> = [
+    { shape: TableShape.ROUND, labelKey: 'floorPlan:shapes.round', Icon: Circle },
+    { shape: TableShape.SQUARE, labelKey: 'floorPlan:shapes.square', Icon: Square },
+    { shape: TableShape.RECT, labelKey: 'floorPlan:shapes.rect', Icon: RectangleHorizontal },
+  ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-white border-b border-slate-200">
       {/* Tables */}
       <span className="text-xs font-medium text-slate-400 uppercase tracking-wide mr-1">{t('floorPlan:addTable')}</span>
-      <TbBtn onClick={() => onAddTable(TableShape.ROUND)} title={t('floorPlan:shapes.round')}>
-        <Circle className="w-4 h-4" />
-      </TbBtn>
-      <TbBtn onClick={() => onAddTable(TableShape.SQUARE)} title={t('floorPlan:shapes.square')}>
-        <Square className="w-4 h-4" />
-      </TbBtn>
-      <TbBtn onClick={() => onAddTable(TableShape.RECT)} title={t('floorPlan:shapes.rect')}>
-        <RectangleHorizontal className="w-4 h-4" />
-      </TbBtn>
+      {TABLE_SHAPE_BUTTONS.map(({ shape, labelKey, Icon }) => {
+        const armed = armedTableShape === shape;
+        return (
+          <TbBtn key={shape} onClick={() => onAddTable(shape)} title={t(labelKey)} active={armed} pressed={armed}>
+            <Icon className="w-4 h-4" />
+          </TbBtn>
+        );
+      })}
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
@@ -66,8 +76,9 @@ export default function EditorToolbar({
       <span className="text-xs font-medium text-slate-400 uppercase tracking-wide mr-1">{t('floorPlan:addElement')}</span>
       {ELEMENT_PALETTE.map((item) => {
         const Icon = ELEMENT_ICON[item.icon] ?? Shapes;
+        const armed = armedElement === item.type;
         return (
-          <TbBtn key={item.type} onClick={() => onAddElement(item.type)} title={t(item.labelKey)}>
+          <TbBtn key={item.type} onClick={() => onAddElement(item.type)} title={t(item.labelKey)} active={armed} pressed={armed}>
             <Icon className="w-4 h-4" />
           </TbBtn>
         );
@@ -85,6 +96,11 @@ export default function EditorToolbar({
       <TbBtn onClick={onToggleGrid} active={showGrid} title={t('floorPlan:toggleGrid')}>
         <Grid3x3 className="w-4 h-4" />
       </TbBtn>
+      {dirty && !saving && (
+        <span className="text-[11px] px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+          {t('floorPlan:unsavedChanges')}
+        </span>
+      )}
       <button
         type="button"
         onClick={onSave}

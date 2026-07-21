@@ -9,6 +9,8 @@
   "saved": "Zal rejasi saqlandi",
   "loading": "Yuklanmoqda…",
   "saving": "Saqlanmoqda…",
+  "unsavedChanges": "Saqlanmagan o'zgarishlar",
+  "placementHint": "Joylashtirish uchun kanvasga bosing — Esc bekor qiladi",
   "addZone": "Hudud qo'shish",
   "zoneSettings": "Hudud sozlamalari",
   "newZonePrompt": "Yangi hududga nom bering (masalan, 2-qavat, Bog')",
@@ -46,7 +48,17 @@
     "element": "Element",
     "label": "Yorliq",
     "labelPlaceholder": "Ixtiyoriy yorliq",
-    "deleteElement": "Elementni o'chirish"
+    "deleteElement": "Elementni o'chirish",
+    "duplicate": "Nusxalash",
+    "moveToZone": "Hududga ko'chirish",
+    "geometry": {
+      "title": "Joylashuv va o'lcham",
+      "x": "X",
+      "y": "Y",
+      "width": "Kenglik",
+      "height": "Balandlik",
+      "rotation": "Burilish (°)"
+    }
   },
   "zone": {
     "name": "Nomi",
@@ -59,6 +71,9 @@
     "background": "Fon rasmi URL",
     "opacity": "Fon shaffofligi ({{value}}%)",
     "delete": "Hududni o'chirish",
-    "deleteConfirm": "\"{{name}}\" hududi o'chirilsinmi? Uning stollari joylashtirilmaganlarga o'tadi."
+    "deleteConfirm": "\"{{name}}\" hududi o'chirilsinmi? Uning stollari joylashtirilmaganlarga o'tadi.",
+    "deleteTitle": "Hududni o'chirish",
+    "deleteBody": "\"{{name}}\" hududi o'chiriladi. Uning stollari joylashtirilmaganlarga o'tadi.",
+    "deleteAction": "O'chirish"
   }
 }

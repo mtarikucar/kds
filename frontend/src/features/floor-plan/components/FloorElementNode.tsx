@@ -1,7 +1,9 @@
-import { Group, Rect, Text } from 'react-konva';
+import { Group, Image as KonvaImage, Rect, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { FloorElementType } from '../../../types';
 import type { EditorElement } from '../floorEditorStore';
+import { spriteForElementType } from '../sprites';
+import useSpriteImage from '../useSpriteImage';
 
 interface Props {
   element: EditorElement;
@@ -13,9 +15,10 @@ interface Props {
 }
 
 /**
- * A decorative/structural floor element. WALL/DOOR/BAR/KITCHEN/PLANT/DECOR/RECT
- * render as a styled rectangle; TEXT renders as a label. Geometry edits mirror
- * the table node (scale baked back into width/height on transform end).
+ * A decorative/structural floor element. DOOR/BAR/KITCHEN/PLANT/DECOR render
+ * their pixel-art sprite when loaded (styled rectangle while loading / with no
+ * asset); WALL/RECT stay rectangles, TEXT renders as a label. Geometry edits
+ * mirror the table node (scale baked back into width/height on transform end).
  */
 export default function FloorElementNode({
   element,
@@ -27,6 +30,18 @@ export default function FloorElementNode({
 }: Props) {
   const style = element.style ?? {};
   const isText = element.type === FloorElementType.TEXT;
+  const loadedSprite = useSpriteImage(spriteForElementType(element.type));
+  // Aspect guard: sprites are authored at each type's DEFAULT footprint aspect,
+  // but persisted elements may carry older defaults (e.g. pre-sprite 60×12
+  // doors) or extreme user resizes. Past ~1.6× mismatch a stretched sprite
+  // reads as a smear — fall back to the vector rendering instead.
+  const sprite = (() => {
+    if (!loadedSprite) return null;
+    const boxAspect = element.width / Math.max(1, element.height);
+    const imgAspect = loadedSprite.width / Math.max(1, loadedSprite.height);
+    const mismatch = boxAspect > imgAspect ? boxAspect / imgAspect : imgAspect / boxAspect;
+    return mismatch <= 1.6 ? loadedSprite : null;
+  })();
 
   const handleTransformEnd = (e: KonvaEventObject<Event>) => {
     const node = e.target;
@@ -64,6 +79,15 @@ export default function FloorElementNode({
           fontStyle="bold"
           fill={(style.color as string) || '#0f172a'}
         />
+      ) : sprite ? (
+        // Pixel-art sprite; the node layer draws with smoothing disabled
+        // (Konva only honors imageSmoothingEnabled at the Layer level).
+        <KonvaImage
+          image={sprite}
+          width={element.width}
+          height={element.height}
+          opacity={(style.opacity as number) ?? 1}
+        />
       ) : (
         <Rect
           width={element.width}
@@ -75,8 +99,8 @@ export default function FloorElementNode({
           opacity={(style.opacity as number) ?? 1}
         />
       )}
-      {/* selection ring for text (which has no stroke) */}
-      {isText && selected && (
+      {/* selection ring for text + sprites (neither has a stroke of its own) */}
+      {(isText || sprite) && selected && (
         <Rect width={element.width} height={element.height} stroke="#0ea5e9" strokeWidth={2} dash={[4, 4]} listening={false} />
       )}
       {/* label on filled blocks (bar/kitchen) */}

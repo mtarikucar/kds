@@ -1,9 +1,34 @@
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Clock, ChefHat, CheckCircle2 } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import OrderCard from './OrderCard';
-import { sortOrdersByAge, countUrgentOrders, cn } from '../../lib/utils';
+import {
+  sortOrdersByAge,
+  countUrgentOrders,
+  calculateAverageWaitTime,
+  formatWaitTime,
+  cn,
+} from '../../lib/utils';
 import { kioskColumnShell } from './kioskTheme';
+
+// Live average wait of the column's orders. The 1s ticker is isolated here so
+// only this chip re-renders every second, never the order cards below.
+const ColumnWaitChip = ({ orders }: { orders: Order[] }) => {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-white/20 text-white rounded-full">
+      <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="tabular-nums">{formatWaitTime(calculateAverageWaitTime(orders))}</span>
+    </span>
+  );
+};
 
 interface OrderQueueProps {
   title: string;
@@ -99,6 +124,8 @@ const OrderQueue = ({
               {urgentCount} {t('kitchen.stats.urgent')}
             </span>
           )}
+          {/* Live Average Wait */}
+          {filteredOrders.length > 0 && <ColumnWaitChip orders={filteredOrders} />}
           {/* Count Badge */}
           <span className="px-2.5 py-0.5 text-sm font-bold bg-white/20 text-white rounded-full">
             {filteredOrders.length}

@@ -17,8 +17,13 @@ export function useFloorPlanSocket() {
 
   useEffect(() => {
     const socket = initializeSocket();
-    const invalidate = () =>
+    const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: ['floorPlan'] });
+      // The Tables page renders ['tables']-derived UI (stats strip, action-sheet
+      // edit) next to the live map — refreshing only the plan would let the two
+      // contradict each other on remote status/layout changes.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    };
 
     const events = [
       'floor:layout-updated',

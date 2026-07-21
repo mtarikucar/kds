@@ -9,6 +9,8 @@
   "saved": "Salon planı kaydedildi",
   "loading": "Yükleniyor…",
   "saving": "Kaydediliyor…",
+  "unsavedChanges": "Kaydedilmemiş değişiklikler",
+  "placementHint": "Yerleştirmek için kanvasa tıklayın — Esc iptal eder",
   "addZone": "Alan ekle",
   "zoneSettings": "Alan ayarları",
   "newZonePrompt": "Yeni alana ad verin (örn. Kat 2, Bahçe)",
@@ -46,7 +48,17 @@
     "element": "Öğe",
     "label": "Etiket",
     "labelPlaceholder": "İsteğe bağlı etiket",
-    "deleteElement": "Öğeyi sil"
+    "deleteElement": "Öğeyi sil",
+    "duplicate": "Çoğalt",
+    "moveToZone": "Alana taşı",
+    "geometry": {
+      "title": "Konum ve boyut",
+      "x": "X",
+      "y": "Y",
+      "width": "Genişlik",
+      "height": "Yükseklik",
+      "rotation": "Dönüş (°)"
+    }
   },
   "zone": {
     "name": "Ad",
@@ -59,6 +71,9 @@
     "background": "Arka plan görseli URL",
     "opacity": "Arka plan saydamlığı (%{{value}})",
     "delete": "Alanı sil",
-    "deleteConfirm": "\"{{name}}\" alanı silinsin mi? Masaları yerleştirilmemişlere taşınır."
+    "deleteConfirm": "\"{{name}}\" alanı silinsin mi? Masaları yerleştirilmemişlere taşınır.",
+    "deleteTitle": "Alanı sil",
+    "deleteBody": "\"{{name}}\" alanı silinecek. Masaları yerleştirilmemişlere taşınır.",
+    "deleteAction": "Sil"
   }
 }
