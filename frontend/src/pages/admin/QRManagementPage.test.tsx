@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { QrCodeData, QrMenuSettings } from '../../types';
 
@@ -84,10 +84,17 @@ beforeEach(() => {
   h.updateSettings.mockReset();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('QRManagementPage (two-pane redesign)', () => {
   it('does not render the statistics tile row', () => {
     render(<QRManagementPage />);
+    // Both the translated string and the raw key (in case the tile JSX
+    // regresses back in after its i18n key was deleted).
     expect(screen.queryByText('Total QR Codes')).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin\.totalQRCodes/)).not.toBeInTheDocument();
   });
 
   it('keeps the guided-tour anchors', () => {
@@ -151,5 +158,70 @@ describe('QRManagementPage (two-pane redesign)', () => {
     render(<QRManagementPage />);
     expect(screen.queryByText('Table-Specific QR Codes')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Search tables…')).not.toBeInTheDocument();
+  });
+
+  it('prints only the filtered tables when a search is active', () => {
+    render(<QRManagementPage />);
+    fireEvent.change(screen.getByPlaceholderText('Search tables…'), {
+      target: { value: 'table 5' },
+    });
+
+    const writes: string[] = [];
+    const fakeWindow = {
+      document: { write: (html: string) => writes.push(html), close: vi.fn() },
+      focus: vi.fn(),
+      print: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.spyOn(window, 'open').mockReturnValue(fakeWindow as unknown as Window);
+
+    fireEvent.click(screen.getByRole('button', { name: /Print Table QR Sheet/ }));
+
+    const html = writes.join('');
+    expect(html).toContain('Table 5');
+    expect(html).not.toContain('Table 1');
+    expect(html).not.toContain('Bahçe 2');
+  });
+
+  it('alerts instead of printing when the search matches no tables', () => {
+    render(<QRManagementPage />);
+    fireEvent.change(screen.getByPlaceholderText('Search tables…'), {
+      target: { value: 'zzz' },
+    });
+
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const openSpy = vi.spyOn(window, 'open');
+
+    fireEvent.click(screen.getByRole('button', { name: /Print Table QR Sheet/ }));
+
+    expect(alertSpy).toHaveBeenCalledWith('No table QR codes found to print.');
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('renders the hero without the table pane while settings are still undefined', () => {
+    h.settings.data = undefined;
+    render(<QRManagementPage />);
+    expect(screen.getByText('Restaurant QR Code')).toBeInTheDocument();
+    expect(screen.queryByText('Table-Specific QR Codes')).not.toBeInTheDocument();
+  });
+
+  it('shows the no-tables empty state when only the restaurant code exists', () => {
+    h.codes.data = {
+      tenant: { id: 't1', name: 'Acme Diner' },
+      settings,
+      qrCodes: [qrCodes[0]],
+    };
+    render(<QRManagementPage />);
+    expect(screen.getByText('No Tables Found')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search tables…')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Print Table QR Sheet/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('survives an undefined codes payload (load race)', () => {
+    h.codes.data = undefined;
+    render(<QRManagementPage />);
+    expect(screen.getByText('Restaurant QR Code')).toBeInTheDocument();
   });
 });

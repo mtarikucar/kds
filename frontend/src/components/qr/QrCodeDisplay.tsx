@@ -65,7 +65,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
   // ids up in the DOM — keep the suffixes in sync with that lookup.
   const elementId = compact ? `qr-${qrCode.id}-small` : `qr-${qrCode.id}-medium`;
 
-  const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}`;
+  const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label}`.replace(/\s/g, '-');
 
   const downloadQR = (format: DownloadFormat) => {
     const svg = document.getElementById(elementId);
@@ -236,8 +236,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
             bgColor={settings?.backgroundColor || '#FFFFFF'}
           />
         </div>
-        <p className="font-semibold text-sm text-slate-900 text-center">{qrCode.label}</p>
-        <p className="text-xs text-slate-400 mb-3">{t('admin.tableQRCodes')}</p>
+        <p className="font-semibold text-sm text-slate-900 text-center mb-3">{qrCode.label}</p>
         <div className="flex gap-2 w-full">
           <IconAction onClick={() => downloadQR('png')} label={t('qr.downloadQrCode')}>
             <Download className="h-4 w-4" />

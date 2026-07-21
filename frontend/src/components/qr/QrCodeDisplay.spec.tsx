@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { QrCodeData } from '../../types';
 import QrCodeDisplay from './QrCodeDisplay';
@@ -77,5 +77,61 @@ describe('QrCodeDisplay hero variant (redesign)', () => {
     render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} />);
     expect(screen.getByText(qrCode.url)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Copy/ })).toBeInTheDocument();
+  });
+
+  it('does not leak the deleted i18n keys back in as raw strings', () => {
+    render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} />);
+    expect(
+      screen.queryByText(/qr\.(previewSize|downloadFormat|proTipsTitle)|admin\.tableTent/),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * QRManagementPage's batch print/download paths resolve QR codes with
+   * document.getElementById('qr-<id>-small') (compact) falling back to
+   * '-medium' (hero). These pins keep the rendered ids in sync with that
+   * cross-file contract — renaming a suffix breaks batch export silently.
+   */
+  it('renders the hero QR svg under the -medium element id', () => {
+    const { container } = render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} />);
+    expect(container.querySelector('#qr-tab-1-medium')).toBeTruthy();
+  });
+
+  it('renders the compact QR svg under the -small element id', () => {
+    const { container } = render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} compact />);
+    expect(container.querySelector('#qr-tab-1-small')).toBeTruthy();
+  });
+
+  it('exports an image/svg+xml blob named after tenant and label on Download SVG', () => {
+    const createdBlobs: Blob[] = [];
+    const downloadNames: string[] = [];
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: (blob: Blob) => {
+        createdBlobs.push(blob);
+        return 'blob:fake';
+      },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: () => {},
+      configurable: true,
+      writable: true,
+    });
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        downloadNames.push(this.download);
+      });
+
+    render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Download$/ }));
+    fireEvent.click(screen.getByText('Download SVG'));
+
+    expect(createdBlobs).toHaveLength(1);
+    expect(createdBlobs[0].type).toBe('image/svg+xml');
+    expect(downloadNames).toEqual(['Acme-Diner-Table-1.svg']);
+
+    clickSpy.mockRestore();
   });
 });
