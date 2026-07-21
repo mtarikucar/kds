@@ -17,6 +17,57 @@ interface KitchenStatsHeaderProps {
   onToggleKiosk?: () => void;
 }
 
+// Inline meta chips (active / avg wait / urgent). The 1s ticker lives HERE so
+// the per-second wait/urgency recomputation re-renders only this tiny row,
+// never the whole header (or the order columns below it).
+const KitchenMetaChips = ({ orders, kiosk }: { orders: Order[]; kiosk: boolean }) => {
+  const { t } = useTranslation('kitchen');
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const avgWait = formatWaitTime(calculateAverageWaitTime(orders));
+  const urgentCount = countUrgentOrders(orders);
+
+  const baseChip = cn(
+    'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs md:text-sm font-medium',
+    kiosk ? 'bg-neutral-800 text-neutral-200' : 'bg-slate-100 text-slate-600'
+  );
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className={baseChip} title={t('kitchen.stats.activeOrders')}>
+        <Users className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="sr-only">{t('kitchen.stats.activeOrders')}: </span>
+        <span className="tabular-nums font-bold">{orders.length}</span>
+      </span>
+      {orders.length > 0 && (
+        <span className={baseChip} title={t('kitchen.stats.avgWaitTime')}>
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">{t('kitchen.stats.avgWaitTime')}: </span>
+          <span className="tabular-nums font-bold">{avgWait}</span>
+        </span>
+      )}
+      {urgentCount > 0 && (
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs md:text-sm font-medium animate-pulse',
+            kiosk ? 'bg-red-500/20 text-red-300' : 'bg-red-100 text-red-700'
+          )}
+          title={t('kitchen.stats.urgentOrders')}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">{t('kitchen.stats.urgentOrders')}: </span>
+          <span className="tabular-nums font-bold">{urgentCount}</span>
+        </span>
+      )}
+    </div>
+  );
+};
+
 const KitchenStatsHeader = ({
   orders,
   isConnected,
@@ -26,53 +77,9 @@ const KitchenStatsHeader = ({
   onToggleKiosk,
 }: KitchenStatsHeaderProps) => {
   const { t } = useTranslation('kitchen');
-  const [avgWaitTime, setAvgWaitTime] = useState('0s');
-  const [urgentCount, setUrgentCount] = useState(0);
-
-  // Update stats every second for real-time display
-  useEffect(() => {
-    const updateStats = () => {
-      const avg = calculateAverageWaitTime(orders);
-      setAvgWaitTime(formatWaitTime(avg));
-      setUrgentCount(countUrgentOrders(orders));
-    };
-
-    updateStats();
-    const interval = setInterval(updateStats, 1000);
-
-    return () => clearInterval(interval);
-  }, [orders]);
-
-  const stats = [
-    {
-      icon: Users,
-      value: orders.length,
-      label: t('kitchen.stats.activeOrders'),
-      color: 'text-slate-600',
-      bgColor: 'bg-slate-50',
-      iconColor: 'text-slate-500',
-    },
-    {
-      icon: Clock,
-      value: avgWaitTime,
-      label: t('kitchen.stats.avgWaitTime'),
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      iconColor: 'text-blue-500',
-    },
-    {
-      icon: AlertTriangle,
-      value: urgentCount,
-      label: t('kitchen.stats.urgentOrders'),
-      color: urgentCount > 0 ? 'text-red-600' : 'text-slate-600',
-      bgColor: urgentCount > 0 ? 'bg-red-50' : 'bg-slate-50',
-      iconColor: urgentCount > 0 ? 'text-red-500' : 'text-slate-500',
-      highlight: urgentCount > 0,
-    },
-  ];
 
   return (
-    <div className="mb-4 md:mb-6 flex-shrink-0">
+    <div className="mb-3 md:mb-4 flex-shrink-0">
       {/* Escalated disconnect bar — a full-width amber alert that the polling
           fallback is keeping the board fresh while the live socket is down.
           Far harder to miss than the small status pill. */}
@@ -96,15 +103,13 @@ const KitchenStatsHeader = ({
         </div>
       )}
 
-      {/* Title Row */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <div>
+      {/* Single compact row: title + live meta chips left, controls right */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap min-w-0">
           <h1 className={kioskHeadingText(kiosk)}>
             {t('kitchen.title')}
           </h1>
-          <p className={cn('text-sm md:text-base', kiosk ? 'text-neutral-400' : 'text-slate-600')}>
-            {t('kitchen.realtimeTracking')}
-          </p>
+          <KitchenMetaChips orders={orders} kiosk={kiosk} />
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
@@ -165,34 +170,6 @@ const KitchenStatsHeader = ({
             </Button>
           )}
         </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-2 md:gap-4">
-        {stats.map((stat, index) => (
-          <div
-            key={index}
-            className={cn(
-              'relative rounded-xl p-3 md:p-4 transition-all',
-              kiosk ? 'bg-neutral-900 border border-neutral-800' : stat.bgColor,
-              stat.highlight && (kiosk ? 'ring-2 ring-red-500 animate-pulse' : 'ring-2 ring-red-200 animate-pulse')
-            )}
-          >
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className={cn('p-2 rounded-lg', kiosk ? 'bg-neutral-800' : 'bg-white/80', stat.iconColor)}>
-                <stat.icon className="h-4 w-4 md:h-5 md:w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={cn('text-lg md:text-2xl font-bold truncate', kiosk ? 'text-white' : stat.color)}>
-                  {stat.value}
-                </p>
-                <p className={cn('text-xs md:text-sm truncate', kiosk ? 'text-neutral-400' : 'text-slate-500')}>
-                  {stat.label}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
