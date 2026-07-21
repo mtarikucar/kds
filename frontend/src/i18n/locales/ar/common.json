@@ -77,6 +77,7 @@
     "reports": "التقارير",
     "analytics": "التحليلات",
     "reportsAnalytics": "التحليلات والتقارير",
+    "finance": "المالية",
     "settings": "الإعدادات",
     "admin": "الإدارة",
     "subscription": "الاشتراك",
@@ -107,6 +108,12 @@
     },
     "expandSidebar": "توسيع الشريط الجانبي",
     "collapseSidebar": "طي الشريط الجانبي"
+  },
+  "finance": {
+    "groups": {
+      "cash": "الصندوق",
+      "documents": "المستندات"
+    }
   },
   "hummytummy": {
     "common": {

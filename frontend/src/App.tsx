@@ -141,15 +141,9 @@ const ReportsAnalyticsPage = lazyWithReload(
   () => import("./pages/admin/ReportsAnalyticsPage"),
 );
 const StockPage = lazyWithReload(() => import("./pages/admin/StockPage"));
-const CashPage = lazyWithReload(() => import("./pages/admin/CashPage"));
-const AccountingBackOfficePage = lazyWithReload(
-  () => import("./pages/admin/AccountingBackOfficePage"),
-);
+const FinancePage = lazyWithReload(() => import("./pages/admin/FinancePage"));
 const ReservationsPage = lazyWithReload(
   () => import("./pages/admin/ReservationsPage"),
-);
-const InvoicesPage = lazyWithReload(
-  () => import("./pages/admin/invoices/InvoicesPage"),
 );
 
 // Onboarding (lazy-loaded)
@@ -223,7 +217,6 @@ import BranchDetailPage from "./features/branches/BranchDetailPage";
 import HealthPage from "./features/health/HealthPage";
 import WebhooksPage from "./features/webhooks/WebhooksPage";
 import PartnerKeysPage from "./features/partner-keys/PartnerKeysPage";
-import FiscalRecoveryPage from "./features/fiscal/FiscalRecoveryPage";
 import CallerFeedPage from "./features/caller/CallerFeedPage";
 import PlanAndAccessPage from "./features/plan/PlanAndAccessPage";
 import FeatureGate from "./components/subscriptions/FeatureGate";
@@ -493,17 +486,22 @@ function App() {
               path="/admin/purchasing"
               element={<Navigate to="/admin/stock" replace />}
             />
-            <Route path="/admin/cash" element={<CashPage />} />
+            {/* Finans — Kasa (eski Nakit & ÖKC) + Belgeler (eski Muhasebe/Faturalar/
+                Fiş Kurtarma) tek çatı. Gate yok: yasal çekirdek her planda. */}
+            <Route path="/admin/finance" element={<FinancePage />} />
+            {/* Eski para rotaları Finans'a yönlenir. */}
+            <Route path="/admin/cash" element={<Navigate to="/admin/finance?group=cash" replace />} />
             <Route
               path="/admin/accounting-backoffice"
-              element={
-                <FeatureGate
-                  feature="advancedReports"
-                  fallback={<UpsellCard addOnCode="advanced_reports" />}
-                >
-                  <AccountingBackOfficePage />
-                </FeatureGate>
-              }
+              element={<Navigate to="/admin/finance?group=documents" replace />}
+            />
+            <Route
+              path="/admin/invoices"
+              element={<Navigate to="/admin/finance?group=documents" replace />}
+            />
+            <Route
+              path="/admin/fiscal-recovery"
+              element={<Navigate to="/admin/finance?group=documents&tab=edoc" replace />}
             />
             <Route
               path="/admin/costing"
@@ -540,7 +538,6 @@ function App() {
                 </FeatureGate>
               }
             />
-            <Route path="/admin/invoices" element={<InvoicesPage />} />
             {/* Delivery/package orders were folded into the POS screen's
             "Paket Siparişleri" panel (accept / reject / prep-time). The
             standalone queue is gone; keep the path as a redirect for
@@ -797,17 +794,6 @@ function App() {
             <Route
               path="/admin/webhooks"
               element={<Navigate to="/admin/settings/webhooks" replace />}
-            />
-            <Route
-              path="/admin/fiscal-recovery"
-              element={
-                <FeatureGate
-                  integration={{ domain: "fiscal" }}
-                  fallback={<UpsellCard addOnCode="fiscal_hugin" />}
-                >
-                  <FiscalRecoveryPage />
-                </FeatureGate>
-              }
             />
             <Route
               path="/admin/caller-feed"

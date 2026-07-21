@@ -77,6 +77,7 @@
     "reports": "Raporlar",
     "analytics": "Analitik",
     "reportsAnalytics": "Analitik & Raporlar",
+    "finance": "Finans",
     "settings": "Ayarlar",
     "admin": "Yönetici",
     "subscription": "Abonelik",
@@ -107,6 +108,12 @@
     },
     "expandSidebar": "Kenar Çubuğunu Genişlet",
     "collapseSidebar": "Kenar Çubuğunu Daralt"
+  },
+  "finance": {
+    "groups": {
+      "cash": "Kasa",
+      "documents": "Belgeler"
+    }
   },
   "hummytummy": {
     "common": {

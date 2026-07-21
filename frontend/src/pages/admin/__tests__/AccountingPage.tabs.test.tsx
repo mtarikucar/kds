@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import AccountingBackOfficePage from '../AccountingBackOfficePage';
 
 // The consolidated Muhasebe page embeds the invoice + settings panels and the
@@ -26,7 +27,7 @@ vi.mock('../../../features/accounting/eBelgeApi', () => ({
 // locale bundle, so t() resolves to the ENGLISH values below.
 describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
   it('shows the three e-Belge tabs and defaults to Faturalar', () => {
-    render(<AccountingBackOfficePage />);
+    render(<AccountingBackOfficePage />, { wrapper: MemoryRouter });
     expect(screen.getByRole('button', { name: /Invoices/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /e-Document Status/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Settings/ })).toBeTruthy();
@@ -35,7 +36,7 @@ describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
   });
 
   it('switches to the Ayarlar tab (settings panel) and the e-Belge status tab', () => {
-    render(<AccountingBackOfficePage />);
+    render(<AccountingBackOfficePage />, { wrapper: MemoryRouter });
     fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
     expect(screen.getByText('AYAR-PANEL')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /e-Document Status/ }));
@@ -43,7 +44,7 @@ describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
   });
 
   it('no longer hosts the management-report tabs (moved to Raporlar)', () => {
-    render(<AccountingBackOfficePage />);
+    render(<AccountingBackOfficePage />, { wrapper: MemoryRouter });
     expect(screen.queryByRole('button', { name: /Budget|Bütçe/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Consolidated|Konsolide/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Forecast|Tahmin/ })).toBeNull();

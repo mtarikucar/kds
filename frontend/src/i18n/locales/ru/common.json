@@ -77,6 +77,7 @@
     "reports": "Отчеты",
     "analytics": "Аналитика",
     "reportsAnalytics": "Аналитика и отчеты",
+    "finance": "Финансы",
     "settings": "Настройки",
     "admin": "Админ",
     "subscription": "Подписка",
@@ -107,6 +108,12 @@
     },
     "expandSidebar": "Развернуть боковую панель",
     "collapseSidebar": "Свернуть боковую панель"
+  },
+  "finance": {
+    "groups": {
+      "cash": "Касса",
+      "documents": "Документы"
+    }
   },
   "hummytummy": {
     "common": {
