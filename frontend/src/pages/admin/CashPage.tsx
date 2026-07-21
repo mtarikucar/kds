@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
 import { useForm } from 'react-hook-form';
-import { Wallet, Coins, Printer, Landmark } from 'lucide-react';
+import { Wallet, Coins, Printer, Landmark, FileText } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -18,8 +18,9 @@ import {
   downloadSessionsCsv,
 } from '../../features/cash/cashApi';
 import { useListFiscalDevices } from '../../features/fiscal/fiscalApi';
+import ZReportsSection from '../../components/reports/ZReportsSection';
 
-type Tab = 'sessions' | 'safe' | 'tips' | 'okc';
+type Tab = 'sessions' | 'safe' | 'tips' | 'okc' | 'dayend';
 
 export default function CashPage({ embedded = false }: { embedded?: boolean }) {
   const fmt = useFormatCurrency();
@@ -28,6 +29,7 @@ export default function CashPage({ embedded = false }: { embedded?: boolean }) {
     { id: 'sessions', label: 'Vardiyalar & X-Report', icon: Wallet },
     { id: 'safe', label: 'Kasa / Petty Cash', icon: Landmark },
     { id: 'tips', label: 'Bahşiş Havuzu', icon: Coins },
+    { id: 'dayend', label: 'Gün Sonu', icon: FileText },
     { id: 'okc', label: 'ÖKC', icon: Printer },
   ];
   return (
@@ -53,6 +55,25 @@ export default function CashPage({ embedded = false }: { embedded?: boolean }) {
       {tab === 'sessions' && <SessionsTab fmt={fmt} />}
       {tab === 'safe' && <SafeTab fmt={fmt} />}
       {tab === 'tips' && <TipsTab fmt={fmt} />}
+      {tab === 'dayend' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <button
+              onClick={async () => {
+                try {
+                  await downloadSessionsCsv();
+                } catch {
+                  toast.error('CSV indirilemedi — tekrar deneyin.');
+                }
+              }}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
+            >
+              Kapanmış vardiya dökümü (CSV)
+            </button>
+          </div>
+          <ZReportsSection />
+        </div>
+      )}
       {tab === 'okc' && <OkcTab />}
     </div>
   );
@@ -67,20 +88,6 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
   if (isLoading) return <Loading />;
   return (
     <div className="space-y-4">
-    <div className="flex justify-end">
-      <button
-        onClick={async () => {
-          try {
-            await downloadSessionsCsv();
-          } catch {
-            toast.error('CSV indirilemedi — tekrar deneyin.');
-          }
-        }}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
-      >
-        Z geçmişi CSV indir
-      </button>
-    </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card>
         <CardHeader><CardTitle>Açık vardiyalar</CardTitle></CardHeader>

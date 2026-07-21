@@ -27,7 +27,6 @@ import HourlyOrdersChart from '../../components/reports/HourlyOrdersChart';
 import CustomerAnalyticsSection from '../../components/reports/CustomerAnalyticsSection';
 import InventorySection from '../../components/reports/InventorySection';
 import StaffPerformanceSection from '../../components/reports/StaffPerformanceSection';
-import ZReportsSection from '../../components/reports/ZReportsSection';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { useFormatDate } from '../../hooks/useFormatDate';
 import {
@@ -41,7 +40,6 @@ import {
   Users,
   Package,
   UserCog,
-  FileText,
   PiggyBank,
   Building2,
   Download,
@@ -52,7 +50,7 @@ interface DateRangeForm {
   endDate: string;
 }
 
-type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
+type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'hourly' | 'customers' | 'inventory' | 'staff';
 
 const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation('reports');
@@ -116,7 +114,6 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
     { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users, gate: undefined },
     { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package, gate: 'inventoryTracking' as const },
     { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog, gate: 'personnelManagement' as const },
-    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText, gate: undefined },
   ];
   const tabs = allTabs.filter((t) => !t.gate || hasFeature(t.gate));
 
@@ -394,10 +391,6 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
           startDate={dateRange.startDate}
           endDate={dateRange.endDate}
         />
-      )}
-
-      {activeTab === 'zreports' && (
-        <ZReportsSection />
       )}
     </div>
   );
