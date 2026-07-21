@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import type { QrCodeData } from '../../types';
 import QrCodeDisplay from './QrCodeDisplay';
 
@@ -49,5 +49,33 @@ describe('QrCodeDisplay caption', () => {
   it('falls back to the default when caption is empty/whitespace (legacy rows)', () => {
     render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} caption="   " />);
     expect(screen.getByText('Scan to view our menu')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Two-pane QR page redesign: the full (hero) variant drops the size-preset
+ * and format selector grids plus the pro-tips box in favor of one Download
+ * button with a PNG/SVG/PDF dropdown. Downloads always export print quality,
+ * so a size choice is no longer part of the operator flow.
+ */
+describe('QrCodeDisplay hero variant (redesign)', () => {
+  it('renders one download dropdown instead of size/format selector grids', () => {
+    render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} />);
+
+    expect(screen.queryByText('Preview Size')).not.toBeInTheDocument();
+    expect(screen.queryByText('Table Tent')).not.toBeInTheDocument();
+    expect(screen.queryByText('Download Format')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pro Tips')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Download$/ }));
+    expect(screen.getByText('Download PNG')).toBeInTheDocument();
+    expect(screen.getByText('Download SVG')).toBeInTheDocument();
+    expect(screen.getByText('Download PDF')).toBeInTheDocument();
+  });
+
+  it('still shows the menu URL with a copy action', () => {
+    render(<QrCodeDisplay qrCode={qrCode} tenant={tenant} />);
+    expect(screen.getByText(qrCode.url)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Copy/ })).toBeInTheDocument();
   });
 });

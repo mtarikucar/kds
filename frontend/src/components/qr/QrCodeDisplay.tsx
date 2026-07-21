@@ -1,9 +1,23 @@
 import QRCode from 'react-qr-code';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Search, Share2, Printer, FileImage, FileText, Copy, Check } from 'lucide-react';
+import {
+  Download,
+  Search,
+  Share2,
+  Printer,
+  ChevronDown,
+  Copy,
+  Check,
+} from 'lucide-react';
 import type { QrCodeData } from '../../types';
 import Button from '../ui/Button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '../ui/dropdown-menu';
 
 interface QrCodeDisplayProps {
   qrCode: QrCodeData;
@@ -21,6 +35,12 @@ interface QrCodeDisplayProps {
   caption?: string;
 }
 
+type DownloadFormat = 'png' | 'svg' | 'pdf';
+
+// Raster exports always render print-quality; the on-screen preview size
+// no longer matters because the export source is a vector SVG.
+const EXPORT_PX = 1200;
+
 // The table caption is operator-supplied free text that gets injected
 // into the raw print-window HTML; escape it so a promo string containing
 // `<`, `&` or quotes can't break (or inject into) the printed document.
@@ -35,36 +55,28 @@ const escapeHtml = (value: string): string =>
 const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: QrCodeDisplayProps) => {
   const { t } = useTranslation('common');
   const [copied, setCopied] = useState(false);
-  const [selectedSize, setSelectedSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const [downloadFormat, setDownloadFormat] = useState<'png' | 'svg' | 'pdf'>('png');
 
   // Prefer the operator's saved caption; fall back to the translated
   // default for empty/legacy settings rows.
   const resolvedCaption = caption?.trim() || t('admin.scanToViewMenu');
 
-  const sizePresets = {
-    small: { size: 150, label: t('admin.tableTent'), description: '150x150px' },
-    medium: { size: 300, label: t('admin.standard'), description: '300x300px' },
-    large: { size: 600, label: t('admin.poster'), description: '600x600px' }
-  };
+  // Compact table cards render the `-small` element, the hero card the
+  // `-medium` one. QRManagementPage's batch print/download paths look these
+  // ids up in the DOM — keep the suffixes in sync with that lookup.
+  const elementId = compact ? `qr-${qrCode.id}-small` : `qr-${qrCode.id}-medium`;
 
-  const currentSize = sizePresets[selectedSize];
+  const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}`;
 
-  const downloadQR = (forceSize?: 'small' | 'medium' | 'large') => {
-    const sizeToUse = forceSize || selectedSize;
-    const sizeConfig = sizePresets[sizeToUse];
-    const elementId = `qr-${qrCode.id}-${sizeToUse}`;
+  const downloadQR = (format: DownloadFormat) => {
     const svg = document.getElementById(elementId);
-
     if (!svg) {
       console.warn(`QR element not found: ${elementId}`);
       return;
     }
 
     const svgData = new XMLSerializer().serializeToString(svg);
-    const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}-${sizeToUse}`;
 
-    if (downloadFormat === 'svg') {
+    if (format === 'svg') {
       const blob = new Blob([svgData], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
       const downloadLink = document.createElement('a');
@@ -79,20 +91,19 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
-    // Use the size based on forceSize, not selectedSize
-    canvas.width = sizeConfig.size * 2;
-    canvas.height = sizeConfig.size * 2;
+    canvas.width = EXPORT_PX;
+    canvas.height = EXPORT_PX;
 
     img.onload = () => {
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      if (downloadFormat === 'png') {
+      if (format === 'png') {
         const pngFile = canvas.toDataURL('image/png');
         const downloadLink = document.createElement('a');
         downloadLink.download = `${fileName}.png`;
         downloadLink.href = pngFile;
         downloadLink.click();
-      } else if (downloadFormat === 'pdf') {
+      } else {
         canvas.toBlob((blob) => {
           if (blob) {
             const url = URL.createObjectURL(blob);
@@ -126,9 +137,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
     }
   };
 
-  const printQR = (forceSize?: 'small' | 'medium' | 'large') => {
-    const sizeToUse = forceSize || selectedSize;
-    const elementId = `qr-${qrCode.id}-${sizeToUse}`;
+  const printQR = () => {
     const printWindow = window.open('', '', 'width=600,height=600');
     if (!printWindow) {
       console.warn('Could not open print window');
@@ -160,6 +169,12 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
             }
             .qr-container {
               padding: 20px;
+            }
+            /* The serialized SVG carries its on-screen pixel size; pin a
+               predictable physical size instead (vector = stays crisp). */
+            .qr-container svg {
+              width: 70mm;
+              height: 70mm;
             }
             h1 { margin-bottom: 10px; }
             p { margin-top: 10px; color: #666; }
@@ -213,7 +228,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
       <div className="group bg-white border border-slate-200/70 rounded-2xl shadow-sm hover:shadow-md hover:border-primary-200 transition-all p-4 flex flex-col items-center">
         <div className="relative bg-white p-3 rounded-xl border border-slate-100 ring-1 ring-slate-100 mb-3">
           <QRCode
-            id={`qr-${qrCode.id}-small`}
+            id={elementId}
             value={qrCode.url}
             size={120}
             level="H"
@@ -224,13 +239,13 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
         <p className="font-semibold text-sm text-slate-900 text-center">{qrCode.label}</p>
         <p className="text-xs text-slate-400 mb-3">{t('admin.tableQRCodes')}</p>
         <div className="flex gap-2 w-full">
-          <IconAction onClick={() => downloadQR('small')} label={t('qr.downloadQrCode')}>
+          <IconAction onClick={() => downloadQR('png')} label={t('qr.downloadQrCode')}>
             <Download className="h-4 w-4" />
           </IconAction>
           <IconAction onClick={openPreview} label={t('qr.previewMenu')}>
             <Search className="h-4 w-4" />
           </IconAction>
-          <IconAction onClick={() => printQR('small')} label={t('qr.printQrCode')}>
+          <IconAction onClick={printQR} label={t('qr.printQrCode')}>
             <Printer className="h-4 w-4" />
           </IconAction>
         </div>
@@ -238,146 +253,89 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings, caption }: Q
     );
   }
 
+  // Hero card: one QR, its link, and the three things an operator actually
+  // does with it — download (print quality), print, preview.
   return (
-    <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
-      {/* QR Code Display Section */}
-      <div className="space-y-4">
-        <div className="text-center">
-          <h3 className="text-lg font-bold text-slate-900">{qrCode.label}</h3>
-          <p className="text-sm text-slate-500 mt-0.5">{resolvedCaption}</p>
-        </div>
-
-        {/* QR Code Preview */}
-        <div className="flex justify-center">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 ring-1 ring-slate-100 shadow-sm">
-            <QRCode
-              id={`qr-${qrCode.id}-${selectedSize}`}
-              value={qrCode.url}
-              size={currentSize.size}
-              level="H"
-              fgColor={settings?.primaryColor || '#000000'}
-              bgColor={settings?.backgroundColor || '#FFFFFF'}
-            />
-          </div>
-        </div>
-
-        {/* Size Selector */}
-        <div>
-          <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">{t('qr.previewSize')}</p>
-          <div className="grid grid-cols-3 gap-2">
-            {Object.entries(sizePresets).map(([key, preset]) => (
-              <button
-                key={key}
-                onClick={() => setSelectedSize(key as any)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${selectedSize === key
-                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-primary-300'
-                  }`}
-              >
-                <div className="text-xs">{preset.label}</div>
-                <div className={`text-[11px] ${selectedSize === key ? 'opacity-80' : 'text-slate-400'}`}>{preset.description}</div>
-              </button>
-            ))}
-          </div>
-        </div>
+    <div className="flex flex-col items-center">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 ring-1 ring-slate-100 shadow-sm">
+        <QRCode
+          id={elementId}
+          value={qrCode.url}
+          size={208}
+          level="H"
+          fgColor={settings?.primaryColor || '#000000'}
+          bgColor={settings?.backgroundColor || '#FFFFFF'}
+        />
       </div>
 
-      {/* Actions Section */}
-      <div className="space-y-5">
-        {/* URL Display */}
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('qr.menuUrl')}</p>
-            <button
-              onClick={copyToClipboard}
-              className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
-            >
-              {copied ? (
-                <><Check className="h-3 w-3" /> {t('qr.copied')}</>
-              ) : (
-                <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>)}
-            </button>
-          </div>
-          <p className="text-sm text-slate-900 font-mono break-all bg-white rounded-lg p-2.5 border border-slate-200">
-            {qrCode.url}
-          </p>
-        </div>
+      <h3 className="mt-4 text-lg font-bold text-slate-900 text-center">{qrCode.label}</h3>
+      <p className="text-sm text-slate-500 text-center">{resolvedCaption}</p>
 
-        {/* Download Options */}
-        <div className="space-y-2.5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('qr.downloadFormat')}</p>
-          <div className="grid grid-cols-3 gap-2">
-            {([
-              { fmt: 'png' as const, icon: FileImage, label: t('qr.png') },
-              { fmt: 'svg' as const, icon: FileImage, label: t('qr.svg') },
-              { fmt: 'pdf' as const, icon: FileText, label: t('qr.pdf') },
-            ]).map(({ fmt, icon: Icon, label }) => (
-              <button
-                key={fmt}
-                onClick={() => setDownloadFormat(fmt)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all border ${downloadFormat === fmt
-                  ? 'bg-primary-50 text-primary-700 border-primary-300'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                  }`}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
+      {/* Menu URL */}
+      <div className="mt-4 w-full flex items-center gap-2 bg-slate-50 rounded-xl border border-slate-200 pl-3 pr-1.5 py-1.5">
+        <p className="flex-1 min-w-0 truncate font-mono text-xs text-slate-600" title={qrCode.url}>
+          {qrCode.url}
+        </p>
+        <button
+          onClick={copyToClipboard}
+          className="shrink-0 h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-xs font-medium text-primary-600 hover:bg-primary-50 transition-colors"
+        >
+          {copied ? (
+            <><Check className="h-3.5 w-3.5" /> {t('qr.copied')}</>
+          ) : (
+            <><Copy className="h-3.5 w-3.5" /> {t('buttons.copy')}</>
+          )}
+        </button>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-3 w-full space-y-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+              <Download className="h-4 w-4" />
+              {t('app.download')}
+              <ChevronDown className="h-4 w-4 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-full min-w-[12rem]">
+            {(['png', 'svg', 'pdf'] as const).map((format) => (
+              <DropdownMenuItem key={format} onClick={() => downloadQR(format)}>
+                {t('qr.downloadAs', { format: format.toUpperCase() })}
+              </DropdownMenuItem>
             ))}
-          </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            onClick={printQR}
+            variant="outline"
+            className="flex items-center justify-center gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            {t('buttons.print')}
+          </Button>
+          <Button
+            onClick={openPreview}
+            variant="outline"
+            className="flex items-center justify-center gap-2"
+          >
+            <Search className="h-4 w-4" />
+            {t('buttons.preview')}
+          </Button>
         </div>
 
-        {/* Action Buttons */}
-        <div className="space-y-3">
+        {typeof (navigator as any).share === 'function' && (
           <Button
-            onClick={() => downloadQR()}
-            variant="primary"
+            onClick={shareQR}
+            variant="outline"
             className="w-full flex items-center justify-center gap-2"
           >
-            <Download className="h-5 w-5" />
-            {t('qr.downloadFile', { format: downloadFormat.toUpperCase(), size: currentSize.label })}
+            <Share2 className="h-4 w-4" />
+            {t('qr.shareQrCode')}
           </Button>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              onClick={() => printQR()}
-              variant="outline"
-              className="flex items-center justify-center gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              {t('buttons.print')}
-            </Button>
-            <Button
-              onClick={openPreview}
-              variant="outline"
-              className="flex items-center justify-center gap-2"
-            >
-              <Search className="h-4 w-4" />
-              {t('buttons.preview')}
-            </Button>
-          </div>
-
-          {typeof (navigator as any).share === 'function' && (
-            <Button
-              onClick={shareQR}
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2"
-            >
-              <Share2 className="h-4 w-4" />
-              {t('qr.shareQrCode')}
-            </Button>
-          )}
-        </div>
-
-        {/* Usage Tips */}
-        <div className="bg-primary-50/60 border border-primary-100 rounded-xl p-3.5">
-          <p className="text-xs font-semibold text-primary-900 mb-1">{t('qr.proTipsTitle')}</p>
-          <ul className="text-xs text-primary-800/90 space-y-1">
-            <li>• {t('qr.proTip1')}</li>
-            <li>• {t('qr.proTip2')}</li>
-            <li>• {t('qr.proTip3')}</li>
-          </ul>
-        </div>
+        )}
       </div>
     </div>
   );
