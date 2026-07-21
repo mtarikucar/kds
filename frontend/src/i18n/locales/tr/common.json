@@ -111,8 +111,25 @@
   },
   "finance": {
     "groups": {
+      "overview": "Genel Bakış",
       "cash": "Kasa",
       "documents": "Belgeler"
+    },
+    "overview": {
+      "expectedCash": "Kasadaki beklenen nakit",
+      "openSessions": "Açık vardiya",
+      "todaysSales": "Bugünkü satış",
+      "fiscalDevices": "Yazarkasa",
+      "fiscalNone": "Kurulmadı",
+      "fiscalReady": "hazır",
+      "fiscalUpsellTitle": "Yazarkasa bağlantısı",
+      "fiscalUpsellBody": "Mali fiş basmak için yazarkasa eklentisi gerekir.",
+      "fiscalUpsellCta": "Mağazaya git",
+      "staleSessionWarning": "Dünden kalan {{count}} açık vardiya var — gün sonu mutabakatı yapılmadı.",
+      "closeAction": "Kapat",
+      "failedDocs": "Gönderilemeyen belge:",
+      "fixAction": "Düzelt",
+      "reconciliation": "{{count}} kart çekimi mutabakat bekliyor — şube cihaz sayfasından inceleyin."
     }
   },
   "hummytummy": {

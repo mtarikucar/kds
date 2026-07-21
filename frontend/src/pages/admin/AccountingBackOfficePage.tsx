@@ -28,12 +28,22 @@ const VALID_TABS: readonly Tab[] = ['invoices', 'edoc', 'settings'];
  *  • Ayarlar      — company identity + integrator credentials + certificate
  * Management reports (budget / consolidated P&L / forecast) live under Raporlar.
  */
-export default function AccountingBackOfficePage({ embedded = false }: { embedded?: boolean }) {
+export default function AccountingBackOfficePage({
+  embedded = false,
+  initialTab,
+}: {
+  embedded?: boolean;
+  initialTab?: string;
+}) {
   const { t } = useTranslation('settings');
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const [tab, setTab] = useState<Tab>(
-    VALID_TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'invoices',
+    VALID_TABS.includes(initialTab as Tab)
+      ? (initialTab as Tab)
+      : VALID_TABS.includes(requestedTab as Tab)
+        ? (requestedTab as Tab)
+        : 'invoices',
   );
   const tabs: {
     id: Tab;

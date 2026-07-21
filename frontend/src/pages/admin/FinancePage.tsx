@@ -1,30 +1,35 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Wallet, Receipt } from 'lucide-react';
+import { LayoutDashboard, Wallet, Receipt } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import CashPage from './CashPage';
 import AccountingBackOfficePage from './AccountingBackOfficePage';
+import FinanceOverview from './finance/FinanceOverview';
 
 /**
- * Finans — tek çatı: Kasa (eski Nakit & ÖKC) + Belgeler (eski Muhasebe +
- * Fiş Kurtarma). Eski rotalar (/admin/cash, /admin/accounting-backoffice,
- * /admin/invoices, /admin/fiscal-recovery) App.tsx'te buraya redirect eder.
+ * Finans — tek çatı: Genel Bakış (bugün ne durumdayım) + Kasa (eski Nakit &
+ * ÖKC) + Belgeler (eski Muhasebe + Fiş Kurtarma). Eski rotalar (/admin/cash,
+ * /admin/accounting-backoffice, /admin/invoices, /admin/fiscal-recovery)
+ * App.tsx'te buraya redirect eder.
  * Desen: grup anahtarı + embedded prop (bkz. ReportsAnalyticsPage, StockPage).
  * Gate yok: kasa/vardiya + fatura kesme yasal çekirdek — her planda açık.
  */
-type Group = 'cash' | 'documents';
-const VALID_GROUPS: readonly Group[] = ['cash', 'documents'];
+type Group = 'overview' | 'cash' | 'documents';
+const VALID_GROUPS: readonly Group[] = ['overview', 'cash', 'documents'];
 
 const FinancePage = () => {
   const { t } = useTranslation('common');
   const [searchParams] = useSearchParams();
   const requested = searchParams.get('group');
   const [group, setGroup] = useState<Group>(
-    VALID_GROUPS.includes(requested as Group) ? (requested as Group) : 'cash',
+    VALID_GROUPS.includes(requested as Group) ? (requested as Group) : 'overview',
   );
+  // overview'daki bir aksiyon Belgeler grubuna belirli bir sekme hedefiyle geçebilir.
+  const [docTab, setDocTab] = useState<string | undefined>(undefined);
 
   const groups = [
+    { id: 'overview' as const, label: t('finance.groups.overview', 'Genel Bakış'), icon: LayoutDashboard },
     { id: 'cash' as const, label: t('finance.groups.cash', 'Kasa'), icon: Wallet },
     { id: 'documents' as const, label: t('finance.groups.documents', 'Belgeler'), icon: Receipt },
   ];
@@ -58,8 +63,16 @@ const FinancePage = () => {
         })}
       </div>
 
+      {group === 'overview' && (
+        <FinanceOverview
+          onNavigate={(g, tab) => {
+            setDocTab(tab);
+            setGroup(g);
+          }}
+        />
+      )}
       {group === 'cash' && <CashPage embedded />}
-      {group === 'documents' && <AccountingBackOfficePage embedded />}
+      {group === 'documents' && <AccountingBackOfficePage embedded initialTab={docTab} />}
     </div>
   );
 };

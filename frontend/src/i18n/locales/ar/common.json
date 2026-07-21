@@ -111,8 +111,25 @@
   },
   "finance": {
     "groups": {
+      "overview": "نظرة عامة",
       "cash": "الصندوق",
       "documents": "المستندات"
+    },
+    "overview": {
+      "expectedCash": "النقد المتوقع في الدرج",
+      "openSessions": "الورديات المفتوحة",
+      "todaysSales": "مبيعات اليوم",
+      "fiscalDevices": "آلة تسجيل النقد",
+      "fiscalNone": "غير مهيأ",
+      "fiscalReady": "جاهز",
+      "fiscalUpsellTitle": "ربط آلة النقد",
+      "fiscalUpsellBody": "تتطلب طباعة الإيصالات المالية إضافة آلة النقد.",
+      "fiscalUpsellCta": "إلى المتجر",
+      "staleSessionWarning": "هناك {{count}} وردية مفتوحة من الأمس — لم تتم تسوية نهاية اليوم.",
+      "closeAction": "إغلاق",
+      "failedDocs": "مستندات غير مرسلة:",
+      "fixAction": "إصلاح",
+      "reconciliation": "{{count}} عملية بطاقة بانتظار التسوية — راجعها في صفحة أجهزة الفرع."
     }
   },
   "hummytummy": {

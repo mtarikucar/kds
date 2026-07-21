@@ -111,8 +111,25 @@
   },
   "finance": {
     "groups": {
+      "overview": "Umumiy ko'rinish",
       "cash": "Kassa",
       "documents": "Hujjatlar"
+    },
+    "overview": {
+      "expectedCash": "Kassadagi kutilgan naqd",
+      "openSessions": "Ochiq smenalar",
+      "todaysSales": "Bugungi savdo",
+      "fiscalDevices": "Kassa apparati",
+      "fiscalNone": "Sozlanmagan",
+      "fiscalReady": "tayyor",
+      "fiscalUpsellTitle": "Kassa ulanishi",
+      "fiscalUpsellBody": "Fiskal chek chiqarish uchun kassa qo'shimchasi kerak.",
+      "fiscalUpsellCta": "Do'konga o'tish",
+      "staleSessionWarning": "Kechadan {{count}} smena ochiq qolgan — kun yakuni solishtiruvi qilinmagan.",
+      "closeAction": "Yopish",
+      "failedDocs": "Yuborilmagan hujjatlar:",
+      "fixAction": "Tuzatish",
+      "reconciliation": "{{count}} karta to'lovi solishtiruvni kutmoqda — filial qurilmalar sahifasida ko'ring."
     }
   },
   "hummytummy": {

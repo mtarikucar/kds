@@ -111,8 +111,25 @@
   },
   "finance": {
     "groups": {
+      "overview": "Overview",
       "cash": "Cash",
       "documents": "Documents"
+    },
+    "overview": {
+      "expectedCash": "Expected cash in drawer",
+      "openSessions": "Open shifts",
+      "todaysSales": "Today's sales",
+      "fiscalDevices": "Cash register",
+      "fiscalNone": "Not set up",
+      "fiscalReady": "ready",
+      "fiscalUpsellTitle": "Cash register connection",
+      "fiscalUpsellBody": "Printing fiscal receipts requires the cash register add-on.",
+      "fiscalUpsellCta": "Go to store",
+      "staleSessionWarning": "{{count}} shift(s) left open from yesterday — day-end reconciliation is missing.",
+      "closeAction": "Close",
+      "failedDocs": "Undelivered documents:",
+      "fixAction": "Fix",
+      "reconciliation": "{{count}} card charge(s) need reconciliation — review on the branch devices page."
     }
   },
   "hummytummy": {

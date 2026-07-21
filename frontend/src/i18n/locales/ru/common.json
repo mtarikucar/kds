@@ -111,8 +111,25 @@
   },
   "finance": {
     "groups": {
+      "overview": "Обзор",
       "cash": "Касса",
       "documents": "Документы"
+    },
+    "overview": {
+      "expectedCash": "Ожидаемая наличность",
+      "openSessions": "Открытые смены",
+      "todaysSales": "Продажи за сегодня",
+      "fiscalDevices": "Кассовый аппарат",
+      "fiscalNone": "Не настроен",
+      "fiscalReady": "готово",
+      "fiscalUpsellTitle": "Подключение кассы",
+      "fiscalUpsellBody": "Для печати фискальных чеков нужен модуль кассы.",
+      "fiscalUpsellCta": "В магазин",
+      "staleSessionWarning": "Со вчерашнего дня открыто смен: {{count}} — сверка не выполнена.",
+      "closeAction": "Закрыть",
+      "failedDocs": "Неотправленные документы:",
+      "fixAction": "Исправить",
+      "reconciliation": "Ожидают сверки: {{count}} — проверьте на странице устройств филиала."
     }
   },
   "hummytummy": {

@@ -5,6 +5,7 @@ import FinancePage from '../FinancePage';
 
 vi.mock('../CashPage', () => ({ default: () => <div>KASA-PANEL</div> }));
 vi.mock('../AccountingBackOfficePage', () => ({ default: () => <div>BELGE-PANEL</div> }));
+vi.mock('../finance/FinanceOverview', () => ({ default: () => <div>GENEL-BAKIS</div> }));
 
 const renderAt = (url: string) =>
   render(
@@ -14,11 +15,17 @@ const renderAt = (url: string) =>
   );
 
 describe('FinancePage — grup anahtarı', () => {
-  it('varsayılan grup Kasa; Belgeler pill ile geçilir', () => {
+  it('varsayılan grup Genel Bakış; Kasa pill ile geçilir', () => {
     renderAt('/admin/finance');
+    expect(screen.getByText('GENEL-BAKIS')).toBeTruthy();
+    expect(screen.queryByText('KASA-PANEL')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Cash|Kasa/ }));
     expect(screen.getByText('KASA-PANEL')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Documents|Belgeler/ }));
-    expect(screen.getByText('BELGE-PANEL')).toBeTruthy();
+  });
+
+  it('?group=cash ile Kasa açılır', () => {
+    renderAt('/admin/finance?group=cash');
+    expect(screen.getByText('KASA-PANEL')).toBeTruthy();
   });
 
   it('?group=documents ile Belgeler açılır', () => {
@@ -26,8 +33,8 @@ describe('FinancePage — grup anahtarı', () => {
     expect(screen.getByText('BELGE-PANEL')).toBeTruthy();
   });
 
-  it('geçersiz group paramı Kasa\'ya düşer', () => {
+  it('geçersiz group paramı Genel Bakış\'a düşer', () => {
     renderAt('/admin/finance?group=zzz');
-    expect(screen.getByText('KASA-PANEL')).toBeTruthy();
+    expect(screen.getByText('GENEL-BAKIS')).toBeTruthy();
   });
 });
