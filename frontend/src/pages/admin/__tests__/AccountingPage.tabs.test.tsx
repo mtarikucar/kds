@@ -61,4 +61,22 @@ describe('Muhasebe (AccountingBackOfficePage) — consolidated tabs', () => {
     fireEvent.click(screen.getByRole('button', { name: /Undelivered|Gönderilemeyen/ }));
     expect(screen.getByText('FIS-KURTARMA')).toBeTruthy();
   });
+
+  it('?tab= query param selects the tab on mount (redirect deep links)', () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/finance?tab=edoc']}>
+        <AccountingBackOfficePage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Go-live readiness check/)).toBeTruthy();
+  });
+
+  it('?tab=settings query param selects the settings tab on mount', () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/finance?tab=settings']}>
+        <AccountingBackOfficePage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('AYAR-PANEL')).toBeTruthy();
+  });
 });

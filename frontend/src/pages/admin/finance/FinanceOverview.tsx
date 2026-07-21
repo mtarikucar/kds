@@ -51,7 +51,7 @@ export default function FinanceOverview({ onNavigate }: { onNavigate: NavigateFn
             value={fmt(expectedCash)}
             icon={Banknote}
             color="bg-emerald-500"
-            isLoading={sessionsLoading}
+            isLoading={sessionsLoading || xReports.some((q) => q.isLoading)}
           />
         </button>
         <button type="button" onClick={() => onNavigate('cash')} className="text-left">
