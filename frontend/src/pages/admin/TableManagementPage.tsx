@@ -834,6 +834,10 @@ const TableManagementPage = () => {
               variant="danger"
               className="flex-1"
               onClick={() => {
+                // Discard = drop the working copy for real: un-dirty the store so
+                // the editor's mount effect reloads the server plan on re-entry
+                // (and the beforeunload guard disarms while browsing plan/list).
+                useFloorEditorStore.getState().markSavedClean();
                 if (pendingView) applyView(pendingView);
                 setPendingView(null);
               }}
