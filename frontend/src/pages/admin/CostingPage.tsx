@@ -9,6 +9,7 @@ import {
   CardContent,
 } from '../../components/ui/Card';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import DateRangeBar from './reports/DateRangeBar';
 import {
   useMenuEngineering,
@@ -32,13 +33,25 @@ const defaultRange = () => ({
 
 export default function CostingPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation('reports');
+  const { hasFeature } = useSubscription();
   const fmt = useFormatCurrency();
   const [tab, setTab] = useState<Tab>('menu');
-  const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'menu', label: t('costing.tabMenu'), icon: ChefHat },
+  const allTabs: {
+    id: Tab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    gate?: keyof import('../../types').PlanFeatures;
+  }[] = [
+    { id: 'menu', label: t('costing.tabMenu'), icon: ChefHat, gate: 'advancedReports' },
     { id: 'variance', label: t('costing.tabVariance'), icon: Scale },
     { id: 'recipes', label: t('costing.tabRecipes'), icon: Layers },
   ];
+  // Menu-engineering is ADVANCED_REPORTS-gated server-side while the rest of
+  // this page is inventoryTracking-gated. Rather than let a BASIC tenant hit
+  // the tab and 403 into an upsell, hide the tab outright (ReportsPage
+  // allTabs.filter pattern) and fall back to the first visible tab.
+  const tabs = allTabs.filter((tb) => !tb.gate || hasFeature(tb.gate));
+  const activeTab = tabs.some((tb) => tb.id === tab) ? tab : tabs[0]?.id;
   return (
     <div className={embedded ? 'space-y-6' : 'p-4 sm:p-6 space-y-6'}>
       {!embedded && (
@@ -53,15 +66,15 @@ export default function CostingPage({ embedded = false }: { embedded?: boolean }
           return (
             <button key={tb.id} onClick={() => setTab(tb.id)}
               className={`flex items-center gap-2 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                tab === tb.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                activeTab === tb.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
               <Icon className="h-4 w-4" />{tb.label}
             </button>
           );
         })}
       </div>
-      {tab === 'menu' && <MenuTab fmt={fmt} />}
-      {tab === 'variance' && <VarianceTab fmt={fmt} />}
-      {tab === 'recipes' && <RecipesTab fmt={fmt} />}
+      {activeTab === 'menu' && <MenuTab fmt={fmt} />}
+      {activeTab === 'variance' && <VarianceTab fmt={fmt} />}
+      {activeTab === 'recipes' && <RecipesTab fmt={fmt} />}
     </div>
   );
 }
@@ -71,19 +84,16 @@ type Fmt = (n: number) => string;
 function MenuTab({ fmt }: { fmt: Fmt }) {
   const { t } = useTranslation('reports');
   const [range, setRange] = useState(defaultRange);
-  const { data, isLoading, isError, error } = useMenuEngineering(range);
+  const { data, isLoading, isError } = useMenuEngineering(range);
   if (isLoading) return <Loading />;
-  // Backend gates menu-engineering on ADVANCED_REPORTS while this page is
-  // inventoryTracking-gated — a BASIC tenant 403s here. Say so instead of
-  // rendering a misleading empty table. Only a 403 means "upgrade"; any other
-  // failure (500/network) gets an honest retry message, not purchase advice.
+  // CostingPage hides this tab entirely when advancedReports isn't granted
+  // (see the allTabs filter), so reaching this tab means the tenant already
+  // has access — any load error here is a genuine failure, not a plan gate.
   if (isError)
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-amber-700">
-          {(error as any)?.response?.status === 403
-            ? t('costing.upgradeRequired')
-            : t('reports.loadError')}
+          {t('reports.loadError')}
         </CardContent>
       </Card>
     );

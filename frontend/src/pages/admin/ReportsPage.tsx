@@ -121,7 +121,7 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const allTabs = [
     { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3, gate: undefined as keyof import('../../types').PlanFeatures | undefined },
     { id: 'finance' as TabType, label: t('reports.finance', 'Finans (Kâr-Zarar)'), icon: Wallet, gate: undefined },
-    { id: 'budget' as TabType, label: t('reports.budget', 'Bütçe vs Fiili'), icon: PiggyBank, gate: undefined },
+    { id: 'budget' as TabType, label: t('reports.budget', 'Bütçe Karşılaştırması'), icon: PiggyBank, gate: undefined },
     { id: 'consolidated' as TabType, label: t('reports.consolidated', 'Tüm Şubeler Kâr-Zarar'), icon: Building2, gate: undefined },
     { id: 'forecast' as TabType, label: t('reports.forecast', 'Satış Tahmini'), icon: TrendingUp, gate: undefined },
     { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock, gate: undefined },

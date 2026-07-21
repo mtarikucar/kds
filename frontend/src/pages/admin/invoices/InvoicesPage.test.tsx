@@ -222,7 +222,7 @@ describe('InvoicesPanel — empty state CTA', () => {
     renderPanel();
 
     expect(
-      screen.getByText(/No accounting integrator is connected yet/),
+      screen.getByText(/No e-document provider connection is set up yet/),
     ).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Go to Settings/ });
     expect(link).toHaveAttribute('href', '/admin/settings/accounting');

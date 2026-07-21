@@ -40,7 +40,7 @@ describe('ReportsPage — tema grupları', () => {
     // finance/consolidated fallback'ları her ikisi de "Kâr-Zarar" içerir —
     // tek tek eşleşen buton sayısını doğrula (belirsiz eşleşmeyi önlemek için).
     expect(screen.getByRole('button', { name: /Finans \(Kâr-Zarar\)|Finance \(P&L\)/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Bütçe vs Fiili|Budget vs Actual/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Bütçe Karşılaştırması|Budget Comparison/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Tüm Şubeler Kâr-Zarar|Consolidated P&L/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Satış Raporu|Sales Report/ })).toBeNull();
   });
@@ -64,7 +64,7 @@ describe('ReportsPage — tema grupları', () => {
       screen.getByRole('button', { name: /Satış Raporu|Sales Report|reports\.sales/ }),
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Finans \(Kâr-Zarar\)|Finance \(P&L\)/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Bütçe vs Fiili|Budget vs Actual/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Bütçe Karşılaştırması|Budget Comparison/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tüm Şubeler Kâr-Zarar|Consolidated P&L/ })).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plug, Plus, Trash2, Power, PowerOff } from 'lucide-react';
+import { Plug, Trash2, Power, PowerOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -95,16 +95,11 @@ const IntegrationsSettingsPage = () => {
       {/* Other Integrations */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{t('integrations.otherTitle')}</CardTitle>
-            <Button
-              variant="outline"
-              onClick={() => toast.info(t('integrations.comingSoon'))}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              {t('integrations.addIntegration')}
-            </Button>
-          </div>
+          {/* No "Ekle" button here — there is no real add-provider flow yet.
+              A button that only ever fired a comingSoon toast was a dead end
+              (Faz 5b jargon/dead-end sweep); render it once an actual
+              addable-provider catalog exists. */}
+          <CardTitle>{t('integrations.otherTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
