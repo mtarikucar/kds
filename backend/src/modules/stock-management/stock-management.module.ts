@@ -16,6 +16,7 @@ import { StockCountsController } from "./controllers/stock-counts.controller";
 import { StockSettingsController } from "./controllers/stock-settings.controller";
 import { StockDashboardController } from "./controllers/stock-dashboard.controller";
 import { StockTransferController } from "./controllers/stock-transfer.controller";
+import { GuidanceController } from "./controllers/guidance.controller";
 
 // Services
 import { StockItemCategoriesService } from "./services/stock-item-categories.service";
@@ -35,6 +36,7 @@ import { StockDashboardService } from "./services/stock-dashboard.service";
 import { ReorderSuggestionService } from "./services/reorder-suggestion.service";
 import { StockTransferService } from "./services/stock-transfer.service";
 import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
+import { GuidanceService } from "./services/guidance.service";
 
 @Module({
   imports: [PrismaModule, SubscriptionsModule, forwardRef(() => KdsModule)],
@@ -51,6 +53,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     StockSettingsController,
     StockDashboardController,
     StockTransferController,
+    GuidanceController,
   ],
   providers: [
     StockItemCategoriesService,
@@ -70,6 +73,7 @@ import { StockAlertsScheduler } from "./schedulers/stock-alerts.scheduler";
     ReorderSuggestionService,
     StockTransferService,
     StockAlertsScheduler,
+    GuidanceService,
   ],
   exports: [StockDeductionService, StockAlertsService, StockItemsService],
 })
