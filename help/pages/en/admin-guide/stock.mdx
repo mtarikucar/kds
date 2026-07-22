@@ -1,6 +1,6 @@
 ---
 title: Stock & Inventory
-description: HummyTummy stock management — ingredients, recipes, suppliers, purchase orders, movements, waste and stock counts. Purpose, usage and tips.
+description: HummyTummy stock management — procurement guide, ingredients, orders, suppliers, recipe & costing, operations. Purpose, usage and tips.
 ---
 
 import { Callout } from 'nextra/components'
@@ -13,7 +13,7 @@ import { Callout } from 'nextra/components'
 
 ## Purpose
 
-The stock module tracks your kitchen ingredients (inventory) end to end: how much you have, what's running out, what's wasted, and the automatic drawdown from sales. Thanks to recipes, when a product is sold its ingredients can be deducted from stock automatically.
+The stock module brings the whole supply-to-kitchen loop into one screen: what to buy and where (Procurement Guide), the ingredient catalog, purchase orders, supplier relationships, recipe/costing, and day-to-day operations (movements, waste, counts, branch transfers). Thanks to recipes, when a product is sold its ingredients can be deducted from stock automatically.
 
 <Callout type="info">
   Inventory tracking is unlocked on **Starter (BASIC)** and higher plans. If your plan
@@ -23,33 +23,47 @@ The stock module tracks your kitchen ingredients (inventory) end to end: how muc
 
 ## Tabs
 
-The screen is split into tabs, each a part of stock management:
+The screen is split into 6 tabs, each deep-linkable via the `?tab=` query parameter (switching tabs is written to browser history — back returns to the previous tab). The default tab is **Procurement Guide**, which opens with no `tab` parameter.
 
-| Tab | What it does |
-| --- | --- |
-| **Dashboard** | Stock-status summary — low/critical levels, at-a-glance view |
-| **Ingredients** | Define stock items — unit, current quantity, critical threshold |
-| **Recipes** | Define how much of which ingredient a product contains |
-| **Suppliers** | Supplier records |
-| **Purchase Orders** | Create an order to a supplier, receive incoming goods into stock |
-| **Movements** | A log of every stock in/out movement |
-| **Waste Log** | Spoilage/waste records |
-| **Stock Count** | Physical counting and reconciliation with the system |
+| Tab | URL | What it contains |
+| --- | --- | --- |
+| **Procurement Guide** | `/admin/stock` (no parameter) | Needed-today buy list (items below par) + one-click draft purchase order + a channel guide for 7 categories |
+| **Ingredients** | `/admin/stock?tab=items` | Summary stat tiles (total/active/low stock/expiring soon/inventory value) + the ingredient catalog (CRUD, unit, critical threshold, category) |
+| **Orders** | `/admin/stock?tab=orders` | Purchase orders (create/submit/approve/receive/allocate landed cost/cancel) + PO templates + barcode stock lookup + supplier return (RMA) |
+| **Suppliers** | `/admin/stock?tab=suppliers` | Supplier records + price catalog + supplier performance scorecard + vendor bills (3-way match) + AP aging |
+| **Recipe & Costing** | `/admin/stock?tab=costing` | Recipe definitions + menu engineering (star/plowhorse/puzzle/dog classification) + usage variance + recipe costs (cost per portion, food-cost %, gross margin) |
+| **Operations** | `/admin/stock?tab=operations` | An inner switcher with 4 sections: Movements, Waste, Stock Count, Branch Transfers |
+
+## Procurement Guide — what it does
+
+The Guide tab has two sections:
+
+1. **Needed today (buy list):** lists items that have fallen below their critical threshold, grouped by recommended supplier. Each row shows where the suggested price comes from — your own **purchase history** (cheapest in recent buys), a **supplier price catalog**, or (if neither exists) the **channel-guide recommendation**. The **"Create draft PO"** button next to a supplier group turns that group's items into a draft purchase order in one click and takes you to the Orders tab.
+2. **Channel guide:** for 7 ingredient categories (Meat, Produce, Dry Goods, Dairy, Beverage, Packaging, Cleaning), shows a "where to buy" recommendation matched to your business scale (Small Cafe / Mid-size Restaurant / Multi-branch). The scale is inferred automatically (branch count + the last 90 days' annualized spend), but you can view any other scale from the switcher in the top-right. Expanding a card lists practical rules for that category (cold chain, market levy, VAT differences, contract/scorecard advice, etc.).
+
+<Callout type="info">
+  The channel-guide content is based on cited research into Turkey's procurement
+  channels (cash&carry, wholesale market, online B2B, producer co-op, local
+  butcher/wholesaler, distributor) — it is general guidance, not a substitute for a
+  current price quote or promotion.
+</Callout>
 
 ## A typical workflow
 
-1. **Define ingredients** — flour, beef, milk, etc.; enter their unit and critical thresholds.
-2. **Attach recipes** — e.g. "Cheeseburger = 1 patty + 1 bun + 30g cheese". Now sales deduct ingredients automatically.
-3. **Supplier + purchasing** — define the supplier, add incoming goods to stock via a purchase order.
-4. **Waste & count** — record spoilage in the waste log; reconcile the system with a periodic physical count.
-5. **Track movements** — every in/out is auditable in the Movements tab.
+1. **Define ingredients** (Ingredients) — flour, beef, milk, etc.; enter their unit and critical thresholds.
+2. **Attach recipes** (Recipe & Costing) — e.g. "Cheeseburger = 1 patty + 1 bun + 30g cheese". Now sales deduct ingredients automatically.
+3. **Check the guide** (Procurement Guide) — see what's fallen below par and create a draft order from the recommended supplier in one click.
+4. **Manage the order** (Orders) — submit the draft, receive it into stock, and allocate landed costs (freight/customs) if needed.
+5. **Track suppliers** (Suppliers) — use the scorecard and AP aging to see who delivers on time and how much you owe.
+6. **Waste, count & transfer** (Operations) — record spoilage in the waste log; reconcile the system with a periodic physical count; log inter-branch transfers.
 
 ## Tips
 
-- **Set critical thresholds:** give each ingredient a critical level; the Dashboard surfaces low stock so you don't miss reorder time.
+- **Set critical thresholds:** give each ingredient a critical level; the Guide and Ingredients tabs surface low stock so you don't miss reorder time.
 - **Recipes are the key to auto-drawdown:** without a recipe, a sale won't reduce stock automatically — you'd have to enter a manual movement. Always define recipes for your best-sellers.
+- **Menu engineering needs the advanced-reports flag:** the menu-engineering block on the Recipe & Costing tab is gated on `ADVANCED_REPORTS`; if your plan doesn't include it you'll see an upgrade message (a separate plan flag from Stock's own `inventoryTracking` gate).
 - **Cancellation returns stock:** if a `PENDING` order is cancelled in the kitchen, stock is restored. So when answering "why is this short/over" during a count, account for cancellations too.
-- **Stock report:** the **Inventory** tab on the Reports screen (shown/hidden by the same `inventoryTracking` flag) gives you stock analysis.
+- **Deep-link a tab:** use the `?tab=` parameter to link directly to a tab (e.g. `/admin/stock?tab=suppliers`); the bare URL always opens the Procurement Guide.
 
 ## Related screens
 

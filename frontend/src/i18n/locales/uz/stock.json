@@ -389,39 +389,114 @@
     "rec": {
       "generic": "kanal qo'llanmasiga ko'ra tavsiya etiladi",
       "MEAT": {
-        "SMALL_CAFE": "Yaqin qassob bilan qat'iy narxda kelishing.",
-        "MID_RESTAURANT": "2-3 qassob/yetkazib beruvchini solishtirib eng yaxshisini tanlang.",
-        "MULTI_BRANCH": "Barcha filiallar uchun ko'p miqdorda go'sht ta'minoti shartnomasini tuzing."
+        "SMALL_CAFE": "Mahalliy qassob yoki ulgurji; muzlatilgan uchun cash&carry.",
+        "MID_RESTAURANT": "Tasdiqlangan distribyutor shartnomasi + yangi go'sht uchun mahalliy qassob.",
+        "MULTI_BRANCH": "Markaziy distribyutor doirasi + filialda mahalliy yangi mahsulot."
       },
       "PRODUCE": {
-        "SMALL_CAFE": "Mahalliy sabzavotfurushdan har kuni yangi mahsulot sotib oling.",
-        "MID_RESTAURANT": "Buyurtmalarni belgilangan yetkazib berish kuniga ko'ra 2 ta yetkazib beruvchi o'rtasida taqsimlang.",
-        "MULTI_BRANCH": "Barcha filiallar uchun markazlashgan sabzavot-meva yetkazib beruvchi bilan kelishuv tuzing."
+        "SMALL_CAFE": "Mahalliy sabzavotfurush yoki ulgurji bozor; har kuni yangi xarid.",
+        "MID_RESTAURANT": "Ulgurji bozordan rejali + spot xarid, belgilangan kunlarda.",
+        "MULTI_BRANCH": "Ishlab chiqaruvchilar kooperativi (bojsiz) + ulgurji bozor."
       },
       "DRY_GOODS": {
-        "SMALL_CAFE": "Ulgurji sotuvchidan oyiga bir marta ko'p miqdorda sotib oling.",
-        "MID_RESTAURANT": "Narxlarni solishtirib muntazam buyurtma bering.",
-        "MULTI_BRANCH": "Markaziy ombor orqali ko'p miqdorda xarid qiling."
+        "SMALL_CAFE": "Cash&carry'dan (Bizim Toptan/Tespo) oylik ko'p miqdorda xarid.",
+        "MID_RESTAURANT": "Cash&carry + onlayn B2B (Toptanmarketi), narxlarni solishtirib.",
+        "MULTI_BRANCH": "Markaziy distribyutor + onlayn B2B orqali ko'p miqdorda buyurtma."
       },
       "DAIRY": {
-        "SMALL_CAFE": "Ishonchli sut mahsulotlari distribyutoridan muntazam buyurtma bering.",
-        "MID_RESTAURANT": "Sovuq zanjirga mos 2 ta yetkazib beruvchi bilan ishlang.",
-        "MULTI_BRANCH": "Mintaqaviy sut mahsulotlari distribyutori bilan shartnoma tuzing."
+        "SMALL_CAFE": "Cash&carry + ishonchli mahalliy sut mahsulotlari distribyutori.",
+        "MID_RESTAURANT": "Tasdiqlangan sut distribyutori bilan shartnomali muntazam ta'minot.",
+        "MULTI_BRANCH": "Markaziy sut mahsulotlari distribyutori bilan doiraviy shartnoma."
       },
       "BEVERAGE": {
-        "SMALL_CAFE": "Aksiyalar vaqtida ichimlik distribyutoridan ko'p miqdorda sotib oling.",
-        "MID_RESTAURANT": "Brend distribyutorlari bilan muddatli to'lov shartlarini kelishing.",
-        "MULTI_BRANCH": "Asosiy distribyutor bilan filial bo'yicha yetkazib berish rejasini tuzing."
+        "SMALL_CAFE": "Cash&carry/Tespo'dan naqd chegirmali ko'p miqdorda xarid.",
+        "MID_RESTAURANT": "Brend distribyutori bilan kelishuv + qo'shimcha cash&carry.",
+        "MULTI_BRANCH": "Brend distribyutori bilan markaziy doiraviy shartnoma."
       },
       "PACKAGING": {
-        "SMALL_CAFE": "Qadoqlash materialini ulgurji sotuvchidan ko'p miqdorda sotib oling.",
-        "MID_RESTAURANT": "Birlik narxini pasaytirish uchun ko'p miqdorda buyurtma bering.",
-        "MULTI_BRANCH": "Markaziy qadoqlash yetkazib beruvchi bilan yillik shartnoma tuzing."
+        "SMALL_CAFE": "Birlik narxini pasaytirish uchun cash&carry'dan ko'p miqdorda xarid.",
+        "MID_RESTAURANT": "Mutaxassis ulgurji sotuvchi (qadoqlash) + onlayn B2B yordami.",
+        "MULTI_BRANCH": "Mutaxassis ulgurji sotuvchi doirasi + markaziy shartnoma."
       },
       "CLEANING": {
-        "SMALL_CAFE": "Tozalash vositalarini mahalliy distribyutordan sotib oling.",
-        "MID_RESTAURANT": "Professional tozalash yetkazib beruvchisi bilan muntazam buyurtmalarni yo'lga qo'ying.",
-        "MULTI_BRANCH": "Barcha filiallar uchun yagona tozalash yetkazib beruvchisi bilan kelishing."
+        "SMALL_CAFE": "Cash&carry'dan tozalash vositalarini ko'p miqdorda xarid qiling.",
+        "MID_RESTAURANT": "Mutaxassis ulgurji sotuvchi + tarmoq uyushmasi kampaniyalari (masalan TÜRES).",
+        "MULTI_BRANCH": "Barcha filiallar uchun yagona tozalash yetkazib beruvchisi."
+      }
+    },
+    "note": {
+      "CASH_CARRY": {
+        "advantage": "Bir joydan keng assortiment, muntazam faktura; chegirmalar bir xonali (~3-7%).",
+        "minOrder": "Yakka tartibdagi a'zolik mumkin; yetkazib berishda odatda 1500-2500 ₺ minimal savat + logistika to'lovi kerak.",
+        "payment": "Sodiqlik ballari (masalan Bizim Kart); muddatli to'lov/bo'lib to'lash afzalligi da'vo qilinmaydi.",
+        "eInvoice": "Yetkazib beruvchining e-Faktura ro'yxatidaligini GİB orqali tekshirib QQSni chegirmaga olishni ta'minlang."
+      },
+      "WHOLESALE_MARKET": {
+        "advantage": "Yangi mahsulotda spot narx va keng assortiment; bozor ichida savdo bojni ikki baravar kamaytiradi.",
+        "minOrder": "Minimal buyurtma yo'q; vositachi komissiyasi eng ko'pi 8% bilan cheklangan.",
+        "payment": "Odatda naqd/spot to'lov; bojni xaridor to'laydi.",
+        "eInvoice": "Ishlab chiqaruvchidan to'g'ridan-to'g'ri xarid Bozor Ro'yxatga Olish Tizimida bildiruvchi sifatida ro'yxatdan o'tishni va ishlab chiqaruvchi kvitansiyasini talab qiladi."
+      },
+      "ONLINE_B2B": {
+        "advantage": "Narx shaffofligi va ko'p haroratli (yangi+muzlatilgan+quruq) assortiment; tezkor yetkazib berish.",
+        "minOrder": "Platformaga qarab farq qiladi: ba'zilarida minimal yo'q, ba'zilarida 2500 ₺dan yuqori bepul yetkazib berish.",
+        "payment": "Hisob asosidagi katalog (masalan Bidfood) a'zolik talab qilishi mumkin; ba'zi platformalarda narx hammaga ochiq.",
+        "eInvoice": "Korporativ B2B platformalari odatda e-Faktura ro'yxatida bo'ladi; buyurtmadan oldin tasdiqlang."
+      },
+      "PRODUCER_COOP": {
+        "advantage": "Vazirlik tomonidan ro'yxatga olingan ishlab chiqaruvchilar tashkilotidan xarid bozor bojidan to'liq ozod va vositachi ulushini kamaytiradi.",
+        "minOrder": "Odatda katta hajm/doimiy kelishuv talab qiladi; kichik kafe uchun amaliy emas.",
+        "payment": "Shartnomali/doiraviy xarid modelida ishlaydi; katta hajmda narx bashoratliligini beradi.",
+        "eInvoice": "Faktura/ishlab chiqaruvchi kvitansiyasi bilan hujjatlashtiriladi; korxona baribir Bozor Ro'yxatga Olish Tizimiga ro'yxatdan o'tishi kerak bo'lishi mumkin."
+      },
+      "LOCAL_BUTCHER_WHOLESALER": {
+        "advantage": "Ishonch munosabati + moslashuvchanlik (kichik hajm, tezkor yetkazib berish); yangi mahsulot uchun afzal ko'riladi.",
+        "minOrder": "Odatda minimal buyurtma talabi yo'q; telefon orqali buyurtma keng tarqalgan.",
+        "payment": "Professional munosabatda narx taklifi/shartnoma + yetkazib beruvchi baholash kartasi tavsiya etiladi.",
+        "eInvoice": "Yetkazib beruvchi rasmiy tasdiqlash/ro'yxatga olish tartibiga bo'ysunishi kerak; ISO 22000 sertifikati kutiladi."
+      },
+      "DISTRIBUTOR": {
+        "advantage": "Shartnomali/doiraviy kelishuvlar narx bashoratliligini beradi; ko'p filialda markaziy+filial-mahalliy aralash model qo'llanadi.",
+        "minOrder": "Korporativ hisob/shartnoma jarayoni kerak; ba'zi kanallarda yuqori minimal buyurtma bor (masalan 10 000 ₺).",
+        "payment": "Muddatli to'lov/doiraviy kelishuvlar keng tarqalgan; yuqori hajmli/ko'p filialli faoliyat uchun tavsiya etiladi.",
+        "eInvoice": "Korporativ distribyutorlar e-Faktura ro'yxatida bo'ladi; GİB so'rovi orqali tasdiqlash mumkin."
+      }
+    },
+    "rule": {
+      "MEAT": {
+        "1": "Sovuq zanjirni saqlang: xom go'sht/parranda 0…+4°C, baliq 0…+2°C, muzlatilgan -18°C.",
+        "2": "Yetkazib beruvchida rasmiy tasdiqlash/ro'yxatga olish hujjati va ISO 22000 sertifikati bo'lishini talab qiling.",
+        "3": "Yuqori hajmda narx taklifi + yetkazib beruvchi baholash kartasidan foydalaning; so'yish shoxobchalarida kuzatuvchanlik 2027-yilda kamerali nazorat bilan majburiy bo'ladi."
+      },
+      "PRODUCE": {
+        "1": "Bozor boji ulgurji bozor ichida 1%, tashqarisida 2%; uni xaridor to'laydi.",
+        "2": "Ishlab chiqaruvchidan to'g'ridan-to'g'ri xarid Bozor Ro'yxatga Olish Tizimida bildiruvchi sifatida ro'yxatdan o'tishni talab qiladi; ro'yxatga olinmagan savdoda 25% jarima boji qo'llanadi.",
+        "3": "Ishlab chiqaruvchilar tashkiloti/kooperativi kanali bojdan ozod va yuqori hajmda vositachi ulushini kamaytiradi."
+      },
+      "DRY_GOODS": {
+        "1": "Cash&carry'ning bosqichma-bosqich chegirmalari bir xonali (~3-7%); asosiy foyda — keng assortiment va muntazam faktura.",
+        "2": "Uzoq muddat saqlanadigan mahsulotlarda ko'p miqdorda/doiraviy xarid eng aniq foyda beradi.",
+        "3": "Onlayn B2B narx shaffofligi kichik korxonaga, hisob asosidagi katalog esa katta miqyosga mos keladi."
+      },
+      "DAIRY": {
+        "1": "Sovuq zanjir uzluksiz +4°C dan past saqlanishi kerak; yetkazib beruvchida sovutgichli transport/ombor bo'lishi shart.",
+        "2": "Sut/go'sht yetkazib beruvchilari shunchaki ro'yxatga olish emas, balki qattiqroq 'tasdiqlash' tartibiga bo'ysunadi.",
+        "3": "Yuqori oziq-ovqat inflyatsiyasi sharoitida shartnomali/doiraviy xarid narx bashoratliligini ta'minlaydi."
+      },
+      "BEVERAGE": {
+        "1": "Aksiz solig'iga tortiladigan qayta ishlangan ichimliklar (gazlangan, sharbat, pivo) 10% QQSga ega — asosiy oziq-ovqatdan yuqori.",
+        "2": "Cash&carry naqd/erta to'lov chegirmasini taklif qilishi mumkin, lekin uning chuqurligi cheklangan (~3-7%).",
+        "3": "Brend distribyutori bilan doiraviy shartnoma yuqori hajmda narx barqarorligini beradi."
+      },
+      "PACKAGING": {
+        "1": "Ko'p miqdorda xarid birlik narxini 20-40% pasaytirishi mumkin; qog'oz gigiena mahsulotlarida tejash 30% gacha yetadi.",
+        "2": "Uzoq saqlanish muddati tufayli oyiga 1-2 buyurtma yetarli; yuqori zaxira buferi saqlanishi mumkin.",
+        "3": "Oziq-ovqat bilan aloqa qiladigan qadoqlashda oziq-ovqat xavfsizligi sertifikatini talab qiling va oziq-ovqatdan alohida saqlang."
+      },
+      "CLEANING": {
+        "1": "Tozalash vositalarini oziq-ovqatdan alohida saqlang; oziq-ovqat bilan aloqa qiladigan yuzalar uchun sertifikat talab qiling.",
+        "2": "Uzoq saqlanish muddati tufayli oyiga bitta buyurtma yetarli.",
+        "3": "Tarmoq uyushmasi a'zoligi (TÜRES/TURYİD/ETÜDER) yetkazib beruvchi kampaniyalari va maxsus chegirmalarga kirish imkonini berishi mumkin."
       }
     }
   }
