@@ -32,7 +32,8 @@
     "ADDON_LIMIT_REDUNDANT": "باقتك توفّر هذا بالفعل دون حد.",
     "SAME_PLAN_ACTIVE": "أنت مشترك بالفعل في هذه الباقة.",
     "HARDWARE_OUT_OF_STOCK": "هذا المنتج غير متوفر في المخزون.",
-    "ACCOUNT_ROLE_INVALID": "دور حسابك غير صالح. يرجى التواصل مع الدعم."
+    "ACCOUNT_ROLE_INVALID": "دور حسابك غير صالح. يرجى التواصل مع الدعم.",
+    "DEMO_PAYMENT_BLOCKED": "لا يمكن إجراء الدفع في وضع العرض التجريبي."
   },
   "errors": {
     "title": "خطأ",

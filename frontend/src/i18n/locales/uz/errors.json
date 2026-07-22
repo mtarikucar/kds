@@ -32,7 +32,8 @@
     "ADDON_LIMIT_REDUNDANT": "Tarifingiz buni allaqachon cheklovsiz taqdim etadi.",
     "SAME_PLAN_ACTIVE": "Siz allaqachon shu tarifga obuna boʻlgansiz.",
     "HARDWARE_OUT_OF_STOCK": "Bu mahsulot omborda mavjud emas.",
-    "ACCOUNT_ROLE_INVALID": "Hisobingizning roli yaroqsiz. Iltimos, qoʻllab-quvvatlash xizmati bilan bogʻlaning."
+    "ACCOUNT_ROLE_INVALID": "Hisobingizning roli yaroqsiz. Iltimos, qoʻllab-quvvatlash xizmati bilan bogʻlaning.",
+    "DEMO_PAYMENT_BLOCKED": "Demo rejimida toʻlov qabul qilinmaydi."
   },
   "errors": {
     "title": "Xatolik",

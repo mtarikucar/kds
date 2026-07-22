@@ -4,6 +4,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import CheckoutPage from './CheckoutPage';
 
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 /** Build a real AxiosError so `getApiErrorCode` (which gates on
  * `isAxiosError`) reads the `errorCode` off the response body. */
 function apiError(errorCode: string, message = 'error') {
@@ -82,20 +88,35 @@ vi.mock('sonner', () => ({
   },
 }));
 
+// `t` must be a STABLE reference across renders — a fresh function per
+// useTranslation() call (unlike real react-i18next, which memoizes it)
+// would retrigger the demo-guard effect below on every render, since it
+// lists `t` in its deps.
+const { t } = vi.hoisted(() => ({
+  // Mirror i18next's two default-value forms used in CheckoutPage:
+  //   t(key, 'Positional default')  and  t(key, { defaultValue: '...' })
+  t: (key: string, arg?: unknown) => {
+    if (typeof arg === 'string') return arg;
+    if (arg && typeof (arg as { defaultValue?: unknown }).defaultValue === 'string') {
+      return (arg as { defaultValue: string }).defaultValue;
+    }
+    return key;
+  },
+}));
 vi.mock('react-i18next', () => ({
   // CheckoutPage now imports the actionable-error helpers, which transitively
   // load the real i18n/config (it calls `.use(initReactI18next)`). Provide a
   // no-op plugin so that import doesn't throw under this mock.
   initReactI18next: { type: '3rdParty', init: () => {} },
-  useTranslation: () => ({
-    // Mirror i18next's two default-value forms used in CheckoutPage:
-    //   t(key, 'Positional default')  and  t(key, { defaultValue: '...' })
-    t: (key: string, arg?: any) => {
-      if (typeof arg === 'string') return arg;
-      if (arg && typeof arg.defaultValue === 'string') return arg.defaultValue;
-      return key;
-    },
-  }),
+  useTranslation: () => ({ t }),
+}));
+
+// Demo-tenant "explore demo" sessions must never reach a working checkout —
+// the backend 403s any real-money initiation for the shared demo tenant
+// (DEMO_PAYMENT_BLOCKED). Mutable so each test controls it.
+let demoMode = false;
+vi.mock('../../store/authStore', () => ({
+  useAuthStore: (selector: (s: { demoMode: boolean }) => unknown) => selector({ demoMode }),
 }));
 
 function renderCheckout(planId = 'plan-pro') {
@@ -113,8 +134,10 @@ describe('CheckoutPage consent gate', () => {
     createBankTransferMutate.mockClear();
     updateProfileMutate.mockClear();
     toastError.mockClear();
+    navigateMock.mockClear();
     bankTransferEnabled = false;
     planCurrency = 'TRY';
+    demoMode = false;
   });
 
   it('blocks the payment intent until all three consents are checked', () => {
@@ -289,5 +312,38 @@ describe('CheckoutPage consent gate', () => {
     expect(havaleProceed).toBeEnabled();
     fireEvent.click(havaleProceed);
     expect(createBankTransferMutate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CheckoutPage — demo payment gating', () => {
+  beforeEach(() => {
+    createIntentMutate.mockClear();
+    createBankTransferMutate.mockClear();
+    toastError.mockClear();
+    navigateMock.mockClear();
+    bankTransferEnabled = false;
+    planCurrency = 'TRY';
+  });
+
+  it('demoMode: redirects away, toasts, renders nothing, and never fires create-intent', () => {
+    demoMode = true;
+    renderCheckout('plan-pro');
+
+    expect(navigateMock).toHaveBeenCalledWith('/admin/settings/subscription', { replace: true });
+    expect(toastError).toHaveBeenCalledTimes(1);
+    // No consent gate, no dead-end card, no PayTR/create-intent mutation.
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(createIntentMutate).not.toHaveBeenCalled();
+    expect(createBankTransferMutate).not.toHaveBeenCalled();
+  });
+
+  it('not demoMode: does not redirect to the demo bounce target and renders the consent gate', () => {
+    demoMode = false;
+    renderCheckout('plan-pro');
+
+    expect(navigateMock).not.toHaveBeenCalledWith('/admin/settings/subscription', { replace: true });
+    expect(toastError).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
   });
 });

@@ -27,6 +27,7 @@ import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
 import { useBankTransferDetails } from '../../api/paymentsApi';
 import { getApiErrorMessage } from '../../lib/api-error';
+import { useAuthStore } from '../../store/authStore';
 import { SubscriptionStatus, BillingCycle, InvoiceStatus } from '../../types';
 import { formatCurrency } from '../../lib/currency';
 
@@ -39,6 +40,7 @@ import { formatCurrency } from '../../lib/currency';
 const SubscriptionManagementSection = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
+  const demoMode = useAuthStore((state) => state.demoMode);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState<string>('');
 
@@ -158,6 +160,24 @@ const SubscriptionManagementSection = () => {
   const havaleEnabled = bankTransfer?.enabled ?? false;
   const noWorkingPaymentPath = isNonTryPlan && !havaleEnabled;
 
+  // Demo-tenant sessions ("explore demo") get a fully-privileged ADMIN
+  // account on a shared tenant; the backend 403s any real-money initiation
+  // for it (DEMO_PAYMENT_BLOCKED). Rather than let a demo explorer click
+  // through to a checkout dead-end, disable the money CTAs and explain why
+  // via a tooltip. Small local helper keeps the disabled+title+onClick
+  // treatment DRY across the three CTAs below and still lets each keep its
+  // own non-demo disabled/tooltip logic (scheduledDowngrade,
+  // noWorkingPaymentPath).
+  const demoPaymentBlockedTitle = t('errors:apiCodes.DEMO_PAYMENT_BLOCKED');
+  const demoGuard = (
+    onClick: () => void,
+    fallbackDisabled = false,
+    fallbackTitle?: string,
+  ) =>
+    demoMode
+      ? { disabled: true, title: demoPaymentBlockedTitle, onClick: () => {} }
+      : { disabled: fallbackDisabled, title: fallbackTitle, onClick };
+
   return (
     <div className="space-y-6">
       {/* Scheduled Downgrade Alert */}
@@ -243,9 +263,11 @@ const SubscriptionManagementSection = () => {
                   <Button
                     variant="primary"
                     className="w-full"
-                    onClick={() => navigate('/subscription/change-plan')}
-                    disabled={!!scheduledDowngrade}
-                    title={scheduledDowngrade ? t('subscriptions.scheduledDowngrade.description') : undefined}
+                    {...demoGuard(
+                      () => navigate('/subscription/change-plan'),
+                      !!scheduledDowngrade,
+                      scheduledDowngrade ? t('subscriptions.scheduledDowngrade.description') : undefined,
+                    )}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t('subscriptions.changePlan')}
@@ -285,21 +307,21 @@ const SubscriptionManagementSection = () => {
                   // Non-TRY plan + Havale disabled → checkout would dead-end
                   // (no card rail for foreign currency); send them to the
                   // plans page to choose a payable plan instead.
-                  onClick={() =>
-                    navigate(
-                      noWorkingPaymentPath
-                        ? '/subscription/plans?renew=1'
-                        : `/subscription/checkout?planId=${currentSubscription.planId}&billingCycle=${currentSubscription.billingCycle}`,
-                    )
-                  }
-                  title={
+                  {...demoGuard(
+                    () =>
+                      navigate(
+                        noWorkingPaymentPath
+                          ? '/subscription/plans?renew=1'
+                          : `/subscription/checkout?planId=${currentSubscription.planId}&billingCycle=${currentSubscription.billingCycle}`,
+                      ),
+                    false,
                     noWorkingPaymentPath
                       ? t(
                           'subscriptions.noPaymentPathHint',
                           'Bu plan için ödeme yöntemi yapılandırılmamış. Lütfen bir plan seçin.',
                         )
-                      : undefined
-                  }
+                      : undefined,
+                  )}
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
                   {t('subscriptions.renewNow', 'Şimdi yenile')}
@@ -315,15 +337,16 @@ const SubscriptionManagementSection = () => {
                 <Button
                   variant="primary"
                   className="w-full"
-                  onClick={() => navigate('/subscription/plans?renew=1')}
-                  title={
+                  {...demoGuard(
+                    () => navigate('/subscription/plans?renew=1'),
+                    false,
                     noWorkingPaymentPath
                       ? t(
                           'subscriptions.noPaymentPathHint',
                           'Bu plan için ödeme yöntemi yapılandırılmamış. Lütfen bir plan seçin.',
                         )
-                      : undefined
-                  }
+                      : undefined,
+                  )}
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
                   {t('subscriptions.resubscribe', 'Yeniden abone ol')}

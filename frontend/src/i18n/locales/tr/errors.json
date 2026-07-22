@@ -32,7 +32,8 @@
     "ADDON_LIMIT_REDUNDANT": "Planınız bunu zaten sınırsız olarak sağlıyor.",
     "SAME_PLAN_ACTIVE": "Bu plana zaten abonesiniz.",
     "HARDWARE_OUT_OF_STOCK": "Bu ürün stokta yok.",
-    "ACCOUNT_ROLE_INVALID": "Hesap rolü geçersiz. Lütfen destek ekibiyle iletişime geçin."
+    "ACCOUNT_ROLE_INVALID": "Hesap rolü geçersiz. Lütfen destek ekibiyle iletişime geçin.",
+    "DEMO_PAYMENT_BLOCKED": "Demo modunda ödeme alınamaz."
   },
   "errors": {
     "title": "Hata",

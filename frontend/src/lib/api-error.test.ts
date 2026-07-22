@@ -79,6 +79,22 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(err, 'fallback')).toBe(expected);
   });
 
+  it('localizes DEMO_PAYMENT_BLOCKED for a blocked demo-tenant payment', () => {
+    // Backend 403s any real-money initiation for the shared demo tenant with
+    // this errorCode; the toast must show the friendly localized message,
+    // not the raw backend text, on every payment surface (subscription
+    // checkout, marketplace/hardware store, QR self-pay).
+    const err = axiosErrorWith(
+      { errorCode: 'DEMO_PAYMENT_BLOCKED', message: 'Demo payment blocked' },
+      403,
+    );
+    const expected = i18n.t('errors:apiCodes.DEMO_PAYMENT_BLOCKED', {
+      defaultValue: '',
+    });
+    expect(expected).toBeTruthy();
+    expect(getApiErrorMessage(err, 'fallback')).toBe(expected);
+  });
+
   it('keeps the specific backend message for an unmapped errorCode', () => {
     const err = axiosErrorWith({
       errorCode: 'SOME_UNMAPPED_CODE',

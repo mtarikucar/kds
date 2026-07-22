@@ -9,6 +9,7 @@ import {
   type CustomerPayableItem,
 } from '../../features/qr-menu/customerPayApi';
 import { formatCurrency } from '../../lib/utils';
+import { getApiErrorMessage } from '../../lib/api-error';
 import PhoneInput from '../ui/PhoneInput';
 
 interface SelfPayModalProps {
@@ -121,18 +122,22 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
       window.location.href = response.paymentLink;
     } catch (err: any) {
       inflight.current = false;
-      // Prefer the localized message for known error codes; fall back
-      // to the server's English text only when the code is unknown.
-      // Without this a Turkish customer was seeing raw English.
+      // Self-pay-domain errors (SELF_PAY_DISABLED, ORDER_ALREADY_PAID, …)
+      // carry a stable `code` field — see selfPayError() in
+      // self-pay-pricing.util.ts — mapped under common:payment.errors.*.
+      // Errors from the shared DemoGuardService (and any other standard
+      // NestJS HttpException in this codebase, incl. DEMO_PAYMENT_BLOCKED
+      // for the shared demo tenant) carry `errorCode` instead, which
+      // getApiErrorMessage resolves via errors:apiCodes.*. Try the
+      // self-pay-specific code first (preserves the existing translations),
+      // then fall back to the generic helper so those errors are localized
+      // too instead of leaking the backend's hardcoded-Turkish message.
       const code = err?.response?.data?.code as string | undefined;
       const codeKey = code ? `payment.errors.${code}` : '';
-      const localized = code
-        ? t(codeKey, { defaultValue: '' })
-        : '';
+      const selfPayLocalized = code ? t(codeKey, { defaultValue: '' }) : '';
       const msg =
-        localized ||
-        err?.response?.data?.message ||
-        t('payment.intentFailed', 'Could not start payment');
+        selfPayLocalized ||
+        getApiErrorMessage(err, t('payment.intentFailed', 'Could not start payment'));
       toast.error(msg);
     }
   };

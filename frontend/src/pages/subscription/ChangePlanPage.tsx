@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { ArrowLeft, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import {
   useGetCurrentSubscription,
@@ -12,12 +13,14 @@ import PlanCard from '../../components/subscriptions/PlanCard';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import Modal from '../../components/ui/Modal';
+import { useAuthStore } from '../../store/authStore';
 import { BillingCycle, Plan, SubscriptionPlanType } from '../../types';
 import { formatCurrency } from '../../lib/currency';
 
 const ChangePlanPage = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
+  const demoMode = useAuthStore((state) => state.demoMode);
   const [searchParams] = useSearchParams();
   // The plans page passes the user's choice via ?newPlanId & ?billingCycle.
   const preselectedPlanId = searchParams.get('newPlanId');
@@ -70,6 +73,18 @@ const ChangePlanPage = () => {
     setSelectedPlan(plan);
     setShowConfirmModal(true);
   }, [plans, currentSubscription, preselectedPlanId, preselectedCycle]);
+
+  // Belt-and-suspenders guard for a demo-tenant admin reaching this page via
+  // a direct URL — the "Change plan" CTA that normally links here is already
+  // disabled in demo (see SubscriptionSettingsPage), and the backend 403s
+  // any real-money initiation for the shared demo tenant regardless. Toast +
+  // bounce back rather than let them pick a plan into a dead-end.
+  useEffect(() => {
+    if (demoMode) {
+      toast.error(t('errors:apiCodes.DEMO_PAYMENT_BLOCKED'));
+      navigate('/admin/settings/subscription', { replace: true });
+    }
+  }, [demoMode, navigate, t]);
 
   // Calculate savings percentage for each plan
   const calculateSavingsPercent = (plan: Plan): number => {
@@ -147,6 +162,11 @@ const ChangePlanPage = () => {
       // Error handled by mutation
     }
   };
+
+  // Render nothing while the demo-guard effect above redirects away.
+  if (demoMode) {
+    return null;
+  }
 
   if (subLoading || plansLoading) {
     return (

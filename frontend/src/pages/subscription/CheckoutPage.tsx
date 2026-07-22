@@ -14,6 +14,7 @@ import { useGetPlans } from '../../features/subscriptions/subscriptionsApi';
 import { useGetCurrentLegalDocument } from '../../features/legal/legalApi';
 import { useActionableError } from '../../components/common/actionable-errors/ActionableErrorProvider';
 import { getApiErrorCode, getApiErrorMessage } from '../../lib/api-error';
+import { useAuthStore } from '../../store/authStore';
 import Spinner from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
 import { BillingCycle } from '../../types';
@@ -36,6 +37,7 @@ const AUTO_REDIRECT_MS = 3000;
 const CheckoutPage = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
+  const demoMode = useAuthStore((state) => state.demoMode);
   const [params] = useSearchParams();
   const planId = params.get('planId');
   const billingCycle = (params.get('billingCycle') ?? BillingCycle.MONTHLY) as BillingCycle;
@@ -117,6 +119,18 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (!planId) navigate('/subscription/plans', { replace: true });
   }, [planId, navigate]);
+
+  // Belt-and-suspenders guard for a demo-tenant admin reaching checkout via a
+  // direct URL — the money CTAs that normally link here are already disabled
+  // in demo (see SubscriptionSettingsPage), and the backend 403s any
+  // real-money initiation for the shared demo tenant regardless. Toast +
+  // bounce back rather than let them tick consents into a dead-end.
+  useEffect(() => {
+    if (demoMode) {
+      toast.error(t('errors:apiCodes.DEMO_PAYMENT_BLOCKED'));
+      navigate('/admin/settings/subscription', { replace: true });
+    }
+  }, [demoMode, navigate, t]);
 
   const submitIntent = () => {
     if (!planId || !kvkkQ.data || !distanceQ.data || !refundQ.data) return;
@@ -292,6 +306,11 @@ const CheckoutPage = () => {
     }, 1000);
     return () => clearInterval(tick);
   }, [paymentLink]);
+
+  // Render nothing while the demo-guard effect above redirects away.
+  if (demoMode) {
+    return null;
+  }
 
   if (error) {
     return (
