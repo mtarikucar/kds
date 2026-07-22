@@ -491,7 +491,7 @@ function App() {
                 page (/admin/stock). Old paths redirect. */}
             <Route
               path="/admin/purchasing"
-              element={<Navigate to="/admin/stock" replace />}
+              element={<Navigate to="/admin/stock?tab=orders" replace />}
             />
             <Route path="/admin/cash" element={<CashPage />} />
             <Route
@@ -507,7 +507,7 @@ function App() {
             />
             <Route
               path="/admin/costing"
-              element={<Navigate to="/admin/stock" replace />}
+              element={<Navigate to="/admin/stock?tab=costing" replace />}
             />
             {/* Analitik: Raporlar ile birleşti — eski yol yönlendirir. */}
             <Route

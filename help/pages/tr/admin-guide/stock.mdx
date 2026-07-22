@@ -1,6 +1,6 @@
 ---
 title: Stok & Envanter
-description: HummyTummy stok yönetimi — malzemeler, reçeteler, tedarikçiler, satın alma siparişleri, hareketler, fire ve stok sayımı. Amacı, kullanımı ve ipuçları.
+description: HummyTummy stok yönetimi — tedarik rehberi, malzemeler, siparişler, tedarikçiler, reçete & maliyet, operasyon. Amacı, kullanımı ve ipuçları.
 ---
 
 import { Callout } from 'nextra/components'
@@ -13,7 +13,7 @@ import { Callout } from 'nextra/components'
 
 ## Amacı
 
-Stok modülü, mutfak malzemelerinizi (envanter) baştan sona izler: ne kadar var, ne tükeniyor, ne fire veriyor ve satışla otomatik düşüşü. Reçeteler sayesinde bir ürün satıldığında içindeki malzemeler stoktan otomatik düşülebilir.
+Stok modülü, tedarikten mutfağa kadar tüm döngüyü tek ekranda toplar: ne alınmalı ve nereden (Tedarik Rehberi), malzeme envanteri, satın alma siparişleri, tedarikçi ilişkileri, reçete/maliyet ve günlük operasyon (hareket, fire, sayım, şube transferi). Reçeteler sayesinde bir ürün satıldığında içindeki malzemeler stoktan otomatik düşülebilir.
 
 <Callout type="info">
   Stok takibi **Başlangıç (BASIC)** ve üzeri planlarda açıktır. Planınızda yoksa sol
@@ -22,33 +22,47 @@ Stok modülü, mutfak malzemelerinizi (envanter) baştan sona izler: ne kadar va
 
 ## Sekmeler
 
-Ekran sekmelere ayrılır; her biri stok yönetiminin bir parçasıdır:
+Ekran, adresteki `?tab=` parametresiyle derin bağlantı verilebilen 6 sekmeye ayrılır (sekme geçişi tarayıcı geçmişine yazılır — geri tuşu bir önceki sekmeye döner). Varsayılan sekme **Tedarik Rehberi**'dir ve `tab` parametresi olmadan açılır.
 
-| Sekme | Ne yapar? |
-| --- | --- |
-| **Genel Bakış (Dashboard)** | Stok durumu özeti — düşük/kritik seviyeler, anlık görünüm |
-| **Malzemeler (Ingredients)** | Stok kalemlerini tanımla — birim, mevcut miktar, kritik eşik |
-| **Reçeteler (Recipes)** | Bir ürünün hangi malzemelerden ne kadar içerdiğini tanımla |
-| **Tedarikçiler (Suppliers)** | Tedarikçi kayıtları |
-| **Satın Alma Siparişleri (Purchase Orders)** | Tedarikçiye sipariş oluştur, gelen malı stoğa al |
-| **Hareketler (Movements)** | Tüm stok giriş/çıkış hareketlerinin kaydı |
-| **Fire (Waste Log)** | Zayi/fire kayıtları |
-| **Stok Sayımı (Stock Count)** | Fiziksel sayım ve sistemle uzlaştırma |
+| Sekme | URL | Ne içerir? |
+| --- | --- | --- |
+| **Tedarik Rehberi** | `/admin/stock` (parametresiz) | Bugün alınması gerekenler (par altı malzemeler) + tek tıkla sipariş taslağı + 7 kategori için kanal rehberi |
+| **Malzemeler** | `/admin/stock?tab=items` | Özet sayaçlar (toplam/aktif/düşük stok/yaklaşan SKT/envanter değeri) + malzeme kataloğu (CRUD, birim, kritik eşik, kategori) |
+| **Siparişler** | `/admin/stock?tab=orders` | Satın alma siparişleri (oluştur/gönder/onayla/teslim al/ek maliyet dağıt/iptal) + sipariş şablonları + barkodla stok arama + tedarikçiye iade (RMA) |
+| **Tedarikçiler** | `/admin/stock?tab=suppliers` | Tedarikçi kayıtları + fiyat kataloğu + tedarikçi performans karnesi + tedarikçi faturaları (3'lü eşleştirme) + borç yaşlandırma |
+| **Reçete & Maliyet** | `/admin/stock?tab=costing` | Reçete tanımları + menü mühendisliği (yıldız/çeki düzeni/bilmece/köpek sınıflandırması) + kullanım varyansı + reçete maliyetleri (porsiyon maliyeti, gıda maliyeti %, brüt marj) |
+| **Operasyon** | `/admin/stock?tab=operations` | İç anahtarlı 4 alt bölüm: Hareketler, Fire, Sayım, Şube Transferleri |
+
+## Tedarik Rehberi — ne yapar?
+
+Rehber sekmesi iki bölümden oluşur:
+
+1. **Bugün alınması gerekenler (buy list):** Kritik eşiğin altındaki malzemeleri, önerilen tedarikçiye göre gruplayıp listeler. Her satırda önerilen fiyat kaynağı görünür — işletmenizin **kendi alım geçmişi** (son alımlarda en ucuz), bir **tedarikçi fiyat kataloğu** veya (geçmiş/katalog yoksa) **kanal rehberi önerisi**. Bir tedarikçi grubunun yanındaki **"Sipariş taslağı oluştur"** butonu, o gruptaki kalemleri tek tıkla taslak bir satın alma siparişine çevirir ve sizi Siparişler sekmesine yönlendirir.
+2. **Kanal rehberi:** 7 malzeme kategorisi (Et, Sebze & Meyve, Kuru Gıda, Süt Ürünleri, İçecek, Ambalaj, Temizlik) için, işletmenizin ölçeğine (Küçük Kafe / Orta Ölçek Restoran / Çoklu Şube) göre "nereden almalı" önerisi gösterir. Ölçek otomatik belirlenir (şube sayısı + son 90 günün yıllıklandırılmış harcaması) ama sağ üstteki anahtardan farklı bir ölçek için de görüntüleyebilirsiniz. Kartı açtığınızda, o kategori için pratik kurallar (soğuk zincir, hal rüsumu, KDV farkı, sözleşme/scorecard önerisi vb.) listelenir.
+
+<Callout type="info">
+  Kanal rehberi içeriği, Türkiye'deki tedarik kanalları (cash&carry, toptancı hali,
+  online B2B, üretici kooperatifi, yerel kasap/toptancı, distribütör) üzerine yapılmış
+  kaynaklı bir araştırmaya dayanır — genel yönlendirme amaçlıdır, güncel fiyat/kampanya
+  teklifi yerine geçmez.
+</Callout>
 
 ## Tipik kullanım akışı
 
-1. **Malzemeleri tanımla** — un, et, süt vb.; birim ve kritik eşiklerini gir.
-2. **Reçete bağla** — "Cheeseburger = 1 köfte + 1 ekmek + 30g peynir" gibi. Böylece satışta malzeme otomatik düşer.
-3. **Tedarikçi + satın alma** — tedarikçiyi tanımla, satın alma siparişiyle gelen malı stoğa ekle.
-4. **Fire & sayım** — zayi olanı fire kaydına gir; dönemsel fiziksel sayımla sistemi uzlaştır.
-5. **Hareketleri izle** — tüm giriş/çıkışlar Hareketler sekmesinde denetlenebilir.
+1. **Malzemeleri tanımla** (Malzemeler) — un, et, süt vb.; birim ve kritik eşiklerini gir.
+2. **Reçete bağla** (Reçete & Maliyet) — "Cheeseburger = 1 köfte + 1 ekmek + 30g peynir" gibi. Böylece satışta malzeme otomatik düşer.
+3. **Rehberi kontrol et** (Tedarik Rehberi) — par altına düşen kalemleri gör, önerilen tedarikçiden tek tıkla taslak sipariş oluştur.
+4. **Siparişi yönet** (Siparişler) — taslağı gönder, teslim alındığında stoğa işle, gerekirse ek maliyet (navlun/gümrük) dağıt.
+5. **Tedarikçiyi izle** (Tedarikçiler) — performans karnesi ve borç yaşlandırmayla hangi tedarikçinin zamanında teslim ettiğini, ne kadar borcunuz olduğunu takip et.
+6. **Fire & sayım** (Operasyon) — zayi olanı fire kaydına gir; dönemsel fiziksel sayımla sistemi uzlaştır; şubeler arası transferi kaydet.
 
 ## İpuçları
 
-- **Kritik eşik belirleyin:** Her malzemeye kritik seviye girin; Genel Bakış düşük stokları öne çıkarır, sipariş zamanını kaçırmazsınız.
+- **Kritik eşik belirleyin:** Her malzemeye kritik seviye girin; Rehber ve Malzemeler sekmeleri düşük stokları öne çıkarır, sipariş zamanını kaçırmazsınız.
 - **Reçeteler otomatik düşüşün anahtarı:** Reçete tanımlamazsanız satış stoğu otomatik düşmez — manuel hareket girmeniz gerekir. Çok satan ürünler için reçeteyi mutlaka tanımlayın.
-- **İptal stok iade eder:** Mutfakta `PENDING` bir sipariş iptal edilirse stok geri yazılır. Bu yüzden sayımda "neden eksik/fazla" sorusunu yanıtlarken iptalleri de göz önünde bulundurun.
-- **Stok raporu:** Raporlar ekranındaki **Envanter** sekmesi (aynı `inventoryTracking` ile gizlenir/görünür) stok analizini sunar.
+- **Menü mühendisliği gelişmiş rapor gerektirir:** Reçete & Maliyet sekmesindeki menü mühendisliği bloğu `ADVANCED_REPORTS` ile kapılıdır; plana dahil değilse yükseltme mesajı görürsünüz (bu, Stok'un kendi `inventoryTracking` kapısından ayrı bir plan bayrağıdır).
+- **İptal stok iade eder:** Mutfakta `PENDING` bir sipariş iptal edilirse stok geri yazılır. Sayımda "neden eksik/fazla" sorusunu yanıtlarken iptalleri de göz önünde bulundurun.
+- **Derin bağlantı verin:** Belirli bir sekmeye doğrudan bağlantı vermek için `?tab=` parametresini kullanın (ör. `/admin/stock?tab=suppliers`); parametresiz adres her zaman Tedarik Rehberi'ni açar.
 
 ## İlgili ekranlar
 

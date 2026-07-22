@@ -1,22 +1,20 @@
 import { useState } from 'react';
 import { format, subDays } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { ChefHat, Scale, Layers } from 'lucide-react';
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-} from '../../components/ui/Card';
-import { useFormatCurrency } from '../../hooks/useFormatCurrency';
-import DateRangeBar from './reports/DateRangeBar';
+} from '../../../components/ui/Card';
+import { useFormatCurrency } from '../../../hooks/useFormatCurrency';
+import DateRangeBar from '../reports/DateRangeBar';
 import {
   useMenuEngineering,
   useUsageVariance,
-} from '../../features/stock-management/costingApi';
-import { useRecipes } from '../../features/stock-management/stockManagementApi';
-
-type Tab = 'menu' | 'variance' | 'recipes';
+} from '../../../features/stock-management/costingApi';
+import { useRecipes } from '../../../features/stock-management/stockManagementApi';
+import RecipesTab from '../../../features/stock-management/components/RecipesTab';
 
 const CLASS_TONE: Record<string, string> = {
   STAR: 'bg-emerald-100 text-emerald-700',
@@ -30,43 +28,26 @@ const defaultRange = () => ({
   endDate: format(new Date(), 'yyyy-MM-dd'),
 });
 
-export default function CostingPage({ embedded = false }: { embedded?: boolean }) {
-  const { t } = useTranslation('reports');
+type Fmt = (n: number) => string;
+
+// Reçete & Maliyet = recipe CRUD (from the old inventory group) + costing,
+// menu engineering, usage variance (lifted verbatim, incl. its
+// ADVANCED_REPORTS 403 'upgrade required' special-case for the
+// menu-engineering block) from CostingPage.
+export default function CostingTab() {
   const fmt = useFormatCurrency();
-  const [tab, setTab] = useState<Tab>('menu');
-  const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'menu', label: t('costing.tabMenu'), icon: ChefHat },
-    { id: 'variance', label: t('costing.tabVariance'), icon: Scale },
-    { id: 'recipes', label: t('costing.tabRecipes'), icon: Layers },
-  ];
   return (
-    <div className={embedded ? 'space-y-6' : 'p-4 sm:p-6 space-y-6'}>
-      {!embedded && (
-        <div>
-          <h1 className="text-2xl font-bold">{t('costing.title')}</h1>
-          <p className="text-sm text-slate-500">{t('costing.subtitle')}</p>
-        </div>
-      )}
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
-        {tabs.map((tb) => {
-          const Icon = tb.icon;
-          return (
-            <button key={tb.id} onClick={() => setTab(tb.id)}
-              className={`flex items-center gap-2 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                tab === tb.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-              <Icon className="h-4 w-4" />{tb.label}
-            </button>
-          );
-        })}
-      </div>
-      {tab === 'menu' && <MenuTab fmt={fmt} />}
-      {tab === 'variance' && <VarianceTab fmt={fmt} />}
-      {tab === 'recipes' && <RecipesTab fmt={fmt} />}
+    <div className="space-y-8">
+      <RecipesTab />
+      <MenuTab fmt={fmt} />
+      <VarianceTab fmt={fmt} />
+      <RecipeCostingSection fmt={fmt} />
     </div>
   );
 }
 
-type Fmt = (n: number) => string;
+// ── Menu engineering + usage variance + recipe costing, lifted verbatim
+// from CostingPage.tsx ──
 
 function MenuTab({ fmt }: { fmt: Fmt }) {
   const { t } = useTranslation('reports');
@@ -175,7 +156,9 @@ function VarianceTab({ fmt }: { fmt: Fmt }) {
   );
 }
 
-function RecipesTab({ fmt }: { fmt: Fmt }) {
+// Lifted from CostingPage.tsx's local `RecipesTab` (renamed here to avoid
+// clashing with the imported CRUD `RecipesTab` above).
+function RecipeCostingSection({ fmt }: { fmt: Fmt }) {
   const { t } = useTranslation('reports');
   const { data, isLoading, isError } = useRecipes();
   if (isLoading) return <Loading />;

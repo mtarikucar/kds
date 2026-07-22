@@ -114,7 +114,18 @@
     "deleteError": "Tedarikçi silinemedi",
     "itemAdded": "Ürün tedarikçiye eklendi",
     "itemAddError": "Ürün eklenemedi",
-    "confirmDelete": "Bu tedarikçiyi silmek istiyor musunuz?"
+    "confirmDelete": "Bu tedarikçiyi silmek istiyor musunuz?",
+    "catalog": {
+      "selectSupplier": "Tedarikçi seçin",
+      "item": "Ürün",
+      "supplierSku": "Tedarikçi Kodu",
+      "price": "Fiyat",
+      "preferred": "Tercih Edilen",
+      "remove": "Kaldır",
+      "noItems": "Henüz ürün bağlanmadı",
+      "selectItem": "Ürün seçin",
+      "addLink": "Ürün Bağla"
+    }
   },
   "purchaseOrders": {
     "title": "Satın Alma Siparişleri",
@@ -327,5 +338,166 @@
     "inventory": "Envanter",
     "purchasing": "Satın Alma",
     "costing": "Maliyet & Reçete"
+  },
+  "nav": {
+    "guide": "Tedarik Rehberi",
+    "items": "Malzemeler",
+    "orders": "Siparişler",
+    "suppliers": "Tedarikçiler",
+    "costing": "Reçete & Maliyet",
+    "operations": "Operasyon"
+  },
+  "sections": {
+    "reorder": "Sipariş Önerileri",
+    "apAging": "Borç Yaşlandırma",
+    "scorecard": "Tedarikçi Karnesi",
+    "transfers": "Şube Transferleri",
+    "valuation": "Stok Değerleme",
+    "templates": "Şablonlar",
+    "barcode": "Barkod",
+    "returns": "İade (RMA)",
+    "vendorBills": "Tedarikçi Faturaları",
+    "catalog": "Fiyat Kataloğu",
+    "menuEngineering": "Menü Mühendisliği",
+    "usageVariance": "Kullanım Varyansı",
+    "recipeCosting": "Reçete Maliyetleri"
+  },
+  "guide": {
+    "buyNow": "Bugün alınması gerekenler",
+    "channelGuide": "Kanal rehberi",
+    "createDraft": "Sipariş taslağı oluştur",
+    "cheapestRecent": "son {{count}} alımda en ucuz",
+    "catalogPrice": "katalog fiyatı",
+    "alt": "alternatif: {{name}} {{price}}",
+    "buyListEmpty": "Par altında malzeme yok 🎉",
+    "error": "Rehber yüklenemedi",
+    "viewAsTier": "Şu ölçek için görüntüle",
+    "tier": {
+      "SMALL_CAFE": "Küçük Kafe",
+      "MID_RESTAURANT": "Orta Ölçek Restoran",
+      "MULTI_BRANCH": "Çoklu Şube"
+    },
+    "cat": {
+      "MEAT": "Et",
+      "PRODUCE": "Sebze & Meyve",
+      "DRY_GOODS": "Kuru Gıda",
+      "DAIRY": "Süt Ürünleri",
+      "BEVERAGE": "İçecek",
+      "PACKAGING": "Ambalaj",
+      "CLEANING": "Temizlik"
+    },
+    "rec": {
+      "generic": "kanal rehberine göre önerilir",
+      "MEAT": {
+        "SMALL_CAFE": "Yerel kasap veya toptancı; donuk için cash&carry.",
+        "MID_RESTAURANT": "Onaylı distribütör sözleşmesi + taze için yerel kasap.",
+        "MULTI_BRANCH": "Merkezi distribütör çerçevesi + şube-yerel taze."
+      },
+      "PRODUCE": {
+        "SMALL_CAFE": "Yerel manav veya hal; günlük taze alım.",
+        "MID_RESTAURANT": "Hal'den planlı + spot alım, sabit günlerde.",
+        "MULTI_BRANCH": "Üretici kooperatifi (rüsum muaf) + hal."
+      },
+      "DRY_GOODS": {
+        "SMALL_CAFE": "Cash&carry'den (Bizim Toptan/Tespo) aylık toplu alım.",
+        "MID_RESTAURANT": "Cash&carry + online B2B (Toptanmarketi) karşılaştırmalı.",
+        "MULTI_BRANCH": "Merkezi distribütör + toplu online B2B siparişi."
+      },
+      "DAIRY": {
+        "SMALL_CAFE": "Cash&carry + güvenilir yerel süt distribütörü.",
+        "MID_RESTAURANT": "Onaylı süt distribütörüyle sözleşmeli düzenli tedarik.",
+        "MULTI_BRANCH": "Merkezi süt distribütörü çerçeve anlaşması."
+      },
+      "BEVERAGE": {
+        "SMALL_CAFE": "Cash&carry/Tespo'dan nakit indirimli toplu alım.",
+        "MID_RESTAURANT": "Marka distribütör anlaşması + tamamlayıcı cash&carry.",
+        "MULTI_BRANCH": "Marka distribütörüyle merkezi çerçeve anlaşma."
+      },
+      "PACKAGING": {
+        "SMALL_CAFE": "Cash&carry'den toplu alım, birim maliyeti düşürün.",
+        "MID_RESTAURANT": "Uzman toptancı (ambalaj) + online B2B destek.",
+        "MULTI_BRANCH": "Uzman toptancı çerçevesi + merkezi sözleşme."
+      },
+      "CLEANING": {
+        "SMALL_CAFE": "Cash&carry'den toplu temizlik malzemesi alımı.",
+        "MID_RESTAURANT": "Uzman toptancı + dernek kampanyaları (TÜRES üyeliği).",
+        "MULTI_BRANCH": "Tüm şubeler için tek temizlik tedarikçisi."
+      }
+    },
+    "note": {
+      "CASH_CARRY": {
+        "advantage": "Tek noktadan geniş sortiman, düzenli fatura; indirim tek haneli (~%3-7).",
+        "minOrder": "Bireysel üyelik mümkün; teslimatta genelde 1.500-2.500 ₺ asgari sepet + lojistik bedeli.",
+        "payment": "Sadakat puanı (ör. Bizim Kart); vade/taksit avantajı iddia edilmez.",
+        "eInvoice": "Tedarikçinin e-Fatura mükellefiyetini GİB'den sorgulayıp KDV indirimini güvenceye alın."
+      },
+      "WHOLESALE_MARKET": {
+        "advantage": "Taze üründe spot fiyat + geniş çeşit; hal içinde işlem rüsumu yarıya indirir.",
+        "minOrder": "Asgari sipariş yok; komisyoncu üzerinden alımda azami komisyon %8.",
+        "payment": "Genelde peşin/spot ödeme; malı satın alan rüsumu öder.",
+        "eInvoice": "Doğrudan üreticiden alım, Hal Kayıt Sistemi'ne bildirimci kaydı + müstahsil makbuzu gerektirir."
+      },
+      "ONLINE_B2B": {
+        "advantage": "Fiyat şeffaflığı ve çoklu-sıcaklık (taze+donuk+kuru) sortiman; hızlı teslim.",
+        "minOrder": "Platforma göre değişir: bazısında asgari yok, bazısında 2.500 ₺ üzeri ücretsiz kargo.",
+        "payment": "Hesap bazlı katalog (ör. Bidfood) üyelik gerektirebilir; bazı platformda fiyat herkese açık.",
+        "eInvoice": "Kurumsal B2B platformları genelde e-Fatura mükellefidir; sipariş öncesi teyit edin."
+      },
+      "PRODUCER_COOP": {
+        "advantage": "Bakanlık belgeli üretici örgütünden alım hal rüsumundan tam muaf; aracı payını düşürür.",
+        "minOrder": "Genelde yüksek hacim/düzenli anlaşma gerektirir; küçük kafeye pratik değildir.",
+        "payment": "Sözleşmeli/çerçeve alım modeliyle çalışılır; yüksek hacimde fiyat öngörülebilirliği sağlar.",
+        "eInvoice": "Alım fatura/müstahsil makbuzuyla belgelenir; işletme yine Hal Kayıt Sistemi'ne tabi olabilir."
+      },
+      "LOCAL_BUTCHER_WHOLESALER": {
+        "advantage": "Güven ilişkisi + esneklik (küçük miktar, hızlı teslim); taze üründe tercih edilir.",
+        "minOrder": "Genelde asgari sipariş şartı yok; telefonla sipariş yaygın.",
+        "payment": "Profesyonel ilişkide fiyat teklifi/sözleşme + tedarikçi karnesi (scorecard) önerilir.",
+        "eInvoice": "Tedarikçi resmi onay/kayıt rejimine tabi olmalı; ISO 22000 sertifikası aranmalı."
+      },
+      "DISTRIBUTOR": {
+        "advantage": "Sözleşmeli/çerçeve anlaşmayla fiyat öngörülebilirliği; çok şubede merkezi+şube-yerel hibrit model.",
+        "minOrder": "Distribütörle hesap/sözleşme gerekir; asgari sipariş tedarikçiye göre değişir.",
+        "payment": "Sözleşmeli/çerçeve alım fiyat öngörülebilirliği sağlar; ödeme koşulları tedarikçiyle görüşülür.",
+        "eInvoice": "Kurumsal distribütörler e-Fatura mükellefidir; GİB sorgusuyla teyit edilebilir."
+      }
+    },
+    "rule": {
+      "MEAT": {
+        "1": "Soğuk zinciri koruyun: çiğ et/tavuk 0…+4°C, balık 0…+2°C, donuk -18°C.",
+        "2": "Tedarikçinin resmi onay/kayıt belgesi ve ISO 22000 sertifikası olsun.",
+        "3": "Yüksek hacimde fiyat teklifi + tedarikçi karnesi kullanın; kesimhane izlenebilirliği 2027'de kamerayla zorunlu olacak."
+      },
+      "PRODUCE": {
+        "1": "Hal rüsumu hal içinde %1, dışında %2'dir; malı satın alan öder.",
+        "2": "Doğrudan üreticiden alım Hal Kayıt Sistemi'ne bildirimci kaydı ister; bildirimsizde cezalı rüsum %25'tir.",
+        "3": "Üretici örgütü/kooperatif kanalı rüsumdan muaftır ve yüksek hacimde aracı payını azaltır."
+      },
+      "DRY_GOODS": {
+        "1": "Cash&carry'nin kademeli indirimleri tek hanelidir (~%3-7); asıl kazanç geniş sortiman + düzenli fatura.",
+        "2": "Uzun raf ömürlü kalemlerde toplu/çerçeve alım en net kazancı sağlar.",
+        "3": "Online B2B fiyat şeffaflığı küçük işletmeye, hesap bazlı katalog büyük ölçeğe uygundur."
+      },
+      "DAIRY": {
+        "1": "Soğuk zincir kesintisiz <+4°C sağlanmalı; tedarikçide soğutmalı araç/depo şart.",
+        "2": "Süt/et tedarikçisi kayıt değil, daha sıkı 'onay' rejimine tabidir.",
+        "3": "Yüksek gıda enflasyonunda sözleşmeli/çerçeve alım fiyat öngörülebilirliği sağlar."
+      },
+      "BEVERAGE": {
+        "1": "İşlenmiş/ÖTV'li içecekte (gazlı içecek, meyve suyu, bira) KDV %10; temel gıdadan yüksektir.",
+        "2": "Cash&carry'de nakit/erken ödeme indirimi olabilir ama derinliği sınırlıdır (~%3-7).",
+        "3": "Marka distribütörüyle çerçeve anlaşma yüksek hacimde fiyat istikrarı sağlar."
+      },
+      "PACKAGING": {
+        "1": "Toplu alımda birim fiyat %20-40 düşebilir; kağıt hijyende tasarruf %30'a varır.",
+        "2": "Uzun raf ömrü nedeniyle ayda 1-2 sipariş yeterlidir; yüksek stok tamponu tutulabilir.",
+        "3": "Gıdayla temas eden ambalajda gıda-güvenliği belgesi isteyin; gıdadan ayrı depolayın."
+      },
+      "CLEANING": {
+        "1": "Temizlik ürünleri gıdadan ayrı depolanmalı; gıda-temas yüzeyi ürününde belge istenmeli.",
+        "2": "Uzun raf ömrü nedeniyle ayda 1 sipariş sıklığı yeterlidir.",
+        "3": "Sektör derneği üyeliği (TÜRES/TURYİD/ETÜDER) tedarikçi kampanyası ve özel indirime erişim sağlayabilir."
+      }
+    }
   }
 }
