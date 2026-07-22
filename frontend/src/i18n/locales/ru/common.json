@@ -81,6 +81,7 @@
     "admin": "Админ",
     "subscription": "Подписка",
     "reservations": "Reservations",
+    "pendingReservations": "{{count}} в ожидании",
     "personnel": "Персонал",
     "stock": "Склад",
     "invoices": "Счета",

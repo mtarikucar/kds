@@ -81,6 +81,7 @@
     "admin": "الإدارة",
     "subscription": "الاشتراك",
     "reservations": "Reservations",
+    "pendingReservations": "{{count}} قيد الانتظار",
     "personnel": "الموظفين",
     "stock": "المخزون",
     "invoices": "الفواتير",

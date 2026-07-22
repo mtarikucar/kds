@@ -81,6 +81,7 @@
     "admin": "Admin",
     "subscription": "Obuna",
     "reservations": "Reservations",
+    "pendingReservations": "{{count}} kutilmoqda",
     "personnel": "Xodimlar",
     "stock": "Zaxira",
     "invoices": "Hisob-fakturalar",

@@ -81,6 +81,7 @@
     "admin": "Admin",
     "subscription": "Subscription",
     "reservations": "Reservations",
+    "pendingReservations": "{{count}} pending",
     "personnel": "Personnel",
     "stock": "Stock",
     "invoices": "Invoices",
