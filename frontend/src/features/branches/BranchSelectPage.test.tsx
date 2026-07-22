@@ -86,10 +86,32 @@ describe('BranchSelectPage', () => {
   });
 
   it('filters to the allow-list when one is present', () => {
-    useBranchScopeStore.setState({ allowedBranchIds: ['b-2'] });
+    // A scoped ADMIN (explicit allow-list) is NOT wildcard — mirrors what a
+    // real hydrateFromUser() would compute for this allowedBranchIds value.
+    useBranchScopeStore.setState({ allowedBranchIds: ['b-2'], isWildcard: false });
     renderPage();
     expect(screen.getByText('Beşiktaş')).toBeInTheDocument();
     expect(screen.queryByText('Kadıköy')).not.toBeInTheDocument();
+  });
+
+  // Backend BranchGuard's wildcard rule is ADMIN-only — a MANAGER (or any
+  // non-ADMIN) with an empty allow-list is a data bug, not wildcard access.
+  it('shows zero branches for a non-wildcard user with an empty allow-list', () => {
+    useBranchScopeStore.getState().hydrateFromUser({
+      id: 'u-2',
+      email: 'm@example.com',
+      firstName: 'M',
+      lastName: 'G',
+      role: UserRole.MANAGER,
+      tenantId: 't-1',
+      primaryBranchId: 'b-1',
+      allowedBranchIds: [],
+    } as never);
+    expect(useBranchScopeStore.getState().isWildcard).toBe(false);
+    renderPage();
+    expect(screen.queryByText('Kadıköy')).not.toBeInTheDocument();
+    expect(screen.queryByText('Beşiktaş')).not.toBeInTheDocument();
+    expect(screen.getByText('No branches you can access')).toBeInTheDocument();
   });
 
   it('selecting a branch stores it, marks it chosen and navigates back', () => {

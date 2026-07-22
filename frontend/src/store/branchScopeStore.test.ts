@@ -106,6 +106,66 @@ describe('branchScopeStore', () => {
       expect(useBranchScopeStore.getState().branchId).toBe('b-2');
     });
   });
+
+  /**
+   * Mirrors backend BranchGuard.canAccessBranchStatic's wildcard rule
+   * EXACTLY: wildcard (implicit all-branch access) is granted only to a
+   * non-pinned ADMIN with an empty allowedBranchIds. Any other role with
+   * an empty list (e.g. a MANAGER whose allow-list was never populated —
+   * a data bug) must NOT be treated as wildcard, or the FE shows/allows
+   * branches the backend will 403 on.
+   */
+  describe('isWildcard', () => {
+    it('is true for an ADMIN with an empty allow-list', () => {
+      useBranchScopeStore.getState().hydrateFromUser(
+        makeUser({ role: UserRole.ADMIN, allowedBranchIds: [], primaryBranchId: 'b-1' }),
+      );
+      expect(useBranchScopeStore.getState().isWildcard).toBe(true);
+    });
+
+    it('is false for a MANAGER with an empty allow-list (data bug, not wildcard)', () => {
+      useBranchScopeStore.getState().hydrateFromUser(
+        makeUser({ role: UserRole.MANAGER, allowedBranchIds: [], primaryBranchId: 'b-1' }),
+      );
+      expect(useBranchScopeStore.getState().isWildcard).toBe(false);
+    });
+
+    it('is false for a MANAGER with a non-empty allow-list', () => {
+      useBranchScopeStore.getState().hydrateFromUser(
+        makeUser({ role: UserRole.MANAGER, allowedBranchIds: ['b-1', 'b-2'] }),
+      );
+      const s = useBranchScopeStore.getState();
+      expect(s.isWildcard).toBe(false);
+      // and setBranchId still refuses an id outside the explicit list.
+      s.setBranchId('b-99');
+      expect(useBranchScopeStore.getState().branchId).not.toBe('b-99');
+    });
+
+    it('is false for an ADMIN with a non-empty allow-list (scoped ADMIN)', () => {
+      useBranchScopeStore.getState().hydrateFromUser(
+        makeUser({ role: UserRole.ADMIN, allowedBranchIds: ['b-1'] }),
+      );
+      expect(useBranchScopeStore.getState().isWildcard).toBe(false);
+    });
+
+    it('lets a wildcard ADMIN setBranchId to any id, including one outside allowedBranchIds', () => {
+      useBranchScopeStore.getState().hydrateFromUser(
+        makeUser({ role: UserRole.ADMIN, allowedBranchIds: [], primaryBranchId: 'b-1' }),
+      );
+      useBranchScopeStore.getState().setBranchId('b-anything');
+      expect(useBranchScopeStore.getState().branchId).toBe('b-anything');
+    });
+
+    it('resets to false on clear (logout)', () => {
+      const store = useBranchScopeStore.getState();
+      store.hydrateFromUser(
+        makeUser({ role: UserRole.ADMIN, allowedBranchIds: [], primaryBranchId: 'b-1' }),
+      );
+      expect(useBranchScopeStore.getState().isWildcard).toBe(true);
+      store.clear();
+      expect(useBranchScopeStore.getState().isWildcard).toBe(false);
+    });
+  });
 });
 
 /**
