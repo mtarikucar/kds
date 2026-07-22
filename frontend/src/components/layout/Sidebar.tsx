@@ -17,7 +17,6 @@ import {
   CalendarCheck,
   UsersRound,
   Package,
-  Receipt,
   Wallet,
   LogOut,
   User,
@@ -25,7 +24,6 @@ import {
   Network,
   PhoneIncoming,
   Download,
-  FileWarning,
   CreditCard,
   Sparkles,
 } from 'lucide-react';
@@ -183,19 +181,13 @@ const SECTIONS: NavSection[] = [
         gate: { feature: 'advancedReports' },
       },
       {
-        to: '/admin/cash',
+        // Finans: Nakit & ÖKC + Muhasebe + Fiş Kurtarma tek çatı (FinancePage).
+        // Gate yok — kasa + fatura kesme yasal çekirdek, her planda.
+        to: '/admin/finance',
         icon: Wallet,
-        labelKey: 'navigation.cash',
-        labelFallback: 'Nakit & ÖKC',
+        labelKey: 'navigation.finance',
+        labelFallback: 'Finans',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/accounting-backoffice',
-        icon: Receipt,
-        labelKey: 'navigation.accountingBackOffice',
-        labelFallback: 'Muhasebe',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { feature: 'advancedReports' },
       },
       // Analitik: artık Raporlar ile birleşti (/admin/reports) — ayrı nav yok.
       // Paket Siparişleri: folded into the POS screen's "Paket Siparişleri"
@@ -254,13 +246,6 @@ const SECTIONS: NavSection[] = [
         icon: Settings,
         labelKey: 'navigation.settings',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
-      },
-      {
-        to: '/admin/fiscal-recovery',
-        icon: FileWarning,
-        labelKey: 'navigation.fiscalRecovery',
-        roles: [UserRole.ADMIN, UserRole.MANAGER],
-        gate: { integration: { domain: 'fiscal' } },
       },
       {
         to: '/admin/caller-feed',

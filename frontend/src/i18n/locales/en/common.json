@@ -88,6 +88,7 @@
     "reports": "Reports",
     "analytics": "Analytics",
     "reportsAnalytics": "Analytics & Reports",
+    "finance": "Finance",
     "settings": "Settings",
     "admin": "Admin",
     "subscription": "Subscription",
@@ -119,6 +120,81 @@
     },
     "expandSidebar": "Expand Sidebar",
     "collapseSidebar": "Collapse Sidebar"
+  },
+  "finance": {
+    "groups": {
+      "overview": "Overview",
+      "cash": "Cash",
+      "documents": "Documents"
+    },
+    "overview": {
+      "expectedCash": "Expected cash in drawer",
+      "openSessions": "Open shifts",
+      "todaysSales": "Today's sales",
+      "fiscalDevices": "Cash register",
+      "fiscalNone": "Not set up",
+      "fiscalReady": "ready",
+      "fiscalUpsellTitle": "Cash register connection",
+      "fiscalUpsellBody": "Printing fiscal receipts requires the cash register add-on.",
+      "fiscalUpsellCta": "Go to store",
+      "staleSessionWarning": "{{count}} shift(s) left open from yesterday — day-end reconciliation is missing.",
+      "closeAction": "Close",
+      "failedDocs": "Undelivered documents:",
+      "fixAction": "Fix",
+      "reconciliation": "{{count}} card charge(s) need reconciliation — review on the branch devices page."
+    }
+  },
+  "cash": {
+    "title": "Cash",
+    "subtitle": "Shift reconciliation, cash movements and day-end.",
+    "tabs": {
+      "sessions": "Shifts",
+      "safe": "Cash Movements",
+      "dayend": "Day-End",
+      "tips": "Tips"
+    },
+    "sessions": {
+      "open": "Open shifts",
+      "none": "No open shifts.",
+      "row": "Shift {{id}} — opening {{amount}}"
+    },
+    "xreport": {
+      "title": "Live drawer summary (without closing)",
+      "pick": "Pick a shift on the left.",
+      "opening": "Opening",
+      "cashSales": "Cash sales",
+      "cashIn": "Cash in",
+      "cashOut": "Cash out",
+      "expected": "Expected cash"
+    },
+    "safe": {
+      "title": "Cash movement",
+      "desc": "Money leaving the drawer — requires approval, counts as an outflow in shift reconciliation.",
+      "typeSafeDrop": "Transfer to main safe",
+      "typeBankDeposit": "Bank deposit",
+      "typePettyCash": "Petty cash",
+      "typeCashOut": "Cash out",
+      "amount": "Amount",
+      "reason": "Description",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Movement recorded (pending approval). Amount: {{amount}}",
+      "failed": "Could not record — check the amount and retry."
+    },
+    "tips": {
+      "title": "Tip distribution — pool {{pool}}, {{hours}} hours",
+      "error": "Could not load — refresh and retry.",
+      "staff": "Staff",
+      "hours": "Hours",
+      "share": "Share",
+      "undistributed": "Undistributed: {{amount}} (no hours entered)."
+    },
+    "dayend": {
+      "csv": "Closed-shift export (CSV)",
+      "csvError": "Download failed — retry."
+    },
+    "loading": "Loading…",
+    "empty": "No records."
   },
   "hummytummy": {
     "common": {
@@ -425,8 +501,12 @@
       "notFound": "Branch not found, or you don't have access.",
       "tabs": {
         "devices": "Devices",
+        "terminals": "Payment Terminals",
+        "fiscal": "Cash Register",
+        "hardware": "Printer & Drawer",
         "network": "Local network"
-      }
+      },
+      "scopeHint": "Switch to this branch in the top bar to manage terminals and the cash register."
     },
     "network": {
       "tokenTitle": "Bridge token (shown once)",
