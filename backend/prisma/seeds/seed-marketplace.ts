@@ -20,12 +20,21 @@ const prisma = new PrismaClient();
 // Minimal seller-responsibility docs stamped on seeded DIRECT_SALE rows so
 // (a) the storefront "Yasal & Garanti" tab isn't empty and (b) a later admin
 // edit doesn't hit the publish gate (which requires complianceDocs for
-// DIRECT_SALE). Demo placeholders — real catalog rows carry real documents.
-const SEED_DEFAULT_COMPLIANCE = {
+// DIRECT_SALE).
+//
+// Task 11 — this used to also carry `warrantyCertUrl`/`returnTermsUrl`
+// pointing at "/docs/*.pdf" files that were never actually uploaded anywhere
+// (dead links) and a `serviceInfo` string with a fabricated support line
+// ("0850 000 00 00") — all three rendered, unfiltered, to real tenants on
+// the product detail page's "Yasal & Garanti" tab. Removed rather than
+// replaced with different placeholders. `invoiceIssued: true` is a real
+// business fact (invoices ARE issued through the accounting module) and
+// alone still satisfies CatalogService.hasComplianceDocs (>=1 non-empty
+// value), so the DIRECT_SALE publish gate stays satisfied. Reversible data
+// migration 20260722160000_hardware_drop_fake_compliance_placeholders backs
+// this out for already-seeded rows (round-trip verified).
+export const SEED_DEFAULT_COMPLIANCE = {
   invoiceIssued: true,
-  warrantyCertUrl: "/docs/garanti-belgesi.pdf",
-  returnTermsUrl: "/docs/iade-ve-cayma-sartlari.pdf",
-  serviceInfo: "Yetkili teknik servis üzerinden — destek hattı: 0850 000 00 00",
 };
 
 // ---- Add-on catalog ---------------------------------------------------
@@ -209,7 +218,7 @@ export const ADDONS = [
 // (category-name fallback card). Replace with own-CDN URLs in a follow-up
 // once we have permission/uploads in place.
 
-const PRODUCTS = [
+export const PRODUCTS = [
   // ── Yeni Nesil Yazarkasa POS (YN ÖKC — GİB onaylı) ───────────────────
   {
     sku: "yazarkasa-hugin-tiger-t300",
@@ -247,16 +256,31 @@ const PRODUCTS = [
     images: ["/products/yazarkasa-beko-300tr.webp"],
     stockStatus: "in_stock",
   },
+  // ── Banka POS Terminali (Tier 2 — PARTNER_REDIRECT) ──────────────────
+  //
+  // Task 11 — moved out of the "Yeni Nesil Yazarkasa POS" section above.
+  // Ingenico Move/5000F is a bank/PSP card-payment terminal (EMV L1/L2 +
+  // PCI PTS 5.x acquiring device), not a YN ÖKC fiscal cash register — it
+  // was previously seeded with category:'yazarkasa', which defaulted it to
+  // saleMode:QUOTE_ONLY (the fiscal-dealer tier) instead of the correct
+  // saleMode:PARTNER_REDIRECT (bank/PSP tier — see CATEGORY_DEFAULT_SALE_MODE
+  // in create-hardware-product.dto.ts). `compat.gibCertified` is dropped for
+  // the same reason: GİB's YN ÖKC onay listesi doesn't apply to a bank POS
+  // terminal, so the badge was a false claim. Reversible data migration
+  // 20260722150000_hardware_recategorize_ingenico_pos_terminal backfills
+  // this on already-seeded rows (round-trip verified). SKU keeps its
+  // original "yazarkasa-…" prefix — renaming it would ripple into
+  // HARDWARE_DETAILS' key, historical order lines, and cart/quote
+  // references for no functional benefit.
   {
     sku: "yazarkasa-ingenico-move5000f",
-    category: "yazarkasa",
+    category: "pos_terminal",
     name: "Ingenico Move/5000F",
     brand: "Ingenico",
     model: "Move/5000F",
     description:
-      "GİB onaylı, premium mobil yeni nesil yazarkasa POS. 4G + Ethernet + WiFi + entegre termal printer; EMV L1/L2 + PCI PTS 5.x sertifikalı. Yüksek hacimli restoran/cafe için.",
+      "Premium mobil banka POS terminali. 4G + Ethernet + WiFi + entegre termal printer; EMV L1/L2 + PCI PTS 5.x sertifikalı. Yüksek hacimli restoran/cafe için.",
     compat: {
-      gibCertified: true,
       sourceUrl: "https://shop.interpay.com.tr/Product/SingleProduct/?id=1004",
     },
     priceCents: 1_900_000,
@@ -461,6 +485,17 @@ const PRODUCTS = [
   },
 
   // ── Network Bridge (HummyTummy kendi cihazı) ─────────────────────────
+  //
+  // Task 11 — rentalMonthlyCents REMOVED (was 9_900 / 19_900). Approved
+  // decision: PayTR only supports one-time charges, so there was no
+  // monthly-billing rail behind "rent" — a buyer who chose "rent" here paid
+  // once and was never billed again. Rent is deferred to its own future
+  // project, not deleted: the `rentalMonthlyCents` column, the DTO field,
+  // and QuoteService's `acquisition === 'rent'` branch (which still throws
+  // if it's unset) all stay — only the catalog no longer OFFERS it, so the
+  // storefront never sends acquisition:'rent'. Reversible data migration
+  // 20260722140000_hardware_drop_rent_offering backfills already-seeded
+  // rows (round-trip verified).
   {
     sku: "hummybox-lite",
     category: "bridge",
@@ -471,7 +506,6 @@ const PRODUCTS = [
       "HummyTummy Local Bridge Agent önyüklü mini-PC. 4GB RAM, 64GB SSD, fanless. Yazarkasa + printer + caller-ID donanımını buluta bağlar; offline çalışır.",
     compat: { sourceUrl: "https://hummytummy.com/landing" },
     priceCents: 480_000,
-    rentalMonthlyCents: 9_900,
     warrantyMonths: 24,
     images: ["/products/hummybox-lite.webp"],
     stockStatus: "in_stock",
@@ -486,7 +520,6 @@ const PRODUCTS = [
       "Yüksek hacim için: dahili UPS + dual-LAN failover. Elektrik/internet kesintilerinde işin durmaması gereken çok şubeli işletmeler için.",
     compat: { sourceUrl: "https://hummytummy.com/landing" },
     priceCents: 950_000,
-    rentalMonthlyCents: 19_900,
     warrantyMonths: 24,
     images: ["/products/hummybox-pro.webp"],
     stockStatus: "in_stock",
@@ -918,7 +951,11 @@ const HARDWARE_DETAILS: Record<string, { details: any; specs?: any }> = {
         "24 ay garanti",
         "PCI sertifikalı yazılım önyüklemesi",
       ],
-      requirements: ["GİB e-Devlet şifresi", "WiFi veya Ethernet"],
+      // Task 11: was "GİB e-Devlet şifresi" — that requirement belonged to
+      // the fiscal-yazarkasa framing this SKU no longer carries (it's a
+      // bank/PSP terminal, not a YN ÖKC device; see the category-fix
+      // comment above the PRODUCTS entry).
+      requirements: ["Banka/PSP üye işyeri (merchant) sözleşmesi", "WiFi veya Ethernet"],
       faq: [
         {
           q: "Hangi banka işyerlerine uygun?",

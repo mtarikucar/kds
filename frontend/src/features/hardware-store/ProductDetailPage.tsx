@@ -32,9 +32,11 @@ function currentDetailsLang(): string {
  *      "Add to cart" time — the data flows verbatim into the cart line,
  *      then through quote → checkout → InstallationRequest.
  *
- * Hardware acquisition toggle (Buy / Rent) is rendered only when the
- * product has a rentalMonthlyCents — saves a useless toggle on
- * sale-only SKUs.
+ * Task 11 (2026-07) — the Buy/Rent acquisition toggle was removed. There is
+ * no monthly-billing rail behind "rent" (PayTR only supports one-time
+ * charges), so the storefront no longer offers it; every hardware add-to-
+ * cart is acquisition:'sell'. Deferred, not deleted — see the `add()`
+ * comment in HardwareDetail below.
  */
 
 const STATUS_LABEL_TR: Record<string, string> = {
@@ -102,7 +104,6 @@ function HardwareDetail({
 }) {
   const { t } = useTranslation('hardware');
   const addHardware = useCartStore((s) => s.addHardware);
-  const [acquisition, setAcquisition] = useState<'sell' | 'rent'>('sell');
   const [activeTab, setActiveTab] = useState<
     'description' | 'specs' | 'compat' | 'requirements' | 'faq' | 'compliance'
   >('description');
@@ -125,8 +126,6 @@ function HardwareDetail({
   const showCompliance = mode === 'DIRECT_SALE' && complianceEntries.length > 0;
 
   const isOos = product.stockStatus === 'out_of_stock' || product.stockStatus === 'discontinued';
-  // Buy/Rent toggle only makes sense for directly-sellable products.
-  const showRental = Boolean(product.rentalMonthlyCents) && mode === 'DIRECT_SALE';
   const showLowStock = (product.available ?? 0) > 0 && (product.available ?? 0) <= 5;
 
   const details = useMemo(() => localizeDetails(product.details, currentDetailsLang()), [product.details]);
@@ -139,7 +138,12 @@ function HardwareDetail({
 
   function add() {
     if (isOos) return;
-    addHardware(product, { qty: 1, acquisition });
+    // Task 11 — rent acquisition is deferred (no monthly-billing rail
+    // exists yet; PayTR only supports one-time charges), so the storefront
+    // never offers it: always 'sell'. QuoteService's `acquisition ===
+    // 'rent'` branch stays as defensive code server-side, but this client
+    // can no longer send it.
+    addHardware(product, { qty: 1, acquisition: 'sell' });
     toast.success(t('productDetail.addedToCart', { name: product.name }));
     navigate("/admin/store?tab=hardware");
   }
@@ -201,42 +205,16 @@ function HardwareDetail({
           <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
           {product.description && <p className="text-sm text-gray-700">{product.description}</p>}
 
-          {showRental && (
-            <div className="flex items-center gap-1 rounded-lg border bg-white p-1">
-              <button
-                type="button"
-                onClick={() => setAcquisition('sell')}
-                className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                  acquisition === 'sell' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {t('productDetail.buy')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAcquisition('rent')}
-                className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                  acquisition === 'rent' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {t('productDetail.rent')}
-              </button>
-            </div>
-          )}
+          {/* Task 11: the Buy/Rent acquisition toggle was removed here —
+              rent is deferred (no monthly-billing rail exists yet). See the
+              `add()` comment above. Restore a rental branch only once a
+              recurring-billing rail exists to actually collect the monthly
+              charge. */}
 
           {/* Price / CTA branches by regulatory tier (TR law). */}
           {mode === 'DIRECT_SALE' ? (
             <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-white p-5">
-              <div className="text-3xl font-semibold text-gray-900">
-                {acquisition === 'rent' && product.rentalMonthlyCents
-                  ? t('productDetail.perMonth', { price: fmt(product.rentalMonthlyCents) })
-                  : fmt(product.priceCents)}
-              </div>
-              {acquisition === 'sell' && product.rentalMonthlyCents && (
-                <div className="mt-1 text-xs text-gray-500">
-                  {t('productDetail.orRentPerMonth', { price: fmt(product.rentalMonthlyCents) })}
-                </div>
-              )}
+              <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
               <div className="mt-1 text-xs text-gray-500">{t('productDetail.warranty', { count: product.warrantyMonths })}</div>
               <button
                 type="button"
@@ -437,7 +415,7 @@ function ServiceDetail({
         <aside className="space-y-3">
           <div className="rounded-xl border bg-white p-5">
             <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
-            <div className="mt-1 text-xs text-gray-500">{t('productDetail.service.oneTimeExclVat')}</div>
+            <div className="mt-1 text-xs text-gray-500">{t('productDetail.service.oneTimeInclVat')}</div>
 
             {requiresBranch && (
               <div className="mt-4">
