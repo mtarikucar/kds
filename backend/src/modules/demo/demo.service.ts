@@ -101,6 +101,17 @@ export class DemoService {
         trialDays: 0,
         maxUsers: 999,
         maxTables: 999,
+        // Drift fix: maxBranches was missing from this create block, so it
+        // silently fell through to the Prisma schema default (1) — even
+        // though ALL_FEATURES.multiLocation is true and BranchesController
+        // gates branch creation on BOTH the MULTI_LOCATION feature AND the
+        // maxBranches limit (@CheckLimit(BRANCHES)). A demo visitor with the
+        // "add another branch" feature visibly on would hit the cap on the
+        // very first attempt (the seeded Main branch already consumes the
+        // only slot). Matches BUSINESS-tier's unlimited value (prisma/seed.ts)
+        // — same "generous top-tier-equivalent" pattern as every other limit
+        // here (see plan-mapper-parity.spec.ts for the drift-class tripwire).
+        maxBranches: -1,
         maxProducts: 9999,
         maxCategories: 999,
         maxMonthlyOrders: 999999,

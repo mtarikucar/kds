@@ -1,10 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DemoService } from './demo.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PlanProjectorService } from '../entitlements/plan-projector.service';
 import {
   mockPrismaClient,
   MockPrismaClient,
 } from '../../common/test/prisma-mock.service';
+
+// Drift tripwire (mirror of plan-mapper-parity.spec.ts's FEATURE_COLUMNS
+// pin): the demo plan's `subscriptionPlan.upsert` create block hand-mirrors
+// every SubscriptionPlan.LIMIT_COLUMNS entry as a generous top-tier value.
+// Reaches the same private static via the same `as any` escape hatch used
+// throughout plan-projector.service.spec.ts / plan-mapper-parity.spec.ts.
+const LIMIT_COLUMNS: readonly string[] = (PlanProjectorService as any)
+  .LIMIT_COLUMNS;
 
 /**
  * Guards the self-contained demo environment:
@@ -104,6 +113,19 @@ describe('DemoService', () => {
     expect(planArgs.create.maxMonthlyAiPhotos).toBeGreaterThan(0);
     expect(planArgs.create.maxMonthlyAiVideos).toBeGreaterThan(0);
     expect(planArgs.create.maxMonthlyAi3dModels).toBeGreaterThan(0);
+    // Durable tripwire: every SubscriptionPlan.LIMIT_COLUMNS entry (the
+    // single source of truth PlanProjectorService projects from) must be
+    // set explicitly on this create block, so a future limit column added
+    // to the schema fails LOUDLY here instead of silently falling through
+    // to the Prisma column default the way `maxBranches` did (was missing
+    // -> defaulted to 1 even though ALL_FEATURES.multiLocation is true and
+    // branch creation is separately capped by maxBranches — a demo visitor
+    // could never add a second branch despite the feature reading granted;
+    // fixed alongside this pin — see plan-mapper-parity.spec.ts).
+    for (const col of LIMIT_COLUMNS) {
+      expect(planArgs.create).toHaveProperty(col);
+      expect(typeof planArgs.create[col]).toBe('number');
+    }
     // Idempotent: tenant/branch/admin go through upsert on their unique keys so
     // a pre-existing/partial demo never collides on the subdomain.
     const tenantArgs = (prisma.tenant.upsert as jest.Mock).mock.calls[0][0];
