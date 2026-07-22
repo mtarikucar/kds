@@ -53,7 +53,7 @@ describe("TenantMarketplaceService.isIncludedInEntitlements", () => {
     ).toBe(false);
     expect(
       fn(
-        { "limit.branches": 1, "feature.multiLocation": true },
+        { "limit.maxBranches": 1, "feature.multiLocation": true },
         ent({ features: { "feature.multiLocation": true } }),
       ),
     ).toBe(false);

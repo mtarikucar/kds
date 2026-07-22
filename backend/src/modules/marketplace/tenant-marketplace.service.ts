@@ -85,7 +85,7 @@ export class TenantMarketplaceService {
    *  - A `limit.*` grant is ADDITIVE capacity (an extra branch/screen/tablet) —
    *    you can always buy more, so an add-on carrying ANY limit grant is never
    *    "included" (stays purchasable). This also covers mixed grants like
-   *    extra_branch ({ "limit.branches": 1, "feature.multiLocation": true }).
+   *    extra_branch ({ "limit.maxBranches": 1, "feature.multiLocation": true }).
    *  - A `feature.X: true` grant is covered iff features[X] is already true.
    *  - An `integration.domain: [vendors]` grant is covered iff every vendor is
    *    already present in integrations[domain].

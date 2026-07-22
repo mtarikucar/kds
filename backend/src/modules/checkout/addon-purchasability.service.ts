@@ -23,21 +23,6 @@ export interface AssertPurchasableInput {
 }
 
 /**
- * TEMPORARY grant-key -> effective-limit-key map for the redundancy check
- * (DEF-8). `extra_branch`'s seed grant currently writes `limit.branches`,
- * but the plan/engine effective-limit namespace everything else reads is
- * `limit.maxBranches` (see SUBSCRIPTION_PLANS[*].limits.maxBranches and the
- * PlanFeatureGuard/branch-count call sites). Task 5 (plan-access-overhaul —
- * not landed as of this commit) migrates the grant key itself to
- * `limit.maxBranches` so producer and consumer finally agree; once that
- * reversible migration ships, every entry below becomes a no-op identity
- * mapping and this map (and comment) can be deleted.
- */
-const REDUNDANCY_KEY_MAP: Record<string, string> = {
-  "limit.branches": "limit.maxBranches",
-};
-
-/**
  * Pre-payment purchasability gate for marketplace add-ons.
  *
  * `TenantMarketplaceService.purchase()` already runs an included-in-plan
@@ -143,11 +128,14 @@ export class AddonPurchasabilityService {
     }
 
     // 4) Redundant capacity (DEF-8) — a limit.* grant whose corresponding
-    // effective limit is already unlimited (-1) buys nothing.
+    // effective limit is already unlimited (-1) buys nothing. Grant keys
+    // match the engine's effective-limit namespace 1:1 (Task 5 fixed
+    // extra_branch's grant to write `limit.maxBranches`, the same key
+    // PlanProjectorService.LIMIT_COLUMNS / PlanFeatureGuard.checkLimit
+    // read), so no key-remapping layer is needed here anymore.
     for (const [key] of Object.entries(grants ?? {})) {
       if (!key.startsWith("limit.")) continue;
-      const effectiveKey = REDUNDANCY_KEY_MAP[key] ?? key;
-      if (ent.limits?.[effectiveKey] === -1) {
+      if (ent.limits?.[key] === -1) {
         this.reject(
           "ADDON_LIMIT_REDUNDANT",
           addOn.code,

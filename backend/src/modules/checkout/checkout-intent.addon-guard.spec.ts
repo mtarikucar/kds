@@ -231,7 +231,10 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
       addonRow({
         code: "extra_branch",
         name: "Extra branch",
-        grants: { "limit.branches": 1, "feature.multiLocation": true },
+        // Task 5 fixed the seed grant key from `limit.branches` to
+        // `limit.maxBranches` — this mock mirrors the corrected catalog
+        // row (REDUNDANCY_KEY_MAP removed from AddonPurchasabilityService).
+        grants: { "limit.maxBranches": 1, "feature.multiLocation": true },
         deps: [],
       }),
     );

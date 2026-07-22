@@ -185,7 +185,11 @@ describe("AddonPurchasabilityService.assertPurchasable", () => {
       addonRow({
         code: "extra_branch",
         name: "Extra branch",
-        grants: { "limit.branches": 1, "feature.multiLocation": true },
+        // Task 5 fixed the seed grant key from `limit.branches` to
+        // `limit.maxBranches` (the key the engine actually reads) — this
+        // mock mirrors the corrected catalog row; no REDUNDANCY_KEY_MAP
+        // remapping needed anymore.
+        grants: { "limit.maxBranches": 1, "feature.multiLocation": true },
         deps: [],
       }),
     );
@@ -208,7 +212,7 @@ describe("AddonPurchasabilityService.assertPurchasable", () => {
       addonRow({
         code: "extra_branch",
         name: "Extra branch",
-        grants: { "limit.branches": 1, "feature.multiLocation": true },
+        grants: { "limit.maxBranches": 1, "feature.multiLocation": true },
         deps: [],
       }),
     );

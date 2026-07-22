@@ -76,7 +76,7 @@ export const ADDONS = [
     kind: "capacity",
     billing: "recurring",
     priceCents: 39900,
-    grants: { "limit.branches": 1, "feature.multiLocation": true },
+    grants: { "limit.maxBranches": 1, "feature.multiLocation": true },
     deps: [],
   },
   // Integrations
