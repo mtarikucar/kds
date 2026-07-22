@@ -124,7 +124,7 @@ describe("Reservation public plan-gate (finding #1)", () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
 
       // Never reached the create.
-      expect((prisma.reservation.create as any)).not.toHaveBeenCalled();
+      expect(prisma.reservation.create as any).not.toHaveBeenCalled();
       expect((prisma as any).$transaction).not.toHaveBeenCalled();
     });
   });
@@ -308,10 +308,10 @@ describe("ReservationsService.createPublicReservation — no-table party too big
       // no tableId
     };
 
-    await expect(svc.createPublicReservation("t-1", dto)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect((prisma.reservation.create as any)).not.toHaveBeenCalled();
+    await expect(
+      svc.createPublicReservation("t-1", dto),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.reservation.create as any).not.toHaveBeenCalled();
   });
 
   // BLOCKER A regression: a reservation-enabled branch with ZERO tables
@@ -333,6 +333,9 @@ describe("ReservationsService.createPublicReservation — no-table party too big
     (prisma.table.aggregate as any).mockResolvedValue({
       _max: { capacity: null },
     });
+    // B1 no-table guard reads branch tables inside the tx; zero tables ⇒
+    // falls back to the slot cap (count below), which is under the default.
+    (prisma.table.findMany as any).mockResolvedValue([]);
     // Run the create transaction callback against the mock client directly.
     (prisma as any).$transaction = jest.fn(async (cb: any) => cb(prisma));
     (prisma.reservation.findFirst as any).mockResolvedValue(null); // duplicate check
@@ -369,7 +372,7 @@ describe("ReservationsService.createPublicReservation — no-table party too big
 
     const res = await svc.createPublicReservation("t-1", dto);
     expect(res).toBe(created);
-    expect((prisma.reservation.create as any)).toHaveBeenCalledTimes(1);
+    expect(prisma.reservation.create as any).toHaveBeenCalledTimes(1);
     // The no-single-table guard must NOT fire when zero tables exist.
     expect((prisma.reservation.create as any).mock.calls[0][0].data).toEqual(
       expect.objectContaining({ branchId: "b-1", guestCount: 4 }),
@@ -396,7 +399,7 @@ describe("ReservationAvailabilityService.listPublicBranches — plan-gate (minor
     const res = await svc.listPublicBranches("t-1");
     expect(res).toEqual([]);
     // Gated BEFORE any branch read — nothing leaked.
-    expect((prisma.branch.findMany as any)).not.toHaveBeenCalled();
+    expect(prisma.branch.findMany as any).not.toHaveBeenCalled();
   });
 
   it("returns the active branch roster when reservationSystem IS granted", async () => {
