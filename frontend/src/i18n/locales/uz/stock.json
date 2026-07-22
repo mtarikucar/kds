@@ -457,7 +457,7 @@
       },
       "DISTRIBUTOR": {
         "advantage": "Shartnomali/doiraviy kelishuvlar narx bashoratliligini beradi; ko'p filialda markaziy+filial-mahalliy aralash model qo'llanadi.",
-        "minOrder": "Minimal buyurtma yetkazib beruvchiga qarab farq qiladi; ko'plab distribyutorlar kichik korxonalar uchun moslashuvchan variantlar taklif qiladi.",
+        "minOrder": "Distribyutor bilan hisob/shartnoma talab qilinadi; minimal buyurtma yetkazib beruvchiga qarab farq qiladi.",
         "payment": "Shartnomali/doiraviy xarid narx bashoratliligini ta'minlaydi; to'lov shartlari yetkazib beruvchi bilan kelishiladi.",
         "eInvoice": "Korporativ distribyutorlar e-Faktura ro'yxatida bo'ladi; GİB so'rovi orqali tasdiqlash mumkin."
       }

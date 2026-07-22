@@ -457,7 +457,7 @@
       },
       "DISTRIBUTOR": {
         "advantage": "Sözleşmeli/çerçeve anlaşmayla fiyat öngörülebilirliği; çok şubede merkezi+şube-yerel hibrit model.",
-        "minOrder": "Asgari sipariş tedarikçiye göre değişir; birçok distribütör küçük işletmeye esnek seçenek sunar.",
+        "minOrder": "Distribütörle hesap/sözleşme gerekir; asgari sipariş tedarikçiye göre değişir.",
         "payment": "Sözleşmeli/çerçeve alım fiyat öngörülebilirliği sağlar; ödeme koşulları tedarikçiyle görüşülür.",
         "eInvoice": "Kurumsal distribütörler e-Fatura mükellefidir; GİB sorgusuyla teyit edilebilir."
       }
