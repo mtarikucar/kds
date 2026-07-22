@@ -108,6 +108,12 @@ export type QuoteWarningCode =
   | "addon_not_purchasable"
   | "hardware_not_purchasable"
   | "hardware_not_directly_purchasable"
+  // Task 4 — soft, display-only signal: qty requested exceeds real
+  // inventory (CatalogService.getAvailableStock). The LINE STAYS PRICED
+  // (not dropped) so the buyer still sees the total; the actual payment
+  // block is CheckoutIntentService.createIntent's HARDWARE_OUT_OF_STOCK
+  // ConflictException, not this warning.
+  | "hardware_out_of_stock"
   | "service_not_purchasable"
   | "service_not_directly_purchasable"
   | "unknown_service";

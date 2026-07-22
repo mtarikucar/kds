@@ -15,8 +15,7 @@ import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
-import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
-import { PlanFeature } from "../../../common/constants/subscription.enum";
+import { RequiresIntegration } from "../../subscriptions/decorators/requires-integration.decorator";
 import { DeliveryLogService } from "../services/delivery-log.service";
 
 interface RequeueBody {
@@ -36,11 +35,13 @@ interface RequeueBody {
  * failures. The view is intentionally tenant-wide across branches (matching
  * the existing /delivery-platforms/logs semantics), hence @SkipBranchScope().
  */
+// DEF-3: same @RequiresIntegration('delivery') gate as DeliveryPlatformsController
+// — see that controller's comment for the full rationale.
 @ApiTags("delivery-platforms/dlq")
 @ApiBearerAuth()
 @Controller("delivery-platforms/dlq")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
-@RequiresFeature(PlanFeature.DELIVERY_INTEGRATION)
+@RequiresIntegration("delivery")
 export class DeliveryDlqController {
   constructor(private readonly logService: DeliveryLogService) {}
 

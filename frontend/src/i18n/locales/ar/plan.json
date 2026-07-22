@@ -14,8 +14,14 @@
     "users": "المستخدمون",
     "branches": "الفروع",
     "products": "المنتجات",
-    "monthlyOrders": "الطلبات الشهرية"
+    "monthlyOrders": "الطلبات الشهرية",
+    "unlimited": "غير محدود",
+    "upgradeCta": "الترقية إلى باقة أعلى ←"
   },
+  "included": {
+    "title": "مشمول في باقتك"
+  },
+  "perMonthSuffix": "/شهرياً",
   "activeAddOns": {
     "title": "الإضافات النشطة",
     "empty": "لم تشترِ أي إضافات بعد. اطّلع على الاقتراحات أدناه.",

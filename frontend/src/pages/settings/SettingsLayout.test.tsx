@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const sub = {
-  hasFeature: vi.fn(() => false),
-  hasIntegration: vi.fn(() => false),
+  hasFeature: vi.fn((_feature?: string) => false),
+  hasIntegration: vi.fn((_domain?: string, _vendor?: string) => false),
 };
 vi.mock('../../contexts/SubscriptionContext', () => ({
   useSubscription: () => sub,
@@ -52,5 +52,29 @@ describe('SettingsLayout nav gating', () => {
     expect(links).toContain('/admin/settings/integrations');
     expect(links).toContain('/admin/settings/online-orders');
     expect(links).toContain('/admin/settings/sms');
+  });
+
+  it('shows the delivery nav item for an integration-only (add-on) tenant even without the plan feature', () => {
+    sub.hasFeature.mockReturnValue(false);
+    sub.hasIntegration.mockImplementation((domain?: string) => domain === 'delivery');
+    renderLayout();
+    const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(links).toContain('/admin/settings/online-orders');
+  });
+
+  it('shows the delivery nav item for a plan-feature tenant even without the delivery add-on', () => {
+    sub.hasFeature.mockImplementation((f?: string) => f === 'deliveryIntegration');
+    sub.hasIntegration.mockReturnValue(false);
+    renderLayout();
+    const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(links).toContain('/admin/settings/online-orders');
+  });
+
+  it('hides the delivery nav item when neither the plan feature nor the add-on is present', () => {
+    sub.hasFeature.mockReturnValue(false);
+    sub.hasIntegration.mockReturnValue(false);
+    renderLayout();
+    const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(links).not.toContain('/admin/settings/online-orders');
   });
 });

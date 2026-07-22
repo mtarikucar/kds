@@ -14,8 +14,14 @@
     "users": "Foydalanuvchilar",
     "branches": "Filiallar",
     "products": "Mahsulotlar",
-    "monthlyOrders": "Oylik buyurtmalar"
+    "monthlyOrders": "Oylik buyurtmalar",
+    "unlimited": "Cheksiz",
+    "upgradeCta": "Yuqori tarifga oʻting →"
   },
+  "included": {
+    "title": "Tarifingizga kiritilgan"
+  },
+  "perMonthSuffix": "/oy",
   "activeAddOns": {
     "title": "Faol qoʻshimchalar",
     "empty": "Hozircha hech qanday qoʻshimcha sotib olmadingiz. Quyidagi tavsiyalarni koʻring.",

@@ -14,8 +14,14 @@
     "users": "Users",
     "branches": "Branches",
     "products": "Products",
-    "monthlyOrders": "Monthly orders"
+    "monthlyOrders": "Monthly orders",
+    "unlimited": "Unlimited",
+    "upgradeCta": "Upgrade plan →"
   },
+  "included": {
+    "title": "Included in your plan"
+  },
+  "perMonthSuffix": "/mo",
   "activeAddOns": {
     "title": "Active add-ons",
     "empty": "You haven't purchased any add-ons yet. See suggestions below.",

@@ -53,8 +53,16 @@ export default function PlanComparisonMatrix({ plans }: PlanComparisonMatrixProp
     { key: 'maxMonthlyAi3dModels', label: t('subscriptions.comparison.limits.maxMonthlyAi3dModels') },
   ];
 
-  const fmtLimit = (n: number) =>
-    n === -1 ? '∞' : n.toLocaleString('tr-TR');
+  // Defends against a missing/undefined limit key on the plan payload
+  // (e.g. a backend mapper mirror that drifted out of sync with the plan
+  // record — Number(undefined) is NaN, and NaN.toLocaleString() renders the
+  // literal string "NaN" in the cell). Render an em dash instead of a
+  // confusing "NaN" for any non-finite value.
+  const fmtLimit = (n: number) => {
+    if (n === -1) return '∞';
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString('tr-TR');
+  };
 
   // Monthly price + ISO currency code per plan, so buyers can compare
   // cost head-to-head inside the matrix (the cards show it, but the

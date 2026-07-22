@@ -122,4 +122,76 @@ describe('FeatureGate', () => {
     expect(screen.queryByTestId('upgrade-prompt')).toBeNull();
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('mode="any": renders children when the integration passes even though the feature fails (OR semantics)', () => {
+    ctx({
+      hasFeature: () => false,
+      hasIntegration: (domain) => domain === 'delivery',
+    });
+    render(
+      <FeatureGate
+        feature="deliveryIntegration"
+        integration={{ domain: 'delivery' }}
+        mode="any"
+        fallback={<div>upsell</div>}
+      >
+        <div>secret</div>
+      </FeatureGate>,
+    );
+    expect(screen.getByText('secret')).toBeInTheDocument();
+    expect(screen.queryByText('upsell')).toBeNull();
+  });
+
+  it('mode="any": renders children when the feature passes even though the integration fails (OR semantics)', () => {
+    ctx({
+      hasFeature: (f) => f === 'deliveryIntegration',
+      hasIntegration: () => false,
+    });
+    render(
+      <FeatureGate
+        feature="deliveryIntegration"
+        integration={{ domain: 'delivery' }}
+        mode="any"
+        fallback={<div>upsell</div>}
+      >
+        <div>secret</div>
+      </FeatureGate>,
+    );
+    expect(screen.getByText('secret')).toBeInTheDocument();
+    expect(screen.queryByText('upsell')).toBeNull();
+  });
+
+  it('mode="any": falls back when neither the feature nor the integration passes', () => {
+    ctx({ hasFeature: () => false, hasIntegration: () => false });
+    render(
+      <FeatureGate
+        feature="deliveryIntegration"
+        integration={{ domain: 'delivery' }}
+        mode="any"
+        fallback={<div>upsell</div>}
+      >
+        <div>secret</div>
+      </FeatureGate>,
+    );
+    expect(screen.queryByText('secret')).toBeNull();
+    expect(screen.getByText('upsell')).toBeInTheDocument();
+  });
+
+  it('mode="all" (default) is unaffected: missing integration still blocks even if feature passes', () => {
+    ctx({
+      hasFeature: () => true,
+      hasIntegration: () => false,
+    });
+    render(
+      <FeatureGate
+        feature="deliveryIntegration"
+        integration={{ domain: 'delivery' }}
+        fallback={<div>upsell</div>}
+      >
+        <div>secret</div>
+      </FeatureGate>,
+    );
+    expect(screen.queryByText('secret')).toBeNull();
+    expect(screen.getByText('upsell')).toBeInTheDocument();
+  });
 });

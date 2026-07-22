@@ -14,6 +14,24 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 }
 
 /**
+ * Permissive EntitlementService stub: KDS_SCREENS/TABLETS both unlimited
+ * (-1) by default so the pre-existing createSlot specs below (written
+ * before Task 6's DEF-7 capacity gate) keep exercising the pending-slot-cap
+ * / pairing / provisioning behavior they were written for, unaffected by
+ * the new enforceDeviceCapacity check. Dedicated capacity-limit specs live
+ * in kds-tablet-limit.spec.ts and pass explicit `limits` to test the gate.
+ */
+function makeEntitlements(limits: Record<string, number> = {}) {
+  return {
+    getForTenant: jest.fn().mockResolvedValue({
+      features: {},
+      limits: { "limit.kdsScreens": -1, "limit.tablets": -1, ...limits },
+      integrations: {},
+    }),
+  } as any;
+}
+
+/**
  * Smoke tests for the most security-relevant flows on DeviceService: pairing
  * and token authentication. The full integration story (heartbeat sweeps,
  * command queue interaction) lives in the e2e suite once the mesh is wired
@@ -27,7 +45,12 @@ describe("DeviceService pairing", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue("outbox-id") };
-    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    svc = new DeviceService(
+      prisma as any,
+      outbox as any,
+      makeEntitlements(),
+      makeConfig(),
+    );
   });
 
   describe("TTL config", () => {
@@ -55,6 +78,7 @@ describe("DeviceService pairing", () => {
       svc = new DeviceService(
         prisma as any,
         outbox as any,
+        makeEntitlements(),
         makeConfig({ DEVICE_PAIR_CODE_TTL_MS: override }),
       );
       prisma.device.findUnique.mockResolvedValue(null);
@@ -306,7 +330,12 @@ describe("DeviceService heartbeat", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue("outbox-id") };
-    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    svc = new DeviceService(
+      prisma as any,
+      outbox as any,
+      makeEntitlements(),
+      makeConfig(),
+    );
   });
 
   it("flips device to online and bumps lastSeenAt with no telemetry log on empty payload", async () => {
@@ -404,7 +433,12 @@ describe("DeviceService sweepStale", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue("outbox-id") };
-    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    svc = new DeviceService(
+      prisma as any,
+      outbox as any,
+      makeEntitlements(),
+      makeConfig(),
+    );
   });
 
   it("updates only online devices older than the 45s grace window and returns the count", async () => {
@@ -446,7 +480,12 @@ describe("DeviceService slot lifecycle + tallies (branch hub)", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue("o") };
-    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    svc = new DeviceService(
+      prisma as any,
+      outbox as any,
+      makeEntitlements(),
+      makeConfig(),
+    );
     (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1" });
   });
 
@@ -712,7 +751,12 @@ describe("DeviceService assignBridge", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue("outbox-id") };
-    svc = new DeviceService(prisma as any, outbox as any, makeConfig());
+    svc = new DeviceService(
+      prisma as any,
+      outbox as any,
+      makeEntitlements(),
+      makeConfig(),
+    );
     (prisma.device.findFirst as any).mockResolvedValue(DEVICE);
     (prisma.device.updateMany as any).mockResolvedValue({ count: 1 });
     (prisma.device.findFirstOrThrow as any).mockResolvedValue({

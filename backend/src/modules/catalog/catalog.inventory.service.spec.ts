@@ -136,6 +136,42 @@ describe("CatalogService — inventory transitions", () => {
     });
   });
 
+  describe("getAvailableStock (Task 4 — pre-payment stock guard)", () => {
+    // `available` already excludes stock claimed by allocate() (moved to
+    // `allocated`) and stock that has shipped — the
+    // available+allocated+shipped=received invariant pinned above means
+    // this is a direct passthrough, not a further subtraction.
+    it("returns the inventory row's available count", async () => {
+      prisma.hardwareInventory.findUnique = jest
+        .fn()
+        .mockResolvedValue({ available: 12 });
+
+      const stock = await svc.getAvailableStock("p-1");
+
+      expect(stock).toBe(12);
+      expect(prisma.hardwareInventory.findUnique).toHaveBeenCalledWith({
+        where: { productId: "p-1" },
+        select: { available: true },
+      });
+    });
+
+    it("returns 0 (not a throw) when there is no inventory row for the product", async () => {
+      prisma.hardwareInventory.findUnique = jest.fn().mockResolvedValue(null);
+
+      const stock = await svc.getAvailableStock("missing-product");
+
+      expect(stock).toBe(0);
+    });
+
+    it("returns 0 when the row exists but available is 0 (the seed's pre-fix default)", async () => {
+      prisma.hardwareInventory.findUnique = jest
+        .fn()
+        .mockResolvedValue({ available: 0 });
+
+      expect(await svc.getAvailableStock("p-1")).toBe(0);
+    });
+  });
+
   describe("markShipped", () => {
     it("moves allocated → shipped by qty via a floor-guarded (allocated >= qty) claim", async () => {
       prisma.hardwareInventory.updateMany.mockResolvedValue({ count: 1 });

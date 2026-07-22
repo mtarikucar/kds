@@ -4,6 +4,7 @@ import { CatalogModule } from "../catalog/catalog.module";
 import { MarketplaceModule } from "../marketplace/marketplace.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
+import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { QuoteService } from "./quote.service";
 import { CheckoutService } from "./checkout.service";
 import { CheckoutController } from "./checkout.controller";
@@ -12,6 +13,7 @@ import { HardwareOrdersController } from "./hardware-orders.controller";
 import { CheckoutIntentService } from "./checkout-intent.service";
 import { CheckoutSettlementService } from "./checkout-settlement.service";
 import { CheckoutNotificationsService } from "./checkout-notifications.service";
+import { AddonPurchasabilityService } from "./addon-purchasability.service";
 
 @Module({
   imports: [
@@ -21,6 +23,11 @@ import { CheckoutNotificationsService } from "./checkout-notifications.service";
     OutboxModule,
     // Provisions device-mesh slots for purchased device-class hardware.
     DeviceMeshModule,
+    // AddonPurchasabilityService reads EntitlementService.getForTenant.
+    // EntitlementsModule is @Global() so this isn't strictly required for
+    // resolution, but importing it explicitly keeps this module's own
+    // dependency graph honest.
+    EntitlementsModule,
   ],
   controllers: [CheckoutController, HardwareOrdersController],
   providers: [
@@ -32,6 +39,9 @@ import { CheckoutNotificationsService } from "./checkout-notifications.service";
     CheckoutSettlementService,
     // v2.8.86: order-placed email listener — subscribes on init.
     CheckoutNotificationsService,
+    // Task 1 — tahsilat-önü guard: included/owned/deps-tier/redundant-limit
+    // checks BEFORE createIntent ever mints a CheckoutIntent row.
+    AddonPurchasabilityService,
   ],
   exports: [
     QuoteService,

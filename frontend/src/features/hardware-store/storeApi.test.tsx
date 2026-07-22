@@ -18,6 +18,16 @@ vi.mock('../../lib/api', () => ({
 vi.mock('sonner', () => ({
   toast: { success: (m: string) => h.toastSuccess(m), error: (m: string) => h.toastError(m) },
 }));
+vi.mock('../../i18n/config', () => ({
+  // storeApi's own i18n.t() AND lib/api-error's getApiErrorMessage (which
+  // calls i18n.exists/i18n.t for errorCode-mapped messages) both resolve
+  // through this same mocked module — stub both so a future errorCode-based
+  // test case doesn't hit a missing-method crash.
+  default: {
+    t: (_k: string, o?: { defaultValue?: string }) => o?.defaultValue ?? _k,
+    exists: () => false,
+  },
+}));
 
 import {
   formatMoney,
@@ -189,7 +199,18 @@ describe('storeApi mutations', () => {
         'marketplace',
       ]),
     );
-    expect(h.toastSuccess).toHaveBeenCalled();
+    // Toast copy now flows through i18n (hardware:store.toast.orderPlaced)
+    // instead of a hardcoded English literal.
+    expect(h.toastSuccess).toHaveBeenCalledWith('Order placed.');
+  });
+
+  it('useConfirmCheckout falls back to the i18n checkout-failed copy when the server gives no message', async () => {
+    h.post.mockRejectedValue({ isAxiosError: true, response: { data: {} } });
+    const { result } = renderHook(() => useConfirmCheckout(), { wrapper });
+    await result.current
+      .mutateAsync({ cart: { items: [] }, paymentRef: 'x' })
+      .catch(() => undefined);
+    expect(h.toastError).toHaveBeenCalledWith('Checkout failed');
   });
 
   it('useCreateCheckoutIntent POSTs the intent endpoint', async () => {

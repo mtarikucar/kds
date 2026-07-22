@@ -681,6 +681,8 @@ function App() {
                 element={
                   <FeatureGate
                     feature="deliveryIntegration"
+                    integration={{ domain: "delivery" }}
+                    mode="any"
                     fallback={
                       <UpsellCard
                         addOnCode="delivery_yemeksepeti"

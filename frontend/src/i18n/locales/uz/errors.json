@@ -25,7 +25,13 @@
     "EXTERNAL_SERVICE_ERROR": "Tashqi xizmatga ulanib boʻlmadi. Qayta urinib koʻring.",
     "TOO_MANY_REQUESTS": "Juda koʻp urinish. Biroz kutib, qayta urinib koʻring.",
     "TENANT_NOT_FOUND": "Restoran hisobi topilmadi.",
-    "INVALID_TENANT": "Notoʻgʻri restoran hisobi."
+    "INVALID_TENANT": "Notoʻgʻri restoran hisobi.",
+    "ADDON_INCLUDED_IN_PLAN": "Bu qoʻshimcha allaqachon tarifingizga kiritilgan.",
+    "ADDON_ALREADY_OWNED": "Bu qoʻshimcha sizda allaqachon mavjud.",
+    "ADDON_REQUIRES_PLAN": "Bu qoʻshimcha yuqoriroq tarifni talab qiladi.",
+    "ADDON_LIMIT_REDUNDANT": "Tarifingiz buni allaqachon cheklovsiz taqdim etadi.",
+    "SAME_PLAN_ACTIVE": "Siz allaqachon shu tarifga obuna boʻlgansiz.",
+    "HARDWARE_OUT_OF_STOCK": "Bu mahsulot omborda mavjud emas."
   },
   "errors": {
     "title": "Xatolik",

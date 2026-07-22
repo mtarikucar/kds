@@ -17,6 +17,14 @@ interface SettingsNavItem {
   gate?: {
     feature?: keyof PlanFeatures;
     integration?: { domain: string; vendor?: string };
+    /**
+     * How `feature` and `integration` combine when BOTH are set.
+     * `'all'` (default) requires both — unchanged pre-existing
+     * behavior for every other gated item. `'any'` shows the item
+     * when EITHER is granted — used for delivery, where a plan
+     * feature and the purchasable add-on unlock the same page.
+     */
+    mode?: 'all' | 'any';
   };
 }
 
@@ -95,7 +103,13 @@ const SettingsLayout = () => {
       to: '/admin/settings/online-orders',
       icon: Truck,
       label: t('nav.onlineOrders'),
-      gate: { feature: 'deliveryIntegration' },
+      // Delivery access = plan feature OR the delivery add-on grant —
+      // an add-on-only (BASIC) tenant must see this item too.
+      gate: {
+        feature: 'deliveryIntegration',
+        integration: { domain: 'delivery' },
+        mode: 'any',
+      },
     },
     {
       to: '/admin/settings/accounting',
@@ -107,10 +121,19 @@ const SettingsLayout = () => {
 
   const settingsNavItems = allSettingsNavItems.filter((item) => {
     if (!item.gate) return true;
-    if (item.gate.feature && !hasFeature(item.gate.feature)) return false;
-    if (item.gate.integration && !hasIntegration(item.gate.integration.domain, item.gate.integration.vendor)) {
-      return false;
+    const { feature, integration, mode = 'all' } = item.gate;
+    const featurePasses = feature ? hasFeature(feature) : undefined;
+    const integrationPasses = integration
+      ? hasIntegration(integration.domain, integration.vendor)
+      : undefined;
+    // `mode: 'any'` (both feature + integration set) shows the item when
+    // EITHER passes; default 'all' requires every present gate to pass —
+    // unchanged behavior for every item that only sets one of the two.
+    if (mode === 'any' && feature && integration) {
+      return Boolean(featurePasses) || Boolean(integrationPasses);
     }
+    if (feature && !featurePasses) return false;
+    if (integration && !integrationPasses) return false;
     return true;
   });
 

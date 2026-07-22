@@ -25,7 +25,13 @@
     "EXTERNAL_SERVICE_ERROR": "Dış servise ulaşılamadı. Lütfen tekrar deneyin.",
     "TOO_MANY_REQUESTS": "Çok fazla deneme yaptınız. Lütfen biraz bekleyip tekrar deneyin.",
     "TENANT_NOT_FOUND": "Restoran hesabı bulunamadı.",
-    "INVALID_TENANT": "Geçersiz restoran hesabı."
+    "INVALID_TENANT": "Geçersiz restoran hesabı.",
+    "ADDON_INCLUDED_IN_PLAN": "Bu eklenti zaten planınıza dahil.",
+    "ADDON_ALREADY_OWNED": "Bu eklentiye zaten sahipsiniz.",
+    "ADDON_REQUIRES_PLAN": "Bu eklenti daha üst bir plan gerektiriyor.",
+    "ADDON_LIMIT_REDUNDANT": "Planınız bunu zaten sınırsız olarak sağlıyor.",
+    "SAME_PLAN_ACTIVE": "Bu plana zaten abonesiniz.",
+    "HARDWARE_OUT_OF_STOCK": "Bu ürün stokta yok."
   },
   "errors": {
     "title": "Hata",

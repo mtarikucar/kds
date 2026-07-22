@@ -483,6 +483,7 @@
       "remote": "Masofadan",
       "consultation": "Konsultatsiya",
       "requiresBranch": "Filial kerak",
+      "oneTimeVatIncluded": "Bir martalik, QQS kiritilgan",
       "lowStock": "Faqat {n} qoldi",
       "warrantyMonthsLabel": "{months} oy kafolat",
       "noDetailsAuthored": "Batafsil ma'lumot hali kiritilmagan.",

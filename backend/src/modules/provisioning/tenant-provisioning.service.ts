@@ -194,6 +194,11 @@ export class TenantProvisioningService implements CoreProvisioningPort {
                       personnelManagement: !!planRow.personnelManagement,
                       deliveryIntegration: !!planRow.deliveryIntegration,
                       posAccess: !!planRow.posAccess,
+                      // Drift fix: aiContentGeneration was missing from this
+                      // mirror (kept in lockstep with
+                      // AuthProvisioningService.buildPlanFeatureOverrides,
+                      // fixed the same way — see plan-mapper-parity.spec.ts).
+                      aiContentGeneration: !!planRow.aiContentGeneration,
                     }).filter(([, v]) => v),
                   ),
                 }

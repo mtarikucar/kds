@@ -135,4 +135,71 @@ describe('PlanComparisonMatrix', () => {
     const proCell = checks[2];
     expect(proCell.querySelector('svg')).toBeTruthy();
   });
+
+  // Drift regression (backend getAvailablePlans was missing `posAccess` in
+  // its features block, so every plan showed ✗ for POS on the sales page —
+  // see plan-mapper-parity.spec.ts on the backend for the tripwire that now
+  // guards this). Both plans here grant posAccess=true; the row must show a
+  // check for both, not an X.
+  it('renders the POS row correctly once the backend sends posAccess', () => {
+    const withPos: Plan[] = plans.map((p) => ({
+      ...p,
+      features: { ...p.features, posAccess: true },
+    }));
+    render(<PlanComparisonMatrix plans={withPos} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /subscriptions.comparison.toggle/i }),
+    );
+
+    const posRow = screen
+      .getByText('subscriptions.comparison.features.posAccess')
+      .closest('tr')!;
+    const cells = within(posRow).getAllByRole('cell');
+    // 1 label cell + 2 plan cells, both checked.
+    expect(cells).toHaveLength(3);
+    expect(cells[1].querySelector('svg')).toBeTruthy();
+    expect(cells[2].querySelector('svg')).toBeTruthy();
+  });
+
+  // Drift regression (backend getAvailablePlans was missing `maxBranches` in
+  // its limits block, so Number(undefined) rendered the literal string
+  // "NaN" in the Şube sayısı cell). Once the backend sends the value it
+  // renders as a normal grouped number.
+  it('renders a numeric maxBranches cell (not "NaN") when present', () => {
+    const withBranches: Plan[] = plans.map((p) => ({
+      ...p,
+      limits: { ...p.limits, maxBranches: 3 },
+    }));
+    render(<PlanComparisonMatrix plans={withBranches} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /subscriptions.comparison.toggle/i }),
+    );
+
+    const branchRow = screen
+      .getByText('subscriptions.comparison.limits.maxBranches')
+      .closest('tr')!;
+    expect(within(branchRow).queryByText('NaN')).toBeNull();
+    expect(within(branchRow).getAllByText('3')).toHaveLength(2);
+  });
+
+  // Defensive regression: even if a mapper drifts again in the future and
+  // omits a limit key entirely, the cell must degrade to an em dash rather
+  // than the confusing literal "NaN".
+  it('renders "—" instead of "NaN" when a limit key is missing from the payload', () => {
+    const missingBranches: Plan[] = plans.map((p) => {
+      const limits = { ...p.limits } as any;
+      delete limits.maxBranches;
+      return { ...p, limits };
+    });
+    render(<PlanComparisonMatrix plans={missingBranches} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /subscriptions.comparison.toggle/i }),
+    );
+
+    const branchRow = screen
+      .getByText('subscriptions.comparison.limits.maxBranches')
+      .closest('tr')!;
+    expect(within(branchRow).queryByText('NaN')).toBeNull();
+    expect(within(branchRow).getAllByText('—')).toHaveLength(2);
+  });
 });

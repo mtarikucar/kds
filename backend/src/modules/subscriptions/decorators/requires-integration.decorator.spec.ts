@@ -72,9 +72,9 @@ describe('PlanFeatureGuard @RequiresIntegration branch (v2.8.88)', () => {
     await expect(guard.canActivate(c)).resolves.toBe(true);
   });
 
-  it('rejects with a marketplace-pointer message when the domain is missing', async () => {
+  it('rejects with a marketplace-pointer message when the domain is missing and no covering plan feature is true', async () => {
     entitlements.getForTenant.mockResolvedValue({
-      features: { 'feature.deliveryIntegration': true },
+      features: {}, // no covering feature either
       limits: {},
       integrations: {}, // no grants
       computedAt: new Date().toISOString(),
@@ -87,6 +87,28 @@ describe('PlanFeatureGuard @RequiresIntegration branch (v2.8.88)', () => {
       expect(e.message).toMatch(/delivery/);
       expect(e.message).toMatch(/marketplace/);
     }
+  });
+
+  it('rejects a domain with NO covering plan feature (fiscal) even when an unrelated feature is true — no cross-domain leakage', async () => {
+    entitlements.getForTenant.mockResolvedValue({
+      features: { 'feature.deliveryIntegration': true }, // unrelated to fiscal
+      limits: {},
+      integrations: {},
+      computedAt: new Date().toISOString(),
+    });
+    const c = ctx({ [REQUIRED_INTEGRATIONS_KEY]: ['fiscal'] });
+    await expect(guard.canActivate(c)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('DEF-3: allows the request when the domain has NO vendor grant but the covering plan feature is true (plan-delivery tenant)', async () => {
+    entitlements.getForTenant.mockResolvedValue({
+      features: { 'feature.deliveryIntegration': true },
+      limits: {},
+      integrations: {}, // plan never projects integration.* — see plan-projector.service.ts
+      computedAt: new Date().toISOString(),
+    });
+    const c = ctx({ [REQUIRED_INTEGRATIONS_KEY]: ['delivery'] });
+    await expect(guard.canActivate(c)).resolves.toBe(true);
   });
 
   it('rejects when the domain key exists but the vendor list is empty', async () => {
