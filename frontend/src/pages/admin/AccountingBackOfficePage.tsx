@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Receipt, FileCheck, Settings2, RefreshCw } from 'lucide-react';
 import {
   Card,
@@ -14,8 +15,11 @@ import {
 } from '../../features/accounting/eBelgeApi';
 import { InvoicesPanel } from './invoices/InvoicesPage';
 import { AccountingSettingsPanel } from '../settings/AccountingSettingsPage';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import FiscalRecoveryPage from '../../features/fiscal/FiscalRecoveryPage';
 
 type Tab = 'invoices' | 'edoc' | 'settings';
+const VALID_TABS: readonly Tab[] = ['invoices', 'edoc', 'settings'];
 
 /**
  * Muhasebe — the single home for everything e-Belge. Three tabs:
@@ -24,9 +28,23 @@ type Tab = 'invoices' | 'edoc' | 'settings';
  *  • Ayarlar      — company identity + integrator credentials + certificate
  * Management reports (budget / consolidated P&L / forecast) live under Raporlar.
  */
-export default function AccountingBackOfficePage() {
+export default function AccountingBackOfficePage({
+  embedded = false,
+  initialTab,
+}: {
+  embedded?: boolean;
+  initialTab?: string;
+}) {
   const { t } = useTranslation('settings');
-  const [tab, setTab] = useState<Tab>('invoices');
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState<Tab>(
+    VALID_TABS.includes(initialTab as Tab)
+      ? (initialTab as Tab)
+      : VALID_TABS.includes(requestedTab as Tab)
+        ? (requestedTab as Tab)
+        : 'invoices',
+  );
   const tabs: {
     id: Tab;
     label: string;
@@ -37,11 +55,13 @@ export default function AccountingBackOfficePage() {
     { id: 'settings', label: t('accounting.backoffice.tabSettings'), icon: Settings2 },
   ];
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t('accounting.backoffice.title')}</h1>
-        <p className="text-sm text-slate-500">{t('accounting.backoffice.subtitle')}</p>
-      </div>
+    <div className={embedded ? 'space-y-6' : 'p-4 sm:p-6 space-y-6'}>
+      {!embedded && (
+        <div>
+          <h1 className="text-2xl font-bold">{t('accounting.backoffice.title')}</h1>
+          <p className="text-sm text-slate-500">{t('accounting.backoffice.subtitle')}</p>
+        </div>
+      )}
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((tb) => {
           const Icon = tb.icon;
@@ -73,6 +93,7 @@ function EDocTab() {
   const readinessQuery = useEDocumentReadiness();
   const { data } = readinessQuery;
   const resync = useResyncFailedEDocuments();
+  const { hasIntegration } = useSubscription();
   const ready = data?.signerConfigured && data?.mukellefQuery !== 'NONE';
   return (
     <QueryStateGate query={readinessQuery} loading={<Loading />}>
@@ -143,6 +164,10 @@ function EDocTab() {
             </p>
           </CardContent>
         </Card>
+        {/* Yazarkasa fiş kuyruğu — yalnız fiscal entegrasyonu olan tenant'ta.
+            (Eski /admin/fiscal-recovery sayfası; cihaz kayıt paneli Faz 4'te
+            şube hub'ına ayrışacak.) */}
+        {hasIntegration('fiscal') && <FiscalRecoveryPage embedded />}
       </div>
     </QueryStateGate>
   );

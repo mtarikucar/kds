@@ -36,8 +36,8 @@
     "category": "Kategori",
     "quantitySold": "Satılan Miktar",
     "finance": "Finans (Kâr-Zarar)",
-    "budget": "Bütçe vs Fiili",
-    "consolidated": "Konsolide Kâr-Zarar",
+    "budget": "Bütçe Karşılaştırması",
+    "consolidated": "Tüm Şubeler Kâr-Zarar",
     "forecast": "Satış Tahmini",
     "downloadCsv": "CSV indir",
     "downloading": "İndiriliyor…",
@@ -47,7 +47,12 @@
     "loading": "Yükleniyor…",
     "noRecords": "Kayıt yok.",
     "loadError": "Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.",
-    "ordersCount": "{{count}} sipariş"
+    "ordersCount": "{{count}} sipariş",
+    "themes": {
+      "sales": "Satış",
+      "financeBudget": "Finans & Bütçe",
+      "operation": "Operasyon"
+    }
   },
   "zReports": {
     "title": "Z-Raporları",
@@ -148,11 +153,11 @@
   },
   "finance": {
     "revenue": "Ciro",
-    "cogs": "SMM (COGS)",
+    "cogs": "Malzeme Maliyeti",
     "grossProfit": "Brüt Kâr",
     "operatingExpenses": "İşletme Gideri",
     "netProfit": "Net Kâr",
-    "primeCost": "Prime Cost (SMM+İşçilik)",
+    "primeCost": "Malzeme + İşçilik Maliyeti",
     "wasteCost": "Fire Maliyeti",
     "labor": "İşçilik",
     "laborCost": "İşçilik Maliyeti",
@@ -193,20 +198,20 @@
     }
   },
   "budget": {
-    "title": "Bütçe vs Fiili",
-    "varianceLabel": "varyans",
+    "title": "Bütçe Karşılaştırması",
+    "varianceLabel": "fark",
     "monthLabel": "Ay",
     "setBudget": "Bütçe belirle",
     "saveError": "Bütçe kaydedilemedi — tekrar deneyin.",
     "amountPlaceholder": "{{period}} bütçesi",
     "headBudget": "Bütçe",
     "headActual": "Fiili",
-    "headVariance": "Varyans"
+    "headVariance": "Fark"
   },
   "consolidated": {
-    "title": "Konsolide Kâr-Zarar",
+    "title": "Tüm Şubeler Kâr-Zarar",
     "netLabel": "net",
-    "forbidden": "Konsolide P&L yalnızca tüm şubelere erişimi olan yöneticiler içindir.",
+    "forbidden": "Tüm şubeler kâr-zarar raporu yalnızca tüm şubelere erişimi olan yöneticiler içindir.",
     "headBranch": "Şube",
     "headExpenses": "Gider",
     "headNetPct": "Net %"
@@ -219,11 +224,11 @@
   },
   "costing": {
     "title": "Reçete & Maliyet",
-    "subtitle": "Menü mühendisliği (Star/Plowhorse/Puzzle/Dog), teorik-fiili varyans ve reçete başı maliyet.",
-    "tabMenu": "Menü Mühendisliği",
+    "subtitle": "Menü kârlılık analizi, planlanan-gerçekleşen kullanım farkı ve reçete başı maliyet.",
+    "tabMenu": "Menü Kârlılığı",
     "tabVariance": "Kullanım Varyansı",
     "tabRecipes": "Reçete Maliyetleri",
-    "menuTitle": "Menü mühendisliği",
+    "menuTitle": "Menü kârlılığı",
     "upgradeRequired": "Menü mühendisliği için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.",
     "uncosted": "{{count}} satılan ürünün maliyeti tanımlı değil — sınıflandırılamadıkları için tabloda görünmüyorlar. Reçete/maliyet girin.",
     "headProduct": "Ürün",

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useForm } from 'react-hook-form';
-import { Wallet, Coins, Printer, Landmark } from 'lucide-react';
+import { Wallet, Coins, Landmark, FileText } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -17,25 +18,32 @@ import {
   useTipDistribution,
   downloadSessionsCsv,
 } from '../../features/cash/cashApi';
-import { useListFiscalDevices } from '../../features/fiscal/fiscalApi';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import type { PlanFeatures } from '../../types';
+import ZReportsSection from '../../components/reports/ZReportsSection';
 
-type Tab = 'sessions' | 'safe' | 'tips' | 'okc';
+type Tab = 'sessions' | 'safe' | 'tips' | 'dayend';
 
-export default function CashPage() {
+export default function CashPage({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useTranslation('common');
   const fmt = useFormatCurrency();
   const [tab, setTab] = useState<Tab>('sessions');
-  const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'sessions', label: 'Vardiyalar & X-Report', icon: Wallet },
-    { id: 'safe', label: 'Kasa / Petty Cash', icon: Landmark },
-    { id: 'tips', label: 'Bahşiş Havuzu', icon: Coins },
-    { id: 'okc', label: 'ÖKC', icon: Printer },
+  const { hasFeature } = useSubscription();
+  const allTabs = [
+    { id: 'sessions' as Tab, label: t('cash.tabs.sessions', 'Vardiyalar'), icon: Wallet, gate: undefined as keyof PlanFeatures | undefined },
+    { id: 'safe' as Tab, label: t('cash.tabs.safe', 'Kasa Hareketleri'), icon: Landmark, gate: undefined },
+    { id: 'dayend' as Tab, label: t('cash.tabs.dayend', 'Gün Sonu'), icon: FileText, gate: undefined },
+    { id: 'tips' as Tab, label: t('cash.tabs.tips', 'Bahşiş'), icon: Coins, gate: 'advancedReports' as keyof PlanFeatures },
   ];
+  const tabs = allTabs.filter((tb) => !tb.gate || hasFeature(tb.gate));
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Nakit & ÖKC</h1>
-        <p className="text-sm text-slate-500">Vardiya mutabakatı, kasa hareketleri, bahşiş dağıtımı ve yazarkasa.</p>
-      </div>
+    <div className={embedded ? 'space-y-6' : 'p-4 sm:p-6 space-y-6'}>
+      {!embedded && (
+        <div>
+          <h1 className="text-2xl font-bold">{t('cash.title')}</h1>
+          <p className="text-sm text-slate-500">{t('cash.subtitle')}</p>
+        </div>
+      )}
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map((tb) => {
           const Icon = tb.icon;
@@ -51,7 +59,25 @@ export default function CashPage() {
       {tab === 'sessions' && <SessionsTab fmt={fmt} />}
       {tab === 'safe' && <SafeTab fmt={fmt} />}
       {tab === 'tips' && <TipsTab fmt={fmt} />}
-      {tab === 'okc' && <OkcTab />}
+      {tab === 'dayend' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <button
+              onClick={async () => {
+                try {
+                  await downloadSessionsCsv();
+                } catch {
+                  toast.error(t('cash.dayend.csvError'));
+                }
+              }}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
+            >
+              {t('cash.dayend.csv')}
+            </button>
+          </div>
+          <ZReportsSection />
+        </div>
+      )}
     </div>
   );
 }
@@ -59,37 +85,24 @@ export default function CashPage() {
 type Fmt = (n: number) => string;
 
 function SessionsTab({ fmt }: { fmt: Fmt }) {
+  const { t } = useTranslation('common');
   const { data: sessions, isLoading } = useCashierSessions('OPEN');
   const [selected, setSelected] = useState<string | undefined>();
   const { data: x, isLoading: xLoading } = useXReport(selected);
   if (isLoading) return <Loading />;
   return (
     <div className="space-y-4">
-    <div className="flex justify-end">
-      <button
-        onClick={async () => {
-          try {
-            await downloadSessionsCsv();
-          } catch {
-            toast.error('CSV indirilemedi — tekrar deneyin.');
-          }
-        }}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
-      >
-        Z geçmişi CSV indir
-      </button>
-    </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card>
-        <CardHeader><CardTitle>Açık vardiyalar</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('cash.sessions.open')}</CardTitle></CardHeader>
         <CardContent>
-          {(!sessions || sessions.length === 0) ? <Empty text="Açık vardiya yok." /> : (
+          {(!sessions || sessions.length === 0) ? <Empty text={t('cash.sessions.none')} /> : (
             <ul className="divide-y divide-slate-100">
               {sessions.map((s: any) => (
                 <li key={s.id}>
                   <button onClick={() => setSelected(s.id)}
                     className={`w-full text-left py-2 px-1 text-sm hover:bg-slate-50 ${selected === s.id ? 'bg-indigo-50' : ''}`}>
-                    Vardiya {s.id.slice(0, 8)} — açılış {fmt(Number(s.openingFloat))}
+                    {t('cash.sessions.row', { id: s.id.slice(0, 8), amount: fmt(Number(s.openingFloat)) })}
                   </button>
                 </li>
               ))}
@@ -98,15 +111,15 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>X-Report (kapatmadan)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('cash.xreport.title')}</CardTitle></CardHeader>
         <CardContent>
-          {xLoading ? <Loading /> : !x ? <Empty text="Soldan bir vardiya seçin." /> : (
+          {xLoading ? <Loading /> : !x ? <Empty text={t('cash.xreport.pick')} /> : (
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <KV label="Açılış" value={fmt(x.openingFloat)} />
-              <KV label="Nakit satış" value={fmt(x.cashSales)} />
-              <KV label="Kasa girişi" value={fmt(x.cashIn)} />
-              <KV label="Kasa çıkışı" value={fmt(x.cashOut)} />
-              <KV label="Beklenen nakit" value={fmt(x.expectedCash)} strong />
+              <KV label={t('cash.xreport.opening')} value={fmt(x.openingFloat)} />
+              <KV label={t('cash.xreport.cashSales')} value={fmt(x.cashSales)} />
+              <KV label={t('cash.xreport.cashIn')} value={fmt(x.cashIn)} />
+              <KV label={t('cash.xreport.cashOut')} value={fmt(x.cashOut)} />
+              <KV label={t('cash.xreport.expected')} value={fmt(x.expectedCash)} strong />
             </div>
           )}
         </CardContent>
@@ -117,6 +130,7 @@ function SessionsTab({ fmt }: { fmt: Fmt }) {
 }
 
 function SafeTab({ fmt }: { fmt: Fmt }) {
+  const { t } = useTranslation('common');
   const create = useCreateCashMovement();
   const { register, handleSubmit, reset } = useForm<{ type: string; amount: number; reason: string }>({
     defaultValues: { type: 'SAFE_DROP' },
@@ -125,112 +139,74 @@ function SafeTab({ fmt }: { fmt: Fmt }) {
     create.mutate({ ...d, amount: Number(d.amount) }, { onSuccess: () => reset({ type: d.type }) });
   return (
     <Card>
-      <CardHeader><CardTitle>Kasa hareketi (safe / petty cash / banka)</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{t('cash.safe.title')}</CardTitle></CardHeader>
       <CardContent>
-        <p className="mb-3 text-sm text-slate-500">Kasadan çıkan para — onaya düşer, vardiya mutabakatında çıkış olarak sayılır.</p>
+        <p className="mb-3 text-sm text-slate-500">{t('cash.safe.desc')}</p>
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
           <select {...register('type')} className="rounded-md border-slate-300 text-sm">
-            <option value="SAFE_DROP">Kasaya devir (SAFE_DROP)</option>
-            <option value="BANK_DEPOSIT">Banka yatırma</option>
-            <option value="PETTY_CASH">Küçük kasa (petty)</option>
-            <option value="CASH_OUT">Nakit çıkış</option>
+            <option value="SAFE_DROP">{t('cash.safe.typeSafeDrop')}</option>
+            <option value="BANK_DEPOSIT">{t('cash.safe.typeBankDeposit')}</option>
+            <option value="PETTY_CASH">{t('cash.safe.typePettyCash')}</option>
+            <option value="CASH_OUT">{t('cash.safe.typeCashOut')}</option>
           </select>
-          <input {...register('amount', { required: true, valueAsNumber: true })} type="number" step="0.01" placeholder="Tutar" className="rounded-md border-slate-300 text-sm" />
-          <input {...register('reason')} placeholder="Açıklama" className="rounded-md border-slate-300 text-sm" />
+          <input {...register('amount', { required: true, valueAsNumber: true })} type="number" step="0.01" placeholder={t('cash.safe.amount')} className="rounded-md border-slate-300 text-sm" />
+          <input {...register('reason')} placeholder={t('cash.safe.reason')} className="rounded-md border-slate-300 text-sm" />
           <button type="submit" disabled={create.isPending} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-            {create.isPending ? 'Kaydediliyor…' : 'Kaydet'}
+            {create.isPending ? t('cash.safe.saving') : t('cash.safe.save')}
           </button>
         </form>
-        {create.isSuccess && <p className="mt-3 text-sm text-emerald-600">Hareket kaydedildi (onay bekliyor). Tutar: {fmt(create.data?.amount ?? 0)}</p>}
-        {create.isError && <p className="mt-3 text-sm text-rose-600">Hareket kaydedilemedi — tutarı kontrol edip tekrar deneyin.</p>}
+        {create.isSuccess && <p className="mt-3 text-sm text-emerald-600">{t('cash.safe.saved', { amount: fmt(create.data?.amount ?? 0) })}</p>}
+        {create.isError && <p className="mt-3 text-sm text-rose-600">{t('cash.safe.failed')}</p>}
       </CardContent>
     </Card>
   );
 }
 
 function TipsTab({ fmt }: { fmt: Fmt }) {
+  const { t } = useTranslation('common');
   const today = format(new Date(), 'yyyy-MM-dd');
   const [range] = useState({ startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'), endDate: today });
-  const { data, isLoading, isError, error } = useTipDistribution(range);
+  const { data, isLoading, isError } = useTipDistribution(range);
   if (isLoading) return <Loading />;
-  // tip-distribution is ADVANCED_REPORTS-gated on the backend; without it the
-  // request 403s — say so instead of showing a fabricated ₺0 pool. Only a 403
-  // means "upgrade"; other failures get an honest retry message.
+  // The tab is now hidden entirely without advancedReports (filtered out of
+  // `tabs` in CashPage), so a 403 here would mean a state drift bug, not a
+  // plan-upsell moment — no fabricated pool, just an honest retry message.
   if (isError)
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-amber-700">
-          {(error as any)?.response?.status === 403
-            ? 'Bahşiş havuzu raporu için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.'
-            : 'Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.'}
+          {t('cash.tips.error')}
         </CardContent>
       </Card>
     );
   return (
     <Card>
-      <CardHeader><CardTitle>Bahşiş havuzu dağıtımı — havuz {fmt(data?.pool ?? 0)}, {data?.totalHours ?? 0} saat</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{t('cash.tips.title', { pool: fmt(data?.pool ?? 0), hours: data?.totalHours ?? 0 })}</CardTitle></CardHeader>
       <CardContent>
-        <Table head={['Personel', 'Saat', 'Pay']}
+        <Table head={[t('cash.tips.staff'), t('cash.tips.hours'), t('cash.tips.share')]}
           rows={(data?.distribution ?? []).map((d: any) => [d.staffName, String(d.hours), fmt(d.tipShare)])} />
-        {data?.undistributed > 0 && <p className="mt-3 text-xs text-amber-600">Dağıtılmayan: {fmt(data.undistributed)} (saat girilmemiş).</p>}
+        {data?.undistributed > 0 && <p className="mt-3 text-xs text-amber-600">{t('cash.tips.undistributed', { amount: fmt(data.undistributed) })}</p>}
       </CardContent>
     </Card>
   );
 }
 
-function OkcTab() {
-  // Sourced from the single fiscal rail (fiscal-core /v1/fiscal/devices).
-  // That endpoint is gated by the "fiscal" integration, so tenants without a
-  // yazarkasa add-on get a 403 → isError; we degrade to the "not configured"
-  // state rather than surfacing an error.
-  const { data: devices, isLoading, isError } = useListFiscalDevices();
-  if (isLoading) return <Loading />;
-  const list = isError ? [] : (devices ?? []);
-  const ready = list.filter((d) => d.status === 'online');
-  return (
-    <Card>
-      <CardHeader><CardTitle>Yazarkasa (ÖKC) durumu</CardTitle></CardHeader>
-      <CardContent>
-        {list.length === 0 ? (
-          <>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="h-3 w-3 rounded-full bg-slate-400" />
-              <span>Cihaz yapılandırılmamış</span>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">
-              Mali fiş basmak için Ayarlar → Mali Cihazlar’dan bir yazarkasa (ÖKC) kaydedin. Fiş üretimi + akış hazır; yalnızca sertifikalı fiziksel cihaz adaptörü (vendor SDK) eksik.
-            </p>
-          </>
-        ) : (
-          <div className="space-y-2 text-sm">
-            {list.map((d) => (
-              <div key={d.id} className="flex items-center gap-3">
-                <span className={`h-3 w-3 rounded-full ${d.status === 'online' ? 'bg-emerald-500' : d.status === 'error' ? 'bg-red-500' : 'bg-slate-400'}`} />
-                <span>Sağlayıcı: <strong>{d.providerId}</strong></span>
-                <span className="text-slate-500">{d.serial}{d.model ? ` · ${d.model}` : ''}</span>
-                <span className="text-slate-500">{d.status === 'online' ? 'Hazır' : d.status}</span>
-              </div>
-            ))}
-            <p className="pt-1 text-xs text-slate-500">{ready.length}/{list.length} cihaz hazır. Kayıt/emeklilik için Ayarlar → Mali Cihazlar.</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+function Loading() {
+  const { t } = useTranslation('common');
+  return <div className="py-12 text-center text-slate-400">{t('cash.loading')}</div>;
 }
-
-function Loading() { return <div className="py-12 text-center text-slate-400">Yükleniyor…</div>; }
 function Empty({ text }: { text: string }) { return <div className="py-8 text-center text-slate-400">{text}</div>; }
 function KV({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return <div><p className="text-slate-500">{label}</p><p className={`tabular-nums ${strong ? 'text-lg font-bold' : 'font-semibold'}`}>{value}</p></div>;
 }
 function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
+  const { t } = useTranslation('common');
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead><tr className="text-left text-slate-500">{head.map((h) => <th key={h} className="py-2 pr-4">{h}</th>)}</tr></thead>
         <tbody>
-          {rows.length === 0 ? <tr><td colSpan={head.length} className="py-6 text-center text-slate-400">Kayıt yok.</td></tr>
+          {rows.length === 0 ? <tr><td colSpan={head.length} className="py-6 text-center text-slate-400">{t('cash.empty')}</td></tr>
           : rows.map((r, i) => <tr key={i} className="border-t border-slate-100">{r.map((c, j) => <td key={j} className="py-2 pr-4 tabular-nums">{c}</td>)}</tr>)}
         </tbody>
       </table>

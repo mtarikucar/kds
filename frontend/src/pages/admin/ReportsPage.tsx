@@ -18,6 +18,7 @@ import {
 } from './reports/AccountingReportsTabs';
 import { useListBranches } from '../../features/branches/branchesApi';
 import { useSubscription } from '../../contexts/SubscriptionContext';
+import { cn } from '../../lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -27,7 +28,6 @@ import HourlyOrdersChart from '../../components/reports/HourlyOrdersChart';
 import CustomerAnalyticsSection from '../../components/reports/CustomerAnalyticsSection';
 import InventorySection from '../../components/reports/InventorySection';
 import StaffPerformanceSection from '../../components/reports/StaffPerformanceSection';
-import ZReportsSection from '../../components/reports/ZReportsSection';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { useFormatDate } from '../../hooks/useFormatDate';
 import {
@@ -41,10 +41,10 @@ import {
   Users,
   Package,
   UserCog,
-  FileText,
   PiggyBank,
   Building2,
   Download,
+  LayoutGrid,
 } from 'lucide-react';
 
 interface DateRangeForm {
@@ -52,7 +52,18 @@ interface DateRangeForm {
   endDate: string;
 }
 
-type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
+type TabType = 'sales' | 'finance' | 'budget' | 'consolidated' | 'forecast' | 'hourly' | 'customers' | 'inventory' | 'staff';
+
+// Faz 5a: 9 sekme üç temaya gruplanır (Satış / Finans & Bütçe / Operasyon) —
+// tema pill'leri sekme şeridinin üstünde, StockPage/FinancePage'deki grup
+// anahtarıyla aynı desen. Tema DEĞİŞTİRME state'i (activeTab'tan ayrı) o
+// temanın ilk görünür sekmesine geçer.
+type Theme = 'sales' | 'financeBudget' | 'operation';
+const THEME_TABS: Record<Theme, TabType[]> = {
+  sales: ['sales', 'forecast', 'hourly'],
+  financeBudget: ['finance', 'budget', 'consolidated'],
+  operation: ['customers', 'inventory', 'staff'],
+};
 
 const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation('reports');
@@ -62,6 +73,7 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
   const [activeTab, setActiveTab] = useState<TabType>('sales');
+  const [theme, setTheme] = useState<Theme>('sales');
   // dateRange carries branchId too — undefined means "all branches" which
   // matches the backend's tenant-wide default.
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string; branchId?: string }>({
@@ -109,16 +121,33 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const allTabs = [
     { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3, gate: undefined as keyof import('../../types').PlanFeatures | undefined },
     { id: 'finance' as TabType, label: t('reports.finance', 'Finans (Kâr-Zarar)'), icon: Wallet, gate: undefined },
-    { id: 'budget' as TabType, label: t('reports.budget', 'Bütçe vs Fiili'), icon: PiggyBank, gate: undefined },
-    { id: 'consolidated' as TabType, label: t('reports.consolidated', 'Konsolide P&L'), icon: Building2, gate: undefined },
+    { id: 'budget' as TabType, label: t('reports.budget', 'Bütçe Karşılaştırması'), icon: PiggyBank, gate: undefined },
+    { id: 'consolidated' as TabType, label: t('reports.consolidated', 'Tüm Şubeler Kâr-Zarar'), icon: Building2, gate: undefined },
     { id: 'forecast' as TabType, label: t('reports.forecast', 'Satış Tahmini'), icon: TrendingUp, gate: undefined },
     { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock, gate: undefined },
     { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users, gate: undefined },
     { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package, gate: 'inventoryTracking' as const },
     { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog, gate: 'personnelManagement' as const },
-    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText, gate: undefined },
   ];
   const tabs = allTabs.filter((t) => !t.gate || hasFeature(t.gate));
+
+  // Tema filtresi: mevcut feature-filtreli `tabs`ın üstüne uygulanır. Boş
+  // temaların pill'i gizlenir (`themes`); tema değişince o temanın `tabs`
+  // sırasındaki ilk görünür sekmesine geçilir.
+  const themeTabs = tabs.filter((tb) => THEME_TABS[theme].includes(tb.id));
+  const switchTheme = (th: Theme) => {
+    setTheme(th);
+    const first = tabs.find((tb) => THEME_TABS[th].includes(tb.id));
+    if (first) setActiveTab(first.id);
+  };
+  const themes = (['sales', 'financeBudget', 'operation'] as Theme[]).filter((th) =>
+    tabs.some((tb) => THEME_TABS[th].includes(tb.id)),
+  );
+  const themeMeta: Record<Theme, { label: string; icon: typeof BarChart3 }> = {
+    sales: { label: t('reports.themes.sales', 'Satış'), icon: BarChart3 },
+    financeBudget: { label: t('reports.themes.financeBudget', 'Finans & Bütçe'), icon: Wallet },
+    operation: { label: t('reports.themes.operation', 'Operasyon'), icon: LayoutGrid },
+  };
 
   return (
     <div>
@@ -129,10 +158,32 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
+      {/* Theme pills */}
+      <div className="mb-4 inline-flex rounded-xl bg-slate-100 p-1">
+        {themes.map((th) => {
+          const { label, icon: Icon } = themeMeta[th];
+          return (
+            <button
+              key={th}
+              onClick={() => switchTheme(th)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors',
+                theme === th
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Tabs */}
       <div className="mb-4 md:mb-6 border-b border-slate-200/60 overflow-x-auto">
         <nav className="flex space-x-4 min-w-max" aria-label="Report tabs">
-          {tabs.map((tab) => {
+          {themeTabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
@@ -394,10 +445,6 @@ const ReportsPage = ({ embedded = false }: { embedded?: boolean }) => {
           startDate={dateRange.startDate}
           endDate={dateRange.endDate}
         />
-      )}
-
-      {activeTab === 'zreports' && (
-        <ZReportsSection />
       )}
     </div>
   );

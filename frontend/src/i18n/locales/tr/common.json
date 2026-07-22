@@ -88,6 +88,7 @@
     "reports": "Raporlar",
     "analytics": "Analitik",
     "reportsAnalytics": "Analitik & Raporlar",
+    "finance": "Finans",
     "settings": "Ayarlar",
     "admin": "Yönetici",
     "subscription": "Abonelik",
@@ -119,6 +120,81 @@
     },
     "expandSidebar": "Kenar Çubuğunu Genişlet",
     "collapseSidebar": "Kenar Çubuğunu Daralt"
+  },
+  "finance": {
+    "groups": {
+      "overview": "Genel Bakış",
+      "cash": "Kasa",
+      "documents": "Belgeler"
+    },
+    "overview": {
+      "expectedCash": "Kasadaki beklenen nakit",
+      "openSessions": "Açık vardiya",
+      "todaysSales": "Bugünkü satış",
+      "fiscalDevices": "Yazarkasa",
+      "fiscalNone": "Kurulmadı",
+      "fiscalReady": "hazır",
+      "fiscalUpsellTitle": "Yazarkasa bağlantısı",
+      "fiscalUpsellBody": "Mali fiş basmak için yazarkasa eklentisi gerekir.",
+      "fiscalUpsellCta": "Mağazaya git",
+      "staleSessionWarning": "Dünden kalan {{count}} açık vardiya var — gün sonu mutabakatı yapılmadı.",
+      "closeAction": "Kapat",
+      "failedDocs": "Gönderilemeyen belge:",
+      "fixAction": "Düzelt",
+      "reconciliation": "{{count}} kart çekimi mutabakat bekliyor — şube cihaz sayfasından inceleyin."
+    }
+  },
+  "cash": {
+    "title": "Kasa",
+    "subtitle": "Vardiya mutabakatı, kasa hareketleri ve gün sonu.",
+    "tabs": {
+      "sessions": "Vardiyalar",
+      "safe": "Kasa Hareketleri",
+      "dayend": "Gün Sonu",
+      "tips": "Bahşiş"
+    },
+    "sessions": {
+      "open": "Açık vardiyalar",
+      "none": "Açık vardiya yok.",
+      "row": "Vardiya {{id}} — açılış {{amount}}"
+    },
+    "xreport": {
+      "title": "Anlık kasa özeti (kapatmadan)",
+      "pick": "Soldan bir vardiya seçin.",
+      "opening": "Açılış",
+      "cashSales": "Nakit satış",
+      "cashIn": "Kasa girişi",
+      "cashOut": "Kasa çıkışı",
+      "expected": "Beklenen nakit"
+    },
+    "safe": {
+      "title": "Kasa hareketi",
+      "desc": "Kasadan çıkan para — onaya düşer, vardiya mutabakatında çıkış olarak sayılır.",
+      "typeSafeDrop": "Ana kasaya para devri",
+      "typeBankDeposit": "Banka yatırma",
+      "typePettyCash": "Küçük kasa",
+      "typeCashOut": "Nakit çıkış",
+      "amount": "Tutar",
+      "reason": "Açıklama",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor…",
+      "saved": "Hareket kaydedildi (onay bekliyor). Tutar: {{amount}}",
+      "failed": "Hareket kaydedilemedi — tutarı kontrol edip tekrar deneyin."
+    },
+    "tips": {
+      "title": "Bahşiş dağıtımı — havuz {{pool}}, {{hours}} saat",
+      "error": "Rapor yüklenemedi — sayfayı yenileyip tekrar deneyin.",
+      "staff": "Personel",
+      "hours": "Saat",
+      "share": "Pay",
+      "undistributed": "Dağıtılmayan: {{amount}} (saat girilmemiş)."
+    },
+    "dayend": {
+      "csv": "Kapanmış vardiya dökümü (CSV)",
+      "csvError": "CSV indirilemedi — tekrar deneyin."
+    },
+    "loading": "Yükleniyor…",
+    "empty": "Kayıt yok."
   },
   "hummytummy": {
     "common": {
@@ -425,8 +501,12 @@
       "notFound": "Şube bulunamadı veya erişiminiz yok.",
       "tabs": {
         "devices": "Cihazlar",
+        "terminals": "Ödeme Terminalleri",
+        "fiscal": "Yazarkasa",
+        "hardware": "Yazıcı & Çekmece",
         "network": "Yerel ağ"
-      }
+      },
+      "scopeHint": "Terminal ve yazarkasa yönetimi için üst çubuktan bu şubeye geçin."
     },
     "network": {
       "tokenTitle": "Köprü token’ı (bir kez gösterilir)",

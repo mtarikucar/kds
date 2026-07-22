@@ -36,8 +36,8 @@
     "category": "Category",
     "quantitySold": "Quantity Sold",
     "finance": "Finance (P&L)",
-    "budget": "Budget vs Actual",
-    "consolidated": "Consolidated P&L",
+    "budget": "Budget Comparison",
+    "consolidated": "All-Branches P&L",
     "forecast": "Sales Forecast",
     "downloadCsv": "Download CSV",
     "downloading": "Downloading…",
@@ -47,7 +47,12 @@
     "loading": "Loading…",
     "noRecords": "No records.",
     "loadError": "The report could not be loaded — refresh the page and try again.",
-    "ordersCount": "{{count}} orders"
+    "ordersCount": "{{count}} orders",
+    "themes": {
+      "sales": "Sales",
+      "financeBudget": "Finance & Budget",
+      "operation": "Operations"
+    }
   },
   "zReports": {
     "title": "Z-Reports",
@@ -148,11 +153,11 @@
   },
   "finance": {
     "revenue": "Revenue",
-    "cogs": "COGS",
+    "cogs": "Material Cost",
     "grossProfit": "Gross Profit",
     "operatingExpenses": "Operating Expenses",
     "netProfit": "Net Profit",
-    "primeCost": "Prime Cost (COGS + Labor)",
+    "primeCost": "Material + Labor Cost",
     "wasteCost": "Waste Cost",
     "labor": "Labor",
     "laborCost": "Labor Cost",
@@ -193,20 +198,20 @@
     }
   },
   "budget": {
-    "title": "Budget vs Actual",
-    "varianceLabel": "variance",
+    "title": "Budget Comparison",
+    "varianceLabel": "difference",
     "monthLabel": "Month",
     "setBudget": "Set budget",
     "saveError": "The budget could not be saved — try again.",
     "amountPlaceholder": "{{period}} budget",
     "headBudget": "Budget",
     "headActual": "Actual",
-    "headVariance": "Variance"
+    "headVariance": "Difference"
   },
   "consolidated": {
-    "title": "Consolidated P&L",
+    "title": "All-Branches P&L",
     "netLabel": "net",
-    "forbidden": "The consolidated P&L is only available to admins with access to all branches.",
+    "forbidden": "The all-branches P&L report is only available to admins with access to all branches.",
     "headBranch": "Branch",
     "headExpenses": "Expenses",
     "headNetPct": "Net %"
@@ -219,11 +224,11 @@
   },
   "costing": {
     "title": "Recipes & Costing",
-    "subtitle": "Menu engineering (Star/Plowhorse/Puzzle/Dog), theoretical vs actual variance and per-recipe cost.",
-    "tabMenu": "Menu Engineering",
+    "subtitle": "Menu profitability analysis, planned-vs-actual usage difference, and per-recipe cost.",
+    "tabMenu": "Menu Profitability",
     "tabVariance": "Usage Variance",
     "tabRecipes": "Recipe Costs",
-    "menuTitle": "Menu engineering",
+    "menuTitle": "Menu profitability",
     "upgradeRequired": "Menu engineering requires the Advanced Reports feature — upgrade your plan.",
     "uncosted": "{{count}} sold product(s) have no cost defined — they can't be classified and are hidden from the table. Enter a recipe/cost.",
     "headProduct": "Product",

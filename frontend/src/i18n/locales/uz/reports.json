@@ -36,8 +36,8 @@
     "category": "Kategoriya",
     "quantitySold": "Sotilgan miqdor",
     "finance": "Moliya (foyda-zarar)",
-    "budget": "Byudjet va amaldagi",
-    "consolidated": "Konsolidatsiyalangan foyda-zarar",
+    "budget": "Byudjet taqqoslash",
+    "consolidated": "Barcha filiallar foyda-zarari",
     "forecast": "Savdo prognozi",
     "downloadCsv": "CSV yuklab olish",
     "downloading": "Yuklab olinmoqda…",
@@ -47,7 +47,12 @@
     "loading": "Yuklanmoqda…",
     "noRecords": "Yozuvlar yo‘q.",
     "loadError": "Hisobot yuklanmadi — sahifani yangilab, qayta urinib ko‘ring.",
-    "ordersCount": "{{count}} ta buyurtma"
+    "ordersCount": "{{count}} ta buyurtma",
+    "themes": {
+      "sales": "Savdo",
+      "financeBudget": "Moliya va byudjet",
+      "operation": "Operatsiyalar"
+    }
   },
   "zReports": {
     "title": "Z-hisobotlar",
@@ -148,11 +153,11 @@
   },
   "finance": {
     "revenue": "Tushum",
-    "cogs": "Sotilgan mahsulot tannarxi",
+    "cogs": "Material tannarxi",
     "grossProfit": "Yalpi foyda",
     "operatingExpenses": "Operatsion xarajatlar",
     "netProfit": "Sof foyda",
-    "primeCost": "Prime cost (tannarx + mehnat)",
+    "primeCost": "Material va mehnat tannarxi",
     "wasteCost": "Isrof xarajati",
     "labor": "Mehnat",
     "laborCost": "Mehnat xarajati",
@@ -193,7 +198,7 @@
     }
   },
   "budget": {
-    "title": "Byudjet va amaldagi",
+    "title": "Byudjet taqqoslash",
     "varianceLabel": "farq",
     "monthLabel": "Oy",
     "setBudget": "Byudjet belgilash",
@@ -204,9 +209,9 @@
     "headVariance": "Farq"
   },
   "consolidated": {
-    "title": "Konsolidatsiyalangan foyda-zarar",
+    "title": "Barcha filiallar foyda-zarari",
     "netLabel": "sof",
-    "forbidden": "Konsolidatsiyalangan hisobot faqat barcha filiallarga kirish huquqiga ega administratorlar uchun.",
+    "forbidden": "Barcha filiallar foyda-zarar hisoboti faqat barcha filiallarga kirish huquqiga ega administratorlar uchun.",
     "headBranch": "Filial",
     "headExpenses": "Xarajat",
     "headNetPct": "Sof %"
@@ -219,11 +224,11 @@
   },
   "costing": {
     "title": "Retsept va tannarx",
-    "subtitle": "Menyu muhandisligi (Star/Plowhorse/Puzzle/Dog), nazariy-amaliy farq va retsept boshiga tannarx.",
-    "tabMenu": "Menyu muhandisligi",
+    "subtitle": "Menyu foydaliligi tahlili, rejalashtirilgan-amaldagi sarf farqi va retsept boshiga tannarx.",
+    "tabMenu": "Menyu foydaliligi",
     "tabVariance": "Sarf farqi",
     "tabRecipes": "Retsept xarajatlari",
-    "menuTitle": "Menyu muhandisligi",
+    "menuTitle": "Menyu foydaliligi",
     "upgradeRequired": "Menyu muhandisligi uchun Kengaytirilgan hisobotlar funksiyasi kerak — tarifingizni yangilang.",
     "uncosted": "{{count}} sotilgan mahsulotning tannarxi belgilanmagan — tasniflab bo‘lmagani uchun jadvalda ko‘rinmaydi. Retsept/tannarx kiriting.",
     "headProduct": "Mahsulot",

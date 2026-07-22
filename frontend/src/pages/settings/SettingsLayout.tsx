@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt, KeyRound, CreditCard, Clock, CalendarDays } from 'lucide-react';
+import { Settings, Monitor, Plug, Webhook, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, KeyRound, Clock, CalendarDays } from 'lucide-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import type { PlanFeatures } from '../../types';
 
@@ -39,7 +39,6 @@ const SettingsLayout = () => {
     // Erişim page (/admin/plan). Billing detail (invoices / cancel) is reached
     // from there via /subscription/manage.
     { to: '/admin/settings/pos', icon: Monitor, label: t('pos') },
-    { to: '/admin/settings/payment-terminals', icon: CreditCard, label: t('nav.paymentTerminals') },
     { to: '/admin/settings/qr-menu', icon: QrCode, label: t('nav.qrMenu') },
     { to: '/admin/settings/reports', icon: FileText, label: t('nav.reports') },
     {
@@ -110,12 +109,6 @@ const SettingsLayout = () => {
         integration: { domain: 'delivery' },
         mode: 'any',
       },
-    },
-    {
-      to: '/admin/settings/accounting',
-      icon: Receipt,
-      label: t('nav.accounting'),
-      gate: { integration: { domain: 'accounting' } },
     },
   ];
 
