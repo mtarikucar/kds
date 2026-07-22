@@ -46,6 +46,7 @@
   },
   "branchPicker": {
     "activeBranch": "Faol filialni tanlang",
+    "changeBranch": "Filialni almashtirish",
     "lockedToPrimary": "Sizning filialingiz qattiq biriktirilgan. Oʻzgartirish uchun menejerga murojaat qiling.",
     "activeTooltip": "Faol filial. Barcha soʻrovlar va real vaqt oqimlari shu boʻyicha filtrlanadi."
   }

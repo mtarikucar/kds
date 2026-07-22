@@ -22,11 +22,11 @@ import {
   LogOut,
   User,
   Stethoscope,
+  Network,
   PhoneIncoming,
   Download,
   FileWarning,
   CreditCard,
-  Building2,
   Sparkles,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
@@ -203,18 +203,27 @@ const SECTIONS: NavSection[] = [
       // Faturalar is now the "Faturalar" tab inside Muhasebe — no separate nav.
     ],
   },
+  // 'Şubeler' left the sidebar (2026-07-22): switching lives on the
+  // full-screen /branch-select (navbar "Şube değiştir" button), and the
+  // device/network hub (/admin/branches) is linked from that screen.
+  // 'Sistem Sağlığı' moved into the Ayarlar & Erişim group below.
+  // 'Pazaryeri' moved out of the sidebar → top-bar "Mağaza" icon (Header.tsx)
+  // → consolidated /admin/store hub (add-ons + hardware + orders tabs).
   {
-    id: 'multiBranch',
-    labelKey: 'navigation.sections.multiBranch',
-    labelFallback: 'Şubeler ve Cihazlar',
+    id: 'planAndAccess',
+    labelKey: 'navigation.sections.planAndAccess',
+    labelFallback: 'Ayarlar & Erişim',
     items: [
       {
-        // The branch hub manages each branch's devices + local network too, so
-        // it is NOT multiLocation-gated — single-location tenants provision
-        // their devices here. (Creating a 2nd branch is still server-gated.)
+        // Branch SWITCHING left the sidebar, but /admin/branches is also the
+        // device + local-network hub — and it is NOT multiLocation-gated, so a
+        // single-location tenant provisions its devices/bridges here. Keep a
+        // device-focused entry (the multi-branch "Şubeleri Yönet" link on
+        // /branch-select can't be reached by single-branch tenants).
         to: '/admin/branches',
-        icon: Building2,
-        labelKey: 'navigation.branches',
+        icon: Network,
+        labelKey: 'navigation.devicesNetwork',
+        labelFallback: 'Cihazlar & Ağ',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
       {
@@ -223,15 +232,6 @@ const SECTIONS: NavSection[] = [
         labelKey: 'navigation.health',
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
-    ],
-  },
-  // 'Pazaryeri' moved out of the sidebar → top-bar "Mağaza" icon (Header.tsx)
-  // → consolidated /admin/store hub (add-ons + hardware + orders tabs).
-  {
-    id: 'planAndAccess',
-    labelKey: 'navigation.sections.planAndAccess',
-    labelFallback: 'Ayarlar & Erişim',
-    items: [
       {
         to: '/admin/plan',
         icon: CreditCard,

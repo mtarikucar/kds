@@ -6,6 +6,7 @@ import { initReactI18next } from 'react-i18next';
 import enErrors from '../i18n/locales/en/errors.json';
 import enCommon from '../i18n/locales/en/common.json';
 import enAuth from '../i18n/locales/en/auth.json';
+import enPlan from '../i18n/locales/en/plan.json';
 
 // Bootstrap i18next in test mode so components that call useTranslation()
 // resolve to real strings instead of echoing back the key. We import a
@@ -21,6 +22,7 @@ if (!i18next.isInitialized) {
         errors: enErrors,
         common: enCommon,
         auth: enAuth,
+        plan: enPlan,
       },
     },
   });

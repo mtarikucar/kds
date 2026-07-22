@@ -46,6 +46,7 @@
   },
   "branchPicker": {
     "activeBranch": "Select active branch",
+    "changeBranch": "Switch branch",
     "lockedToPrimary": "Your branch is fixed. Contact your manager to change it.",
     "activeTooltip": "Active branch. All queries and realtime streams are filtered to it."
   }

@@ -46,6 +46,7 @@
   },
   "branchPicker": {
     "activeBranch": "Aktif şube seçin",
+    "changeBranch": "Şube değiştir",
     "lockedToPrimary": "Şubeniz sabit. Değiştirmek için yöneticinize başvurun.",
     "activeTooltip": "Aktif şube. Tüm sorgular ve gerçek zamanlı akışlar bu şubeye göre filtrelenir."
   }

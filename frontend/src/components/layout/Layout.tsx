@@ -11,6 +11,7 @@ import { RTL_LANGUAGES } from '../../i18n/config';
 import SubscriptionStatusBanner from '../subscriptions/SubscriptionStatusBanner';
 import SubscriptionGate from '../subscriptions/SubscriptionGate';
 import ProfileCompletionGate from '../onboarding/ProfileCompletionGate';
+import BranchSelectionGate from '../branches/BranchSelectionGate';
 
 const Layout = () => {
   const { i18n } = useTranslation();
@@ -53,7 +54,9 @@ const Layout = () => {
                 (TRIAL_ENDED → plan selection). */}
             <ProfileCompletionGate>
               <SubscriptionGate>
-                <Outlet />
+                <BranchSelectionGate>
+                  <Outlet />
+                </BranchSelectionGate>
               </SubscriptionGate>
             </ProfileCompletionGate>
             {import.meta.env.VITE_APP_VERSION && (

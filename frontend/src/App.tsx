@@ -157,6 +157,12 @@ const WelcomePage = lazyWithReload(
   () => import("./pages/onboarding/WelcomePage"),
 );
 
+// Full-screen branch switcher (lazy-loaded) — also the forced first-entry
+// selection screen (BranchSelectionGate). Outside Layout on purpose.
+const BranchSelectPage = lazyWithReload(
+  () => import("./features/branches/BranchSelectPage"),
+);
+
 // Subscription & Settings Pages (lazy-loaded)
 const SubscriptionPlansPage = lazyWithReload(
   () => import("./pages/subscription/SubscriptionPlansPage"),
@@ -375,6 +381,18 @@ function App() {
             element={
               <ProtectedRoute>
                 <WelcomePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Branch switcher (full-screen, no app chrome) — navbar "Şube
+          değiştir" lands here; BranchSelectionGate forces it on first entry
+          when a multi-branch user has no cached selection. */}
+          <Route
+            path="/branch-select"
+            element={
+              <ProtectedRoute>
+                <BranchSelectPage />
               </ProtectedRoute>
             }
           />

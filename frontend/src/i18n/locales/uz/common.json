@@ -1,4 +1,16 @@
 {
+  "branchSelect": {
+    "title": "Filialni tanlang",
+    "subtitle": "Ishlamoqchi boʻlgan filialni tanlang. Barcha ekranlar, buyurtmalar va hisobotlar shu filialga koʻra filtrlanadi.",
+    "activeBadge": "Faol filial",
+    "headquarters": "Bosh ofis",
+    "suspended": "Toʻxtatilgan",
+    "archived": "Arxivlangan",
+    "manageBranches": "Filiallarni boshqarish",
+    "notSelectable": "Bu filial faol emas",
+    "empty": "Siz kira oladigan filial topilmadi",
+    "emptyHint": "Menejeringizdan filialga kirish soʻrang."
+  },
   "demo": {
     "enter": "Demoni ko‘rib chiqing",
     "entered": "Demo restoraniga o‘tildi. Tanishishni boshlang!",
@@ -88,6 +100,7 @@
     "deliveryOrders": "Yetkazib berish buyurtmalari",
     "devices": "Qurilmalar",
     "branches": "Filiallar",
+    "devicesNetwork": "Qurilmalar va tarmoq",
     "health": "Filial salomatligi",
     "marketplace": "Bozor",
     "store": "Jihozlar do'koni",
