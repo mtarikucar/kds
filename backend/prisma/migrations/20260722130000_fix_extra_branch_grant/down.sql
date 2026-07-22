@@ -10,7 +10,7 @@
 -- rollback: undo this migration's effect. Idempotent — a second run,
 -- or a run against a row that never had `limit.maxBranches`, is a
 -- no-op. Scoped to exactly `code = 'extra_branch'`.
-UPDATE "MarketplaceAddOn"
+UPDATE "marketplace_addons"
 SET grants = jsonb_set(
   grants - 'limit.maxBranches',
   '{limit.branches}',

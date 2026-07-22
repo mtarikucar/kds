@@ -1,3 +1,4 @@
+-- @doctor:idempotent verified=single guarded UPDATE on marketplace_addons, scoped to code='extra_branch' AND grants ? 'limit.branches' (no-op on re-run once renamed); jsonb -/jsonb_set touch only the one key.
 -- Task 5 (DEF-6) — fix the extra_branch marketplace add-on's dead grant key.
 --
 -- DEFECT: seed-marketplace.ts's `extra_branch` entry wrote
@@ -60,7 +61,7 @@
 --   (e.g. via a one-off script querying TenantAddOn WHERE addOnId =
 --   the extra_branch row's id AND status IN ('active','past_due')),
 --   not to edit FeatureEntitlement by hand.
-UPDATE "MarketplaceAddOn"
+UPDATE "marketplace_addons"
 SET grants = jsonb_set(
   grants - 'limit.branches',
   '{limit.maxBranches}',
