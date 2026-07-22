@@ -91,7 +91,9 @@
     "completed": "Завершённые",
     "cancelled": "Отменённые",
     "date": "Дата",
-    "searchPlaceholder": "Поиск по имени или телефону..."
+    "searchPlaceholder": "Поиск по имени или телефону...",
+    "rejected": "Отклонённые",
+    "noShow": "Не пришли"
   },
   "stats": {
     "total": "Всего",
@@ -125,7 +127,67 @@
     "confirmedAt": "Подтверждено",
     "seatedAt": "Гость посажен",
     "completedAt": "Завершено",
-    "cancelledAt": "Отменено"
+    "cancelledAt": "Отменено",
+    "editDate": "Дата",
+    "editGuests": "Гостей",
+    "editStartTime": "Начало",
+    "editEndTime": "Конец",
+    "editName": "Имя и фамилия",
+    "editPhone": "Телефон",
+    "editEmail": "Эл. почта",
+    "tableConflict": "Недоступен в это время",
+    "lifecycleActions": "Действия"
+  },
+  "views": {
+    "day": "День",
+    "pending": "Ожидающие",
+    "upcoming": "Предстоящие"
+  },
+  "day": {
+    "today": "Сегодня",
+    "previous": "Предыдущий день",
+    "next": "Следующий день"
+  },
+  "pending": {
+    "empty": "Нет ожидающих броней",
+    "emptyDescription": "Нет заявок на бронирование, ожидающих подтверждения."
+  },
+  "upcoming": {
+    "empty": "Нет броней на этот день",
+    "emptyDescription": "На выбранный день нет запланированных броней."
+  },
+  "create": {
+    "button": "Новая бронь",
+    "title": "Новая бронь",
+    "sourcePhone": "Телефон",
+    "sourceWalkin": "Без брони",
+    "walkinHint": "Гость без брони сразу сажается за выбранный стол",
+    "date": "Дата",
+    "guests": "Количество гостей",
+    "duration": "Длительность (мин.)",
+    "time": "Время",
+    "useSlots": "Доступное время",
+    "customTime": "Ввести время вручную",
+    "selectTime": "Выберите время",
+    "table": "Стол",
+    "selectTable": "Выберите стол",
+    "anyTable": "Назначить автоматически",
+    "noFreeTables": "Нет свободных столов на это время",
+    "name": "Имя и фамилия",
+    "phone": "Телефон",
+    "email": "Эл. почта",
+    "notes": "Заметки",
+    "contactRequired": "Для телефонной брони нужен телефон или эл. почта",
+    "submit": "Создать бронь",
+    "nameRequired": "Укажите имя и фамилию",
+    "timeRequired": "Укажите время",
+    "walkinTableRequired": "Для гостя без брони нужно выбрать стол"
+  },
+  "reject": {
+    "title": "Отклонить бронь",
+    "reasonLabel": "Причина отказа (необязательно)",
+    "reasonPlaceholder": "Укажите причину отказа для гостя...",
+    "submit": "Отклонить"
   },
   "public": {
     "title": "Забронировать стол",
@@ -246,6 +308,7 @@
     "sunday": "Воскресенье"
   },
   "table": {
+    "date": "Дата",
     "time": "Время",
     "customer": "Клиент",
     "guests": "Гостей",

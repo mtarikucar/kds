@@ -91,7 +91,9 @@
     "completed": "Yakunlangan",
     "cancelled": "Bekor qilingan",
     "date": "Sana",
-    "searchPlaceholder": "Ism yoki telefon bo‘yicha qidirish..."
+    "searchPlaceholder": "Ism yoki telefon bo‘yicha qidirish...",
+    "rejected": "Rad etilgan",
+    "noShow": "Kelmagan"
   },
   "stats": {
     "total": "Jami",
@@ -125,7 +127,67 @@
     "confirmedAt": "Tasdiqlangan",
     "seatedAt": "Joylashtirilgan",
     "completedAt": "Yakunlangan",
-    "cancelledAt": "Bekor qilingan"
+    "cancelledAt": "Bekor qilingan",
+    "editDate": "Sana",
+    "editGuests": "Mehmonlar soni",
+    "editStartTime": "Boshlanishi",
+    "editEndTime": "Tugashi",
+    "editName": "Ism familiya",
+    "editPhone": "Telefon",
+    "editEmail": "E-pochta",
+    "tableConflict": "Bu vaqtda mavjud emas",
+    "lifecycleActions": "Amallar"
+  },
+  "views": {
+    "day": "Kun",
+    "pending": "Kutilayotgan",
+    "upcoming": "Yaqinlashayotgan"
+  },
+  "day": {
+    "today": "Bugun",
+    "previous": "Oldingi kun",
+    "next": "Keyingi kun"
+  },
+  "pending": {
+    "empty": "Kutilayotgan bronlar yo‘q",
+    "emptyDescription": "Tasdiqlashni kutayotgan yangi bron so‘rovlari yo‘q."
+  },
+  "upcoming": {
+    "empty": "Bu kun uchun bron yo‘q",
+    "emptyDescription": "Tanlangan kun uchun rejalashtirilgan bronlar yo‘q."
+  },
+  "create": {
+    "button": "Yangi bron",
+    "title": "Yangi bron",
+    "sourcePhone": "Telefon",
+    "sourceWalkin": "Tashrif buyuruvchi",
+    "walkinHint": "Tashrif buyuruvchi mehmon tanlangan stolga darhol o‘tqaziladi",
+    "date": "Sana",
+    "guests": "Mehmonlar soni",
+    "duration": "Davomiyligi (daqiqa)",
+    "time": "Vaqt",
+    "useSlots": "Mavjud vaqtlar",
+    "customTime": "Vaqtni qo‘lda kiriting",
+    "selectTime": "Vaqtni tanlang",
+    "table": "Stol",
+    "selectTable": "Stolni tanlang",
+    "anyTable": "Avtomatik biriktirish",
+    "noFreeTables": "Bu vaqt uchun bo‘sh stol yo‘q",
+    "name": "Ism familiya",
+    "phone": "Telefon",
+    "email": "E-pochta",
+    "notes": "Izohlar",
+    "contactRequired": "Telefon broni uchun telefon yoki e-pochta kerak",
+    "submit": "Bron yaratish",
+    "nameRequired": "Ism familiya majburiy",
+    "timeRequired": "Vaqt tanlash majburiy",
+    "walkinTableRequired": "Tashrif buyuruvchi uchun stol tanlash majburiy"
+  },
+  "reject": {
+    "title": "Bronni rad etish",
+    "reasonLabel": "Rad etish sababi (ixtiyoriy)",
+    "reasonPlaceholder": "Mehmonga yuboriladigan rad etish sababini yozing...",
+    "submit": "Rad etish"
   },
   "public": {
     "title": "Bron qilish",
@@ -246,6 +308,7 @@
     "sunday": "Yakshanba"
   },
   "table": {
+    "date": "Sana",
     "time": "Vaqt",
     "customer": "Mijoz",
     "guests": "Mehmonlar",

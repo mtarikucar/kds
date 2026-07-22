@@ -25,11 +25,22 @@ const NotificationCenter = () => {
         case 'EMAIL_VERIFICATION_REQUIRED':
           setIsOpen(false);
           navigate('/profile');
-          break;
+          return;
+        case 'view_reservations':
+          setIsOpen(false);
+          navigate('/admin/reservations');
+          return;
         // Add more action handlers as needed
         default:
           break;
       }
+    }
+
+    // Fallback for older reservation notifications that only carry
+    // data.type (before the data.action deep-link was added).
+    if (notification.data?.type === 'new_reservation') {
+      setIsOpen(false);
+      navigate('/admin/reservations');
     }
   };
 
@@ -39,6 +50,8 @@ const NotificationCenter = () => {
         return '🛒';
       case 'STOCK':
         return '📦';
+      case 'RESERVATION':
+        return '📅';
       case 'WARNING':
         return '⚠️';
       case 'ERROR':

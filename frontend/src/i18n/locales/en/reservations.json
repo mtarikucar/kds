@@ -91,7 +91,9 @@
     "completed": "Completed",
     "cancelled": "Cancelled",
     "date": "Date",
-    "searchPlaceholder": "Search by name or phone..."
+    "searchPlaceholder": "Search by name or phone...",
+    "rejected": "Rejected",
+    "noShow": "No Show"
   },
   "stats": {
     "total": "Total",
@@ -125,7 +127,67 @@
     "confirmedAt": "Confirmed",
     "seatedAt": "Seated",
     "completedAt": "Completed",
-    "cancelledAt": "Cancelled"
+    "cancelledAt": "Cancelled",
+    "editDate": "Date",
+    "editGuests": "Guests",
+    "editStartTime": "Start",
+    "editEndTime": "End",
+    "editName": "Full Name",
+    "editPhone": "Phone",
+    "editEmail": "Email",
+    "tableConflict": "Not available at this time",
+    "lifecycleActions": "Actions"
+  },
+  "views": {
+    "day": "Day",
+    "pending": "Pending",
+    "upcoming": "Upcoming"
+  },
+  "day": {
+    "today": "Today",
+    "previous": "Previous day",
+    "next": "Next day"
+  },
+  "pending": {
+    "empty": "No pending reservations",
+    "emptyDescription": "There are no reservation requests waiting for approval."
+  },
+  "upcoming": {
+    "empty": "No reservations for this day",
+    "emptyDescription": "There are no reservations scheduled for the selected day."
+  },
+  "create": {
+    "button": "New Reservation",
+    "title": "New Reservation",
+    "sourcePhone": "Phone",
+    "sourceWalkin": "Walk-in",
+    "walkinHint": "A walk-in guest is seated at the selected table immediately",
+    "date": "Date",
+    "guests": "Number of Guests",
+    "duration": "Duration (minutes)",
+    "time": "Time",
+    "useSlots": "Available times",
+    "customTime": "Enter time manually",
+    "selectTime": "Select time",
+    "table": "Table",
+    "selectTable": "Select a table",
+    "anyTable": "Auto-assign",
+    "noFreeTables": "No available table for this time",
+    "name": "Full Name",
+    "phone": "Phone",
+    "email": "Email",
+    "notes": "Notes",
+    "contactRequired": "A phone or email is required for a phone reservation",
+    "submit": "Create Reservation",
+    "nameRequired": "Full name is required",
+    "timeRequired": "A time is required",
+    "walkinTableRequired": "A table is required for a walk-in"
+  },
+  "reject": {
+    "title": "Reject Reservation",
+    "reasonLabel": "Rejection Reason (optional)",
+    "reasonPlaceholder": "Write a reason to share with the guest...",
+    "submit": "Reject"
   },
   "public": {
     "title": "Make a Reservation",
@@ -246,6 +308,7 @@
     "sunday": "Sunday"
   },
   "table": {
+    "date": "Date",
     "time": "Time",
     "customer": "Customer",
     "guests": "Guests",

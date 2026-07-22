@@ -15,11 +15,13 @@ import type { ReactNode } from 'react';
 const getMock = vi.fn();
 const patchMock = vi.fn();
 const deleteMock = vi.fn();
+const postMock = vi.fn();
 vi.mock('../../lib/api', () => ({
   default: {
     get: (...a: unknown[]) => getMock(...a),
     patch: (...a: unknown[]) => patchMock(...a),
     delete: (...a: unknown[]) => deleteMock(...a),
+    post: (...a: unknown[]) => postMock(...a),
   },
 }));
 
@@ -35,6 +37,9 @@ import {
   useConfirmReservation,
   useRejectReservation,
   useDeleteReservation,
+  useCreateReservation,
+  usePendingReservationCount,
+  type CreateStaffReservationDto,
 } from './reservationsApi';
 
 function makeClient() {
@@ -58,6 +63,81 @@ describe('useReservations', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(getMock).toHaveBeenCalledWith('/reservations', { params });
     expect(client.getQueryCache().getAll()[0].queryKey).toEqual(['reservations', params, 'b-3']);
+  });
+
+  it('forwards the dateFrom/dateTo range params (future-visibility fetch)', async () => {
+    getMock.mockResolvedValue({ data: { data: [], meta: {} } });
+    const client = makeClient();
+    const params = { dateFrom: '2026-06-14', dateTo: '2026-06-28', limit: 500 };
+    const { result } = renderHook(() => useReservations(params), { wrapper: wrapper(client) });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith('/reservations', { params });
+  });
+
+  it('does not fetch when disabled via options', async () => {
+    getMock.mockResolvedValue({ data: { data: [], meta: {} } });
+    const client = makeClient();
+    renderHook(() => useReservations({ date: 'x' }, { enabled: false }), {
+      wrapper: wrapper(client),
+    });
+    // give react-query a tick — a disabled query must never hit the network.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(getMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePendingReservationCount', () => {
+  it('GETs the pending-count endpoint under a branch-scoped ["reservations"] key', async () => {
+    getMock.mockResolvedValue({ data: { count: 4 } });
+    const client = makeClient();
+    const { result } = renderHook(() => usePendingReservationCount(), { wrapper: wrapper(client) });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getMock).toHaveBeenCalledWith('/reservations/pending-count');
+    expect(result.current.data).toEqual({ count: 4 });
+    // Nested under the ['reservations'] prefix so list/socket invalidations
+    // refresh the badge for free.
+    expect(client.getQueryCache().getAll()[0].queryKey).toEqual([
+      'reservations',
+      'pending-count',
+      'b-3',
+    ]);
+  });
+
+  it('honors enabled:false (no request for users without reservation access)', async () => {
+    getMock.mockResolvedValue({ data: { count: 0 } });
+    const client = makeClient();
+    renderHook(() => usePendingReservationCount({ enabled: false }), { wrapper: wrapper(client) });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(getMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useCreateReservation (staff create)', () => {
+  it('POSTs the staff payload and invalidates reservations, stats AND tables', async () => {
+    postMock.mockResolvedValue({ data: { id: 'r-9' } });
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateReservation(), { wrapper: wrapper(client) });
+
+    const payload: CreateStaffReservationDto = {
+      date: '2026-06-20',
+      startTime: '19:00',
+      endTime: '20:30',
+      guestCount: 4,
+      customerName: 'Ada',
+      customerPhone: '+90 555 111 22 33',
+      source: 'PHONE',
+    };
+    result.current.mutate(payload);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(postMock).toHaveBeenCalledWith('/reservations', payload);
+    // A WALKIN autoSeat flips a table; invalidate tables even for a plain create.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['reservations'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['reservationStats'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tables'] });
   });
 });
 

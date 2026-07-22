@@ -91,7 +91,9 @@
     "completed": "Tamamlanan",
     "cancelled": "İptal",
     "date": "Tarih",
-    "searchPlaceholder": "İsim veya telefon ile ara..."
+    "searchPlaceholder": "İsim veya telefon ile ara...",
+    "rejected": "Reddedilen",
+    "noShow": "Gelmedi"
   },
   "stats": {
     "total": "Toplam",
@@ -125,7 +127,67 @@
     "confirmedAt": "Onaylanma",
     "seatedAt": "Oturma",
     "completedAt": "Tamamlanma",
-    "cancelledAt": "İptal Edilme"
+    "cancelledAt": "İptal Edilme",
+    "editDate": "Tarih",
+    "editGuests": "Kişi Sayısı",
+    "editStartTime": "Başlangıç",
+    "editEndTime": "Bitiş",
+    "editName": "Ad Soyad",
+    "editPhone": "Telefon",
+    "editEmail": "E-posta",
+    "tableConflict": "Bu saat için uygun değil",
+    "lifecycleActions": "İşlemler"
+  },
+  "views": {
+    "day": "Gün",
+    "pending": "Bekleyenler",
+    "upcoming": "Yaklaşan"
+  },
+  "day": {
+    "today": "Bugün",
+    "previous": "Önceki gün",
+    "next": "Sonraki gün"
+  },
+  "pending": {
+    "empty": "Bekleyen rezervasyon yok",
+    "emptyDescription": "Onay bekleyen yeni rezervasyon isteği bulunmuyor."
+  },
+  "upcoming": {
+    "empty": "Bu gün için rezervasyon yok",
+    "emptyDescription": "Seçilen gün için planlanmış rezervasyon bulunmuyor."
+  },
+  "create": {
+    "button": "Yeni Rezervasyon",
+    "title": "Yeni Rezervasyon",
+    "sourcePhone": "Telefon",
+    "sourceWalkin": "Kapıdan Gelen",
+    "walkinHint": "Kapıdan gelen misafir seçilen masaya hemen oturtulur",
+    "date": "Tarih",
+    "guests": "Kişi Sayısı",
+    "duration": "Süre (dakika)",
+    "time": "Saat",
+    "useSlots": "Uygun saatler",
+    "customTime": "Saati elle gir",
+    "selectTime": "Saat seçin",
+    "table": "Masa",
+    "selectTable": "Masa seçin",
+    "anyTable": "Otomatik atansın",
+    "noFreeTables": "Bu saat için uygun masa yok",
+    "name": "Ad Soyad",
+    "phone": "Telefon",
+    "email": "E-posta",
+    "notes": "Notlar",
+    "contactRequired": "Telefon rezervasyonu için telefon veya e-postadan biri gerekli",
+    "submit": "Rezervasyon Oluştur",
+    "nameRequired": "Ad Soyad zorunlu",
+    "timeRequired": "Saat seçimi zorunlu",
+    "walkinTableRequired": "Kapıdan gelen için masa seçimi zorunlu"
+  },
+  "reject": {
+    "title": "Rezervasyonu Reddet",
+    "reasonLabel": "Red Nedeni (isteğe bağlı)",
+    "reasonPlaceholder": "Misafire iletilecek red nedenini yazın...",
+    "submit": "Reddet"
   },
   "public": {
     "title": "Rezervasyon Yap",
@@ -246,6 +308,7 @@
     "sunday": "Pazar"
   },
   "table": {
+    "date": "Tarih",
     "time": "Saat",
     "customer": "Müşteri",
     "guests": "Kişi",
