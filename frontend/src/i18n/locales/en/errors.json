@@ -31,7 +31,8 @@
     "ADDON_REQUIRES_PLAN": "This add-on requires a higher plan.",
     "ADDON_LIMIT_REDUNDANT": "Your plan already provides this without limit.",
     "SAME_PLAN_ACTIVE": "You're already subscribed to this plan.",
-    "HARDWARE_OUT_OF_STOCK": "This product is out of stock."
+    "HARDWARE_OUT_OF_STOCK": "This product is out of stock.",
+    "ACCOUNT_ROLE_INVALID": "Your account role is invalid. Please contact support."
   },
   "errors": {
     "title": "Error",
@@ -112,6 +113,10 @@
       "upgrade3": "Security enhancements",
       "needHelp": "Need urgent assistance?",
       "contactSupportLink": "Contact Support"
+    },
+    "accountRoleInvalid": {
+      "title": "Invalid Account Configuration",
+      "description": "Your account's role information appears to be invalid. This is usually caused by a support action and can't be fixed on your end. Please contact support."
     }
   },
   "troubleshooting": {

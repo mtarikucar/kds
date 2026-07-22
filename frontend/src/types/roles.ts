@@ -23,3 +23,14 @@ export const HARD_RESTRICTED_ROLES: readonly string[] = [
 export function isHardRestrictedRole(role: string | undefined | null): boolean {
   return !!role && HARD_RESTRICTED_ROLES.includes(role);
 }
+
+/**
+ * Mirrors backend's `isValidUserRole` in `roles.enum.ts` — the structural
+ * role guard that JwtStrategy.validate() enforces (401 ACCOUNT_ROLE_INVALID
+ * for a role planted directly in Postgres, bypassing app-level @IsEnum
+ * validation). Used by ProtectedRoute to render AccountRoleInvalid instead
+ * of silently producing an empty sidebar / bounce loop.
+ */
+export function isValidUserRole(role: string | undefined | null): boolean {
+  return !!role && (Object.values(UserRole) as string[]).includes(role);
+}

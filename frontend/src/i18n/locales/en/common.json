@@ -791,6 +791,7 @@
       "kitchen": "Kitchen",
       "courier": "Courier"
     },
+    "unknownRole": "Unknown role",
     "deleteUser": "Delete User",
     "actionCannotBeUndone": "This action cannot be undone",
     "confirmDeleteUser": "Are you sure you want to delete",

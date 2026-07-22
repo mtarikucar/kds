@@ -254,6 +254,20 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Structural role guard (see JwtStrategy.validate() /
+    // ACCOUNT_ROLE_INVALID). The role is structurally invalid — a row
+    // planted directly in Postgres bypassing app-level @IsEnum
+    // validation — so refreshing just re-mints a token the guard
+    // rejects again. Reject straight through without retry/redirect;
+    // ProtectedRoute's AccountRoleInvalid screen (driven by the stored
+    // user.role) is what informs the user, not a bounce-to-login.
+    if (
+      error.response?.status === 401 &&
+      error.response?.data?.errorCode === "ACCOUNT_ROLE_INVALID"
+    ) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 

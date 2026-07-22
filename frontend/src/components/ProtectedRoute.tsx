@@ -3,8 +3,10 @@ import { Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '../types';
+import { isValidUserRole } from '../types/roles';
 import { API_URL } from '../lib/env';
 import Spinner from './ui/Spinner';
+import AccountRoleInvalid from './AccountRoleInvalid';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -92,6 +94,17 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
         <Spinner size="lg" />
       </div>
     );
+  }
+
+  // Structural role guard (mirrors JwtStrategy.validate()'s 401
+  // ACCOUNT_ROLE_INVALID). Checked BEFORE the per-route allowedRoles gate
+  // below — that gate would either silently bounce to /dashboard or (via
+  // Sidebar's itemVisible) render an empty nav with no explanation. This
+  // is the single highest-level wrapper around every authenticated route,
+  // so replacing children here also removes the app shell (Sidebar) that
+  // would otherwise render blank for an unrecognized role.
+  if (user && !isValidUserRole(user.role)) {
+    return <AccountRoleInvalid />;
   }
 
   // Check role-based access if allowedRoles is specified

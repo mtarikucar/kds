@@ -803,6 +803,7 @@
       "kitchen": "مطبخ",
       "courier": "موصل"
     },
+    "unknownRole": "دور غير معروف",
     "deleteUser": "حذف المستخدم",
     "actionCannotBeUndone": "لا يمكن التراجع عن هذا الإجراء",
     "confirmDeleteUser": "هل أنت متأكد من حذف",

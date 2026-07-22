@@ -31,7 +31,8 @@
     "ADDON_REQUIRES_PLAN": "Bu qoʻshimcha yuqoriroq tarifni talab qiladi.",
     "ADDON_LIMIT_REDUNDANT": "Tarifingiz buni allaqachon cheklovsiz taqdim etadi.",
     "SAME_PLAN_ACTIVE": "Siz allaqachon shu tarifga obuna boʻlgansiz.",
-    "HARDWARE_OUT_OF_STOCK": "Bu mahsulot omborda mavjud emas."
+    "HARDWARE_OUT_OF_STOCK": "Bu mahsulot omborda mavjud emas.",
+    "ACCOUNT_ROLE_INVALID": "Hisobingizning roli yaroqsiz. Iltimos, qoʻllab-quvvatlash xizmati bilan bogʻlaning."
   },
   "errors": {
     "title": "Xatolik",
@@ -112,6 +113,10 @@
       "upgrade3": "Xavfsizlik yaxshilanishi",
       "needHelp": "Shoshilinch yordam kerakmi?",
       "contactSupportLink": "Qo'llab-quvvatlash bilan bog'laning"
+    },
+    "accountRoleInvalid": {
+      "title": "Hisob konfiguratsiyasi yaroqsiz",
+      "description": "Hisobingizning rol maʼlumoti yaroqsiz koʻrinmoqda. Bu odatda qoʻllab-quvvatlash xizmati amali natijasida yuzaga keladi va oʻzingiz tuzata olmaysiz. Iltimos, qoʻllab-quvvatlash xizmati bilan bogʻlaning."
     }
   },
   "troubleshooting": {

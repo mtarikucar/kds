@@ -791,6 +791,7 @@
       "kitchen": "Oshxona",
       "courier": "Kuryer"
     },
+    "unknownRole": "Noma'lum rol",
     "deleteUser": "Foydalanuvchini o'chirish",
     "actionCannotBeUndone": "Bu amalni ortga qaytarib bo'lmaydi",
     "confirmDeleteUser": "Ushbu foydalanuvchini o'chirishni xohlaysizmi",

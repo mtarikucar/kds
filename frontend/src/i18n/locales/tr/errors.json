@@ -31,7 +31,8 @@
     "ADDON_REQUIRES_PLAN": "Bu eklenti daha üst bir plan gerektiriyor.",
     "ADDON_LIMIT_REDUNDANT": "Planınız bunu zaten sınırsız olarak sağlıyor.",
     "SAME_PLAN_ACTIVE": "Bu plana zaten abonesiniz.",
-    "HARDWARE_OUT_OF_STOCK": "Bu ürün stokta yok."
+    "HARDWARE_OUT_OF_STOCK": "Bu ürün stokta yok.",
+    "ACCOUNT_ROLE_INVALID": "Hesap rolü geçersiz. Lütfen destek ekibiyle iletişime geçin."
   },
   "errors": {
     "title": "Hata",
@@ -112,6 +113,10 @@
       "upgrade3": "Güvenlik geliştirmeleri",
       "needHelp": "Acil yardıma mı ihtiyacınız var?",
       "contactSupportLink": "Destek Ekibiyle İletişime Geçin"
+    },
+    "accountRoleInvalid": {
+      "title": "Hesap Yapılandırması Geçersiz",
+      "description": "Hesabınızın rol bilgisi geçersiz görünüyor. Bu genellikle bir destek ekibi işlemi sonucu oluşur ve tarafınızca düzeltilemez. Lütfen destek ekibiyle iletişime geçin."
     }
   },
   "troubleshooting": {
