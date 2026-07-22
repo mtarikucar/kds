@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
@@ -192,6 +193,28 @@ export class BankTransferService {
       throw new BadRequestException("FREE plan için ödeme oluşturulamaz.");
     }
 
+    // Same-plan-while-ACTIVE guard (mirrors payments.service.ts's PayTR
+    // rail). `isUpgrade` below is derived from `existingSub.planId !==
+    // plan.id` — when the tenant re-selects their CURRENT plan while
+    // ACTIVE, isUpgrade is false but createIntent would otherwise still
+    // reserve a full-price PENDING SubscriptionPayment. Confirming it
+    // writes `currentPeriodStart: now`, which RESETS (not extends) the
+    // billing period — burning whatever paid days the tenant had left.
+    // Reject before any DB write. PAST_DUE is exempt: that's the
+    // legitimate "Şimdi yenile" (renew now) flow — the period already
+    // lapsed there, so there's nothing to burn.
+    const existingSub = tenant.subscriptions[0];
+    if (
+      existingSub?.status === SubscriptionStatus.ACTIVE &&
+      existingSub.planId === plan.id
+    ) {
+      throw new ConflictException({
+        code: "SAME_PLAN_ACTIVE",
+        message:
+          "Zaten bu plana abonesiniz. Aynı planı tekrar satın almak yerine faturalandırma döneminizin bitmesini bekleyin.",
+      });
+    }
+
     // Same legal gate as the PayTR flow (KVKK + Mesafeli Satış + İade).
     await this.consents.verifyAndRecord(params.acceptedDocumentIds, {
       userId: params.userId,
@@ -201,7 +224,7 @@ export class BankTransferService {
 
     // Honor any active promotional discount — the price the buyer was shown.
     const amount = resolvePlanAmount(plan, params.billingCycle);
-    const existingSub = tenant.subscriptions[0];
+    // `existingSub` declared above (same-plan-active guard).
     const isUpgrade = !!existingSub && existingSub.planId !== plan.id;
     const reference = this.generateReference();
 

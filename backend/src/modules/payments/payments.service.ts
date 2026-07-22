@@ -4,6 +4,7 @@ import {
   Logger,
   Optional,
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -201,6 +202,28 @@ export class PaymentsService {
       });
     }
 
+    // Same-plan-while-ACTIVE guard. `isUpgrade` below is derived from
+    // `existingSub.planId !== plan.id` — when the tenant re-selects their
+    // CURRENT plan while ACTIVE, isUpgrade is false but createIntent would
+    // otherwise still walk the full paid path and reserve a full-price
+    // PENDING SubscriptionPayment. On settlement that writes
+    // `currentPeriodStart: now`, which RESETS (not extends) the billing
+    // period — burning whatever paid days the tenant had left. Reject
+    // before any DB write or PayTR call. PAST_DUE is exempt: that's the
+    // legitimate "Şimdi yenile" (renew now) flow — the period already
+    // lapsed there, so there's nothing to burn.
+    const existingSub = tenant.subscriptions[0];
+    if (
+      existingSub?.status === SubscriptionStatus.ACTIVE &&
+      existingSub.planId === plan.id
+    ) {
+      throw new ConflictException({
+        code: "SAME_PLAN_ACTIVE",
+        message:
+          "Zaten bu plana abonesiniz. Aynı planı tekrar satın almak yerine faturalandırma döneminizin bitmesini bekleyin.",
+      });
+    }
+
     // Legal consent gate — three required documents (KVKK + Mesafeli
     // Satış + İade) must be checked at the checkout step. ConsentService
     // verifies the ids point to the current `isCurrent=true` rows of
@@ -247,8 +270,7 @@ export class PaymentsService {
     // paid plan they pick. (We still write `usedTrialPlanIds` for audit,
     // but reading it as the gate would let an old tenant who trialed
     // BASIC also trial PRO/BUSINESS for free, which is the bug we just
-    // closed.)
-    const existingSub = tenant.subscriptions[0];
+    // closed.) `existingSub` is declared above (same-plan-active guard).
     const isOnFreeOrNone =
       !existingSub || existingSub.plan.name === SubscriptionPlanType.FREE;
     const hasUsedAnyTrial = tenant.trialUsed === true;
