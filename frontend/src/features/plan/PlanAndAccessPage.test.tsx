@@ -5,9 +5,24 @@ import PlanAndAccessPage from './PlanAndAccessPage';
 
 // Echo i18n defaultValue (the page supplies tr-TR copy as defaultValue) so
 // rendered labels are the real strings the user sees.
+//
+// EXCEPTION: keys under the real, resolvable
+// `subscriptions:subscriptions.comparison.features.*` path (see
+// subscriptions.json — every locale wraps its content under a top-level
+// "subscriptions" key, so the namespace prefix and the JSON's own key both
+// say "subscriptions") are treated as if i18next actually resolved them,
+// returning a translated sentinel instead of falling through to
+// defaultValue. This is what a real i18next instance would do once the key
+// resolves, and it lets the Included-band test below catch a regression to
+// the wrong (single-prefix) path: a wrong path would never match this
+// regex, so the mock would silently fall back to the Turkish defaultLabel
+// for every locale again — exactly the bug this test guards against.
+const FEATURE_KEY_RE = /^subscriptions:subscriptions\.comparison\.features\.(\w+)$/;
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: any) => {
+      const resolved = FEATURE_KEY_RE.exec(key);
+      if (resolved) return `i18n-resolved:${resolved[1]}`;
       if (typeof opts?.defaultValue !== 'string') return key;
       // Mirror i18next {{var}} interpolation for the values the page passes
       // (e.g. {{date}}), so date-formatting behavior is actually exercised.
@@ -254,10 +269,34 @@ describe('PlanAndAccessPage', () => {
     renderPage();
 
     const included = screen.getByText('Planınıza dahil olanlar').closest('section')!;
-    expect(within(included).getByText('POS / Satış ekranı')).toBeInTheDocument();
-    expect(within(included).getByText('Gelişmiş raporlar')).toBeInTheDocument();
+    // Rendered via the `i18n-resolved:` sentinel (see the react-i18next mock
+    // above), which only fires for the correct, resolvable
+    // `subscriptions:subscriptions.comparison.features.<flag>` key path. If
+    // the component regresses to the wrong (single-prefix) path, these
+    // would fall through to the mock's defaultValue echo and render the
+    // Turkish defaultLabel instead — failing this assertion.
+    expect(within(included).getByText('i18n-resolved:posAccess')).toBeInTheDocument();
+    expect(within(included).getByText('i18n-resolved:advancedReports')).toBeInTheDocument();
     // customBranding is OFF for this plan → must not appear.
+    expect(within(included).queryByText('i18n-resolved:customBranding')).toBeNull();
     expect(within(included).queryByText('Özel marka')).toBeNull();
+  });
+
+  it('resolves Included-band feature labels via the correct double-prefixed subscriptions i18n key path (not the single-prefixed one)', () => {
+    planRef.value = { displayName: 'Pro', currency: 'TRY' };
+    hasFeatureRef.value = (feature: string) => feature === 'advancedReports';
+
+    renderPage();
+
+    const included = screen.getByText('Planınıza dahil olanlar').closest('section')!;
+    // Regression guard for the bug where the page called
+    // t(`subscriptions:comparison.features.${flag}`) — missing the JSON's
+    // own top-level "subscriptions" wrapper — which never resolves and
+    // silently falls back to the hardcoded Turkish defaultLabel for every
+    // locale (en/ar/ru/uz users saw Turkish). The Turkish defaultLabel must
+    // NOT be the rendered text; the resolved-key sentinel must be.
+    expect(within(included).queryByText('Gelişmiş raporlar')).toBeNull();
+    expect(within(included).getByText('i18n-resolved:advancedReports')).toBeInTheDocument();
   });
 
   it('points the quota upgrade CTA at /subscription/change-plan, not the plan page itself', () => {

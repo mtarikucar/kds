@@ -26,10 +26,13 @@ import type { PlanFeatures } from '../../types';
 
 /**
  * The 13 boolean flags on `PlanFeatures`, labeled. Reuses the labels already
- * shipped for the plan-comparison table (`subscriptions:comparison.features.*`,
- * mirrored to all 5 locales) instead of inventing a second copy — see
- * `subscriptions.json`. defaultValue below is the tr-TR text, matching this
- * page's existing convention.
+ * shipped for the plan-comparison table
+ * (`subscriptions:subscriptions.comparison.features.*` — every locale's
+ * subscriptions.json wraps its content under a top-level "subscriptions"
+ * key, so the namespace prefix and the JSON's own key both say
+ * "subscriptions", mirrored to all 5 locales) instead of inventing a second
+ * copy — see `subscriptions.json`. defaultValue below is the tr-TR text,
+ * matching this page's existing convention.
  */
 const PLAN_FEATURE_FLAGS: Array<{ flag: keyof PlanFeatures; defaultLabel: string }> = [
   { flag: 'advancedReports', defaultLabel: 'Gelişmiş raporlar' },
@@ -197,7 +200,7 @@ export default function PlanAndAccessPage() {
                     className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    {t(`subscriptions:comparison.features.${f.flag}`, {
+                    {t(`subscriptions:subscriptions.comparison.features.${f.flag}`, {
                       defaultValue: f.defaultLabel,
                     })}
                   </span>
