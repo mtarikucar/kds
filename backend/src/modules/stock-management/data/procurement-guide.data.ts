@@ -59,6 +59,7 @@ const SOURCES: GuideSource[] = [
   { id: 's1', title: 'Metro Gastro Servis', publisher: 'Metro Türkiye', url: 'https://www.metro-tr.com/gastroservis', accessedAt: '2026-07-22' },
   { id: 's2', title: 'Bizim Toptan HORECA Ürünleri (indirim örnekleri)', publisher: 'Bizim Toptan', url: 'https://www.bizimtoptan.com.tr/horeca-urunleri', accessedAt: '2026-07-22' },
   { id: 's3', title: 'Sebze ve Meyve Ticareti — Sıkça Sorulan Sorular', publisher: 'T.C. Ticaret Bakanlığı', url: 'https://ticaret.gov.tr/ic-ticaret/sikca-sorulan-sorular/sebze-ve-meyve-ticareti', accessedAt: '2026-07-22' },
+  { id: 's12', title: 'TÜİK TÜFE Haziran 2026 — gıda ve alkolsüz içecek yıllık %35,45 artış', publisher: 'TÜİK (alomaliye.com aktarımı)', url: 'https://www.alomaliye.com/2026/07/03/enflasyon-rakamlari-tufe-haziran-2026/', accessedAt: '2026-07-22' },
   { id: 's7', title: 'Tespo İçecek Kategorisi (kademeli/nakit indirim)', publisher: 'Tespo', url: 'https://eticaret.tespo.com.tr/c/icecek', accessedAt: '2026-07-22' },
   { id: 's17', title: 'Metro Türkiye — Sıkça Sorulan Sorular (vergi mükellefi %1 KDV)', publisher: 'Metro Türkiye', url: 'https://www.metro-tr.com/hakkimizda/sss', accessedAt: '2026-07-22' },
   { id: 's18', title: 'Toptancı Hali Yönetmeliği — hal rüsumu oranları (%1/%2)', publisher: 'Mevzuat.gov.tr', url: 'https://mevzuat.gov.tr/MevzuatMetin/yonetmelik/7.5.16340.pdf', accessedAt: '2026-07-22' },
@@ -97,7 +98,7 @@ export const PROCUREMENT_GUIDE: ProcurementGuide = {
       channels: [
         { channelKey: 'LOCAL_BUTCHER_WHOLESALER', rankForTier: { SMALL_CAFE: 1, MID_RESTAURANT: 2, MULTI_BRANCH: 2 }, ...noteKeys('LOCAL_BUTCHER_WHOLESALER'), sourceIds: ['s29', 's30', 's31', 's36'] },
         { channelKey: 'CASH_CARRY', rankForTier: { SMALL_CAFE: 2, MID_RESTAURANT: 0, MULTI_BRANCH: 0 }, ...noteKeys('CASH_CARRY'), sourceIds: ['s2', 's7', 's61'] },
-        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s29', 's31', 's35', 's36', 's43b', 's61'] },
+        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s12', 's29', 's31', 's35', 's36', 's43', 's43b', 's61'] },
       ],
       ruleKeys: ['guide.rule.MEAT.1', 'guide.rule.MEAT.2', 'guide.rule.MEAT.3'],
     },
@@ -121,7 +122,7 @@ export const PROCUREMENT_GUIDE: ProcurementGuide = {
       channels: [
         { channelKey: 'CASH_CARRY', rankForTier: { SMALL_CAFE: 1, MID_RESTAURANT: 1, MULTI_BRANCH: 0 }, ...noteKeys('CASH_CARRY'), sourceIds: ['s1', 's2', 's7', 's17', 's61'] },
         { channelKey: 'ONLINE_B2B', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 2, MULTI_BRANCH: 2 }, ...noteKeys('ONLINE_B2B'), sourceIds: ['s40', 's41', 's43', 's61'] },
-        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 0, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s43b', 's61'] },
+        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 0, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s12', 's43', 's43b', 's61'] },
       ],
       ruleKeys: ['guide.rule.DRY_GOODS.1', 'guide.rule.DRY_GOODS.2', 'guide.rule.DRY_GOODS.3'],
     },
@@ -132,7 +133,7 @@ export const PROCUREMENT_GUIDE: ProcurementGuide = {
       recommendationKeyByTier: recKeys('DAIRY'),
       channels: [
         { channelKey: 'CASH_CARRY', rankForTier: { SMALL_CAFE: 1, MID_RESTAURANT: 0, MULTI_BRANCH: 0 }, ...noteKeys('CASH_CARRY'), sourceIds: ['s2', 's61'] },
-        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 2, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s31', 's36', 's61'] },
+        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 2, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s12', 's31', 's36', 's43', 's61'] },
       ],
       ruleKeys: ['guide.rule.DAIRY.1', 'guide.rule.DAIRY.2', 'guide.rule.DAIRY.3'],
     },
@@ -144,7 +145,7 @@ export const PROCUREMENT_GUIDE: ProcurementGuide = {
       recommendationKeyByTier: recKeys('BEVERAGE'),
       channels: [
         { channelKey: 'CASH_CARRY', rankForTier: { SMALL_CAFE: 1, MID_RESTAURANT: 2, MULTI_BRANCH: 0 }, ...noteKeys('CASH_CARRY'), sourceIds: ['s1', 's2', 's7', 's17', 's61'] },
-        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s58', 's61'] },
+        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s12', 's43', 's58', 's61'] },
       ],
       ruleKeys: ['guide.rule.BEVERAGE.1', 'guide.rule.BEVERAGE.2', 'guide.rule.BEVERAGE.3'],
     },
@@ -156,7 +157,7 @@ export const PROCUREMENT_GUIDE: ProcurementGuide = {
       recommendationKeyByTier: recKeys('PACKAGING'),
       channels: [
         { channelKey: 'CASH_CARRY', rankForTier: { SMALL_CAFE: 1, MID_RESTAURANT: 0, MULTI_BRANCH: 0 }, ...noteKeys('CASH_CARRY'), sourceIds: ['s2', 's61'] },
-        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s51', 's52', 's55', 's61'] },
+        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s12', 's43', 's51', 's52', 's55', 's61'] },
         { channelKey: 'ONLINE_B2B', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 2, MULTI_BRANCH: 0 }, ...noteKeys('ONLINE_B2B'), sourceIds: ['s38', 's41', 's61'] },
       ],
       ruleKeys: ['guide.rule.PACKAGING.1', 'guide.rule.PACKAGING.2', 'guide.rule.PACKAGING.3'],
@@ -168,7 +169,7 @@ export const PROCUREMENT_GUIDE: ProcurementGuide = {
       recommendationKeyByTier: recKeys('CLEANING'),
       channels: [
         { channelKey: 'CASH_CARRY', rankForTier: { SMALL_CAFE: 1, MID_RESTAURANT: 0, MULTI_BRANCH: 0 }, ...noteKeys('CASH_CARRY'), sourceIds: ['s2', 's61'] },
-        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s51', 's46', 's61'] },
+        { channelKey: 'DISTRIBUTOR', rankForTier: { SMALL_CAFE: 0, MID_RESTAURANT: 1, MULTI_BRANCH: 1 }, ...noteKeys('DISTRIBUTOR'), sourceIds: ['s12', 's43', 's46', 's51', 's61'] },
       ],
       ruleKeys: ['guide.rule.CLEANING.1', 'guide.rule.CLEANING.2', 'guide.rule.CLEANING.3'],
     },

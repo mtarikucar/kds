@@ -457,8 +457,8 @@
       },
       "DISTRIBUTOR": {
         "advantage": "Contracted/framework agreements give price predictability; multi-branch uses a hybrid central+branch-local model.",
-        "minOrder": "Requires a corporate account/contract process; some channels have a high minimum order (e.g. 10,000 TRY).",
-        "payment": "Deferred payment/framework agreements are common; recommended for high-volume/multi-branch operations.",
+        "minOrder": "Minimum order varies by supplier; many distributors offer flexible options for small businesses.",
+        "payment": "Contracted/framework buying gives price predictability; payment terms are negotiated with the supplier.",
         "eInvoice": "Corporate distributors are e-Invoice registered; confirm via a GİB lookup."
       }
     },
