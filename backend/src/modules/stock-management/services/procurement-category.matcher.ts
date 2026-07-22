@@ -16,7 +16,7 @@ const fold = (s: string): string =>
 
 // Keyword lists are conservative; extend with the research report in Phase 3.
 const KEYWORDS: Record<GuideCategory, string[]> = {
-  MEAT: ['kiyma', 'dana', 'kuzu', 'et', 'tavuk', 'but', 'kanat', 'gogus', 'antrikot', 'biftek', 'sucuk', 'sosis', 'pastirma', 'balik', 'somon', 'levrek', 'cipura', 'hamsi', 'ton'],
+  MEAT: ['kiyma', 'dana', 'kuzu', 'et', 'tavuk', 'but', 'kanat', 'gogus', 'antrikot', 'biftek', 'sucuk', 'sosis', 'pastirma', 'balik', 'somon', 'levrek', 'cipura', 'hamsi'],
   PRODUCE: ['domates', 'salatalik', 'biber', 'sogan', 'sarimsak', 'patates', 'marul', 'maydanoz', 'limon', 'elma', 'muz', 'portakal', 'yesillik', 'sebze', 'meyve', 'patlican', 'kabak', 'havuc'],
   DRY_GOODS: ['pirinc', 'bulgur', 'mercimek', 'nohut', 'fasulye', 'makarna', 'un', 'seker', 'tuz', 'salca', 'yag', 'zeytinyagi', 'baharat', 'bakliyat', 'kuru'],
   DAIRY: ['sut', 'peynir', 'yogurt', 'kaymak', 'tereyag', 'krema', 'ayran', 'yumurta', 'kasar', 'labne'],
