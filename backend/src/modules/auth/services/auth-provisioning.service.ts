@@ -132,6 +132,7 @@ export class AuthProvisioningService {
     personnelManagement?: boolean | null;
     deliveryIntegration?: boolean | null;
     posAccess?: boolean | null;
+    aiContentGeneration?: boolean | null;
   }): Record<string, boolean> {
     return Object.fromEntries(
       Object.entries({
@@ -147,6 +148,10 @@ export class AuthProvisioningService {
         personnelManagement: !!businessPlan.personnelManagement,
         deliveryIntegration: !!businessPlan.deliveryIntegration,
         posAccess: !!businessPlan.posAccess,
+        // Drift fix: aiContentGeneration was missing from this mirror (kept
+        // in lockstep with TenantProvisioningService's featureOverrides
+        // seed, fixed the same way — see plan-mapper-parity.spec.ts).
+        aiContentGeneration: !!businessPlan.aiContentGeneration,
       }).filter(([, v]) => v),
     );
   }

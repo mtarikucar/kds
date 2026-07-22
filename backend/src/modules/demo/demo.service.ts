@@ -52,6 +52,12 @@ export class DemoService {
     personnelManagement: true,
     deliveryIntegration: true,
     posAccess: true,
+    // Drift fix: aiContentGeneration was missing from this mirror, and the
+    // DEMO plan's AI limits were left at the schema default (0) — a demo
+    // visitor could never open the AI menu studio, contradicting "every
+    // screen reachable in the demo". Fixed alongside the AI limits below
+    // (see plan-mapper-parity.spec.ts for the drift-class tripwire).
+    aiContentGeneration: true,
   };
 
   constructor(private readonly prisma: PrismaService) {}
@@ -98,6 +104,13 @@ export class DemoService {
         maxProducts: 9999,
         maxCategories: 999,
         maxMonthlyOrders: 999999,
+        // Discoverable AI menu-studio quota (BUSINESS-tier values) so the
+        // demo tenant can actually open the AI menu studio — pre-fix these
+        // were left at the schema default (0), silently disabling the
+        // feature ALL_FEATURES.aiContentGeneration claims to grant.
+        maxMonthlyAiPhotos: 200,
+        maxMonthlyAiVideos: 20,
+        maxMonthlyAi3dModels: 30,
         ...DemoService.ALL_FEATURES,
       },
     });

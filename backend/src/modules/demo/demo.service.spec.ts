@@ -97,6 +97,13 @@ describe('DemoService', () => {
     const planArgs = (prisma.subscriptionPlan.upsert as jest.Mock).mock.calls[0][0];
     expect(planArgs.create.isActive).toBe(false);
     expect(planArgs.create.isPublic).toBe(false);
+    // Drift fix (DRIFT-4): aiContentGeneration must be granted AND the AI
+    // quota must be discoverable (non-zero) — pre-fix the flag was true but
+    // the schema-default 0 quota silently blocked the AI menu studio.
+    expect(planArgs.create.aiContentGeneration).toBe(true);
+    expect(planArgs.create.maxMonthlyAiPhotos).toBeGreaterThan(0);
+    expect(planArgs.create.maxMonthlyAiVideos).toBeGreaterThan(0);
+    expect(planArgs.create.maxMonthlyAi3dModels).toBeGreaterThan(0);
     // Idempotent: tenant/branch/admin go through upsert on their unique keys so
     // a pre-existing/partial demo never collides on the subdomain.
     const tenantArgs = (prisma.tenant.upsert as jest.Mock).mock.calls[0][0];
