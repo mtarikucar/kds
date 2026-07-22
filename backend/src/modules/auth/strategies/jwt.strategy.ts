@@ -3,6 +3,8 @@ import { PassportStrategy } from "@nestjs/passport";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { isValidUserRole } from "../../../common/constants/roles.enum";
+import { ErrorCode } from "../../../common/interfaces/error-response.interface";
 
 export interface JwtPayload {
   sub: string;
@@ -73,6 +75,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (user.tenant?.status !== "ACTIVE") {
       throw new UnauthorizedException("Your restaurant account is not active");
+    }
+
+    // Structural role guard (v3.2.x incident). Every application write path
+    // validates role with @IsEnum(UserRole), so this can only trip for a row
+    // planted directly in Postgres (raw DB / Prisma Studio) bypassing that
+    // validation — the DB CHECK constraint (`users_role_valid`) blocks new
+    // writes but a legacy bad row can still exist. Fail loud here instead of
+    // letting a garbage role silently 403 every downstream RolesGuard check
+    // with no diagnostic. Fixed via PATCH /superadmin/users/:id/role.
+    if (!isValidUserRole(user.role)) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: "Account Role Invalid",
+        errorCode: ErrorCode.ACCOUNT_ROLE_INVALID,
+        message: "Account role is invalid — contact support",
+      });
     }
 
     // Token revocation check. Tokens issued before the current tokenVersion

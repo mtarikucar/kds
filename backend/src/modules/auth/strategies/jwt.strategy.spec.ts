@@ -133,6 +133,65 @@ describe('JwtStrategy', () => {
       );
     });
 
+    /**
+     * v3.2.x incident hardening — a support engineer wrote an invalid role
+     * string ("OWNER") directly into Postgres (raw DB / Prisma Studio),
+     * bypassing every application write path's @IsEnum(UserRole)
+     * validation. validate() must reject that account loudly with
+     * ACCOUNT_ROLE_INVALID instead of letting it through to a silent 403
+     * storm downstream.
+     */
+    it('throws UnauthorizedException with errorCode ACCOUNT_ROLE_INVALID for a structurally-invalid role', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: 'OWNER',
+        tenantId: mockUser.tenantId,
+      };
+
+      const fullUser = {
+        ...mockUser,
+        role: 'OWNER',
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      await expect(strategy.validate(payload)).rejects.toMatchObject({
+        response: expect.objectContaining({
+          errorCode: 'ACCOUNT_ROLE_INVALID',
+        }),
+      });
+    });
+
+    it('resolves normally for a valid ADMIN role', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: 'ADMIN',
+        tenantId: mockUser.tenantId,
+      };
+
+      const fullUser = {
+        ...mockUser,
+        role: 'ADMIN',
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+      expect(result).toMatchObject({ role: 'ADMIN' });
+    });
+
     it('should return user data when found (email verification checked in auth flow)', async () => {
       const payload = {
         sub: mockUser.id,

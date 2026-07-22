@@ -32,3 +32,16 @@ export const HARD_RESTRICTED_ROLES: readonly UserRole[] = [
 export function isHardRestrictedRole(role: string): boolean {
   return (HARD_RESTRICTED_ROLES as readonly string[]).includes(role);
 }
+
+/**
+ * v3.2.x incident hardening — a support engineer once wrote an invalid
+ * role string ("OWNER") directly into Postgres (raw DB / Prisma Studio),
+ * bypassing every application write path's `@IsEnum(UserRole)` validation.
+ * The DB column itself has no value constraint (see the
+ * `users_role_valid` CHECK constraint migration), so JwtStrategy.validate
+ * uses this to fail loudly at auth time instead of the account silently
+ * producing a 403 storm with no diagnostic anywhere.
+ */
+export function isValidUserRole(role: string): role is UserRole {
+  return (Object.values(UserRole) as string[]).includes(role);
+}

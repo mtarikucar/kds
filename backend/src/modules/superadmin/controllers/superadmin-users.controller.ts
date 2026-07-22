@@ -11,6 +11,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { IsBoolean } from "class-validator";
 import { SuperAdminUsersService } from "../services/superadmin-users.service";
 import { UserFilterDto, UserActivityFilterDto } from "../dto/user-filter.dto";
+import { UpdateUserRoleDto } from "../dto/update-user-role.dto";
 import { SuperAdminGuard } from "../guards/superadmin.guard";
 import { SuperAdminRoute } from "../decorators/superadmin.decorator";
 import { CurrentSuperAdmin } from "../decorators/current-superadmin.decorator";
@@ -64,5 +65,21 @@ export class SuperAdminUsersController {
       actorId,
       actorEmail,
     );
+  }
+
+  @Patch(":id/role")
+  @ApiOperation({
+    summary:
+      "Correct a user's role. Safe replacement for raw-DB / Prisma Studio " +
+      "edits — @IsEnum(UserRole) on the DTO makes an invalid role a 400, " +
+      "never a DB write. Refuses to demote a tenant's last active ADMIN.",
+  })
+  async updateRole(
+    @Param("id") id: string,
+    @Body() dto: UpdateUserRoleDto,
+    @CurrentSuperAdmin("id") actorId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
+  ) {
+    return this.usersService.updateRole(id, dto.role, actorId, actorEmail);
   }
 }
