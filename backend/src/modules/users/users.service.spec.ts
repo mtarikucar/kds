@@ -66,9 +66,28 @@ describe('UsersService.findAll filters (iter-74)', () => {
   });
 
   it('accepts every status in the allowlist', async () => {
-    for (const s of ['ACTIVE', 'INACTIVE', 'PENDING', 'REJECTED', 'SUSPENDED']) {
+    for (const s of ['ACTIVE', 'INACTIVE', 'PENDING_APPROVAL', 'REJECTED']) {
       await expect(svc.findAll('t1', { status: s })).resolves.toBeDefined();
     }
+  });
+
+  // v3.2.x regression: USER_STATUS_ALLOW used to contain the typo'd
+  // "PENDING" (the real value ever written to User.status is
+  // "PENDING_APPROVAL") and the bogus "SUSPENDED" (never written to
+  // User.status — that's a Tenant.status value). Both now correctly 400.
+  it('accepts the real PENDING_APPROVAL value and rejects the old PENDING typo', async () => {
+    await expect(
+      svc.findAll('t1', { status: 'PENDING_APPROVAL' }),
+    ).resolves.toBeDefined();
+    await expect(svc.findAll('t1', { status: 'PENDING' })).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('rejects SUSPENDED (a Tenant.status value, never written to User.status)', async () => {
+    await expect(svc.findAll('t1', { status: 'SUSPENDED' })).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejects role outside the UserRole enum', async () => {
