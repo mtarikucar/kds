@@ -187,12 +187,16 @@ export class GuidanceService {
   }
 
   // Base-unit price = unitPrice / (conversionFactor ?? 1) — mirrors the receive
-  // path (purchase-orders.service.ts: baseUnitPrice = unitPrice.div(factor)),
-  // so a "10kg box @4500" line and a "1kg @470" line compare on the same footing.
+  // path (purchase-orders.service.ts: baseUnitPrice = unitPrice.div(factor),
+  // where null-or-<=0 factor falls back to 1). A stored conversionFactor <= 0
+  // (including negative, e.g. corrupt data) must NOT be divided into the
+  // price: unitPrice / -5 flips the sign and makes the line look like the
+  // cheapest possible source, inverting supplier ranking.
   private baseUnitPrice(line: any): number {
-    const factor =
-      line.conversionFactor != null ? Number(line.conversionFactor) : 1;
-    return Number(line.unitPrice) / (factor || 1);
+    const raw =
+      line.conversionFactor != null ? Number(line.conversionFactor) : NaN;
+    const factor = Number.isFinite(raw) && raw > 0 ? raw : 1;
+    return Number(line.unitPrice) / factor;
   }
 
   private sourcesForItem(

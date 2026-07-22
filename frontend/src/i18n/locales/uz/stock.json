@@ -427,7 +427,7 @@
     "note": {
       "CASH_CARRY": {
         "advantage": "Bir joydan keng assortiment, muntazam faktura; chegirmalar bir xonali (~3-7%).",
-        "minOrder": "Yakka tartibdagi a'zolik mumkin; yetkazib berishda odatda 1500-2500 ₺ minimal savat + logistika to'lovi kerak.",
+        "minOrder": "Yakka tartibdagi a'zolik odatda mumkin; minimal savat miqdori va logistika to'lovi yetkazib beruvchiga qarab keskin farq qiladi — buyurtmadan oldin aniqlashtiring.",
         "payment": "Sodiqlik ballari (masalan Bizim Kart); muddatli to'lov/bo'lib to'lash afzalligi da'vo qilinmaydi.",
         "eInvoice": "Yetkazib beruvchining e-Faktura ro'yxatidaligini GİB orqali tekshirib QQSni chegirmaga olishni ta'minlang."
       },
@@ -466,11 +466,11 @@
       "MEAT": {
         "1": "Sovuq zanjirni saqlang: xom go'sht/parranda 0…+4°C, baliq 0…+2°C, muzlatilgan -18°C.",
         "2": "Yetkazib beruvchida rasmiy tasdiqlash/ro'yxatga olish hujjati va ISO 22000 sertifikati bo'lishini talab qiling.",
-        "3": "Yuqori hajmda narx taklifi + yetkazib beruvchi baholash kartasidan foydalaning; so'yish shoxobchalarida kuzatuvchanlik 2027-yilda kamerali nazorat bilan majburiy bo'ladi."
+        "3": "Yuqori hajmda narx taklifi va yetkazib beruvchi baholash kartasidan foydalaning; go'sht yetkazib berishda so'yish shoxobchasi/korxona tasdiqnomasi va kuzatuvchanlik hujjatlarini so'rang, amaldagi qonunchilikni tekshiring."
       },
       "PRODUCE": {
         "1": "Bozor boji ulgurji bozor ichida 1%, tashqarisida 2%; uni xaridor to'laydi.",
-        "2": "Ishlab chiqaruvchidan to'g'ridan-to'g'ri xarid Bozor Ro'yxatga Olish Tizimida bildiruvchi sifatida ro'yxatdan o'tishni talab qiladi; ro'yxatga olinmagan savdoda 25% jarima boji qo'llanadi.",
+        "2": "Ishlab chiqaruvchidan to'g'ridan-to'g'ri xarid Bozor Ro'yxatga Olish Tizimida bildiruvchi sifatida ro'yxatdan o'tishni talab qiladi; bozordan tashqari yoki ro'yxatga olinmagan savdoda boj yoki jarima xavfi bo'lishi mumkin — joriy stavka va majburiyatni shahar hokimiyati/bozor boshqarmasidan aniqlashtiring.",
         "3": "Ishlab chiqaruvchilar tashkiloti/kooperativi kanali bojdan ozod va yuqori hajmda vositachi ulushini kamaytiradi."
       },
       "DRY_GOODS": {
@@ -489,7 +489,7 @@
         "3": "Brend distribyutori bilan doiraviy shartnoma yuqori hajmda narx barqarorligini beradi."
       },
       "PACKAGING": {
-        "1": "Ko'p miqdorda xarid birlik narxini 20-40% pasaytirishi mumkin; qog'oz gigiena mahsulotlarida tejash 30% gacha yetadi.",
+        "1": "Ko'p miqdorda xarid odatda birlik narxini pasaytiradi; bir nechta yetkazib beruvchidan takliflarni solishtiring.",
         "2": "Uzoq saqlanish muddati tufayli oyiga 1-2 buyurtma yetarli; yuqori zaxira buferi saqlanishi mumkin.",
         "3": "Oziq-ovqat bilan aloqa qiladigan qadoqlashda oziq-ovqat xavfsizligi sertifikatini talab qiling va oziq-ovqatdan alohida saqlang."
       },

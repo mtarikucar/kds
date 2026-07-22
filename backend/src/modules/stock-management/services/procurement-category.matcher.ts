@@ -147,9 +147,11 @@ const ORDER: GuideCategory[] = [
 
 // Flatten to (keyword, category) pairs, longest keyword first so a specific
 // term (tereyag, "meyve suyu") beats a shorter substring of it (yag, meyve)
-// from another category; equal-length ties break by category ORDER. Substring
-// (not word-boundary) matching is required because Turkish suffixes attach to
-// the stem (tereyagi, sucuklu) — longest-first resolves the collisions.
+// from another category; equal-length ties break by category ORDER.
+// Substring-within-token matching (see scan() below) is required for
+// keywords >=4 chars because Turkish suffixes attach to the stem (tereyagi,
+// sucuklu) — longest-first resolves the collisions. Keywords <=3 chars are
+// word-boundary (whole-token) only; see scan().
 const RANKED: Array<{ kw: string; cat: GuideCategory }> = ORDER.flatMap((cat) =>
   KEYWORDS[cat].map((kw) => ({ kw, cat })),
 ).sort(
@@ -157,10 +159,28 @@ const RANKED: Array<{ kw: string; cat: GuideCategory }> = ORDER.flatMap((cat) =>
     b.kw.length - a.kw.length || ORDER.indexOf(a.cat) - ORDER.indexOf(b.cat),
 );
 
+// Short keywords (<=3 chars, e.g. "et", "su", "un") are only matched as a
+// WHOLE token: raw substring matching lets them fire inside unrelated words
+// ("Peçete" -> "pecete" contains "et"; "Sünger" -> "sunger" contains "un"),
+// mislabeling universal items like napkins as MEAT. Longer keywords (>=4
+// chars) keep substring-within-token matching, since Turkish suffixes attach
+// directly to the stem with no separator (tereyagi, sucuklu, kiymali).
+// Keywords with an embedded space (multi-word, e.g. "meyve suyu") are matched
+// as a raw substring against the whole folded string, since tokenizing would
+// split them apart.
+const tokenize = (f: string): string[] => f.match(/[a-z]+/g) ?? [];
+
 const scan = (text: string): GuideCategory | null => {
   const f = fold(text);
+  const tokens = tokenize(f);
   for (const { kw, cat } of RANKED) {
-    if (f.includes(kw)) return cat;
+    if (kw.includes(" ")) {
+      if (f.includes(kw)) return cat;
+    } else if (kw.length <= 3) {
+      if (tokens.includes(kw)) return cat;
+    } else if (tokens.some((t) => t.includes(kw))) {
+      return cat;
+    }
   }
   return null;
 };

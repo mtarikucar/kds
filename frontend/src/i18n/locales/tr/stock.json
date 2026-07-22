@@ -427,7 +427,7 @@
     "note": {
       "CASH_CARRY": {
         "advantage": "Tek noktadan geniş sortiman, düzenli fatura; indirim tek haneli (~%3-7).",
-        "minOrder": "Bireysel üyelik mümkün; teslimatta genelde 1.500-2.500 ₺ asgari sepet + lojistik bedeli.",
+        "minOrder": "Bireysel üyelik mümkün; asgari sepet tutarı ve lojistik bedeli tedarikçiye göre büyük ölçüde değişir, sipariş öncesi teyit edin.",
         "payment": "Sadakat puanı (ör. Bizim Kart); vade/taksit avantajı iddia edilmez.",
         "eInvoice": "Tedarikçinin e-Fatura mükellefiyetini GİB'den sorgulayıp KDV indirimini güvenceye alın."
       },
@@ -466,11 +466,11 @@
       "MEAT": {
         "1": "Soğuk zinciri koruyun: çiğ et/tavuk 0…+4°C, balık 0…+2°C, donuk -18°C.",
         "2": "Tedarikçinin resmi onay/kayıt belgesi ve ISO 22000 sertifikası olsun.",
-        "3": "Yüksek hacimde fiyat teklifi + tedarikçi karnesi kullanın; kesimhane izlenebilirliği 2027'de kamerayla zorunlu olacak."
+        "3": "Yüksek hacimde fiyat teklifi + tedarikçi karnesi kullanın; et tedarikinde kesimhane/işletme onayı ve izlenebilirlik belgelerini isteyin, güncel mevzuatı teyit edin."
       },
       "PRODUCE": {
         "1": "Hal rüsumu hal içinde %1, dışında %2'dir; malı satın alan öder.",
-        "2": "Doğrudan üreticiden alım Hal Kayıt Sistemi'ne bildirimci kaydı ister; bildirimsizde cezalı rüsum %25'tir.",
+        "2": "Doğrudan üreticiden alım Hal Kayıt Sistemi'ne bildirimci kaydı ister; hal dışı/bildirimsiz alımlarda rüsum veya ceza riski olabilir, güncel oran ve yükümlülüğü belediye/hal müdürlüğünden teyit edin.",
         "3": "Üretici örgütü/kooperatif kanalı rüsumdan muaftır ve yüksek hacimde aracı payını azaltır."
       },
       "DRY_GOODS": {
@@ -489,7 +489,7 @@
         "3": "Marka distribütörüyle çerçeve anlaşma yüksek hacimde fiyat istikrarı sağlar."
       },
       "PACKAGING": {
-        "1": "Toplu alımda birim fiyat %20-40 düşebilir; kağıt hijyende tasarruf %30'a varır.",
+        "1": "Toplu alımda birim fiyat genelde düşer; tekliflerinizi birkaç tedarikçiden karşılaştırın.",
         "2": "Uzun raf ömrü nedeniyle ayda 1-2 sipariş yeterlidir; yüksek stok tamponu tutulabilir.",
         "3": "Gıdayla temas eden ambalajda gıda-güvenliği belgesi isteyin; gıdadan ayrı depolayın."
       },

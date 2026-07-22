@@ -427,7 +427,7 @@
     "note": {
       "CASH_CARRY": {
         "advantage": "Wide range in one stop, orderly invoicing; discounts are single-digit (~3-7%).",
-        "minOrder": "Individual membership possible; delivery usually needs a 1,500-2,500 TRY minimum basket + logistics fee.",
+        "minOrder": "Individual membership is usually possible; minimum basket size and logistics fees vary widely by supplier — confirm before ordering.",
         "payment": "Loyalty points (e.g. Bizim Kart); no deferred-payment/installment advantage is claimed.",
         "eInvoice": "Check the supplier's e-Invoice registration via GİB to secure the input-VAT deduction."
       },
@@ -466,11 +466,11 @@
       "MEAT": {
         "1": "Keep the cold chain: raw meat/poultry 0…+4°C, fish 0…+2°C, frozen -18°C.",
         "2": "Require the supplier's official approval/registration and ISO 22000 certification.",
-        "3": "At high volume, use price quotes plus a supplier scorecard; slaughterhouse traceability becomes camera-mandatory in 2027."
+        "3": "At high volume, use price quotes plus a supplier scorecard; for meat sourcing, ask for slaughterhouse/facility approval and traceability documentation, and confirm current regulations."
       },
       "PRODUCE": {
         "1": "The market levy is 1% inside the wholesale market, 2% outside; the buyer pays it.",
-        "2": "Buying directly from a producer requires notifier registration in the Market Registry; unregistered trading draws a 25% penalty levy.",
+        "2": "Buying directly from a producer requires notifier registration in the Market Registry; unregistered or off-market trading can carry a levy or penalty risk — confirm the current rate and obligation with the municipality/market authority.",
         "3": "The producer-organization/co-op channel is levy-exempt and cuts middleman margin at high volume."
       },
       "DRY_GOODS": {
@@ -489,7 +489,7 @@
         "3": "A framework agreement with a brand distributor gives price stability at high volume."
       },
       "PACKAGING": {
-        "1": "Bulk buying can cut unit price 20-40%; paper hygiene items can save up to 30%.",
+        "1": "Buying in bulk typically lowers the unit price; compare quotes from a few suppliers.",
         "2": "Long shelf life means 1-2 orders a month is enough; a large stock buffer is fine.",
         "3": "For packaging touching food, require a food-safety certificate and store it separately from food."
       },
