@@ -52,6 +52,12 @@ export class DemoService {
     personnelManagement: true,
     deliveryIntegration: true,
     posAccess: true,
+    // Drift fix: aiContentGeneration was missing from this mirror, and the
+    // DEMO plan's AI limits were left at the schema default (0) — a demo
+    // visitor could never open the AI menu studio, contradicting "every
+    // screen reachable in the demo". Fixed alongside the AI limits below
+    // (see plan-mapper-parity.spec.ts for the drift-class tripwire).
+    aiContentGeneration: true,
   };
 
   constructor(private readonly prisma: PrismaService) {}
@@ -95,9 +101,27 @@ export class DemoService {
         trialDays: 0,
         maxUsers: 999,
         maxTables: 999,
+        // Drift fix: maxBranches was missing from this create block, so it
+        // silently fell through to the Prisma schema default (1) — even
+        // though ALL_FEATURES.multiLocation is true and BranchesController
+        // gates branch creation on BOTH the MULTI_LOCATION feature AND the
+        // maxBranches limit (@CheckLimit(BRANCHES)). A demo visitor with the
+        // "add another branch" feature visibly on would hit the cap on the
+        // very first attempt (the seeded Main branch already consumes the
+        // only slot). Matches BUSINESS-tier's unlimited value (prisma/seed.ts)
+        // — same "generous top-tier-equivalent" pattern as every other limit
+        // here (see plan-mapper-parity.spec.ts for the drift-class tripwire).
+        maxBranches: -1,
         maxProducts: 9999,
         maxCategories: 999,
         maxMonthlyOrders: 999999,
+        // Discoverable AI menu-studio quota (BUSINESS-tier values) so the
+        // demo tenant can actually open the AI menu studio — pre-fix these
+        // were left at the schema default (0), silently disabling the
+        // feature ALL_FEATURES.aiContentGeneration claims to grant.
+        maxMonthlyAiPhotos: 200,
+        maxMonthlyAiVideos: 20,
+        maxMonthlyAi3dModels: 30,
         ...DemoService.ALL_FEATURES,
       },
     });

@@ -21,6 +21,7 @@ import {
 } from "../../../common/constants/subscription.enum";
 import { isUnlimited } from "../../../common/constants/subscription-plans.const";
 import { EntitlementService } from "../../entitlements/entitlement.service";
+import { INTEGRATION_COVERED_BY_FEATURE } from "../../entitlements/integration-coverage";
 
 @Injectable()
 export class PlanFeatureGuard implements CanActivate {
@@ -197,11 +198,28 @@ export class PlanFeatureGuard implements CanActivate {
     // `integration_yemeksepeti`, the engine grants
     // `integration.delivery: ['yemeksepeti']`; the gate
     // `@RequiresIntegration('delivery')` then passes.
+    //
+    // DEF-3: that vendor-list check alone misses a tenant whose PLAN
+    // already includes the domain — PlanProjectorService only ever
+    // projects `feature.<name>` for plan-sourced access, never
+    // `integration.<domain>` (see plan-projector.service.ts's
+    // FEATURE_COLUMNS loop), so a plan-delivery tenant had
+    // integrations['integration.delivery'] permanently empty and every
+    // `@RequiresIntegration('delivery')` route 403'd despite the plan
+    // covering it. INTEGRATION_COVERED_BY_FEATURE cross-checks the
+    // covering plan feature (delivery only — fiscal/caller have no
+    // covering feature and stay purely vendor-list based) as a second,
+    // OR'd way to pass.
     if (requiredIntegrations && requiredIntegrations.length > 0) {
       const set = await loadEngineSet();
       for (const domain of requiredIntegrations) {
         const vendors = set.integrations[`integration.${domain}`];
-        if (!Array.isArray(vendors) || vendors.length === 0) {
+        const hasVendorGrant = Array.isArray(vendors) && vendors.length > 0;
+        const coveringFeature = INTEGRATION_COVERED_BY_FEATURE[domain];
+        const hasCoveringFeature =
+          coveringFeature != null &&
+          set.features[`feature.${coveringFeature}`] === true;
+        if (!hasVendorGrant && !hasCoveringFeature) {
           throw new ForbiddenException(
             `No active ${domain} integration. Buy one from the marketplace to unlock this feature.`,
           );
@@ -252,16 +270,32 @@ export class PlanFeatureGuard implements CanActivate {
       // semantics and add-on SUM, so the legacy override-then-plan
       // fallback would just re-do work the engine has finished.
       limit = engineLimit;
-    } else {
-      // Engine empty for this key — fall back to plan-only. Same
-      // safety-net as PlanFeatureGuard.canActivate's feature branch.
-      limit =
-        limitOverrides?.[limitType] !== undefined
-          ? limitOverrides[limitType]
-          : plan[limitType];
+    } else if (limitOverrides?.[limitType] !== undefined) {
+      limit = limitOverrides[limitType];
       this.logger.debug(
         `PlanFeatureGuard.checkLimit fell back to plan-only for tenant=${tenantId} limit=${limitType}`,
       );
+    } else if (typeof plan[limitType] === "number") {
+      // Engine empty for this key — fall back to plan-only. Same
+      // safety-net as PlanFeatureGuard.canActivate's feature branch.
+      limit = plan[limitType];
+      this.logger.debug(
+        `PlanFeatureGuard.checkLimit fell back to plan-only for tenant=${tenantId} limit=${limitType}`,
+      );
+    } else {
+      // KDS_SCREENS/TABLETS have no SubscriptionPlan column at all
+      // (100% add-on-sourced — see the LimitType enum doc): every OTHER
+      // LimitType always has a real numeric plan column, so this branch
+      // is unreachable for them. For these two, "no add-on purchased
+      // yet and no admin override" means there is nothing to cap
+      // against, not "cap at zero" — an unprovisioned device slot costs
+      // the platform nothing, unlike MenuAiQuotaService's per-generation
+      // quotas (real vendor charge per unit → deny-by-default is
+      // correct there, not here). Enforcement activates the moment the
+      // engine or an override produces a real number above. DeviceService.
+      // enforceDeviceCapacity encodes this identical rule for the actual
+      // production enforcement path (see that file).
+      return;
     }
 
     // If unlimited, allow
@@ -343,6 +377,34 @@ export class PlanFeatureGuard implements CanActivate {
         currentCount = agg._sum.units ?? 0;
         break;
       }
+
+      // Device-mesh capacity add-ons (DEF-7 / Task 6). Counts tenant-scoped
+      // Device rows of the matching kind, excluding `retired` — a retired
+      // slot frees its capacity back, same convention as BRANCHES'
+      // `status: 'active'` filter above. NOT wired to a route via
+      // @CheckLimit — POST /v1/devices creates every DeviceKind through one
+      // endpoint, so a fixed-per-route decorator can't gate only these two
+      // kinds. The real production enforcement is
+      // DeviceService.enforceDeviceCapacity; these cases exist so the
+      // switch stays the canonical, directly-testable definition of "how do
+      // we count usage for this LimitType" (mirrors the AI_PHOTOS/VIDEOS/
+      // 3D_MODELS cases above, whose real enforcement is likewise
+      // in-service).
+      case LimitType.KDS_SCREENS:
+        currentCount = await this.prisma.device.count({
+          where: { tenantId, kind: "kds_screen", status: { not: "retired" } },
+        });
+        break;
+
+      case LimitType.TABLETS:
+        currentCount = await this.prisma.device.count({
+          where: {
+            tenantId,
+            kind: "tablet_waiter",
+            status: { not: "retired" },
+          },
+        });
+        break;
     }
 
     if (currentCount >= limit) {

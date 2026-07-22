@@ -14,8 +14,14 @@
     "users": "Kullanıcılar",
     "branches": "Şubeler",
     "products": "Ürünler",
-    "monthlyOrders": "Aylık siparişler"
+    "monthlyOrders": "Aylık siparişler",
+    "unlimited": "Sınırsız",
+    "upgradeCta": "Üst pakete geç →"
   },
+  "included": {
+    "title": "Planınıza dahil olanlar"
+  },
+  "perMonthSuffix": "/ay",
   "activeAddOns": {
     "title": "Aktif eklentiler",
     "empty": "Henüz eklentiniz yok. Aşağıdan önerilen eklentilere göz atabilirsiniz.",
@@ -40,6 +46,7 @@
   },
   "branchPicker": {
     "activeBranch": "Aktif şube seçin",
+    "changeBranch": "Şube değiştir",
     "lockedToPrimary": "Şubeniz sabit. Değiştirmek için yöneticinize başvurun.",
     "activeTooltip": "Aktif şube. Tüm sorgular ve gerçek zamanlı akışlar bu şubeye göre filtrelenir."
   }

@@ -114,7 +114,18 @@
     "deleteError": "Failed to delete supplier",
     "itemAdded": "Item added to supplier",
     "itemAddError": "Failed to add item",
-    "confirmDelete": "Delete this supplier?"
+    "confirmDelete": "Delete this supplier?",
+    "catalog": {
+      "selectSupplier": "Select a supplier",
+      "item": "Item",
+      "supplierSku": "Supplier SKU",
+      "price": "Price",
+      "preferred": "Preferred",
+      "remove": "Remove",
+      "noItems": "No items linked yet",
+      "selectItem": "Select item",
+      "addLink": "Link item"
+    }
   },
   "purchaseOrders": {
     "title": "Purchase Orders",
@@ -327,5 +338,166 @@
     "inventory": "Inventory",
     "purchasing": "Purchasing",
     "costing": "Costing & Recipes"
+  },
+  "nav": {
+    "guide": "Purchasing Guide",
+    "items": "Items",
+    "orders": "Orders",
+    "suppliers": "Suppliers",
+    "costing": "Recipes & Cost",
+    "operations": "Operations"
+  },
+  "sections": {
+    "reorder": "Reorder Suggestions",
+    "apAging": "AP Aging",
+    "scorecard": "Supplier Scorecard",
+    "transfers": "Branch Transfers",
+    "valuation": "Stock Valuation",
+    "templates": "Templates",
+    "barcode": "Barcode",
+    "returns": "Returns (RMA)",
+    "vendorBills": "Vendor Bills",
+    "catalog": "Price Catalog",
+    "menuEngineering": "Menu Engineering",
+    "usageVariance": "Usage Variance",
+    "recipeCosting": "Recipe Costs"
+  },
+  "guide": {
+    "buyNow": "Needed today",
+    "channelGuide": "Channel guide",
+    "createDraft": "Create draft PO",
+    "cheapestRecent": "cheapest in the last {{count}} purchases",
+    "catalogPrice": "catalog price",
+    "alt": "alt: {{name}} {{price}}",
+    "buyListEmpty": "Nothing below par 🎉",
+    "error": "Couldn't load the guide",
+    "viewAsTier": "View as this scale",
+    "tier": {
+      "SMALL_CAFE": "Small Cafe",
+      "MID_RESTAURANT": "Mid-size Restaurant",
+      "MULTI_BRANCH": "Multi-branch"
+    },
+    "cat": {
+      "MEAT": "Meat",
+      "PRODUCE": "Produce",
+      "DRY_GOODS": "Dry Goods",
+      "DAIRY": "Dairy",
+      "BEVERAGE": "Beverage",
+      "PACKAGING": "Packaging",
+      "CLEANING": "Cleaning"
+    },
+    "rec": {
+      "generic": "recommended per the channel guide",
+      "MEAT": {
+        "SMALL_CAFE": "Local butcher or wholesaler; cash&carry for frozen.",
+        "MID_RESTAURANT": "Approved distributor contract + local butcher for fresh.",
+        "MULTI_BRANCH": "Central distributor framework + branch-local fresh."
+      },
+      "PRODUCE": {
+        "SMALL_CAFE": "Local greengrocer or market; buy fresh daily.",
+        "MID_RESTAURANT": "Planned + spot buying from the market, fixed days.",
+        "MULTI_BRANCH": "Producer co-op (levy-exempt) + wholesale market."
+      },
+      "DRY_GOODS": {
+        "SMALL_CAFE": "Monthly bulk buy from cash&carry (Bizim Toptan/Tespo).",
+        "MID_RESTAURANT": "Cash&carry + online B2B (Toptanmarketi), compared.",
+        "MULTI_BRANCH": "Central distributor + bulk online B2B ordering."
+      },
+      "DAIRY": {
+        "SMALL_CAFE": "Cash&carry + a trusted local dairy distributor.",
+        "MID_RESTAURANT": "Contracted, regular supply from an approved dairy distributor.",
+        "MULTI_BRANCH": "Central dairy distributor framework agreement."
+      },
+      "BEVERAGE": {
+        "SMALL_CAFE": "Bulk buy from cash&carry/Tespo with cash discounts.",
+        "MID_RESTAURANT": "Brand distributor deal + complementary cash&carry.",
+        "MULTI_BRANCH": "Central framework agreement with the brand distributor."
+      },
+      "PACKAGING": {
+        "SMALL_CAFE": "Bulk buy from cash&carry to lower unit cost.",
+        "MID_RESTAURANT": "Specialist wholesaler (packaging) + online B2B support.",
+        "MULTI_BRANCH": "Specialist-wholesaler framework + central contract."
+      },
+      "CLEANING": {
+        "SMALL_CAFE": "Bulk buy cleaning supplies from cash&carry.",
+        "MID_RESTAURANT": "Specialist wholesaler + trade-association campaigns (e.g. TÜRES).",
+        "MULTI_BRANCH": "One cleaning supplier for all branches."
+      }
+    },
+    "note": {
+      "CASH_CARRY": {
+        "advantage": "Wide range in one stop, orderly invoicing; discounts are single-digit (~3-7%).",
+        "minOrder": "Individual membership is usually possible; minimum basket size and logistics fees vary widely by supplier — confirm before ordering.",
+        "payment": "Loyalty points (e.g. Bizim Kart); no deferred-payment/installment advantage is claimed.",
+        "eInvoice": "Check the supplier's e-Invoice registration via GİB to secure the input-VAT deduction."
+      },
+      "WHOLESALE_MARKET": {
+        "advantage": "Spot pricing and wide variety for fresh produce; trading inside the market halves the levy.",
+        "minOrder": "No minimum order; a broker's commission is capped at 8%.",
+        "payment": "Usually cash/spot payment; the buyer pays the market levy.",
+        "eInvoice": "Buying directly from a producer requires registering as a notifier in the Market Registry plus a producer receipt."
+      },
+      "ONLINE_B2B": {
+        "advantage": "Price transparency and a multi-temperature (fresh+frozen+dry) range; fast delivery.",
+        "minOrder": "Varies by platform: some have no minimum, others waive shipping above 2,500 TRY.",
+        "payment": "Account-based catalogs (e.g. Bidfood) may require membership; some platforms show prices to everyone.",
+        "eInvoice": "Corporate B2B platforms are generally e-Invoice registered; confirm before ordering."
+      },
+      "PRODUCER_COOP": {
+        "advantage": "Buying from a ministry-registered producer organization is fully exempt from the market levy and cuts out middleman margin.",
+        "minOrder": "Usually needs high volume/a standing agreement; not practical for a small cafe.",
+        "payment": "Works on a contracted/framework basis; gives price predictability at high volume.",
+        "eInvoice": "Documented by invoice/producer receipt; the business may still need Market Registry registration."
+      },
+      "LOCAL_BUTCHER_WHOLESALER": {
+        "advantage": "Trust and flexibility (small quantities, fast delivery); preferred for fresh product.",
+        "minOrder": "Usually no minimum-order requirement; phone ordering is common.",
+        "payment": "In a professional relationship, a price quote/contract plus a supplier scorecard is recommended.",
+        "eInvoice": "The supplier must be under the official approval/registration regime; ISO 22000 certification should be expected."
+      },
+      "DISTRIBUTOR": {
+        "advantage": "Contracted/framework agreements give price predictability; multi-branch uses a hybrid central+branch-local model.",
+        "minOrder": "Requires a corporate account/contract with the distributor; minimum order varies by supplier.",
+        "payment": "Contracted/framework buying gives price predictability; payment terms are negotiated with the supplier.",
+        "eInvoice": "Corporate distributors are e-Invoice registered; confirm via a GİB lookup."
+      }
+    },
+    "rule": {
+      "MEAT": {
+        "1": "Keep the cold chain: raw meat/poultry 0…+4°C, fish 0…+2°C, frozen -18°C.",
+        "2": "Require the supplier's official approval/registration and ISO 22000 certification.",
+        "3": "At high volume, use price quotes plus a supplier scorecard; for meat sourcing, ask for slaughterhouse/facility approval and traceability documentation, and confirm current regulations."
+      },
+      "PRODUCE": {
+        "1": "The market levy is 1% inside the wholesale market, 2% outside; the buyer pays it.",
+        "2": "Buying directly from a producer requires notifier registration in the Market Registry; unregistered or off-market trading can carry a levy or penalty risk — confirm the current rate and obligation with the municipality/market authority.",
+        "3": "The producer-organization/co-op channel is levy-exempt and cuts middleman margin at high volume."
+      },
+      "DRY_GOODS": {
+        "1": "Cash&carry's tiered discounts are single-digit (~3-7%); the real win is the wide range plus orderly invoicing.",
+        "2": "For long-shelf-life items, bulk/framework buying is the clearest win.",
+        "3": "Online B2B price transparency suits small operators; account-based catalogs suit larger scale."
+      },
+      "DAIRY": {
+        "1": "The cold chain must stay unbroken below +4°C; the supplier needs refrigerated vehicles/storage.",
+        "2": "Dairy/meat suppliers are under the stricter 'approval' regime, not just registration.",
+        "3": "In a high food-inflation environment, contracted/framework buying gives price predictability."
+      },
+      "BEVERAGE": {
+        "1": "Processed/excise-taxed drinks (soda, juice, beer) carry 10% VAT — higher than staple food.",
+        "2": "Cash&carry may offer a cash/early-payment discount, but its depth is limited (~3-7%).",
+        "3": "A framework agreement with a brand distributor gives price stability at high volume."
+      },
+      "PACKAGING": {
+        "1": "Buying in bulk typically lowers the unit price; compare quotes from a few suppliers.",
+        "2": "Long shelf life means 1-2 orders a month is enough; a large stock buffer is fine.",
+        "3": "For packaging touching food, require a food-safety certificate and store it separately from food."
+      },
+      "CLEANING": {
+        "1": "Store cleaning supplies separately from food; require a certificate for food-contact-surface products.",
+        "2": "Long shelf life means once a month ordering is enough.",
+        "3": "Trade-association membership (TÜRES/TURYİD/ETÜDER) can unlock supplier campaigns and special discounts."
+      }
+    }
   }
 }

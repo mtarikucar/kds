@@ -17,8 +17,7 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
-import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
-import { PlanFeature } from "../../../common/constants/subscription.enum";
+import { RequiresIntegration } from "../../subscriptions/decorators/requires-integration.decorator";
 import { DeliveryConfigService } from "../services/delivery-config.service";
 import { DeliveryLogService } from "../services/delivery-log.service";
 import { DeliveryMenuSyncService } from "../services/delivery-menu-sync.service";
@@ -27,11 +26,19 @@ import { DeliveryModerationService } from "../services/delivery-moderation.servi
 import { CreatePlatformConfigDto } from "../dto/create-platform-config.dto";
 import { UpdatePlatformConfigDto } from "../dto/update-platform-config.dto";
 
+// DEF-3: gate on the integration domain, not the plan feature directly.
+// PlanFeatureGuard's @RequiresIntegration branch accepts EITHER a bought
+// delivery add-on (integration.delivery=[vendor]) OR a plan that already
+// includes delivery (feature.deliveryIntegration=true, via
+// INTEGRATION_COVERED_BY_FEATURE) — so a BASIC tenant who buys
+// delivery_yemeksepeti/getir/trendyol_yemek actually unlocks this
+// controller, which @RequiresFeature(DELIVERY_INTEGRATION) alone never did
+// (the add-on grants integration.delivery, not feature.deliveryIntegration).
 @ApiTags("delivery-platforms")
 @ApiBearerAuth()
 @Controller("delivery-platforms")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
-@RequiresFeature(PlanFeature.DELIVERY_INTEGRATION)
+@RequiresIntegration("delivery")
 export class DeliveryPlatformsController {
   constructor(
     private readonly configService: DeliveryConfigService,

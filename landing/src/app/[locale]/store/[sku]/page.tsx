@@ -204,6 +204,7 @@ export default async function ProductDetailPage(
                 consultation: t('detail.consultation'),
                 buy: t('detail.buy'),
                 requiresBranch: t('detail.requiresBranch'),
+                oneTimeVatIncluded: t('detail.oneTimeVatIncluded'),
               }}
             />
           ) : (

@@ -32,6 +32,7 @@ interface Props {
     consultation: string;
     buy: string;
     requiresBranch: string;
+    oneTimeVatIncluded: string;
   };
 }
 
@@ -104,7 +105,7 @@ export default function ServiceHero({
       <div className="flex flex-col">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
           <div className="text-3xl font-semibold text-slate-900">{priceLabel}</div>
-          <div className="mt-1 text-xs text-slate-500">Tek seferlik, KDV hariç</div>
+          <div className="mt-1 text-xs text-slate-500">{t.oneTimeVatIncluded}</div>
           <a
             href={appHref(`/admin/store?sku=${encodeURIComponent(sku)}`)}
             className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"

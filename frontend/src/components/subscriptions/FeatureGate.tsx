@@ -14,6 +14,16 @@ interface FeatureGateProps {
    * vendor in the domain unlocks; `vendor` given → that exact vendor.
    */
   integration?: { domain: string; vendor?: string };
+  /**
+   * How `feature` and `integration` combine when BOTH are supplied.
+   * `'all'` (default) ANDs them — unchanged pre-existing behavior.
+   * `'any'` ORs them — passes when EITHER is satisfied. Used for
+   * domains where a plan feature and a purchasable add-on grant the
+   * same access (e.g. delivery: `feature.deliveryIntegration` OR
+   * `integration.delivery`). Has no effect when only one of
+   * `feature`/`integration` is supplied.
+   */
+  mode?: 'all' | 'any';
   children: ReactNode;
   fallback?: ReactNode;
   showUpgradePrompt?: boolean;
@@ -42,6 +52,7 @@ interface FeatureGateProps {
 const FeatureGate = ({
   feature,
   integration,
+  mode = 'all',
   children,
   fallback,
   showUpgradePrompt = true,
@@ -53,12 +64,18 @@ const FeatureGate = ({
     return null;
   }
 
-  // Both gates (when present) must pass.
   const featurePasses = feature ? hasFeature(feature) : true;
   const integrationPasses = integration
     ? hasIntegration(integration.domain, integration.vendor)
     : true;
-  if (featurePasses && integrationPasses) {
+  // Default: both gates (when present) must pass. `mode="any"` ORs them,
+  // but only when both `feature` and `integration` are actually supplied
+  // — with just one gate present, "any" and "all" agree.
+  const passes =
+    mode === 'any' && feature && integration
+      ? featurePasses || integrationPasses
+      : featurePasses && integrationPasses;
+  if (passes) {
     return <>{children}</>;
   }
 

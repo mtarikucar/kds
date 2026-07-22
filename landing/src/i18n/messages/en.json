@@ -483,6 +483,7 @@
       "remote": "Remote",
       "consultation": "Consultation",
       "requiresBranch": "Branch required",
+      "oneTimeVatIncluded": "One-time, incl. VAT",
       "lowStock": "Only {n} left",
       "warrantyMonthsLabel": "{months}-month manufacturer warranty",
       "noDetailsAuthored": "Detailed information for this product has not been authored yet. Reach out to support with questions.",

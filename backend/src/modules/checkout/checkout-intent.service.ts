@@ -1,10 +1,17 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { PaymentsFacadeService } from "../payments-core/payments-facade.service";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 import { CheckoutBuyerDto } from "./dto/create-intent.dto";
+import { AddonPurchasabilityService } from "./addon-purchasability.service";
+import { CatalogService } from "../catalog/catalog.service";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -48,6 +55,9 @@ export class CheckoutIntentService {
     private readonly prisma: PrismaService,
     private readonly quoteSvc: QuoteService,
     private readonly payments: PaymentsFacadeService,
+    private readonly addonGuard: AddonPurchasabilityService,
+    // Task 4 — pre-payment hardware stock guard.
+    private readonly catalog: CatalogService,
   ) {}
 
   async createIntent(args: {
@@ -58,7 +68,72 @@ export class CheckoutIntentService {
     returnUrl?: string;
   }): Promise<CreateIntentResult> {
     const { tenantId, cart, buyer, buyerIp, returnUrl } = args;
+
+    // Tahsilat-önü guard (DEF-1/2/4/8): every `addon` cart line must clear
+    // included-in-plan / already-owned / deps-tier / redundant-limit BEFORE
+    // we price it, mint a CheckoutIntent row, or call PayTR. A rejection
+    // here throws ConflictException and nothing downstream is ever touched
+    // — no intent row, no payment gateway call. purchase()'s own guards
+    // stay in place as defence in depth for non-checkout callers.
+    for (const item of cart.items) {
+      if (item.type !== "addon") continue;
+      await this.addonGuard.assertPurchasable(tenantId, {
+        addOnCode: item.code,
+        branchId: item.branchId,
+        quantity: item.qty,
+      });
+    }
+
     const quote = await this.quoteSvc.quote(cart);
+
+    // Tahsilat-önü guard (Task 4 / Donanım #1): every `hardware` line must
+    // have enough REAL stock BEFORE we mint a CheckoutIntent row or call
+    // PayTR. Without this, CatalogService.allocate() only ran inside
+    // confirmAndProvision — AFTER PayTR had already charged the buyer — so
+    // an out-of-stock SKU (the seed shipped every product with
+    // hardwareInventory.available defaulting to 0 while the hand-written
+    // stockStatus said "in_stock") let a buyer pay in full and then hit
+    // "Insufficient stock" with no refund rail. Reads `line.meta.productId`
+    // — the SAME id confirmAndProvision later hands to allocate() — off the
+    // quote QuoteService just produced, so this is a cheap follow-up read,
+    // not a second SKU lookup. This is NOT a reservation: a concurrent
+    // checkout can still race between this check and confirmAndProvision,
+    // which is exactly why allocate()'s atomic `updateMany` guard stays in
+    // place there as the authoritative, race-safe check at confirm time.
+    //
+    // QuoteService.quote() never dedupes by SKU — the same productId can
+    // appear as multiple lines (the UI sends sell+rent as two lines keyed
+    // on (productId, acquisition); CartDto.items has no uniqueness
+    // constraint, so a direct API client can send duplicate lines). Checking
+    // each line against getAvailableStock() independently using only that
+    // line's qty let two lines of qty 3 each both pass against available=5
+    // — PayTR would charge for 6 units and allocate() would only reject the
+    // SECOND line at confirm time: buyer charged, nothing delivered. Sum
+    // requested qty PER productId across all hardware lines first, then
+    // read stock ONCE per distinct product and compare against the total.
+    const requestedByProductId = new Map<string, number>();
+    for (const line of quote.lines) {
+      if (line.type !== "hardware") continue;
+      const productId = line.meta?.productId;
+      if (!productId) continue; // defensive — QuoteService always sets this for hardware lines
+      requestedByProductId.set(
+        productId,
+        (requestedByProductId.get(productId) ?? 0) + line.qty,
+      );
+    }
+    for (const [productId, requestedQty] of requestedByProductId) {
+      const stock = await this.catalog.getAvailableStock(productId);
+      if (stock < requestedQty) {
+        const line = quote.lines.find(
+          (l) => l.type === "hardware" && l.meta?.productId === productId,
+        )!;
+        throw new ConflictException({
+          code: "HARDWARE_OUT_OF_STOCK",
+          message: `"${line.name}" doesn't have enough stock: ${stock} available, ${requestedQty} requested.`,
+          sku: line.code,
+        });
+      }
+    }
 
     if (quote.totalCents <= 0) {
       // PayTR rejects amount=0; surface a clean BadRequest instead of a

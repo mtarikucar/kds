@@ -72,23 +72,66 @@ export class CatalogService {
    * The shape returned here is the contract the SPA + landing storefronts
    * consume — adding a private field to HardwareProduct/HardwareInventory
    * does NOT bleed into the public payload unless explicitly listed here.
+   *
+   * Task 4: `stockStatus` is now DERIVED from `available` here, not read
+   * off the row's hand-written `stockStatus` column — see
+   * `deriveStockStatus()`.
    */
   private toPublicView<
-    T extends { inventory?: Array<{ available?: number | null }> | null },
+    T extends {
+      inventory?: Array<{ available?: number | null }> | null;
+      stockStatus?: string;
+    },
   >(row: T) {
-    const inventory = Array.isArray(row.inventory) ? row.inventory : [];
-    const available = inventory.reduce(
-      (acc, inv) => acc + (inv.available ?? 0),
-      0,
-    );
+    const available = this.sumAvailable(row.inventory);
     // Strip the inventory relation entirely from the public payload —
-    // we replace it with a single scalar `available` field.
-    const { inventory: _omitted, ...rest } = row;
-    return { ...rest, available };
+    // we replace it with a single scalar `available` field. Also drop the
+    // hand-written stockStatus so the spread below can't leak the stale
+    // value before we overwrite it with the derived one.
+    const {
+      inventory: _omitted,
+      stockStatus: _staleStockStatus,
+      ...rest
+    } = row;
+    return {
+      ...rest,
+      available,
+      stockStatus: this.deriveStockStatus(available),
+    };
+  }
+
+  /** Sum `available` across a product's inventory row(s) (0 if none). */
+  private sumAvailable(
+    inventory?: Array<{ available?: number | null }> | null,
+  ): number {
+    const rows = Array.isArray(inventory) ? inventory : [];
+    return rows.reduce((acc, inv) => acc + (inv.available ?? 0), 0);
+  }
+
+  /**
+   * Task 4 (Donanım stok kontrolü ödeme-önüne) — `stockStatus` used to be a
+   * hand-written HardwareProduct column the seed/admin set independently of
+   * real inventory (every seeded row said "in_stock" while
+   * hardwareInventory.available defaulted to 0). A buyer saw "in stock",
+   * paid, and only THEN discovered CatalogService.allocate() had nothing to
+   * give them — money charged, nothing delivered. We stop READING the
+   * column entirely (it is NOT dropped from the schema — that needs a
+   * migration and is riskier — just no longer trusted) and always compute
+   * purchasability's own signal instead.
+   *
+   * Deliberately binary: this collapses the legacy preorder/discontinued
+   * labels into out_of_stock. Purchasability was already gated on
+   * `available` alone (CatalogService.allocate /
+   * CheckoutIntentService.createIntent's HARDWARE_OUT_OF_STOCK guard), never
+   * on this label, so the binary derivation matches the ONLY thing that
+   * actually decides whether a buyer can check out.
+   */
+  private deriveStockStatus(available: number): "in_stock" | "out_of_stock" {
+    return available > 0 ? "in_stock" : "out_of_stock";
   }
 
   async listAdmin(filters?: { status?: string; category?: string }) {
-    return this.prisma.hardwareProduct.findMany({
+    const rows = await this.prisma.hardwareProduct.findMany({
       where: {
         ...(filters?.status ? { status: filters.status } : {}),
         ...(filters?.category ? { category: filters.category } : {}),
@@ -96,6 +139,16 @@ export class CatalogService {
       include: { inventory: true },
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
+    // Task 4: override the hand-written column with the derived value here
+    // too (unlike the public view, `inventory` is NOT stripped — the admin
+    // list is an internal-trusted payload that already shows allocated/
+    // shipped/serials, per findBySkuOrThrow's doc comment above).
+    // stockStatus isn't even settable via Create/UpdateHardwareProductDto
+    // today, so there is no admin workflow reading back a value it wrote.
+    return rows.map((r) => ({
+      ...r,
+      stockStatus: this.deriveStockStatus(this.sumAvailable(r.inventory)),
+    }));
   }
 
   async findOrThrow(id: string) {
@@ -104,7 +157,10 @@ export class CatalogService {
       include: { inventory: true },
     });
     if (!row) throw new NotFoundException("Product not found");
-    return row;
+    return {
+      ...row,
+      stockStatus: this.deriveStockStatus(this.sumAvailable(row.inventory)),
+    };
   }
 
   async findBySkuOrThrow(sku: string) {
@@ -113,7 +169,10 @@ export class CatalogService {
       include: { inventory: true },
     });
     if (!row) throw new NotFoundException(`SKU not found: ${sku}`);
-    return row;
+    return {
+      ...row,
+      stockStatus: this.deriveStockStatus(this.sumAvailable(row.inventory)),
+    };
   }
 
   async create(input: {
@@ -471,6 +530,30 @@ export class CatalogService {
       },
     });
     return { ok: true };
+  }
+
+  /**
+   * Task 4 (Donanım stok kontrolü ödeme-önüne) — real, current sellable
+   * quantity for a product. `available` already excludes stock claimed by
+   * allocate() (moved to `allocated`) and stock that has shipped — see the
+   * available+allocated+shipped=received invariant on HardwareInventory —
+   * so this is a direct passthrough, not a further subtraction.
+   *
+   * Callers: CheckoutIntentService.createIntent (the pre-payment
+   * HARDWARE_OUT_OF_STOCK guard) and QuoteService (the soft
+   * hardware_out_of_stock display warning). This is a cheap read, NOT a
+   * reservation — a concurrent checkout can still race between this check
+   * and confirmAndProvision, which is exactly why allocate()'s atomic
+   * `updateMany` guard stays the authoritative, race-safe check at confirm
+   * time. Missing inventory row reads as 0 stock rather than throwing —
+   * "no row" and "no stock" mean the same thing to a buyer.
+   */
+  async getAvailableStock(productId: string): Promise<number> {
+    const inv = await this.prisma.hardwareInventory.findUnique({
+      where: { productId },
+      select: { available: true },
+    });
+    return inv?.available ?? 0;
   }
 
   /** Inventory ops — adjust stock and serials in one place to keep totals consistent. */

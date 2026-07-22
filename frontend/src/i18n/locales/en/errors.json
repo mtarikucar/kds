@@ -25,7 +25,13 @@
     "EXTERNAL_SERVICE_ERROR": "Couldn't reach an external service. Please try again.",
     "TOO_MANY_REQUESTS": "Too many attempts. Please wait a moment and try again.",
     "TENANT_NOT_FOUND": "Restaurant account not found.",
-    "INVALID_TENANT": "Invalid restaurant account."
+    "INVALID_TENANT": "Invalid restaurant account.",
+    "ADDON_INCLUDED_IN_PLAN": "This add-on is already included in your plan.",
+    "ADDON_ALREADY_OWNED": "You already have this add-on.",
+    "ADDON_REQUIRES_PLAN": "This add-on requires a higher plan.",
+    "ADDON_LIMIT_REDUNDANT": "Your plan already provides this without limit.",
+    "SAME_PLAN_ACTIVE": "You're already subscribed to this plan.",
+    "HARDWARE_OUT_OF_STOCK": "This product is out of stock."
   },
   "errors": {
     "title": "Error",

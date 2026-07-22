@@ -123,6 +123,19 @@ export class QuoteService {
           acquisition === "rent"
             ? product.rentalMonthlyCents!
             : product.priceCents;
+        // Task 4 — soft, display-only warning when the requested qty
+        // exceeds real inventory. Deliberately does NOT drop the line
+        // (the buyer should still see the price/total) and is NOT the
+        // enforcement gate — CheckoutIntentService.createIntent is what
+        // actually blocks payment (HARDWARE_OUT_OF_STOCK). Checked for
+        // both 'sell' and 'rent': confirmAndProvision calls
+        // CatalogService.allocate() for every hardware line regardless of
+        // acquisition (a rented unit still comes out of the same physical
+        // stock pool), so rentals are stock-gated too.
+        const stock = await this.catalog.getAvailableStock(product.id);
+        if (stock < qty) {
+          warnings.push({ code: "hardware_out_of_stock", ref: product.sku });
+        }
         lines.push({
           type: "hardware",
           code: product.sku,

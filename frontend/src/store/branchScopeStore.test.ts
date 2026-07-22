@@ -107,3 +107,107 @@ describe('branchScopeStore', () => {
     });
   });
 });
+
+/**
+ * Branch-select screen (2026-07-22): `branchChosen` marks an EXPLICIT user
+ * selection. The first-entry gate forces /branch-select only while it is
+ * false; auto-seeding primaryBranchId during hydration must NOT count.
+ */
+describe('branchChosen flag', () => {
+  beforeEach(() => {
+    // This describe sits outside the main suite's beforeEach scope.
+    useBranchScopeStore.getState().clear();
+    localStorage.clear();
+  });
+
+  it('is false after hydration alone (auto-seed is not a choice)', () => {
+    useBranchScopeStore.getState().hydrateFromUser(makeUser({}));
+    expect(useBranchScopeStore.getState().branchChosen).toBe(false);
+  });
+
+  it('becomes true when the user explicitly selects a branch', () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(makeUser({}));
+    store.setBranchId('b-2');
+    expect(useBranchScopeStore.getState().branchChosen).toBe(true);
+  });
+
+  it('stays false when a pinned role attempts a selection (no-op path)', () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(
+      makeUser({ role: UserRole.WAITER, primaryBranchId: 'b-9', allowedBranchIds: [] }),
+    );
+    store.setBranchId('b-2');
+    expect(useBranchScopeStore.getState().branchChosen).toBe(false);
+  });
+
+  it('resets on clear (logout)', () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(makeUser({}));
+    store.setBranchId('b-2');
+    store.clear();
+    expect(useBranchScopeStore.getState().branchChosen).toBe(false);
+  });
+
+  it('resets on a same-device tenant switch', () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(makeUser({}));
+    store.setBranchId('b-2');
+    store.hydrateFromUser(
+      makeUser({ tenantId: 't-OTHER', primaryBranchId: 'x-1', allowedBranchIds: ['x-1', 'x-2'] }),
+    );
+    expect(useBranchScopeStore.getState().branchChosen).toBe(false);
+  });
+
+  it('survives re-hydration for the same tenant (login keeps the choice)', () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(makeUser({}));
+    store.setBranchId('b-2');
+    store.hydrateFromUser(makeUser({}));
+    expect(useBranchScopeStore.getState().branchChosen).toBe(true);
+  });
+
+  it('migrates a legacy persisted snapshot with a branchId as already-chosen', async () => {
+    localStorage.setItem(
+      'branch-scope-storage',
+      JSON.stringify({
+        state: { branchId: 'b-2', allowedBranchIds: ['b-1', 'b-2'], isPinned: false, tenantId: 't-1' },
+        version: 0,
+      }),
+    );
+    await useBranchScopeStore.persist.rehydrate();
+    expect(useBranchScopeStore.getState().branchChosen).toBe(true);
+  });
+
+  it('migrates a legacy snapshot WITHOUT a branchId as not-chosen', async () => {
+    localStorage.setItem(
+      'branch-scope-storage',
+      JSON.stringify({
+        state: { branchId: null, allowedBranchIds: [], isPinned: false, tenantId: 't-1' },
+        version: 0,
+      }),
+    );
+    await useBranchScopeStore.persist.rehydrate();
+    expect(useBranchScopeStore.getState().branchChosen).toBe(false);
+  });
+
+  it('persists an explicit choice across a fresh-store reload (v1 round-trip)', async () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(makeUser({}));
+    store.setBranchId('b-2'); // writes a current-version snapshot to localStorage
+    const persisted = localStorage.getItem('branch-scope-storage');
+
+    // Simulate a page reload: a fresh store starts at its initial values, then
+    // the persist middleware rehydrates from what was persisted. If branchChosen
+    // were dropped from partialize, this is where the reload would re-force the
+    // selection screen — the merge cannot restore what was never written.
+    // (Restore the snapshot because the setState below overwrites localStorage.)
+    useBranchScopeStore.setState({ branchChosen: false, branchId: null });
+    localStorage.setItem('branch-scope-storage', persisted!);
+    await useBranchScopeStore.persist.rehydrate();
+
+    const s = useBranchScopeStore.getState();
+    expect(s.branchId).toBe('b-2');
+    expect(s.branchChosen).toBe(true);
+  });
+});

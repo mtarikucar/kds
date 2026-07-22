@@ -126,6 +126,50 @@ describe('CatalogService — public view (v2.8.87)', () => {
       expect(out.complianceDocs).toEqual({ warrantyCertUrl: '/docs/w.pdf' });
     });
   });
+
+  /**
+   * Task 4 — stockStatus is now DERIVED from real inventory, never read off
+   * the hand-written `hardware_products.stockStatus` column. Pre-fix, the
+   * seed hand-set every row to "in_stock" while hardwareInventory.available
+   * defaulted to 0 — the storefront showed "in stock", the buyer paid, and
+   * only then did provisioning fail with "Insufficient stock". The column
+   * itself is NOT dropped (that needs a migration and is riskier); the
+   * public view just stops trusting it.
+   */
+  describe('stockStatus — derived from inventory, not the hand-written column (Task 4)', () => {
+    it('reports in_stock when available > 0, even if the stored column says otherwise', async () => {
+      prisma.hardwareProduct.findUnique.mockResolvedValue(
+        makeRow({ stockStatus: 'out_of_stock', inventory: [{ available: 3 }] }),
+      );
+      const out: any = await svc.findBySkuPublicOrThrow('kds-21in');
+      expect(out.stockStatus).toBe('in_stock');
+    });
+
+    it('reports out_of_stock when available is 0, even if the stored column says "in_stock"', async () => {
+      // This is the EXACT pre-fix defect: seed hand-writes "in_stock" while
+      // the inventory row defaults to available=0.
+      prisma.hardwareProduct.findUnique.mockResolvedValue(
+        makeRow({ stockStatus: 'in_stock', inventory: [{ available: 0 }] }),
+      );
+      const out: any = await svc.findBySkuPublicOrThrow('kds-21in');
+      expect(out.stockStatus).toBe('out_of_stock');
+    });
+
+    it('derives stockStatus per-row on listPublic too', async () => {
+      prisma.hardwareProduct.findMany.mockResolvedValue([
+        makeRow({ stockStatus: 'in_stock', inventory: [{ available: 5 }] }),
+        makeRow({
+          id: 'h-2',
+          sku: 'printer-80mm',
+          stockStatus: 'in_stock', // stale hand-written value
+          inventory: [{ available: 0 }],
+        }),
+      ]);
+      const out: any[] = await svc.listPublic();
+      expect(out[0].stockStatus).toBe('in_stock');
+      expect(out[1].stockStatus).toBe('out_of_stock');
+    });
+  });
 });
 
 /**

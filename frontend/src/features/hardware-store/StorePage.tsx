@@ -22,6 +22,8 @@ import { useAuthStore } from '../../store/authStore';
 // the buyer can "ship to my branch" instead of typing a custom
 // address.
 import { useListBranches } from '../branches/branchesApi';
+import HardwareCheckoutResult from './HardwareCheckoutResult';
+import { stashPendingCheckoutRef, resolvePendingCheckoutRef, clearPendingCheckoutRef } from './checkoutRef';
 
 /**
  * Renders a product image but hides itself when the file is missing (404).
@@ -108,6 +110,7 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
   const lines = useCartStore((s) => s.lines);
   const addHardware = useCartStore((s) => s.addHardware);
   const removeFromCart = useCartStore((s) => s.remove);
+  const setQty = useCartStore((s) => s.setQty);
   const [byoDismissed, setByoDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(BYO_DISMISS_KEY) === '1';
@@ -201,12 +204,20 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
         phone: (user as any).phone ?? '',
         address: `${address.line1}${address.line2 ? ', ' + address.line2 : ''}, ${address.city}`,
       },
-      returnUrl: `${window.location.origin}/admin/store?tab=orders`,
+      // v3.2.x — carries `?intent=pending` so the buyer lands back on a
+      // dedicated result screen (HardwareCheckoutResult) instead of
+      // silently landing on the orders tab with no confirmation. PayTR's
+      // okUrl/failUrl are BOTH this exact string regardless of outcome, and
+      // it has to be built before CheckoutIntentService mints the real
+      // paymentRef — so the real ref can't be embedded here. It's stashed
+      // client-side just below instead; see checkoutRef.ts.
+      returnUrl: `${window.location.origin}/admin/store?tab=hardware&intent=pending`,
       // v2.8.99.3 — top-level branchId so the backend stamps it onto
       // HardwareOrder.branchId. Address still in cart.shippingAddress
       // as the snapshot; branchId is the reference.
       branchId,
     });
+    stashPendingCheckoutRef(intentResult.paymentRef);
     if (intentResult.paymentLink) {
       window.location.assign(intentResult.paymentLink);
     }
@@ -247,6 +258,28 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
         defaultValue: '{{name}} bu siparişe eklenemiyor.',
       }),
     });
+  }
+
+  // Returning from a PayTR redirect (?intent=<ref> — see startCheckout's
+  // returnUrl above). Show the outcome instead of the normal catalogue/cart
+  // so a buyer who just paid gets a confirmation rather than silently
+  // landing back on the store.
+  const intentParam = searchParams.get('intent');
+  if (intentParam) {
+    const resolvedPaymentRef = resolvePendingCheckoutRef(intentParam);
+    return (
+      <div className={embedded ? '' : 'p-6'}>
+        <HardwareCheckoutResult
+          paymentRef={resolvedPaymentRef}
+          onContinue={() => {
+            clearPendingCheckoutRef();
+            const next = new URLSearchParams(searchParams);
+            next.delete('intent');
+            setSearchParams(next, { replace: true });
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -350,10 +383,35 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
                   return (
                     <li key={`${l.product.id}-${l.type === 'service' ? l.branchId ?? '_' : l.acquisition}`} className="flex items-start justify-between gap-2 text-sm">
                       <div className="flex-1 min-w-0">
-                        <div className="truncate">
-                          {l.product.name}{' '}
+                        <div className="truncate">{l.product.name}</div>
+                        {l.type === 'hardware' ? (
+                          // Qty is editable for hardware lines — setQty
+                          // mutates `lines`, which re-fires the cart-change
+                          // effect below and invalidates any fetched quote,
+                          // re-locking the Checkout button until re-quoted.
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              aria-label={t('store.decreaseQty')}
+                              className="flex h-5 w-5 items-center justify-center rounded border text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                              disabled={l.qty <= 1}
+                              onClick={() => setQty(cartLineKey(l), l.qty - 1)}
+                            >
+                              −
+                            </button>
+                            <span className="w-4 text-center text-xs text-gray-700">{l.qty}</span>
+                            <button
+                              type="button"
+                              aria-label={t('store.increaseQty')}
+                              className="flex h-5 w-5 items-center justify-center rounded border text-xs text-gray-600 hover:bg-gray-50"
+                              onClick={() => setQty(cartLineKey(l), l.qty + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
                           <span className="text-gray-500">× {l.qty}</span>
-                        </div>
+                        )}
                         {l.type === 'hardware' && l.acquisition === 'rent' && (
                           <div className="text-[11px] text-gray-500">{t('store.rentMonthly')}</div>
                         )}
@@ -418,7 +476,12 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
               <button
                 className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setCheckoutOpen(true)}
-                disabled={intent.isPending || lines.length === 0}
+                // Locked until a live quote exists for the CURRENT cart —
+                // `currentQuote` is cleared by the effect above the moment
+                // `cartItems` changes, so an add/remove/setQty after the
+                // last quote re-locks this until the buyer re-quotes.
+                disabled={intent.isPending || lines.length === 0 || !currentQuote}
+                title={!currentQuote ? t('store.checkoutNeedsQuote') : undefined}
               >
                 {intent.isPending ? t('store.redirecting') : t('store.checkout')}
               </button>

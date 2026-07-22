@@ -1242,6 +1242,13 @@ export class SubscriptionService {
         limits: {
           maxUsers: plan.maxUsers,
           maxTables: plan.maxTables,
+          // Drift fix: this mapper mirrors SubscriptionPlan independently of
+          // PlanProjectorService.LIMIT_COLUMNS and had fallen out of sync —
+          // maxBranches was missing, so the sales-page comparison matrix
+          // rendered Number(undefined) → "NaN" in the Şube sayısı cell. See
+          // plan-mapper-parity.spec.ts (tripwire pinning this mapper against
+          // LIMIT_COLUMNS so a future column addition fails loudly here).
+          maxBranches: plan.maxBranches,
           maxProducts: plan.maxProducts,
           maxCategories: plan.maxCategories,
           maxMonthlyOrders: plan.maxMonthlyOrders,
@@ -1261,6 +1268,14 @@ export class SubscriptionService {
           reservationSystem: plan.reservationSystem,
           personnelManagement: plan.personnelManagement,
           deliveryIntegration: plan.deliveryIntegration,
+          // Drift fix: posAccess was missing from this mirror (see
+          // maxBranches comment above for the same drift class) — the sales
+          // page's "POS / Satış ekranı" row showed ✗ for every plan even
+          // though BASIC/PRO/BUSINESS grant it. Gating itself was unaffected
+          // (SubscriptionContext.hasFeature is fail-closed and reads
+          // getEffectiveFeatures, not this endpoint) — this was a display-only
+          // drift on the public plan-comparison matrix.
+          posAccess: plan.posAccess,
           aiContentGeneration: plan.aiContentGeneration,
         },
         discount: isDiscountActive

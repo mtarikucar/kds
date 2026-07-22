@@ -483,6 +483,7 @@
       "remote": "Uzaktan",
       "consultation": "Danışmanlık",
       "requiresBranch": "Şube gerekli",
+      "oneTimeVatIncluded": "Tek seferlik, KDV dahil",
       "lowStock": "Son {n} adet",
       "warrantyMonthsLabel": "{months} ay üretici garantisi",
       "noDetailsAuthored": "Bu ürün için detaylı bilgi henüz girilmedi. Sorularınız için destek ekibimize ulaşabilirsiniz.",

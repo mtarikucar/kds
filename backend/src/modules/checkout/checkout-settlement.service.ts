@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { HttpException, Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CheckoutService } from "./checkout.service";
 import { Cart } from "./checkout.types";
@@ -57,6 +57,18 @@ export class CheckoutSettlementService {
       );
       return;
     }
+    if (intent.status === "failed_permanent") {
+      // A deterministic provisioning failure already parked this intent for
+      // manual review (Task 3 / DEF-2 — the dup-addon / cart-mismatch class
+      // of error that would fail identically on every retry). Re-running
+      // confirmAndProvision on each of PayTR's webhook retries would just
+      // reproduce the same failure and re-fire the alarm log for nothing —
+      // short-circuit instead.
+      this.logger.error(
+        `PayTR success for ref=${paymentRef} but intent is 'failed_permanent' (deterministic provisioning failure awaiting manual review). Refusing to re-attempt.`,
+      );
+      return;
+    }
 
     // Mark the success first so a second arrival of the same callback hits
     // the idempotency check above instead of starting a parallel
@@ -87,20 +99,46 @@ export class CheckoutSettlementService {
         `Provisioned mixed-cart checkout ref=${paymentRef} tenant=${intent.tenantId} hwOrder=${result.hardwareOrderId ?? "none"} addOns=${result.addOnIds.length} paymentType=${paymentType ?? "unknown"}`,
       );
     } catch (err) {
-      // Roll back the status flip so a manual retry (or the recovery
-      // sweeper, when v2.9.x lands) can re-attempt provisioning. The
-      // succeededAt timestamp stays — we know PayTR did charge the card.
+      // DEF-2: not every provisioning failure deserves a retry. A Nest
+      // HttpException with a 4xx status (BadRequestException from the
+      // add-on dup guard, ConflictException, ForbiddenException,
+      // NotFoundException, ...) is DETERMINISTIC — the same cart against the
+      // same tenant state fails identically every time. Leaving the intent
+      // 'succeeded' for retry would strand it there forever: PayTR already
+      // charged the card, nothing gets delivered, and nothing ever surfaces
+      // the problem. Anything else (a raw Prisma P2034 serialization abort
+      // from a concurrent settlement, a network blip, a 5xx) is TRANSIENT
+      // and keeps today's retry behaviour.
       //
-      // Status-scoped so a LOSER of a concurrent settlement (whose tx aborted
-      // with P2034 while the WINNER already flipped the row to 'provisioned')
-      // cannot clobber that committed terminal state back to 'succeeded'.
-      await this.prisma.checkoutIntent.updateMany({
-        where: { paymentRef, status: { notIn: ["provisioned", "failed"] } },
-        data: { status: "succeeded" },
-      });
-      this.logger.error(
-        `Provisioning failed for ref=${paymentRef} after PayTR success — left in 'succeeded' for retry. err=${(err as Error).message}`,
-      );
+      // Status-scoped in BOTH branches so a LOSER of a concurrent settlement
+      // (whose tx aborted with P2034 while the WINNER already flipped the
+      // row to 'provisioned') cannot clobber that committed terminal state.
+      const deterministic =
+        err instanceof HttpException && err.getStatus() < 500;
+
+      if (deterministic) {
+        await this.prisma.checkoutIntent.updateMany({
+          where: { paymentRef, status: { notIn: ["provisioned", "failed"] } },
+          data: { status: "failed_permanent" },
+        });
+        // Alarm-grade: superadmin's settlement recovery queue watches for
+        // this log line (and/or the failed_permanent status) to trigger a
+        // manual review / refund. No automatic refund here — out of scope.
+        this.logger.error(
+          `SETTLEMENT_PERMANENT_FAIL ref=${paymentRef} tenant=${intent.tenantId} reason=${(err as Error).message}`,
+        );
+      } else {
+        // Roll back the status flip so a manual retry (or the recovery
+        // sweeper, when v2.9.x lands) can re-attempt provisioning. The
+        // succeededAt timestamp stays — we know PayTR did charge the card.
+        await this.prisma.checkoutIntent.updateMany({
+          where: { paymentRef, status: { notIn: ["provisioned", "failed"] } },
+          data: { status: "succeeded" },
+        });
+        this.logger.error(
+          `Provisioning failed for ref=${paymentRef} after PayTR success — left in 'succeeded' for retry. err=${(err as Error).message}`,
+        );
+      }
       throw err;
     }
   }

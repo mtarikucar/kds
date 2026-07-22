@@ -1,4 +1,15 @@
 {
+  "branchSelect": {
+    "title": "Select a branch",
+    "subtitle": "Choose the branch you want to work in. Every screen, order and report is scoped to it.",
+    "activeBadge": "Active branch",
+    "headquarters": "Headquarters",
+    "suspended": "Suspended",
+    "archived": "Archived",
+    "manageBranches": "Manage Branches",
+    "empty": "No branches you can access",
+    "emptyHint": "Ask your manager for branch access."
+  },
   "demo": {
     "enter": "Explore the demo",
     "entered": "Switched to the demo restaurant. Start exploring!",
@@ -88,6 +99,7 @@
     "deliveryOrders": "Delivery Orders",
     "devices": "Devices",
     "branches": "Branches",
+    "devicesNetwork": "Devices & Network",
     "health": "Branch Health",
     "marketplace": "Marketplace",
     "store": "Hardware Store",
@@ -102,7 +114,6 @@
       "business": "Operations",
       "menuAndTables": "Menu & Tables",
       "operation": "Back Office",
-      "multiBranch": "Branches & Devices",
       "marketplace": "Marketplace",
       "planAndAccess": "Settings & Access"
     },

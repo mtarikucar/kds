@@ -119,17 +119,26 @@ describe('ProductDetailPage', () => {
     expect(navigate).toHaveBeenCalledWith('/admin/store?tab=hardware');
   });
 
-  it('carts with acquisition=rent after toggling to Rent (rental product)', () => {
+  // Task 11 — rent acquisition is removed from the storefront FOR NOW: PayTR
+  // only supports one-time charges, so there is no monthly-billing rail
+  // behind "rent" (a buyer who "rented" a device was charged once and never
+  // billed again). Even a product that still carries rentalMonthlyCents
+  // (legacy data, or a superadmin-entered value ahead of the future billing
+  // rail) must never show a way to select rent — the catalog no longer
+  // OFFERS it, so the client can never send acquisition:'rent'.
+  it('never offers a Buy/Rent toggle, even for a product with rentalMonthlyCents set', () => {
     productState.data = makeProduct({ rentalMonthlyCents: 9000 });
     renderPage();
 
-    // The Buy/Rent toggle only renders when rentalMonthlyCents is set.
-    fireEvent.click(screen.getByRole('button', { name: 'Rent' }));
+    expect(screen.queryByRole('button', { name: 'Rent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buy' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/rent/i)).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
 
     const lines = useCartStore.getState().lines;
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ type: 'hardware', acquisition: 'rent' });
+    expect(lines[0]).toMatchObject({ type: 'hardware', acquisition: 'sell' });
   });
 
   it('disables Add to cart and does not write the cart for an out-of-stock product', () => {
@@ -159,6 +168,22 @@ describe('ProductDetailPage', () => {
     const link = screen.getByRole('link', { name: /BankX/ });
     expect(link).toHaveAttribute('href', 'https://bankx.example/pos');
     expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  // Task 11 — QuoteService prices every line as KDV-INCLUSIVE (gross; see
+  // quote.service.ts's netCents/taxCents derivation), but the service detail
+  // page used to say "Tek seferlik, KDV hariç" (excl. VAT) right under the
+  // price — the opposite of what actually happens at checkout. The copy must
+  // read incl.-VAT so it matches the real pricing model.
+  it('shows VAT-inclusive copy under a service price (not the old excl.-VAT claim)', () => {
+    productState.data = makeProduct({
+      category: 'service',
+      serviceMeta: { serviceType: 'consultation', requiresBranch: false },
+    });
+    renderPage();
+
+    expect(screen.getByText('One-time, incl. VAT')).toBeInTheDocument();
+    expect(screen.queryByText(/excl\.\s*VAT/i)).not.toBeInTheDocument();
   });
 
   it('blocks adding a branch-required service until a branch is chosen, then carts it', () => {

@@ -37,6 +37,12 @@ export interface TenantAddOn {
 
 export const marketplaceKeys = {
   catalog: (kind?: string) => ['marketplace', 'catalog', kind] as const,
+  // Prefix-only key (no `kind`) for invalidation — `invalidateQueries` fuzzy-
+  // matches on a key PREFIX, so a 3-tuple `catalog(undefined)` would only
+  // match the unfiltered query and miss the kind-filtered ones (MarketplacePage's
+  // category chips). Use this whenever a mutation needs to invalidate every
+  // `includedInPlan`-bearing catalog query regardless of `kind`.
+  catalogAll: ['marketplace', 'catalog'] as const,
   mine: ['marketplace', 'mine'] as const,
 };
 
@@ -87,6 +93,7 @@ export interface AddOnCheckoutIntent {
  * free-grant endpoint was removed (deep-review C2).
  */
 export const usePurchaseAddOnViaCheckout = () => {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       addOnCode: string;
@@ -120,6 +127,12 @@ export const usePurchaseAddOnViaCheckout = () => {
       return r.data;
     },
     onSuccess: (data) => {
+      // Provisioning itself happens later (async, off the `CK-` webhook once
+      // PayTR settles) so this won't flip `includedInPlan`/ownership by
+      // itself — but invalidate anyway so any catalog view still mounted
+      // when the buyer returns via `returnUrl` refetches instead of serving
+      // a stale pre-purchase snapshot from cache.
+      qc.invalidateQueries({ queryKey: marketplaceKeys.catalogAll });
       // Full-page hand-off to PayTR's hosted page — the iframe owns the tab.
       if (data.paymentLink) window.location.assign(data.paymentLink);
     },
@@ -142,6 +155,11 @@ export const useCancelAddOn = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: marketplaceKeys.mine });
+      // DEF-10: cancelling doesn't change `includedInPlan` (that's plan-
+      // derived), but it does change ownership, which the catalog views'
+      // "owned" state also depends on — refetch so a re-buyable add-on
+      // doesn't linger looking unavailable from a stale cache.
+      qc.invalidateQueries({ queryKey: marketplaceKeys.catalogAll });
       qc.invalidateQueries({ queryKey: entitlementKeys.me });
       qc.invalidateQueries({ queryKey: ['subscriptions', 'effective-features'] });
       toast.success(

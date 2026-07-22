@@ -1,4 +1,15 @@
 {
+  "branchSelect": {
+    "title": "Şube seçin",
+    "subtitle": "Çalışmak istediğiniz şubeyi seçin. Tüm ekranlar, siparişler ve raporlar bu şubeye göre filtrelenir.",
+    "activeBadge": "Aktif şube",
+    "headquarters": "Merkez",
+    "suspended": "Askıda",
+    "archived": "Arşivlenmiş",
+    "manageBranches": "Şubeleri Yönet",
+    "empty": "Erişebileceğiniz şube bulunamadı",
+    "emptyHint": "Yöneticinizden şube erişimi isteyin."
+  },
   "demo": {
     "enter": "Demo'yu keşfet",
     "entered": "Demo restoranına geçildi. Keşfetmeye başlayın!",
@@ -88,6 +99,7 @@
     "deliveryOrders": "Paket Siparişleri",
     "devices": "Cihazlar",
     "branches": "Şubeler",
+    "devicesNetwork": "Cihazlar & Ağ",
     "health": "Şube Sağlığı",
     "marketplace": "Eklenti Pazarı",
     "store": "Donanım Mağazası",
@@ -102,7 +114,6 @@
       "business": "İşletme",
       "menuAndTables": "Menü & Masa",
       "operation": "Operasyon",
-      "multiBranch": "Şubeler ve Cihazlar",
       "marketplace": "Pazaryeri",
       "planAndAccess": "Ayarlar & Erişim"
     },

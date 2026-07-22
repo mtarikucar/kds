@@ -157,6 +157,12 @@ const WelcomePage = lazyWithReload(
   () => import("./pages/onboarding/WelcomePage"),
 );
 
+// Full-screen branch switcher (lazy-loaded) — also the forced first-entry
+// selection screen (BranchSelectionGate). Outside Layout on purpose.
+const BranchSelectPage = lazyWithReload(
+  () => import("./features/branches/BranchSelectPage"),
+);
+
 // Subscription & Settings Pages (lazy-loaded)
 const SubscriptionPlansPage = lazyWithReload(
   () => import("./pages/subscription/SubscriptionPlansPage"),
@@ -379,6 +385,18 @@ function App() {
             }
           />
 
+          {/* Branch switcher (full-screen, no app chrome) — navbar "Şube
+          değiştir" lands here; BranchSelectionGate forces it on first entry
+          when a multi-branch user has no cached selection. */}
+          <Route
+            path="/branch-select"
+            element={
+              <ProtectedRoute>
+                <BranchSelectPage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Protected Routes - All authenticated users */}
           <Route
             element={
@@ -491,7 +509,7 @@ function App() {
                 page (/admin/stock). Old paths redirect. */}
             <Route
               path="/admin/purchasing"
-              element={<Navigate to="/admin/stock" replace />}
+              element={<Navigate to="/admin/stock?tab=orders" replace />}
             />
             <Route path="/admin/cash" element={<CashPage />} />
             <Route
@@ -507,7 +525,7 @@ function App() {
             />
             <Route
               path="/admin/costing"
-              element={<Navigate to="/admin/stock" replace />}
+              element={<Navigate to="/admin/stock?tab=costing" replace />}
             />
             {/* Analitik: Raporlar ile birleşti — eski yol yönlendirir. */}
             <Route
@@ -681,6 +699,8 @@ function App() {
                 element={
                   <FeatureGate
                     feature="deliveryIntegration"
+                    integration={{ domain: "delivery" }}
+                    mode="any"
                     fallback={
                       <UpsellCard
                         addOnCode="delivery_yemeksepeti"
