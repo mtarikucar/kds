@@ -114,7 +114,18 @@
     "deleteError": "فشل حذف المورد",
     "itemAdded": "تمت إضافة الصنف",
     "itemAddError": "فشل إضافة الصنف",
-    "confirmDelete": "هل تريد حذف هذا المورد؟"
+    "confirmDelete": "هل تريد حذف هذا المورد؟",
+    "catalog": {
+      "selectSupplier": "اختر مورداً",
+      "item": "الصنف",
+      "supplierSku": "رمز المورد",
+      "price": "السعر",
+      "preferred": "مفضل",
+      "remove": "إزالة",
+      "noItems": "لم يتم ربط أي صنف بعد",
+      "selectItem": "اختر صنفاً",
+      "addLink": "ربط صنف"
+    }
   },
   "purchaseOrders": {
     "title": "أوامر الشراء",

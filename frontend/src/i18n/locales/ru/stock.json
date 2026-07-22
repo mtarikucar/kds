@@ -114,7 +114,18 @@
     "deleteError": "Не удалось удалить",
     "itemAdded": "Товар добавлен",
     "itemAddError": "Не удалось добавить товар",
-    "confirmDelete": "Удалить этого поставщика?"
+    "confirmDelete": "Удалить этого поставщика?",
+    "catalog": {
+      "selectSupplier": "Выберите поставщика",
+      "item": "Товар",
+      "supplierSku": "Артикул поставщика",
+      "price": "Цена",
+      "preferred": "Предпочтительный",
+      "remove": "Удалить",
+      "noItems": "Товары еще не привязаны",
+      "selectItem": "Выберите товар",
+      "addLink": "Привязать товар"
+    }
   },
   "purchaseOrders": {
     "title": "Заказы поставщикам",

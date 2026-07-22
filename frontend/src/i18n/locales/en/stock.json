@@ -114,7 +114,18 @@
     "deleteError": "Failed to delete supplier",
     "itemAdded": "Item added to supplier",
     "itemAddError": "Failed to add item",
-    "confirmDelete": "Delete this supplier?"
+    "confirmDelete": "Delete this supplier?",
+    "catalog": {
+      "selectSupplier": "Select a supplier",
+      "item": "Item",
+      "supplierSku": "Supplier SKU",
+      "price": "Price",
+      "preferred": "Preferred",
+      "remove": "Remove",
+      "noItems": "No items linked yet",
+      "selectItem": "Select item",
+      "addLink": "Link item"
+    }
   },
   "purchaseOrders": {
     "title": "Purchase Orders",

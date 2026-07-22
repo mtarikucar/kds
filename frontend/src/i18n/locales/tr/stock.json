@@ -114,7 +114,18 @@
     "deleteError": "Tedarikçi silinemedi",
     "itemAdded": "Ürün tedarikçiye eklendi",
     "itemAddError": "Ürün eklenemedi",
-    "confirmDelete": "Bu tedarikçiyi silmek istiyor musunuz?"
+    "confirmDelete": "Bu tedarikçiyi silmek istiyor musunuz?",
+    "catalog": {
+      "selectSupplier": "Tedarikçi seçin",
+      "item": "Ürün",
+      "supplierSku": "Tedarikçi Kodu",
+      "price": "Fiyat",
+      "preferred": "Tercih Edilen",
+      "remove": "Kaldır",
+      "noItems": "Henüz ürün bağlanmadı",
+      "selectItem": "Ürün seçin",
+      "addLink": "Ürün Bağla"
+    }
   },
   "purchaseOrders": {
     "title": "Satın Alma Siparişleri",

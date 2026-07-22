@@ -9,6 +9,7 @@ import { ErrorState } from '../../../components/ui/ErrorState';
 import { useFormatCurrency } from '../../../hooks/useFormatCurrency';
 import { useSupplierScorecard, useApAging } from '../../../features/stock-management/purchasingApi';
 import SuppliersTab from '../../../features/stock-management/components/SuppliersTab';
+import SupplierCatalog from '../../../features/stock-management/components/SupplierCatalog';
 import VendorBillsTab from '../../../features/stock-management/components/VendorBillsTab';
 
 type Fmt = (n: number) => string;
@@ -25,7 +26,10 @@ export default function SuppliersHub() {
         <h2 className="text-lg font-heading font-semibold text-slate-900 mb-3">{t('nav.suppliers')}</h2>
         <SuppliersTab />
       </section>
-      {/* Phase 2 slots <SupplierCatalog /> here */}
+      <section>
+        <h2 className="text-lg font-heading font-semibold text-slate-900 mb-3">{t('sections.catalog')}</h2>
+        <SupplierCatalog />
+      </section>
       <section>
         <h2 className="text-lg font-heading font-semibold text-slate-900 mb-3">{t('sections.scorecard')}</h2>
         <ScorecardSection fmt={fmt} />

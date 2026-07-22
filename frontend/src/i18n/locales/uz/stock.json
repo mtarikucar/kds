@@ -114,7 +114,18 @@
     "deleteError": "O'chirib bo'lmadi",
     "itemAdded": "Mahsulot qo'shildi",
     "itemAddError": "Mahsulot qo'shib bo'lmadi",
-    "confirmDelete": "Bu yetkazib beruvchini o'chirmoqchimisiz?"
+    "confirmDelete": "Bu yetkazib beruvchini o'chirmoqchimisiz?",
+    "catalog": {
+      "selectSupplier": "Yetkazib beruvchini tanlang",
+      "item": "Mahsulot",
+      "supplierSku": "Yetkazib beruvchi kodi",
+      "price": "Narx",
+      "preferred": "Afzal ko'rilgan",
+      "remove": "O'chirish",
+      "noItems": "Hali mahsulot bog'lanmagan",
+      "selectItem": "Mahsulot tanlang",
+      "addLink": "Mahsulot bog'lash"
+    }
   },
   "purchaseOrders": {
     "title": "Xarid buyurtmalari",
