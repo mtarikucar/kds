@@ -100,11 +100,15 @@ export interface PricedLine {
 }
 
 // A cart line the quote silently dropped (not published / not directly
-// purchasable / unknown). Structured so the UI can render a localized,
-// name-bearing message instead of a raw English "Hardware not purchasable: SKU".
+// purchasable / unknown), or — for 'hardware_out_of_stock' — a line that
+// stays in the quote but is flagged because requested qty exceeds real
+// inventory (Task 4; the line still prices/totals, this is display-only).
+// Structured so the UI can render a localized, name-bearing message instead
+// of a raw English "Hardware not purchasable: SKU".
 export type QuoteWarningCode =
   | 'addon_not_purchasable'
   | 'hardware_not_purchasable'
+  | 'hardware_out_of_stock'
   | 'hardware_not_directly_purchasable'
   | 'service_not_purchasable'
   | 'service_not_directly_purchasable'

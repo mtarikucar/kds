@@ -100,15 +100,36 @@ export class CheckoutIntentService {
     // checkout can still race between this check and confirmAndProvision,
     // which is exactly why allocate()'s atomic `updateMany` guard stays in
     // place there as the authoritative, race-safe check at confirm time.
+    //
+    // QuoteService.quote() never dedupes by SKU — the same productId can
+    // appear as multiple lines (the UI sends sell+rent as two lines keyed
+    // on (productId, acquisition); CartDto.items has no uniqueness
+    // constraint, so a direct API client can send duplicate lines). Checking
+    // each line against getAvailableStock() independently using only that
+    // line's qty let two lines of qty 3 each both pass against available=5
+    // — PayTR would charge for 6 units and allocate() would only reject the
+    // SECOND line at confirm time: buyer charged, nothing delivered. Sum
+    // requested qty PER productId across all hardware lines first, then
+    // read stock ONCE per distinct product and compare against the total.
+    const requestedByProductId = new Map<string, number>();
     for (const line of quote.lines) {
       if (line.type !== "hardware") continue;
       const productId = line.meta?.productId;
       if (!productId) continue; // defensive — QuoteService always sets this for hardware lines
+      requestedByProductId.set(
+        productId,
+        (requestedByProductId.get(productId) ?? 0) + line.qty,
+      );
+    }
+    for (const [productId, requestedQty] of requestedByProductId) {
       const stock = await this.catalog.getAvailableStock(productId);
-      if (stock < line.qty) {
+      if (stock < requestedQty) {
+        const line = quote.lines.find(
+          (l) => l.type === "hardware" && l.meta?.productId === productId,
+        )!;
         throw new ConflictException({
           code: "HARDWARE_OUT_OF_STOCK",
-          message: `"${line.name}" doesn't have enough stock: ${stock} available, ${line.qty} requested.`,
+          message: `"${line.name}" doesn't have enough stock: ${stock} available, ${requestedQty} requested.`,
           sku: line.code,
         });
       }

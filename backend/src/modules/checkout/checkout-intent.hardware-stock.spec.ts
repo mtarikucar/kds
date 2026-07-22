@@ -232,6 +232,76 @@ describe("CheckoutIntentService.createIntent — hardware stock guard (Task 4)",
     expect(payments.createIntent).not.toHaveBeenCalled();
   });
 
+  it("aggregates qty across MULTIPLE lines for the SAME productId before comparing to available stock — closes the split-line bypass", async () => {
+    // QuoteService.quote() never dedupes by SKU: the UI emits sell+rent as
+    // two separate lines keyed on (productId, acquisition), and CartDto has
+    // no uniqueness constraint, so a direct API client can send duplicate
+    // lines for the same product. Pre-fix, each line was checked against
+    // getAvailableStock() independently using ONLY that line's qty — with
+    // available=5 and two lines of qty 3 each, BOTH lines pass (3 <= 5),
+    // PayTR charges the buyer for 6 units, and allocate() then rejects the
+    // second line at confirm time: buyer charged, nothing delivered.
+    quoteSvc.quote.mockResolvedValue({
+      lines: [
+        {
+          type: "hardware",
+          code: "yazarkasa-hugin-tiger-t300",
+          name: "Yazarkasa Hugin Tiger T300 (satış)",
+          qty: 3,
+          unitCents: 50000,
+          subtotalCents: 150000,
+          cadence: "oneTime",
+          meta: { productId: "p-1", acquisition: "sell" },
+        },
+        {
+          type: "hardware",
+          code: "yazarkasa-hugin-tiger-t300",
+          name: "Yazarkasa Hugin Tiger T300 (kiralık)",
+          qty: 3,
+          unitCents: 5000,
+          subtotalCents: 15000,
+          cadence: "monthly",
+          meta: { productId: "p-1", acquisition: "rent" },
+        },
+      ],
+      currency: "TRY",
+      subtotalCents: 165000,
+      taxCents: 33000,
+      shippingCents: 5000,
+      totalCents: 203000,
+      warnings: [],
+      isPureRecurring: false,
+    } as CartQuote);
+    catalog.getAvailableStock.mockResolvedValue(5); // only 5 on hand, buyer effectively wants 3+3=6
+
+    let threw = false;
+    try {
+      await svc.createIntent({
+        tenantId: "t-1",
+        cart: {
+          items: [
+            { type: "hardware", sku: "yazarkasa-hugin-tiger-t300", qty: 3, acquisition: "sell" },
+            { type: "hardware", sku: "yazarkasa-hugin-tiger-t300", qty: 3, acquisition: "rent" },
+          ],
+        } as Cart,
+        buyer,
+        buyerIp: "1.2.3.4",
+      });
+    } catch (e: any) {
+      threw = true;
+      expect(e).toBeInstanceOf(ConflictException);
+      expect(e.getResponse().code).toBe("HARDWARE_OUT_OF_STOCK");
+    }
+    expect(threw).toBe(true);
+    // The money-integrity assertion: NOTHING downstream ran, even though
+    // each individual line's qty (3) was under the available stock (5).
+    expect(prisma.checkoutIntent.create).not.toHaveBeenCalled();
+    expect(payments.createIntent).not.toHaveBeenCalled();
+    // One read per distinct productId — not one per line.
+    expect(catalog.getAvailableStock).toHaveBeenCalledTimes(1);
+    expect(catalog.getAvailableStock).toHaveBeenCalledWith("p-1");
+  });
+
   it("does not call getAvailableStock for non-hardware lines (plan/addon/service untouched by this guard)", async () => {
     quoteSvc.quote.mockResolvedValue({
       lines: [

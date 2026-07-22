@@ -132,6 +132,7 @@
       "generic": "لا يمكن إضافة {{name}} إلى هذا الطلب.",
       "addon_not_purchasable": "{{name}} غير متاح للشراء حاليًا.",
       "hardware_not_purchasable": "{{name}} غير متاح للشراء حاليًا.",
+      "hardware_out_of_stock": "{{name}} غير متوفر في المخزون حاليًا.",
       "hardware_not_directly_purchasable": "لا يمكن شراء {{name}} مباشرة من هنا (يلزم عرض سعر/موزع معتمد).",
       "service_not_purchasable": "لا يمكن شراء {{name}} كخدمة.",
       "service_not_directly_purchasable": "لا يمكن شراء {{name}} مباشرة من هنا (يلزم عرض سعر).",
