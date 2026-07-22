@@ -24,6 +24,11 @@ const snapshotRef: { value: any } = { value: undefined };
 const catalogRef: { value: any[] } = { value: [] };
 const myAddOnsRef: { value: any[] } = { value: [] };
 const planRef: { value: any } = { value: null };
+// Defaults to "nothing on" so tests that don't care about the Included
+// band's feature chips don't get surprise output from a stale flag set.
+const hasFeatureRef: { value: (feature: string) => boolean } = {
+  value: () => false,
+};
 const cancelAddOnMutate = vi.fn();
 let cancelPending = false;
 
@@ -31,7 +36,7 @@ vi.mock('../subscriptions/subscriptionsApi', () => ({
   useGetCurrentSubscription: () => ({ data: subscriptionRef.value }),
 }));
 vi.mock('../../contexts/SubscriptionContext', () => ({
-  useSubscription: () => ({ plan: planRef.value }),
+  useSubscription: () => ({ plan: planRef.value, hasFeature: hasFeatureRef.value }),
 }));
 vi.mock('./planApi', () => ({
   useGetUsageSnapshot: () => ({ data: snapshotRef.value }),
@@ -63,6 +68,7 @@ describe('PlanAndAccessPage', () => {
     catalogRef.value = [];
     myAddOnsRef.value = [];
     planRef.value = null;
+    hasFeatureRef.value = () => false;
     cancelAddOnMutate.mockClear();
     cancelPending = false;
   });
@@ -179,8 +185,8 @@ describe('PlanAndAccessPage', () => {
       { id: 'ta-1', quantity: 1, cancelAtPeriodEnd: false, currentPeriodEnd: null, addOn: { name: 'Fiscal', code: 'fiscal', priceCents: 0, billing: 'oneTime' } },
     ];
     catalogRef.value = [
-      { code: 'fiscal', name: 'Fiscal', kind: 'integration', billing: 'recurring', priceCents: 49900, currency: 'TRY', deps: [] },
-      { code: 'caller', name: 'Caller ID', kind: 'integration', billing: 'recurring', priceCents: 9900, currency: 'TRY', deps: [] },
+      { code: 'fiscal', name: 'Fiscal', kind: 'integration', billing: 'recurring', priceCents: 49900, currency: 'TRY', deps: [], includedInPlan: false },
+      { code: 'caller', name: 'Caller ID', kind: 'integration', billing: 'recurring', priceCents: 9900, currency: 'TRY', deps: [], includedInPlan: false },
     ];
 
     renderPage();
@@ -189,5 +195,80 @@ describe('PlanAndAccessPage', () => {
     const suggested = screen.getByText('Önerilen eklentiler').closest('section')!;
     expect(within(suggested).getByText('Caller ID')).toBeInTheDocument();
     expect(within(suggested).queryByText('Fiscal')).toBeNull();
+  });
+
+  it('shows a plan-included add-on in the Included band with the "Planınıza dahil" badge, and excludes it from the purchasable list', () => {
+    planRef.value = { displayName: 'Pro', currency: 'TRY' };
+    catalogRef.value = [
+      {
+        code: 'fiscal',
+        name: 'Fiscal Integration',
+        kind: 'integration',
+        billing: 'recurring',
+        priceCents: 49900,
+        currency: 'TRY',
+        deps: [],
+        includedInPlan: true,
+      },
+    ];
+
+    renderPage();
+
+    const included = screen.getByText('Planınıza dahil olanlar').closest('section')!;
+    expect(within(included).getByText('Fiscal Integration')).toBeInTheDocument();
+    expect(within(included).getByText('Planınıza dahil')).toBeInTheDocument();
+
+    // Included → never offered for sale. Nothing purchasable means the
+    // "Önerilen eklentiler" section doesn't render at all.
+    expect(screen.queryByText('Önerilen eklentiler')).toBeNull();
+  });
+
+  it('does NOT show an add-on with includedInPlan===undefined as purchasable (fail-closed)', () => {
+    planRef.value = { displayName: 'Pro', currency: 'TRY' };
+    catalogRef.value = [
+      {
+        code: 'mystery',
+        name: 'Mystery Add-on',
+        kind: 'software',
+        billing: 'oneTime',
+        priceCents: 10000,
+        currency: 'TRY',
+        deps: [],
+        // includedInPlan intentionally omitted → undefined (shape drift).
+      },
+    ];
+
+    renderPage();
+
+    // Fail-closed: undefined is neither confirmed-included nor
+    // confirmed-purchasable, so it must not be offered for sale.
+    expect(screen.queryByText('Önerilen eklentiler')).toBeNull();
+    expect(screen.queryByText('Mystery Add-on')).toBeNull();
+  });
+
+  it("renders the plan's ON boolean features in the Included band (and leaves OFF features out)", () => {
+    planRef.value = { displayName: 'Pro', currency: 'TRY' };
+    hasFeatureRef.value = (feature: string) =>
+      feature === 'posAccess' || feature === 'advancedReports';
+
+    renderPage();
+
+    const included = screen.getByText('Planınıza dahil olanlar').closest('section')!;
+    expect(within(included).getByText('POS / Satış ekranı')).toBeInTheDocument();
+    expect(within(included).getByText('Gelişmiş raporlar')).toBeInTheDocument();
+    // customBranding is OFF for this plan → must not appear.
+    expect(within(included).queryByText('Özel marka')).toBeNull();
+  });
+
+  it('points the quota upgrade CTA at /subscription/change-plan, not the plan page itself', () => {
+    planRef.value = { displayName: 'Pro', currency: 'TRY' };
+    snapshotRef.value = {
+      users: { current: 5, max: 5 }, // 100% used → "full" → upgrade CTA shows
+    };
+
+    renderPage();
+
+    const link = screen.getByRole('link', { name: /Üst pakete geç/ });
+    expect(link).toHaveAttribute('href', '/subscription/change-plan');
   });
 });

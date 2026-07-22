@@ -21,6 +21,31 @@ import {
 } from '../marketplace/marketplaceApi';
 import { useGetUsageSnapshot, type UsageDimension } from './planApi';
 import SubscriptionManagementSection from '../../pages/settings/SubscriptionSettingsPage';
+import Badge from '../../components/ui/Badge';
+import type { PlanFeatures } from '../../types';
+
+/**
+ * The 13 boolean flags on `PlanFeatures`, labeled. Reuses the labels already
+ * shipped for the plan-comparison table (`subscriptions:comparison.features.*`,
+ * mirrored to all 5 locales) instead of inventing a second copy — see
+ * `subscriptions.json`. defaultValue below is the tr-TR text, matching this
+ * page's existing convention.
+ */
+const PLAN_FEATURE_FLAGS: Array<{ flag: keyof PlanFeatures; defaultLabel: string }> = [
+  { flag: 'advancedReports', defaultLabel: 'Gelişmiş raporlar' },
+  { flag: 'multiLocation', defaultLabel: 'Çoklu şube' },
+  { flag: 'customBranding', defaultLabel: 'Özel marka' },
+  { flag: 'apiAccess', defaultLabel: 'API erişimi' },
+  { flag: 'prioritySupport', defaultLabel: 'Öncelikli destek' },
+  { flag: 'inventoryTracking', defaultLabel: 'Stok takibi' },
+  { flag: 'kdsIntegration', defaultLabel: 'KDS entegrasyonu' },
+  { flag: 'reservationSystem', defaultLabel: 'Rezervasyon sistemi' },
+  { flag: 'personnelManagement', defaultLabel: 'Personel yönetimi' },
+  { flag: 'deliveryIntegration', defaultLabel: 'Yemek platformu entegrasyonu' },
+  { flag: 'posAccess', defaultLabel: 'POS / Satış ekranı' },
+  { flag: 'externalDisplay', defaultLabel: 'Uzak ekran & Partner API' },
+  { flag: 'aiContentGeneration', defaultLabel: 'Yapay Zeka Menü Stüdyosu' },
+];
 
 /**
  * v2.8.88 — top-level Plan & Erişim sayfası.
@@ -30,15 +55,20 @@ import SubscriptionManagementSection from '../../pages/settings/SubscriptionSett
  * destination — same page bundles:
  *   1. Current plan card + next-billing + "Planı değiştir" CTA.
  *   2. Quota cards (users / branches / products / monthly orders),
- *      colored green / amber / red as utilisation crosses 80% / 100%.
- *   3. Active add-ons list with renewal date + cancel CTA.
- *   4. Suggested add-ons grid — anything in the catalog the tenant
- *      doesn't own yet.
+ *      colored green / amber / red as utilisation crosses 80% / 100%,
+ *      with an upgrade CTA to /subscription/change-plan once full.
+ *   3. Dahil (Included) band — the plan's ON boolean features plus
+ *      catalog add-ons the plan already grants (`includedInPlan === true`).
+ *      Reuses MarketplacePage's "Planınıza dahil" badge treatment.
+ *   4. Active add-ons list with renewal date + cancel CTA.
+ *   5. Satın alınabilir (Purchasable) — suggested add-ons grid, FAIL-CLOSED:
+ *      only `includedInPlan === false` is ever offered for sale. An
+ *      `undefined` value (shape drift / stale cache) is shown nowhere.
  */
 export default function PlanAndAccessPage() {
   const { t } = useTranslation('plan');
   const { data: subscription } = useGetCurrentSubscription();
-  const { plan } = useSubscription();
+  const { plan, hasFeature } = useSubscription();
   const { data: snapshot } = useGetUsageSnapshot();
   const { data: catalog = [] } = useListAddOns();
   const { data: myAddOns = [] } = useListMyAddOns();
@@ -48,13 +78,29 @@ export default function PlanAndAccessPage() {
     () => new Set(myAddOns.map((a) => a.addOn?.code).filter(Boolean)),
     [myAddOns],
   );
+
+  // Dahil band — the plan's ON boolean features …
+  const includedFeatures = PLAN_FEATURE_FLAGS.filter((f) => hasFeature(f.flag));
+  // … plus add-ons the plan already grants (server-computed includedInPlan).
+  // Shown, not hidden — the old behavior silently dropped these from
+  // suggestions without ever telling the tenant they already have them.
+  const includedAddOns = useMemo(
+    () => catalog.filter((c) => c.includedInPlan === true),
+    [catalog],
+  );
+
   const suggested = useMemo(
-    // Don't suggest add-ons the tenant already owns OR whose feature their plan
-    // already grants (includedInPlan, from /addons/available) — suggesting a
-    // feature they already have is the same "selling what you own" bug.
+    // FAIL-CLOSED (deep-review DEF-9): only offer an add-on for sale when the
+    // server has EXPLICITLY said `includedInPlan === false`. The old
+    // `!c.includedInPlan` check was fail-OPEN — an `undefined` value (shape
+    // drift, a stale cache, a field the server forgot to send) fell through
+    // to "suggest it", which can sell a tenant something their plan already
+    // covers. `undefined` now means "unknown" and is shown nowhere: neither
+    // sold (this list) nor claimed as included (the Dahil band above, which
+    // requires `=== true`).
     () =>
       catalog
-        .filter((c) => !ownedCodes.has(c.code) && !c.includedInPlan)
+        .filter((c) => c.includedInPlan === false && !ownedCodes.has(c.code))
         .slice(0, 6),
     [catalog, ownedCodes],
   );
@@ -66,6 +112,12 @@ export default function PlanAndAccessPage() {
       currency,
       maximumFractionDigits: 0,
     });
+  const recurringSuffix = t('perMonthSuffix', { defaultValue: '/ay' });
+  const unlimitedLabel = t('quota.unlimited', { defaultValue: 'Sınırsız' });
+  const upgradeCta = t('quota.upgradeCta', { defaultValue: 'Üst pakete geç →' });
+  const includedInPlanLabel = t('common:hummytummy.marketplace.includedInPlan', {
+    defaultValue: 'Planınıza dahil',
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -97,16 +149,22 @@ export default function PlanAndAccessPage() {
             icon={Users}
             label={t('quota.users', { defaultValue: 'Kullanıcılar' })}
             dim={snapshot?.users}
+            unlimitedLabel={unlimitedLabel}
+            upgradeCta={upgradeCta}
           />
           <QuotaCard
             icon={Building2}
             label={t('quota.branches', { defaultValue: 'Şubeler' })}
             dim={snapshot?.branches}
+            unlimitedLabel={unlimitedLabel}
+            upgradeCta={upgradeCta}
           />
           <QuotaCard
             icon={Package}
             label={t('quota.products', { defaultValue: 'Ürünler' })}
             dim={snapshot?.products}
+            unlimitedLabel={unlimitedLabel}
+            upgradeCta={upgradeCta}
           />
           <QuotaCard
             icon={ShoppingCart}
@@ -114,9 +172,68 @@ export default function PlanAndAccessPage() {
               defaultValue: 'Aylık siparişler',
             })}
             dim={snapshot?.monthlyOrders}
+            unlimitedLabel={unlimitedLabel}
+            upgradeCta={upgradeCta}
           />
         </div>
       </section>
+
+      {/* Dahil (Included) — plan features that are ON + add-ons the plan
+          already grants. Not hidden: the audit found the old page silently
+          dropped includedInPlan add-ons from suggestions but never told the
+          tenant they already had them. Badge/copy mirrors MarketplacePage's
+          "Planınıza dahil" treatment. */}
+      {(includedFeatures.length > 0 || includedAddOns.length > 0) && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            {t('included.title', { defaultValue: 'Planınıza dahil olanlar' })}
+          </h2>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50/40 p-4">
+            {includedFeatures.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {includedFeatures.map((f) => (
+                  <span
+                    key={f.flag}
+                    className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {t(`subscriptions:comparison.features.${f.flag}`, {
+                      defaultValue: f.defaultLabel,
+                    })}
+                  </span>
+                ))}
+              </div>
+            )}
+            {includedAddOns.length > 0 && (
+              <div
+                className={`grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 ${
+                  includedFeatures.length > 0 ? 'mt-4' : ''
+                }`}
+              >
+                {includedAddOns.map((a) => (
+                  <div
+                    key={a.code}
+                    className="rounded-lg border border-emerald-200 bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-medium text-slate-900">{a.name}</div>
+                      <Badge variant="success" size="sm">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        {includedInPlanLabel}
+                      </Badge>
+                    </div>
+                    {a.description && (
+                      <p className="mt-1 line-clamp-2 text-xs text-slate-600">
+                        {a.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Active add-ons */}
       <section>
@@ -173,7 +290,7 @@ export default function PlanAndAccessPage() {
                       </td>
                       <td className="px-4 py-2 text-slate-700">
                         {a.addOn?.priceCents != null
-                          ? `${fmt(a.addOn.priceCents)}${a.addOn?.billing === 'recurring' ? '/ay' : ''}`
+                          ? `${fmt(a.addOn.priceCents)}${a.addOn?.billing === 'recurring' ? recurringSuffix : ''}`
                           : '—'}
                       </td>
                       <td className="px-4 py-2 text-slate-700">{periodEnd}</td>
@@ -221,7 +338,7 @@ export default function PlanAndAccessPage() {
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {suggested.map((c) => (
-              <SuggestedCard key={c.code} addon={c} fmt={fmt} />
+              <SuggestedCard key={c.code} addon={c} fmt={fmt} recurringSuffix={recurringSuffix} />
             ))}
           </div>
         </section>
@@ -234,10 +351,14 @@ function QuotaCard({
   icon: Icon,
   label,
   dim,
+  unlimitedLabel,
+  upgradeCta,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   dim?: UsageDimension;
+  unlimitedLabel: string;
+  upgradeCta: string;
 }) {
   if (!dim) {
     return (
@@ -281,7 +402,7 @@ function QuotaCard({
         {dim.current} {unlimited ? '' : <span className="text-slate-400 text-base">/ {dim.max}</span>}
       </div>
       {unlimited ? (
-        <div className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${colors.chip}`}>Sınırsız</div>
+        <div className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${colors.chip}`}>{unlimitedLabel}</div>
       ) : (
         <>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -289,10 +410,10 @@ function QuotaCard({
           </div>
           {status !== 'ok' && (
             <Link
-              to="/admin/plan"
+              to="/subscription/change-plan"
               className="mt-2 inline-block text-[11px] font-medium text-blue-600 hover:underline"
             >
-              Üst pakete geç →
+              {upgradeCta}
             </Link>
           )}
         </>
@@ -304,9 +425,11 @@ function QuotaCard({
 function SuggestedCard({
   addon,
   fmt,
+  recurringSuffix,
 }: {
   addon: MarketplaceAddOn;
   fmt: (cents: number) => string;
+  recurringSuffix: string;
 }) {
   return (
     <Link
@@ -319,7 +442,7 @@ function SuggestedCard({
         </span>
         <span className="text-sm font-medium text-slate-900">
           {fmt(addon.priceCents)}
-          {addon.billing === 'recurring' ? '/ay' : ''}
+          {addon.billing === 'recurring' ? recurringSuffix : ''}
         </span>
       </div>
       <div className="mt-2 font-medium text-slate-900">{addon.name}</div>

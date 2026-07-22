@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-error';
+import { marketplaceKeys } from '../marketplace/marketplaceApi';
 import {
   Plan,
   Subscription,
@@ -174,6 +175,14 @@ export const useChangePlan = () => {
       // kept showing the old entitlements until something else refetched.
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
+      // DEF-10: the marketplace catalog's `includedInPlan` is computed from
+      // the tenant's plan, so a plan change can flip it on add-ons that were
+      // purchasable a moment ago (or vice versa). Cross-module invalidation
+      // (marketplace catalog from the subscriptions mutation) is the cleanest
+      // fix — the alternative (Plan & Access page polling / a manual refetch
+      // in a success handler) would miss any OTHER place the catalog is
+      // rendered (e.g. the standalone Marketplace page, the Mağaza hub).
+      queryClient.invalidateQueries({ queryKey: marketplaceKeys.catalogAll });
 
       if (result.type === 'downgrade') {
         // Downgrade is scheduled - refresh to show scheduled downgrade alert
