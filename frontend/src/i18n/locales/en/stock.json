@@ -350,5 +350,71 @@
     "menuEngineering": "Menu Engineering",
     "usageVariance": "Usage Variance",
     "recipeCosting": "Recipe Costs"
+  },
+  "guide": {
+    "title": "Purchasing Guide",
+    "buyNow": "Needed today",
+    "channelGuide": "Channel guide",
+    "createDraft": "Create draft PO",
+    "cheapestRecent": "cheapest in the last {{count}} purchases",
+    "catalogPrice": "catalog price",
+    "alt": "alt: {{name}} {{price}}",
+    "trendUp": "↗ {{pct}}%/mo",
+    "trendDown": "↘ {{pct}}%/mo",
+    "buyListEmpty": "Nothing below par 🎉",
+    "error": "Couldn't load the guide",
+    "viewAsTier": "View as this scale",
+    "tier": {
+      "SMALL_CAFE": "Small Cafe",
+      "MID_RESTAURANT": "Mid-size Restaurant",
+      "MULTI_BRANCH": "Multi-branch"
+    },
+    "cat": {
+      "MEAT": "Meat",
+      "PRODUCE": "Produce",
+      "DRY_GOODS": "Dry Goods",
+      "DAIRY": "Dairy",
+      "BEVERAGE": "Beverage",
+      "PACKAGING": "Packaging",
+      "CLEANING": "Cleaning"
+    },
+    "rec": {
+      "generic": "recommended per the channel guide",
+      "MEAT": {
+        "SMALL_CAFE": "Agree a fixed price with a nearby butcher.",
+        "MID_RESTAURANT": "Compare 2-3 butchers/suppliers and pick the best.",
+        "MULTI_BRANCH": "Set up a bulk meat supply contract for all branches."
+      },
+      "PRODUCE": {
+        "SMALL_CAFE": "Buy fresh daily from a local greengrocer/market.",
+        "MID_RESTAURANT": "Split orders across 2 suppliers on a fixed delivery day.",
+        "MULTI_BRANCH": "Set up a multi-branch deal with a central produce supplier."
+      },
+      "DRY_GOODS": {
+        "SMALL_CAFE": "Buy in bulk monthly from a wholesaler.",
+        "MID_RESTAURANT": "Place regular orders while comparing prices.",
+        "MULTI_BRANCH": "Buy in bulk through a central warehouse."
+      },
+      "DAIRY": {
+        "SMALL_CAFE": "Order regularly from a trusted dairy distributor.",
+        "MID_RESTAURANT": "Work with 2 cold-chain-capable suppliers.",
+        "MULTI_BRANCH": "Contract a regional dairy distributor."
+      },
+      "BEVERAGE": {
+        "SMALL_CAFE": "Buy in bulk from a beverage distributor during promotions.",
+        "MID_RESTAURANT": "Set up deferred payment terms with brand distributors.",
+        "MULTI_BRANCH": "Set up a per-branch delivery plan with the main distributor."
+      },
+      "PACKAGING": {
+        "SMALL_CAFE": "Buy packaging in bulk from a wholesaler.",
+        "MID_RESTAURANT": "Order in bulk to lower the unit cost.",
+        "MULTI_BRANCH": "Sign an annual contract with a central packaging supplier."
+      },
+      "CLEANING": {
+        "SMALL_CAFE": "Buy cleaning supplies from a local distributor.",
+        "MID_RESTAURANT": "Set up regular orders with a professional cleaning supplier.",
+        "MULTI_BRANCH": "Agree with a single cleaning supplier for all branches."
+      }
+    }
   }
 }

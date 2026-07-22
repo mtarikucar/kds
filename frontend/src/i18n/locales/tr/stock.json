@@ -350,5 +350,71 @@
     "menuEngineering": "Menü Mühendisliği",
     "usageVariance": "Kullanım Varyansı",
     "recipeCosting": "Reçete Maliyetleri"
+  },
+  "guide": {
+    "title": "Tedarik Rehberi",
+    "buyNow": "Bugün alınması gerekenler",
+    "channelGuide": "Kanal rehberi",
+    "createDraft": "Sipariş taslağı oluştur",
+    "cheapestRecent": "son {{count}} alımda en ucuz",
+    "catalogPrice": "katalog fiyatı",
+    "alt": "alternatif: {{name}} {{price}}",
+    "trendUp": "↗ %{{pct}}/ay",
+    "trendDown": "↘ %{{pct}}/ay",
+    "buyListEmpty": "Par altında malzeme yok 🎉",
+    "error": "Rehber yüklenemedi",
+    "viewAsTier": "Şu ölçek için görüntüle",
+    "tier": {
+      "SMALL_CAFE": "Küçük Kafe",
+      "MID_RESTAURANT": "Orta Ölçek Restoran",
+      "MULTI_BRANCH": "Çoklu Şube"
+    },
+    "cat": {
+      "MEAT": "Et",
+      "PRODUCE": "Sebze & Meyve",
+      "DRY_GOODS": "Kuru Gıda",
+      "DAIRY": "Süt Ürünleri",
+      "BEVERAGE": "İçecek",
+      "PACKAGING": "Ambalaj",
+      "CLEANING": "Temizlik"
+    },
+    "rec": {
+      "generic": "kanal rehberine göre önerilir",
+      "MEAT": {
+        "SMALL_CAFE": "Yakın kasapla sabit fiyatlı anlaşma yapın.",
+        "MID_RESTAURANT": "2-3 kasap/tedarikçiyi karşılaştırıp en uygununu seçin.",
+        "MULTI_BRANCH": "Şubeler için toplu et tedarik sözleşmesi yapın."
+      },
+      "PRODUCE": {
+        "SMALL_CAFE": "Yerel manav/halden günlük taze alım yapın.",
+        "MID_RESTAURANT": "Sabit teslimat gününe göre 2 tedarikçiden alın.",
+        "MULTI_BRANCH": "Merkezi sebze-meyve tedarikçisiyle çoklu şube anlaşması yapın."
+      },
+      "DRY_GOODS": {
+        "SMALL_CAFE": "Toptancıdan ayda bir stoklu alım yapın.",
+        "MID_RESTAURANT": "Fiyat karşılaştırmalı düzenli sipariş verin.",
+        "MULTI_BRANCH": "Merkezi depo üzerinden toplu satın alma yapın."
+      },
+      "DAIRY": {
+        "SMALL_CAFE": "Güvenilir süt ürünleri bayisinden düzenli alım yapın.",
+        "MID_RESTAURANT": "Soğuk zincire uygun 2 tedarikçiyle çalışın.",
+        "MULTI_BRANCH": "Bölgesel süt ürünleri dağıtıcısıyla sözleşme yapın."
+      },
+      "BEVERAGE": {
+        "SMALL_CAFE": "İçecek bayisinden kampanyalı toplu alım yapın.",
+        "MID_RESTAURANT": "Marka bayileriyle vadeli ödeme anlaşması yapın.",
+        "MULTI_BRANCH": "Ana distribütörle şube bazlı teslimat planı kurun."
+      },
+      "PACKAGING": {
+        "SMALL_CAFE": "Ambalaj malzemesini toptancıdan stoklu alın.",
+        "MID_RESTAURANT": "Birim maliyeti düşürmek için toplu sipariş verin.",
+        "MULTI_BRANCH": "Merkezi ambalaj tedarikçisiyle yıllık sözleşme yapın."
+      },
+      "CLEANING": {
+        "SMALL_CAFE": "Temizlik malzemelerini yerel bayiden alın.",
+        "MID_RESTAURANT": "Profesyonel temizlik tedarikçisiyle düzenli sipariş kurun.",
+        "MULTI_BRANCH": "Tüm şubeler için tek temizlik tedarikçisiyle anlaşın."
+      }
+    }
   }
 }

@@ -350,5 +350,71 @@
     "menuEngineering": "Menyu muhandisligi",
     "usageVariance": "Sarf farqi",
     "recipeCosting": "Retsept tannarxi"
+  },
+  "guide": {
+    "title": "Ta'minot qo'llanmasi",
+    "buyNow": "Bugun sotib olinishi kerak",
+    "channelGuide": "Kanal qo'llanmasi",
+    "createDraft": "Buyurtma qoralamasini yaratish",
+    "cheapestRecent": "so'nggi {{count}} xariddagi eng arzoni",
+    "catalogPrice": "katalog narxi",
+    "alt": "muqobil: {{name}} {{price}}",
+    "trendUp": "↗ {{pct}}%/oy",
+    "trendDown": "↘ {{pct}}%/oy",
+    "buyListEmpty": "Norma ostida mahsulot yo'q 🎉",
+    "error": "Qo'llanmani yuklab bo'lmadi",
+    "viewAsTier": "Shu masshtab uchun ko'rish",
+    "tier": {
+      "SMALL_CAFE": "Kichik kafe",
+      "MID_RESTAURANT": "O'rta restoran",
+      "MULTI_BRANCH": "Ko'p filial"
+    },
+    "cat": {
+      "MEAT": "Go'sht",
+      "PRODUCE": "Sabzavot va meva",
+      "DRY_GOODS": "Quruq mahsulotlar",
+      "DAIRY": "Sut mahsulotlari",
+      "BEVERAGE": "Ichimlik",
+      "PACKAGING": "Qadoqlash",
+      "CLEANING": "Tozalash"
+    },
+    "rec": {
+      "generic": "kanal qo'llanmasiga ko'ra tavsiya etiladi",
+      "MEAT": {
+        "SMALL_CAFE": "Yaqin qassob bilan qat'iy narxda kelishing.",
+        "MID_RESTAURANT": "2-3 qassob/yetkazib beruvchini solishtirib eng yaxshisini tanlang.",
+        "MULTI_BRANCH": "Barcha filiallar uchun ko'p miqdorda go'sht ta'minoti shartnomasini tuzing."
+      },
+      "PRODUCE": {
+        "SMALL_CAFE": "Mahalliy sabzavotfurushdan har kuni yangi mahsulot sotib oling.",
+        "MID_RESTAURANT": "Buyurtmalarni belgilangan yetkazib berish kuniga ko'ra 2 ta yetkazib beruvchi o'rtasida taqsimlang.",
+        "MULTI_BRANCH": "Barcha filiallar uchun markazlashgan sabzavot-meva yetkazib beruvchi bilan kelishuv tuzing."
+      },
+      "DRY_GOODS": {
+        "SMALL_CAFE": "Ulgurji sotuvchidan oyiga bir marta ko'p miqdorda sotib oling.",
+        "MID_RESTAURANT": "Narxlarni solishtirib muntazam buyurtma bering.",
+        "MULTI_BRANCH": "Markaziy ombor orqali ko'p miqdorda xarid qiling."
+      },
+      "DAIRY": {
+        "SMALL_CAFE": "Ishonchli sut mahsulotlari distribyutoridan muntazam buyurtma bering.",
+        "MID_RESTAURANT": "Sovuq zanjirga mos 2 ta yetkazib beruvchi bilan ishlang.",
+        "MULTI_BRANCH": "Mintaqaviy sut mahsulotlari distribyutori bilan shartnoma tuzing."
+      },
+      "BEVERAGE": {
+        "SMALL_CAFE": "Aksiyalar vaqtida ichimlik distribyutoridan ko'p miqdorda sotib oling.",
+        "MID_RESTAURANT": "Brend distribyutorlari bilan muddatli to'lov shartlarini kelishing.",
+        "MULTI_BRANCH": "Asosiy distribyutor bilan filial bo'yicha yetkazib berish rejasini tuzing."
+      },
+      "PACKAGING": {
+        "SMALL_CAFE": "Qadoqlash materialini ulgurji sotuvchidan ko'p miqdorda sotib oling.",
+        "MID_RESTAURANT": "Birlik narxini pasaytirish uchun ko'p miqdorda buyurtma bering.",
+        "MULTI_BRANCH": "Markaziy qadoqlash yetkazib beruvchi bilan yillik shartnoma tuzing."
+      },
+      "CLEANING": {
+        "SMALL_CAFE": "Tozalash vositalarini mahalliy distribyutordan sotib oling.",
+        "MID_RESTAURANT": "Professional tozalash yetkazib beruvchisi bilan muntazam buyurtmalarni yo'lga qo'ying.",
+        "MULTI_BRANCH": "Barcha filiallar uchun yagona tozalash yetkazib beruvchisi bilan kelishing."
+      }
+    }
   }
 }
