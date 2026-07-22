@@ -363,15 +363,12 @@
     "recipeCosting": "تكاليف الوصفات"
   },
   "guide": {
-    "title": "دليل التموين",
     "buyNow": "المطلوب شراؤه اليوم",
     "channelGuide": "دليل القنوات",
     "createDraft": "إنشاء مسودة طلب شراء",
     "cheapestRecent": "الأرخص في آخر {{count}} عمليات شراء",
     "catalogPrice": "سعر الكتالوج",
     "alt": "بديل: {{name}} {{price}}",
-    "trendUp": "↗ {{pct}}%/شهر",
-    "trendDown": "↘ {{pct}}%/شهر",
     "buyListEmpty": "لا توجد أصناف تحت الحد الأدنى 🎉",
     "error": "تعذر تحميل الدليل",
     "viewAsTier": "عرض حسب هذا الحجم",

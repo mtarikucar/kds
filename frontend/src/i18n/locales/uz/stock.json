@@ -363,15 +363,12 @@
     "recipeCosting": "Retsept tannarxi"
   },
   "guide": {
-    "title": "Ta'minot qo'llanmasi",
     "buyNow": "Bugun sotib olinishi kerak",
     "channelGuide": "Kanal qo'llanmasi",
     "createDraft": "Buyurtma qoralamasini yaratish",
     "cheapestRecent": "so'nggi {{count}} xariddagi eng arzoni",
     "catalogPrice": "katalog narxi",
     "alt": "muqobil: {{name}} {{price}}",
-    "trendUp": "↗ {{pct}}%/oy",
-    "trendDown": "↘ {{pct}}%/oy",
     "buyListEmpty": "Norma ostida mahsulot yo'q 🎉",
     "error": "Qo'llanmani yuklab bo'lmadi",
     "viewAsTier": "Shu masshtab uchun ko'rish",

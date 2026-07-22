@@ -363,15 +363,12 @@
     "recipeCosting": "Recipe Costs"
   },
   "guide": {
-    "title": "Purchasing Guide",
     "buyNow": "Needed today",
     "channelGuide": "Channel guide",
     "createDraft": "Create draft PO",
     "cheapestRecent": "cheapest in the last {{count}} purchases",
     "catalogPrice": "catalog price",
     "alt": "alt: {{name}} {{price}}",
-    "trendUp": "↗ {{pct}}%/mo",
-    "trendDown": "↘ {{pct}}%/mo",
     "buyListEmpty": "Nothing below par 🎉",
     "error": "Couldn't load the guide",
     "viewAsTier": "View as this scale",

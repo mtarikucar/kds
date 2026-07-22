@@ -58,6 +58,16 @@ describe('GuidanceTab', () => {
     expect(screen.getAllByTestId('channel-card')).toHaveLength(7);
   });
 
+  it('updates the channel card recommendation when the tier switcher changes', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    renderTab();
+    expect(screen.getByText('guide.rec.MEAT.SMALL_CAFE')).toBeInTheDocument();
+    await user.click(screen.getByText('MID_RESTAURANT'));
+    expect(screen.getByText('guide.rec.MEAT.MID_RESTAURANT')).toBeInTheDocument();
+    expect(screen.queryByText('guide.rec.MEAT.SMALL_CAFE')).not.toBeInTheDocument();
+  });
+
   it('shows the empty state when nothing is below par', () => {
     globalThis.__guidance = q({ volumeTier: 'SMALL_CAFE', buyList: [], channelGuide: [] });
     renderTab();

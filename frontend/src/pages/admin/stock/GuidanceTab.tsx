@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ShoppingCart, TrendingUp, TrendingDown, Compass, ChevronDown } from 'lucide-react';
 import { useGuidance, type GuidanceSource, type VolumeTier, type BuyListItem } from '../../../features/stock-management/guidanceApi';
@@ -18,7 +18,6 @@ export default function GuidanceTab() {
   const { t } = useTranslation('stock');
   const formatCurrency = useFormatCurrency();
   const navigate = useNavigate();
-  const [, setSearchParams] = useSearchParams();
   const { data, isLoading, isError } = useGuidance();
   const createPO = useCreatePurchaseOrder();
   const [tierView, setTierView] = useState<VolumeTier | null>(null);
@@ -54,8 +53,7 @@ export default function GuidanceTab() {
       },
       {
         onSuccess: () => {
-          setSearchParams((p) => { const n = new URLSearchParams(p); n.set('tab', 'orders'); return n; });
-          navigate('/admin/stock?tab=orders');
+          navigate('/admin/stock?tab=orders', { replace: true });
         },
       },
     );
@@ -88,6 +86,9 @@ export default function GuidanceTab() {
                     <ul className="space-y-2">
                       {g.rows.map((r) => {
                         const p = priceOf(r.recommended);
+                        const alt = r.alternatives?.[0];
+                        const altPrice = alt ? priceOf(alt) : null;
+                        const altName = alt ? supplierNameOf(alt) : null;
                         return (
                           <li key={r.stockItemId} className="flex items-center gap-3 text-sm">
                             <span className="flex-1 truncate text-slate-800">{r.name}</span>
@@ -95,6 +96,11 @@ export default function GuidanceTab() {
                             <span className="tabular-nums font-semibold text-slate-900">{p != null ? `${formatCurrency(p)}/${r.unit}` : '—'}</span>
                             <span className="hidden sm:flex items-center gap-1 text-xs text-slate-400 min-w-0">
                               {whyLine(r.recommended)}
+                              {altPrice != null && altName && (
+                                <span className="text-slate-300">
+                                  {t('guide.alt', { name: altName, price: formatCurrency(altPrice) })}
+                                </span>
+                              )}
                               {r.recommended.type === 'OWN_HISTORY' && r.recommended.trendPct != null && (
                                 r.recommended.trendPct >= 0
                                   ? <TrendingUp className="h-3 w-3 text-rose-500" />
@@ -158,14 +164,14 @@ export default function GuidanceTab() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(data?.channelGuide ?? []).map((c) => <ChannelCard key={c.categoryKey} entry={c} />)}
+          {(data?.channelGuide ?? []).map((c) => <ChannelCard key={c.categoryKey} entry={c} tier={tier} />)}
         </div>
       </section>
     </div>
   );
 }
 
-function ChannelCard({ entry }: { entry: { categoryKey: string; recommendationKey: string; detail: { channels: unknown[]; rules: string[] } } }) {
+function ChannelCard({ entry, tier }: { entry: { categoryKey: string; recommendationKey: string; detail: { channels: unknown[]; rules: string[] } }; tier: VolumeTier }) {
   const { t } = useTranslation('stock');
   const [open, setOpen] = useState(false);
   return (
@@ -173,7 +179,7 @@ function ChannelCard({ entry }: { entry: { categoryKey: string; recommendationKe
       <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((o) => !o)}>
         <div>
           <div className="text-xs uppercase tracking-wide text-slate-400">{t(`guide.cat.${entry.categoryKey}`, entry.categoryKey)}</div>
-          <div className="text-sm text-slate-800 mt-0.5">{t(entry.recommendationKey, t('guide.rec.generic', ''))}</div>
+          <div className="text-sm text-slate-800 mt-0.5">{t(`guide.rec.${entry.categoryKey}.${tier}`, { defaultValue: t('guide.rec.generic', '') })}</div>
         </div>
         <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

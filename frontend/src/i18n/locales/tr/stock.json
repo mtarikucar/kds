@@ -363,15 +363,12 @@
     "recipeCosting": "Reçete Maliyetleri"
   },
   "guide": {
-    "title": "Tedarik Rehberi",
     "buyNow": "Bugün alınması gerekenler",
     "channelGuide": "Kanal rehberi",
     "createDraft": "Sipariş taslağı oluştur",
     "cheapestRecent": "son {{count}} alımda en ucuz",
     "catalogPrice": "katalog fiyatı",
     "alt": "alternatif: {{name}} {{price}}",
-    "trendUp": "↗ %{{pct}}/ay",
-    "trendDown": "↘ %{{pct}}/ay",
     "buyListEmpty": "Par altında malzeme yok 🎉",
     "error": "Rehber yüklenemedi",
     "viewAsTier": "Şu ölçek için görüntüle",
