@@ -31,4 +31,26 @@ describe('SupplierCatalog', () => {
     await user.click(screen.getByTestId('remove-i1'));
     expect(removeItem).toHaveBeenCalledWith({ supplierId: 'A', stockItemId: 'i1' });
   });
+
+  it('adds a catalog link using the real {supplierId, data} mutate shape', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    render(<SupplierCatalog />);
+
+    // Two <select>s exist: the supplier picker and the add-link stock-item
+    // picker. i1 is already linked (excluded from the add-link options), so
+    // i2 is the addable one.
+    const selects = screen.getAllByRole('combobox');
+    await user.selectOptions(selects[1], 'i2');
+    await user.type(screen.getByRole('spinbutton'), '99');
+    await user.click(screen.getByRole('button', { name: 'suppliers.catalog.addLink' }));
+
+    expect(addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supplierId: 'A',
+        data: expect.objectContaining({ stockItemId: 'i2', unitPrice: 99 }),
+      }),
+      expect.anything(),
+    );
+  });
 });
