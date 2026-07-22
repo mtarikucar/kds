@@ -25,7 +25,13 @@
     "EXTERNAL_SERVICE_ERROR": "تعذّر الوصول إلى خدمة خارجية. حاول مرة أخرى.",
     "TOO_MANY_REQUESTS": "محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مجددًا.",
     "TENANT_NOT_FOUND": "لم يُعثر على حساب المطعم.",
-    "INVALID_TENANT": "حساب مطعم غير صالح."
+    "INVALID_TENANT": "حساب مطعم غير صالح.",
+    "ADDON_INCLUDED_IN_PLAN": "هذه الإضافة مشمولة بالفعل في باقتك.",
+    "ADDON_ALREADY_OWNED": "لديك هذه الإضافة بالفعل.",
+    "ADDON_REQUIRES_PLAN": "تتطلب هذه الإضافة باقة أعلى.",
+    "ADDON_LIMIT_REDUNDANT": "باقتك توفّر هذا بالفعل دون حد.",
+    "SAME_PLAN_ACTIVE": "أنت مشترك بالفعل في هذه الباقة.",
+    "HARDWARE_OUT_OF_STOCK": "هذا المنتج غير متوفر في المخزون."
   },
   "errors": {
     "title": "خطأ",
