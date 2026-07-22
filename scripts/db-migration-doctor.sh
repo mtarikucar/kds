@@ -178,11 +178,22 @@ if echo "$status_out" | grep -qi "drift detected"; then
   exit 1
 fi
 
-# Failed migration in DB. The format Prisma prints is:
-#   The `<name>` migration started at <timestamp> failed
-failed_names=$(echo "$status_out" \
-  | grep -oE 'The `[0-9A-Za-z_]+` migration started' \
-  | sed -E 's/The `([^`]+)` migration started/\1/' \
+# Failed migration in DB. Prisma's `migrate status` wording is version-
+# dependent, so match every shape we've seen instead of a single one:
+#   - Older: "The `<name>` migration started at <timestamp> failed"
+#   - Newer: "Following migration have failed:" then the name, plus the
+#     always-printed remediation hints
+#     `prisma migrate resolve --rolled-back "<name>"` /
+#     `... --applied "<name>"`. The resolve-hint lines carry the exact
+#     migration name verbatim on EVERY affected version, so parsing them
+#     is the robust cross-version signal. (v3.2.131 incident: the old
+#     single-pattern parse silently missed a real failed migration on the
+#     installed Prisma, so the doctor reported "state clean" and the
+#     follow-on `migrate deploy` died with P3009.)
+failed_names=$(printf '%s\n' "$status_out" \
+  | grep -oE 'The `[0-9A-Za-z_]+` migration started|migrate resolve --(rolled-back|applied) "[0-9A-Za-z_]+"' \
+  | sed -E 's/^The `([^`]+)` migration started$/\1/; s/^migrate resolve --(rolled-back|applied) "([^"]+)"$/\2/' \
+  | grep -E '^[0-9]' \
   | sort -u || true)
 
 failed_count=$(printf '%s\n' "$failed_names" | grep -c . || true)
