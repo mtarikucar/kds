@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,6 +12,9 @@ import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { captureSwallowedEmit } from "../../common/observability/capture-swallowed-emit";
+import { EntitlementService } from "../entitlements/entitlement.service";
+import { LimitType } from "../subscriptions/decorators/check-limit.decorator";
+import { isUnlimited } from "../../common/constants/subscription-plans.const";
 
 /**
  * Device registry + pairing + heartbeat + command queue.
@@ -50,6 +54,15 @@ export class DeviceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
+    // Required (unlike `config` below, which just falls back to hardcoded
+    // TTL defaults when absent): a missing EntitlementService must never
+    // silently skip the capacity gate in enforceDeviceCapacity — that
+    // would recreate the exact "grant written, nothing reads it" class of
+    // bug this file exists to close. Real DI (device-mesh.module.ts)
+    // always resolves this — EntitlementsModule is @Global(). Placed
+    // before the optional `config` because TS forbids a required param
+    // after an optional one.
+    private readonly entitlements: EntitlementService,
     private readonly config?: ConfigService,
   ) {
     this.pairCodeTtlMs = numericEnv(
@@ -93,6 +106,93 @@ export class DeviceService {
 
   private hashToken(raw: string): string {
     return createHash("sha256").update(raw).digest("hex");
+  }
+
+  // Device kinds capped by a capacity add-on. POST /v1/devices creates
+  // every DeviceKind through one endpoint, so a route-level @CheckLimit
+  // (fixed per route, not per request-body field) can't gate only these
+  // two — hence the in-service check below. Kinds with no entry here
+  // (receipt_printer, pos_terminal, yazarkasa, scanner, caller_id,
+  // local_bridge, bar_screen, tablet_customer) are ungated, unchanged.
+  private static readonly CAPACITY_LIMIT_BY_KIND: Partial<
+    Record<string, LimitType>
+  > = {
+    kds_screen: LimitType.KDS_SCREENS,
+    tablet_waiter: LimitType.TABLETS,
+  };
+
+  /**
+   * DEF-7 / Task 6: enforce the `kds_extra_screen` / `extra_tablet`
+   * capacity add-ons. Mirrors PlanFeatureGuard.checkLimit's KDS_SCREENS/
+   * TABLETS cases exactly (engine limit -> admin override -> "nothing to
+   * cap against yet, skip") but lives here — not behind @CheckLimit —
+   * because a single multi-kind endpoint can't apply a fixed per-route
+   * limit type (see CAPACITY_LIMIT_BY_KIND doc above). No-op for any kind
+   * not in that map.
+   *
+   * Neither key has a SubscriptionPlan column (100% add-on-sourced — see
+   * the LimitType enum doc), so a tenant who has never bought the add-on
+   * and has no admin override has NOTHING to cap against: this is a
+   * capacity ceiling, not a per-unit-cost quota (contrast
+   * MenuAiQuotaService, which correctly denies-by-default because every
+   * generation is a real vendor charge — an unprovisioned device slot
+   * costs the platform nothing). Real-DB e2e coverage
+   * (test/device-mesh.e2e-spec.ts, test/device-http.e2e-spec.ts) creates a
+   * `kds_screen` slot for a freshly seeded tenant with zero add-ons and
+   * expects success — confirming "no add-on yet" must mean "not enforced
+   * yet", not "capped at 0". Enforcement activates, and stays activated,
+   * the moment the tenant has an active add-on unit or an admin override
+   * for this key.
+   */
+  private async enforceDeviceCapacity(
+    tenantId: string,
+    kind: string,
+  ): Promise<void> {
+    const limitType = DeviceService.CAPACITY_LIMIT_BY_KIND[kind];
+    if (!limitType) return;
+
+    const [tenant, engineSet] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          limitOverrides: true,
+          currentPlan: { select: { displayName: true } },
+        },
+      }),
+      this.entitlements.getForTenant(tenantId, null),
+    ]);
+
+    const engineLimit = engineSet?.limits?.[`limit.${limitType}`];
+    let limit: number;
+    if (typeof engineLimit === "number") {
+      // Engine wins — already folded add-on SUM + admin override REPLACE
+      // (no plan grant is possible for these two keys).
+      limit = engineLimit;
+    } else {
+      const overrides =
+        (tenant?.limitOverrides as Record<string, number> | null) ?? {};
+      const overrideVal = overrides[limitType];
+      if (typeof overrideVal === "number") {
+        limit = overrideVal;
+      } else {
+        return; // nothing to cap against yet — see docstring above
+      }
+    }
+
+    if (isUnlimited(limit)) return;
+
+    const currentCount = await this.prisma.device.count({
+      where: { tenantId, kind, status: { not: "retired" } },
+    });
+
+    if (currentCount >= limit) {
+      const planLabel = tenant?.currentPlan?.displayName
+        ? ` (${tenant.currentPlan.displayName})`
+        : "";
+      throw new ForbiddenException(
+        `You have reached the limit for ${limitType} in your current plan${planLabel}. Current: ${currentCount}, Limit: ${limit}. Buy the capacity add-on to increase this limit.`,
+      );
+    }
   }
 
   async createSlot(
@@ -141,6 +241,15 @@ export class DeviceService {
           `Too many devices are waiting to be paired in this branch (${pending}). Pair or remove them before adding more.`,
         );
       }
+      // DEF-7 / Task 6: paid capacity add-ons (kds_extra_screen,
+      // extra_tablet) grant `limit.kdsScreens` / `limit.tablets` but
+      // nothing read them — see enforceDeviceCapacity. Gated by the same
+      // skipPendingCap flag as the pending-slot cap above: a hardware
+      // order the tenant already paid for (provisionPurchasedDevices)
+      // is trusted bulk provisioning, not the interactive button, and
+      // must not additionally require a separate recurring capacity
+      // add-on just to pair hardware already bought.
+      await this.enforceDeviceCapacity(tenantId, input.kind);
     }
     let pairCode = this.newPairCode();
     // Retry on collision — pairCode is globally unique. 36^6 makes
