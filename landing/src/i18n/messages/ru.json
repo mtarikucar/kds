@@ -483,6 +483,7 @@
       "remote": "Удалённо",
       "consultation": "Консультация",
       "requiresBranch": "Нужен филиал",
+      "oneTimeVatIncluded": "Разово, с учётом НДС",
       "lowStock": "Осталось {n}",
       "warrantyMonthsLabel": "Гарантия {months} мес.",
       "noDetailsAuthored": "Подробная информация ещё не добавлена.",
