@@ -10,11 +10,15 @@ const h = vi.hoisted(() => ({
   navigate: vi.fn(),
   locationState: null as { from?: string } | null,
   user: { role: 'ADMIN' } as { role: string } | null,
+  logout: vi.fn(),
 }));
 
 vi.mock('./branchesApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./branchesApi')>()),
   useListBranches: () => h.branches,
+}));
+vi.mock('../auth/authApi', () => ({
+  useLogout: () => ({ mutate: h.logout }),
 }));
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
@@ -51,6 +55,7 @@ beforeEach(() => {
   useBranchScopeStore.getState().clear();
   localStorage.clear();
   h.navigate.mockReset();
+  h.logout.mockReset();
   h.locationState = null;
   h.user = { role: 'ADMIN' };
   h.branches.data = [
@@ -103,10 +108,13 @@ describe('BranchSelectPage', () => {
     expect(h.navigate).toHaveBeenCalledWith('/dashboard', { replace: true });
   });
 
-  it('does not select a non-active branch', () => {
+  it('does not select a non-active branch but keeps it focusable', () => {
     renderPage();
     const suspended = screen.getByRole('button', { name: /Depo/ });
-    expect(suspended).toBeDisabled();
+    // aria-disabled (not the `disabled` attribute) so keyboard/SR users still
+    // reach it; the click is ignored by choose().
+    expect(suspended).toHaveAttribute('aria-disabled', 'true');
+    expect(suspended).not.toBeDisabled();
     fireEvent.click(suspended);
     expect(useBranchScopeStore.getState().branchId).not.toBe('b-3');
     expect(h.navigate).not.toHaveBeenCalled();
@@ -130,11 +138,15 @@ describe('BranchSelectPage', () => {
     useBranchScopeStore.setState({ branchChosen: true });
     renderPage();
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
   });
 
-  it('hides the back affordance in forced first-entry mode', () => {
+  it('offers logout (not back) in forced first-entry mode so the user is never trapped', () => {
     useBranchScopeStore.setState({ branchChosen: false });
     renderPage();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    const logoutBtn = screen.getByRole('button', { name: 'Logout' });
+    fireEvent.click(logoutBtn);
+    expect(h.logout).toHaveBeenCalled();
   });
 });

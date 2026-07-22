@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Building2, Check, Crown, Settings2 } from 'lucide-react';
+import { ArrowLeft, Building2, Check, Crown, LogOut, Settings2 } from 'lucide-react';
 import { useListBranches, type Branch } from './branchesApi';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 import { useAuthStore } from '../../store/authStore';
+import { useLogout } from '../auth/authApi';
 import Spinner from '../../components/ui/Spinner';
 
 /**
@@ -26,6 +27,7 @@ const BranchSelectPage = () => {
   const branchChosen = useBranchScopeStore((s) => s.branchChosen);
   const setBranchId = useBranchScopeStore((s) => s.setBranchId);
   const user = useAuthStore((s) => s.user);
+  const { mutate: logout } = useLogout();
 
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
   const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
@@ -79,9 +81,11 @@ const BranchSelectPage = () => {
                   key={branch.id}
                   type="button"
                   onClick={() => choose(branch)}
-                  disabled={!selectable}
-                  title={selectable ? undefined : t('branchSelect.notSelectable')}
-                  className={`group relative flex items-center gap-3 rounded-2xl border bg-white p-4 text-left transition-all ${
+                  // aria-disabled (not `disabled`) keeps suspended/archived
+                  // branches in the tab order so keyboard/SR users still reach
+                  // them and hear their status; choose() ignores the click.
+                  aria-disabled={!selectable}
+                  className={`group relative flex items-center gap-3 rounded-2xl border bg-white p-4 text-start transition-all ${
                     isActive
                       ? 'border-primary-300 ring-2 ring-primary-500/30'
                       : 'border-slate-200/70 hover:border-primary-200 hover:shadow-md'
@@ -131,14 +135,26 @@ const BranchSelectPage = () => {
 
         {/* Footer actions */}
         <div className="mt-8 flex items-center justify-center gap-4">
-          {branchChosen && (
+          {branchChosen ? (
             <button
               type="button"
               onClick={() => navigate(from, { replace: true })}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
               {t('app.back')}
+            </button>
+          ) : (
+            // Forced first-entry mode has no back/app chrome — offer logout so a
+            // wrong-account user on a shared device isn't trapped into mutating
+            // the (X-Branch-Id-driving) store under the wrong identity.
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700"
+            >
+              <LogOut className="h-4 w-4 rtl:rotate-180" />
+              {t('app.logout')}
             </button>
           )}
           {canManage && (

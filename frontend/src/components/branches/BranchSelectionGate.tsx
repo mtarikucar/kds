@@ -40,7 +40,10 @@ const BranchSelectionGate = ({ children }: { children: React.ReactNode }) => {
 
   if (visible.length <= 1) return <>{children}</>;
 
-  return <Navigate to="/branch-select" state={{ from: location.pathname }} replace />;
+  // Preserve the full URL (query/hash carry tab + filter state on branch-scoped
+  // pages) so the selection screen returns the user exactly where they were.
+  const from = location.pathname + location.search + location.hash;
+  return <Navigate to="/branch-select" state={{ from }} replace />;
 };
 
 export default BranchSelectionGate;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useBranchScopeStore } from '../../store/branchScopeStore';
 
 const h = vi.hoisted(() => ({
@@ -19,19 +19,26 @@ import BranchSelectionGate from './BranchSelectionGate';
 
 const branch = (id: string, status = 'active') => ({ id, name: id, status });
 
-const renderGate = () =>
+// Probe rendered at /branch-select so tests can read the `from` the gate
+// forwards (the return-to-origin contract the BranchSelectPage consumes).
+const FromProbe = () => {
+  const loc = useLocation();
+  return <div>SELECT SCREEN from:{(loc.state as { from?: string } | null)?.from ?? 'none'}</div>;
+};
+
+const renderGate = (initialEntry = '/dashboard') =>
   render(
-    <MemoryRouter initialEntries={['/dashboard']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route
-          path="/dashboard"
+          path="*"
           element={
             <BranchSelectionGate>
               <div>APP CONTENT</div>
             </BranchSelectionGate>
           }
         />
-        <Route path="/branch-select" element={<div>SELECT SCREEN</div>} />
+        <Route path="/branch-select" element={<FromProbe />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -54,7 +61,19 @@ beforeEach(() => {
 describe('BranchSelectionGate', () => {
   it('redirects a multi-branch user with no explicit choice to /branch-select', () => {
     renderGate();
-    expect(screen.getByText('SELECT SCREEN')).toBeInTheDocument();
+    expect(screen.getByText(/SELECT SCREEN/)).toBeInTheDocument();
+  });
+
+  it('forwards the origin path so the screen can return the user there', () => {
+    renderGate('/kitchen');
+    expect(screen.getByText('SELECT SCREEN from:/kitchen')).toBeInTheDocument();
+  });
+
+  it('preserves query string and hash in the forwarded origin', () => {
+    renderGate('/admin/store?tab=hardware&sku=X#top');
+    expect(
+      screen.getByText('SELECT SCREEN from:/admin/store?tab=hardware&sku=X#top'),
+    ).toBeInTheDocument();
   });
 
   it('renders the app when the branch was already chosen', () => {

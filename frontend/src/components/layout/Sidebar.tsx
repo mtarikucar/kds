@@ -22,6 +22,7 @@ import {
   LogOut,
   User,
   Stethoscope,
+  Network,
   PhoneIncoming,
   Download,
   FileWarning,
@@ -210,6 +211,18 @@ const SECTIONS: NavSection[] = [
     labelKey: 'navigation.sections.planAndAccess',
     labelFallback: 'Ayarlar & Erişim',
     items: [
+      {
+        // Branch SWITCHING left the sidebar, but /admin/branches is also the
+        // device + local-network hub — and it is NOT multiLocation-gated, so a
+        // single-location tenant provisions its devices/bridges here. Keep a
+        // device-focused entry (the multi-branch "Şubeleri Yönet" link on
+        // /branch-select can't be reached by single-branch tenants).
+        to: '/admin/branches',
+        icon: Network,
+        labelKey: 'navigation.devicesNetwork',
+        labelFallback: 'Cihazlar & Ağ',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
       {
         to: '/admin/health',
         icon: Stethoscope,

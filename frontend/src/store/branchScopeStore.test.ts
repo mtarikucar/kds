@@ -190,4 +190,24 @@ describe('branchChosen flag', () => {
     await useBranchScopeStore.persist.rehydrate();
     expect(useBranchScopeStore.getState().branchChosen).toBe(false);
   });
+
+  it('persists an explicit choice across a fresh-store reload (v1 round-trip)', async () => {
+    const store = useBranchScopeStore.getState();
+    store.hydrateFromUser(makeUser({}));
+    store.setBranchId('b-2'); // writes a current-version snapshot to localStorage
+    const persisted = localStorage.getItem('branch-scope-storage');
+
+    // Simulate a page reload: a fresh store starts at its initial values, then
+    // the persist middleware rehydrates from what was persisted. If branchChosen
+    // were dropped from partialize, this is where the reload would re-force the
+    // selection screen — the merge cannot restore what was never written.
+    // (Restore the snapshot because the setState below overwrites localStorage.)
+    useBranchScopeStore.setState({ branchChosen: false, branchId: null });
+    localStorage.setItem('branch-scope-storage', persisted!);
+    await useBranchScopeStore.persist.rehydrate();
+
+    const s = useBranchScopeStore.getState();
+    expect(s.branchId).toBe('b-2');
+    expect(s.branchChosen).toBe(true);
+  });
 });

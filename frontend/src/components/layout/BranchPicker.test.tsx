@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   branches: { data: [] as unknown[], isLoading: false },
   hasFeature: vi.fn(() => true),
   navigate: vi.fn(),
+  location: { pathname: '/admin/reports', search: '', hash: '' },
 }));
 
 vi.mock('../../features/branches/branchesApi', () => ({
@@ -18,7 +19,7 @@ vi.mock('../../contexts/SubscriptionContext', () => ({
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
   useNavigate: () => h.navigate,
-  useLocation: () => ({ pathname: '/admin/reports' }),
+  useLocation: () => h.location,
 }));
 
 import BranchPicker from './BranchPicker';
@@ -29,6 +30,7 @@ beforeEach(() => {
   useBranchScopeStore.getState().clear();
   localStorage.clear();
   h.navigate.mockReset();
+  h.location = { pathname: '/admin/reports', search: '', hash: '' };
   h.hasFeature.mockReturnValue(true);
   h.branches.data = [branch('b-1', 'Kadıköy'), branch('b-2', 'Beşiktaş')];
   h.branches.isLoading = false;
@@ -60,6 +62,15 @@ describe('BranchPicker (navbar switch button)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Switch branch/ }));
     expect(h.navigate).toHaveBeenCalledWith('/branch-select', {
       state: { from: '/admin/reports' },
+    });
+  });
+
+  it('carries the query string and hash so the switcher returns to the exact view', () => {
+    h.location = { pathname: '/admin/store', search: '?tab=hardware&sku=X', hash: '#top' };
+    renderPicker();
+    fireEvent.click(screen.getByRole('button', { name: /Switch branch/ }));
+    expect(h.navigate).toHaveBeenCalledWith('/branch-select', {
+      state: { from: '/admin/store?tab=hardware&sku=X#top' },
     });
   });
 

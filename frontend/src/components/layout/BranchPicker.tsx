@@ -76,9 +76,15 @@ export default function BranchPicker() {
       </div>
       <button
         type="button"
-        onClick={() => navigate('/branch-select', { state: { from: location.pathname } })}
-        aria-label={changeLabel}
-        title={changeLabel}
+        onClick={() =>
+          navigate('/branch-select', {
+            // Carry the full URL (query/hash hold tab + filter state) so the
+            // switcher returns the user to the exact view they left.
+            state: { from: location.pathname + location.search + location.hash },
+          })
+        }
+        aria-label={active ? `${changeLabel} (${label})` : changeLabel}
+        title={active ? `${changeLabel} — ${label}` : changeLabel}
         className="flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-100 transition-colors"
       >
         <ArrowLeftRight className="h-4 w-4" />
