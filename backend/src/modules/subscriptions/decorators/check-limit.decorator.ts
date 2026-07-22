@@ -22,14 +22,18 @@ export enum LimitType {
   // kds_extra_screen -> "limit.kdsScreens", extra_tablet -> "limit.tablets")
   // — deliberately NOT "maxKdsScreens"/"maxTablets" like the plan-backed
   // limits above. Unlike those, neither has a SubscriptionPlan column
-  // (PlanConfig.limits / PlanProjectorService.LIMIT_COLUMNS): the entire
-  // cap is 100% add-on-sourced, so a tenant with zero active add-on units
-  // has an effective limit of 0 (see PlanFeatureGuard.checkLimit's
-  // "missing everywhere -> 0" fallback for these two keys, and
-  // DeviceService.enforceDeviceCapacity for the actual production
-  // enforcement path — a single multi-kind endpoint, POST /v1/devices,
-  // can't use this decorator directly since @CheckLimit is fixed per
-  // route, not per request-body kind).
+  // (PlanConfig.limits / PlanProjectorService.LIMIT_COLUMNS): the cap is
+  // 100% add-on-sourced. Because there is no plan baseline, a tenant with
+  // no add-on grant and no admin override has NO ceiling to enforce yet —
+  // enforcement is SKIPPED in that case (NOT capped at 0, which would brick
+  // first-device registration for every tenant that never bought the
+  // add-on). It activates with a real finite ceiling once >=1 add-on unit
+  // or an admin override exists. A legitimately-set 0 is still honored as a
+  // real cap (the skip only triggers on a genuinely-absent key). See
+  // PlanFeatureGuard.checkLimit and DeviceService.enforceDeviceCapacity for
+  // the production enforcement path — a single multi-kind endpoint,
+  // POST /v1/devices, can't use this decorator directly since @CheckLimit
+  // is fixed per route, not per request-body kind.
   KDS_SCREENS = "kdsScreens",
   TABLETS = "tablets",
 
