@@ -21,16 +21,25 @@ const KEYWORDS: Record<GuideCategory, string[]> = {
   DRY_GOODS: ['pirinc', 'bulgur', 'mercimek', 'nohut', 'fasulye', 'makarna', 'un', 'seker', 'tuz', 'salca', 'yag', 'zeytinyagi', 'baharat', 'bakliyat', 'kuru'],
   DAIRY: ['sut', 'peynir', 'yogurt', 'kaymak', 'tereyag', 'krema', 'ayran', 'yumurta', 'kasar', 'labne'],
   BEVERAGE: ['kola', 'gazoz', 'su', 'maden', 'meyve suyu', 'cay', 'kahve', 'icecek', 'soda', 'ayran', 'nektar'],
-  PACKAGING: ['karton', 'kutu', 'ambalaj', 'poset', 'strec', 'strec', 'folyo', 'bardak', 'tabak', 'catal', 'kasik', 'pipet', 'servis', 'kese'],
+  PACKAGING: ['karton', 'kutu', 'ambalaj', 'poset', 'strec', 'folyo', 'bardak', 'tabak', 'catal', 'kasik', 'pipet', 'servis', 'kese'],
   CLEANING: ['temizlik', 'deterjan', 'sabun', 'bez', 'eldiven', 'cop', 'hijyen', 'dezenfekt', 'kagit havlu', 'tuvalet', 'bulasik'],
 };
 
 const ORDER: GuideCategory[] = ['MEAT', 'PRODUCE', 'DRY_GOODS', 'DAIRY', 'BEVERAGE', 'PACKAGING', 'CLEANING'];
 
+// Flatten to (keyword, category) pairs, longest keyword first so a specific
+// term (tereyag, "meyve suyu") beats a shorter substring of it (yag, meyve)
+// from another category; equal-length ties break by category ORDER. Substring
+// (not word-boundary) matching is required because Turkish suffixes attach to
+// the stem (tereyagi, sucuklu) — longest-first resolves the collisions.
+const RANKED: Array<{ kw: string; cat: GuideCategory }> = ORDER.flatMap((cat) =>
+  KEYWORDS[cat].map((kw) => ({ kw, cat })),
+).sort((a, b) => b.kw.length - a.kw.length || ORDER.indexOf(a.cat) - ORDER.indexOf(b.cat));
+
 const scan = (text: string): GuideCategory | null => {
   const f = fold(text);
-  for (const cat of ORDER) {
-    if (KEYWORDS[cat].some((kw) => f.includes(kw))) return cat;
+  for (const { kw, cat } of RANKED) {
+    if (f.includes(kw)) return cat;
   }
   return null;
 };

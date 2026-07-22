@@ -22,4 +22,13 @@ describe('matchCategory', () => {
   it('is case/diacritic tolerant', () => {
     expect(matchCategory({ itemName: 'KIYMA' })).toBe('MEAT');
   });
+  it('resolves cross-category substring collisions by longest keyword', () => {
+    expect(matchCategory({ itemName: 'Tereyağı' })).toBe('DAIRY');
+    expect(matchCategory({ itemName: 'Meyve suyu' })).toBe('BEVERAGE');
+    expect(matchCategory({ itemName: 'Sabun' })).toBe('CLEANING');
+    expect(matchCategory({ itemName: 'Deterjan' })).toBe('CLEANING');
+    expect(matchCategory({ itemName: 'Tuvalet kağıdı' })).toBe('CLEANING');
+    expect(matchCategory({ itemName: 'Plastik pipet' })).toBe('PACKAGING');
+    expect(matchCategory({ itemName: 'Karton kutu' })).toBe('PACKAGING');
+  });
 });
