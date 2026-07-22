@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { PaymentsFacadeService } from "../payments-core/payments-facade.service";
@@ -6,6 +11,7 @@ import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 import { CheckoutBuyerDto } from "./dto/create-intent.dto";
 import { AddonPurchasabilityService } from "./addon-purchasability.service";
+import { CatalogService } from "../catalog/catalog.service";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -50,6 +56,8 @@ export class CheckoutIntentService {
     private readonly quoteSvc: QuoteService,
     private readonly payments: PaymentsFacadeService,
     private readonly addonGuard: AddonPurchasabilityService,
+    // Task 4 — pre-payment hardware stock guard.
+    private readonly catalog: CatalogService,
   ) {}
 
   async createIntent(args: {
@@ -77,6 +85,34 @@ export class CheckoutIntentService {
     }
 
     const quote = await this.quoteSvc.quote(cart);
+
+    // Tahsilat-önü guard (Task 4 / Donanım #1): every `hardware` line must
+    // have enough REAL stock BEFORE we mint a CheckoutIntent row or call
+    // PayTR. Without this, CatalogService.allocate() only ran inside
+    // confirmAndProvision — AFTER PayTR had already charged the buyer — so
+    // an out-of-stock SKU (the seed shipped every product with
+    // hardwareInventory.available defaulting to 0 while the hand-written
+    // stockStatus said "in_stock") let a buyer pay in full and then hit
+    // "Insufficient stock" with no refund rail. Reads `line.meta.productId`
+    // — the SAME id confirmAndProvision later hands to allocate() — off the
+    // quote QuoteService just produced, so this is a cheap follow-up read,
+    // not a second SKU lookup. This is NOT a reservation: a concurrent
+    // checkout can still race between this check and confirmAndProvision,
+    // which is exactly why allocate()'s atomic `updateMany` guard stays in
+    // place there as the authoritative, race-safe check at confirm time.
+    for (const line of quote.lines) {
+      if (line.type !== "hardware") continue;
+      const productId = line.meta?.productId;
+      if (!productId) continue; // defensive — QuoteService always sets this for hardware lines
+      const stock = await this.catalog.getAvailableStock(productId);
+      if (stock < line.qty) {
+        throw new ConflictException({
+          code: "HARDWARE_OUT_OF_STOCK",
+          message: `"${line.name}" doesn't have enough stock: ${stock} available, ${line.qty} requested.`,
+          sku: line.code,
+        });
+      }
+    }
 
     if (quote.totalCents <= 0) {
       // PayTR rejects amount=0; surface a clean BadRequest instead of a

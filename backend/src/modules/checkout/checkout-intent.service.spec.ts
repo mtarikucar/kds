@@ -22,6 +22,7 @@ describe('CheckoutIntentService (v2.8.85)', () => {
   let payments: any;
   let quoteSvc: any;
   let addonGuard: any;
+  let catalog: any;
   let svc: CheckoutIntentService;
 
   beforeEach(() => {
@@ -50,7 +51,14 @@ describe('CheckoutIntentService (v2.8.85)', () => {
     addonGuard = {
       assertPurchasable: jest.fn().mockResolvedValue(undefined),
     };
-    svc = new CheckoutIntentService(prisma, quoteSvc, payments, addonGuard);
+    // Task 4 — dedicated coverage for the pre-payment hardware stock guard
+    // lives in checkout-intent.hardware-stock.spec.ts; default to abundant
+    // stock here so these pre-existing fixtures (which DO include a
+    // hardware line) keep passing.
+    catalog = {
+      getAvailableStock: jest.fn().mockResolvedValue(999),
+    };
+    svc = new CheckoutIntentService(prisma, quoteSvc, payments, addonGuard, catalog);
   });
 
   function mockQuote(overrides: Partial<CartQuote> = {}): CartQuote {

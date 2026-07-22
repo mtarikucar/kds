@@ -55,6 +55,12 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
   let catalog: jest.Mocked<AddOnCatalogService>;
   let entitlements: { getForTenant: jest.Mock };
   let addonGuard: AddonPurchasabilityService;
+  // Task 4 — hardware CatalogService (distinct from the add-on `catalog`
+  // above). None of this file's fixtures carry a `hardware` cart line, so
+  // the stock-check loop is a no-op here; dedicated coverage lives in
+  // checkout-intent.hardware-stock.spec.ts. Still wired so the constructor
+  // shape matches production DI.
+  let hardwareCatalog: any;
   let svc: CheckoutIntentService;
 
   const buyer = {
@@ -72,6 +78,7 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
     quoteSvc = { quote: jest.fn() };
     catalog = { findByCodeOrThrow: jest.fn() } as any;
     entitlements = { getForTenant: jest.fn().mockResolvedValue(ent()) };
+    hardwareCatalog = { getAvailableStock: jest.fn().mockResolvedValue(999) };
 
     addonGuard = new AddonPurchasabilityService(
       prisma as any,
@@ -83,6 +90,7 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
       quoteSvc,
       payments,
       addonGuard,
+      hardwareCatalog,
     );
   });
 

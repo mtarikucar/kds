@@ -21,7 +21,13 @@ describe('QuoteService', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    catalog = { findBySkuOrThrow: jest.fn() } as any;
+    catalog = {
+      findBySkuOrThrow: jest.fn(),
+      // Task 4 — default to abundant stock so existing hardware-line
+      // fixtures below (none of which care about stock) keep passing;
+      // the dedicated out-of-stock tests override this per-case.
+      getAvailableStock: jest.fn().mockResolvedValue(999),
+    } as any;
     addons = { findByCodeOrThrow: jest.fn() } as any;
     svc = new QuoteService(prisma as any, catalog, addons);
   });
@@ -146,6 +152,38 @@ describe('QuoteService', () => {
     expect(q.lines[0].subtotalCents).toBe(50_000); // gross line
     expect(q.subtotalCents).toBe(41_667); // net = round(50000 / 1.2)
     expect(q.totalCents).toBe(55_000); // 50000 gross + 5000 shipping
+  });
+
+  // Task 4 — soft display-only warning when the requested qty exceeds real
+  // inventory. This does NOT drop the line (the buyer should still see the
+  // price/total) and is NOT the enforcement gate — CheckoutIntentService.
+  // createIntent is what actually blocks payment (HARDWARE_OUT_OF_STOCK).
+  it('still prices a hardware line short on stock but adds a hardware_out_of_stock warning', async () => {
+    catalog.findBySkuOrThrow.mockResolvedValue({
+      sku: 'printer-80mm', name: 'Printer', status: 'published', category: 'printer',
+      priceCents: 50_000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-pr',
+      warrantyMonths: 12, saleMode: 'DIRECT_SALE',
+    } as any);
+    catalog.getAvailableStock.mockResolvedValue(1); // buyer wants 3, only 1 on hand
+
+    const q = await svc.quote({ items: [{ type: 'hardware', sku: 'printer-80mm', qty: 3 }] });
+
+    expect(q.lines).toHaveLength(1); // still priced, not dropped
+    expect(q.lines[0].subtotalCents).toBe(150_000);
+    expect(q.warnings).toContainEqual({ code: 'hardware_out_of_stock', ref: 'printer-80mm' });
+  });
+
+  it('does not warn when stock exactly matches qty', async () => {
+    catalog.findBySkuOrThrow.mockResolvedValue({
+      sku: 'printer-80mm', name: 'Printer', status: 'published', category: 'printer',
+      priceCents: 50_000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-pr',
+      warrantyMonths: 12, saleMode: 'DIRECT_SALE',
+    } as any);
+    catalog.getAvailableStock.mockResolvedValue(2);
+
+    const q = await svc.quote({ items: [{ type: 'hardware', sku: 'printer-80mm', qty: 2 }] });
+
+    expect(q.warnings).toEqual([]);
   });
 
   // The service branch carries the same regulatory gate: a non-DIRECT_SALE

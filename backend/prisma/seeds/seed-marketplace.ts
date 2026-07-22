@@ -1172,10 +1172,36 @@ async function main() {
     // Ensure inventory row exists. Services skip stock tracking; the row
     // is harmless to create (available stays 0; quote/checkout for
     // category='service' bypasses CatalogService.allocate).
+    //
+    // Task 4 (Donanım stok kontrolü ödeme-önüne) — REVERSIBLE representative
+    // stock: a brand-new, never-seeded DIRECT_SALE hardware row starts with
+    // `available: 25` instead of the schema default 0, so it's actually
+    // buyable the moment it's seeded (pre-fix, every DIRECT_SALE product
+    // shipped with available=0 while the hand-written stockStatus said
+    // "in_stock" — pay first, "Insufficient stock" second).
+    //
+    // Deliberately CREATE-ONLY (not `update`): this is a content seed, not
+    // an inventory-ops tool. `receiveStock` / `allocate` / `markShipped`
+    // are the real inventory-ops rails; re-running this seed (the
+    // seed-runner workflow does so routinely against staging/prod to push
+    // catalog content changes) must NEVER clobber real received/sold stock
+    // that ops has since tracked. `update: {}` already left `available`
+    // untouched — this keeps that invariant.
+    //
+    // The "down" for a DB that was already seeded before this fix (so this
+    // upsert's create branch never fires again) is the paired data
+    // migration 20260722120000_hardware_inventory_seed_stock/{migration,
+    // down}.sql, which backfills/reverts existing rows using the identical
+    // available=0-and-untouched scope — verified round-trip (up→down→up).
+    const isDirectSaleHardware =
+      product.category !== "service" && saleMode === "DIRECT_SALE";
     await prisma.hardwareInventory.upsert({
       where: { productId: product.id },
       update: {},
-      create: { productId: product.id },
+      create: {
+        productId: product.id,
+        ...(isDirectSaleHardware ? { available: 25 } : {}),
+      },
     });
   }
   console.log(
