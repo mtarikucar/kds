@@ -481,7 +481,12 @@ describe("CustomerSelfPayService (characterization)", () => {
         },
         orderItemPayments: [],
       };
-      if (args?.select?.id) return Promise.resolve([{ id: "oi-1" }]);
+      // The post-lock re-validate now selects id + quantity + completed
+      // orderItemPayments (reservation/remaining re-check under the lock).
+      if (args?.select?.id)
+        return Promise.resolve([
+          { id: "oi-1", quantity: 2, orderItemPayments: [] },
+        ]);
       return Promise.resolve([baseItem]);
     });
     (prisma.order.findMany as any).mockResolvedValue([
@@ -839,7 +844,10 @@ describe("CustomerSelfPayService (characterization)", () => {
       baseStubs();
       (prisma.orderItem.findMany as any).mockImplementation((args: any) => {
         if (args?.select?.id)
-          return Promise.resolve([{ id: "oi-1" }, { id: "oi-2" }]);
+          return Promise.resolve([
+            { id: "oi-1", quantity: 2, orderItemPayments: [] },
+            { id: "oi-2", quantity: 2, orderItemPayments: [] },
+          ]);
         return Promise.resolve([
           {
             id: "oi-1",
@@ -894,6 +902,61 @@ describe("CustomerSelfPayService (characterization)", () => {
         ),
       ).rejects.toThrow(/spans multiple branches/);
       expect(prisma.pendingSelfPayment.create).not.toHaveBeenCalled();
+    });
+
+    it("re-checks reservations INSIDE the lock: 409s when a competing intent reserved the units after the pre-tx fast-fail (TOCTOU close)", async () => {
+      baseStubs();
+      (prisma.orderItem.findMany as any).mockImplementation((args: any) => {
+        if (args?.select?.id)
+          return Promise.resolve([
+            { id: "oi-1", quantity: 2, orderItemPayments: [] },
+          ]);
+        return Promise.resolve([
+          {
+            id: "oi-1",
+            orderId: "order-A",
+            quantity: 2,
+            subtotal: new Prisma.Decimal("50.00"),
+            product: { name: "x" },
+            order: { id: "order-A", discount: 0, totalAmount: 50 },
+            orderItemPayments: [],
+          },
+        ]);
+      });
+      (prisma.order.findMany as any).mockResolvedValue([
+        {
+          id: "order-A",
+          branchId: BRANCH_ID,
+          finalAmount: new Prisma.Decimal("50.00"),
+          payments: [],
+          orderItems: [{ orderItemPayments: [] }],
+        },
+      ]);
+      // The race: the OUTER reservation fast-fail (1st findMany) sees nothing,
+      // but a competing intent commits before the IN-TX re-read (2nd findMany)
+      // and reserves both units of oi-1 — exactly the TOCTOU the in-tx check
+      // closes. Without the in-tx re-check this would mint a 2nd PayTR token.
+      (prisma.pendingSelfPayment.findMany as any)
+        .mockResolvedValueOnce([]) // outer fast-fail: clear
+        .mockResolvedValue([
+          {
+            itemsByOrder: [
+              { orderId: "order-A", items: [{ orderItemId: "oi-1", quantity: 2 }] },
+            ],
+          },
+        ]); // in-tx re-read: oi-1 fully reserved by a competing intent
+      wireTransaction();
+
+      await expect(
+        svc.createPayIntent(
+          SESSION_ID,
+          { items: [{ orderItemId: "oi-1", quantity: 1 }] } as any,
+          "1.2.3.4",
+        ),
+      ).rejects.toThrow(ConflictException);
+      // No intent minted, no PayTR token requested → no second card charge.
+      expect(prisma.pendingSelfPayment.create).not.toHaveBeenCalled();
+      expect(paytrAdapter.getIframeToken).not.toHaveBeenCalled();
     });
   });
 

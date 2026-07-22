@@ -102,12 +102,14 @@ describe('SuccessCard — confirmation + email-only hint', () => {
   const base = {
     reservationNumber: 'RES-12345',
     formattedDate: 'Sunday, March 1, 2026',
-    formattedTime: '2:30 PM — 4:00 PM',
+    formattedTime: '14:30 — 16:00',
     guestCount: 4,
     lookupHref: '/reserve/t1/lookup',
   };
 
-  function renderCard(props: Partial<typeof base> & { tableName?: string | null; isEmailOnly: boolean }) {
+  function renderCard(
+    props: Partial<typeof base> & { status?: string; tableName?: string | null; isEmailOnly: boolean },
+  ) {
     return render(
       <MemoryRouter>
         <SuccessCard {...base} {...props} />
@@ -119,7 +121,21 @@ describe('SuccessCard — confirmation + email-only hint', () => {
     renderCard({ isEmailOnly: false });
     expect(screen.getByText('RES-12345')).toBeInTheDocument();
     expect(screen.getByText('Sunday, March 1, 2026')).toBeInTheDocument();
-    expect(screen.getByText('2:30 PM — 4:00 PM')).toBeInTheDocument();
+    expect(screen.getByText('14:30 — 16:00')).toBeInTheDocument();
+  });
+
+  it('shows the PENDING heading/copy by default (no status / requireApproval)', () => {
+    renderCard({ isEmailOnly: false });
+    expect(screen.getByText('public.successPending')).toBeInTheDocument();
+    expect(screen.getByText('public.successDescription')).toBeInTheDocument();
+    expect(screen.queryByText('public.successConfirmed')).not.toBeInTheDocument();
+  });
+
+  it('shows the CONFIRMED heading/copy when the reservation is auto-confirmed', () => {
+    renderCard({ isEmailOnly: false, status: 'CONFIRMED' });
+    expect(screen.getByText('public.successConfirmed')).toBeInTheDocument();
+    expect(screen.getByText('public.successConfirmedDescription')).toBeInTheDocument();
+    expect(screen.queryByText('public.successPending')).not.toBeInTheDocument();
   });
 
   it('shows the email-only cancel hint when isEmailOnly is true', () => {

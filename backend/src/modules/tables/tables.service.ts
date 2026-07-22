@@ -43,6 +43,20 @@ export interface UpcomingReservation {
   startsAt: string; // ISO datetime — frontend can compute "in N minutes"
 }
 
+/**
+ * UTC midnight of the current UTC calendar day. Reservation.date is `@db.Date`
+ * written as `new Date("YYYY-MM-DD")` (UTC midnight), so any `date` comparison
+ * must anchor in UTC too — otherwise a non-UTC server pod (e.g.
+ * TZ=Europe/Istanbul) computes process-local midnight, which serializes to the
+ * prior UTC day and shifts the whole window by the offset.
+ */
+function startOfUtcToday(): Date {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+}
+
 @Injectable()
 export class TablesService {
   constructor(
@@ -225,10 +239,13 @@ export class TablesService {
   ): Promise<(T & { upcomingReservation: UpcomingReservation | null })[]> {
     if (tables.length === 0) return [] as any;
 
+    // Anchor today/tomorrow to UTC midnight (see startOfUtcToday) so the
+    // `date IN (...)` filter matches the UTC-midnight @db.Date storage
+    // regardless of the server pod's TZ.
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const today = startOfUtcToday();
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     // Per-tenant pre-start hold window. Single row lookup — keep it
     // unwrapped here rather than passing through every call site.
@@ -441,7 +458,15 @@ export class TablesService {
       // cross-branch rename.
       const claim = await tx.table.updateMany({
         where: { id, ...branchScope(scope) },
-        data: updateTableDto,
+        data: {
+          ...updateTableDto,
+          // Same auto-hold detach as updateStatus(): an admin editing the
+          // status to OCCUPIED/AVAILABLE releases the scheduler's hold pointer.
+          ...(updateTableDto.status === TableStatus.OCCUPIED ||
+          updateTableDto.status === TableStatus.AVAILABLE
+            ? { reservationHoldId: null }
+            : {}),
+        },
       });
       if (claim.count === 0) {
         throw new NotFoundException("Table not found");
@@ -512,9 +537,20 @@ export class TablesService {
       // must also be scope-bound so a future refactor that drops the
       // findFirst (or the ConflictException early-return) can't regress
       // into a cross-branch status overwrite.
+      // A user explicitly moving a table to OCCUPIED (seated) or AVAILABLE
+      // (freed) consumes/releases any scheduler auto-hold, so detach
+      // reservationHoldId in the same write. Otherwise the reservation release
+      // tick still sees the pointer and can later flip a now-seated table back
+      // to AVAILABLE (marking the reservation NO_SHOW under a live guest).
       const claim = await tx.table.updateMany({
         where: { id, ...branchScope(scope) },
-        data: { status: updateStatusDto.status },
+        data: {
+          status: updateStatusDto.status,
+          ...(updateStatusDto.status === TableStatus.OCCUPIED ||
+          updateStatusDto.status === TableStatus.AVAILABLE
+            ? { reservationHoldId: null }
+            : {}),
+        },
       });
       if (claim.count === 0) throw new NotFoundException("Table not found");
       return tx.table.findFirstOrThrow({
@@ -555,6 +591,25 @@ export class TablesService {
       if (activeOrders > 0) {
         throw new ConflictException("Cannot delete table with active orders");
       }
+
+      // Don't silently strand a booking. Reservation.table is onDelete:
+      // SetNull, so deleting a table with a live reservation quietly unassigns
+      // it (the guest arrives to no table). Block the delete — parity with the
+      // active-orders guard — so the operator moves/cancels the booking first.
+      const upcomingReservations = await tx.reservation.count({
+        where: {
+          tableId: id,
+          tenantId: scope.tenantId,
+          status: { in: ["PENDING", "CONFIRMED", "SEATED"] },
+          date: { gte: startOfUtcToday() },
+        },
+      });
+      if (upcomingReservations > 0) {
+        throw new ConflictException(
+          "Cannot delete table with upcoming reservations. Reassign or cancel them first.",
+        );
+      }
+
       // Compound WHERE on the delete (defense-in-depth — same as update/
       // updateStatus). deleteMany returns count rather than throwing so a
       // missing row is explicit; we re-raise as 404 to preserve the API.
@@ -562,7 +617,24 @@ export class TablesService {
         where: { id, ...branchScope(scope) },
       });
       if (claim.count === 0) throw new NotFoundException("Table not found");
-      return { id, zoneId: table.zoneId };
+
+      // If the table was part of a merge group, deleting it must not strand a
+      // lone sibling in a "group of 1" (the exact invariant unmergeTable's
+      // dissolve enforces). Recount after the delete and dissolve if <= 1.
+      let dissolvedGroupId: string | null = null;
+      if (table.groupId) {
+        const remaining = await tx.table.count({
+          where: { groupId: table.groupId, ...branchScope(scope) },
+        });
+        if (remaining <= 1) {
+          await tx.table.updateMany({
+            where: { groupId: table.groupId, ...branchScope(scope) },
+            data: { groupId: null },
+          });
+          dissolvedGroupId = table.groupId;
+        }
+      }
+      return { id, zoneId: table.zoneId, dissolvedGroupId };
     });
 
     // A removed table disappears from the plan (placed map or unplaced tray) —
@@ -572,6 +644,14 @@ export class TablesService {
       scope.branchId,
       removed.zoneId ? { zoneId: removed.zoneId } : {},
     );
+    // If deleting the table dissolved its merge group, tell other terminals so
+    // their merge/bill state doesn't go stale (parity with unmergeTable).
+    if (removed.dissolvedGroupId) {
+      this.kdsGateway.emitTableUnmerge(scope.tenantId, scope.branchId, {
+        tableNumber: "all",
+        groupId: removed.dissolvedGroupId,
+      });
+    }
     return { id: removed.id };
   }
 
@@ -580,159 +660,215 @@ export class TablesService {
   // ========================================
 
   async mergeTables(scope: BranchScope, dto: MergeTablesDto) {
-    return this.prisma
-      .$transaction(async (tx) => {
-        // v3.0.0 — lookup is scope-bound so a MANAGER in branch A who
-        // somehow obtains a branch-B tableId can't pull those tables into
-        // their merge group. The lookup also surfaces the cross-branch
-        // attempt as a 404 rather than a silent partial match.
-        const tables = await tx.table.findMany({
-          where: { id: { in: dto.tableIds }, ...branchScope(scope) },
-        });
+    let result: { groupId: string; tableNumbers: string[]; branchId: string };
+    try {
+      result = await this.prisma.$transaction(
+        async (tx) => {
+          // v3.0.0 — lookup is scope-bound so a MANAGER in branch A who
+          // somehow obtains a branch-B tableId can't pull those tables into
+          // their merge group. The lookup also surfaces the cross-branch
+          // attempt as a 404 rather than a silent partial match.
+          const tables = await tx.table.findMany({
+            where: { id: { in: dto.tableIds }, ...branchScope(scope) },
+          });
 
-        if (tables.length !== dto.tableIds.length) {
-          throw new NotFoundException(
-            "One or more tables not found in current branch",
-          );
-        }
+          if (tables.length !== dto.tableIds.length) {
+            throw new NotFoundException(
+              "One or more tables not found in current branch",
+            );
+          }
 
-        // Cross-group merge protection. Previously a user picking one
-        // table out of group A and one out of group B would silently
-        // pull every member of both groups into a single new group.
-        // That violates least-surprise — the user only selected 2
-        // tables but ended up with a 10-table merge. Refuse instead;
-        // operator must unmerge the existing groups first if that's
-        // really what they want.
-        const existingGroupIds = tables
-          .map((t) => t.groupId)
-          .filter(Boolean) as string[];
-        const uniqueGroups = [...new Set(existingGroupIds)];
+          // Cross-group merge protection. Previously a user picking one
+          // table out of group A and one out of group B would silently
+          // pull every member of both groups into a single new group.
+          // That violates least-surprise — the user only selected 2
+          // tables but ended up with a 10-table merge. Refuse instead;
+          // operator must unmerge the existing groups first if that's
+          // really what they want.
+          const existingGroupIds = tables
+            .map((t) => t.groupId)
+            .filter(Boolean) as string[];
+          const uniqueGroups = [...new Set(existingGroupIds)];
 
-        if (uniqueGroups.length > 1) {
-          throw new ConflictException(
-            "One or more selected tables already belong to different merged groups. " +
-              "Unmerge them first before creating a new merge.",
-          );
-        }
+          if (uniqueGroups.length > 1) {
+            throw new ConflictException(
+              "One or more selected tables already belong to different merged groups. " +
+                "Unmerge them first before creating a new merge.",
+            );
+          }
 
-        // Use existing groupId if one of the tables is already in a group, otherwise create new
-        const groupId =
-          uniqueGroups.length > 0 ? uniqueGroups[0] : randomUUID();
+          // Use existing groupId if one of the tables is already in a group, otherwise create new
+          const groupId =
+            uniqueGroups.length > 0 ? uniqueGroups[0] : randomUUID();
 
-        // Assign groupId to all requested tables
-        await tx.table.updateMany({
-          where: { id: { in: dto.tableIds }, ...branchScope(scope) },
-          data: { groupId },
-        });
+          // Assign groupId to all requested tables
+          await tx.table.updateMany({
+            where: { id: { in: dto.tableIds }, ...branchScope(scope) },
+            data: { groupId },
+          });
 
-        return {
-          groupId,
-          tableNumbers: tables.map((t) => t.number),
-          branchId: tables[0].branchId,
-        };
-      })
-      .then(({ groupId, tableNumbers, branchId }) => {
-        this.kdsGateway.emitTableMerge(scope.tenantId, branchId, {
-          groupId,
-          tableNumbers,
-        });
-        return this.getTableGroup(scope, groupId);
-      });
+          return {
+            groupId,
+            tableNumbers: tables.map((t) => t.number),
+            branchId: tables[0].branchId,
+          };
+        },
+        // SERIALIZABLE so two concurrent overlapping merges can't both read
+        // the pre-commit (null) groupId and defeat the cross-group guard,
+        // stranding a shared table in a split-brain group. The loser hits a
+        // 40001 serialization failure (P2034) and retries — where it now sees
+        // the committed groupId and the cross-group guard fires correctly.
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2034"
+      ) {
+        throw new ConflictException(
+          "This merge conflicted with a concurrent table change. Please try again.",
+        );
+      }
+      throw err;
+    }
+
+    this.kdsGateway.emitTableMerge(scope.tenantId, result.branchId, {
+      groupId: result.groupId,
+      tableNumbers: result.tableNumbers,
+    });
+    return this.getTableGroup(scope, result.groupId);
   }
 
   async unmergeTable(scope: BranchScope, dto: UnmergeTableDto) {
-    return this.prisma
-      .$transaction(async (tx) => {
-        const table = await tx.table.findFirst({
-          where: { id: dto.tableId, ...branchScope(scope) },
-        });
+    let result: {
+      message: string;
+      tableId: string;
+      tableNumber: string;
+      groupId: string;
+      branchId: string;
+    };
+    try {
+      result = await this.prisma.$transaction(
+        async (tx) => {
+          const table = await tx.table.findFirst({
+            where: { id: dto.tableId, ...branchScope(scope) },
+          });
 
-        if (!table) {
-          throw new NotFoundException("Table not found");
-        }
+          if (!table) {
+            throw new NotFoundException("Table not found");
+          }
 
-        if (!table.groupId) {
-          throw new BadRequestException("Table is not part of any group");
-        }
+          if (!table.groupId) {
+            throw new BadRequestException("Table is not part of any group");
+          }
 
-        const groupId = table.groupId;
+          const groupId = table.groupId;
 
-        // Compound WHERE — IDOR guard (B41-B45 pattern, same shape as
-        // update() / updateStatus() / remove() above). The findFirst
-        // above already proves ownership, but a future refactor that
-        // hoists the early-return or condenses the txn shouldn't get to
-        // silently leak into a cross-tenant/cross-branch write. Switching
-        // to updateMany also gives us a count we can sanity-check.
-        const detach = await tx.table.updateMany({
-          where: { id: dto.tableId, ...branchScope(scope) },
-          data: { groupId: null },
-        });
-        if (detach.count === 0) {
-          throw new NotFoundException("Table not found");
-        }
+          // Compound WHERE — IDOR guard (B41-B45 pattern, same shape as
+          // update() / updateStatus() / remove() above). The findFirst
+          // above already proves ownership, but a future refactor that
+          // hoists the early-return or condenses the txn shouldn't get to
+          // silently leak into a cross-tenant/cross-branch write. Switching
+          // to updateMany also gives us a count we can sanity-check.
+          const detach = await tx.table.updateMany({
+            where: { id: dto.tableId, ...branchScope(scope) },
+            data: { groupId: null },
+          });
+          if (detach.count === 0) {
+            throw new NotFoundException("Table not found");
+          }
 
-        // Check remaining group members
-        const remaining = await tx.table.count({
-          where: { groupId, ...branchScope(scope) },
-        });
+          // Check remaining group members
+          const remaining = await tx.table.count({
+            where: { groupId, ...branchScope(scope) },
+          });
 
-        // If only 1 table left, dissolve the group entirely
-        if (remaining <= 1) {
+          // If only 1 table left, dissolve the group entirely
+          if (remaining <= 1) {
+            await tx.table.updateMany({
+              where: { groupId, ...branchScope(scope) },
+              data: { groupId: null },
+            });
+          }
+
+          return {
+            message: "Table unmerged successfully",
+            tableId: dto.tableId,
+            tableNumber: table.number,
+            groupId,
+            branchId: table.branchId,
+          };
+        },
+        // SERIALIZABLE so two concurrent unmerges of different members can't
+        // each read remaining=2 and skip the "group of 1" dissolve, stranding
+        // the last member alone in the group. The loser retries on P2034.
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2034"
+      ) {
+        throw new ConflictException(
+          "This unmerge conflicted with a concurrent table change. Please try again.",
+        );
+      }
+      throw err;
+    }
+
+    this.kdsGateway.emitTableUnmerge(scope.tenantId, result.branchId, {
+      tableNumber: result.tableNumber,
+      groupId: result.groupId,
+    });
+    return { message: result.message, tableId: result.tableId };
+  }
+
+  async unmergeAll(scope: BranchScope, groupId: string) {
+    let result: { message: string; branchId: string };
+    try {
+      result = await this.prisma.$transaction(
+        async (tx) => {
+          const sampleTable = await tx.table.findFirst({
+            where: { groupId, ...branchScope(scope) },
+            select: { branchId: true },
+          });
+          const count = await tx.table.count({
+            where: { groupId, ...branchScope(scope) },
+          });
+
+          if (count === 0) {
+            throw new NotFoundException("No tables found in this group");
+          }
+
           await tx.table.updateMany({
             where: { groupId, ...branchScope(scope) },
             data: { groupId: null },
           });
-        }
 
-        return {
-          message: "Table unmerged successfully",
-          tableId: dto.tableId,
-          tableNumber: table.number,
-          groupId,
-          branchId: table.branchId,
-        };
-      })
-      .then((result) => {
-        this.kdsGateway.emitTableUnmerge(scope.tenantId, result.branchId, {
-          tableNumber: result.tableNumber,
-          groupId: result.groupId,
-        });
-        return { message: result.message, tableId: result.tableId };
-      });
-  }
+          return {
+            message: "All tables unmerged successfully",
+            branchId: sampleTable?.branchId ?? "",
+          };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2034"
+      ) {
+        throw new ConflictException(
+          "This unmerge conflicted with a concurrent table change. Please try again.",
+        );
+      }
+      throw err;
+    }
 
-  async unmergeAll(scope: BranchScope, groupId: string) {
-    return this.prisma
-      .$transaction(async (tx) => {
-        const sampleTable = await tx.table.findFirst({
-          where: { groupId, ...branchScope(scope) },
-          select: { branchId: true },
-        });
-        const count = await tx.table.count({
-          where: { groupId, ...branchScope(scope) },
-        });
-
-        if (count === 0) {
-          throw new NotFoundException("No tables found in this group");
-        }
-
-        await tx.table.updateMany({
-          where: { groupId, ...branchScope(scope) },
-          data: { groupId: null },
-        });
-
-        return {
-          message: "All tables unmerged successfully",
-          branchId: sampleTable?.branchId ?? "",
-        };
-      })
-      .then((result) => {
-        this.kdsGateway.emitTableUnmerge(scope.tenantId, result.branchId, {
-          tableNumber: "all",
-          groupId,
-        });
-        return result;
-      });
+    this.kdsGateway.emitTableUnmerge(scope.tenantId, result.branchId, {
+      tableNumber: "all",
+      groupId,
+    });
+    return result;
   }
 
   async getTableGroup(scope: BranchScope, groupId: string) {

@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Clock, User, Users, CalendarCheck } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { useSeatReservation } from '../../features/reservations/reservationsApi';
+import {
+  useSeatReservation,
+  useNoShowReservation,
+  useCancelReservation,
+} from '../../features/reservations/reservationsApi';
 import type { UpcomingReservationOnTable } from '../../types';
 
 interface ReservationActionDialogProps {
@@ -37,6 +42,16 @@ const ReservationActionDialog = ({
 }: ReservationActionDialogProps) => {
   const { t } = useTranslation('pos');
   const seatMutation = useSeatReservation();
+  const noShowMutation = useNoShowReservation();
+  const cancelMutation = useCancelReservation();
+
+  // No-Show and Cancel are destructive-ish (they release the hold and
+  // finalize the row) so each sits behind an inline confirm sub-step —
+  // the footer swaps to a prompt instead of a browser confirm().
+  const [confirmAction, setConfirmAction] = useState<'noShow' | 'cancel' | null>(null);
+
+  const isBusy =
+    seatMutation.isPending || noShowMutation.isPending || cancelMutation.isPending;
 
   const handleSeat = () => {
     seatMutation.mutate(reservation.id, {
@@ -49,16 +64,30 @@ const ReservationActionDialog = ({
     });
   };
 
+  const handleNoShow = () => {
+    noShowMutation.mutate(reservation.id, {
+      // Hook invalidates ['tables']/['reservations'] and toasts; the
+      // refetch drops the hold so we just close.
+      onSuccess: () => onClose(),
+    });
+  };
+
+  const handleCancel = () => {
+    cancelMutation.mutate(reservation.id, {
+      onSuccess: () => onClose(),
+    });
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={() => {
-        // Refuse backdrop/Escape closes while the seat PATCH is in
-        // flight — otherwise the dialog disappears, the mutation
-        // resolves into an unmounted component, and the waiter is
-        // dropped on the table grid with the table silently flipped
-        // to OCCUPIED. Forcing them to wait keeps the flow coherent.
-        if (seatMutation.isPending) return;
+        // Refuse backdrop/Escape closes while any PATCH is in flight —
+        // otherwise the dialog disappears, the mutation resolves into
+        // an unmounted component, and the waiter is dropped on the
+        // table grid with the table silently flipped underneath them.
+        // Forcing them to wait keeps the flow coherent.
+        if (isBusy) return;
         onClose();
       }}
       title={t('reservationDialog.title')}
@@ -115,24 +144,93 @@ const ReservationActionDialog = ({
           </div>
         </dl>
 
-        {/* Actions. Primary "Seat" comes first since it's the
-            overwhelmingly common case; the secondary cancel just
-            closes the dialog without touching state. We deliberately
-            don't add a "walk-in anyway" button — the backend's 30-min
-            overlap guard would 400 it, and offering it here would be
-            misleading. */}
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={seatMutation.isPending}>
-            {t('reservationDialog.cancelButton')}
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSeat}
-            isLoading={seatMutation.isPending}
+        {/* Actions. Primary "Seat" is the overwhelmingly common case;
+            No-Show and Cancel are quieter outline buttons, each behind
+            an inline confirm sub-step that replaces the footer. We
+            deliberately don't add a "walk-in anyway" button — the
+            backend's 30-min overlap guard would 400 it, and offering
+            it here would be misleading. */}
+        {confirmAction ? (
+          <div
+            className={`rounded-lg border px-4 py-3 ${
+              confirmAction === 'cancel'
+                ? 'border-red-200 bg-red-50'
+                : 'border-amber-200 bg-amber-50'
+            }`}
           >
-            {t('reservationDialog.seatButton')}
-          </Button>
-        </div>
+            <p
+              className={`text-sm ${
+                confirmAction === 'cancel' ? 'text-red-900' : 'text-amber-900'
+              }`}
+            >
+              {t(
+                confirmAction === 'cancel'
+                  ? 'reservationDialog.cancelConfirmPrompt'
+                  : 'reservationDialog.noShowConfirmPrompt',
+                { customerName: reservation.customerName },
+              )}
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmAction(null)}
+                disabled={isBusy}
+              >
+                {t('reservationDialog.backButton')}
+              </Button>
+              {confirmAction === 'cancel' ? (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleCancel}
+                  isLoading={cancelMutation.isPending}
+                  disabled={isBusy && !cancelMutation.isPending}
+                >
+                  {t('reservationDialog.confirmCancelButton')}
+                </Button>
+              ) : (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleNoShow}
+                  isLoading={noShowMutation.isPending}
+                  disabled={isBusy && !noShowMutation.isPending}
+                >
+                  {t('reservationDialog.confirmNoShowButton')}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={isBusy}>
+              {t('reservationDialog.closeButton')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmAction('noShow')}
+              disabled={isBusy}
+            >
+              {t('reservationDialog.noShowButton')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmAction('cancel')}
+              disabled={isBusy}
+            >
+              {t('reservationDialog.cancelReservationButton')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSeat}
+              isLoading={seatMutation.isPending}
+              disabled={isBusy && !seatMutation.isPending}
+            >
+              {t('reservationDialog.seatButton')}
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   );

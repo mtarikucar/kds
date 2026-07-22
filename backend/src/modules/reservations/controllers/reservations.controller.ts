@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
@@ -32,6 +33,7 @@ import { UpdateReservationDto } from "../dto/update-reservation.dto";
 import { RejectReservationDto } from "../dto/update-reservation.dto";
 import { UpdateReservationSettingsDto } from "../dto/update-reservation-settings.dto";
 import { ReservationQueryDto } from "../dto/reservation-query.dto";
+import { CreateStaffReservationDto } from "../dto/create-staff-reservation.dto";
 
 @ApiTags("reservations")
 @ApiBearerAuth()
@@ -54,11 +56,29 @@ export class ReservationsController {
     return this.reservationsService.findAll(scope, query);
   }
 
+  @Post()
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: "Create a reservation (staff: phone / walk-in)" })
+  create(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreateStaffReservationDto,
+  ) {
+    return this.reservationsService.createStaffReservation(scope, dto);
+  }
+
   @Get("stats")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: "Get reservation statistics" })
   getStats(@CurrentScope() scope: BranchScope, @Query("date") date?: string) {
     return this.reservationsService.getStats(scope, date);
+  }
+
+  // Declared BEFORE the `:id` route so the literal path isn't captured as an id.
+  @Get("pending-count")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: "Count of pending reservations from today onward" })
+  getPendingCount(@CurrentScope() scope: BranchScope) {
+    return this.reservationsService.getPendingCount(scope);
   }
 
   @Get(":id")

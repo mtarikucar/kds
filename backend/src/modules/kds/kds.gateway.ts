@@ -725,6 +725,47 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  /**
+   * Broadcast that a reservation was CREATED, to the same per-branch rooms
+   * floor:layout-updated uses. The admin reservations view invalidates its
+   * lists + pending-count on this so a walk-in / phone / online booking shows
+   * up live without a manual refresh. Payload is intentionally minimal (id +
+   * status + YYYY-MM-DD date) — the client refetches the row it needs.
+   */
+  emitReservationNew(
+    tenantId: string,
+    branchId: string,
+    payload: { reservationId: string; status: string; date: string },
+  ) {
+    this.server
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("reservation:new", { ...payload, timestamp: new Date() });
+    this.logger.debug(
+      `reservation:new ${payload.reservationId} → kitchen/pos-${tenantId}`,
+    );
+  }
+
+  /**
+   * Broadcast that a reservation CHANGED (any lifecycle transition or edit),
+   * to the same per-branch rooms floor:layout-updated uses. Pairs with
+   * emitReservationNew so the admin view stays live across confirm / reject /
+   * seat / complete / no-show / cancel / edit.
+   */
+  emitReservationUpdated(
+    tenantId: string,
+    branchId: string,
+    payload: { reservationId: string; status: string; date: string },
+  ) {
+    this.server
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
+      .emit("reservation:updated", { ...payload, timestamp: new Date() });
+    this.logger.debug(
+      `reservation:updated ${payload.reservationId} → kitchen/pos-${tenantId}`,
+    );
+  }
+
   // ========================================
   // CUSTOMER-SPECIFIC EVENTS
   // ========================================

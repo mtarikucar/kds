@@ -81,6 +81,7 @@
     "admin": "Yönetici",
     "subscription": "Abonelik",
     "reservations": "Rezervasyonlar",
+    "pendingReservations": "{{count}} bekleyen",
     "personnel": "Personel",
     "stock": "Stok",
     "invoices": "Faturalar",

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt, LayoutGrid, Map as MapIcon } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt, LayoutGrid, Map as MapIcon, CalendarClock } from 'lucide-react';
 import LiveFloorMap from '../../features/floor-plan/components/LiveFloorMap';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
@@ -963,6 +963,28 @@ const POSPage = () => {
                       <Users className="h-4 w-4" />
                       <span>{t('tableSelection.seats', { count: table.capacity })}</span>
                     </div>
+
+                    {/* Upcoming reservation chip — warns the waiter this table
+                        is booked soon even while it still reads AVAILABLE. */}
+                    {table.upcomingReservation && (
+                      <div className="mt-2">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold ring-1 ring-inset ring-amber-200/60"
+                          title={t('tableGrid.upcomingReservationTitle', {
+                            customerName: table.upcomingReservation.customerName,
+                          })}
+                          aria-label={t('tableGrid.upcomingReservationTitle', {
+                            customerName: table.upcomingReservation.customerName,
+                          })}
+                        >
+                          <CalendarClock className="h-3 w-3" />
+                          {t('tableGrid.reservationChip', {
+                            startTime: table.upcomingReservation.startTime,
+                            guestCount: table.upcomingReservation.guestCount,
+                          })}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Notification Details */}
                     {hasNotifications && (

@@ -19,6 +19,20 @@ export class ReservationQueryDto {
   @IsDateString()
   date?: string;
 
+  // Inclusive date-range filter (YYYY-MM-DD). Applied by findAll only when
+  // `date` is absent — `date` still wins for back-compat single-day callers.
+  @ApiPropertyOptional({ description: "Range start (YYYY-MM-DD, inclusive)" })
+  @EmptyStringToUndefined()
+  @IsOptional()
+  @IsDateString()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({ description: "Range end (YYYY-MM-DD, inclusive)" })
+  @EmptyStringToUndefined()
+  @IsOptional()
+  @IsDateString()
+  dateTo?: string;
+
   @ApiPropertyOptional({ enum: ReservationStatus })
   @IsOptional()
   @IsEnum(ReservationStatus)

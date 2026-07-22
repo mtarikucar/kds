@@ -22,8 +22,42 @@ interface PaginatedResponse<T> {
   };
 }
 
+export interface ReservationListParams {
+  date?: string;
+  /** Inclusive range start (YYYY-MM-DD). When `date` is also given the
+   *  server prefers `date` — send one OR the other, not both. */
+  dateFrom?: string;
+  /** Inclusive range end (YYYY-MM-DD). */
+  dateTo?: string;
+  status?: string;
+  tableId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Staff-side create payload (POST /reservations). Distinct from the
+ *  public CreateReservationDto: staff pick a `source` and can auto-seat a
+ *  walk-in. `endTime` is optional — the server defaults it to
+ *  `startTime + settings.defaultDuration`. */
+export interface CreateStaffReservationDto {
+  date: string;
+  startTime: string;
+  endTime?: string;
+  guestCount: number;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  notes?: string;
+  adminNotes?: string;
+  tableId?: string;
+  branchId?: string;
+  source: 'PHONE' | 'WALKIN';
+  autoSeat?: boolean;
+}
+
 // Reservation queries
-export const useReservations = (params?: { date?: string; status?: string; tableId?: string; search?: string; page?: number; limit?: number }) => {
+export const useReservations = (params?: ReservationListParams, options?: { enabled?: boolean }) => {
   const branchId = useBranchScopeStore((s) => s.branchId);
   return useQuery<PaginatedResponse<Reservation>>({
     queryKey: ['reservations', params, branchId],
@@ -31,6 +65,27 @@ export const useReservations = (params?: { date?: string; status?: string; table
       const response = await api.get('/reservations', { params });
       return response.data;
     },
+    enabled: options?.enabled ?? true,
+  });
+};
+
+/**
+ * Badge count for the sidebar + Bekleyenler tab: PENDING rows dated today
+ * or later (server UTC-anchors the day). Nested under the ['reservations']
+ * key prefix so any list/stat invalidation (local mutations OR the
+ * reservation socket) refreshes it for free; the 60s poll is a fallback for
+ * a dropped socket. */
+export const usePendingReservationCount = (options?: { enabled?: boolean }) => {
+  const branchId = useBranchScopeStore((s) => s.branchId);
+  return useQuery<{ count: number }>({
+    queryKey: ['reservations', 'pending-count', branchId],
+    queryFn: async () => {
+      const response = await api.get('/reservations/pending-count');
+      return response.data;
+    },
+    enabled: options?.enabled ?? true,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
   });
 };
 
@@ -58,6 +113,28 @@ export const useReservationStats = (date?: string) => {
 };
 
 // Reservation mutations
+export const useCreateReservation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateStaffReservationDto) => {
+      const response = await api.post('/reservations', data);
+      return response.data as Reservation;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // A WALKIN with autoSeat immediately flips its table → OCCUPIED, so
+      // the floor plan / POS need the fresh table state; harmless for a
+      // plain PHONE create.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(i18n.t('reservations:notifications.created'));
+    },
+    onError: (error: any) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
+    },
+  });
+};
+
 export const useUpdateReservation = () => {
   const queryClient = useQueryClient();
   return useMutation({

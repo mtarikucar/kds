@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import i18next from 'i18next';
 import { formatReservationDate, formatTime, formatTimeRange } from './utils';
 
 describe('formatReservationDate', () => {
@@ -30,23 +31,49 @@ describe('formatReservationDate', () => {
     expect(formatReservationDate(undefined)).toBe('');
     expect(formatReservationDate('')).toBe('');
   });
+
+  describe('localizes against the active i18n language (not the browser locale)', () => {
+    const original = i18next.language;
+    afterEach(() => {
+      i18next.language = original;
+    });
+
+    it('produces different weekday/month names for tr vs en for the same date', () => {
+      i18next.language = 'en';
+      const en = formatReservationDate('2026-03-01');
+      i18next.language = 'tr';
+      const tr = formatReservationDate('2026-03-01');
+      expect(en).not.toBe(tr);
+      // English "March" vs Turkish "Mart"/"Pazar" — the switch changed the
+      // rendered locale, proving i18next.language drives the output.
+      expect(en.toLowerCase()).toContain('march');
+      expect(tr.toLowerCase()).not.toContain('march');
+    });
+  });
 });
 
-describe('formatTime', () => {
-  it('renders 14:30 as "2:30 PM"', () => {
-    expect(formatTime('14:30')).toBe('2:30 PM');
+describe('formatTime (24h)', () => {
+  it('renders 14:30 as "14:30"', () => {
+    expect(formatTime('14:30')).toBe('14:30');
   });
 
-  it('renders 09:00 as "9:00 AM"', () => {
-    expect(formatTime('09:00')).toBe('9:00 AM');
+  it('zero-pads a single-digit hour: 9:00 -> "09:00"', () => {
+    expect(formatTime('9:00')).toBe('09:00');
+    expect(formatTime('09:00')).toBe('09:00');
   });
 
-  it('renders 00:00 as "12:00 AM"', () => {
-    expect(formatTime('00:00')).toBe('12:00 AM');
+  it('renders midnight as "00:00" (not 12h AM)', () => {
+    expect(formatTime('00:00')).toBe('00:00');
   });
 
-  it('returns malformed input unchanged (no NaN:undefined PM)', () => {
+  it('renders 23:30 as "23:30"', () => {
+    expect(formatTime('23:30')).toBe('23:30');
+  });
+
+  it('returns malformed input unchanged (no NaN:undefined)', () => {
     expect(formatTime('xxx')).toBe('xxx');
+    expect(formatTime('25:00')).toBe('25:00');
+    expect(formatTime('12:99')).toBe('12:99');
   });
 
   it('returns empty for null/undefined/empty', () => {
@@ -56,14 +83,14 @@ describe('formatTime', () => {
   });
 });
 
-describe('formatTimeRange', () => {
+describe('formatTimeRange (24h)', () => {
   it('joins start and end with em-dash', () => {
-    expect(formatTimeRange('14:30', '16:00')).toBe('2:30 PM — 4:00 PM');
+    expect(formatTimeRange('14:30', '16:00')).toBe('14:30 — 16:00');
   });
 
   it('falls back to start only when end missing', () => {
-    expect(formatTimeRange('14:30')).toBe('2:30 PM');
-    expect(formatTimeRange('14:30', null)).toBe('2:30 PM');
-    expect(formatTimeRange('14:30', '')).toBe('2:30 PM');
+    expect(formatTimeRange('14:30')).toBe('14:30');
+    expect(formatTimeRange('14:30', null)).toBe('14:30');
+    expect(formatTimeRange('14:30', '')).toBe('14:30');
   });
 });

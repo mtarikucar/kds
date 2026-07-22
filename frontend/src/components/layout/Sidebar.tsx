@@ -35,7 +35,10 @@ import { useUiStore } from '../../store/uiStore';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useLogout } from '../../features/auth/authApi';
 import { useEnterDemo } from '../../features/demo';
+import { usePendingReservationCount } from '../../features/reservations/reservationsApi';
 import { RTL_LANGUAGES } from '../../i18n/config';
+
+const RESERVATIONS_PATH = '/admin/reservations';
 
 /**
  * v2.8.88 — typed grouped sidebar.
@@ -297,6 +300,17 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
     !demoMode &&
     (user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER);
 
+  // Pending-reservation badge on the Rezervasyonlar nav item. Only poll for
+  // accounts that can actually see the item (ADMIN/MANAGER + the feature), so
+  // waiters/kitchen never fire the request.
+  const canSeeReservations =
+    (user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER) &&
+    hasFeature('reservationSystem');
+  const { data: pendingReservationData } = usePendingReservationCount({
+    enabled: canSeeReservations,
+  });
+  const pendingReservationCount = pendingReservationData?.count ?? 0;
+
   const handleLogout = () => {
     if (window.innerWidth < 768) {
       onClose();
@@ -425,13 +439,15 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
                       const label = t(item.labelKey, {
                         defaultValue: item.labelFallback ?? item.labelKey,
                       });
+                      const showPendingBadge =
+                        item.to === RESERVATIONS_PATH && pendingReservationCount > 0;
                       return (
                         <NavLink
                           key={item.to}
                           to={item.to}
                           onClick={handleNavClick}
                           className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                            `relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
                               isActive
                                 ? 'bg-white/10 text-white font-medium'
                                 : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
@@ -445,6 +461,21 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
                           >
                             {label}
                           </span>
+                          {showPendingBadge && (
+                            <span
+                              className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold ${
+                                isSidebarCollapsed
+                                  ? 'md:absolute md:top-1 md:end-1 md:min-w-0 md:h-4 md:w-4 md:p-0 md:text-[10px]'
+                                  : 'ms-auto'
+                              }`}
+                              aria-label={t('navigation.pendingReservations', {
+                                defaultValue: '{{count}} pending',
+                                count: pendingReservationCount,
+                              })}
+                            >
+                              {pendingReservationCount}
+                            </span>
+                          )}
                         </NavLink>
                       );
                     })}

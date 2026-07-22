@@ -86,6 +86,7 @@ describe('usePosSocket — wiring + connection', () => {
     expect(fakeSocket.on).toHaveBeenCalledWith('bill-request:new', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
     expect(fakeSocket.on).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
+    expect(fakeSocket.on).toHaveBeenCalledWith('floor:layout-updated', expect.any(Function));
 
     act(() => handlers['connect']());
     expect(result.current.isConnected).toBe(true);
@@ -249,6 +250,18 @@ describe('handleStockAlerts — warning toasts', () => {
   });
 });
 
+describe('handleFloorLayoutUpdated — reservation auto-holds recolor live', () => {
+  it('invalidates tables and floorPlan on floor:layout-updated', () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    renderHook(() => usePosSocket(), { wrapper: wrapper(client) });
+
+    act(() => handlers['floor:layout-updated']());
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['tables'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['floorPlan'] });
+  });
+});
+
 describe('usePosSocket — cleanup', () => {
   it('removes its listeners and disconnects on unmount', () => {
     const client = new QueryClient();
@@ -257,6 +270,7 @@ describe('usePosSocket — cleanup', () => {
     expect(fakeSocket.off).toHaveBeenCalledWith('payment:success', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('stock:low-alert', expect.any(Function));
     expect(fakeSocket.off).toHaveBeenCalledWith('stock:expiry-alert', expect.any(Function));
+    expect(fakeSocket.off).toHaveBeenCalledWith('floor:layout-updated', expect.any(Function));
     expect(disconnectSocket).toHaveBeenCalledTimes(1);
   });
 });

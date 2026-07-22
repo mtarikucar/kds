@@ -1759,6 +1759,10 @@ model Reservation {
 
   status String @default("PENDING") // PENDING, CONFIRMED, REJECTED, SEATED, COMPLETED, CANCELLED, NO_SHOW
 
+  // Booking origin channel: ONLINE (public wizard), PHONE (staff phone booking),
+  // WALKIN (staff walk-in). Default keeps every pre-existing row as ONLINE.
+  source String @default("ONLINE")
+
   customerName  String
   /// Either customerPhone or customerEmail must be present at the
   /// application level (enforced by the @AtLeastOneOf DTO constraint).

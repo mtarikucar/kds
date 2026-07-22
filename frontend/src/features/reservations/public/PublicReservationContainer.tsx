@@ -3,13 +3,15 @@ import { useParams } from 'react-router-dom';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Loader2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   usePublicReservationSettings,
   usePublicBranches,
   useAvailableSlots,
   useAvailableTables,
   useCreatePublicReservation,
+  classifyCreateReservationError,
+  createReservationErrorKey,
 } from '../publicReservationsApi';
 import type { CreateReservationDto, Reservation } from '../../../types';
 import { reservationFormSchema } from './schema';
@@ -81,12 +83,11 @@ const PublicReservationContainer: React.FC = () => {
     }
   }, [branches, branchId]);
 
-  const { data: slots, isLoading: slotsLoading } = useAvailableSlots(
-    tenantId || '',
-    date,
-    guestCount,
-    branchId,
-  );
+  const {
+    data: slots,
+    isLoading: slotsLoading,
+    refetch: refetchSlots,
+  } = useAvailableSlots(tenantId || '', date, guestCount, branchId);
   const { data: tables, isLoading: tablesLoading } = useAvailableTables(
     tenantId || '',
     date,
@@ -112,6 +113,28 @@ const PublicReservationContainer: React.FC = () => {
     () => (tables ?? []).find((tt) => tt.id === tableId) || null,
     [tables, tableId],
   );
+
+  // Whether the tenant is closed on the picked day — mirrors the backend's
+  // operating-hours gate (weekday name, lowercased) so step 2's empty state
+  // can say "closed" instead of the ambiguous "no times". Build the weekday
+  // from the calendar parts (NOT `new Date('2026-03-01')`, which is UTC
+  // midnight and can read as the previous day for negative-offset visitors).
+  const isClosedDay = useMemo(() => {
+    if (!date || !settings?.operatingHours) return false;
+    const [y, mo, d] = date.slice(0, 10).split('-').map(Number);
+    if (!y || !mo || !d) return false;
+    const weekday = new Date(y, mo - 1, d)
+      .toLocaleDateString('en-US', { weekday: 'long' })
+      .toLowerCase();
+    return settings.operatingHours[weekday]?.closed === true;
+  }, [date, settings?.operatingHours]);
+
+  // Persistent, translated submit-error surfaced on the review step. The
+  // transient toast is fired by the mutation hook; here we drive the inline
+  // alert + (for conflicts) the "refresh times" recovery action.
+  const submitError = createReservation.isError
+    ? classifyCreateReservationError(createReservation.error)
+    : null;
 
   // Reset downstream choices when an earlier choice changes — picking
   // a new date should invalidate the chosen time, etc.
@@ -168,8 +191,22 @@ const PublicReservationContainer: React.FC = () => {
   };
 
   const handleEditFromReview = async (targetStep: 1 | 2 | 3 | 4) => {
+    // Editing any field clears a stale submit error so the guest isn't
+    // nagged by a failure they're already correcting.
+    if (createReservation.isError) createReservation.reset();
     returnToReviewRef.current = true;
     goTo(targetStep);
+  };
+
+  // Conflict-recovery: the table/slot filled while the guest was booking.
+  // Send them to step 2 with fresh availability and the stale pick cleared.
+  const handleRefreshSlots = () => {
+    createReservation.reset();
+    form.setValue('startTime', '');
+    form.setValue('endTime', '');
+    form.setValue('tableId', '');
+    refetchSlots();
+    goTo(2);
   };
 
   const handleSubmit = form.handleSubmit(async (values) => {
@@ -190,7 +227,9 @@ const PublicReservationContainer: React.FC = () => {
       const reservation = await createReservation.mutateAsync({ tenantId, data: payload });
       setCreatedReservation(reservation);
     } catch {
-      // Error toast handled by the mutation hook.
+      // Transient toast is fired by the mutation hook's onError; the
+      // persistent inline alert (+ conflict recovery) renders on the review
+      // step from `createReservation.error`. Nothing to do here but stay put.
     }
   });
 
@@ -223,6 +262,7 @@ const PublicReservationContainer: React.FC = () => {
       <div className="min-h-screen bg-background py-6 px-4">
         <div className="mx-auto max-w-2xl">
           <SuccessCard
+            status={createdReservation.status}
             reservationNumber={createdReservation.reservationNumber}
             formattedDate={formatReservationDate(form.getValues('date'))}
             formattedTime={formatTimeRange(
@@ -301,17 +341,43 @@ const PublicReservationContainer: React.FC = () => {
                 isLoading={slotsLoading}
                 defaultDuration={settings.defaultDuration ?? 60}
                 date={date}
+                isClosedDay={isClosedDay}
               />
             )}
             {step === 3 && <Step3Table tables={tables} isLoading={tablesLoading} />}
             {step === 4 && <Step4Contact />}
             {step === 5 && (
-              <Step5Review
-                tableName={
-                  selectedTable ? `${t('public.table')} ${selectedTable.number}` : null
-                }
-                onEditStep={handleEditFromReview}
-              />
+              <>
+                <Step5Review
+                  tableName={
+                    selectedTable ? `${t('public.table')} ${selectedTable.number}` : null
+                  }
+                  onEditStep={handleEditFromReview}
+                />
+                {submitError && (
+                  <div
+                    role="alert"
+                    className="mt-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 flex items-start gap-3"
+                  >
+                    <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <p className="text-sm text-destructive">
+                        {t(createReservationErrorKey(submitError.code))}
+                      </p>
+                      {submitError.isConflict && (
+                        <button
+                          type="button"
+                          onClick={handleRefreshSlots}
+                          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-destructive/40 bg-background text-xs font-semibold text-destructive hover:bg-destructive/10 transition"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          {t('public.refreshSlots')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="mt-6 flex items-center justify-between gap-3">

@@ -517,6 +517,16 @@ export const usePosSocket = () => {
       );
     };
 
+    // Every table-status write rail emits floor:layout-updated — including
+    // the reservation scheduler's auto-holds (AVAILABLE→RESERVED) and their
+    // release on seat/cancel/no-show. Invalidate so the grid AND the live
+    // floor map recolor without waiting for a poll (LiveFloorMap's own
+    // socket hook only runs while the map view is mounted).
+    const handleFloorLayoutUpdated = () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['floorPlan'] });
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -532,6 +542,7 @@ export const usePosSocket = () => {
     socket.on('stock:low-alert', handleStockLowAlert);
     socket.on('stock:expiry-alert', handleStockExpiryAlert);
     socket.on('stock:reversal-failed', handleStockReversalFailed);
+    socket.on('floor:layout-updated', handleFloorLayoutUpdated);
 
     // Table merge/unmerge: invalidate tables cache
     const handleTableMergeOrUnmerge = () => {
@@ -562,6 +573,7 @@ export const usePosSocket = () => {
       socket.off('stock:low-alert', handleStockLowAlert);
       socket.off('stock:expiry-alert', handleStockExpiryAlert);
       socket.off('stock:reversal-failed', handleStockReversalFailed);
+      socket.off('floor:layout-updated', handleFloorLayoutUpdated);
       disconnectSocket();
     };
   }, [queryClient]);

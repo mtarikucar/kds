@@ -104,6 +104,7 @@ export class PublicReservationsController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get(":tenantId/branches")
   @ApiOperation({
     summary:
