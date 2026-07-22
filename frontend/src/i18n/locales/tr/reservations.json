@@ -254,14 +254,23 @@
       "editingHint": "Değiştirmek istediğini yap, ardından otomatik olarak özete döneceksin."
     },
     "slots": {
-      "empty": "Bu tarih ve kişi sayısı için uygun saat yok."
+      "empty": "Bu tarih ve kişi sayısı için uygun saat yok.",
+      "closed": "Restoran seçtiğiniz gün kapalı. Lütfen başka bir tarih seçin."
     },
     "unavailable": {
       "title": "Rezervasyon şu an aktif değil",
       "description": "Lütfen doğrudan restoranı arayın."
     },
     "successEmailOnlyCancelHint": "Restoran e-posta onaylarını etkinleştirdiyse, e-posta adresinize bir bilgilendirme gönderilecektir. İptal etmek isterseniz lütfen restoranı arayın — telefonsuz rezervasyonlar için self-iptal henüz aktif değil.",
-    "branch": "Şube"
+    "branch": "Şube",
+    "errorTableTaken": "Seçtiğiniz saatte bu masa artık dolu. Lütfen saatleri yenileyin.",
+    "errorSlotFull": "Bu zaman dilimi az önce doldu. Lütfen başka bir saat seçin.",
+    "errorDuplicate": "Bu saat için zaten bir rezervasyonunuz var.",
+    "errorRateLimited": "Çok fazla deneme yaptınız. Lütfen biraz bekleyip tekrar deneyin.",
+    "errorGeneric": "Rezervasyon oluşturulamadı. Lütfen tekrar deneyin.",
+    "refreshSlots": "Saatleri yenile",
+    "successConfirmed": "Rezervasyon Onaylandı!",
+    "successConfirmedDescription": "Rezervasyonunuz onaylandı. Sizi ağırlamak için sabırsızlanıyoruz!"
   },
   "lookup": {
     "title": "Rezervasyonunuzu Kontrol Edin",
@@ -276,7 +285,11 @@
     "cancel": "Rezervasyonu iptal et",
     "cancelTitle": "Rezervasyon iptal edilsin mi?",
     "keep": "Vazgeç",
-    "confirmCancel": "İptal et"
+    "confirmCancel": "İptal et",
+    "cancelDisabled": "Bu rezervasyon için çevrimiçi iptal kapalı. Lütfen restoranı arayın.",
+    "cannotCancel": "Bu rezervasyon iptal edilemez.",
+    "cancelError": "Rezervasyon iptal edilemedi. Lütfen tekrar deneyin.",
+    "tempError": "Şu anda rezervasyonunuzu getiremiyoruz. Lütfen birazdan tekrar deneyin."
   },
   "notifications": {
     "confirmed": "Rezervasyon onaylandı",

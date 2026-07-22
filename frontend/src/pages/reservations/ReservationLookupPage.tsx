@@ -17,6 +17,9 @@ import {
 import {
   useLookupReservation,
   useCancelPublicReservation,
+  classifyLookupError,
+  classifyCancelError,
+  cancelReservationErrorKey,
 } from '../../features/reservations/publicReservationsApi';
 import PhoneInput from '../../components/ui/PhoneInput';
 import Modal from '../../components/ui/Modal';
@@ -44,8 +47,14 @@ const ReservationLookupPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [reservationNumber, setReservationNumber] = useState('');
   const [reservation, setReservation] = useState<Reservation | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  // Distinguish a definitive "no such booking" (404/4xx) from a temporary
+  // failure (429 throttle / 5xx) so a rate-limited guest isn't told their
+  // reservation is gone.
+  const [lookupError, setLookupError] = useState<'notFound' | 'temporary' | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Translation key for an inline cancel failure (deadline passed / cancellation
+  // disabled / etc.), rendered inside the confirm modal.
+  const [cancelErrorKey, setCancelErrorKey] = useState<string | null>(null);
 
   const lookupMutation = useLookupReservation();
   const cancelMutation = useCancelPublicReservation();
@@ -53,7 +62,7 @@ const ReservationLookupPage: React.FC = () => {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantId || !phone.trim() || !reservationNumber.trim()) return;
-    setNotFound(false);
+    setLookupError(null);
     setReservation(null);
     try {
       const result = await lookupMutation.mutateAsync({
@@ -62,13 +71,19 @@ const ReservationLookupPage: React.FC = () => {
         reservationNumber: reservationNumber.trim(),
       });
       setReservation(result);
-    } catch {
-      setNotFound(true);
+    } catch (err) {
+      setLookupError(classifyLookupError(err));
     }
+  };
+
+  const openCancelConfirm = () => {
+    setCancelErrorKey(null);
+    setShowCancelConfirm(true);
   };
 
   const handleCancel = async () => {
     if (!tenantId || !reservation) return;
+    setCancelErrorKey(null);
     try {
       const updated = await cancelMutation.mutateAsync({
         tenantId,
@@ -78,8 +93,10 @@ const ReservationLookupPage: React.FC = () => {
       });
       setReservation({ ...reservation, ...updated });
       setShowCancelConfirm(false);
-    } catch {
-      // mutation state surfaces the error
+    } catch (err) {
+      // Surface WHY inline in the modal (deadline passed, cancellation
+      // disabled, …) and keep it open so the guest sees the reason.
+      setCancelErrorKey(cancelReservationErrorKey(classifyCancelError(err)));
     }
   };
 
@@ -140,10 +157,12 @@ const ReservationLookupPage: React.FC = () => {
           </button>
         </form>
 
-        {notFound && (
+        {lookupError && (
           <div className="rounded-xl border border-border bg-card p-4 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground">{t('lookup.notFound')}</p>
+            <p className="text-sm text-foreground">
+              {lookupError === 'temporary' ? t('lookup.tempError') : t('lookup.notFound')}
+            </p>
           </div>
         )}
 
@@ -195,7 +214,7 @@ const ReservationLookupPage: React.FC = () => {
               <div className="p-5 sm:p-6 pt-0">
                 <button
                   type="button"
-                  onClick={() => setShowCancelConfirm(true)}
+                  onClick={openCancelConfirm}
                   className="w-full h-12 rounded-xl border border-destructive/40 bg-destructive/5 text-destructive text-sm font-semibold hover:bg-destructive/10 transition inline-flex items-center justify-center gap-2"
                 >
                   <X className="h-4 w-4" />
@@ -215,6 +234,15 @@ const ReservationLookupPage: React.FC = () => {
           >
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">{t('lookup.cancelConfirm')}</p>
+              {cancelErrorKey && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 flex items-start gap-2.5"
+                >
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{t(cancelErrorKey)}</p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   type="button"

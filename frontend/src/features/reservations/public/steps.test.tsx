@@ -145,6 +145,22 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
     expect(screen.getByText('public.slots.empty')).toBeInTheDocument();
   });
 
+  it('shows the CLOSED-day message (not the generic no-slots one) when isClosedDay', () => {
+    render(
+      <Harness>
+        <Step2TimeSlots
+          slots={[] as AvailableSlot[]}
+          isLoading={false}
+          defaultDuration={60}
+          date="2026-06-20"
+          isClosedDay
+        />
+      </Harness>,
+    );
+    expect(screen.getByText('public.slots.closed')).toBeInTheDocument();
+    expect(screen.queryByText('public.slots.empty')).not.toBeInTheDocument();
+  });
+
   it('hides backend-unavailable slots but keeps available ones for a future date', () => {
     render(
       <Harness>
@@ -152,10 +168,10 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
       </Harness>,
     );
     // 09:00 and 20:00 available; 12:00 unavailable -> hidden.
-    // formatTime is NOT mocked (real util), so labels are 12h.
-    expect(screen.getByRole('button', { name: '9:00 AM' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '8:00 PM' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '12:00 PM' })).not.toBeInTheDocument();
+    // formatTime is NOT mocked (real util) and now renders 24h labels.
+    expect(screen.getByRole('button', { name: '09:00' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '20:00' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '12:00' })).not.toBeInTheDocument();
   });
 
   it('drops past slots when the chosen date is today (defense-in-depth)', () => {
@@ -180,8 +196,8 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
         />
       </Harness>,
     );
-    expect(screen.queryByRole('button', { name: '9:00 AM' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '8:00 PM' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '09:00' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '20:00' })).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -199,7 +215,7 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
         />
       </Harness>,
     );
-    expect(screen.getByRole('button', { name: '8:00 PM' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '20:00' })).toBeInTheDocument();
   });
 
   it('selecting a slot sets startTime and endTime = start + defaultDuration', () => {
@@ -213,7 +229,7 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
         />
       </Harness>,
     );
-    fireEvent.click(screen.getByRole('button', { name: '8:00 PM' }));
+    fireEvent.click(screen.getByRole('button', { name: '20:00' }));
     expect(formRef.getValues('startTime')).toBe('20:00');
     expect(formRef.getValues('endTime')).toBe('21:30'); // +90 min
   });
@@ -229,7 +245,7 @@ describe('Step2TimeSlots — availability + past-time filtering', () => {
         />
       </Harness>,
     );
-    fireEvent.click(screen.getByRole('button', { name: '11:30 PM' }));
+    fireEvent.click(screen.getByRole('button', { name: '23:30' }));
     expect(formRef.getValues('endTime')).toBe('00:30');
   });
 });

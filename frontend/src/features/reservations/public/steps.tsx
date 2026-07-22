@@ -111,6 +111,10 @@ interface Step2Props extends StepCommonProps {
    *  as available (defense-in-depth against a stale or misconfigured
    *  `minAdvanceBooking` setting). */
   date: string;
+  /** True when the tenant is closed on the picked day (operating hours).
+   *  Splits the empty state into a distinct "closed" message vs the
+   *  generic "no times / fully booked" one. */
+  isClosedDay?: boolean;
 }
 
 export const Step2TimeSlots: React.FC<Step2Props> = ({
@@ -118,6 +122,7 @@ export const Step2TimeSlots: React.FC<Step2Props> = ({
   isLoading,
   defaultDuration,
   date,
+  isClosedDay = false,
 }) => {
   const { t } = useTranslation('reservations');
   const { watch, setValue } = useFormContext<ReservationFormValues>();
@@ -162,10 +167,12 @@ export const Step2TimeSlots: React.FC<Step2Props> = ({
   }
 
   if (visible.length === 0) {
+    // Closed day and "no free times" are different problems with different
+    // fixes (pick another date vs. pick another time), so we tell them apart.
     return (
       <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
         <AlertCircle className="h-6 w-6 text-muted-foreground" />
-        {t('public.slots.empty')}
+        {isClosedDay ? t('public.slots.closed') : t('public.slots.empty')}
       </div>
     );
   }

@@ -30,10 +30,19 @@ vi.mock('react-i18next', () => ({
 const lookupAsync = vi.fn();
 const cancelAsync = vi.fn();
 let cancelPending = false;
-vi.mock('../../features/reservations/publicReservationsApi', () => ({
-  useLookupReservation: () => ({ mutateAsync: lookupAsync, isPending: false }),
-  useCancelPublicReservation: () => ({ mutateAsync: cancelAsync, isPending: cancelPending }),
-}));
+// Keep the real error classifiers (classifyLookupError / classifyCancelError /
+// cancelReservationErrorKey) — the page maps its inline error copy off them —
+// and stub only the two mutations.
+vi.mock('../../features/reservations/publicReservationsApi', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../features/reservations/publicReservationsApi')
+  >('../../features/reservations/publicReservationsApi');
+  return {
+    ...actual,
+    useLookupReservation: () => ({ mutateAsync: lookupAsync, isPending: false }),
+    useCancelPublicReservation: () => ({ mutateAsync: cancelAsync, isPending: cancelPending }),
+  };
+});
 
 // utils + parts are exercised with their real impls (already specced); they
 // just format the reservation fields for display.
@@ -95,6 +104,15 @@ describe('ReservationLookupPage — search', () => {
     fillAndSearch();
     await waitFor(() => expect(screen.getByText('lookup.notFound')).toBeInTheDocument());
   });
+
+  it('distinguishes a TEMPORARY failure (429/5xx) from a real not-found', async () => {
+    lookupAsync.mockRejectedValue({ isAxiosError: true, response: { status: 429 } });
+    renderPage();
+    fillAndSearch();
+    await waitFor(() => expect(screen.getByText('lookup.tempError')).toBeInTheDocument());
+    // The guest is NOT falsely told their reservation doesn't exist.
+    expect(screen.queryByText('lookup.notFound')).toBeNull();
+  });
 });
 
 describe('ReservationLookupPage — cancel availability', () => {
@@ -135,5 +153,26 @@ describe('ReservationLookupPage — cancel flow', () => {
       }),
     );
     await waitFor(() => expect(screen.getByText('status.CANCELLED')).toBeInTheDocument());
+  });
+
+  it('renders a cancel failure inline in the modal (deadline passed) and keeps it open', async () => {
+    lookupAsync.mockResolvedValue(reservation);
+    cancelAsync.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 400, data: { message: 'Cancellation deadline has passed' } },
+    });
+    renderPage();
+    fillAndSearch();
+
+    await waitFor(() => expect(screen.getByText('lookup.cancel')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('lookup.cancel'));
+    fireEvent.click(screen.getByText('lookup.confirmCancel'));
+
+    // The specific reason renders inline; the modal stays open (confirm button
+    // still present) rather than silently swallowing the error.
+    await waitFor(() => expect(screen.getByText('lookup.deadlinePassed')).toBeInTheDocument());
+    expect(screen.getByText('lookup.confirmCancel')).toBeInTheDocument();
+    // Not cancelled — the reservation is unchanged.
+    expect(screen.queryByText('status.CANCELLED')).toBeNull();
   });
 });

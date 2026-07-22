@@ -29,18 +29,39 @@ vi.mock('react-i18next', () => ({
 // ---- api-hook mocks -------------------------------------------------------
 const settingsState = { data: undefined as unknown, isLoading: false, error: null as unknown };
 const branchesState = { data: undefined as unknown };
-const slotsState = { data: undefined as unknown, isLoading: false };
+const refetchSlotsMock = vi.fn();
+const slotsState = {
+  data: undefined as unknown,
+  isLoading: false,
+  refetch: refetchSlotsMock,
+};
 const tablesState = { data: undefined as unknown, isLoading: false };
 const mutateAsyncMock = vi.fn();
-const createState = { mutateAsync: mutateAsyncMock, isPending: false };
+const resetMock = vi.fn();
+const createState = {
+  mutateAsync: mutateAsyncMock,
+  isPending: false,
+  isError: false,
+  error: null as unknown,
+  reset: resetMock,
+};
 
-vi.mock('../publicReservationsApi', () => ({
-  usePublicReservationSettings: () => settingsState,
-  usePublicBranches: () => branchesState,
-  useAvailableSlots: () => slotsState,
-  useAvailableTables: () => tablesState,
-  useCreatePublicReservation: () => createState,
-}));
+// Keep the real error classifiers (classifyCreateReservationError /
+// createReservationErrorKey) — the container maps its inline alert off them —
+// and only stub the data hooks with our controllable states.
+vi.mock('../publicReservationsApi', async () => {
+  const actual = await vi.importActual<typeof import('../publicReservationsApi')>(
+    '../publicReservationsApi',
+  );
+  return {
+    ...actual,
+    usePublicReservationSettings: () => settingsState,
+    usePublicBranches: () => branchesState,
+    useAvailableSlots: () => slotsState,
+    useAvailableTables: () => tablesState,
+    useCreatePublicReservation: () => createState,
+  };
+});
 
 import PublicReservationContainer from './PublicReservationContainer';
 
@@ -72,7 +93,11 @@ function resetState() {
   tablesState.data = undefined;
   tablesState.isLoading = false;
   createState.isPending = false;
+  createState.isError = false;
+  createState.error = null;
   mutateAsyncMock.mockReset();
+  resetMock.mockReset();
+  refetchSlotsMock.mockReset();
 }
 
 beforeEach(resetState);
@@ -161,9 +186,9 @@ describe('PublicReservationContainer — submit payload + success', () => {
     fireEvent.change(dateInput, { target: { value: '2999-01-01' } });
     fireEvent.click(screen.getByText('public.next'));
 
-    // Step 2: pick the only slot (sets start/end).
+    // Step 2: pick the only slot (sets start/end). 24h label now.
     await screen.findByText('public.selectTime');
-    fireEvent.click(screen.getByText('7:00 PM'));
+    fireEvent.click(screen.getByText('19:00'));
     fireEvent.click(screen.getByText('public.next'));
 
     // Step 3: table (optional) — pick the offered table.
@@ -253,16 +278,69 @@ describe('PublicReservationContainer — submit payload + success', () => {
     );
   });
 
-  it('does not crash or show success when the create mutation rejects', async () => {
+  it('renders the CONFIRMED success copy when the backend auto-confirms', async () => {
+    mutateAsyncMock.mockResolvedValue({
+      reservationNumber: 'RES-C',
+      status: 'CONFIRMED',
+    } as Reservation);
+
+    const { container } = renderContainer();
+    await driveToReview(container, { withPhone: true });
+    fireEvent.click(screen.getByText('public.submit'));
+
+    await waitFor(() => expect(screen.getByText('RES-C')).toBeInTheDocument());
+    expect(screen.getByText('public.successConfirmed')).toBeInTheDocument();
+    expect(screen.queryByText('public.successPending')).not.toBeInTheDocument();
+  });
+
+  // Audit's top finding was that submit failures were 100% SILENT. The
+  // container must now render a translated, inline destructive alert on the
+  // review step (the transient toast is fired by the hook) instead of just
+  // swallowing the rejection.
+  it('surfaces a translated inline error on the review step when create fails (generic)', async () => {
     mutateAsyncMock.mockRejectedValue(new Error('server down'));
+    // The mutation object reports the error state the container maps off.
+    createState.isError = true;
+    createState.error = new Error('server down');
 
     const { container } = renderContainer();
     await driveToReview(container, { withPhone: true });
     fireEvent.click(screen.getByText('public.submit'));
 
     await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalled());
-    // Stays on the review step (no success number rendered).
+    // Inline destructive alert with the generic-fallback key; no success; stays put.
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('public.errorGeneric')).toBeInTheDocument();
     expect(screen.queryByText('RES-99')).not.toBeInTheDocument();
     expect(screen.getByText('public.review.title')).toBeInTheDocument();
+    // Non-conflict error -> no "refresh times" affordance.
+    expect(screen.queryByText('public.refreshSlots')).not.toBeInTheDocument();
+  });
+
+  it('maps a table-conflict to its key and "refresh times" jumps back to step 2 with slots refetched', async () => {
+    const conflict = {
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { message: 'This table is already reserved for the selected time period' },
+      },
+    };
+    mutateAsyncMock.mockRejectedValue(conflict);
+    createState.isError = true;
+    createState.error = conflict;
+
+    const { container } = renderContainer();
+    await driveToReview(container, { withPhone: true });
+    fireEvent.click(screen.getByText('public.submit'));
+
+    await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalled());
+    expect(screen.getByText('public.errorTableTaken')).toBeInTheDocument();
+
+    // The conflict recovery: refresh clears the stale pick, refetches slots,
+    // and returns to the time step.
+    fireEvent.click(screen.getByText('public.refreshSlots'));
+    expect(resetMock).toHaveBeenCalled();
+    expect(refetchSlotsMock).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('public.selectTime')).toBeInTheDocument());
   });
 });

@@ -19,7 +19,13 @@ const { get, post, patch } = vi.hoisted(() => ({
   patch: vi.fn(),
 }));
 vi.mock('axios', () => ({
-  default: { create: () => ({ get, post, patch }) },
+  // The error classifiers call axios.isAxiosError — keep a faithful stub so
+  // they can read status/message off axios-shaped errors in these specs.
+  default: {
+    create: () => ({ get, post, patch }),
+    isAxiosError: (e: unknown) =>
+      !!e && typeof e === 'object' && (e as { isAxiosError?: boolean }).isAxiosError === true,
+  },
 }));
 
 import {
@@ -29,7 +35,20 @@ import {
   useCreatePublicReservation,
   useLookupReservation,
   useCancelPublicReservation,
+  classifyCreateReservationError,
+  createReservationErrorKey,
+  classifyCancelError,
+  cancelReservationErrorKey,
+  classifyLookupError,
 } from './publicReservationsApi';
+
+/** Build an axios-shaped rejection for classifier specs. */
+function axiosError(status: number | undefined, message?: string) {
+  return {
+    isAxiosError: true,
+    response: status === undefined ? undefined : { status, data: { message } },
+  };
+}
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -128,5 +147,89 @@ describe('useCancelPublicReservation', () => {
       customerPhone: '555',
       reservationNumber: 'R-3',
     });
+  });
+});
+
+describe('classifyCreateReservationError — backend message → code', () => {
+  it('maps 429 to a non-conflict rate-limited code', () => {
+    expect(classifyCreateReservationError(axiosError(429))).toEqual({
+      code: 'rateLimited',
+      isConflict: false,
+    });
+  });
+
+  it('maps "already reserved" to a recoverable table-conflict', () => {
+    expect(
+      classifyCreateReservationError(
+        axiosError(400, 'This table is already reserved for the selected time period'),
+      ),
+    ).toEqual({ code: 'tableTaken', isConflict: true });
+  });
+
+  it('maps "fully booked" to a recoverable slot-conflict', () => {
+    expect(
+      classifyCreateReservationError(axiosError(400, 'This time slot is fully booked')),
+    ).toEqual({ code: 'slotFull', isConflict: true });
+  });
+
+  it('maps "already have a reservation" to a non-conflict duplicate', () => {
+    expect(
+      classifyCreateReservationError(
+        axiosError(400, 'You already have a reservation for this time slot'),
+      ),
+    ).toEqual({ code: 'duplicate', isConflict: false });
+  });
+
+  it('falls back to generic for unknown messages and non-axios errors', () => {
+    expect(classifyCreateReservationError(axiosError(500, 'boom'))).toEqual({
+      code: 'generic',
+      isConflict: false,
+    });
+    expect(classifyCreateReservationError(new Error('network'))).toEqual({
+      code: 'generic',
+      isConflict: false,
+    });
+  });
+
+  it('maps each code to a public.error* key', () => {
+    expect(createReservationErrorKey('tableTaken')).toBe('public.errorTableTaken');
+    expect(createReservationErrorKey('slotFull')).toBe('public.errorSlotFull');
+    expect(createReservationErrorKey('duplicate')).toBe('public.errorDuplicate');
+    expect(createReservationErrorKey('rateLimited')).toBe('public.errorRateLimited');
+    expect(createReservationErrorKey('generic')).toBe('public.errorGeneric');
+  });
+});
+
+describe('classifyCancelError — cancel failure → lookup key', () => {
+  it('maps the deadline, disabled, and cannot-cancel messages', () => {
+    expect(cancelReservationErrorKey(classifyCancelError(axiosError(400, 'Cancellation deadline has passed')))).toBe(
+      'lookup.deadlinePassed',
+    );
+    expect(cancelReservationErrorKey(classifyCancelError(axiosError(400, 'Cancellation is not allowed')))).toBe(
+      'lookup.cancelDisabled',
+    );
+    expect(
+      cancelReservationErrorKey(classifyCancelError(axiosError(400, 'This reservation cannot be cancelled'))),
+    ).toBe('lookup.cannotCancel');
+  });
+
+  it('maps 429 to the temporary key and unknown to the generic key', () => {
+    expect(cancelReservationErrorKey(classifyCancelError(axiosError(429)))).toBe('lookup.tempError');
+    expect(cancelReservationErrorKey(classifyCancelError(new Error('x')))).toBe('lookup.cancelError');
+  });
+});
+
+describe('classifyLookupError — temporary vs not-found', () => {
+  it('treats 429 and 5xx as temporary', () => {
+    expect(classifyLookupError(axiosError(429))).toBe('temporary');
+    expect(classifyLookupError(axiosError(503))).toBe('temporary');
+  });
+
+  it('treats 404 / other 4xx as not-found', () => {
+    expect(classifyLookupError(axiosError(404, 'Reservation not found'))).toBe('notFound');
+    expect(classifyLookupError(axiosError(400))).toBe('notFound');
+    // A transport error with no response is a definitive negative here
+    // (preserves the page's historical behavior for plain rejections).
+    expect(classifyLookupError(new Error('boom'))).toBe('notFound');
   });
 });

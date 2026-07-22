@@ -254,14 +254,23 @@
       "editingHint": "Change what you need — you’ll return to review automatically."
     },
     "slots": {
-      "empty": "No available times for this date and party size."
+      "empty": "No available times for this date and party size.",
+      "closed": "The restaurant is closed on the selected day. Please choose another date."
     },
     "unavailable": {
       "title": "Reservations are not available",
       "description": "Please contact the restaurant directly to book."
     },
     "successEmailOnlyCancelHint": "If the restaurant has email confirmations enabled, a message will be sent to your email. To cancel this reservation, please call the restaurant — phone-based self-cancel is unavailable for email-only bookings.",
-    "branch": "Branch"
+    "branch": "Branch",
+    "errorTableTaken": "This table is no longer available for the selected time. Please refresh the times.",
+    "errorSlotFull": "This time slot just filled up. Please choose another time.",
+    "errorDuplicate": "You already have a reservation for this time slot.",
+    "errorRateLimited": "Too many attempts. Please wait a moment and try again.",
+    "errorGeneric": "We couldn't create your reservation. Please try again.",
+    "refreshSlots": "Refresh times",
+    "successConfirmed": "Reservation Confirmed!",
+    "successConfirmedDescription": "Your reservation is confirmed. We look forward to seeing you!"
   },
   "lookup": {
     "title": "Check Your Reservation",
@@ -276,7 +285,11 @@
     "cancel": "Cancel reservation",
     "cancelTitle": "Cancel reservation?",
     "keep": "Keep",
-    "confirmCancel": "Cancel reservation"
+    "confirmCancel": "Cancel reservation",
+    "cancelDisabled": "Online cancellation is disabled for this reservation. Please call the restaurant.",
+    "cannotCancel": "This reservation cannot be cancelled.",
+    "cancelError": "We couldn't cancel your reservation. Please try again.",
+    "tempError": "We can't look up your reservation right now. Please try again shortly."
   },
   "notifications": {
     "confirmed": "Reservation confirmed",

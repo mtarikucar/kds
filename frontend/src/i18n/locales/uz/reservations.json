@@ -254,14 +254,23 @@
       "editingHint": "O‘zgartirgan zahoti avtomatik xulosaga qaytasiz."
     },
     "slots": {
-      "empty": "Bo‘sh vaqt yo‘q."
+      "empty": "Bo‘sh vaqt yo‘q.",
+      "closed": "Restoran tanlangan kuni yopiq. Iltimos, boshqa sanani tanlang."
     },
     "unavailable": {
       "title": "Bron mavjud emas",
       "description": "Restoranga qo‘ng‘iroq qiling."
     },
     "successEmailOnlyCancelHint": "Agar restoran email tasdiqlarini yoqgan bo‘lsa, emailingizga xabar yuboriladi. Bekor qilish uchun restoranga qo‘ng‘iroq qiling.",
-    "branch": "Filial"
+    "branch": "Filial",
+    "errorTableTaken": "Ushbu stol tanlangan vaqtga endi mavjud emas. Iltimos, vaqtlarni yangilang.",
+    "errorSlotFull": "Ushbu vaqt oralig‘i hozirgina to‘ldi. Iltimos, boshqa vaqtni tanlang.",
+    "errorDuplicate": "Sizda allaqachon ushbu vaqtga bron bor.",
+    "errorRateLimited": "Juda ko‘p urinish. Iltimos, biroz kuting va qayta urinib ko‘ring.",
+    "errorGeneric": "Bronni yaratib bo‘lmadi. Iltimos, qayta urinib ko‘ring.",
+    "refreshSlots": "Vaqtlarni yangilash",
+    "successConfirmed": "Bron tasdiqlandi!",
+    "successConfirmedDescription": "Bronyangiz tasdiqlandi. Sizni kutib qolamiz!"
   },
   "lookup": {
     "title": "Bronni tekshirish",
@@ -276,7 +285,11 @@
     "cancel": "Bronni bekor qilish",
     "cancelTitle": "Bron bekor qilinsinmi?",
     "keep": "Saqlash",
-    "confirmCancel": "Bekor qilish"
+    "confirmCancel": "Bekor qilish",
+    "cancelDisabled": "Ushbu bron uchun onlayn bekor qilish o‘chirilgan. Iltimos, restoranga qo‘ng‘iroq qiling.",
+    "cannotCancel": "Ushbu bronni bekor qilib bo‘lmaydi.",
+    "cancelError": "Bronni bekor qilib bo‘lmadi. Iltimos, qayta urinib ko‘ring.",
+    "tempError": "Hozircha bronyangizni topa olmayapmiz. Iltimos, birozdan so‘ng qayta urinib ko‘ring."
   },
   "notifications": {
     "confirmed": "Bron tasdiqlandi",

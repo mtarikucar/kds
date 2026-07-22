@@ -145,10 +145,15 @@ export const ReviewRow: React.FC<ReviewRowProps> = ({ label, value, icon, onEdit
 );
 
 interface SuccessCardProps {
+  /** Backend-assigned status of the just-created reservation. CONFIRMED
+   *  (auto-approve tenants) gets celebratory "you're booked" copy; anything
+   *  else (PENDING under requireApproval) keeps the "awaiting approval" copy.
+   *  Optional so the presentational component still defaults sensibly. */
+  status?: string;
   reservationNumber: string;
   /** Date is shown via formatReservationDate from the shared util. */
   formattedDate: string;
-  /** "2:30 PM — 4:00 PM" pre-formatted. */
+  /** "14:30 — 16:00" pre-formatted. */
   formattedTime: string;
   guestCount: number;
   tableName?: string | null;
@@ -174,6 +179,7 @@ interface SuccessCardProps {
  * toggle is off or the mailer is unconfigured.
  */
 export const SuccessCard: React.FC<SuccessCardProps> = ({
+  status,
   reservationNumber,
   formattedDate,
   formattedTime,
@@ -183,14 +189,19 @@ export const SuccessCard: React.FC<SuccessCardProps> = ({
   lookupHref,
 }) => {
   const { t } = useTranslation('reservations');
+  const isConfirmed = status === 'CONFIRMED';
   return (
     <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 space-y-5 text-center">
       <div className="mx-auto h-16 w-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
         <Check className="h-8 w-8 text-emerald-500" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground">{t('public.successPending')}</h2>
-        <p className="text-sm text-muted-foreground">{t('public.successDescription')}</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+          {isConfirmed ? t('public.successConfirmed') : t('public.successPending')}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {isConfirmed ? t('public.successConfirmedDescription') : t('public.successDescription')}
+        </p>
       </div>
       <div className="rounded-xl bg-muted/40 p-4 space-y-2 text-left">
         <p className="text-xs text-muted-foreground">{t('public.yourReservationNumber')}</p>
