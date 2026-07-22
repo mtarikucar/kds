@@ -28,6 +28,15 @@ export interface JwtPayload {
    *  more than one element here; BranchGuard ignores it for those
    *  roles in favour of primaryBranchId. */
   allowedBranchIds?: string[];
+  /** Set true only on the demo-explore session minted by
+   *  POST /auth/demo-session (AuthController via DemoService). Not currently
+   *  read as an authorization signal here — DemoGuardService.assertNotDemo
+   *  (keyed off tenant.currentPlan.name) is the authoritative, single-source
+   *  block on real-money initiation, and it also covers the @Public self-pay
+   *  path which carries no JWT at all. Forwarded onto req.user so it stops
+   *  being silently dropped and remains available for future use (audit
+   *  logging, UI banners) without another token-shape change. */
+  demo?: boolean;
 }
 
 @Injectable()
@@ -110,6 +119,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...result,
       activeBranchId: payload.activeBranchId ?? null,
       allowedBranchIds: payload.allowedBranchIds ?? [],
+      demo: payload.demo === true,
     };
   }
 }

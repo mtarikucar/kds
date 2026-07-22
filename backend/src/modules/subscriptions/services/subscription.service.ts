@@ -29,6 +29,7 @@ import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
 import { foldPlanGrants } from "./effective-features.fold";
 import { MetricsService } from "../../../common/metrics/metrics.service";
 import { DowngradeUsageGuardService } from "./downgrade-usage-guard.service";
+import { DemoGuardService } from "../../demo/demo-guard.service";
 
 @Injectable()
 export class SubscriptionService {
@@ -58,6 +59,12 @@ export class SubscriptionService {
     // same PrismaService so the extracted query runs identically.
     @Optional()
     private readonly injectedDowngradeGuard?: DowngradeUsageGuardService,
+    // Demo-tenant real-money block. @Optional so unit tests constructing the
+    // service bare keep working — SubscriptionsModule imports DemoGuardModule
+    // so production DI always supplies a real instance; the changePlan call
+    // site is `?.`-guarded so a bare-constructed test that never wires this
+    // in doesn't perform a real Prisma call it didn't ask for.
+    @Optional() private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
@@ -637,6 +644,11 @@ export class SubscriptionService {
     dto: ChangePlanDto,
     actorUserId?: string,
   ) {
+    // Demo-tenant real-money block — very first statement, before
+    // isUpgrade/requiresPayment is even computed, so the frontend never
+    // navigates to checkout for the shared "explore demo" tenant.
+    await this.demoGuard?.assertNotDemo(tenantId);
+
     const subscription = await this.getSubscriptionById(
       subscriptionId,
       tenantId,

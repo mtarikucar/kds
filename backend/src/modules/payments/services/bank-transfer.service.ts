@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
@@ -14,6 +15,7 @@ import { BillingService } from "../../subscriptions/services/billing.service";
 import { ConsentService } from "../../legal/services/consent.service";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
+import { DemoGuardService } from "../../demo/demo-guard.service";
 import {
   BillingCycle,
   PaymentProvider,
@@ -62,6 +64,12 @@ export class BankTransferService {
     private readonly billing: BillingService,
     private readonly consents: ConsentService,
     private readonly outbox: OutboxService,
+    // Demo-tenant real-money block. @Optional so unit tests constructing the
+    // service bare keep working — BankTransferModule imports DemoGuardModule
+    // so production DI always supplies a real instance; the call site below
+    // is `?.`-guarded so a bare-constructed test that never wires this in
+    // doesn't perform a real Prisma call it didn't ask for.
+    @Optional() private readonly demoGuard?: DemoGuardService,
   ) {}
 
   // ---- settings (singleton, superadmin) ------------------------------------
@@ -144,6 +152,10 @@ export class BankTransferService {
     userIp?: string;
     userAgent?: string;
   }): Promise<BankTransferIntentResult> {
+    // Demo-tenant real-money block — the shared "explore demo" tenant must
+    // never reserve a havale payment. First statement, before any DB write.
+    await this.demoGuard?.assertNotDemo(params.tenantId);
+
     const settings = await this.getSettings();
     if (!settings.enabled || !settings.iban) {
       throw new BadRequestException(

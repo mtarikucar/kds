@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -12,6 +13,7 @@ import { QuoteService } from "./quote.service";
 import { CheckoutBuyerDto } from "./dto/create-intent.dto";
 import { AddonPurchasabilityService } from "./addon-purchasability.service";
 import { CatalogService } from "../catalog/catalog.service";
+import { DemoGuardService } from "../demo/demo-guard.service";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -58,6 +60,12 @@ export class CheckoutIntentService {
     private readonly addonGuard: AddonPurchasabilityService,
     // Task 4 — pre-payment hardware stock guard.
     private readonly catalog: CatalogService,
+    // Demo-tenant real-money block. @Optional so unit tests constructing the
+    // service bare keep working — CheckoutModule imports DemoGuardModule so
+    // production DI always supplies a real instance; the call site below is
+    // `?.`-guarded so a bare-constructed test that never wires this in
+    // doesn't perform a real Prisma call it didn't ask for.
+    @Optional() private readonly demoGuard?: DemoGuardService,
   ) {}
 
   async createIntent(args: {
@@ -68,6 +76,11 @@ export class CheckoutIntentService {
     returnUrl?: string;
   }): Promise<CreateIntentResult> {
     const { tenantId, cart, buyer, buyerIp, returnUrl } = args;
+
+    // Demo-tenant real-money block — the shared "explore demo" tenant must
+    // never reach PayTR via marketplace/hardware checkout. First statement,
+    // before pricing/guard/stock checks or any PayTR call.
+    await this.demoGuard?.assertNotDemo(tenantId);
 
     // Tahsilat-önü guard (DEF-1/2/4/8): every `addon` cart line must clear
     // included-in-plan / already-owned / deps-tier / redundant-limit BEFORE

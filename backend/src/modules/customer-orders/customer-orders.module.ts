@@ -17,6 +17,7 @@ import { CustomersModule } from "../customers/customers.module";
 import { StockManagementModule } from "../stock-management/stock-management.module";
 import { OrdersModule } from "../orders/orders.module";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
+import { DemoGuardModule } from "../demo/demo-guard.module";
 
 @Module({
   imports: [
@@ -28,6 +29,9 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     PaytrAdapterModule,
     forwardRef(() => StockManagementModule),
     forwardRef(() => OrdersModule),
+    // DemoGuardService — blocks real-money initiation for the @Public
+    // customer self-pay intent on the shared demo tenant.
+    DemoGuardModule,
   ],
   controllers: [CustomerOrdersController, CustomerSelfPayController],
   providers: [

@@ -78,12 +78,14 @@ describe('JwtStrategy', () => {
       // The strategy strips `tenant` and `tokenVersion` from the
       // returned user, and v3.0.0 appends `activeBranchId` +
       // `allowedBranchIds` from the JWT payload (defaults: null + []
-      // when the legacy-shape payload omits them).
+      // when the legacy-shape payload omits them). `demo` defaults to
+      // false when the payload omits the claim (legacy/non-demo tokens).
       const { tenant: _t, tokenVersion: _v, ...expected } = fullUser as any;
       expect(result).toEqual({
         ...expected,
         activeBranchId: null,
         allowedBranchIds: [],
+        demo: false,
       });
       expect(prisma.user.findUnique).toHaveBeenCalled();
     });
@@ -116,6 +118,51 @@ describe('JwtStrategy', () => {
         activeBranchId: 'b-active',
         allowedBranchIds: ['b-primary', 'b-other'],
       });
+    });
+
+    it('forwards demo:true from the JWT payload onto req.user (was silently dropped pre-fix)', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        tenantId: mockUser.tenantId,
+        demo: true,
+      };
+      const fullUser = {
+        ...mockUser,
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+
+      expect(result).toMatchObject({ demo: true });
+    });
+
+    it('defaults demo to false when the payload omits the claim', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        tenantId: mockUser.tenantId,
+      };
+      const fullUser = {
+        ...mockUser,
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+
+      expect(result).toMatchObject({ demo: false });
     });
 
     it('should throw UnauthorizedException when user is not found', async () => {

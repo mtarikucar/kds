@@ -26,6 +26,7 @@ import {
 import { PaytrAdapter } from "./adapters/paytr.adapter";
 import { SubscriptionService } from "../subscriptions/services/subscription.service";
 import { ConsentService } from "../legal/services/consent.service";
+import { DemoGuardService } from "../demo/demo-guard.service";
 import {
   BillingCycle,
   PaymentProvider,
@@ -74,6 +75,13 @@ export class PaymentsService {
     // merchantOid generation deterministic.
     @Optional() @Inject(CLOCK) clock?: Clock,
     @Optional() @Inject(ID_GENERATOR) idGenerator?: IdGenerator,
+    // Demo-tenant real-money block. @Optional so unit tests constructing the
+    // service bare keep working (mirrors the `metrics` param above) — every
+    // consuming module imports DemoGuardModule so production DI always
+    // supplies a real instance; the call site below is `?.`-guarded so a
+    // bare-constructed test that never wires this in doesn't perform a real
+    // Prisma call it didn't ask for.
+    @Optional() private readonly demoGuard?: DemoGuardService,
   ) {
     this.clock = clock ?? new SystemClock();
     this.idGenerator = idGenerator ?? new SystemIdGenerator();
@@ -109,6 +117,10 @@ export class PaymentsService {
     userIp: string,
     userAgent?: string,
   ): Promise<CreateIntentResult> {
+    // Demo-tenant real-money block — the shared "explore demo" tenant must
+    // never reach PayTR. First statement, before any DB write or PayTR call.
+    await this.demoGuard?.assertNotDemo(tenantId);
+
     const [tenant, callingUser] = await Promise.all([
       this.prisma.tenant.findUnique({
         where: { id: tenantId },

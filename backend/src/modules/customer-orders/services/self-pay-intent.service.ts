@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   forwardRef,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -14,6 +15,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { PaymentsService } from "../../orders/services/payments.service";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
 import { CustomerSessionService } from "../../customers/customer-session.service";
+import { DemoGuardService } from "../../demo/demo-guard.service";
 import { CreatePayIntentDto } from "../dto/pay-intent.dto";
 import {
   OrderStatus,
@@ -52,6 +54,12 @@ export class SelfPayIntentService {
     private customerSessionService: CustomerSessionService,
     private config: ConfigService,
     private reservations: SelfPayReservationService,
+    // Demo-tenant real-money block. @Optional so unit tests constructing the
+    // service bare keep working — CustomerOrdersModule imports
+    // DemoGuardModule so production DI always supplies a real instance; the
+    // call site below is `?.`-guarded so a bare-constructed test that never
+    // wires this in doesn't perform a real Prisma call it didn't ask for.
+    @Optional() private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
@@ -127,6 +135,12 @@ export class SelfPayIntentService {
     returnOrigin?: string,
   ) {
     const session = await this.customerSessionService.requireSession(sessionId);
+
+    // Demo-tenant real-money block. This endpoint is @Public/unauthenticated
+    // (no req.user) — key off the tenantId resolved from the customer
+    // session, which is the earliest point in this method it's known. First
+    // check after session resolution, before any pricing/PayTR work.
+    await this.demoGuard?.assertNotDemo(session.tenantId);
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: session.tenantId },

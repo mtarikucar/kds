@@ -15,6 +15,7 @@ import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.serv
 import { DeviceService } from "../device-mesh/device.service";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
+import { DemoGuardService } from "../demo/demo-guard.service";
 
 /**
  * Checkout orchestrator — turns a Cart into:
@@ -51,6 +52,12 @@ export class CheckoutService {
     // Optional: provisions device-mesh slots for purchased device-class
     // hardware (best-effort, post-commit). Bare-constructed tests pass null.
     @Optional() private readonly devices?: DeviceService,
+    // Demo-tenant real-money block. @Optional so unit tests constructing the
+    // service bare keep working — CheckoutModule imports DemoGuardModule so
+    // production DI always supplies a real instance; the call site below is
+    // `?.`-guarded so a bare-constructed test that never wires this in
+    // doesn't perform a real Prisma call it didn't ask for.
+    @Optional() private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
@@ -75,6 +82,13 @@ export class CheckoutService {
     hardwareOrderId?: string;
     addOnIds: string[];
   }> {
+    // Demo-tenant real-money block — defense-in-depth on confirm. The
+    // shared "explore demo" tenant should never provision paid hardware/
+    // add-ons even if a paymentRef somehow reached this far (createIntent
+    // already blocks it upstream); also blocks the admin-comp path for the
+    // demo tenant, which has no legitimate use case. Very first statement.
+    await this.demoGuard?.assertNotDemo(tenantId);
+
     // C1 residual — make the comp trust boundary EXPLICIT, not implicit in the
     // public DTO's @IsNotEmpty. The only ungated (no settled-intent) path is a
     // deliberate operator comp, which an internal caller opts into via

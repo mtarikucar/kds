@@ -7,6 +7,7 @@ import { PaytrSettlementModule } from "../payments/services/paytr-settlement.mod
 // frontend. Previously this read tenant.currentPlan + overrides only,
 // invisibly bypassing every TenantAddOn purchase.
 import { EntitlementsModule } from "../entitlements/entitlements.module";
+import { DemoGuardModule } from "../demo/demo-guard.module";
 
 // Services
 import { SubscriptionService } from "./services/subscription.service";
@@ -47,6 +48,9 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
     // EntitlementsModule is a leaf — no inbound deps — so this import
     // is safe (no cycle).
     EntitlementsModule,
+    // DemoGuardService — blocks real-money initiation for changePlan on the
+    // shared demo tenant.
+    DemoGuardModule,
   ],
   controllers: [SubscriptionController, InvoiceController],
   providers: [
