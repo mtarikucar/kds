@@ -119,4 +119,14 @@ describe('BranchSelectionGate', () => {
     renderGate();
     expect(screen.getByText('APP CONTENT')).toBeInTheDocument();
   });
+
+  it('renders the app (does not redirect) for a not-yet-chosen user on a recovery path', () => {
+    renderGate('/subscription/plans');
+    expect(screen.getByText('APP CONTENT')).toBeInTheDocument();
+  });
+
+  it('still redirects a not-yet-chosen user on a non-recovery path', () => {
+    renderGate('/dashboard');
+    expect(screen.getByText(/SELECT SCREEN/)).toBeInTheDocument();
+  });
 });

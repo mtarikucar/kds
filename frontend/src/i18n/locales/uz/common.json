@@ -7,7 +7,6 @@
     "suspended": "Toʻxtatilgan",
     "archived": "Arxivlangan",
     "manageBranches": "Filiallarni boshqarish",
-    "notSelectable": "Bu filial faol emas",
     "empty": "Siz kira oladigan filial topilmadi",
     "emptyHint": "Menejeringizdan filialga kirish soʻrang."
   },
@@ -115,7 +114,6 @@
       "business": "Operatsiyalar",
       "menuAndTables": "Menyu va stollar",
       "operation": "Back-ofis",
-      "multiBranch": "Filiallar va qurilmalar",
       "marketplace": "Bozor",
       "planAndAccess": "Sozlamalar va kirish"
     },

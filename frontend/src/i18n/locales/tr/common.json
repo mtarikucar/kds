@@ -7,7 +7,6 @@
     "suspended": "Askıda",
     "archived": "Arşivlenmiş",
     "manageBranches": "Şubeleri Yönet",
-    "notSelectable": "Bu şube aktif değil",
     "empty": "Erişebileceğiniz şube bulunamadı",
     "emptyHint": "Yöneticinizden şube erişimi isteyin."
   },
@@ -115,7 +114,6 @@
       "business": "İşletme",
       "menuAndTables": "Menü & Masa",
       "operation": "Operasyon",
-      "multiBranch": "Şubeler ve Cihazlar",
       "marketplace": "Pazaryeri",
       "planAndAccess": "Ayarlar & Erişim"
     },

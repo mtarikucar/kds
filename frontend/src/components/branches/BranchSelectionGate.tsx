@@ -18,7 +18,23 @@ import { useSubscription } from '../../contexts/SubscriptionContext';
  * Mounted in Layout inside ProfileCompletionGate → SubscriptionGate, so
  * account completion and the plan lock win first. /branch-select itself
  * renders outside Layout, so this cannot loop.
+ *
+ * Recovery paths (plan selection, checkout, profile, legal, help, welcome
+ * onboarding, and /branch-select itself) stay reachable — otherwise a
+ * locked-but-still-multiLocation user (e.g. TRIAL_ENDED) that SubscriptionGate
+ * already routed to /subscription/plans would get bounced again here, before
+ * they can pay.
  */
+const RECOVERY_PREFIXES = [
+  '/subscription',
+  '/admin/plan',
+  '/profile',
+  '/legal',
+  '/help',
+  '/welcome',
+  '/branch-select',
+];
+
 const BranchSelectionGate = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isPinned = useBranchScopeStore((s) => s.isPinned);
@@ -31,6 +47,11 @@ const BranchSelectionGate = ({ children }: { children: React.ReactNode }) => {
   if (!hasFeature('multiLocation')) return <>{children}</>;
   // Don't redirect before the list resolves — avoids a flash-redirect.
   if (isLoading) return <>{children}</>;
+
+  const onRecoveryPath = RECOVERY_PREFIXES.some(
+    (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
+  );
+  if (onRecoveryPath) return <>{children}</>;
 
   const active = branches.filter((b) => b.status === 'active');
   const visible =

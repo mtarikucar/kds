@@ -7,7 +7,6 @@
     "suspended": "معلّق",
     "archived": "مؤرشف",
     "manageBranches": "إدارة الفروع",
-    "notSelectable": "هذا الفرع غير نشط",
     "empty": "لا توجد فروع يمكنك الوصول إليها",
     "emptyHint": "اطلب من مديرك صلاحية الوصول إلى فرع."
   },
@@ -115,7 +114,6 @@
       "business": "العمليات",
       "menuAndTables": "القائمة والطاولات",
       "operation": "المكتب الخلفي",
-      "multiBranch": "الفروع والأجهزة",
       "marketplace": "متجر الإضافات",
       "planAndAccess": "الإعدادات والوصول"
     },

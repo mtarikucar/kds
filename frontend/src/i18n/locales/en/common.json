@@ -7,7 +7,6 @@
     "suspended": "Suspended",
     "archived": "Archived",
     "manageBranches": "Manage Branches",
-    "notSelectable": "This branch is not active",
     "empty": "No branches you can access",
     "emptyHint": "Ask your manager for branch access."
   },
@@ -115,7 +114,6 @@
       "business": "Operations",
       "menuAndTables": "Menu & Tables",
       "operation": "Back Office",
-      "multiBranch": "Branches & Devices",
       "marketplace": "Marketplace",
       "planAndAccess": "Settings & Access"
     },
