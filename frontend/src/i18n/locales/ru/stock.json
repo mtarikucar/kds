@@ -327,5 +327,28 @@
     "inventory": "Склад",
     "purchasing": "Закупки",
     "costing": "Себестоимость и рецепты"
+  },
+  "nav": {
+    "guide": "Гид по закупкам",
+    "items": "Товары",
+    "orders": "Заказы",
+    "suppliers": "Поставщики",
+    "costing": "Рецепты и себестоимость",
+    "operations": "Операции"
+  },
+  "sections": {
+    "reorder": "Рекомендации к заказу",
+    "apAging": "Долги по срокам",
+    "scorecard": "Оценка поставщика",
+    "transfers": "Межфилиальные передачи",
+    "valuation": "Оценка запасов",
+    "templates": "Шаблоны",
+    "barcode": "Штрихкод",
+    "returns": "Возвраты (RMA)",
+    "vendorBills": "Счета поставщиков",
+    "catalog": "Каталог цен",
+    "menuEngineering": "Инжиниринг меню",
+    "usageVariance": "Отклонение расхода",
+    "recipeCosting": "Себестоимость рецептов"
   }
 }

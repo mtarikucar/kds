@@ -327,5 +327,28 @@
     "inventory": "Envanter",
     "purchasing": "Satın Alma",
     "costing": "Maliyet & Reçete"
+  },
+  "nav": {
+    "guide": "Tedarik Rehberi",
+    "items": "Malzemeler",
+    "orders": "Siparişler",
+    "suppliers": "Tedarikçiler",
+    "costing": "Reçete & Maliyet",
+    "operations": "Operasyon"
+  },
+  "sections": {
+    "reorder": "Sipariş Önerileri",
+    "apAging": "Borç Yaşlandırma",
+    "scorecard": "Tedarikçi Karnesi",
+    "transfers": "Şube Transferleri",
+    "valuation": "Stok Değerleme",
+    "templates": "Şablonlar",
+    "barcode": "Barkod",
+    "returns": "İade (RMA)",
+    "vendorBills": "Tedarikçi Faturaları",
+    "catalog": "Fiyat Kataloğu",
+    "menuEngineering": "Menü Mühendisliği",
+    "usageVariance": "Kullanım Varyansı",
+    "recipeCosting": "Reçete Maliyetleri"
   }
 }

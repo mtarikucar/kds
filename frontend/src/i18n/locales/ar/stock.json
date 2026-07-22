@@ -327,5 +327,28 @@
     "inventory": "المخزون",
     "purchasing": "المشتريات",
     "costing": "التكلفة والوصفات"
+  },
+  "nav": {
+    "guide": "دليل التموين",
+    "items": "الأصناف",
+    "orders": "الطلبات",
+    "suppliers": "الموردون",
+    "costing": "الوصفات والتكلفة",
+    "operations": "العمليات"
+  },
+  "sections": {
+    "reorder": "اقتراحات إعادة الطلب",
+    "apAging": "أعمار الذمم",
+    "scorecard": "بطاقة أداء المورد",
+    "transfers": "تحويلات الفروع",
+    "valuation": "تقييم المخزون",
+    "templates": "القوالب",
+    "barcode": "الباركود",
+    "returns": "المرتجعات (RMA)",
+    "vendorBills": "فواتير الموردين",
+    "catalog": "كتالوج الأسعار",
+    "menuEngineering": "هندسة القائمة",
+    "usageVariance": "تباين الاستخدام",
+    "recipeCosting": "تكاليف الوصفات"
   }
 }

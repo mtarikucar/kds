@@ -327,5 +327,28 @@
     "inventory": "Inventory",
     "purchasing": "Purchasing",
     "costing": "Costing & Recipes"
+  },
+  "nav": {
+    "guide": "Purchasing Guide",
+    "items": "Items",
+    "orders": "Orders",
+    "suppliers": "Suppliers",
+    "costing": "Recipes & Cost",
+    "operations": "Operations"
+  },
+  "sections": {
+    "reorder": "Reorder Suggestions",
+    "apAging": "AP Aging",
+    "scorecard": "Supplier Scorecard",
+    "transfers": "Branch Transfers",
+    "valuation": "Stock Valuation",
+    "templates": "Templates",
+    "barcode": "Barcode",
+    "returns": "Returns (RMA)",
+    "vendorBills": "Vendor Bills",
+    "catalog": "Price Catalog",
+    "menuEngineering": "Menu Engineering",
+    "usageVariance": "Usage Variance",
+    "recipeCosting": "Recipe Costs"
   }
 }

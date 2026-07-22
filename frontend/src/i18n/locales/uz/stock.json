@@ -327,5 +327,28 @@
     "inventory": "Inventar",
     "purchasing": "Xaridlar",
     "costing": "Tannarx va retseptlar"
+  },
+  "nav": {
+    "guide": "Ta'minot qo'llanmasi",
+    "items": "Mahsulotlar",
+    "orders": "Buyurtmalar",
+    "suppliers": "Yetkazib beruvchilar",
+    "costing": "Retsept va tannarx",
+    "operations": "Operatsiyalar"
+  },
+  "sections": {
+    "reorder": "Qayta buyurtma takliflari",
+    "apAging": "Qarz muddatlari",
+    "scorecard": "Yetkazib beruvchi baholi",
+    "transfers": "Filiallararo o'tkazmalar",
+    "valuation": "Zaxira bahosi",
+    "templates": "Shablonlar",
+    "barcode": "Shtrix-kod",
+    "returns": "Qaytarish (RMA)",
+    "vendorBills": "Yetkazib beruvchi hisoblari",
+    "catalog": "Narx katalogi",
+    "menuEngineering": "Menyu muhandisligi",
+    "usageVariance": "Sarf farqi",
+    "recipeCosting": "Retsept tannarxi"
   }
 }
