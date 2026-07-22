@@ -15,6 +15,7 @@ import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.serv
 import { DeviceService } from "../device-mesh/device.service";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
+import { DemoGuardService } from "../demo/demo-guard.service";
 
 /**
  * Checkout orchestrator — turns a Cart into:
@@ -51,6 +52,13 @@ export class CheckoutService {
     // Optional: provisions device-mesh slots for purchased device-class
     // hardware (best-effort, post-commit). Bare-constructed tests pass null.
     @Optional() private readonly devices?: DeviceService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // CheckoutModule imports DemoGuardModule, so DI fails loud at boot if a
+    // future module-wiring regression ever drops that import, instead of
+    // silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // call site below stay only as belt-and-suspenders (and to keep any
+    // bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
@@ -75,6 +83,13 @@ export class CheckoutService {
     hardwareOrderId?: string;
     addOnIds: string[];
   }> {
+    // Demo-tenant real-money block — defense-in-depth on confirm. The
+    // shared "explore demo" tenant should never provision paid hardware/
+    // add-ons even if a paymentRef somehow reached this far (createIntent
+    // already blocks it upstream); also blocks the admin-comp path for the
+    // demo tenant, which has no legitimate use case. Very first statement.
+    await this.demoGuard?.assertNotDemo(tenantId);
+
     // C1 residual — make the comp trust boundary EXPLICIT, not implicit in the
     // public DTO's @IsNotEmpty. The only ungated (no settled-intent) path is a
     // deliberate operator comp, which an internal caller opts into via

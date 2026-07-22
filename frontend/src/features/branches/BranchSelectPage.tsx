@@ -24,6 +24,7 @@ const BranchSelectPage = () => {
   const { data: branches = [], isLoading } = useListBranches();
   const branchId = useBranchScopeStore((s) => s.branchId);
   const allowedBranchIds = useBranchScopeStore((s) => s.allowedBranchIds);
+  const isWildcard = useBranchScopeStore((s) => s.isWildcard);
   const branchChosen = useBranchScopeStore((s) => s.branchChosen);
   const setBranchId = useBranchScopeStore((s) => s.setBranchId);
   const user = useAuthStore((s) => s.user);
@@ -32,12 +33,14 @@ const BranchSelectPage = () => {
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
   const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
-  // Same visibility rule as the navbar picker: an explicit allow-list
-  // filters; an empty list (wildcard ADMIN) exposes every branch.
-  const visibleBranches =
-    allowedBranchIds.length > 0
-      ? branches.filter((b) => allowedBranchIds.includes(b.id))
-      : branches;
+  // Same visibility rule as the navbar picker (mirrors backend
+  // BranchGuard): wildcard (ADMIN + empty allow-list) exposes every
+  // branch; everyone else — including a non-ADMIN with an empty
+  // allow-list, a data bug rather than intentional all-access — only
+  // sees their explicit list.
+  const visibleBranches = isWildcard
+    ? branches
+    : branches.filter((b) => allowedBranchIds.includes(b.id));
 
   const choose = (branch: Branch) => {
     if (branch.status !== 'active') return;

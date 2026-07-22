@@ -53,6 +53,10 @@ beforeEach(() => {
     branchId: 'b-1',
     allowedBranchIds: [],
     isPinned: false,
+    // Default fixture represents a wildcard ADMIN (empty allow-list +
+    // wildcard) — the pre-fix implicit assumption every other test in
+    // this file relies on.
+    isWildcard: true,
     tenantId: 't-1',
     branchChosen: false,
   });
@@ -115,7 +119,9 @@ describe('BranchSelectionGate', () => {
 
   it('respects the allow-list when counting visible branches', () => {
     h.branches.data = [branch('b-1'), branch('b-2'), branch('b-3')];
-    useBranchScopeStore.setState({ allowedBranchIds: ['b-2'] });
+    // A scoped user (explicit allow-list) is NOT wildcard — mirrors what a
+    // real hydrateFromUser() would compute for this allowedBranchIds value.
+    useBranchScopeStore.setState({ allowedBranchIds: ['b-2'], isWildcard: false });
     renderGate();
     expect(screen.getByText('APP CONTENT')).toBeInTheDocument();
   });
@@ -128,5 +134,15 @@ describe('BranchSelectionGate', () => {
   it('still redirects a not-yet-chosen user on a non-recovery path', () => {
     renderGate('/dashboard');
     expect(screen.getByText(/SELECT SCREEN/)).toBeInTheDocument();
+  });
+
+  // Backend BranchGuard's wildcard rule is ADMIN-only. A non-ADMIN with an
+  // empty allow-list (data bug) is NOT wildcard — it sees 0 branches, so
+  // the gate must not force it into the (empty) selection screen.
+  it('renders the app (no redirect) for a non-wildcard user with an empty allow-list', () => {
+    h.branches.data = [branch('b-1'), branch('b-2'), branch('b-3')];
+    useBranchScopeStore.setState({ allowedBranchIds: [], isWildcard: false });
+    renderGate();
+    expect(screen.getByText('APP CONTENT')).toBeInTheDocument();
   });
 });

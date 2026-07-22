@@ -14,6 +14,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { PaymentsService } from "../../orders/services/payments.service";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
 import { CustomerSessionService } from "../../customers/customer-session.service";
+import { DemoGuardService } from "../../demo/demo-guard.service";
 import { CreatePayIntentDto } from "../dto/pay-intent.dto";
 import {
   OrderStatus,
@@ -52,6 +53,13 @@ export class SelfPayIntentService {
     private customerSessionService: CustomerSessionService,
     private config: ConfigService,
     private reservations: SelfPayReservationService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // CustomerOrdersModule imports DemoGuardModule, so DI fails loud at boot
+    // if a future module-wiring regression ever drops that import, instead
+    // of silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // call site below stay only as belt-and-suspenders (and to keep any
+    // bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
@@ -127,6 +135,12 @@ export class SelfPayIntentService {
     returnOrigin?: string,
   ) {
     const session = await this.customerSessionService.requireSession(sessionId);
+
+    // Demo-tenant real-money block. This endpoint is @Public/unauthenticated
+    // (no req.user) — key off the tenantId resolved from the customer
+    // session, which is the earliest point in this method it's known. First
+    // check after session resolution, before any pricing/PayTR work.
+    await this.demoGuard?.assertNotDemo(session.tenantId);
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: session.tenantId },

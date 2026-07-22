@@ -12,6 +12,7 @@ import { QuoteService } from "./quote.service";
 import { CheckoutBuyerDto } from "./dto/create-intent.dto";
 import { AddonPurchasabilityService } from "./addon-purchasability.service";
 import { CatalogService } from "../catalog/catalog.service";
+import { DemoGuardService } from "../demo/demo-guard.service";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -58,6 +59,13 @@ export class CheckoutIntentService {
     private readonly addonGuard: AddonPurchasabilityService,
     // Task 4 — pre-payment hardware stock guard.
     private readonly catalog: CatalogService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // CheckoutModule imports DemoGuardModule, so DI fails loud at boot if a
+    // future module-wiring regression ever drops that import, instead of
+    // silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // call site below stay only as belt-and-suspenders (and to keep any
+    // bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   async createIntent(args: {
@@ -68,6 +76,11 @@ export class CheckoutIntentService {
     returnUrl?: string;
   }): Promise<CreateIntentResult> {
     const { tenantId, cart, buyer, buyerIp, returnUrl } = args;
+
+    // Demo-tenant real-money block — the shared "explore demo" tenant must
+    // never reach PayTR via marketplace/hardware checkout. First statement,
+    // before pricing/guard/stock checks or any PayTR call.
+    await this.demoGuard?.assertNotDemo(tenantId);
 
     // Tahsilat-önü guard (DEF-1/2/4/8): every `addon` cart line must clear
     // included-in-plan / already-owned / deps-tier / redundant-limit BEFORE

@@ -39,20 +39,38 @@ vi.mock('../../components/subscriptions/PlanCard', () => ({
   ),
 }));
 
+// `t` must be a STABLE reference across renders (a fresh function per
+// useTranslation() call — unlike real react-i18next, which memoizes it —
+// would retrigger any effect that lists `t` in its deps on every render,
+// e.g. double-firing the demo-payment-blocked toast below).
+const { t } = vi.hoisted(() => ({
+  t: (key: string, arg?: unknown) => {
+    if (typeof arg === 'string') return arg;
+    if (arg && typeof (arg as { defaultValue?: unknown }).defaultValue === 'string') {
+      return (arg as { defaultValue: string }).defaultValue;
+    }
+    return key;
+  },
+}));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, arg?: any) => {
-      if (typeof arg === 'string') return arg;
-      if (arg && typeof arg.defaultValue === 'string') return arg.defaultValue;
-      return key;
-    },
-  }),
+  useTranslation: () => ({ t }),
 }));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useNavigate: () => navigateMock };
 });
+
+const toastError = vi.fn();
+vi.mock('sonner', () => ({ toast: { error: (m: string) => toastError(m) } }));
+
+// Demo-tenant "explore demo" sessions must never reach a working plan-change
+// flow — the backend 403s any real-money initiation for the shared demo
+// tenant (DEMO_PAYMENT_BLOCKED). Mutable so each test controls it.
+let demoMode = false;
+vi.mock('../../store/authStore', () => ({
+  useAuthStore: (selector: (s: { demoMode: boolean }) => unknown) => selector({ demoMode }),
+}));
 
 function renderPage(search: string) {
   return render(
@@ -66,6 +84,8 @@ describe('ChangePlanPage — honors the plan picked on the plans page', () => {
   beforeEach(() => {
     mutateAsync.mockReset();
     navigateMock.mockReset();
+    toastError.mockReset();
+    demoMode = false;
   });
 
   it('auto-opens the confirm modal for ?newPlanId (no redundant re-pick)', () => {
@@ -106,5 +126,31 @@ describe('ChangePlanPage — honors the plan picked on the plans page', () => {
     renderPage('?newPlanId=plan-lite&billingCycle=YEARLY');
     expect(screen.getByText('subscriptions.confirmDowngrade')).toBeInTheDocument();
     expect(screen.queryByText('subscriptions.confirmUpgrade')).not.toBeInTheDocument();
+  });
+});
+
+describe('ChangePlanPage — demo payment gating', () => {
+  beforeEach(() => {
+    mutateAsync.mockReset();
+    navigateMock.mockReset();
+    toastError.mockReset();
+  });
+
+  it('demoMode: redirects away, toasts, renders nothing, and never fires changePlan — even with a preselected plan', () => {
+    demoMode = true;
+    renderPage('?newPlanId=plan-pro&billingCycle=YEARLY');
+    expect(navigateMock).toHaveBeenCalledWith('/admin/settings/subscription', { replace: true });
+    expect(toastError).toHaveBeenCalledTimes(1);
+    // No confirm modal, no plan cards — the page renders nothing.
+    expect(screen.queryByText('subscriptions.confirmUpgrade')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^card-/)).not.toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('not demoMode: does not redirect to the demo bounce target', () => {
+    demoMode = false;
+    renderPage('');
+    expect(navigateMock).not.toHaveBeenCalledWith('/admin/settings/subscription', { replace: true });
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

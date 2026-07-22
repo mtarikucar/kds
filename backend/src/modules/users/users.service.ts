@@ -266,13 +266,24 @@ export class UsersService {
    * values used to fall through to Prisma and silently no-match —
    * 400ing instead surfaces typos at the admin UI rather than leaving
    * the operator wondering why the filter returned zero rows.
+   *
+   * v3.2.x fix: this used to contain "PENDING" (a typo — the value the
+   * app actually writes is "PENDING_APPROVAL", set at signup for a
+   * non-owner account and read back in approveUser/rejectUser) and
+   * "SUSPENDED", which is never written to User.status at all (it's a
+   * Tenant.status value — see TenantStatus). A `?status=PENDING_APPROVAL`
+   * query 400'd today; masked only because the admin UI filters
+   * client-side instead of relying on this query param. Verified via
+   * `grep -rn '"status:' users.service.ts / auth.service.ts /
+   * auth-provisioning.service.ts` — the only User.status literals ever
+   * written are ACTIVE, INACTIVE, PENDING_APPROVAL, and REJECTED (the
+   * rejectUser() soft-delete tombstone).
    */
   private static readonly USER_STATUS_ALLOW = new Set([
     "ACTIVE",
     "INACTIVE",
-    "PENDING",
+    "PENDING_APPROVAL",
     "REJECTED",
-    "SUSPENDED",
   ]);
 
   async findAll(tenantId: string, filters: UserListFilters = {}) {

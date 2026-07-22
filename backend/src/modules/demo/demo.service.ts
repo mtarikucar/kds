@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import * as bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { DEMO_PLAN_NAME } from "./demo.constants";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { UserRole } from "../../common/constants/roles.enum";
 import {
@@ -34,7 +35,10 @@ export class DemoService {
   // already exists"). This one is ours alone.
   static readonly SUBDOMAIN = "demo-explore";
   static readonly ADMIN_EMAIL = "demo-admin@demo.hummytummy.local";
-  private static readonly PLAN_NAME = "DEMO";
+  // Kept as its own static (referencing the shared constant) so nothing
+  // else in this file has to change — DemoGuardService imports
+  // DEMO_PLAN_NAME directly so both sides can never drift apart.
+  private static readonly PLAN_NAME = DEMO_PLAN_NAME;
   private static readonly BRANCH_CODE = "MAIN";
 
   // All plan features ON so every screen is reachable in the demo. Mirrors the

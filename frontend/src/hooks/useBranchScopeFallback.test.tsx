@@ -38,7 +38,12 @@ describe('useBranchScopeFallback', () => {
     mockedGet.mockResolvedValue({ data: BRANCHES });
     useAuthStore.setState({ accessToken: 'tok' } as any);
     // ADMIN owner: not pinned, no prior branch, wildcard allow-list.
-    useBranchScopeStore.setState({ branchId: null, isPinned: false, allowedBranchIds: [] });
+    useBranchScopeStore.setState({
+      branchId: null,
+      isPinned: false,
+      allowedBranchIds: [],
+      isWildcard: true,
+    });
 
     renderHook(() => useBranchScopeFallback(), { wrapper });
 
@@ -83,6 +88,27 @@ describe('useBranchScopeFallback', () => {
     await waitFor(() =>
       expect(useBranchScopeStore.getState().branchId).toBe('b-active-2'),
     );
+  });
+
+  // Backend BranchGuard's wildcard rule is ADMIN-only. A non-wildcard user
+  // (e.g. MANAGER) with an empty allow-list is a data bug, not intentional
+  // all-access — the candidate pool must stay empty, not silently default
+  // to "any branch" (which setBranchId would then refuse anyway, leaving
+  // branchId stuck null with no diagnostic).
+  it('picks nothing for a non-wildcard user with an empty allow-list (data bug)', async () => {
+    mockedGet.mockResolvedValue({ data: BRANCHES });
+    useAuthStore.setState({ accessToken: 'tok' } as any);
+    useBranchScopeStore.setState({
+      branchId: null,
+      isPinned: false,
+      allowedBranchIds: [],
+      isWildcard: false,
+    });
+
+    renderHook(() => useBranchScopeFallback(), { wrapper });
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(useBranchScopeStore.getState().branchId).toBeNull();
   });
 
   it('does not fetch for a pinned (WAITER/KITCHEN/COURIER) user', async () => {

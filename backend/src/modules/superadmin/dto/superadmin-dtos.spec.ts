@@ -5,6 +5,7 @@ import { RefundSubscriptionPaymentDto } from "./refund-subscription-payment.dto"
 import { UserFilterDto } from "./user-filter.dto";
 import { SubscriptionFilterDto } from "./subscription-filter.dto";
 import { UpdateTenantOverridesDto } from "./update-tenant-overrides.dto";
+import { UpdateUserRoleDto } from "./update-user-role.dto";
 
 /**
  * Long-tail validation spec for the superadmin write/filter DTOs. Load-
@@ -107,5 +108,28 @@ describe("UpdateTenantOverridesDto", () => {
       limitOverrides: { maxUsers: -2 },
     });
     expect((await errs(dto)).some((m) => /maxUsers/.test(m))).toBe(true);
+  });
+});
+
+// v3.2.x incident hardening — PATCH /superadmin/users/:id/role is the safe
+// replacement for the raw-DB edit that planted an invalid "OWNER" role in
+// production. @IsEnum(UserRole) here is what makes that a 400 at the door
+// instead of ever reaching a DB write.
+describe("UpdateUserRoleDto", () => {
+  it("accepts each of the 5 valid roles", async () => {
+    for (const role of ["ADMIN", "MANAGER", "WAITER", "KITCHEN", "COURIER"]) {
+      const dto = plainToInstance(UpdateUserRoleDto, { role });
+      expect(await errs(dto)).toEqual([]);
+    }
+  });
+
+  it("rejects an invalid role string (e.g. the OWNER incident value)", async () => {
+    const dto = plainToInstance(UpdateUserRoleDto, { role: "OWNER" });
+    expect((await errs(dto)).some((m) => /role/.test(m))).toBe(true);
+  });
+
+  it("rejects a missing role", async () => {
+    const dto = plainToInstance(UpdateUserRoleDto, {});
+    expect((await errs(dto)).some((m) => /role/.test(m))).toBe(true);
   });
 });

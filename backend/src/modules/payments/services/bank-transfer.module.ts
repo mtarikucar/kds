@@ -3,6 +3,7 @@ import { PrismaModule } from "../../../prisma/prisma.module";
 import { SubscriptionsModule } from "../../subscriptions/subscriptions.module";
 import { LegalModule } from "../../legal/legal.module";
 import { OutboxModule } from "../../outbox/outbox.module";
+import { DemoGuardModule } from "../../demo/demo-guard.module";
 import { BankTransferService } from "./bank-transfer.service";
 
 /**
@@ -18,6 +19,9 @@ import { BankTransferService } from "./bank-transfer.service";
     forwardRef(() => SubscriptionsModule), // BillingService
     LegalModule, // ConsentService
     OutboxModule, // OutboxService
+    // DemoGuardService — blocks real-money initiation for the shared demo
+    // tenant (havale rail).
+    DemoGuardModule,
   ],
   providers: [BankTransferService],
   exports: [BankTransferService],

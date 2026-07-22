@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 import { isHardRestrictedRole } from '../types/roles';
 
 /**
@@ -33,6 +33,16 @@ type BranchScopeState = {
   allowedBranchIds: string[];
   /** True for WAITER/KITCHEN/COURIER. Disables BranchPicker. */
   isPinned: boolean;
+  /**
+   * Mirrors backend BranchGuard.canAccessBranchStatic's wildcard rule
+   * EXACTLY: true only for a non-pinned ADMIN with an empty
+   * allowedBranchIds (owner accounts — every branch is implicitly
+   * theirs). Any other role with an empty list (a data bug, e.g. a
+   * MANAGER whose allow-list was never populated) is NOT wildcard —
+   * the backend 403s them on every branch, so the FE must not show
+   * them a picker full of branches they can't actually access.
+   */
+  isWildcard: boolean;
   /** Tenant the persisted state belongs to (cross-tenant guard). */
   tenantId: string | null;
   /**
@@ -54,6 +64,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
       branchId: null,
       allowedBranchIds: [],
       isPinned: false,
+      isWildcard: false,
       tenantId: null,
       branchChosen: false,
 
@@ -63,6 +74,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
             branchId: null,
             allowedBranchIds: [],
             isPinned: false,
+            isWildcard: false,
             tenantId: null,
             branchChosen: false,
           });
@@ -78,12 +90,19 @@ export const useBranchScopeStore = create<BranchScopeState>()(
             branchId: null,
             allowedBranchIds: [],
             isPinned: false,
+            isWildcard: false,
             tenantId: null,
             branchChosen: false,
           });
         }
         const pinned = isHardRestrictedRole(user.role);
         const allowed = user.allowedBranchIds ?? [];
+        // Mirrors backend BranchGuard.canAccessBranchStatic exactly:
+        // wildcard (implicit all-branch access) is ADMIN-only, and only
+        // when the allow-list is empty. Any other role with an empty
+        // list is a data bug, not wildcard access — the backend 403s
+        // them on every branch.
+        const wildcard = !pinned && user.role === UserRole.ADMIN && allowed.length === 0;
         let nextBranchId: string | null = pinned
           ? user.primaryBranchId
           : current.branchId;
@@ -97,6 +116,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
           branchId: nextBranchId,
           allowedBranchIds: allowed,
           isPinned: pinned,
+          isWildcard: wildcard,
           tenantId: user.tenantId,
           // Preserved across same-tenant re-logins; the tenant-switch wipe
           // above (and the null-user reset) are the only things clearing it.
@@ -105,10 +125,10 @@ export const useBranchScopeStore = create<BranchScopeState>()(
       },
 
       setBranchId: (id) => {
-        const { isPinned, allowedBranchIds } = get();
+        const { isPinned, isWildcard, allowedBranchIds } = get();
         if (isPinned) return; // hard-restricted: no-op.
-        if (allowedBranchIds.length > 0 && !allowedBranchIds.includes(id)) {
-          return; // outside allow-list: refuse.
+        if (!isWildcard && !allowedBranchIds.includes(id)) {
+          return; // outside allow-list (and not wildcard): refuse.
         }
         set({ branchId: id, branchChosen: true });
       },
@@ -118,6 +138,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
           branchId: null,
           allowedBranchIds: [],
           isPinned: false,
+          isWildcard: false,
           tenantId: null,
           branchChosen: false,
         }),
@@ -134,6 +155,10 @@ export const useBranchScopeStore = create<BranchScopeState>()(
           branchId: state.branchId ?? null,
           allowedBranchIds: state.allowedBranchIds ?? [],
           isPinned: state.isPinned ?? false,
+          // Predates `isWildcard` on every persisted version so far — safe
+          // default; the next hydrateFromUser() (which always runs on
+          // login/reload) recomputes it correctly from the fresh user.
+          isWildcard: state.isWildcard ?? false,
           tenantId: state.tenantId ?? null,
           branchChosen:
             version === 0
@@ -145,6 +170,7 @@ export const useBranchScopeStore = create<BranchScopeState>()(
         branchId: state.branchId,
         allowedBranchIds: state.allowedBranchIds,
         isPinned: state.isPinned,
+        isWildcard: state.isWildcard,
         tenantId: state.tenantId,
         branchChosen: state.branchChosen,
       }),

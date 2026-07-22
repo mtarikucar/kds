@@ -1,8 +1,14 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { UserFilterDto, UserActivityFilterDto } from "../dto/user-filter.dto";
 import { SuperAdminAuditService } from "./superadmin-audit.service";
 import { AuditAction, EntityType } from "../dto/audit-filter.dto";
+import { UserRole } from "../../../common/constants/roles.enum";
 
 @Injectable()
 export class SuperAdminUsersService {
@@ -172,6 +178,137 @@ export class SuperAdminUsersService {
       .catch((err) => {
         this.logger.error(
           `Failed to write audit log for setEmailVerified user=${id}`,
+          err as any,
+        );
+      });
+
+    return updated;
+  }
+
+  /**
+   * Support tool for fixing a User.role value without touching Postgres
+   * directly. Before this endpoint existed, the only way to correct a role
+   * was raw DB / Prisma Studio — that is exactly how an invalid "OWNER"
+   * role got planted in production (v3.2.x incident): it bypassed every
+   * application write path's `@IsEnum(UserRole)` validation. The DTO here
+   * makes an invalid role a 400, never a DB write.
+   */
+  async updateRole(
+    id: string,
+    newRole: UserRole,
+    actorId: string,
+    actorEmail: string,
+  ) {
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+        tenantId: true,
+        tenant: { select: { name: true } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException("User not found");
+    }
+
+    // No-op: same role requested (also covers the case where an operator
+    // re-submits after a prior successful fix). Skip the write, tokenVersion
+    // bump, and audit rows entirely — nothing changed.
+    if (newRole === existing.role) {
+      return {
+        id: existing.id,
+        email: existing.email,
+        role: existing.role,
+        tenantId: existing.tenantId,
+      };
+    }
+
+    // Last-admin protection — mirrors UsersService.update's role-change
+    // guard (backend/src/modules/users/users.service.ts): a tenant must
+    // never be left with zero ACTIVE ADMIN users, or every admin-only
+    // action (including fixing roles) becomes unreachable for that tenant.
+    if (
+      existing.role === UserRole.ADMIN &&
+      newRole !== UserRole.ADMIN &&
+      existing.status === "ACTIVE"
+    ) {
+      const otherAdmins = await this.prisma.user.count({
+        where: {
+          tenantId: existing.tenantId,
+          role: UserRole.ADMIN,
+          status: "ACTIVE",
+          NOT: { id: existing.id },
+        },
+      });
+      if (otherAdmins === 0) {
+        throw new BadRequestException(
+          "Cannot demote the last active admin of this restaurant",
+        );
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.user.update({
+        where: { id: existing.id },
+        data: {
+          role: newRole,
+          // Bump tokenVersion so any outstanding access/refresh token —
+          // including one still carrying the OLD/invalid role — is
+          // rejected by JwtStrategy's revocation check, forcing a clean
+          // re-auth that picks up the corrected role fresh from the DB.
+          // Mirrors the credential-rotation bump in UsersService.update
+          // and the privilege-transition bump in
+          // SuperAdminTenantsService.updateStatus.
+          tokenVersion: { increment: 1 },
+        },
+        select: { id: true, email: true, role: true, tenantId: true },
+      });
+
+      await tx.refreshToken.updateMany({
+        where: { userId: existing.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      // Tenant-facing audit trail — same event name/shape as
+      // UsersService.update's role-change record (grep ROLE_CHANGED), now
+      // also reachable from this cross-tenant support tool.
+      await tx.userActivity.create({
+        data: {
+          userId: existing.id,
+          tenantId: existing.tenantId,
+          action: "ROLE_CHANGED",
+          metadata: {
+            by: actorId,
+            from: existing.role,
+            to: newRole,
+          },
+        },
+      });
+
+      return next;
+    });
+
+    // Superadmin-side audit log — best-effort, mirrors setEmailVerified: a
+    // failure to record it must never break the support action that
+    // already committed.
+    await this.auditService
+      .log({
+        action: AuditAction.UPDATE,
+        entityType: EntityType.USER,
+        entityId: existing.id,
+        actorId,
+        actorEmail,
+        previousData: { role: existing.role },
+        newData: { role: newRole, targetEmail: existing.email },
+        targetTenantId: existing.tenantId ?? undefined,
+        targetTenantName: existing.tenant?.name ?? undefined,
+      })
+      .catch((err) => {
+        this.logger.error(
+          `Failed to write audit log for updateRole user=${existing.id}`,
           err as any,
         );
       });

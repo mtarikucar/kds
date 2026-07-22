@@ -16,6 +16,7 @@ interface HeaderProps {
 const Header = ({ onMenuClick }: HeaderProps) => {
   const { t } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
+  const demoMode = useAuthStore((state) => state.demoMode);
   const { mutate: logout, isPending } = useLogout();
 
   return (
@@ -46,8 +47,11 @@ const Header = ({ onMenuClick }: HeaderProps) => {
           <LanguageSwitcher />
 
           {/* Mağaza (store hub) — add-ons + hardware + orders. ADMIN/MANAGER
-              only; moved here from the sidebar so it's reachable anywhere. */}
-          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+              only; moved here from the sidebar so it's reachable anywhere.
+              Hidden entirely for demo-tenant sessions — the store hub is
+              nothing but real-money purchases, which the backend 403s
+              (DEMO_PAYMENT_BLOCKED) for the shared demo tenant. */}
+          {!demoMode && (user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
             <Link
               to="/admin/store"
               aria-label={t('hummytummy.storeHub.title', { defaultValue: 'Mağaza' })}

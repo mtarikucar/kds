@@ -47,13 +47,16 @@ export function useBranchScopeFallback(): void {
 
   useEffect(() => {
     if (!needsFallback || !branches || branches.length === 0) return;
-    const allowed = useBranchScopeStore.getState().allowedBranchIds;
-    // Narrowed users (non-empty allow-list) may only land on a branch they're
-    // entitled to; wildcard owners (empty allow-list) can take any branch.
-    const pool =
-      allowed.length > 0
-        ? branches.filter((b) => allowed.includes(b.id))
-        : branches;
+    const { allowedBranchIds: allowed, isWildcard } =
+      useBranchScopeStore.getState();
+    // Wildcard owners (ADMIN + empty allow-list, mirrors backend
+    // BranchGuard) can take any branch. Everyone else — including a
+    // non-ADMIN with an empty allow-list, which is a data bug rather
+    // than intentional all-access — is restricted to their explicit
+    // list, same rule setBranchId enforces below.
+    const pool = isWildcard
+      ? branches
+      : branches.filter((b) => allowed.includes(b.id));
     const pick = pool.find((b) => b.status === 'active') ?? pool[0];
     if (pick) {
       useBranchScopeStore.getState().setBranchId(pick.id);

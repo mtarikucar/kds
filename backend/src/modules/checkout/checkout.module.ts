@@ -5,6 +5,7 @@ import { MarketplaceModule } from "../marketplace/marketplace.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
 import { EntitlementsModule } from "../entitlements/entitlements.module";
+import { DemoGuardModule } from "../demo/demo-guard.module";
 import { QuoteService } from "./quote.service";
 import { CheckoutService } from "./checkout.service";
 import { CheckoutController } from "./checkout.controller";
@@ -28,6 +29,9 @@ import { AddonPurchasabilityService } from "./addon-purchasability.service";
     // resolution, but importing it explicitly keeps this module's own
     // dependency graph honest.
     EntitlementsModule,
+    // DemoGuardService — blocks real-money initiation for the shared demo
+    // tenant (marketplace/hardware checkout intent + confirm).
+    DemoGuardModule,
   ],
   controllers: [CheckoutController, HardwareOrdersController],
   providers: [

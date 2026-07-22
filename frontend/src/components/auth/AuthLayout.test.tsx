@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AuthLayout from './AuthLayout';
 
@@ -54,6 +54,44 @@ function renderLayout() {
     </MemoryRouter>,
   );
 }
+
+describe('AuthLayout mascot click area', () => {
+  // Regression test: the mascot PNG canvas is mostly transparent padding, so the
+  // full-bleed <img> must never be a click target — otherwise the invisible
+  // padding (which can overlap the form) intercepts clicks meant for the inputs.
+  it('renders the full-bleed mascot image as non-interactive (pointer-events-none, no onClick)', () => {
+    renderLayout();
+    const img = screen.getByAltText('HummyTummy Chef Mascot');
+    expect(img.className).toContain('pointer-events-none');
+
+    // Clicking the raw <img> must NOT open the speech bubble — there is no
+    // onClick handler on it anymore (jsdom doesn't honor pointer-events on
+    // fireEvent, so this only passes if the handler was actually removed).
+    fireEvent.click(img);
+    expect(screen.queryByText(/^auth:mascot\.messages\./)).not.toBeInTheDocument();
+  });
+
+  it('exposes a small, separate hotspot over the chef that carries the click handler', () => {
+    renderLayout();
+    const hotspot = screen.getByRole('button', { name: 'Interact with mascot' });
+
+    // The hotspot must be a small region (sized to the visible chef), not the
+    // full mascot bounding box.
+    expect(hotspot.className).toContain('w-[42%]');
+    expect(hotspot.className).toContain('h-[78%]');
+    expect(hotspot.className).not.toContain('w-[400px]');
+  });
+
+  it('shows the joke/fact speech bubble when the hotspot is clicked', () => {
+    renderLayout();
+    expect(screen.queryByText(/^auth:mascot\.messages\./)).not.toBeInTheDocument();
+
+    const hotspot = screen.getByRole('button', { name: 'Interact with mascot' });
+    fireEvent.click(hotspot);
+
+    expect(screen.getByText(/^auth:mascot\.messages\./)).toBeInTheDocument();
+  });
+});
 
 describe('AuthLayout legal footer', () => {
   // Google OAuth verification requires the homepage (hummytummy.com → /login,

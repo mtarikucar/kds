@@ -3,6 +3,8 @@ import { PassportStrategy } from "@nestjs/passport";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { isValidUserRole } from "../../../common/constants/roles.enum";
+import { ErrorCode } from "../../../common/interfaces/error-response.interface";
 
 export interface JwtPayload {
   sub: string;
@@ -26,6 +28,15 @@ export interface JwtPayload {
    *  more than one element here; BranchGuard ignores it for those
    *  roles in favour of primaryBranchId. */
   allowedBranchIds?: string[];
+  /** Set true only on the demo-explore session minted by
+   *  POST /auth/demo-session (AuthController via DemoService). Not currently
+   *  read as an authorization signal here — DemoGuardService.assertNotDemo
+   *  (keyed off tenant.currentPlan.name) is the authoritative, single-source
+   *  block on real-money initiation, and it also covers the @Public self-pay
+   *  path which carries no JWT at all. Forwarded onto req.user so it stops
+   *  being silently dropped and remains available for future use (audit
+   *  logging, UI banners) without another token-shape change. */
+  demo?: boolean;
 }
 
 @Injectable()
@@ -75,6 +86,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException("Your restaurant account is not active");
     }
 
+    // Structural role guard (v3.2.x incident). Every application write path
+    // validates role with @IsEnum(UserRole), so this can only trip for a row
+    // planted directly in Postgres (raw DB / Prisma Studio) bypassing that
+    // validation — the DB CHECK constraint (`users_role_valid`) blocks new
+    // writes but a legacy bad row can still exist. Fail loud here instead of
+    // letting a garbage role silently 403 every downstream RolesGuard check
+    // with no diagnostic. Fixed via PATCH /superadmin/users/:id/role.
+    if (!isValidUserRole(user.role)) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: "Account Role Invalid",
+        errorCode: ErrorCode.ACCOUNT_ROLE_INVALID,
+        message: "Account role is invalid — contact support",
+      });
+    }
+
     // Token revocation check. Tokens issued before the current tokenVersion
     // are rejected so password-reset / admin-lockout / suspicious-login
     // handlers can invalidate all live sessions by bumping the counter.
@@ -92,6 +119,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...result,
       activeBranchId: payload.activeBranchId ?? null,
       allowedBranchIds: payload.allowedBranchIds ?? [],
+      demo: payload.demo === true,
     };
   }
 }

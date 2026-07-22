@@ -11,6 +11,7 @@ import { PaytrSettlementModule } from "./services/paytr-settlement.module";
 import { BankTransferModule } from "./services/bank-transfer.module";
 import { CustomerOrdersModule } from "../customer-orders/customer-orders.module";
 import { CheckoutModule } from "../checkout/checkout.module";
+import { DemoGuardModule } from "../demo/demo-guard.module";
 
 @Module({
   imports: [
@@ -20,6 +21,11 @@ import { CheckoutModule } from "../checkout/checkout.module";
     // checkout-time KVKK / mesafeli / iade consent gate.
     LegalModule,
     PaytrAdapterModule,
+    // DemoGuardService — blocks real-money initiation for the shared demo
+    // tenant. Lightweight standalone module (PrismaService only); see
+    // demo-guard.module.ts for why the full DemoModule/AuthModule isn't
+    // imported here.
+    DemoGuardModule,
     // Settlement engine (shared with the inquiry-recovery sweeper in
     // SubscriptionsModule); pulled into its own module to break the
     // Payments ↔ Subscriptions cycle.

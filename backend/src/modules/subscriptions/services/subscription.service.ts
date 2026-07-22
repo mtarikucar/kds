@@ -29,6 +29,7 @@ import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
 import { foldPlanGrants } from "./effective-features.fold";
 import { MetricsService } from "../../../common/metrics/metrics.service";
 import { DowngradeUsageGuardService } from "./downgrade-usage-guard.service";
+import { DemoGuardService } from "../../demo/demo-guard.service";
 
 @Injectable()
 export class SubscriptionService {
@@ -58,6 +59,13 @@ export class SubscriptionService {
     // same PrismaService so the extracted query runs identically.
     @Optional()
     private readonly injectedDowngradeGuard?: DowngradeUsageGuardService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // SubscriptionsModule imports DemoGuardModule, so DI fails loud at boot
+    // if a future module-wiring regression ever drops that import, instead
+    // of silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // changePlan call site stay only as belt-and-suspenders (and to keep
+    // any bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
@@ -637,6 +645,11 @@ export class SubscriptionService {
     dto: ChangePlanDto,
     actorUserId?: string,
   ) {
+    // Demo-tenant real-money block — very first statement, before
+    // isUpgrade/requiresPayment is even computed, so the frontend never
+    // navigates to checkout for the shared "explore demo" tenant.
+    await this.demoGuard?.assertNotDemo(tenantId);
+
     const subscription = await this.getSubscriptionById(
       subscriptionId,
       tenantId,

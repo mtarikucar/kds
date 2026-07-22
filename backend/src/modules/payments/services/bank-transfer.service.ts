@@ -14,6 +14,7 @@ import { BillingService } from "../../subscriptions/services/billing.service";
 import { ConsentService } from "../../legal/services/consent.service";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
+import { DemoGuardService } from "../../demo/demo-guard.service";
 import {
   BillingCycle,
   PaymentProvider,
@@ -62,6 +63,13 @@ export class BankTransferService {
     private readonly billing: BillingService,
     private readonly consents: ConsentService,
     private readonly outbox: OutboxService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // BankTransferModule imports DemoGuardModule, so DI fails loud at boot
+    // if a future module-wiring regression ever drops that import, instead
+    // of silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // call site below stay only as belt-and-suspenders (and to keep any
+    // bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   // ---- settings (singleton, superadmin) ------------------------------------
@@ -144,6 +152,10 @@ export class BankTransferService {
     userIp?: string;
     userAgent?: string;
   }): Promise<BankTransferIntentResult> {
+    // Demo-tenant real-money block — the shared "explore demo" tenant must
+    // never reserve a havale payment. First statement, before any DB write.
+    await this.demoGuard?.assertNotDemo(params.tenantId);
+
     const settings = await this.getSettings();
     if (!settings.enabled || !settings.iban) {
       throw new BadRequestException(

@@ -791,6 +791,7 @@
       "kitchen": "Mutfak",
       "courier": "Kurye"
     },
+    "unknownRole": "Bilinmeyen rol",
     "deleteUser": "Kullanıcıyı Sil",
     "actionCannotBeUndone": "Bu işlem geri alınamaz",
     "confirmDeleteUser": "Silmek istediğinizden emin misiniz",

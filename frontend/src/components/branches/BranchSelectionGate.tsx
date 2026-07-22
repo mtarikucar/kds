@@ -40,6 +40,7 @@ const BranchSelectionGate = ({ children }: { children: React.ReactNode }) => {
   const isPinned = useBranchScopeStore((s) => s.isPinned);
   const branchChosen = useBranchScopeStore((s) => s.branchChosen);
   const allowedBranchIds = useBranchScopeStore((s) => s.allowedBranchIds);
+  const isWildcard = useBranchScopeStore((s) => s.isWildcard);
   const { hasFeature } = useSubscription();
   const { data: branches = [], isLoading } = useListBranches();
 
@@ -54,10 +55,13 @@ const BranchSelectionGate = ({ children }: { children: React.ReactNode }) => {
   if (onRecoveryPath) return <>{children}</>;
 
   const active = branches.filter((b) => b.status === 'active');
-  const visible =
-    allowedBranchIds.length > 0
-      ? active.filter((b) => allowedBranchIds.includes(b.id))
-      : active;
+  // Mirrors backend BranchGuard: wildcard (ADMIN + empty allow-list) can
+  // roam every active branch; everyone else — including a non-ADMIN
+  // with an empty allow-list (a data bug, not intentional all-access) —
+  // is restricted to their explicit list.
+  const visible = isWildcard
+    ? active
+    : active.filter((b) => allowedBranchIds.includes(b.id));
 
   if (visible.length <= 1) return <>{children}</>;
 

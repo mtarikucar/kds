@@ -78,12 +78,14 @@ describe('JwtStrategy', () => {
       // The strategy strips `tenant` and `tokenVersion` from the
       // returned user, and v3.0.0 appends `activeBranchId` +
       // `allowedBranchIds` from the JWT payload (defaults: null + []
-      // when the legacy-shape payload omits them).
+      // when the legacy-shape payload omits them). `demo` defaults to
+      // false when the payload omits the claim (legacy/non-demo tokens).
       const { tenant: _t, tokenVersion: _v, ...expected } = fullUser as any;
       expect(result).toEqual({
         ...expected,
         activeBranchId: null,
         allowedBranchIds: [],
+        demo: false,
       });
       expect(prisma.user.findUnique).toHaveBeenCalled();
     });
@@ -118,6 +120,51 @@ describe('JwtStrategy', () => {
       });
     });
 
+    it('forwards demo:true from the JWT payload onto req.user (was silently dropped pre-fix)', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        tenantId: mockUser.tenantId,
+        demo: true,
+      };
+      const fullUser = {
+        ...mockUser,
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+
+      expect(result).toMatchObject({ demo: true });
+    });
+
+    it('defaults demo to false when the payload omits the claim', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        tenantId: mockUser.tenantId,
+      };
+      const fullUser = {
+        ...mockUser,
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+
+      expect(result).toMatchObject({ demo: false });
+    });
+
     it('should throw UnauthorizedException when user is not found', async () => {
       const payload = {
         sub: 'non-existent-user',
@@ -131,6 +178,65 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(payload)).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+
+    /**
+     * v3.2.x incident hardening — a support engineer wrote an invalid role
+     * string ("OWNER") directly into Postgres (raw DB / Prisma Studio),
+     * bypassing every application write path's @IsEnum(UserRole)
+     * validation. validate() must reject that account loudly with
+     * ACCOUNT_ROLE_INVALID instead of letting it through to a silent 403
+     * storm downstream.
+     */
+    it('throws UnauthorizedException with errorCode ACCOUNT_ROLE_INVALID for a structurally-invalid role', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: 'OWNER',
+        tenantId: mockUser.tenantId,
+      };
+
+      const fullUser = {
+        ...mockUser,
+        role: 'OWNER',
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      await expect(strategy.validate(payload)).rejects.toMatchObject({
+        response: expect.objectContaining({
+          errorCode: 'ACCOUNT_ROLE_INVALID',
+        }),
+      });
+    });
+
+    it('resolves normally for a valid ADMIN role', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: 'ADMIN',
+        tenantId: mockUser.tenantId,
+      };
+
+      const fullUser = {
+        ...mockUser,
+        role: 'ADMIN',
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
+      };
+
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+      expect(result).toMatchObject({ role: 'ADMIN' });
     });
 
     it('should return user data when found (email verification checked in auth flow)', async () => {

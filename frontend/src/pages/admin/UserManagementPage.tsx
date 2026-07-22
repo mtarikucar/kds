@@ -6,6 +6,7 @@ import { UsersRound, UserPlus, Edit2, Trash2, AlertTriangle, Lock, Users, UserCh
 import { useTranslation } from 'react-i18next';
 import { usersApi, User, CreateUserData, UpdateUserData } from '../../api/usersApi';
 import { UserRole, UserStatus } from '../../types';
+import { isValidUserRole } from '../../types/roles';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 import { useSubscription } from '../../contexts/SubscriptionContext';
@@ -634,9 +635,19 @@ const UserManagementPage = ({ embedded = false }: UserManagementPageProps) => {
                   {user.email}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role as UserRole)}`}>
-                    {t(`admin.roles.${user.role.toLowerCase()}`)}
-                  </span>
+                  {isValidUserRole(user.role) ? (
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role as UserRole)}`}>
+                      {t(`admin.roles.${user.role.toLowerCase()}`)}
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-300"
+                      title={t('admin.unknownRole')}
+                    >
+                      <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                      {t('admin.unknownRole')}: {user.role}
+                    </span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(user.status)}`}>

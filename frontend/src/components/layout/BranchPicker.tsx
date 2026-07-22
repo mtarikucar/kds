@@ -28,17 +28,20 @@ export default function BranchPicker() {
   const branchId = useBranchScopeStore((s) => s.branchId);
   const allowedBranchIds = useBranchScopeStore((s) => s.allowedBranchIds);
   const isPinned = useBranchScopeStore((s) => s.isPinned);
+  const isWildcard = useBranchScopeStore((s) => s.isWildcard);
   const { data: allBranches = [], isLoading } = useListBranches();
 
   if (!hasFeature('multiLocation')) return null;
   if (isLoading) return null;
 
-  // ADMIN with an empty allow-list = wildcard tenant access; an explicit
-  // list (MANAGER, scoped ADMIN) filters what is visible.
-  const visibleBranches =
-    allowedBranchIds.length > 0
-      ? allBranches.filter((b) => allowedBranchIds.includes(b.id))
-      : allBranches;
+  // Wildcard (ADMIN + empty allow-list, mirrors backend
+  // BranchGuard.canAccessBranchStatic) shows every branch. Any other
+  // non-pinned role — including one with an empty allow-list, which is
+  // a data bug rather than intentional all-access — only sees its
+  // explicit list, since the backend 403s it on anything outside that.
+  const visibleBranches = isWildcard
+    ? allBranches
+    : allBranches.filter((b) => allowedBranchIds.includes(b.id));
 
   if (visibleBranches.length <= 1 && !isPinned) return null;
 

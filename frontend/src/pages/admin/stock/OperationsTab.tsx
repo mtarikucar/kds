@@ -115,6 +115,7 @@ function TransfersTab() {
 function CreateTransferForm() {
   const myBranchId = useBranchScopeStore((s) => s.branchId);
   const allowedBranchIds = useBranchScopeStore((s) => s.allowedBranchIds);
+  const isWildcard = useBranchScopeStore((s) => s.isWildcard);
   const { data: branches } = useListBranches();
   const { data: sourceItems } = useStockItems();
   const [toBranchId, setToBranchId] = useState('');
@@ -125,14 +126,17 @@ function CreateTransferForm() {
   const [unitCost, setUnitCost] = useState('');
   const create = useCreateStockTransfer();
 
-  // Only ACTIVE branches the caller is authorized for (empty allow-list =
-  // wildcard ADMIN) — the backend enforces the same rule; filtering here just
-  // avoids offering targets that would dead-end at the dest-item fetch.
+  // Only ACTIVE branches the caller is authorized for. Wildcard (ADMIN +
+  // empty allow-list) is authorized for all of them — the backend
+  // enforces the same rule; filtering here just avoids offering targets
+  // that would dead-end at the dest-item fetch. A non-ADMIN with an
+  // empty allow-list is NOT wildcard (data bug, not intentional
+  // all-access), so it correctly yields zero targets.
   const targets = (branches ?? []).filter(
     (b: any) =>
       b.id !== myBranchId &&
       (b.status == null || b.status === 'active') &&
-      (allowedBranchIds.length === 0 || allowedBranchIds.includes(b.id))
+      (isWildcard || allowedBranchIds.includes(b.id))
   );
   const canSubmit = toBranchId && sourceStockItemId && destStockItemId && Number(qty) > 0;
 

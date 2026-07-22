@@ -77,73 +77,89 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
 
   return (
     <div className="min-h-screen flex relative" dir="ltr">
-      {/* Mascot Container - wraps mascot and speech bubble for relative positioning */}
-      <div className="hidden lg:block absolute bottom-0 left-[10%] lg:left-[15%] xl:left-[20%] z-30" dir="ltr">
-        {/* Speech Bubble - positioned relative to mascot */}
-        <AnimatePresence>
-          {showMessage && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="absolute -top-4 right-0 translate-x-[70%] lg:translate-x-[75%] xl:translate-x-[80%] z-40 max-w-[280px] lg:max-w-[320px]"
-              dir="ltr"
-            >
-              <div className="relative bg-white rounded-2xl shadow-2xl p-4 border border-orange-100 text-left">
-                {/* Close button */}
-                <button
-                  onClick={() => setShowMessage(false)}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center text-sm font-bold transition-colors shadow-md"
-                >
-                  <X size={14} />
-                </button>
-
-                {/* Message content */}
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl flex-shrink-0">{currentMessage.emoji}</span>
-                  <div>
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-1 ${
-                        currentMessage.type === 'joke'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : currentMessage.type === 'fact'
-                            ? 'bg-blue-100 text-blue-700'
-                            : currentMessage.type === 'tip'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-purple-100 text-purple-700'
-                      }`}
-                    >
-                      {t(`auth:mascot.messageTypes.${currentMessage.type}`)}
-                    </span>
-                    <p className="text-sm text-gray-700 leading-relaxed">{t(`auth:${currentMessage.messageKey}`)}</p>
-                  </div>
-                </div>
-
-                {/* Speech bubble tail - pointing down-left towards mascot */}
-                <div className="absolute bottom-0 left-8 w-6 h-6 bg-white border-r border-b border-orange-100 transform rotate-45 translate-y-1/2" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Mascot Image */}
-        <motion.img
-          src={config.image}
-          alt="HummyTummy Chef Mascot"
-          onClick={handleMascotClick}
-          className="w-[400px] lg:w-[500px] xl:w-[600px] object-contain drop-shadow-2xl cursor-pointer hover:scale-105 transition-transform duration-300"
-          initial={{ opacity: 0, x: '-100%' }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{
-            opacity: { duration: 0.6, ease: 'easeOut' },
-            x: { duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }
-          }}
-        />
-      </div>
-
       {/* Left Panel - Branding with Mascot (Desktop only) */}
       <div className="hidden lg:flex lg:w-[42%] xl:w-[40%] bg-gradient-to-br from-orange-400 via-primary-500 to-amber-600 relative overflow-hidden">
+        {/* Mascot Container - wraps mascot and speech bubble for relative positioning.
+            Nested INSIDE the (relative + overflow-hidden) Left Panel so it is clipped to
+            the branding panel and can never bleed over the form on the right. */}
+        <div className="absolute bottom-0 left-[10%] lg:left-[15%] xl:left-[20%] z-30 group" dir="ltr">
+          {/* Speech Bubble - positioned relative to mascot */}
+          <AnimatePresence>
+            {showMessage && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="absolute -top-4 right-0 translate-x-[70%] lg:translate-x-[75%] xl:translate-x-[80%] z-40 max-w-[280px] lg:max-w-[320px]"
+                dir="ltr"
+              >
+                <div className="relative bg-white rounded-2xl shadow-2xl p-4 border border-orange-100 text-left">
+                  {/* Close button */}
+                  <button
+                    onClick={() => setShowMessage(false)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center text-sm font-bold transition-colors shadow-md"
+                  >
+                    <X size={14} />
+                  </button>
+
+                  {/* Message content */}
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl flex-shrink-0">{currentMessage.emoji}</span>
+                    <div>
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-1 ${
+                          currentMessage.type === 'joke'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : currentMessage.type === 'fact'
+                              ? 'bg-blue-100 text-blue-700'
+                              : currentMessage.type === 'tip'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-purple-100 text-purple-700'
+                        }`}
+                      >
+                        {t(`auth:mascot.messageTypes.${currentMessage.type}`)}
+                      </span>
+                      <p className="text-sm text-gray-700 leading-relaxed">{t(`auth:${currentMessage.messageKey}`)}</p>
+                    </div>
+                  </div>
+
+                  {/* Speech bubble tail - pointing down-left towards mascot */}
+                  <div className="absolute bottom-0 left-8 w-6 h-6 bg-white border-r border-b border-orange-100 transform rotate-45 translate-y-1/2" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Mascot Image - decorative only. The PNG canvas is mostly transparent
+              padding around the chef, so it must NOT be the click target (that was
+              the bug: a huge invisible clickable area bleeding over the form).
+              pointer-events-none lets clicks/hovers pass through to whatever is
+              actually under the cursor; the visible "hover" affordance is driven by
+              the hotspot button below via the group/group-hover pair. */}
+          <motion.img
+            src={config.image}
+            alt="HummyTummy Chef Mascot"
+            className="w-[400px] lg:w-[500px] xl:w-[600px] object-contain drop-shadow-2xl pointer-events-none transition-transform duration-300 group-hover:scale-105"
+            initial={{ opacity: 0, x: '-100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              opacity: { duration: 0.6, ease: 'easeOut' },
+              x: { duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }
+            }}
+          />
+
+          {/* Mascot Hotspot - small, invisible click target sized to the visible
+              chef only (conservative bbox measured from the source PNGs), so
+              clicking the transparent padding around the chef does nothing. */}
+          <button
+            type="button"
+            onClick={handleMascotClick}
+            aria-label={t('auth:mascot.interactionLabel', 'Interact with mascot')}
+            className="absolute left-[28%] top-[13%] w-[42%] h-[78%] cursor-pointer bg-transparent border-0 p-0"
+          />
+        </div>
+
         {/* Top Section: Logo + Headline */}
         <div className={`absolute top-0 z-20 p-8 xl:p-12 ${isRTL ? 'right-0 text-right' : 'left-0'}`}>
           <Link to="/" className={`inline-flex items-center gap-3 text-white mb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
