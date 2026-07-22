@@ -4,7 +4,6 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
-  Optional,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
@@ -64,12 +63,13 @@ export class BankTransferService {
     private readonly billing: BillingService,
     private readonly consents: ConsentService,
     private readonly outbox: OutboxService,
-    // Demo-tenant real-money block. @Optional so unit tests constructing the
-    // service bare keep working — BankTransferModule imports DemoGuardModule
-    // so production DI always supplies a real instance; the call site below
-    // is `?.`-guarded so a bare-constructed test that never wires this in
-    // doesn't perform a real Prisma call it didn't ask for.
-    @Optional() private readonly demoGuard?: DemoGuardService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // BankTransferModule imports DemoGuardModule, so DI fails loud at boot
+    // if a future module-wiring regression ever drops that import, instead
+    // of silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // call site below stay only as belt-and-suspenders (and to keep any
+    // bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   // ---- settings (singleton, superadmin) ------------------------------------

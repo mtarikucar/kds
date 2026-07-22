@@ -52,12 +52,13 @@ export class CheckoutService {
     // Optional: provisions device-mesh slots for purchased device-class
     // hardware (best-effort, post-commit). Bare-constructed tests pass null.
     @Optional() private readonly devices?: DeviceService,
-    // Demo-tenant real-money block. @Optional so unit tests constructing the
-    // service bare keep working — CheckoutModule imports DemoGuardModule so
-    // production DI always supplies a real instance; the call site below is
-    // `?.`-guarded so a bare-constructed test that never wires this in
-    // doesn't perform a real Prisma call it didn't ask for.
-    @Optional() private readonly demoGuard?: DemoGuardService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // CheckoutModule imports DemoGuardModule, so DI fails loud at boot if a
+    // future module-wiring regression ever drops that import, instead of
+    // silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // call site below stay only as belt-and-suspenders (and to keep any
+    // bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**

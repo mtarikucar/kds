@@ -59,12 +59,13 @@ export class SubscriptionService {
     // same PrismaService so the extracted query runs identically.
     @Optional()
     private readonly injectedDowngradeGuard?: DowngradeUsageGuardService,
-    // Demo-tenant real-money block. @Optional so unit tests constructing the
-    // service bare keep working — SubscriptionsModule imports DemoGuardModule
-    // so production DI always supplies a real instance; the changePlan call
-    // site is `?.`-guarded so a bare-constructed test that never wires this
-    // in doesn't perform a real Prisma call it didn't ask for.
-    @Optional() private readonly demoGuard?: DemoGuardService,
+    // Demo-tenant real-money block. REQUIRED (no @Optional) —
+    // SubscriptionsModule imports DemoGuardModule, so DI fails loud at boot
+    // if a future module-wiring regression ever drops that import, instead
+    // of silently no-op'ing a money guard. The `?` on the type + `?.` at the
+    // changePlan call site stay only as belt-and-suspenders (and to keep
+    // any bare-`new`-constructed spec compiling).
+    private readonly demoGuard?: DemoGuardService,
   ) {}
 
   /**
