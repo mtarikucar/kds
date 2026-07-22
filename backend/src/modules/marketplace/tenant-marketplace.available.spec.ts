@@ -74,6 +74,47 @@ describe("TenantMarketplaceService.isIncludedInEntitlements", () => {
     ).toBe(false);
   });
 
+  it("DEF-3: integration add-on IS included when a covering plan feature is true, even with no integration.* grant at all (plan never projects integration.*)", () => {
+    // Tenant whose PLAN includes delivery: PlanProjectorService only ever
+    // projects feature.deliveryIntegration=true, never integration.delivery
+    // (see plan-projector.service.ts's FEATURE_COLUMNS loop). Before the
+    // INTEGRATION_COVERED_BY_FEATURE coverage map, isIncludedInEntitlements
+    // only ever compared against ent.integrations and returned false here,
+    // so the delivery add-on showed as purchasable to a tenant whose plan
+    // already included it.
+    expect(
+      fn(
+        { "integration.delivery": ["yemeksepeti"] },
+        ent({
+          features: { "feature.deliveryIntegration": true },
+          integrations: {},
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("DEF-3: fiscal/caller integration add-ons are NOT covered by any plan feature (no map entry) — stay vendor-list based even if unrelated features are true", () => {
+    expect(
+      fn(
+        { "integration.fiscal": ["hugin"] },
+        ent({
+          // An unrelated feature being true must not spuriously cover
+          // fiscal — there is no INTEGRATION_COVERED_BY_FEATURE entry for
+          // it, so this must fall through to the vendor-list check and
+          // fail (empty ent.integrations).
+          features: { "feature.deliveryIntegration": true },
+          integrations: {},
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      fn(
+        { "integration.caller": ["generic"] },
+        ent({ features: { "feature.deliveryIntegration": true }, integrations: {} }),
+      ),
+    ).toBe(false);
+  });
+
   it("no-grant add-on (one-time service) is never included", () => {
     expect(fn({}, ent({ features: { "feature.x": true } }))).toBe(false);
     expect(fn(null, ent())).toBe(false);

@@ -13,6 +13,7 @@ import { EventTypes } from "../outbox/event-types";
 import { AddOnCatalogService } from "./addon-catalog.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { EntitlementSet } from "../entitlements/entitlement.types";
+import { INTEGRATION_COVERED_BY_FEATURE } from "../entitlements/integration-coverage";
 
 /**
  * Tenant-facing operations: purchase, cancel, list-mine.
@@ -87,8 +88,13 @@ export class TenantMarketplaceService {
    *    "included" (stays purchasable). This also covers mixed grants like
    *    extra_branch ({ "limit.maxBranches": 1, "feature.multiLocation": true }).
    *  - A `feature.X: true` grant is covered iff features[X] is already true.
-   *  - An `integration.domain: [vendors]` grant is covered iff every vendor is
-   *    already present in integrations[domain].
+   *  - An `integration.domain: [vendors]` grant is covered iff EITHER (a) a
+   *    plan-feature covers the whole domain (DEF-3 — see
+   *    INTEGRATION_COVERED_BY_FEATURE: PlanProjectorService never projects
+   *    `integration.*` for plan-sourced access, only `feature.*`, so a
+   *    tenant whose PLAN includes e.g. delivery would otherwise never show
+   *    as covered no matter how the vendor-list check is written), OR (b)
+   *    every vendor is already present in integrations[domain].
    *  - An add-on with NO grants (e.g. a one-time on-site service) is never
    *    "included" — there's nothing for the plan to cover.
    */
@@ -108,6 +114,17 @@ export class TenantMarketplaceService {
         // no-op and doesn't block inclusion.
         if (value === true && ent.features?.[key] !== true) return false;
       } else if (key.startsWith("integration.")) {
+        const domain = key.slice("integration.".length);
+        const coveringFeature = INTEGRATION_COVERED_BY_FEATURE[domain];
+        if (
+          coveringFeature &&
+          ent.features?.[`feature.${coveringFeature}`] === true
+        ) {
+          // DEF-3: the tenant's PLAN already covers this whole domain —
+          // no need to check the (always-empty, for plan-sourced access)
+          // vendor list.
+          continue;
+        }
         const have = ent.integrations?.[key] ?? [];
         // "*" is the engine's "all vendors permitted" wildcard (see
         // entitlement-engine allowsIntegration) — if the tenant has it, every

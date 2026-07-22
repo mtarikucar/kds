@@ -21,6 +21,7 @@ import {
 } from "../../../common/constants/subscription.enum";
 import { isUnlimited } from "../../../common/constants/subscription-plans.const";
 import { EntitlementService } from "../../entitlements/entitlement.service";
+import { INTEGRATION_COVERED_BY_FEATURE } from "../../entitlements/integration-coverage";
 
 @Injectable()
 export class PlanFeatureGuard implements CanActivate {
@@ -197,11 +198,28 @@ export class PlanFeatureGuard implements CanActivate {
     // `integration_yemeksepeti`, the engine grants
     // `integration.delivery: ['yemeksepeti']`; the gate
     // `@RequiresIntegration('delivery')` then passes.
+    //
+    // DEF-3: that vendor-list check alone misses a tenant whose PLAN
+    // already includes the domain — PlanProjectorService only ever
+    // projects `feature.<name>` for plan-sourced access, never
+    // `integration.<domain>` (see plan-projector.service.ts's
+    // FEATURE_COLUMNS loop), so a plan-delivery tenant had
+    // integrations['integration.delivery'] permanently empty and every
+    // `@RequiresIntegration('delivery')` route 403'd despite the plan
+    // covering it. INTEGRATION_COVERED_BY_FEATURE cross-checks the
+    // covering plan feature (delivery only — fiscal/caller have no
+    // covering feature and stay purely vendor-list based) as a second,
+    // OR'd way to pass.
     if (requiredIntegrations && requiredIntegrations.length > 0) {
       const set = await loadEngineSet();
       for (const domain of requiredIntegrations) {
         const vendors = set.integrations[`integration.${domain}`];
-        if (!Array.isArray(vendors) || vendors.length === 0) {
+        const hasVendorGrant = Array.isArray(vendors) && vendors.length > 0;
+        const coveringFeature = INTEGRATION_COVERED_BY_FEATURE[domain];
+        const hasCoveringFeature =
+          coveringFeature != null &&
+          set.features[`feature.${coveringFeature}`] === true;
+        if (!hasVendorGrant && !hasCoveringFeature) {
           throw new ForbiddenException(
             `No active ${domain} integration. Buy one from the marketplace to unlock this feature.`,
           );
