@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-error';
+import i18n from '../../i18n/config';
 
 export interface HardwareProduct {
   id: string;
@@ -230,9 +231,15 @@ export const useConfirmCheckout = () => {
       qc.invalidateQueries({ queryKey: ['devices'] });
       qc.invalidateQueries({ queryKey: ['hardware-orders'] });
       qc.invalidateQueries({ queryKey: ['marketplace'] });
-      toast.success('Order placed.');
+      toast.success(i18n.t('hardware:store.toast.orderPlaced', { defaultValue: 'Order placed.' }));
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Checkout failed')),
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('hardware:store.toast.checkoutFailed', { defaultValue: 'Checkout failed' }),
+        ),
+      ),
   });
 };
 

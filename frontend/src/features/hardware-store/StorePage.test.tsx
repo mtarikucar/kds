@@ -16,6 +16,10 @@ import { useCartStore } from './cartStore';
 const products: { data: HardwareProduct[]; isLoading: boolean } = { data: [], isLoading: false };
 const quote = { mutateAsync: vi.fn(), reset: vi.fn(), isPending: false, data: undefined as any };
 const intent = { mutateAsync: vi.fn(), isPending: false };
+const hardwareOrders: { data: any[]; refetch: ReturnType<typeof vi.fn> } = {
+  data: [],
+  refetch: vi.fn(),
+};
 
 vi.mock('./storeApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./storeApi')>();
@@ -25,6 +29,7 @@ vi.mock('./storeApi', async (importOriginal) => {
     useCategories: () => ({ data: [{ value: 'kds', labelTr: 'KDS' }] }),
     useQuoteCart: () => quote,
     useCreateCheckoutIntent: () => intent,
+    useListHardwareOrders: () => hardwareOrders,
   };
 });
 
@@ -104,8 +109,11 @@ describe('StorePage', () => {
     quote.data = undefined;
     intent.mutateAsync.mockReset();
     intent.isPending = false;
+    hardwareOrders.data = [];
+    hardwareOrders.refetch.mockReset();
     // Reset the shared in-memory cart between tests.
     useCartStore.getState().clear();
+    window.sessionStorage.clear();
   });
 
   it('shows the empty-category copy when no products are returned', () => {
@@ -121,11 +129,12 @@ describe('StorePage', () => {
     expect(screen.getByText('Your cart is empty.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
 
-    // Cart store now holds the line; the panel lists it with × quantity.
+    // Cart store now holds the line; the panel lists it with a qty stepper.
     expect(useCartStore.getState().lines).toHaveLength(1);
     const cart = screen.getByText('Cart').closest('aside')!;
     expect(within(cart).getByText('KDS Screen 15"')).toBeInTheDocument();
-    expect(within(cart).getByText('× 1')).toBeInTheDocument();
+    expect(within(cart).getByText('1')).toBeInTheDocument();
+    expect(within(cart).getByRole('button', { name: 'Increase quantity' })).toBeInTheDocument();
   });
 
   it('disables the add button for an out-of-stock product', () => {
@@ -206,11 +215,29 @@ describe('StorePage', () => {
   it('opens the checkout modal and fires the checkout intent on address submit', async () => {
     products.data = [makeProduct()];
     intent.mutateAsync.mockResolvedValue({ paymentLink: '' });
-    renderStore();
+    const { rerender } = renderStore();
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
 
-    // No modal yet.
+    // No modal yet, and Checkout stays locked until a quote is fetched.
     expect(screen.queryByTestId('ship-submit')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Checkout' })).toBeDisabled();
+
+    // Simulate a fetched quote (as the real mutation's onSuccess would).
+    quote.data = {
+      lines: [],
+      currency: 'TRY',
+      subtotalCents: 50000,
+      taxCents: 9000,
+      shippingCents: 2500,
+      totalCents: 61500,
+      warnings: [],
+      isPureRecurring: false,
+    };
+    rerender(
+      <MemoryRouter>
+        <StorePage />
+      </MemoryRouter>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Checkout' }));
     expect(screen.getByText('Delivery details')).toBeInTheDocument();
@@ -233,5 +260,109 @@ describe('StorePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Got it, close' }));
     expect(screen.queryByText('Already have hardware?')).not.toBeInTheDocument();
     expect(window.localStorage.getItem('hardware-store-byo-dismiss-v1')).toBe('1');
+  });
+
+  describe('quote-before-pay lock', () => {
+    it('keeps Checkout disabled with an empty cart, and with a non-empty cart before a quote exists', () => {
+      products.data = [makeProduct()];
+      renderStore();
+      // Empty cart — no Checkout button rendered at all (cart panel shows
+      // the empty-cart copy instead).
+      expect(screen.queryByRole('button', { name: 'Checkout' })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
+      // Cart has a line now, but no quote has been fetched yet — Checkout
+      // must stay locked (pre-fix this only checked lines.length).
+      expect(screen.getByRole('button', { name: 'Checkout' })).toBeDisabled();
+    });
+
+    it('enables Checkout once a quote is fetched, and re-locks it after any cart mutation', () => {
+      products.data = [makeProduct()];
+      const { rerender } = renderStore();
+      fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
+      expect(screen.getByRole('button', { name: 'Checkout' })).toBeDisabled();
+
+      quote.data = {
+        lines: [],
+        currency: 'TRY',
+        subtotalCents: 50000,
+        taxCents: 9000,
+        shippingCents: 2500,
+        totalCents: 61500,
+        warnings: [],
+        isPureRecurring: false,
+      };
+      rerender(
+        <MemoryRouter>
+          <StorePage />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: 'Checkout' })).toBeEnabled();
+
+      // Any cart mutation invalidates the quote (the existing effect calls
+      // quote.reset()); assert the button re-locks once that invalidation
+      // is reflected, instead of staying clickable against a stale quote.
+      fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
+      expect(quote.reset).toHaveBeenCalled();
+      quote.data = undefined; // mirrors what the real hook's reset() clears
+      rerender(
+        <MemoryRouter>
+          <StorePage />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: 'Checkout' })).toBeDisabled();
+    });
+  });
+
+  describe('cart line quantity stepper', () => {
+    it('increases a hardware line quantity via +, calling cartStore.setQty and re-invalidating the quote', () => {
+      products.data = [makeProduct()];
+      renderStore();
+      fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
+      expect(useCartStore.getState().lines[0].qty).toBe(1);
+
+      const cart = screen.getByText('Cart').closest('aside')!;
+      quote.reset.mockClear();
+      fireEvent.click(within(cart).getByRole('button', { name: 'Increase quantity' }));
+
+      expect(useCartStore.getState().lines[0].qty).toBe(2);
+      expect(within(cart).getByText('2')).toBeInTheDocument();
+      // cartItems changed → the cart-change effect re-fires, invalidating
+      // any previously-fetched quote.
+      expect(quote.reset).toHaveBeenCalled();
+    });
+
+    it('decreases a hardware line quantity via −, floored at 1', () => {
+      products.data = [makeProduct()];
+      renderStore();
+      fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
+
+      const cart = screen.getByText('Cart').closest('aside')!;
+      fireEvent.click(within(cart).getByRole('button', { name: 'Decrease quantity' }));
+      expect(useCartStore.getState().lines[0].qty).toBe(1);
+    });
+  });
+
+  describe('payment return result panel', () => {
+    it('shows the checkout-result panel instead of the store grid when returning with ?intent=', () => {
+      hardwareOrders.data = [{ id: 'ord-9', paymentRef: 'pending', status: 'paid' }];
+      render(
+        <MemoryRouter initialEntries={['/admin/store?tab=hardware&intent=pending']}>
+          <StorePage />
+        </MemoryRouter>,
+      );
+      expect(screen.getByText('Payment received')).toBeInTheDocument();
+      expect(screen.queryByText('Cart')).not.toBeInTheDocument();
+    });
+
+    it('shows the pending/confirming state when no matching order exists yet', () => {
+      hardwareOrders.data = [];
+      render(
+        <MemoryRouter initialEntries={['/admin/store?tab=hardware&intent=pending']}>
+          <StorePage />
+        </MemoryRouter>,
+      );
+      expect(screen.getByText('Confirming your payment')).toBeInTheDocument();
+    });
   });
 });

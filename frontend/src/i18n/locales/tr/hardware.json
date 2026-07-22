@@ -97,7 +97,25 @@
     "total": "Toplam",
     "redirecting": "Yönlendiriliyor…",
     "checkout": "Ödemeye geç",
+    "checkoutNeedsQuote": "Ödemeye geçmeden önce teklif alın",
+    "increaseQty": "Adedi artır",
+    "decreaseQty": "Adedi azalt",
     "pastOrders": "Geçmiş siparişlerim →",
+    "toast": {
+      "orderPlaced": "Sipariş oluşturuldu.",
+      "checkoutFailed": "Ödeme alınamadı"
+    },
+    "checkoutResult": {
+      "confirmingTitle": "Ödemeniz onaylanıyor",
+      "confirmingBody": "PayTR onayı bekleniyor. Bu birkaç saniye sürebilir.",
+      "successTitle": "Ödeme alındı",
+      "successBody": "Siparişiniz oluşturuldu. Sipariş detayını aşağıdan görebilirsiniz.",
+      "viewOrder": "Siparişi görüntüle",
+      "continueShopping": "Alışverişe devam et",
+      "failTitle": "Ödeme tamamlanamadı",
+      "failBody": "Kartınızdan çekim yapılmadı. Tekrar deneyebilir veya siparişlerim sayfasından kontrol edebilirsiniz.",
+      "tryAgain": "Tekrar dene"
+    },
     "deliveryInfo": "Teslimat bilgileri",
     "close": "Kapat",
     "deliveryNote": "Donanımınız bu adrese kargolanacak. Bilgiler güvenli PayTR ödeme sayfasına aktarılacaktır.",

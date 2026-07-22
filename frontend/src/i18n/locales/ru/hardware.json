@@ -97,7 +97,25 @@
     "total": "Total",
     "redirecting": "Redirecting…",
     "checkout": "Checkout",
+    "checkoutNeedsQuote": "Get a quote before checkout",
+    "increaseQty": "Increase quantity",
+    "decreaseQty": "Decrease quantity",
     "pastOrders": "My past orders →",
+    "toast": {
+      "orderPlaced": "Order placed.",
+      "checkoutFailed": "Checkout failed"
+    },
+    "checkoutResult": {
+      "confirmingTitle": "Confirming your payment",
+      "confirmingBody": "Waiting for PayTR confirmation. This can take a few seconds.",
+      "successTitle": "Payment received",
+      "successBody": "Your order has been placed. You can view the order details below.",
+      "viewOrder": "View order",
+      "continueShopping": "Continue shopping",
+      "failTitle": "Payment didn't go through",
+      "failBody": "Your card was not charged. You can try again or check your orders page.",
+      "tryAgain": "Try again"
+    },
     "deliveryInfo": "Delivery details",
     "close": "Close",
     "deliveryNote": "Your hardware will be shipped to this address. The information will be transferred to the secure PayTR payment page.",
