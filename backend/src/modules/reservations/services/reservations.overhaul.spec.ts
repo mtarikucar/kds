@@ -285,6 +285,49 @@ describe("ReservationsService — overhaul B1/B2/B4", () => {
       );
     });
 
+    it("accepts a single-digit-hour startTime whose defaulted endTime would sort wrong as a string", async () => {
+      // "9:00" + 90m = "10:30"; the end>start guard must compare in minutes,
+      // not lexically ("10:30" <= "9:00" is true as strings and would 400).
+      const svc = buildSvc(zeroTableSettings);
+      const created = {
+        id: "r-1",
+        status: ReservationStatus.CONFIRMED,
+        source: "PHONE",
+        date: new Date("2026-08-01"),
+        reservationNumber: "R-20260801-0001",
+        customerName: "Jane",
+        customerEmail: null,
+        customerPhone: "+905551234567",
+      };
+      acceptZeroTableMocks(created);
+
+      const res = await svc.createStaffReservation(scope, {
+        date: "2026-08-01",
+        startTime: "9:00",
+        guestCount: 2,
+        customerName: "Jane",
+        customerPhone: "+905551234567",
+      } as any);
+
+      expect(res).toBe(created);
+      const data = (prisma.reservation.create as any).mock.calls[0][0].data;
+      expect(data.endTime).toBe("10:30");
+    });
+
+    it("rejects an inverted window ('10:00'→'9:30') that string compare would let pass", async () => {
+      const svc = buildSvc(zeroTableSettings);
+      await expect(
+        svc.createStaffReservation(scope, {
+          date: "2026-08-01",
+          startTime: "10:00",
+          endTime: "9:30",
+          guestCount: 2,
+          customerName: "Jane",
+          customerPhone: "+905551234567",
+        } as any),
+      ).rejects.toThrow("End time must be after start time");
+    });
+
     it("WALKIN source sends NO customer notification", async () => {
       const svc = buildSvc(zeroTableSettings);
       const created = {

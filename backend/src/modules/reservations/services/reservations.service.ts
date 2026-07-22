@@ -257,8 +257,9 @@ export class ReservationsService {
       throw new BadRequestException("Reservation system is not enabled");
     }
 
-    // Validate end time > start time
-    if (dto.endTime <= dto.startTime) {
+    // Validate end time > start time — compare in minutes (the regex permits
+    // single-digit hours, where string compare is wrong).
+    if (timeToMinutes(dto.endTime) <= timeToMinutes(dto.startTime)) {
       throw new BadRequestException("End time must be after start time");
     }
 
@@ -494,8 +495,11 @@ export class ReservationsService {
     const endTime =
       dto.endTime ?? addMinutesToTime(dto.startTime, settings.defaultDuration);
 
-    // KEEP end>start (public parity).
-    if (endTime <= dto.startTime) {
+    // KEEP end>start (public parity). Compare in minutes, not as strings —
+    // the DTO regex permits single-digit hours ("9:30"), and "10:30" <= "9:00"
+    // is true lexically, which would reject valid windows and let inverted ones
+    // ("10:00"→"9:30") slip past overlap detection.
+    if (timeToMinutes(endTime) <= timeToMinutes(dto.startTime)) {
       throw new BadRequestException("End time must be after start time");
     }
 

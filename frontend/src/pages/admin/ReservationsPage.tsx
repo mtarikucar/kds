@@ -959,6 +959,40 @@ const ReservationsPage = () => {
                     </div>
                   </div>
                 ))}
+                {/* Pending can span many future days — page through them all so
+                    the inbox never hides requests the badge is still counting. */}
+                {meta && meta.totalPages > 1 && (
+                  <div className="flex items-center justify-between px-2 py-2">
+                    <p className="text-sm text-slate-500">
+                      {t('reservations:pagination.showing', {
+                        from: (meta.page - 1) * meta.limit + 1,
+                        to: Math.min(meta.page * meta.limit, meta.total),
+                        total: meta.total,
+                      })}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-slate-600 px-2">
+                        {meta.page} / {meta.totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.min(meta.totalPages, p + 1))}
+                        disabled={currentPage === meta.totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
