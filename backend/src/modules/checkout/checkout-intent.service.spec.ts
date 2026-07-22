@@ -21,6 +21,7 @@ describe('CheckoutIntentService (v2.8.85)', () => {
   let prisma: any;
   let payments: any;
   let quoteSvc: any;
+  let addonGuard: any;
   let svc: CheckoutIntentService;
 
   beforeEach(() => {
@@ -42,7 +43,14 @@ describe('CheckoutIntentService (v2.8.85)', () => {
     quoteSvc = {
       quote: jest.fn(),
     };
-    svc = new CheckoutIntentService(prisma, quoteSvc, payments);
+    // None of these fixtures put an `addon` line in the cart, so the guard
+    // is never invoked here — dedicated coverage lives in
+    // checkout-intent.addon-guard.spec.ts. Still wired so the constructor
+    // shape matches production DI.
+    addonGuard = {
+      assertPurchasable: jest.fn().mockResolvedValue(undefined),
+    };
+    svc = new CheckoutIntentService(prisma, quoteSvc, payments, addonGuard);
   });
 
   function mockQuote(overrides: Partial<CartQuote> = {}): CartQuote {

@@ -5,6 +5,7 @@ import { PaymentsFacadeService } from "../payments-core/payments-facade.service"
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 import { CheckoutBuyerDto } from "./dto/create-intent.dto";
+import { AddonPurchasabilityService } from "./addon-purchasability.service";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -48,6 +49,7 @@ export class CheckoutIntentService {
     private readonly prisma: PrismaService,
     private readonly quoteSvc: QuoteService,
     private readonly payments: PaymentsFacadeService,
+    private readonly addonGuard: AddonPurchasabilityService,
   ) {}
 
   async createIntent(args: {
@@ -58,6 +60,22 @@ export class CheckoutIntentService {
     returnUrl?: string;
   }): Promise<CreateIntentResult> {
     const { tenantId, cart, buyer, buyerIp, returnUrl } = args;
+
+    // Tahsilat-önü guard (DEF-1/2/4/8): every `addon` cart line must clear
+    // included-in-plan / already-owned / deps-tier / redundant-limit BEFORE
+    // we price it, mint a CheckoutIntent row, or call PayTR. A rejection
+    // here throws ConflictException and nothing downstream is ever touched
+    // — no intent row, no payment gateway call. purchase()'s own guards
+    // stay in place as defence in depth for non-checkout callers.
+    for (const item of cart.items) {
+      if (item.type !== "addon") continue;
+      await this.addonGuard.assertPurchasable(tenantId, {
+        addOnCode: item.code,
+        branchId: item.branchId,
+        quantity: item.qty,
+      });
+    }
+
     const quote = await this.quoteSvc.quote(cart);
 
     if (quote.totalCents <= 0) {
