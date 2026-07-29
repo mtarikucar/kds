@@ -546,7 +546,13 @@
     "errorTooLong": "Subdomen 63 belgidan oshmasligi kerak",
     "errorInvalidFormat": "Faqat kichik harflar, raqamlar va chiziqchalardan foydalaning (chiziqcha bilan boshlanmasligi yoki tugamasligi kerak)",
     "errorReserved": "Bu subdomen band va ishlatib bo'lmaydi",
-    "saveError": "Subdomen sozlamalarini saqlash amalga oshmadi"
+    "saveError": "Subdomen sozlamalarini saqlash amalga oshmadi",
+    "saveButton": "Subdomenni saqlash",
+    "saveSuccess": "Subdomen saqlandi",
+    "confirmTitle": "QR menyu manzili o'zgartirilsinmi?",
+    "confirmBody": "Joriy manzilingiz https://{{current}}.hummytummy.com darhol ishlamay qoladi — bu manzildan foydalanadigan chop etilgan QR kodlar va ulashilgan havolalar buziladi. Eski manzil {{days}} kun davomida qulflanadi; bu davrda uni faqat shu restoran qaytarib olishi mumkin.",
+    "confirmAction": "Ha, manzilni o'zgartirish",
+    "confirmCancel": "Bekor qilish"
   },
   "accounting": {
     "title": "Buxgalteriya sozlamalari",

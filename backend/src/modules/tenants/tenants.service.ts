@@ -134,10 +134,17 @@ export class TenantsService {
         updateDto.subdomain,
       );
 
+      // Pass the caller's tenantId: a quarantine row THIS tenant created by
+      // renaming away is reclaimable by it (undo), while a name parked by
+      // any other tenant still blocks for the full window.
       if (
         updateDto.subdomain &&
         updateDto.subdomain !== tenant.subdomain &&
-        (await isSubdomainQuarantined(this.prisma, updateDto.subdomain))
+        (await isSubdomainQuarantined(
+          this.prisma,
+          updateDto.subdomain,
+          tenantId,
+        ))
       ) {
         throw new ConflictException("Subdomain already in use");
       }
@@ -152,7 +159,13 @@ export class TenantsService {
           tenant.subdomain &&
           updateDto.subdomain !== tenant.subdomain
         ) {
-          await reserveSubdomain(tx, tenant.subdomain, "subdomain_changed");
+          // Stamp the owner so the same tenant can reclaim this name later.
+          await reserveSubdomain(
+            tx,
+            tenant.subdomain,
+            "subdomain_changed",
+            tenantId,
+          );
         }
         const updated = await tx.tenant.update({
           where: { id: tenantId },

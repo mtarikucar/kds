@@ -1,13 +1,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe, Lock, ArrowRight } from 'lucide-react';
+import { Globe, Lock, ArrowRight, AlertTriangle, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGetTenantSettings, useUpdateTenantSettings } from '../../hooks/useCurrency';
 import { useSubscription } from '../../contexts/SubscriptionContext';
-import { useAutoSave } from '../../hooks/useAutoSave';
 import { toast } from 'sonner';
 import { SettingsSection } from './SettingsSection';
 import Button from '../ui/Button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '../ui/dialog';
 
 // Subdomain validation regex: lowercase alphanumeric and hyphens, cannot start/end with hyphen
 const SUBDOMAIN_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]{1,2}$/;
@@ -18,6 +25,10 @@ const RESERVED_SUBDOMAINS = [
   'status', 'help', 'support', 'docs', 'dashboard', 'login', 'signup',
   'register', 'auth', 'cdn', 'static', 'assets', 'beta', 'test', 'demo',
 ];
+
+// Mirrors backend SUBDOMAIN_QUARANTINE_DAYS — how long an outgoing subdomain
+// is locked (only this tenant can reclaim it during the window).
+const QUARANTINE_DAYS = 90;
 
 interface SubdomainFormState {
   subdomain: string;
@@ -31,7 +42,7 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
   const { t } = useTranslation('settings');
   const navigate = useNavigate();
   const { data: settings, isLoading } = useGetTenantSettings();
-  const { mutateAsync: updateSettings } = useUpdateTenantSettings();
+  const { mutateAsync: updateSettings, isPending } = useUpdateTenantSettings();
   const { hasFeature, isLoading: isLoadingSubscription } = useSubscription();
 
   const hasCustomBranding = hasFeature('customBranding');
@@ -43,6 +54,7 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
   });
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Load existing settings
   useEffect(() => {
@@ -84,50 +96,48 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
     return true;
   }, [t]);
 
-  // Save function
-  const saveSettings = useCallback(
-    async (state: SubdomainFormState) => {
-      if (!validateSubdomain(state.subdomain)) {
-        throw new Error('Invalid subdomain format');
-      }
+  // EXPLICIT save only — this control used to autosave on an 800ms debounce,
+  // which meant a mid-typing pause committed a partial rename and clearing
+  // the field silently DELETED the subdomain. Every outgoing name is
+  // quarantined for 90 days on the backend, so an accidental save broke the
+  // printed QR address. Renames/removals now require the confirm dialog.
+  const performSave = useCallback(async () => {
+    try {
       await updateSettings({
-        subdomain: state.subdomain || null,
+        subdomain: formState.subdomain || null,
       });
-    },
-    [updateSettings, validateSubdomain]
-  );
-
-  // Auto-save hook
-  const {
-    status: autoSaveStatus,
-    setValue: triggerAutoSave,
-    retry: retryAutoSave,
-  } = useAutoSave(formState, saveSettings, {
-    debounceMs: 800,
-    onSuccess: () => {
-      toast.success(t('autoSave.savedSuccess'), { duration: 2000 });
-    },
-    onError: (error) => {
+      setConfirmOpen(false);
+      toast.success(t('subdomain.saveSuccess'), { duration: 2000 });
+    } catch (error) {
       const errorMessage = error instanceof Error && error.message.includes('403')
         ? t('subdomain.proFeature')
         : t('subdomain.saveError');
       toast.error(errorMessage);
-    },
-  });
+    }
+  }, [updateSettings, formState.subdomain, t]);
 
-  // Handle field changes
+  const hasChanges = formState.subdomain !== currentSubdomain;
+
+  const handleSaveClick = () => {
+    if (!hasCustomBranding || !hasChanges || isPending) return;
+    if (!validateSubdomain(formState.subdomain)) return;
+    if (currentSubdomain) {
+      // Changing OR removing an existing subdomain releases it into the
+      // 90-day quarantine and breaks printed QR codes — always confirm.
+      setConfirmOpen(true);
+    } else {
+      // First-time set: nothing is released, no confirmation needed.
+      void performSave();
+    }
+  };
+
+  // Handle field changes — updates local state only; nothing is persisted
+  // until the operator explicitly saves (and confirms, when destructive).
   const handleChange = (value: string) => {
     // Normalize: lowercase and remove invalid characters
     const normalized = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    const newState = { subdomain: normalized };
-    setFormState(newState);
-
-    const isValid = validateSubdomain(normalized);
-
-    // Only trigger save if user has permission AND validation passes
-    if (hasCustomBranding && isValid) {
-      triggerAutoSave(newState);
-    }
+    setFormState({ subdomain: normalized });
+    validateSubdomain(normalized);
   };
 
   const handleUpgrade = () => {
@@ -268,7 +278,72 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
             {t('subdomain.helpText')}
           </p>
         )}
+
+        {/* Explicit save — changing/removing an existing subdomain is
+            destructive (90-day quarantine, broken printed QR codes), so
+            there is deliberately NO autosave here. */}
+        {!isGrandfathered && hasCustomBranding && (
+          <div className="flex justify-end pt-1">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveClick}
+              isLoading={isPending}
+              disabled={!hasChanges || !!validationError || isPending}
+              className="inline-flex items-center gap-1.5"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {t('subdomain.saveButton')}
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Destructive-change confirmation */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('subdomain.confirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('subdomain.confirmBody', {
+                current: currentSubdomain,
+                days: QUARANTINE_DAYS,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-4 sm:px-6 py-3">
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 break-all">
+                https://{currentSubdomain}.hummytummy.com
+                {formState.subdomain ? (
+                  <>
+                    {' → '}https://{formState.subdomain}.hummytummy.com
+                  </>
+                ) : null}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setConfirmOpen(false)}
+              disabled={isPending}
+            >
+              {t('subdomain.confirmCancel')}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => void performSave()}
+              isLoading={isPending}
+            >
+              {t('subdomain.confirmAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 
@@ -281,8 +356,6 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
       title={t('subdomain.title')}
       description={t('subdomain.description')}
       icon={<Globe className="w-4 h-4" />}
-      saveStatus={hasCustomBranding ? autoSaveStatus : undefined}
-      onRetry={retryAutoSave}
     >
       {subdomainContent}
     </SettingsSection>

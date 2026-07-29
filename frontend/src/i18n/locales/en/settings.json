@@ -519,7 +519,13 @@
     "errorTooLong": "Subdomain must be 63 characters or less",
     "errorInvalidFormat": "Use only lowercase letters, numbers, and hyphens (cannot start or end with hyphen)",
     "errorReserved": "This subdomain is reserved and cannot be used",
-    "saveError": "Failed to save subdomain settings"
+    "saveError": "Failed to save subdomain settings",
+    "saveButton": "Save subdomain",
+    "saveSuccess": "Subdomain saved",
+    "confirmTitle": "Change your QR menu address?",
+    "confirmBody": "Your current address https://{{current}}.hummytummy.com will stop working immediately — printed QR codes and shared links that use it will break. The old address is locked for {{days}} days; during that time only this restaurant can take it back.",
+    "confirmAction": "Yes, change address",
+    "confirmCancel": "Cancel"
   },
   "printer": {
     "loadFailed": "Failed to load printers",
