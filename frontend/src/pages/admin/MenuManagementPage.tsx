@@ -65,6 +65,10 @@ const MenuManagementPage = () => {
   // AI photo-import: promoted from a conditional tab to a persistent header
   // action + full-screen modal so it's always discoverable.
   const [importModalOpen, setImportModalOpen] = useState(false);
+  // True while MenuImportTab holds an unsaved draft (or a parse is running) —
+  // the Modal closes on Escape/backdrop unconditionally, which would unmount
+  // the tab and destroy a quota-consuming parse + manual price edits.
+  const [importDirty, setImportDirty] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const { data: menuImportStatus } = useMenuImportStatus();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -100,8 +104,11 @@ const MenuManagementPage = () => {
   const productLimit = checkLimit("maxProducts", products?.length ?? 0);
   const canAddCategory = categoryLimit.allowed;
   const canAddProduct = productLimit.allowed;
-  const { mutate: createCategory } = useCreateCategory();
-  const { mutate: updateCategory } = useUpdateCategory();
+  const { mutate: createCategory, isPending: isCreatingCategory } =
+    useCreateCategory();
+  const { mutate: updateCategory, isPending: isUpdatingCategory } =
+    useUpdateCategory();
+  const isSavingCategory = isCreatingCategory || isUpdatingCategory;
   const { mutate: deleteCategory } = useDeleteCategory();
   const { mutate: deleteProduct } = useDeleteProduct();
 
@@ -149,7 +156,26 @@ const MenuManagementPage = () => {
     }
   };
 
+  const handleCloseImportModal = () => {
+    if (
+      importDirty &&
+      !window.confirm(
+        t(
+          "menu.importCloseConfirm",
+          "İçe aktarma taslağı kaydedilmedi — kapatırsanız taslak ve düzenlemeleriniz silinecek. Yine de kapatılsın mı?",
+        ),
+      )
+    ) {
+      return;
+    }
+    setImportModalOpen(false);
+    setImportDirty(false);
+  };
+
   const handleCategorySubmit = (data: CategoryFormData) => {
+    // Double-submit guard: Enter + click (or two quick clicks) while the
+    // first mutation is in flight would create the category twice.
+    if (isSavingCategory) return;
     if (editingCategory) {
       updateCategory(
         { id: editingCategory.id, data },
@@ -408,11 +434,11 @@ const MenuManagementPage = () => {
       {/* AI menu import (photo → digitized menu) — full-screen modal */}
       <Modal
         isOpen={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
+        onClose={handleCloseImportModal}
         title={t("menu.importAction", "Fotoğraftan menü")}
         size="full"
       >
-        <MenuImportTab />
+        <MenuImportTab onDirtyChange={setImportDirty} />
       </Modal>
 
       {/* Bulk product add */}
@@ -467,7 +493,12 @@ const MenuManagementPage = () => {
             >
               {t("common:app.cancel")}
             </Button>
-            <Button type="submit" className="flex-1">
+            <Button
+              type="submit"
+              className="flex-1"
+              isLoading={isSavingCategory}
+              disabled={isSavingCategory}
+            >
               {editingCategory
                 ? t("common:app.update")
                 : t("common:app.create")}

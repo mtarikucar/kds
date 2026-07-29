@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useCollections, useCreateCollection } from "../../../features/menu/menuApi";
 
@@ -16,6 +16,10 @@ export default function CollectionMultiSelect({
   const { data: collections } = useCollections();
   const { mutateAsync: createCollection, isPending } = useCreateCollection();
   const [newName, setNewName] = useState("");
+  // Latest selection for the post-create append: two in-flight creates would
+  // otherwise both spread the same stale `selected` and clobber each other.
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   const toggle = (id: string) =>
     onChange(
@@ -26,11 +30,13 @@ export default function CollectionMultiSelect({
 
   const addNew = async () => {
     const name = newName.trim();
-    if (!name) return;
+    // `isPending` guard: the button is disabled while pending, but the Enter
+    // handler isn't — two quick Enters would create the collection twice.
+    if (!name || isPending) return;
     try {
       const created = await createCollection({ name });
       setNewName("");
-      if (created?.id) onChange([...selected, created.id]);
+      if (created?.id) onChange([...selectedRef.current, created.id]);
     } catch {
       /* toast surfaced by the mutation */
     }

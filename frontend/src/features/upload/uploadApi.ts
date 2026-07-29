@@ -107,6 +107,34 @@ export const useDeleteProductImage = () => {
   });
 };
 
+// Bulk-delete product images. Deliberately toast-free (unlike the single-image
+// hook, which toasts per call): the caller shows ONE summary toast and keeps
+// the returned failedIds selected instead of spamming N toasts.
+export const useDeleteProductImages = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (imageIds: string[]): Promise<{ failedIds: string[] }> => {
+      const failedIds: string[] = [];
+      // Sequential on purpose — a parallel burst of deletes can trip the API
+      // rate limit and fail images that would otherwise succeed.
+      for (const id of imageIds) {
+        try {
+          await api.delete(`/upload/product-image/${id}`);
+        } catch {
+          failedIds.push(id);
+        }
+      }
+      return { failedIds };
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-images'] });
+      queryClient.invalidateQueries({ queryKey: ['unused-images'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+};
+
 // Get images for a specific product
 export const useProductImagesForProduct = (productId: string) => {
   return useQuery({

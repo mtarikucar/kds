@@ -125,7 +125,11 @@
       "unusedImages": "Unused",
       "unusedHint": "Images not attached to any product. Delete to reclaim storage.",
       "noUnusedImages": "No unused images",
-      "noUnusedHint": "Every image is attached to at least one product."
+      "noUnusedHint": "Every image is attached to at least one product.",
+      "rejectedTooLarge": "Not uploaded (over the 5MB limit): {{files}}",
+      "rejectedNotImage": "Not uploaded (not an image file): {{files}}",
+      "bulkDeleted": "{{count}} images deleted",
+      "bulkDeleteFailed": "{{failed}} of {{total}} images could not be deleted — they remain selected"
     },
     "comboSlots": "Combo contents",
     "campaign": "Campaign",
@@ -136,7 +140,17 @@
     "campaignEnd": "End",
     "collections": "Collections",
     "productTypeStandard": "Standard product",
-    "productTypeCombo": "Combo / Menu"
+    "productTypeCombo": "Combo / Menu",
+    "importCloseConfirm": "The import draft hasn't been saved — closing will discard the draft and your edits. Close anyway?",
+    "comboValidation": {
+      "slotName": "Slot name cannot be empty",
+      "noItems": "Add at least one option to the slot",
+      "itemProduct": "Select a product for every option",
+      "itemQty": "Quantity must be at least 1",
+      "maxSelectMin": "\"Max\" must be at least 1",
+      "minMax": "\"Min\" cannot exceed \"max\" or the option count",
+      "summary": "The combo has errors — fix the highlighted slots"
+    }
   },
   "media": {
     "title": "AI Studio",
@@ -179,5 +193,8 @@
   "threeD": {
     "quotaLabel": "3D",
     "quotaExhausted": "Your monthly AI 3D-model allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap."
+  },
+  "import": {
+    "invalidRows": "{{n}} rows are incomplete or invalid (empty name or negative price) — fix or remove them"
   }
 }

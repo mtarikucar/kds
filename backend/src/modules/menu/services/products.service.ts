@@ -510,14 +510,26 @@ export class ProductsService {
 
       return deleted;
     } catch (err) {
-      // OrderItem.productId uses onDelete: Restrict, so a product that was
-      // ever ordered cannot be hard-deleted. Translate the P2003 into a
-      // clearer 409 instead of a 500 and hint the admin toward "mark
-      // unavailable" (soft-delete via isAvailable:false).
+      // Two Restrict FKs can block the delete: OrderItem.productId (product
+      // was ever ordered) and ComboGroupItem.componentProductId (product is a
+      // component of a combo). Translate the P2003 into a clearer 409 instead
+      // of a 500, naming the ACTUAL blocker — Prisma exposes the violated
+      // constraint as meta.constraint (newer engines) or meta.field_name
+      // (older), e.g. "combo_group_items_componentProductId_fkey".
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2003"
       ) {
+        const constraint = String(
+          (err.meta as Record<string, unknown>)?.constraint ??
+            (err.meta as Record<string, unknown>)?.field_name ??
+            "",
+        );
+        if (constraint.includes("combo_group_items")) {
+          throw new ConflictException(
+            "Cannot delete a product that is a component of a combo. Remove it from the combo first.",
+          );
+        }
         throw new ConflictException(
           "Cannot delete a product that has associated orders. Mark it as unavailable instead.",
         );

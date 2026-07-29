@@ -125,7 +125,11 @@
       "unusedImages": "Ishlatilmagan",
       "unusedHint": "Hech bir mahsulotga biriktirilmagan rasmlar. Joy bo'shatish uchun o'chiring.",
       "noUnusedImages": "Ishlatilmagan rasmlar yo'q",
-      "noUnusedHint": "Har bir rasm kamida bitta mahsulotga biriktirilgan."
+      "noUnusedHint": "Har bir rasm kamida bitta mahsulotga biriktirilgan.",
+      "rejectedTooLarge": "Yuklanmadi (5MB chegarasidan katta): {{files}}",
+      "rejectedNotImage": "Yuklanmadi (rasm fayli emas): {{files}}",
+      "bulkDeleted": "{{count}} ta rasm o‘chirildi",
+      "bulkDeleteFailed": "{{total}} tadan {{failed}} ta rasm o‘chirilmadi — tanlangan holda qoldi"
     },
     "comboSlots": "Kombo tarkibi",
     "campaign": "Aksiya",
@@ -136,7 +140,17 @@
     "campaignEnd": "Tugashi",
     "collections": "To'plamlar",
     "productTypeStandard": "Oddiy mahsulot",
-    "productTypeCombo": "Kombo / Menyu"
+    "productTypeCombo": "Kombo / Menyu",
+    "importCloseConfirm": "Import qoralamasi saqlanmadi — yopsangiz qoralama va tahrirlaringiz o‘chib ketadi. Baribir yopilsinmi?",
+    "comboValidation": {
+      "slotName": "Slot nomi bo‘sh bo‘lishi mumkin emas",
+      "noItems": "Slotga kamida bitta variant qo‘shing",
+      "itemProduct": "Har bir variant uchun mahsulot tanlang",
+      "itemQty": "Miqdor kamida 1 bo‘lishi kerak",
+      "maxSelectMin": "\"Eng ko‘p\" kamida 1 bo‘lishi kerak",
+      "minMax": "\"Eng kam\" \"eng ko‘p\"dan yoki variantlar sonidan oshmasligi kerak",
+      "summary": "Komboda xatolar bor — belgilangan slotlarni to‘g‘rilang"
+    }
   },
   "media": {
     "title": "AI-studiya",
@@ -179,5 +193,8 @@
   "threeD": {
     "quotaLabel": "3D",
     "quotaExhausted": "Oylik AI 3D model limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring."
+  },
+  "import": {
+    "invalidRows": "{{n}} ta qator to‘liq emas yoki xato (bo‘sh nom yoki manfiy narx) — to‘g‘rilang yoki o‘chiring"
   }
 }

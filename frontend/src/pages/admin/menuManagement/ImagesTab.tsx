@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import {
   Trash2,
   Image as ImageIcon,
@@ -22,6 +23,7 @@ import {
   useProductImages,
   useUnusedImages,
   useDeleteProductImage,
+  useDeleteProductImages,
   useUploadProductImages,
 } from "../../../features/upload/uploadApi";
 import { getImageUrl } from "./imageUrl";
@@ -54,6 +56,7 @@ const ImagesTab = () => {
   const { data: unusedImages, isLoading: unusedImagesLoading } =
     useUnusedImages();
   const { mutate: deleteImage } = useDeleteProductImage();
+  const bulkDeleteImages = useDeleteProductImages();
   const uploadImagesMutation = useUploadProductImages();
 
   const isUnusedView = libraryFilter === "unused";
@@ -82,17 +85,31 @@ const ImagesTab = () => {
   };
 
   const handleDeleteSelectedImages = async () => {
-    if (selectedImages.size === 0) return;
+    if (selectedImages.size === 0 || bulkDeleteImages.isPending) return;
     if (
       !window.confirm(
         t("menu.imageLibraryUI.deleteConfirm", { count: selectedImages.size }),
       )
     )
       return;
-    for (const id of selectedImages) {
-      await deleteImage(id);
+    // The bulk hook awaits every delete (the old `await deleteImage(id)`
+    // awaited mutate(), i.e. void) and stays toast-free: one summary toast
+    // here, and FAILED ids stay selected for a retry.
+    const total = selectedImages.size;
+    const { failedIds } = await bulkDeleteImages.mutateAsync([
+      ...selectedImages,
+    ]);
+    setSelectedImages(new Set(failedIds));
+    if (failedIds.length > 0) {
+      toast.error(
+        t("menu.imageLibraryUI.bulkDeleteFailed", {
+          failed: failedIds.length,
+          total,
+        }),
+      );
+    } else {
+      toast.success(t("menu.imageLibraryUI.bulkDeleted", { count: total }));
     }
-    setSelectedImages(new Set());
   };
 
   const processWithBgRemoval = async (files: File[]): Promise<File[]> => {
@@ -123,14 +140,35 @@ const ImagesTab = () => {
 
   const handleImageFiles = useCallback(
     async (files: FileList | File[]) => {
-      const fileArray = Array.from(files).filter(
+      // Surface WHY a file was skipped instead of silently filtering it —
+      // "I dropped 5 files, 3 appeared" with zero feedback otherwise.
+      const all = Array.from(files);
+      const notImage = all.filter((f) => !f.type.startsWith("image/"));
+      const tooLarge = all.filter(
+        (f) => f.type.startsWith("image/") && f.size > 5 * 1024 * 1024,
+      );
+      if (notImage.length > 0) {
+        toast.error(
+          t("menu.imageLibraryUI.rejectedNotImage", {
+            files: notImage.map((f) => f.name).join(", "),
+          }),
+        );
+      }
+      if (tooLarge.length > 0) {
+        toast.error(
+          t("menu.imageLibraryUI.rejectedTooLarge", {
+            files: tooLarge.map((f) => f.name).join(", "),
+          }),
+        );
+      }
+      const fileArray = all.filter(
         (f) => f.type.startsWith("image/") && f.size <= 5 * 1024 * 1024,
       );
       if (fileArray.length === 0) return;
       const filesToUpload = await processWithBgRemoval(fileArray);
       uploadImagesMutation.mutate(filesToUpload);
     },
-    [bgRemovalEnabled, bgRemovalSupported, uploadImagesMutation],
+    [bgRemovalEnabled, bgRemovalSupported, uploadImagesMutation, t],
   );
 
   const handleImageDrop = useCallback(
