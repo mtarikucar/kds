@@ -1025,9 +1025,14 @@ export class CustomerOrdersService {
 
         let exploded;
         try {
+          // C2: pass comboSelections through UNCOALESCED. `?? []` used to
+          // turn "field absent" into "explicit empty", and the resolver's old
+          // per-group default fallback re-added (and charged) a deselected
+          // optional default. Absent → defaults; present (even empty/partial)
+          // → explicit intent, omitted groups add nothing.
           exploded = explodeComboLine(
             catalog,
-            item.comboSelections ?? [],
+            item.comboSelections,
             item.quantity,
             now,
           );

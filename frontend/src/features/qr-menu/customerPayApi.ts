@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { API_URL } from '../../lib/env';
+import { remintCustomerSessionOn401 } from './customerSession';
 
 export interface CustomerPayableItem {
   orderItemId: string;
@@ -75,8 +76,17 @@ export const useSessionPayableItems = (
   return useQuery({
     queryKey: ['sessionPayableItems', sessionId],
     queryFn: async (): Promise<CustomerPayableSummary> => {
-      const response = await axios.get(`${base(sessionId!)}/payable-items`);
-      return response.data;
+      try {
+        const response = await axios.get(`${base(sessionId!)}/payable-items`);
+        return response.data;
+      } catch (err) {
+        // Review C1: 401 = the server session expired. Re-mint in the
+        // background — the fresh id reaches the caller via the store and the
+        // query re-runs under a new key (the modal no longer sits empty
+        // forever on a dead session).
+        remintCustomerSessionOn401(err);
+        throw err;
+      }
     },
     enabled: !!sessionId,
     // Customer socket pushes order:status-updated which the QR menu's

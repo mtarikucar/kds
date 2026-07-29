@@ -1261,7 +1261,8 @@
     "noOrders": "Henüz sipariş yok",
     "noOrdersDescription": "Menüyü inceleyerek başlayın",
     "total": "Toplam",
-    "note": "Not"
+    "note": "Not",
+    "reorderComboSkipped": "Kombo ürünler atlandı — lütfen menüden yeniden ekleyin."
   },
   "waiter": {
     "call": "Garson Çağır",

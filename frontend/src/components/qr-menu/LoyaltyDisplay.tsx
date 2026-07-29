@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Spinner from '../ui/Spinner';
+import { remintCustomerSessionOn401 } from '../../features/qr-menu/customerSession';
 
 interface LoyaltyDisplayProps {
   sessionId: string;
@@ -84,6 +85,9 @@ const LoyaltyDisplay = ({
       }
       setReferralData(referral);
     } catch (error) {
+      // Review C1: expired server session → background re-mint; the fresh id
+      // propagates down as a new sessionId prop and re-runs this fetch.
+      remintCustomerSessionOn401(error);
       console.error('Failed to fetch loyalty data:', error);
     } finally {
       setIsLoading(false);

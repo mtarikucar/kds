@@ -1261,7 +1261,8 @@
     "noOrders": "No orders yet",
     "noOrdersDescription": "Start by browsing our menu",
     "total": "Total",
-    "note": "Note"
+    "note": "Note",
+    "reorderComboSkipped": "Combo items were skipped — please add them from the menu again."
   },
   "waiter": {
     "call": "Call Waiter",

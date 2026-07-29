@@ -114,20 +114,31 @@ const extractTax = (grossInclusive: number, rate: number) =>
   money((grossInclusive * rate) / (100 + rate));
 
 /**
- * Resolve which items are chosen for each group (explicit selections, or the
- * group's defaults when the client sent none), enforce min/max, and return the
- * flat per-one-combo component list.
+ * Resolve which items are chosen for each group, enforce min/max, and return
+ * the flat per-one-combo component list.
+ *
+ * Default semantics (review C2 — money): defaults apply ONLY when the client
+ * sent no `comboSelections` field at all (null/undefined = "I made no
+ * choice"). When the field IS present — even as an empty or partial list —
+ * it is an EXPLICIT statement of intent: a group with no entries means "none
+ * from this group", NOT "give me the defaults". The old per-group fallback
+ * silently re-added (and charged) a deselected optional default, so the
+ * server charged more than the client showed. Required groups (minSelect > 0)
+ * still reject when an explicit list omits them.
  */
 function resolveSelections(
   catalog: ComboCatalog,
-  selections: ComboSelectionInput[],
+  selections: ComboSelectionInput[] | null | undefined,
 ): Array<{ item: ComboGroupCatalog["items"][number] }> {
+  const explicit = selections != null;
   const flat: Array<{ item: ComboGroupCatalog["items"][number] }> = [];
   for (const group of catalog.groups) {
-    const forGroup = selections.filter((s) => s.groupId === group.id);
-    let chosen = forGroup;
-    if (chosen.length === 0) {
-      // No explicit choice → apply defaults (covers fixed-content slots).
+    let chosen = explicit
+      ? selections.filter((s) => s.groupId === group.id)
+      : [];
+    if (!explicit) {
+      // comboSelections entirely absent → apply defaults (covers
+      // fixed-content slots and legacy clients that never send the field).
       const defaults = group.items.filter((i) => i.isDefault);
       chosen = defaults.map((i) => ({
         groupId: group.id,
@@ -160,10 +171,12 @@ function resolveSelections(
 /**
  * Explode one COMBO order line (comboQuantity of the combo) into parent + qty-1
  * children with kuruş-exact apportioned prices. `now` drives campaign windows.
+ * `selections` null/undefined → the combo's default items; an array (even
+ * empty/partial) is explicit — see resolveSelections.
  */
 export function explodeComboLine(
   catalog: ComboCatalog,
-  selections: ComboSelectionInput[],
+  selections: ComboSelectionInput[] | null | undefined,
   comboQuantity: number,
   now: Date,
 ): ExplodedCombo {
