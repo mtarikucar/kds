@@ -103,7 +103,23 @@
     },
     "credentials": {
       "restaurantId": "Restoran ID (platform üzerinde)",
-      "restaurantIdPlaceholder": "Platformdaki restoran/satıcı ID'si"
+      "restaurantIdPlaceholder": "Platformdaki restoran/satıcı ID'si",
+      "fieldPlaceholder": "{{field}} girin",
+      "apiVersionPlaceholder": "v1 veya v2",
+      "fields": {
+        "appSecretKey": "Uygulama Gizli Anahtarı",
+        "restaurantSecretKey": "Restoran Gizli Anahtarı",
+        "clientId": "İstemci ID (Client ID)",
+        "clientSecret": "İstemci Gizli Anahtarı (Client Secret)",
+        "chainCode": "Zincir Kodu",
+        "posVendorId": "POS Satıcı ID",
+        "apiVersion": "API Sürümü",
+        "username": "Kullanıcı Adı",
+        "password": "Parola",
+        "integratorId": "Entegratör ID (v2)",
+        "integratorSecret": "Entegratör Gizli Anahtarı (v2)",
+        "apiKey": "API Anahtarı"
+      }
     },
     "autoAccept": "Siparişleri otomatik kabul et",
     "autoAcceptDescription": "Gelen siparişleri personel onayı olmadan otomatik kabul et",
@@ -164,6 +180,18 @@
       "sandbox": "Sandbox",
       "sandboxWarning": "Sandbox, bu platformu test uç noktalarına yönlendirir ve yerleşik test sipariş simülatörünü etkinleştirir. Gerçek sipariş işlenmez.",
       "noSandbox": "Bu platformda sandbox yok — test uç noktası tanımlı değil, sandbox seçilemez."
+    },
+    "platformDescriptions": {
+      "GETIR": "Sorgulama (polling) tabanlı entegrasyon (15 sn'de bir)",
+      "YEMEKSEPETI": "Webhook tabanlı entegrasyon (gerçek zamanlı)",
+      "TRENDYOL": "Webhook + sorgulama (polling) entegrasyonu",
+      "MIGROS": "Sorgulama (polling) tabanlı entegrasyon (20 sn'de bir)"
+    },
+    "aria": {
+      "enablePlatform": "{{name}} entegrasyonunu etkinleştir",
+      "disablePlatform": "{{name}} entegrasyonunu devre dışı bırak",
+      "enableAutoAccept": "{{name}} için otomatik onayı etkinleştir",
+      "disableAutoAccept": "{{name}} için otomatik onayı devre dışı bırak"
     }
   },
   "autoSave": {
@@ -309,12 +337,11 @@
     "removeEmail": "Kaldır",
     "noEmails": "Yapılandırılmış e-posta alıcısı yok",
     "invalidEmail": "Lütfen geçerli bir e-posta adresi girin",
-    "emailAdded": "E-posta başarıyla eklendi",
-    "emailRemoved": "E-posta kaldırıldı",
     "settingsSaved": "Rapor ayarları başarıyla kaydedildi",
     "settingsFailed": "Rapor ayarları kaydedilemedi",
     "emailAlreadyAdded": "E-posta zaten eklendi",
-    "emailReportInfo": "Etkinleştirildiğinde, Z-Raporu özetleri her gün kapanış saatinde otomatik olarak oluşturulup yapılandırılmış alıcılara e-posta ile gönderilecektir."
+    "emailReportInfo": "Etkinleştirildiğinde, Z-Raporu özetleri her gün kapanış saatinde otomatik olarak oluşturulup yapılandırılmış alıcılara e-posta ile gönderilecektir.",
+    "unsavedEmailsHint": "E-posta listesindeki değişiklikler henüz kaydedilmedi"
   },
   "downloadNotAvailable": "Bu platform için indirme henüz mevcut değil.",
   "preview": {

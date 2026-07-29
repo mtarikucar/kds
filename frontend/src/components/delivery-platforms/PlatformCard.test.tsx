@@ -196,7 +196,7 @@ describe('PlatformCard save-before-test (probe tests STORED credentials)', () =>
     h.updateMutateAsync.mockResolvedValue(undefined);
     renderExpanded('MIGROS', baseConfig());
     // Flip auto-accept → hasChanges without touching credentials.
-    fireEvent.click(screen.getByRole('button', { name: /auto-accept/i }));
+    fireEvent.click(screen.getByRole('button', { name: /autoAccept/i }));
 
     fireEvent.click(testButton());
 
@@ -210,7 +210,7 @@ describe('PlatformCard save-before-test (probe tests STORED credentials)', () =>
   it('aborts the probe when the pre-test save fails', async () => {
     h.updateMutateAsync.mockRejectedValue(new Error('save failed'));
     renderExpanded('MIGROS', baseConfig());
-    fireEvent.click(screen.getByRole('button', { name: /auto-accept/i }));
+    fireEvent.click(screen.getByRole('button', { name: /autoAccept/i }));
 
     fireEvent.click(testButton());
 

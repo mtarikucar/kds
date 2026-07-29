@@ -123,6 +123,8 @@ interface SettingsInputProps {
   disabled?: boolean;
   className?: string;
   inputClassName?: string;
+  /** Inline per-field validation message (renders red, marks the input). */
+  error?: string;
 }
 
 export function SettingsInput({
@@ -135,6 +137,7 @@ export function SettingsInput({
   disabled = false,
   className,
   inputClassName,
+  error,
 }: SettingsInputProps) {
   return (
     <div
@@ -149,6 +152,7 @@ export function SettingsInput({
         {description && (
           <p className="text-sm text-slate-500 mt-0.5">{description}</p>
         )}
+        {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
       </div>
       <input
         type={type}
@@ -156,8 +160,10 @@ export function SettingsInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
+        aria-invalid={error ? true : undefined}
         className={cn(
-          'flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 disabled:bg-slate-50 disabled:cursor-not-allowed',
+          'flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 disabled:bg-slate-50 disabled:cursor-not-allowed',
+          error ? 'border-red-400' : 'border-slate-300',
           inputClassName
         )}
       />

@@ -59,7 +59,11 @@
     "copyLink": "Nusxalash",
     "linkCopied": "Havola nusxalandi!",
     "holdOffsetMinutes": "Bron ushlash oralig‘i (daqiqa)",
-    "holdOffsetMinutesDesc": "Tasdiqlangan bron boshlanishidan necha daqiqa oldin stol avtomatik Band holatiga o‘tadi. Standart 30 — old-ushlashni o‘chirish uchun 0 kiriting."
+    "holdOffsetMinutesDesc": "Tasdiqlangan bron boshlanishidan necha daqiqa oldin stol avtomatik Band holatiga o‘tadi. Standart 30 — old-ushlashni o‘chirish uchun 0 kiriting.",
+    "validationMin": "Qiymat kamida {{min}} bo'lishi kerak",
+    "validationRange": "Qiymat {{min}} va {{max}} oralig'ida bo'lishi kerak",
+    "overnightNotSupported": "Yopilish vaqti ochilish vaqtidan keyin bo'lishi kerak (yarim tundan oshadigan ish soatlari qo'llab-quvvatlanmaydi)",
+    "copyFailed": "Havolani nusxalab bo'lmadi"
   },
   "status": {
     "PENDING": "Kutilmoqda",

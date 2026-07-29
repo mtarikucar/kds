@@ -103,7 +103,23 @@
     },
     "credentials": {
       "restaurantId": "ID ресторана (на платформе)",
-      "restaurantIdPlaceholder": "ID ресторана/поставщика на платформе"
+      "restaurantIdPlaceholder": "ID ресторана/поставщика на платформе",
+      "fieldPlaceholder": "Введите {{field}}",
+      "apiVersionPlaceholder": "v1 или v2",
+      "fields": {
+        "appSecretKey": "Секретный ключ приложения",
+        "restaurantSecretKey": "Секретный ключ ресторана",
+        "clientId": "ID клиента (Client ID)",
+        "clientSecret": "Секрет клиента (Client Secret)",
+        "chainCode": "Код сети",
+        "posVendorId": "ID поставщика POS",
+        "apiVersion": "Версия API",
+        "username": "Имя пользователя",
+        "password": "Пароль",
+        "integratorId": "ID интегратора (v2)",
+        "integratorSecret": "Секрет интегратора (v2)",
+        "apiKey": "Ключ API"
+      }
     },
     "autoAccept": "Автоприем заказов",
     "autoAcceptDescription": "Автоматически принимать входящие заказы без одобрения персонала",
@@ -164,6 +180,18 @@
       "sandbox": "Песочница",
       "sandboxWarning": "Песочница направляет платформу на тестовые конечные точки и включает встроенный симулятор тестовых заказов. Реальные заказы не обрабатываются.",
       "noSandbox": "У этой платформы нет песочницы — тестовая конечная точка не настроена, песочницу выбрать нельзя."
+    },
+    "platformDescriptions": {
+      "GETIR": "Интеграция на основе опроса (каждые 15 с)",
+      "YEMEKSEPETI": "Интеграция через вебхуки (в реальном времени)",
+      "TRENDYOL": "Интеграция: вебхуки + опрос",
+      "MIGROS": "Интеграция на основе опроса (каждые 20 с)"
+    },
+    "aria": {
+      "enablePlatform": "Включить {{name}}",
+      "disablePlatform": "Отключить {{name}}",
+      "enableAutoAccept": "Включить автоприём для {{name}}",
+      "disableAutoAccept": "Отключить автоприём для {{name}}"
     }
   },
   "autoSave": {
@@ -288,12 +316,11 @@
     "removeEmail": "Удалить",
     "noEmails": "Получатели не настроены",
     "invalidEmail": "Введите корректный адрес email",
-    "emailAdded": "Email успешно добавлен",
-    "emailRemoved": "Email удален",
     "settingsSaved": "Настройки отчетов успешно сохранены",
     "settingsFailed": "Не удалось сохранить настройки отчетов",
     "emailAlreadyAdded": "Email уже добавлен",
-    "emailReportInfo": "При включении Z-отчеты будут автоматически формироваться и отправляться настроенным получателям при закрытии каждый день."
+    "emailReportInfo": "При включении Z-отчеты будут автоматически формироваться и отправляться настроенным получателям при закрытии каждый день.",
+    "unsavedEmailsHint": "Изменения в списке адресов ещё не сохранены"
   },
   "downloadNotAvailable": "Загрузка для этой платформы пока недоступна.",
   "preview": {

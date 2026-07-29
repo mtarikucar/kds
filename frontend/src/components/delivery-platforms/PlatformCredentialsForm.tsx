@@ -4,32 +4,37 @@ import { Eye, EyeOff } from 'lucide-react';
 
 interface CredentialField {
   key: string;
-  label: string;
   type?: 'text' | 'password';
-  placeholder?: string;
+  /** i18n key (settings ns) for a field-specific placeholder. */
+  placeholderKey?: string;
   required?: boolean;
 }
 
+// Labels resolve through i18n: `onlineOrders.credentials.fields.<key>`.
 const PLATFORM_FIELDS: Record<string, CredentialField[]> = {
   GETIR: [
-    { key: 'appSecretKey', label: 'App Secret Key', type: 'password', required: true },
-    { key: 'restaurantSecretKey', label: 'Restaurant Secret Key', type: 'password', required: true },
+    { key: 'appSecretKey', type: 'password', required: true },
+    { key: 'restaurantSecretKey', type: 'password', required: true },
   ],
   YEMEKSEPETI: [
-    { key: 'clientId', label: 'Client ID', type: 'text', required: true },
-    { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
-    { key: 'chainCode', label: 'Chain Code', type: 'text' },
-    { key: 'posVendorId', label: 'POS Vendor ID', type: 'text' },
+    { key: 'clientId', type: 'text', required: true },
+    { key: 'clientSecret', type: 'password', required: true },
+    { key: 'chainCode', type: 'text' },
+    { key: 'posVendorId', type: 'text' },
   ],
   TRENDYOL: [
-    { key: 'apiVersion', label: 'API Version', type: 'text', placeholder: 'v1 or v2' },
-    { key: 'username', label: 'Username', type: 'text' },
-    { key: 'password', label: 'Password', type: 'password' },
-    { key: 'integratorId', label: 'Integrator ID (v2)', type: 'text' },
-    { key: 'integratorSecret', label: 'Integrator Secret (v2)', type: 'password' },
+    {
+      key: 'apiVersion',
+      type: 'text',
+      placeholderKey: 'onlineOrders.credentials.apiVersionPlaceholder',
+    },
+    { key: 'username', type: 'text' },
+    { key: 'password', type: 'password' },
+    { key: 'integratorId', type: 'text' },
+    { key: 'integratorSecret', type: 'password' },
   ],
   MIGROS: [
-    { key: 'apiKey', label: 'API Key', type: 'password', required: true },
+    { key: 'apiKey', type: 'password', required: true },
   ],
 };
 
@@ -76,10 +81,12 @@ const PlatformCredentialsForm = ({
         />
       </div>
 
-      {fields.map((field) => (
+      {fields.map((field) => {
+        const label = t(`onlineOrders.credentials.fields.${field.key}`);
+        return (
         <div key={field.key}>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            {field.label}
+            {label}
             {field.required && <span className="text-red-500 ml-0.5">*</span>}
           </label>
           <div className="relative">
@@ -91,7 +98,11 @@ const PlatformCredentialsForm = ({
               }
               value={credentials[field.key] || ''}
               onChange={(e) => handleChange(field.key, e.target.value)}
-              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              placeholder={
+                field.placeholderKey
+                  ? t(field.placeholderKey)
+                  : t('onlineOrders.credentials.fieldPlaceholder', { field: label })
+              }
               disabled={disabled}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-slate-50 disabled:text-slate-400 pr-10"
             />
@@ -111,7 +122,8 @@ const PlatformCredentialsForm = ({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

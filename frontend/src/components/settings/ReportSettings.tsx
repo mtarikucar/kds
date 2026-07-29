@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useGetTenantSettings, useUpdateTenantSettings } from '../../hooks/useCurrency';
 import { useAutoSave, type AutoSaveStatus } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsDivider, SettingsGroup } from './SettingsSection';
 import { SettingsToggle, SettingsSelect, SettingsInput } from './SettingsToggle';
 import Input from '../ui/Input';
@@ -53,18 +54,11 @@ const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
   const [newEmail, setNewEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [emailStatus, setEmailStatus] = useState<AutoSaveStatus>('idle');
-
-  // Load settings when data arrives
-  useEffect(() => {
-    if (tenantSettings) {
-      setSettings({
-        closingTime: tenantSettings.closingTime || '23:00',
-        timezone: tenantSettings.timezone || 'UTC',
-        reportEmailEnabled: tenantSettings.reportEmailEnabled || false,
-      });
-      setReportEmails(tenantSettings.reportEmails || []);
-    }
-  }, [tenantSettings]);
+  // Local email-list edits not yet persisted via the Save button. Guards the
+  // hydration below: the tenantSettings query is shared with the autosave
+  // section (and other settings components), so a refetch triggered by ANY of
+  // them would otherwise wipe a just-added-but-unsaved address.
+  const [emailsDirty, setEmailsDirty] = useState(false);
 
   // Save function for report settings (auto-save)
   const saveReportSettings = useCallback(
@@ -79,6 +73,7 @@ const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
     status: autoSaveStatus,
     setValue: triggerAutoSave,
     retry: retryAutoSave,
+    isDirty,
   } = useAutoSave(settings, saveReportSettings, {
     debounceMs: 800,
     onSuccess: () => {
@@ -88,6 +83,29 @@ const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
       toast.error(t('reportSettings.settingsFailed'));
     },
   });
+
+  // Guarded hydration for the autosaved fields (see useServerHydratedState).
+  useServerHydratedState(
+    tenantSettings,
+    (data) => {
+      setSettings({
+        closingTime: data.closingTime || '23:00',
+        timezone: data.timezone || 'UTC',
+        reportEmailEnabled: data.reportEmailEnabled || false,
+      });
+    },
+    { skipWhile: isDirty || autoSaveStatus === 'saving' }
+  );
+
+  // The manual-save email list hydrates independently, guarded by its own
+  // dirty flag so unsaved add/remove edits survive refetches.
+  useServerHydratedState(
+    tenantSettings,
+    (data) => {
+      setReportEmails(data.reportEmails || []);
+    },
+    { skipWhile: emailsDirty || isUpdating }
+  );
 
   // Handle auto-save field changes
   const handleFieldChange = <K extends keyof ReportSettingsState>(
@@ -119,15 +137,19 @@ const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
       return;
     }
 
+    // No success toast here: this only changes LOCAL state — nothing is
+    // persisted until the Save button below is pressed. A premature "added"
+    // toast read as "saved" and the edit was silently lost on navigation.
     setReportEmails([...reportEmails, trimmedEmail]);
     setNewEmail('');
     setEmailError('');
-    toast.success(t('reportSettings.emailAdded'));
+    setEmailsDirty(true);
   };
 
   const handleRemoveEmail = (email: string) => {
+    // Local-only change — see handleAddEmail; persisted via the Save button.
     setReportEmails(reportEmails.filter((e) => e !== email));
-    toast.success(t('reportSettings.emailRemoved'));
+    setEmailsDirty(true);
   };
 
   // Save email list (manual)
@@ -138,6 +160,7 @@ const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
       {
         onSuccess: () => {
           setEmailStatus('saved');
+          setEmailsDirty(false);
           toast.success(t('reportSettings.settingsSaved'));
           setTimeout(() => setEmailStatus('idle'), 2000);
         },
@@ -278,19 +301,25 @@ const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
           </Button>
         </div>
 
-        {/* Save Email List Button */}
-        {hasEmailChanges && (
-          <div className="mt-2 flex justify-end">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSaveEmails}
-              isLoading={isUpdating}
-            >
-              {t('saveChanges')}
-            </Button>
-          </div>
-        )}
+        {/* Save Email List Button — always visible so its enabled/disabled
+            state signals whether the list above is persisted; the amber hint
+            makes an unsaved list impossible to miss. */}
+        <div className="mt-2 flex items-center justify-end gap-3">
+          {hasEmailChanges && (
+            <p className="text-xs text-amber-600">
+              {t('reportSettings.unsavedEmailsHint')}
+            </p>
+          )}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSaveEmails}
+            isLoading={isUpdating}
+            disabled={!hasEmailChanges || isUpdating}
+          >
+            {t('saveChanges')}
+          </Button>
+        </div>
       </div>
 
       {/* Info box */}

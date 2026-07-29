@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { SaveStatusIndicator } from '../ui/SaveStatusIndicator';
 import Button from '../ui/Button';
@@ -30,9 +31,12 @@ export function SettingsSection({
   onSave,
   isSaving = false,
   hasChanges = false,
-  saveLabel = 'Save',
+  saveLabel,
   className,
 }: SettingsSectionProps) {
+  // Default save label localises through common:app.save (a hardcoded
+  // 'Save' default leaked raw English into every non-en locale).
+  const { t } = useTranslation('common');
   return (
     <section className={cn('bg-white rounded-xl border border-slate-200', className)}>
       {/* Header */}
@@ -77,7 +81,7 @@ export function SettingsSection({
             isLoading={isSaving}
             disabled={!hasChanges || isSaving}
           >
-            {saveLabel}
+            {saveLabel ?? t('app.save')}
           </Button>
         </div>
       )}

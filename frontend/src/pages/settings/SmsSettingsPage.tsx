@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { MessageSquare, CalendarCheck, ShoppingCart, Mail } from 'lucide-react';
 import { useGetSmsSettings, useUpdateSmsSettings, SmsSettings } from '../../features/sms/smsSettingsApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsToggle } from '../../components/settings/SettingsToggle';
 
@@ -48,27 +49,6 @@ const SmsSettingsPage = () => {
 
   const [settings, setSettings] = useState<SmsSettingsState>(defaultSettings);
 
-  useEffect(() => {
-    if (smsSettings) {
-      setSettings({
-        isEnabled: smsSettings.isEnabled,
-        smsOnReservationCreated: smsSettings.smsOnReservationCreated,
-        smsOnReservationConfirmed: smsSettings.smsOnReservationConfirmed,
-        smsOnReservationRejected: smsSettings.smsOnReservationRejected,
-        smsOnReservationCancelled: smsSettings.smsOnReservationCancelled,
-        emailOnReservationCreated: smsSettings.emailOnReservationCreated ?? true,
-        emailOnReservationConfirmed: smsSettings.emailOnReservationConfirmed ?? true,
-        emailOnReservationRejected: smsSettings.emailOnReservationRejected ?? true,
-        emailOnReservationCancelled: smsSettings.emailOnReservationCancelled ?? true,
-        smsOnOrderCreated: smsSettings.smsOnOrderCreated,
-        smsOnOrderApproved: smsSettings.smsOnOrderApproved,
-        smsOnOrderPreparing: smsSettings.smsOnOrderPreparing,
-        smsOnOrderReady: smsSettings.smsOnOrderReady,
-        smsOnOrderCancelled: smsSettings.smsOnOrderCancelled,
-      });
-    }
-  }, [smsSettings]);
-
   const saveSmsSettings = useCallback(
     async (newSettings: SmsSettingsState) => {
       await updateSmsSettings(newSettings);
@@ -80,6 +60,7 @@ const SmsSettingsPage = () => {
     status: saveStatus,
     setValue: triggerSave,
     retry: retrySave,
+    isDirty,
   } = useAutoSave(settings, saveSmsSettings, {
     debounceMs: 300,
     onSuccess: () => {
@@ -89,6 +70,31 @@ const SmsSettingsPage = () => {
       toast.error(t('settingsFailed'));
     },
   });
+
+  // Hydrate from the server snapshot — guarded so a refetch (e.g. the one a
+  // just-settled save triggers) never clobbers a newer local edit.
+  useServerHydratedState(
+    smsSettings,
+    (data: SmsSettings) => {
+      setSettings({
+        isEnabled: data.isEnabled,
+        smsOnReservationCreated: data.smsOnReservationCreated,
+        smsOnReservationConfirmed: data.smsOnReservationConfirmed,
+        smsOnReservationRejected: data.smsOnReservationRejected,
+        smsOnReservationCancelled: data.smsOnReservationCancelled,
+        emailOnReservationCreated: data.emailOnReservationCreated ?? true,
+        emailOnReservationConfirmed: data.emailOnReservationConfirmed ?? true,
+        emailOnReservationRejected: data.emailOnReservationRejected ?? true,
+        emailOnReservationCancelled: data.emailOnReservationCancelled ?? true,
+        smsOnOrderCreated: data.smsOnOrderCreated,
+        smsOnOrderApproved: data.smsOnOrderApproved,
+        smsOnOrderPreparing: data.smsOnOrderPreparing,
+        smsOnOrderReady: data.smsOnOrderReady,
+        smsOnOrderCancelled: data.smsOnOrderCancelled,
+      });
+    },
+    { skipWhile: isDirty || saveStatus === 'saving' }
+  );
 
   const handleToggleChange = (field: keyof SmsSettingsState, value: boolean) => {
     const newSettings = { ...settings, [field]: value };

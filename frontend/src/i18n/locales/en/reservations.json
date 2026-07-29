@@ -59,7 +59,11 @@
     "copyLink": "Copy",
     "linkCopied": "Link copied!",
     "holdOffsetMinutes": "Reservation hold offset (minutes)",
-    "holdOffsetMinutesDesc": "Minutes before a confirmed reservation that the assigned table flips to Reserved. Default 30 — set to 0 to disable pre-hold."
+    "holdOffsetMinutesDesc": "Minutes before a confirmed reservation that the assigned table flips to Reserved. Default 30 — set to 0 to disable pre-hold.",
+    "validationMin": "Must be at least {{min}}",
+    "validationRange": "Must be between {{min}} and {{max}}",
+    "overnightNotSupported": "Closing time must be after opening time (overnight hours are not supported)",
+    "copyFailed": "Could not copy the link"
   },
   "status": {
     "PENDING": "Pending",

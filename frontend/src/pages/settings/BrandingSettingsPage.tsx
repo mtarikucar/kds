@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Coins, Receipt } from 'lucide-react';
@@ -8,6 +8,7 @@ import {
   SUPPORTED_CURRENCIES,
 } from '../../hooks/useCurrency';
 import type { AutoSaveStatus } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsSelect } from '../../components/settings/SettingsToggle';
 import SubdomainSettings from '../../components/settings/SubdomainSettings';
@@ -25,12 +26,6 @@ const BrandingSettingsPage = () => {
   const [taxIdStatus, setTaxIdStatus] = useState<AutoSaveStatus>('idle');
   const [taxIdError, setTaxIdError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (tenantSettings) {
-      setCurrency(tenantSettings.currency || 'TRY');
-      setTaxId(tenantSettings.taxId || '');
-    }
-  }, [tenantSettings]);
 
   const handleSaveTaxId = () => {
     setTaxIdError(null);
@@ -81,6 +76,18 @@ const BrandingSettingsPage = () => {
   const hasCurrencyChanges = tenantSettings && currency !== tenantSettings.currency;
   const hasTaxIdChanges =
     tenantSettings && (taxId || '') !== (tenantSettings.taxId || '');
+
+  // Guarded hydration — the tenantSettings query is shared across several
+  // settings components; a refetch one of them triggers must not clobber an
+  // unsaved currency/taxId edit here (see useServerHydratedState).
+  useServerHydratedState(
+    tenantSettings,
+    (data) => {
+      setCurrency(data.currency || 'TRY');
+      setTaxId(data.taxId || '');
+    },
+    { skipWhile: Boolean(hasCurrencyChanges || hasTaxIdChanges) || isUpdating }
+  );
 
   if (isLoading) {
     return (

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Wifi, Share2, Eye, EyeOff } from 'lucide-react';
 import { useGetTenantSettings, useUpdateTenantSettings } from '../../hooks/useCurrency';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { toast } from 'sonner';
 import { SettingsSection, SettingsDivider, SettingsGroup } from './SettingsSection';
 
@@ -113,34 +114,23 @@ export default function WifiSocialSettings({ compact = false }: WifiSocialSettin
     socialWhatsapp: '',
   });
 
-  // Load existing settings
-  useEffect(() => {
-    if (settings) {
-      setFormState({
-        wifiSsid: settings.wifiSsid || '',
-        wifiPassword: settings.wifiPassword || '',
-        socialInstagram: settings.socialInstagram || '',
-        socialFacebook: settings.socialFacebook || '',
-        socialTwitter: settings.socialTwitter || '',
-        socialTiktok: settings.socialTiktok || '',
-        socialYoutube: settings.socialYoutube || '',
-        socialWhatsapp: settings.socialWhatsapp || '',
-      });
-    }
-  }, [settings]);
-
-  // Save function
+  // Save function. Send cleared fields as '' — the backend fields are plain
+  // @IsString @IsOptional (no EmptyStringToUndefined), so '' persists and
+  // actually CLEARS the stored value. Mapping ''→undefined here made the
+  // PATCH a no-op for cleared fields: the WiFi password / social handles
+  // could never be deleted from the UI even though the toast said "saved"
+  // (same trap BrandingSettingsPage documents for taxId).
   const saveSettings = useCallback(
     async (state: WifiSocialState) => {
       await updateSettings({
-        wifiSsid: state.wifiSsid || undefined,
-        wifiPassword: state.wifiPassword || undefined,
-        socialInstagram: state.socialInstagram || undefined,
-        socialFacebook: state.socialFacebook || undefined,
-        socialTwitter: state.socialTwitter || undefined,
-        socialTiktok: state.socialTiktok || undefined,
-        socialYoutube: state.socialYoutube || undefined,
-        socialWhatsapp: state.socialWhatsapp || undefined,
+        wifiSsid: state.wifiSsid,
+        wifiPassword: state.wifiPassword,
+        socialInstagram: state.socialInstagram,
+        socialFacebook: state.socialFacebook,
+        socialTwitter: state.socialTwitter,
+        socialTiktok: state.socialTiktok,
+        socialYoutube: state.socialYoutube,
+        socialWhatsapp: state.socialWhatsapp,
       });
     },
     [updateSettings]
@@ -151,6 +141,7 @@ export default function WifiSocialSettings({ compact = false }: WifiSocialSettin
     status: autoSaveStatus,
     setValue: triggerAutoSave,
     retry: retryAutoSave,
+    isDirty,
   } = useAutoSave(formState, saveSettings, {
     debounceMs: 800,
     onSuccess: () => {
@@ -160,6 +151,26 @@ export default function WifiSocialSettings({ compact = false }: WifiSocialSettin
       toast.error(t('wifiSocialSettings.saveError'));
     },
   });
+
+  // Load existing settings — guarded: the tenantSettings query is shared with
+  // LocationSettings/ReportSettings on the same page, so refetches land often;
+  // never let one clobber an in-progress edit here.
+  useServerHydratedState(
+    settings,
+    (data) => {
+      setFormState({
+        wifiSsid: data.wifiSsid || '',
+        wifiPassword: data.wifiPassword || '',
+        socialInstagram: data.socialInstagram || '',
+        socialFacebook: data.socialFacebook || '',
+        socialTwitter: data.socialTwitter || '',
+        socialTiktok: data.socialTiktok || '',
+        socialYoutube: data.socialYoutube || '',
+        socialWhatsapp: data.socialWhatsapp || '',
+      });
+    },
+    { skipWhile: isDirty || autoSaveStatus === 'saving' }
+  );
 
   // Handle field changes
   const handleChange = (field: keyof WifiSocialState, value: string) => {

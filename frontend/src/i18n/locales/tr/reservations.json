@@ -59,7 +59,11 @@
     "copyLink": "Kopyala",
     "linkCopied": "Link kopyalandı!",
     "holdOffsetMinutes": "Rezervasyon hold süresi (dakika)",
-    "holdOffsetMinutesDesc": "Onaylı bir rezervasyonun başlamasından kaç dakika önce masanın otomatik olarak Rezerve durumuna geçeceği. Varsayılan 30 — pre-hold iptali için 0 girin."
+    "holdOffsetMinutesDesc": "Onaylı bir rezervasyonun başlamasından kaç dakika önce masanın otomatik olarak Rezerve durumuna geçeceği. Varsayılan 30 — pre-hold iptali için 0 girin.",
+    "validationMin": "En az {{min}} olmalı",
+    "validationRange": "{{min}} ile {{max}} arasında olmalı",
+    "overnightNotSupported": "Kapanış saati açılış saatinden sonra olmalı (gece yarısını aşan saatler desteklenmiyor)",
+    "copyFailed": "Bağlantı kopyalanamadı"
   },
   "status": {
     "PENDING": "Beklemede",

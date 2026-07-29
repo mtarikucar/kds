@@ -64,37 +64,34 @@ interface PlatformInfo {
   platform: string;
   color: string;
   bgColor: string;
-  description: string;
 }
 
+// Descriptions resolve through i18n: `onlineOrders.platformDescriptions.<key>`
+// (the brand names themselves stay untranslated).
 const PLATFORM_INFO: Record<string, PlatformInfo> = {
   GETIR: {
     name: 'Getir Yemek',
     platform: 'GETIR',
     color: 'text-purple-700',
     bgColor: 'bg-purple-50',
-    description: 'Polling-based integration (every 15s)',
   },
   YEMEKSEPETI: {
     name: 'Yemeksepeti',
     platform: 'YEMEKSEPETI',
     color: 'text-pink-700',
     bgColor: 'bg-pink-50',
-    description: 'Webhook-based integration (real-time)',
   },
   TRENDYOL: {
     name: 'Trendyol Yemek',
     platform: 'TRENDYOL',
     color: 'text-orange-700',
     bgColor: 'bg-orange-50',
-    description: 'Webhook + polling integration',
   },
   MIGROS: {
     name: 'Migros Yemek',
     platform: 'MIGROS',
     color: 'text-green-700',
     bgColor: 'bg-green-50',
-    description: 'Polling-based integration (every 20s)',
   },
 };
 
@@ -318,7 +315,9 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
                 hasCredentials={hasCredentials}
               />
             </div>
-            <p className="text-xs text-slate-500">{info.description}</p>
+            <p className="text-xs text-slate-500">
+              {t(`onlineOrders.platformDescriptions.${platform}`)}
+            </p>
           </div>
         </div>
 
@@ -329,7 +328,11 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
               e.stopPropagation();
               handleToggleEnabled();
             }}
-            aria-label={config?.isEnabled ? `Disable ${info.name}` : `Enable ${info.name}`}
+            aria-label={
+              config?.isEnabled
+                ? t('onlineOrders.aria.disablePlatform', { name: info.name })
+                : t('onlineOrders.aria.enablePlatform', { name: info.name })
+            }
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               config?.isEnabled ? 'bg-primary-600' : 'bg-slate-300'
             }`}
@@ -375,7 +378,11 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
                 setAutoAccept(!autoAccept);
                 setHasChanges(true);
               }}
-              aria-label={autoAccept ? `Disable auto-accept for ${info.name}` : `Enable auto-accept for ${info.name}`}
+              aria-label={
+                autoAccept
+                  ? t('onlineOrders.aria.disableAutoAccept', { name: info.name })
+                  : t('onlineOrders.aria.enableAutoAccept', { name: info.name })
+              }
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 autoAccept ? 'bg-primary-600' : 'bg-slate-300'
               }`}

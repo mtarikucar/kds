@@ -172,9 +172,13 @@ const IntegrationsSettingsPage = () => {
                     );
                   })()}
                   <div className="flex items-center gap-2">
+                    {/* Disabled while the mutation is in flight — a double
+                        click otherwise fires two toggles (net no-op with two
+                        success toasts) or two deletes (second one 404s). */}
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={toggleIntegration.isPending}
                       onClick={() =>
                         handleToggleIntegration(integration.id, integration.isEnabled)
                       }
@@ -194,6 +198,7 @@ const IntegrationsSettingsPage = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={deleteIntegration.isPending}
                       onClick={() => handleDeleteIntegration(integration.id)}
                     >
                       <Trash2 className="h-4 w-4 text-red-600" />

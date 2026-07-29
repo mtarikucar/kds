@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { QrCode } from 'lucide-react';
 import { useGetPosSettings, useUpdatePosSettings } from '../../features/pos/posApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsToggle } from '../../components/settings/SettingsToggle';
 import LocationSettings from '../../components/settings/LocationSettings';
@@ -17,13 +18,6 @@ const QRMenuSettingsPage = () => {
   const [enableCustomerOrdering, setEnableCustomerOrdering] = useState(true);
   const [enableTwoStepCheckout, setEnableTwoStepCheckout] = useState(false);
 
-  useEffect(() => {
-    if (posSettings) {
-      setEnableCustomerOrdering(posSettings.enableCustomerOrdering);
-      setEnableTwoStepCheckout(posSettings.enableTwoStepCheckout);
-    }
-  }, [posSettings]);
-
   const saveSettings = useCallback(
     async (settings: { enableCustomerOrdering: boolean; enableTwoStepCheckout: boolean }) => {
       await updatePosSettings(settings);
@@ -35,6 +29,7 @@ const QRMenuSettingsPage = () => {
     status: saveStatus,
     setValue: triggerSave,
     retry: retrySave,
+    isDirty,
   } = useAutoSave(
     { enableCustomerOrdering, enableTwoStepCheckout },
     saveSettings,
@@ -47,6 +42,16 @@ const QRMenuSettingsPage = () => {
         toast.error(t('settingsFailed'));
       },
     }
+  );
+
+  // Guarded hydration — a mid-save refetch must not revert a newer toggle.
+  useServerHydratedState(
+    posSettings,
+    (data) => {
+      setEnableCustomerOrdering(data.enableCustomerOrdering);
+      setEnableTwoStepCheckout(data.enableTwoStepCheckout);
+    },
+    { skipWhile: isDirty || saveStatus === 'saving' }
   );
 
   const handleToggleCustomerOrdering = (checked: boolean) => {
