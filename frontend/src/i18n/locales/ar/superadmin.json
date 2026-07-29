@@ -104,7 +104,6 @@
     "title": "Tenants",
     "subtitle": "Manage restaurant tenants",
     "searchPlaceholder": "Search tenants...",
-    "confirmStatusChange": "Change status to {{status}}?",
     "filters": {
       "allStatus": "All Status",
       "active": "Active",
@@ -208,14 +207,35 @@
       "maxCategories": "Max Categories",
       "maxMonthlyOrders": "Max Monthly Orders",
       "maxBranches": "الحد الأقصى للفروع"
+    },
+    "statusUpdated": "Tenant status updated.",
+    "statusUpdateFailed": "Status update failed.",
+    "overridesSaveFailed": "Failed to save overrides.",
+    "overridesResetFailed": "Failed to reset overrides.",
+    "suspendModal": {
+      "title": "Suspend Tenant",
+      "intro": "{{name}} will be suspended: all user sessions are revoked immediately, the subdomain is parked and the tenant admins are notified. This is reversible (Activate).",
+      "confirm": "Suspend"
+    },
+    "deleteModal": {
+      "title": "Delete Tenant",
+      "intro": "{{name}} will be moved to DELETED. Consequences:",
+      "consequenceSessions": "All user sessions are revoked immediately (access tokens invalidated).",
+      "consequenceSubdomain": "The subdomain is parked and cannot be claimed by another tenant.",
+      "consequenceEmail": "Every tenant admin receives an \"Account Deleted\" email and notification.",
+      "reversibleNote": "No data is erased; this can be undone from this screen via Activate.",
+      "typeNameLabel": "Type the tenant name to confirm: {{name}}",
+      "confirm": "Delete Tenant"
+    },
+    "statusModal": {
+      "reasonRequired": "Reason (required — recorded in the audit log and included in the admin email)",
+      "reasonOptional": "Reason (optional — recorded in the audit log and included in the admin email)",
+      "reasonPlaceholder": "E.g. non-payment, abuse report…"
     }
   },
   "subscriptions": {
     "title": "Subscriptions",
     "subtitle": "Manage tenant subscriptions",
-    "promptExtendDays": "Enter number of days to extend:",
-    "confirmCancel": "Cancel this subscription?",
-    "promptCancelReason": "Enter cancellation reason (optional):",
     "filters": {
       "allStatus": "All Status",
       "active": "Active",
@@ -233,7 +253,31 @@
       "ends": "Ends"
     },
     "extend": "Extend",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "extendSuccess": "Subscription extended.",
+    "extendFailed": "Failed to extend the subscription.",
+    "cancelSuccess": "Subscription cancelled.",
+    "cancelFailed": "Failed to cancel the subscription.",
+    "extendModal": {
+      "title": "Extend Subscription",
+      "subtitle": "The period end of {{tenant}}'s subscription will be pushed forward.",
+      "reinstateWarning": "This subscription is {{status}}. Extending will REINSTATE it to ACTIVE and unlock the tenant.",
+      "days": "Days to extend",
+      "reason": "Reason (optional)",
+      "back": "Back",
+      "confirm": "Extend",
+      "extending": "Extending..."
+    },
+    "cancelModal": {
+      "title": "Cancel Subscription",
+      "subtitle": "{{tenant}}'s subscription will be cancelled.",
+      "atPeriodEnd": "At period end (default) — access continues until the current period ends.",
+      "immediate": "Immediately — the subscription is CANCELLED right now and access stops.",
+      "reason": "Reason (optional)",
+      "keep": "Keep subscription",
+      "confirm": "Confirm Cancellation",
+      "cancelling": "Cancelling..."
+    }
   },
   "auditLogs": {
     "title": "Audit Logs",
@@ -262,7 +306,8 @@
       "action": "Action",
       "entity": "Entity",
       "target": "Target"
-    }
+    },
+    "exportFailed": "Export failed."
   },
   "users": {
     "title": "Users",
@@ -429,6 +474,19 @@
       },
       "cancel": "Cancel",
       "create": "Create"
+    },
+    "toasts": {
+      "addonCreated": "Add-on created.",
+      "addonUpdated": "Add-on updated.",
+      "addonArchived": "Add-on archived.",
+      "productCreated": "Product created.",
+      "productUpdated": "Product updated.",
+      "productArchived": "Product archived.",
+      "stockReceived": "Stock received.",
+      "createFailed": "Create failed.",
+      "updateFailed": "Update failed.",
+      "archiveFailed": "Archive failed.",
+      "stockFailed": "Stock receive failed."
     }
   },
   "legal": {
@@ -471,6 +529,16 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
+    }
+  },
+  "bankTransfer": {
+    "toasts": {
+      "settingsSaved": "Bank-transfer settings saved.",
+      "settingsSaveFailed": "Saving failed.",
+      "confirmed": "Transfer confirmed, subscription activated.",
+      "confirmFailed": "Confirmation failed.",
+      "rejected": "Transfer rejected.",
+      "rejectFailed": "Rejection failed."
     }
   }
 }

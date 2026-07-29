@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../../i18n/config';
 import { getApiErrorMessage } from '../../../lib/api-error';
 import { superAdminApi as api } from './superAdminApi';
 
@@ -62,9 +63,10 @@ export const useSaCreateAddOn = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa', 'addons'] });
-      toast.success('Add-on created.');
+      toast.success(i18n.t('superadmin:marketplace.toasts.addonCreated'));
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Create failed')),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.createFailed'))),
   });
 };
 
@@ -77,8 +79,12 @@ export const useSaUpdateAddOn = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa', 'addons'] });
-      toast.success('Add-on updated.');
+      toast.success(i18n.t('superadmin:marketplace.toasts.addonUpdated'));
     },
+    // F5: without onError a failed edit/publish resolved silently — the row
+    // simply didn't change. Mirror the create hook's toast pipeline.
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.updateFailed'))),
   });
 };
 
@@ -91,8 +97,10 @@ export const useSaArchiveAddOn = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa', 'addons'] });
-      toast.success('Add-on archived.');
+      toast.success(i18n.t('superadmin:marketplace.toasts.addonArchived'));
     },
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.archiveFailed'))),
   });
 };
 
@@ -116,9 +124,10 @@ export const useSaCreateProduct = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa', 'products'] });
-      toast.success('Product created.');
+      toast.success(i18n.t('superadmin:marketplace.toasts.productCreated'));
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Create failed')),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.createFailed'))),
   });
 };
 
@@ -129,7 +138,12 @@ export const useSaUpdateProduct = () => {
       const r = await api.patch(`/v1/superadmin/catalog/products/${id}`, body);
       return r.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sa', 'products'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sa', 'products'] });
+      toast.success(i18n.t('superadmin:marketplace.toasts.productUpdated'));
+    },
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.updateFailed'))),
   });
 };
 
@@ -140,7 +154,12 @@ export const useSaArchiveProduct = () => {
       const r = await api.delete(`/v1/superadmin/catalog/products/${id}`);
       return r.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sa', 'products'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sa', 'products'] });
+      toast.success(i18n.t('superadmin:marketplace.toasts.productArchived'));
+    },
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.archiveFailed'))),
   });
 };
 
@@ -153,7 +172,9 @@ export const useSaReceiveStock = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa', 'products'] });
-      toast.success('Stock received.');
+      toast.success(i18n.t('superadmin:marketplace.toasts.stockReceived'));
     },
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.stockFailed'))),
   });
 };

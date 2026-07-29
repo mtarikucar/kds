@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../../i18n/config';
 import { getApiErrorMessage } from '../../../lib/api-error';
 import { useSuperAdminAuthStore } from '../../../store/superAdminAuthStore';
 import {
@@ -332,7 +333,8 @@ export const useUpdateTenantStatus = () => {
     // deep-review FM10: surface failed suspend/activate/delete so the
     // destructive lifecycle action never fails silently (mirrors the
     // superadminBankTransferApi sonner + getApiErrorMessage convention).
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Durum güncellenemedi.')),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:tenantDetail.statusUpdateFailed'))),
   });
 };
 
@@ -397,6 +399,14 @@ export const useUpdateTenantOverrides = () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', variables.tenantId, 'overrides'] });
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', variables.tenantId] });
     },
+    // F7: a failed override save used to resolve silently while the local
+    // form (and its "Effective" column) kept showing the unsaved state as
+    // fact. Toast + re-fetch the server truth; the page-level onError also
+    // resets the local form from that truth.
+    onError: (e, variables) => {
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:tenantDetail.overridesSaveFailed')));
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', variables.tenantId, 'overrides'] });
+    },
   });
 };
 
@@ -411,6 +421,12 @@ export const useResetTenantOverrides = () => {
     onSuccess: (_, tenantId) => {
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', tenantId, 'overrides'] });
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', tenantId] });
+    },
+    // F7: surface a failed reset instead of leaving the operator to assume
+    // the overrides are gone.
+    onError: (e, tenantId) => {
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:tenantDetail.overridesResetFailed')));
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', tenantId, 'overrides'] });
     },
   });
 };
@@ -518,8 +534,18 @@ export const useCancelSubscription = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
-      const response = await superAdminApi.post(`/superadmin/subscriptions/${id}/cancel`, { reason });
+    mutationFn: async ({
+      id,
+      mode,
+      reason,
+    }: {
+      id: string;
+      // Backend CancelSubscriptionDto: AT_PERIOD_END (default) lets the
+      // subscription run until currentPeriodEnd; IMMEDIATE cancels right now.
+      mode?: 'AT_PERIOD_END' | 'IMMEDIATE';
+      reason?: string;
+    }) => {
+      const response = await superAdminApi.post(`/superadmin/subscriptions/${id}/cancel`, { mode, reason });
       return response.data;
     },
     onSuccess: () => {
@@ -564,5 +590,9 @@ export const useExportAuditLogs = () => {
       });
       return response.data;
     },
+    // F9: a failed export used to reject silently (the page awaited
+    // mutateAsync uncaught) — the operator just never got a file.
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:auditLogs.exportFailed'))),
   });
 };

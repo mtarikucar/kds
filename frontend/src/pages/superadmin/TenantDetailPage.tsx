@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, RefreshCw, RotateCcw, Save } from 'lucide-react';
+import { toast } from 'sonner';
+import { AlertTriangle, ArrowLeft, RefreshCw, RotateCcw, Save } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import {
   useTenant,
   useTenantUsers,
-  useTenantOrders,
   useTenantStats,
   useUpdateTenantStatus,
   usePlans,
@@ -74,10 +74,15 @@ export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  // F6: SUSPEND/DELETE go through a styled confirm modal that collects the
+  // DTO-supported `reason` (required for DELETE) and, for DELETE, states the
+  // consequences + requires re-typing the tenant name.
+  const [statusAction, setStatusAction] = useState<'SUSPENDED' | 'DELETED' | null>(null);
+  const [statusReason, setStatusReason] = useState('');
+  const [deleteNameConfirm, setDeleteNameConfirm] = useState('');
 
   const { data: tenant, isLoading } = useTenant(id!);
   const { data: users } = useTenantUsers(id!, 1, 10);
-  const { data: orders } = useTenantOrders(id!, 1, 10);
   const { data: stats } = useTenantStats(id!);
   const { data: plans } = usePlans();
   const { data: overridesData } = useTenantOverrides(id!);
@@ -119,10 +124,49 @@ export default function TenantDetailPage() {
     );
   }
 
-  const handleStatusChange = (status: string) => {
-    if (window.confirm(t('tenantDetail.confirmStatusChange', { status }))) {
-      updateStatusMutation.mutate({ id: tenant.id, status });
+  // ACTIVE is non-destructive (re-activation), so a plain confirm stays
+  // sufficient; it also covers the DELETED → ACTIVE recovery path (the
+  // backend status flip is fully reversible and re-parks/reclaims the
+  // subdomain + rotates sessions on either direction).
+  const handleActivate = () => {
+    if (window.confirm(t('tenantDetail.confirmStatusChange', { status: 'ACTIVE' }))) {
+      updateStatusMutation.mutate(
+        { id: tenant.id, status: 'ACTIVE' },
+        { onSuccess: () => toast.success(t('tenantDetail.statusUpdated')) },
+      );
     }
+  };
+
+  const openStatusModal = (action: 'SUSPENDED' | 'DELETED') => {
+    setStatusReason('');
+    setDeleteNameConfirm('');
+    setStatusAction(action);
+  };
+
+  const closeStatusModal = () => {
+    if (updateStatusMutation.isPending) return;
+    setStatusAction(null);
+  };
+
+  const confirmStatusAction = () => {
+    if (!statusAction || updateStatusMutation.isPending) return;
+    const trimmedReason = statusReason.trim();
+    if (statusAction === 'DELETED') {
+      // DELETE demands a reason (it goes to the audit log AND the "Account
+      // Deleted" email) and the tenant name typed back.
+      if (!trimmedReason || deleteNameConfirm.trim() !== tenant.name) return;
+    }
+    updateStatusMutation.mutate(
+      { id: tenant.id, status: statusAction, reason: trimmedReason || undefined },
+      {
+        // Failure: hook-level onError toasts; the modal stays open so the
+        // operator can retry without re-typing the reason.
+        onSuccess: () => {
+          setStatusAction(null);
+          toast.success(t('tenantDetail.statusUpdated'));
+        },
+      },
+    );
   };
 
   const activeSubscription = tenant.subscriptions?.find(
@@ -185,7 +229,21 @@ export default function TenantDetailPage() {
 
     updateOverridesMutation.mutate(
       { tenantId: tenant.id, data: { featureOverrides, limitOverrides } },
-      { onSuccess: () => setHasOverrideChanges(false) }
+      {
+        onSuccess: () => setHasOverrideChanges(false),
+        // F7: on failure re-sync the form from the last-known SERVER state so
+        // the "Effective" column shows persisted truth instead of the unsaved
+        // local edits (the hook also invalidates the overrides query and
+        // toasts the error). Without this, a failed save still rendered ✓ for
+        // features that were never granted.
+        onError: () => {
+          if (overridesData) {
+            setFeatureStates(initFeatureStates(Object.keys(FEATURE_LABELS), overridesData));
+            setLimitValues(initLimitValues(Object.keys(LIMIT_LABELS), overridesData));
+          }
+          setHasOverrideChanges(false);
+        },
+      }
     );
   };
 
@@ -349,24 +407,31 @@ export default function TenantDetailPage() {
           )}
           {tenant.status === 'ACTIVE' && (
             <button
-              onClick={() => handleStatusChange('SUSPENDED')}
-              className="px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+              onClick={() => openStatusModal('SUSPENDED')}
+              disabled={updateStatusMutation.isPending}
+              className="px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t('tenantDetail.suspend')}
             </button>
           )}
-          {tenant.status === 'SUSPENDED' && (
+          {/* F6: DELETED tenants get an Activate action too — the backend
+              status flip is reversible (DELETED → ACTIVE re-rotates sessions
+              and the parked subdomain is stamped with this tenant's id so it
+              can be reclaimed). Previously the UI was a one-way door. */}
+          {(tenant.status === 'SUSPENDED' || tenant.status === 'DELETED') && (
             <button
-              onClick={() => handleStatusChange('ACTIVE')}
-              className="px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+              onClick={handleActivate}
+              disabled={updateStatusMutation.isPending}
+              className="px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t('tenantDetail.activate')}
             </button>
           )}
           {tenant.status !== 'DELETED' && (
             <button
-              onClick={() => handleStatusChange('DELETED')}
-              className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+              onClick={() => openStatusModal('DELETED')}
+              disabled={updateStatusMutation.isPending}
+              className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t('tenantDetail.delete')}
             </button>
@@ -653,6 +718,114 @@ export default function TenantDetailPage() {
                   {changePlanMutation.isPending ? t('tenantDetail.changing') : t('tenantDetail.changePlan')}
                 </button>
               </div>
+      </Modal>
+
+      {/* F6: Suspend / Delete destructive-confirm modal. States consequences,
+          collects the DTO's `reason` (required + type-the-name for DELETE). */}
+      <Modal
+        isOpen={statusAction !== null}
+        onClose={closeStatusModal}
+        title={
+          statusAction === 'DELETED'
+            ? t('tenantDetail.deleteModal.title')
+            : t('tenantDetail.suspendModal.title')
+        }
+        size="md"
+      >
+        <div
+          className={`flex items-start gap-3 rounded-lg border px-4 py-3 mb-4 ${
+            statusAction === 'DELETED'
+              ? 'border-red-200 bg-red-50'
+              : 'border-amber-200 bg-amber-50'
+          }`}
+        >
+          <AlertTriangle
+            className={`mt-0.5 h-4 w-4 flex-shrink-0 ${
+              statusAction === 'DELETED' ? 'text-red-600' : 'text-amber-600'
+            }`}
+          />
+          <div
+            className={`text-sm ${
+              statusAction === 'DELETED' ? 'text-red-800' : 'text-amber-800'
+            }`}
+          >
+            {statusAction === 'DELETED' ? (
+              <>
+                <p className="font-medium mb-1">
+                  {t('tenantDetail.deleteModal.intro', { name: tenant.name })}
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>{t('tenantDetail.deleteModal.consequenceSessions')}</li>
+                  <li>{t('tenantDetail.deleteModal.consequenceSubdomain')}</li>
+                  <li>{t('tenantDetail.deleteModal.consequenceEmail')}</li>
+                </ul>
+                <p className="mt-1.5">{t('tenantDetail.deleteModal.reversibleNote')}</p>
+              </>
+            ) : (
+              <p>{t('tenantDetail.suspendModal.intro', { name: tenant.name })}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+            {statusAction === 'DELETED'
+              ? t('tenantDetail.statusModal.reasonRequired')
+              : t('tenantDetail.statusModal.reasonOptional')}
+          </label>
+          <textarea
+            value={statusReason}
+            onChange={(e) => setStatusReason(e.target.value)}
+            rows={2}
+            placeholder={t('tenantDetail.statusModal.reasonPlaceholder')}
+            className="w-full px-3.5 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+          />
+        </div>
+
+        {statusAction === 'DELETED' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+              {t('tenantDetail.deleteModal.typeNameLabel', { name: tenant.name })}
+            </label>
+            <input
+              type="text"
+              value={deleteNameConfirm}
+              onChange={(e) => setDeleteNameConfirm(e.target.value)}
+              placeholder={tenant.name}
+              className="w-full px-3.5 py-2.5 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+            />
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={closeStatusModal}
+            disabled={updateStatusMutation.isPending}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {t('tenantDetail.cancel')}
+          </button>
+          <button
+            onClick={confirmStatusAction}
+            disabled={
+              updateStatusMutation.isPending ||
+              (statusAction === 'DELETED' &&
+                (!statusReason.trim() || deleteNameConfirm.trim() !== tenant.name))
+            }
+            className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+              statusAction === 'DELETED'
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-amber-600 hover:bg-amber-700'
+            }`}
+          >
+            {updateStatusMutation.isPending
+              ? t('tenantDetail.saving')
+              : statusAction === 'DELETED'
+                ? t('tenantDetail.deleteModal.confirm')
+                : t('tenantDetail.suspendModal.confirm')}
+          </button>
+        </div>
       </Modal>
     </div>
   );

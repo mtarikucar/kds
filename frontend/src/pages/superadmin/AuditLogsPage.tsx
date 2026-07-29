@@ -27,14 +27,20 @@ export default function AuditLogsPage() {
   const exportMutation = useExportAuditLogs();
 
   const handleExport = async (format: 'csv' | 'json') => {
-    const blob = await exportMutation.mutateAsync({ ...filters, format });
-    const url = window.URL.createObjectURL(new Blob([blob]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `audit-logs.${format}`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    // F9: catch the rejection — the hook's onError toasts the failure; an
+    // uncaught mutateAsync used to fail silently (no file, no feedback).
+    try {
+      const blob = await exportMutation.mutateAsync({ ...filters, format });
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `audit-logs.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      // Error toast already shown by the hook's onError.
+    }
   };
 
   return (

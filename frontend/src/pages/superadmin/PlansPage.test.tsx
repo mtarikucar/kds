@@ -159,6 +159,8 @@ describe('PlansPage — PlanModal create', () => {
     expect(createMutate).toHaveBeenCalledTimes(1);
     const body = createMutate.mock.calls[0][0];
     expect(body).toMatchObject({ name: 'STARTER', kdsIntegration: true, isActive: true });
+    // F4: currency is CREATE-only — new plans are always TRY.
+    expect(body.currency).toBe('TRY');
     // create() must not carry an id.
     expect(body.id).toBeUndefined();
     expect(updateMutate).not.toHaveBeenCalled();
@@ -175,7 +177,22 @@ describe('PlansPage — PlanModal create', () => {
     fireEvent.click(screen.getByRole('button', { name: 'plans.modal.update' }));
     expect(updateMutate).toHaveBeenCalledTimes(1);
     expect(updateMutate.mock.calls[0][0]).toMatchObject({ id: 'p-edit', name: 'PRO' });
+    // F4: updates never carry currency — sending it would silently rewrite a
+    // legacy non-TRY plan's denomination (USD 49 → TRY 49).
+    expect(updateMutate.mock.calls[0][0].currency).toBeUndefined();
     expect(createMutate).not.toHaveBeenCalled();
+  });
+
+  it('F4: editing a legacy USD plan never sends currency in the update payload', () => {
+    plansData = [plan({ id: 'p-usd', name: 'LEGACY_USD', displayName: 'Pro Plan', currency: 'USD' })];
+    renderPage();
+    const card = screen.getByText('Pro Plan').closest('div')!.parentElement!.parentElement as HTMLElement;
+    fireEvent.click(within(card).getAllByRole('button')[0]); // [edit, delete]
+    fireEvent.click(screen.getByRole('button', { name: 'plans.modal.update' }));
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    const body = updateMutate.mock.calls[0][0];
+    expect(body.id).toBe('p-usd');
+    expect(body.currency).toBeUndefined();
   });
 
   it('closing the modal via Cancel fires no mutation', () => {
