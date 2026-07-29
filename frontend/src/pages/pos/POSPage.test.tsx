@@ -15,7 +15,17 @@ import { toast } from 'sonner';
 
 // --- child components: lightweight stubs --------------------------------
 vi.mock('../../components/pos/MenuPanel', () => ({ default: () => <div data-testid="menu-panel" /> }));
-vi.mock('../../components/pos/OrderCart', () => ({ default: () => <div data-testid="order-cart" /> }));
+// OrderCart: expose onProgressivePay so the progressive-modal lifecycle spec
+// can open the modal the way a cashier does.
+vi.mock('../../components/pos/OrderCart', () => ({
+  default: ({ onProgressivePay }: any) => (
+    <div data-testid="order-cart">
+      {onProgressivePay && (
+        <button data-testid="open-progressive" onClick={onProgressivePay} />
+      )}
+    </div>
+  ),
+}));
 // PaymentModal: expose onConfirm so the terminal-flow spec can fire a CARD
 // payment (the stub renders regardless of isOpen — POSPage mounts it always).
 vi.mock('../../components/pos/PaymentModal', () => ({
@@ -30,14 +40,39 @@ vi.mock('../../components/pos/ProductOptionsModal', () => ({ default: () => null
 vi.mock('../../components/pos/StickyCartBar', () => ({ default: () => <div data-testid="sticky-cart" /> }));
 vi.mock('../../components/pos/CartDrawer', () => ({ default: () => null }));
 vi.mock('../../components/pos/NotificationBar', () => ({ default: () => <div data-testid="notif-bar" /> }));
+// DeliveryInboxButton: the persistent inbox opener (its own badge/count logic
+// is pinned in DeliveryInboxButton.test.tsx — here we only pin the wiring).
+vi.mock('../../components/pos/DeliveryInboxButton', () => ({
+  default: ({ onOpen }: any) => (
+    <button data-testid="delivery-inbox-btn" onClick={onOpen} />
+  ),
+}));
 vi.mock('../../components/pos/AwaitingPaymentSection', () => ({ default: () => null }));
-vi.mock('../../components/pos/PendingOrdersPanel', () => ({ default: () => null }));
+// PendingOrdersPanel: surface isOpen so the inbox-opener spec can assert the
+// button actually opens the panel.
+vi.mock('../../components/pos/PendingOrdersPanel', () => ({
+  default: ({ isOpen }: any) =>
+    isOpen ? <div data-testid="pending-orders-panel" /> : null,
+}));
 vi.mock('../../components/pos/WaiterRequestsPanel', () => ({ default: () => null }));
 vi.mock('../../components/pos/BillRequestsPanel', () => ({ default: () => null }));
-vi.mock('../../components/pos/TransferTableModal', () => ({ default: () => null }));
+// TransferTableModal: expose onConfirm so the transfer spec can complete a
+// transfer (the modal itself only renders while a table is selected).
+vi.mock('../../components/pos/TransferTableModal', () => ({
+  default: ({ onConfirm }: any) => (
+    <button data-testid="transfer-confirm" onClick={() => onConfirm('tbl-2')} />
+  ),
+}));
 vi.mock('../../components/pos/TableMergeModal', () => ({ default: () => null }));
 vi.mock('../../components/pos/BillSplitModal', () => ({ default: () => null }));
-vi.mock('../../components/pos/ProgressiveSplitModal', () => ({ default: () => null }));
+// ProgressiveSplitModal: render a marker while open so the lifecycle spec can
+// assert POSPage keeps it MOUNTED when the active-order list empties.
+vi.mock('../../components/pos/ProgressiveSplitModal', () => ({
+  default: ({ isOpen, orders }: any) =>
+    isOpen ? (
+      <div data-testid="progressive-modal" data-order-count={orders.length} />
+    ) : null,
+}));
 vi.mock('../../components/pos/ReservationActionDialog', () => ({ default: () => null }));
 vi.mock('../../components/pos/ManualLockDialog', () => ({ default: () => null }));
 // TerminalChargeModal: surface the charge state POSPage passes down (status +
@@ -84,13 +119,21 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 
 // --- feature hooks: inert defaults --------------------------------------
 let tablesResult: any;
+// Transfer resolves synchronously so the transfer spec can drive the
+// onSuccess reset path (view back to table-selection).
+const transferTableOrdersMock = vi.fn(
+  (_vars: any, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.(),
+);
 vi.mock('../../features/orders/ordersApi', () => {
   const mutation = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
   return {
     useCreateOrder: mutation,
     useUpdateOrder: mutation,
     useOrders: () => ({ data: [], isLoading: false }),
-    useTransferTableOrders: mutation,
+    useTransferTableOrders: () => ({
+      mutate: transferTableOrdersMock,
+      isPending: false,
+    }),
     useSplitBill: mutation,
     useGroupBillSummary: () => ({ data: null }),
     useCreatePayment: mutation,
@@ -185,6 +228,76 @@ describe('POSPage — table selection screen', () => {
     tablesResult = { data: undefined, isLoading: true };
     render(<POSPage />);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  });
+});
+
+/** Drive the page into the order view with a selected table (the state the
+ *  transfer/progressive flows start from), via the setters POSPage hands to
+ *  the mocked useTableSelection. */
+const enterOrderViewWithTable = () => {
+  act(() => {
+    tableSelectionArgs.setSelectedTable({
+      id: 'tbl-1',
+      number: '1',
+      status: 'OCCUPIED',
+      capacity: 4,
+    });
+    tableSelectionArgs.setCurrentView('order');
+  });
+};
+
+describe('POSPage — persistent delivery inbox opener', () => {
+  it('renders on the table-selection screen (even with zero notifications)', () => {
+    render(<POSPage />);
+    expect(screen.getByTestId('delivery-inbox-btn')).toBeInTheDocument();
+  });
+
+  it('renders on the order screen too', () => {
+    render(<POSPage />);
+    enterOrderViewWithTable();
+    expect(screen.getByTestId('delivery-inbox-btn')).toBeInTheDocument();
+  });
+
+  it('opens the pending/delivery orders panel on click', () => {
+    render(<POSPage />);
+    expect(screen.queryByTestId('pending-orders-panel')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('delivery-inbox-btn'));
+    expect(screen.getByTestId('pending-orders-panel')).toBeInTheDocument();
+  });
+});
+
+describe('POSPage — table transfer', () => {
+  it('returns to the table-selection view after a successful transfer', () => {
+    render(<POSPage />);
+    enterOrderViewWithTable();
+    expect(screen.queryByText('tableSelection.title')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('transfer-confirm'));
+
+    expect(transferTableOrdersMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceTableId: 'tbl-1', targetTableId: 'tbl-2' }),
+      expect.anything(),
+    );
+    // Pre-fix: stayed on 'order' with no table — a "Takeaway order" header
+    // whose Create is blocked by the no-table guard.
+    expect(screen.getByText('tableSelection.title')).toBeInTheDocument();
+  });
+});
+
+describe('POSPage — progressive split modal lifecycle', () => {
+  it('keeps the OPEN modal mounted while the active-order list is empty (fullyPaid reachable)', () => {
+    render(<POSPage />);
+    enterOrderViewWithTable();
+
+    // useOrders is mocked to an empty list — exactly the state after the
+    // last order flips PAID and drops out of the status-filtered refetch.
+    fireEvent.click(screen.getByTestId('open-progressive'));
+
+    // Pre-fix: POSPage returned null here, unmounting the open modal the
+    // moment the list emptied, so its fullyPaid confirmation never showed.
+    const modal = screen.getByTestId('progressive-modal');
+    expect(modal).toBeInTheDocument();
+    expect(modal.dataset.orderCount).toBe('0');
   });
 });
 

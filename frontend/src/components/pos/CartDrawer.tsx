@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { acquireBodyScrollLock, releaseBodyScrollLock } from '../ui/bodyScrollLock';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -11,15 +12,14 @@ interface CartDrawerProps {
 const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
   const { t } = useTranslation('pos');
 
+  // Participate in the SHARED refcounted body scroll lock (ui/bodyScrollLock).
+  // Writing document.body.style.overflow directly here used to bypass Modal's
+  // refcount, so closing a Modal opened over the drawer restored body scroll
+  // under the still-open drawer.
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    if (!isOpen) return;
+    acquireBodyScrollLock();
+    return () => releaseBodyScrollLock();
   }, [isOpen]);
 
   useEffect(() => {

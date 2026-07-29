@@ -9,6 +9,7 @@ import PaymentModal from '../../components/pos/PaymentModal';
 import ProductOptionsModal, { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 import StickyCartBar from '../../components/pos/StickyCartBar';
 import CartDrawer from '../../components/pos/CartDrawer';
+import DeliveryInboxButton from '../../components/pos/DeliveryInboxButton';
 import NotificationBar from '../../components/pos/NotificationBar';
 import AwaitingPaymentSection from '../../components/pos/AwaitingPaymentSection';
 import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
@@ -25,7 +26,7 @@ import ManualLockDialog from '../../components/pos/ManualLockDialog';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
-import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment, ComboSelectionInput } from '../../types';
+import { Product, Table, TableStatus, OrderStatus, SplitType, SplitPaymentEntry, Payment, ComboSelectionInput } from '../../types';
 import { useResponsive, BREAKPOINTS } from '../../hooks/useResponsive';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import Spinner from '../../components/ui/Spinner';
@@ -809,6 +810,13 @@ const POSPage = () => {
           setCurrentOrderId(null);
           setCurrentOrderAmount(null);
           setCartDirtySinceOrder(false); // deep-review FH2
+          // The transfer cleared the table context, so land back on
+          // table-selection (mirrors handleBackToTables). Staying on
+          // 'order' with no table flips the header to "Takeaway order"
+          // while the no-table guard blocks Create — a dead end.
+          // (Unreachable in tableless mode: transfers need a selected
+          // table, which tableless never has.)
+          setCurrentView('table-selection');
         },
       }
     );
@@ -912,26 +920,32 @@ const POSPage = () => {
                 {t('tableSelection.description')}
               </p>
             </div>
-            {/* Grid / live-map view toggle */}
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setTableViewMode('grid')}
-                aria-pressed={tableViewMode === 'grid'}
-                aria-label={t('tableSelection.viewGrid', 'Izgara')}
-                className={`flex items-center justify-center w-10 h-9 rounded-md transition-colors ${tableViewMode === 'grid' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTableViewMode('map')}
-                aria-pressed={tableViewMode === 'map'}
-                aria-label={t('tableSelection.viewMap', 'Plan')}
-                className={`flex items-center justify-center w-10 h-9 rounded-md transition-colors ${tableViewMode === 'map' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <MapIcon className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Persistent delivery-inbox opener — the NotificationBar hides
+                  itself at 0 pending counts, but accepted delivery orders
+                  (PREPARING/READY) still need a way into the panel. */}
+              <DeliveryInboxButton onOpen={() => setIsPendingOrdersPanelOpen(true)} />
+              {/* Grid / live-map view toggle */}
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setTableViewMode('grid')}
+                  aria-pressed={tableViewMode === 'grid'}
+                  aria-label={t('tableSelection.viewGrid', 'Izgara')}
+                  className={`flex items-center justify-center w-10 h-9 rounded-md transition-colors ${tableViewMode === 'grid' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableViewMode('map')}
+                  aria-pressed={tableViewMode === 'map'}
+                  aria-label={t('tableSelection.viewMap', 'Plan')}
+                  className={`flex items-center justify-center w-10 h-9 rounded-md transition-colors ${tableViewMode === 'map' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <MapIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1118,6 +1132,10 @@ const POSPage = () => {
                 )}
               </p>
             </div>
+            {/* Persistent delivery-inbox opener — mirrored from the
+                table-selection header so it stays reachable mid-order and in
+                tableless mode (where table-selection never renders). */}
+            <DeliveryInboxButton onOpen={() => setIsPendingOrdersPanelOpen(true)} />
             {/* Cart pill for mobile (only when the side cart is hidden). Now
                 surfaces the running TOTAL alongside the count so the cashier
                 can glance the bill without opening the drawer. */}
@@ -1253,6 +1271,22 @@ const POSPage = () => {
             setIsCartDrawerOpen(false);
             handleTransferTable();
           }}
+          // Same table-ops the desktop cart gets — phone waiters need
+          // merge/split/progressive too. The modals are page-level siblings
+          // of the drawer, so close the drawer first (the established
+          // checkout/transfer pattern) rather than stacking them over it.
+          onMergeTables={() => {
+            setIsCartDrawerOpen(false);
+            setIsMergeModalOpen(true);
+          }}
+          onSplitBill={() => {
+            setIsCartDrawerOpen(false);
+            setIsBillSplitModalOpen(true);
+          }}
+          onProgressivePay={() => {
+            setIsCartDrawerOpen(false);
+            setIsProgressiveModalOpen(true);
+          }}
           isCheckingOut={isCreatingOrder || isUpdatingOrder}
           isTwoStepCheckout={isTwoStepCheckout}
           hasActiveOrder={!!currentOrderId}
@@ -1379,7 +1413,12 @@ const POSPage = () => {
             tableNumber: selectedTable?.number,
           }));
         const orders = groupId && groupSummary ? groupOrders : standaloneOrders;
-        if (!orders.length) return null;
+        // Never unmount while the modal is OPEN: paying the last items flips
+        // the order PAID, the status-filtered refetch empties `orders`, and
+        // unmounting here would destroy the modal at that exact moment — its
+        // own fullyPaid confirmation (which it renders from the still-loaded
+        // payable summary) could never be seen.
+        if (!orders.length && !isProgressiveModalOpen) return null;
         return (
           <ProgressiveSplitModal
             isOpen={isProgressiveModalOpen}
