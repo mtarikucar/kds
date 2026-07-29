@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Tag, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, AlertTriangle, Lock } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { usePlans, useCreatePlan, useUpdatePlan, useDeletePlan } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionPlan } from '../../features/superadmin/types';
 import { getApiErrorMessage } from '../../lib/api-error';
-import { discountedMonthlyPrice } from './plans.helpers';
+import { discountedMonthlyPrice, isDemoPlan } from './plans.helpers';
 
 export default function PlansPage() {
   const { t } = useTranslation('superadmin');
@@ -20,6 +20,13 @@ export default function PlansPage() {
   const createMutation = useCreatePlan();
   const updateMutation = useUpdatePlan();
   const deleteMutation = useDeletePlan();
+
+  // The DEMO plan is locked: its name keys the demo money-path guard on the
+  // backend (which also refuses rename/delete). See plans.helpers.isDemoPlan.
+  const demoLockTooltip = t(
+    'plans.demoLockTooltip',
+    'DEMO planının adı, demo kiracının gerçek ödeme yollarını kilitleyen korumanın anahtarıdır; bu plan düzenlenemez ve silinemez.',
+  );
 
   const handleDelete = (id: string) => {
     if (window.confirm(t('plans.confirmDelete'))) {
@@ -91,18 +98,33 @@ export default function PlansPage() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-base font-semibold text-zinc-900">{plan.displayName}</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">{plan.name}</p>
+                <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1.5">
+                  {plan.name}
+                  {isDemoPlan(plan) && (
+                    <span
+                      title={demoLockTooltip}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-50 text-amber-700 border border-amber-200"
+                    >
+                      <Lock className="w-3 h-3" />
+                      {t('plans.demoLockBadge', 'Kilitli')}
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="flex gap-1">
                 <button
                   onClick={() => handleEdit(plan)}
-                  className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors"
+                  disabled={isDemoPlan(plan)}
+                  title={isDemoPlan(plan) ? demoLockTooltip : undefined}
+                  className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Pencil className="w-4 h-4 text-zinc-400" />
                 </button>
                 <button
                   onClick={() => handleDelete(plan.id)}
-                  className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors"
+                  disabled={isDemoPlan(plan)}
+                  title={isDemoPlan(plan) ? demoLockTooltip : undefined}
+                  className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Trash2 className="w-4 h-4 text-zinc-400" />
                 </button>

@@ -20,6 +20,8 @@ import { SuperAdminAuditService } from "./superadmin-audit.service";
 import { AuditAction, EntityType } from "../dto/audit-filter.dto";
 import { SubscriptionService } from "../../subscriptions/services/subscription.service";
 import { SubscriptionSchedulerService } from "../../subscriptions/services/subscription-scheduler.service";
+import { resolvePlanAmount } from "../../subscriptions/plan-pricing.helper";
+import { DEMO_PLAN_NAME } from "../../demo/demo.constants";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
 import {
   PaymentStatus,
@@ -175,6 +177,38 @@ export class SuperAdminSubscriptionsService {
       throw new NotFoundException("Plan not found");
     }
 
+    // The DEMO plan's internal name is load-bearing for the demo money-path
+    // guard: DemoGuardService keys isDemoTenant on
+    // currentPlan.name === DEMO_PLAN_NAME and FAILS OPEN, so renaming this
+    // plan silently disarms the block and the shared explore-demo tenant
+    // regains REAL PayTR money paths. Every other field stays editable.
+    if (
+      existingPlan.name === DEMO_PLAN_NAME &&
+      updateDto.name !== undefined &&
+      updateDto.name !== DEMO_PLAN_NAME
+    ) {
+      throw new ConflictException({
+        errorCode: "DEMO_PLAN_NAME_LOCKED",
+        message:
+          `The "${DEMO_PLAN_NAME}" plan's internal name is load-bearing for ` +
+          "the demo money-path guard and cannot be renamed.",
+      });
+    }
+    // Inverse direction: renaming ANOTHER plan to the demo name would make
+    // every tenant on it read as the demo tenant — 403-ing their real money
+    // paths (DemoGuardService matches by name, not id).
+    if (
+      existingPlan.name !== DEMO_PLAN_NAME &&
+      updateDto.name === DEMO_PLAN_NAME
+    ) {
+      throw new ConflictException({
+        errorCode: "DEMO_PLAN_NAME_RESERVED",
+        message:
+          `"${DEMO_PLAN_NAME}" is reserved for the internal demo plan and ` +
+          "cannot be used as another plan's name.",
+      });
+    }
+
     const plan = await this.prisma.subscriptionPlan.update({
       where: { id },
       data: {
@@ -251,6 +285,20 @@ export class SuperAdminSubscriptionsService {
 
     if (!plan) {
       throw new NotFoundException("Plan not found");
+    }
+
+    // The DEMO plan row must keep existing: DemoService re-seeds the demo
+    // tenant onto the plan with this exact name, and DemoGuardService keys
+    // the demo money-path block on it. Deleting it (possible while the demo
+    // tenant is not yet seeded, when _count.subscriptions === 0) would break
+    // the next demo seed and the guard's single source of truth.
+    if (plan.name === DEMO_PLAN_NAME) {
+      throw new ConflictException({
+        errorCode: "DEMO_PLAN_DELETE_BLOCKED",
+        message:
+          `The "${DEMO_PLAN_NAME}" plan is load-bearing for the demo ` +
+          "money-path guard and cannot be deleted.",
+      });
     }
 
     if (plan._count.subscriptions > 0) {
@@ -354,7 +402,11 @@ export class SuperAdminSubscriptionsService {
   ) {
     const existing = await this.prisma.subscription.findUnique({
       where: { id },
-      include: { tenant: { select: { id: true, name: true } } },
+      include: {
+        tenant: { select: { id: true, name: true } },
+        // Current plan's name feeds the DEMO-assignment guard below.
+        plan: { select: { name: true } },
+      },
     });
 
     if (!existing) {
@@ -366,6 +418,7 @@ export class SuperAdminSubscriptionsService {
       status?: string;
       trialEnd?: Date;
       trialStart?: Date;
+      amount?: Prisma.Decimal;
     } = {};
 
     if (updateDto.planId) {
@@ -374,6 +427,31 @@ export class SuperAdminSubscriptionsService {
       });
       if (!plan) {
         throw new NotFoundException("Plan not found");
+      }
+      // DEMO plan is internal to the single shared explore-demo tenant.
+      // Assigning it to any other tenant would 403 that tenant's every real
+      // money path (DemoGuardService keys on the plan name) — and widen the
+      // "demo tenant" population the guard assumes is exactly one. Only a
+      // subscription already ON the demo plan may be (re)assigned it.
+      if (
+        plan.name === DEMO_PLAN_NAME &&
+        existing.plan?.name !== DEMO_PLAN_NAME
+      ) {
+        throw new ConflictException({
+          errorCode: "DEMO_PLAN_ASSIGNMENT_BLOCKED",
+          message:
+            `The "${DEMO_PLAN_NAME}" plan is internal to the shared ` +
+            "explore-demo tenant and cannot be assigned to other tenants.",
+        });
+      }
+      // Mirror the tenant-side rule (SubscriptionService.changePlan refuses
+      // inactive plans): a retired plan must not be re-enterable through the
+      // SA path. The DEMO plan is deliberately isActive:false and already
+      // covered by the guard above, so it is exempt here.
+      if (plan.name !== DEMO_PLAN_NAME && !plan.isActive) {
+        throw new BadRequestException(
+          "Cannot assign an inactive plan to a subscription",
+        );
       }
       // Downgrade guard: refuse a plan change that would push the tenant
       // above the new plan's limits. The regular tenant flow already has
@@ -411,6 +489,14 @@ export class SuperAdminSubscriptionsService {
         );
       }
       updateData.planId = updateDto.planId;
+      // Recompute the stored billing amount from the NEW plan for the
+      // subscription's current billing cycle — through the SAME
+      // resolvePlanAmount every charge rail uses, so live plan discounts are
+      // honored. Without this the subscription kept the OLD plan's price:
+      // the SA Subscriptions list showed a stale amount and the tenant-side
+      // proration math (SubscriptionService.changePlan) later computed
+      // upgrade/downgrade diffs from it.
+      updateData.amount = resolvePlanAmount(plan, existing.billingCycle);
     }
 
     if (updateDto.status) {

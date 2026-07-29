@@ -23,6 +23,7 @@
     "marketplace": "Pazar Yeri",
     "subscriptions": "Abonelikler",
     "auditLogs": "Denetim Kayıtları",
+    "legal": "Yasal Belgeler",
     "settings": "Ayarlar",
     "signOut": "Çıkış yap"
   },
@@ -179,6 +180,11 @@
     "usersTablesProducts": "{{users}} kullanıcı · {{tables}} masa · {{products}} ürün",
     "current": "Mevcut",
     "changePlanError": "Plan değiştirilemedi",
+    "newAmountInfo": "Plan değişikliği sonrası faturalama tutarı {{amount}} olacak ({{cycle}}).",
+    "cycle": {
+      "MONTHLY": "Aylık",
+      "YEARLY": "Yıllık"
+    },
     "changing": "Değiştiriliyor...",
     "cancel": "İptal",
     "featureLabels": {
@@ -288,6 +294,8 @@
     "subtitle": "Abonelik planlarını yönetin",
     "addPlan": "Plan Ekle",
     "confirmDelete": "Bu plan silinsin mi?",
+    "demoLockBadge": "Kilitli",
+    "demoLockTooltip": "DEMO planının adı, demo kiracının gerçek ödeme yollarını kilitleyen korumanın anahtarıdır; bu plan düzenlenemez ve silinemez.",
     "defaultDiscountLabel": "İNDİRİM",
     "perMonth": "/ay",
     "perYear": "/yıl",
@@ -428,6 +436,7 @@
     "subtitle": "KVKK / Mesafeli Satış / İade ve diğer yasal metinleri yönetin. Yeni versiyon yayınladığınızda eski versiyon devre dışı kalır ama silinmez — mevcut Consent kayıtları geçerliliğini korur.",
     "publishNewVersion": "Yeni versiyon yayınla",
     "loading": "Yükleniyor...",
+    "loadFailed": "Yasal belgeler yüklenemedi.",
     "empty": "Henüz yasal belge yok. Yeni versiyon yayınlayın ya da seed'i çalıştırın.",
     "versionCount": "({{count}} versiyon)",
     "kindLabels": {

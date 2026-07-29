@@ -254,3 +254,49 @@ describe('PlansPage — limit fields (unlimited / blank handling)', () => {
     expect(body.maxMonthlyOrders).toBe(-1);
   });
 });
+
+describe('PlansPage — DEMO plan lock (F2)', () => {
+  beforeEach(() => {
+    updateMutate.mockReset();
+    deleteMutate.mockReset();
+    plansData = [
+      plan({ id: 'plan-demo', name: 'DEMO', displayName: 'Demo', isActive: false }),
+      plan({ id: 'p1', name: 'PRO', displayName: 'Pro Plan' }),
+    ];
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  function cardOf(displayName: string) {
+    return screen.getByText(displayName).closest('div')!.parentElement!
+      .parentElement as HTMLElement;
+  }
+
+  it('renders a lock badge on the DEMO plan card only', () => {
+    renderPage();
+    const demoCard = cardOf('Demo');
+    // t(key, fallback) mock returns the fallback string.
+    expect(within(demoCard).getByText('Kilitli')).toBeInTheDocument();
+    expect(within(cardOf('Pro Plan')).queryByText('Kilitli')).not.toBeInTheDocument();
+  });
+
+  it('disables Edit and Delete for the DEMO plan (tooltip present), leaves other plans editable', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+    const demoButtons = within(cardOf('Demo')).getAllByRole('button');
+    // [edit, delete] icon buttons in the card header.
+    const demoEdit = demoButtons[0];
+    const demoDelete = demoButtons[demoButtons.length - 1];
+    expect(demoEdit).toBeDisabled();
+    expect(demoDelete).toBeDisabled();
+    expect(demoEdit).toHaveAttribute('title', expect.stringContaining('DEMO'));
+    fireEvent.click(demoEdit);
+    fireEvent.click(demoDelete);
+    expect(updateMutate).not.toHaveBeenCalled();
+    expect(deleteMutate).not.toHaveBeenCalled();
+    expect(screen.queryByText('plans.modal.editTitle')).not.toBeInTheDocument();
+
+    const proButtons = within(cardOf('Pro Plan')).getAllByRole('button');
+    expect(proButtons[0]).not.toBeDisabled();
+    expect(proButtons[proButtons.length - 1]).not.toBeDisabled();
+  });
+});

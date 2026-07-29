@@ -11,6 +11,7 @@ import {
   Settings,
   Layers,
   Banknote,
+  Scale,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ const navigation = [
   { nameKey: 'nav.subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
   { nameKey: 'nav.bankTransfer', href: '/superadmin/bank-transfer', icon: Banknote, defaultLabel: 'Havale' },
   { nameKey: 'nav.auditLogs', href: '/superadmin/audit-logs', icon: FileText },
+  { nameKey: 'nav.legal', href: '/superadmin/legal', icon: Scale, defaultLabel: 'Yasal Belgeler' },
   { nameKey: 'nav.settings', href: '/superadmin/settings', icon: Settings },
 ];
 

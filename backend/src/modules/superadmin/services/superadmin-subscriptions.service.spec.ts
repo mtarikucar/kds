@@ -757,3 +757,269 @@ describe("SuperAdminSubscriptionsService.extendSubscription reinstatement", () =
     );
   });
 });
+
+/**
+ * DEMO-plan protection (review F2). DemoGuardService keys the demo tenant's
+ * real-money block on currentPlan.name === "DEMO" and fails OPEN, so the plan
+ * name itself is a security invariant: renaming/deleting the DEMO plan (or
+ * renaming another plan to "DEMO", or assigning the DEMO plan to a real
+ * tenant) must be refused at the service layer.
+ */
+describe("SuperAdminSubscriptionsService DEMO-plan protection (plans)", () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let svc: SuperAdminSubscriptionsService;
+
+  const demoPlan: any = {
+    id: "plan-demo",
+    name: "DEMO",
+    displayName: "Demo",
+    isActive: false,
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      {} as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it("updatePlan refuses renaming the DEMO plan (guard would be disarmed)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(demoPlan);
+    await expect(
+      svc.updatePlan("plan-demo", { name: "DEMO2" } as any, "a1", "a@x"),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.subscriptionPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("updatePlan still allows editing the DEMO plan's OTHER fields (name omitted)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(demoPlan);
+    prisma.subscriptionPlan.update.mockResolvedValue({
+      ...demoPlan,
+      maxUsers: 500,
+    });
+    await svc.updatePlan("plan-demo", { maxUsers: 500 } as any, "a1", "a@x");
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("updatePlan allows a no-op resend of the same DEMO name", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(demoPlan);
+    prisma.subscriptionPlan.update.mockResolvedValue(demoPlan);
+    await svc.updatePlan("plan-demo", { name: "DEMO" } as any, "a1", "a@x");
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("updatePlan refuses renaming ANOTHER plan to DEMO (its tenants would be money-blocked)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+    } as any);
+    await expect(
+      svc.updatePlan("plan-pro", { name: "DEMO" } as any, "a1", "a@x"),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.subscriptionPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("updatePlan still allows a normal rename of a non-DEMO plan", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO",
+      isActive: true,
+    } as any);
+    prisma.subscriptionPlan.update.mockResolvedValue({
+      id: "plan-pro",
+      name: "PRO_2026",
+    } as any);
+    await svc.updatePlan("plan-pro", { name: "PRO_2026" } as any, "a1", "a@x");
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletePlan refuses deleting the DEMO plan even with zero subscriptions", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      ...demoPlan,
+      _count: { subscriptions: 0 },
+    });
+    await expect(
+      svc.deletePlan("plan-demo", "a1", "a@x"),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.subscriptionPlan.delete).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * updateSubscription plan-assignment guards + amount recompute (review F2/F3).
+ */
+describe("SuperAdminSubscriptionsService.updateSubscription plan assignment", () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let subscriptionService: { emitSubscriptionReprojection: jest.Mock };
+  let svc: SuperAdminSubscriptionsService;
+
+  const SUB_ID = "sub-1";
+  const TENANT_ID = "tenant-1";
+  const existingSub: any = {
+    id: SUB_ID,
+    tenantId: TENANT_ID,
+    planId: "plan-old",
+    status: "ACTIVE",
+    billingCycle: "MONTHLY",
+    amount: new Prisma.Decimal("500"),
+    tenant: { id: TENANT_ID, name: "Test Restoran" },
+    plan: { name: "PRO" },
+  };
+
+  const targetPlan: any = {
+    id: "plan-new",
+    name: "BUSINESS",
+    displayName: "Business",
+    isActive: true,
+    monthlyPrice: "1799",
+    yearlyPrice: "17990",
+    maxUsers: -1,
+    maxTables: -1,
+    maxProducts: -1,
+    maxCategories: -1,
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    subscriptionService = {
+      emitSubscriptionReprojection: jest.fn().mockResolvedValue(undefined),
+    };
+    prisma.subscription.findUnique.mockResolvedValue({ ...existingSub });
+    prisma.user.count.mockResolvedValue(0);
+    prisma.table.count.mockResolvedValue(0);
+    prisma.product.count.mockResolvedValue(0);
+    prisma.category.count.mockResolvedValue(0);
+    (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      async (cb: any) => cb(prisma),
+    );
+    prisma.subscription.update.mockImplementation(async (args: any) => ({
+      ...existingSub,
+      ...args.data,
+      tenant: { id: TENANT_ID, name: "Test Restoran" },
+      plan: { id: "plan-new", name: "BUSINESS", displayName: "Business" },
+    }));
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      subscriptionService as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it("refuses assigning the DEMO plan to a tenant whose current plan is not DEMO", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-demo",
+      name: "DEMO",
+      isActive: false,
+      monthlyPrice: "0",
+      yearlyPrice: "0",
+      maxUsers: -1,
+      maxTables: -1,
+      maxProducts: -1,
+      maxCategories: -1,
+    } as any);
+    await expect(
+      svc.updateSubscription(SUB_ID, { planId: "plan-demo" }, "a1", "a@x"),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.subscription.update).not.toHaveBeenCalled();
+  });
+
+  it("allows re-assigning DEMO when the subscription is already on the DEMO plan", async () => {
+    prisma.subscription.findUnique.mockResolvedValue({
+      ...existingSub,
+      plan: { name: "DEMO" },
+    });
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: "plan-demo",
+      name: "DEMO",
+      isActive: false,
+      monthlyPrice: "0",
+      yearlyPrice: "0",
+      maxUsers: -1,
+      maxTables: -1,
+      maxProducts: -1,
+      maxCategories: -1,
+    } as any);
+    await svc.updateSubscription(SUB_ID, { planId: "plan-demo" }, "a1", "a@x");
+    expect(prisma.subscription.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses assigning an inactive (retired) plan", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      ...targetPlan,
+      isActive: false,
+    });
+    await expect(
+      svc.updateSubscription(SUB_ID, { planId: "plan-new" }, "a1", "a@x"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.subscription.update).not.toHaveBeenCalled();
+  });
+
+  it("MONTHLY cycle: plan change recomputes subscription.amount from the new plan's monthly price", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(targetPlan);
+    await svc.updateSubscription(SUB_ID, { planId: "plan-new" }, "a1", "a@x");
+    const data = prisma.subscription.update.mock.calls[0][0].data;
+    expect(data.planId).toBe("plan-new");
+    expect(data.amount).toBeInstanceOf(Prisma.Decimal);
+    expect(data.amount.toString()).toBe("1799");
+    // planId change still moves tenant.currentPlanId + reprojects atomically.
+    expect(prisma.tenant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: TENANT_ID },
+        data: { currentPlanId: "plan-new" },
+      }),
+    );
+    expect(
+      subscriptionService.emitSubscriptionReprojection,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it("YEARLY cycle: plan change recomputes subscription.amount from the new plan's yearly price", async () => {
+    prisma.subscription.findUnique.mockResolvedValue({
+      ...existingSub,
+      billingCycle: "YEARLY",
+    });
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(targetPlan);
+    await svc.updateSubscription(SUB_ID, { planId: "plan-new" }, "a1", "a@x");
+    const data = prisma.subscription.update.mock.calls[0][0].data;
+    expect(data.amount.toString()).toBe("17990");
+  });
+
+  it("honors a live plan discount when recomputing the amount (same rail as charges)", async () => {
+    const now = new Date();
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      ...targetPlan,
+      discountPercentage: 20,
+      isDiscountActive: true,
+      discountStartDate: new Date(now.getTime() - 86400000),
+      discountEndDate: new Date(now.getTime() + 86400000),
+    });
+    await svc.updateSubscription(SUB_ID, { planId: "plan-new" }, "a1", "a@x");
+    const data = prisma.subscription.update.mock.calls[0][0].data;
+    expect(data.amount.toString()).toBe("1439.2");
+  });
+
+  it("status-only update leaves amount and planId untouched", async () => {
+    await svc.updateSubscription(SUB_ID, { status: "CANCELLED" }, "a1", "a@x");
+    const data = prisma.subscription.update.mock.calls[0][0].data;
+    expect(data.amount).toBeUndefined();
+    expect(data.planId).toBeUndefined();
+    expect(prisma.tenant.update).not.toHaveBeenCalled();
+  });
+});
