@@ -214,6 +214,24 @@ const POSPage = () => {
     return tableOrders.find((o) => o.id === currentOrderId) || null;
   }, [currentOrderId, tableOrders]);
 
+  // Live payable amounts. `currentOrderAmount`/`payingOrderAmount` are
+  // snapshots captured when the order was created/loaded or when "collect
+  // payment" was tapped; a socket-driven `tableOrders` refetch (another
+  // cashier adding items, a QR top-up) never re-synced them, so the modal
+  // could charge a stale-low total — the backend accepts any amount ≤
+  // remaining and records a silent PARTIAL payment. Resolve against the
+  // freshest server row at render, falling back to the snapshot only while
+  // the live row isn't loaded. finalAmount may serialize as a string
+  // (Prisma Decimal) → Number().
+  const liveCurrentOrderAmount = currentOrder
+    ? Number(currentOrder.finalAmount)
+    : currentOrderAmount;
+  const livePayingOrderAmount = useMemo(() => {
+    if (!payingOrderId) return payingOrderAmount;
+    const live = tableOrders?.find((o) => o.id === payingOrderId);
+    return live ? Number(live.finalAmount) : payingOrderAmount;
+  }, [payingOrderId, payingOrderAmount, tableOrders]);
+
   // Payment eligibility calculation for two-step checkout. The gate logic
   // (order-type + dine-in requireServed) is the pure computeCanProceedToPayment
   // in posCart.ts; kept inside a useMemo so referential identity is unchanged.
@@ -565,7 +583,7 @@ const POSPage = () => {
         setIsPaymentModalOpen(false);
         setPayingOrderId(null);
         setPayingOrderAmount(null);
-        const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders, target.orderId);
+        const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders);
         if (!hasRemainingOrders && selectedTable) {
           updateTableStatus({ id: selectedTable.id, status: TableStatus.AVAILABLE });
         }
@@ -631,9 +649,9 @@ const POSPage = () => {
     // (currentOrderId). Returns null (and we bail) when nothing is chargeable.
     const target = resolvePaymentTarget({
       payingOrderId,
-      payingOrderAmount,
+      payingOrderAmount: livePayingOrderAmount,
       currentOrderId,
-      currentOrderAmount,
+      currentOrderAmount: liveCurrentOrderAmount,
     });
     if (!target) return;
     const orderIdToPay = target.orderId;
@@ -695,8 +713,11 @@ const POSPage = () => {
           setPayingOrderAmount(null);
 
           // Always check for remaining unpaid orders before marking table as
-          // available (the documented stale-snapshot race guard).
-          const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders, orderIdToPay);
+          // available (the documented stale-snapshot race guard). The just-paid
+          // order is NOT excluded: fully paid ⇒ it already dropped out of the
+          // refetched status-filtered list; still present ⇒ partial payment,
+          // which must block the release.
+          const hasRemainingOrders = hasRemainingUnpaidOrders(freshOrders);
 
           if (wasExistingOrderPayment) {
             // For existing order payments (READY/SERVED), only mark available if no remaining orders
@@ -1219,7 +1240,7 @@ const POSPage = () => {
           setPayingOrderId(null);
           setPayingOrderAmount(null);
         }}
-        total={payingOrderAmount ?? currentOrderAmount ?? total}
+        total={livePayingOrderAmount ?? liveCurrentOrderAmount ?? total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
       />

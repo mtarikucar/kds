@@ -49,6 +49,7 @@ const PaymentModal = ({
     handleSubmit,
     watch,
     control,
+    reset,
     formState: { errors },
   } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -70,6 +71,15 @@ const PaymentModal = ({
   useEffect(() => {
     if (!isOpen || !isCash) setTenderedRaw('');
   }, [isOpen, isCash]);
+
+  // The modal stays permanently mounted (POSPage only toggles isOpen), so the
+  // form would otherwise carry the previous sale's customerPhone/transactionId/
+  // method into the next payment. Reset to the declared defaults on the OPEN
+  // transition only — keyed on isOpen alone so it can never clobber values
+  // mid-payment.
+  useEffect(() => {
+    if (isOpen) reset();
+  }, [isOpen, reset]);
 
   const changeDue = useMemo(
     () => computeChangeDue(total, tendered),
