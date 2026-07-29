@@ -48,6 +48,57 @@ describe("subdomain.helper", () => {
       } as any;
       expect(await isSubdomainQuarantined(prisma, "freename")).toBe(false);
     });
+
+    // Own-name reclaim: the quarantine blocks OTHER tenants from taking over
+    // a released name — the releasing tenant undoing its own rename must not
+    // be locked out of its previous (printed-QR) address for 90 days.
+    it("treats a quarantine row owned by the SAME tenant as reclaimable", async () => {
+      const future = new Date(Date.now() + 86_400_000);
+      const prisma = {
+        reservedSubdomain: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ availableAfter: future, tenantId: "t-1" }),
+        },
+      } as any;
+      expect(await isSubdomainQuarantined(prisma, "myoldname", "t-1")).toBe(
+        false,
+      );
+    });
+
+    it("still blocks a quarantine row owned by ANOTHER tenant", async () => {
+      const future = new Date(Date.now() + 86_400_000);
+      const prisma = {
+        reservedSubdomain: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ availableAfter: future, tenantId: "t-other" }),
+        },
+      } as any;
+      expect(await isSubdomainQuarantined(prisma, "someones", "t-1")).toBe(
+        true,
+      );
+    });
+
+    it("still blocks an owner-less (legacy) quarantine row even with a requesting tenant", async () => {
+      const future = new Date(Date.now() + 86_400_000);
+      const prisma = {
+        reservedSubdomain: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ availableAfter: future, tenantId: null }),
+        },
+      } as any;
+      expect(await isSubdomainQuarantined(prisma, "legacy", "t-1")).toBe(true);
+    });
+
+    it("still blocks a platform-reserved name regardless of requesting tenant", async () => {
+      const prisma = {
+        reservedSubdomain: { findUnique: jest.fn() },
+      } as any;
+      expect(await isSubdomainQuarantined(prisma, "admin", "t-1")).toBe(true);
+      expect(prisma.reservedSubdomain.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   describe("reserveSubdomain", () => {
@@ -63,6 +114,18 @@ describe("subdomain.helper", () => {
       const expected = SUBDOMAIN_QUARANTINE_DAYS * 86_400_000;
       // within a day of the expected quarantine length
       expect(Math.abs(delta - expected)).toBeLessThan(86_400_000);
+      // No owner supplied → explicit null stamp (blocks everyone).
+      expect(arg.create.tenantId).toBeNull();
+      expect(arg.update.tenantId).toBeNull();
+    });
+
+    it("stamps the releasing tenant on both the create and update branches", async () => {
+      const upsert = jest.fn().mockResolvedValue(undefined);
+      const prisma = { reservedSubdomain: { upsert } } as any;
+      await reserveSubdomain(prisma, "MyName", "subdomain_changed", "t-1");
+      const arg = upsert.mock.calls[0][0];
+      expect(arg.create.tenantId).toBe("t-1");
+      expect(arg.update.tenantId).toBe("t-1");
     });
   });
 

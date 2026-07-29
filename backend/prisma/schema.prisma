@@ -206,8 +206,16 @@ model ReservedSubdomain {
   reason         String // 'tenant_deleted' | 'tenant_suspended' | 'subdomain_changed'
   reservedAt     DateTime @default(now())
   availableAfter DateTime
+  // Which tenant released this subdomain. Lets the SAME tenant reclaim its
+  // own quarantined name (undo an accidental rename — otherwise a printed
+  // QR base URL is unrecoverable for 90 days) while everyone else stays
+  // blocked. Nullable: legacy rows have no owner and keep blocking all.
+  // Deliberately a bare column, NOT a relation/FK — quarantine rows written
+  // for DELETED tenants must outlive the tenant row itself.
+  tenantId       String?
 
   @@index([availableAfter])
+  @@index([tenantId])
   @@map("reserved_subdomains")
 }
 

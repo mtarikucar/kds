@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import type { DeliveryPlatformConfig } from '../../types';
 
@@ -13,6 +13,9 @@ import type { DeliveryPlatformConfig } from '../../types';
 
 const h = vi.hoisted(() => ({
   updateMutate: vi.fn(),
+  // Hoisted separately (not a per-render stub) so the save-before-test specs
+  // can assert on / reject the update mutation across renders.
+  updateMutateAsync: vi.fn(),
   createMutate: vi.fn(),
   testMutate: vi.fn(),
   toggleMutate: vi.fn(),
@@ -28,7 +31,11 @@ const mutationStub = (mutate: ReturnType<typeof vi.fn>) => ({
 });
 
 vi.mock('../../features/delivery-platforms/deliveryPlatformsApi', () => ({
-  useUpdatePlatformConfig: () => mutationStub(h.updateMutate),
+  useUpdatePlatformConfig: () => ({
+    mutate: h.updateMutate,
+    mutateAsync: h.updateMutateAsync,
+    isPending: false,
+  }),
   useCreatePlatformConfig: () => mutationStub(h.createMutate),
   useTestPlatformConnection: () => mutationStub(h.testMutate),
   useToggleRestaurant: () => mutationStub(h.toggleMutate),
@@ -166,5 +173,48 @@ describe('PlatformCard sandbox available (Trendyol)', () => {
       name: 'onlineOrders.sendTestOrder',
     });
     expect(btn).toBeEnabled();
+  });
+});
+
+describe('PlatformCard save-before-test (probe tests STORED credentials)', () => {
+  // The test endpoint takes no body and probes the credentials stored on the
+  // backend. With unsaved edits it would validate the PREVIOUS values and
+  // report a misleading result — so a dirty form must be saved first.
+  const testButton = () =>
+    screen.getByRole('button', { name: 'onlineOrders.testConnection' });
+
+  it('probes directly when the form has no unsaved changes', async () => {
+    renderExpanded('MIGROS', baseConfig());
+
+    fireEvent.click(testButton());
+
+    await waitFor(() => expect(h.testMutate).toHaveBeenCalledWith('MIGROS'));
+    expect(h.updateMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('saves dirty changes FIRST, then probes', async () => {
+    h.updateMutateAsync.mockResolvedValue(undefined);
+    renderExpanded('MIGROS', baseConfig());
+    // Flip auto-accept → hasChanges without touching credentials.
+    fireEvent.click(screen.getByRole('button', { name: /auto-accept/i }));
+
+    fireEvent.click(testButton());
+
+    await waitFor(() => expect(h.testMutate).toHaveBeenCalledWith('MIGROS'));
+    expect(h.updateMutateAsync).toHaveBeenCalledTimes(1);
+    expect(h.updateMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      h.testMutate.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('aborts the probe when the pre-test save fails', async () => {
+    h.updateMutateAsync.mockRejectedValue(new Error('save failed'));
+    renderExpanded('MIGROS', baseConfig());
+    fireEvent.click(screen.getByRole('button', { name: /auto-accept/i }));
+
+    fireEvent.click(testButton());
+
+    await waitFor(() => expect(h.updateMutateAsync).toHaveBeenCalledTimes(1));
+    expect(h.testMutate).not.toHaveBeenCalled();
   });
 });

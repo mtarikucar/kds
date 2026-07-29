@@ -268,12 +268,15 @@ export class SuperAdminTenantsService {
           updateDto.status === TenantStatus.DELETED) &&
         previousStatus === TenantStatus.ACTIVE
       ) {
+        // Stamped with the tenant id: if the tenant is later reactivated it
+        // can reclaim its own parked subdomain; other tenants stay blocked.
         await reserveSubdomain(
           tx,
           next.subdomain,
           updateDto.status === TenantStatus.DELETED
             ? "tenant_deleted"
             : "tenant_suspended",
+          next.id,
         );
       }
 

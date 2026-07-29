@@ -226,10 +226,23 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
     setHasChanges(true);
   };
 
-  const handleTestConnection = () => {
+  const handleTestConnection = async () => {
     if (!hasCredentials) {
       toast.error(t('onlineOrders.fillCredentialsFirst'));
       return;
+    }
+    // The probe validates the credentials STORED on the backend (GET strips
+    // secrets and the test endpoint takes no body) — with unsaved edits it
+    // would test the PREVIOUS values and report a misleading result. Save
+    // first, then test (mirrors AccountingSettingsPage's flush-before-test).
+    if (hasChanges || credentialsDirty) {
+      try {
+        await handleSave();
+      } catch {
+        // The save mutation already toasts its own failure; don't probe with
+        // half-saved state.
+        return;
+      }
     }
     testConnection.mutate(platform);
   };
@@ -501,10 +514,10 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
 
             <button
               onClick={handleTestConnection}
-              disabled={testConnection.isPending || !config}
+              disabled={testConnection.isPending || isSaving || !config}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
             >
-              {testConnection.isPending ? (
+              {testConnection.isPending || isSaving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <TestTube className="h-3.5 w-3.5" />

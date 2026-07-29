@@ -519,7 +519,13 @@
     "errorTooLong": "Alt alan adı 63 karakter veya daha kısa olmalıdır",
     "errorInvalidFormat": "Sadece küçük harf, rakam ve tire kullanın (tire ile başlayamaz veya bitemez)",
     "errorReserved": "Bu alt alan adı ayrılmıştır ve kullanılamaz",
-    "saveError": "Alt alan adı ayarları kaydedilemedi"
+    "saveError": "Alt alan adı ayarları kaydedilemedi",
+    "saveButton": "Alt alan adını kaydet",
+    "saveSuccess": "Alt alan adı kaydedildi",
+    "confirmTitle": "QR menü adresiniz değişsin mi?",
+    "confirmBody": "Mevcut adresiniz https://{{current}}.hummytummy.com anında çalışmayı durduracak — bu adresi kullanan basılı QR kodları ve paylaşılmış bağlantılar kırılacak. Eski adres {{days}} gün boyunca kilitli kalır; bu süre içinde yalnızca bu restoran onu geri alabilir.",
+    "confirmAction": "Evet, adresi değiştir",
+    "confirmCancel": "Vazgeç"
   },
   "printer": {
     "loadFailed": "Yazıcılar yüklenemedi",

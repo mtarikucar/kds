@@ -44,6 +44,13 @@ interface AccountingSettingsState {
 // Mirrors the backend CreateSalesInvoiceDto customerTaxId validation.
 const TAX_ID_RE = /^\d{10,11}$/;
 
+// Copied verbatim from UpdateAccountingSettingsDto.nilveraApiUrl @Matches.
+// The backend deliberately has NO EmptyStringToUndefined on that field, so
+// '' (what this page hydrates for tenants that never configured Nilvera)
+// hard-400s — and since saveSettings PATCHes the full state, that 400 used
+// to fail EVERY autosave on the page. Values that don't match are held back.
+const NILVERA_API_URL_RE = /^https:\/\/([a-z0-9-]+\.)*nilvera\.com(\/|$)/i;
+
 const defaultSettings: AccountingSettingsState = {
   autoGenerateInvoice: false,
   companyName: '',
@@ -146,6 +153,18 @@ export const AccountingSettingsPanel = () => {
         (payload.nextInvoiceNumber as number) < 1
       ) {
         delete payload.nextInvoiceNumber;
+      }
+      // The DTO rejects ANY nilveraApiUrl that isn't https://*.nilvera.com —
+      // including the '' hydrated for unconfigured tenants (no
+      // EmptyStringToUndefined there by design: silent-delete would be worse
+      // than a 400). Hold the field back until it matches, same pattern as
+      // companyTaxId/nextInvoiceNumber above; a half-typed URL keeps the
+      // stored value untouched.
+      if (
+        payload.nilveraApiUrl !== undefined &&
+        !NILVERA_API_URL_RE.test(payload.nilveraApiUrl)
+      ) {
+        delete payload.nilveraApiUrl;
       }
       await updateSettings(payload);
     },

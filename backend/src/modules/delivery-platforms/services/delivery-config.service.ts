@@ -272,9 +272,28 @@ export class DeliveryConfigService {
     // them in sync or callers will use the stale token for up to the
     // 10-minute refresh window.
     if (dto.credentials !== undefined) {
-      data.credentials = dto.credentials
-        ? (encryptJson(dto.credentials) as any)
-        : Prisma.JsonNull;
+      if (dto.credentials) {
+        // MERGE onto the stored blob, don't replace it: GET strips every
+        // credential member (only hasCredentials survives), so the client
+        // can only ever send the fields the operator re-typed. Replacing
+        // the whole blob wiped the untouched siblings (e.g. rotating
+        // GETIR's appSecretKey silently erased restaurantSecretKey).
+        // Deletion convention: an EMPTY-STRING member means "remove that
+        // member" — stripped AFTER the merge, so a client can clear one
+        // field without knowing (or resending) the others. With no stored
+        // blob this degrades to storing dto.credentials as before.
+        const stored = isEncryptedPayload(config.credentials)
+          ? decryptJson<StoredCredentials>(config.credentials)
+          : undefined;
+        const merged: StoredCredentials = { ...stored, ...dto.credentials };
+        for (const key of Object.keys(merged)) {
+          if (merged[key] === "") delete merged[key];
+        }
+        data.credentials = encryptJson(merged) as any;
+      } else {
+        // Explicit null still clears the whole blob (hasCredentials → false).
+        data.credentials = Prisma.JsonNull;
+      }
       data.accessToken = null;
       data.tokenExpiresAt = null;
       data.errorCount = 0;

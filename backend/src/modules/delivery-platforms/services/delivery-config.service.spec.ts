@@ -12,6 +12,7 @@ import {
 import {
   decryptJson,
   decryptString,
+  encryptJson,
   isEncryptedPayload,
 } from "../../../common/helpers/encryption.helper";
 
@@ -375,6 +376,100 @@ describe("DeliveryConfigService", () => {
         errorCount: 0,
         lastError: null,
         lastErrorAt: null,
+      });
+    });
+
+    // GET strips every credential member, so the FE only ever sends back the
+    // fields the operator actually re-typed. update() must MERGE onto the
+    // stored blob — replacing it wiped the untouched siblings (rotating
+    // GETIR's appSecretKey silently erased restaurantSecretKey and broke
+    // ingestion until full re-entry).
+    it("partial credential update merges onto the stored blob, preserving untouched members", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        credentials: encryptJson({
+          appSecretKey: "old-app-secret",
+          restaurantSecretKey: "rest-secret",
+        }),
+      });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.update("t1", "GETIR", {
+        credentials: { appSecretKey: "new-app-secret" },
+      } as any);
+
+      expect(isEncryptedPayload(writtenData.credentials)).toBe(true);
+      expect(decryptJson(writtenData.credentials)).toEqual({
+        appSecretKey: "new-app-secret",
+        restaurantSecretKey: "rest-secret",
+      });
+      // Rotation side-effects still apply on a partial update.
+      expect(writtenData).toMatchObject({ accessToken: null, errorCount: 0 });
+    });
+
+    it("an empty-string member DELETES that member from the stored blob", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        credentials: encryptJson({ apiKey: "keep-me", legacyToken: "stale" }),
+      });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.update("t1", "GETIR", {
+        credentials: { legacyToken: "" },
+      } as any);
+
+      expect(decryptJson(writtenData.credentials)).toEqual({
+        apiKey: "keep-me",
+      });
+    });
+
+    it("with no stored blob the dto credentials are stored as-is (behaviour unchanged)", async () => {
+      (prisma.deliveryPlatformConfig.findFirst as any).mockResolvedValue({
+        id: "cfg-1",
+        tenantId: "t1",
+        platform: "GETIR",
+        credentials: null,
+      });
+      let writtenData: any;
+      (prisma.deliveryPlatformConfig.updateMany as any).mockImplementation(
+        async ({ data }: any) => {
+          writtenData = data;
+          return { count: 1 };
+        },
+      );
+      (
+        prisma.deliveryPlatformConfig.findUniqueOrThrow as any
+      ).mockResolvedValue({ id: "cfg-1" });
+
+      await svc.update("t1", "GETIR", {
+        credentials: { apiKey: "fresh", empty: "" },
+      } as any);
+
+      // Empty-string members are stripped on this path too.
+      expect(decryptJson(writtenData.credentials)).toEqual({
+        apiKey: "fresh",
       });
     });
   });

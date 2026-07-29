@@ -114,6 +114,55 @@ describe('TenantsService.updateSettings', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('still rejects a subdomain quarantined by ANOTHER tenant with Conflict', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue(activeTenant());
+    entitlements.getForTenant.mockResolvedValue({
+      features: { 'feature.customBranding': true },
+    });
+    (prisma.reservedSubdomain.findUnique as any).mockResolvedValue({
+      subdomain: 'newsub',
+      availableAfter: new Date(Date.now() + 86_400_000),
+      tenantId: 't-someone-else',
+    });
+
+    await expect(
+      svc.updateSettings(tenantId, { subdomain: 'newsub' } as any),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.tenant.update as any).not.toHaveBeenCalled();
+  });
+
+  it('allows a tenant to reclaim its OWN quarantined subdomain (rename undo)', async () => {
+    // The tenant renamed oldsub → currentsub earlier; 'oldsub' sits in
+    // quarantine stamped with THIS tenant. Renaming back must succeed —
+    // the quarantine only exists to block takeover by OTHERS.
+    (prisma.tenant.findUnique as any).mockResolvedValue(
+      activeTenant({ subdomain: 'currentsub' }),
+    );
+    entitlements.getForTenant.mockResolvedValue({
+      features: { 'feature.customBranding': true },
+    });
+    (prisma.reservedSubdomain.findUnique as any).mockResolvedValue({
+      subdomain: 'oldsub',
+      availableAfter: new Date(Date.now() + 86_400_000),
+      tenantId, // owned by the requesting tenant
+    });
+    (prisma.reservedSubdomain.upsert as any).mockResolvedValue({});
+    (prisma.tenant.update as any).mockResolvedValue({
+      id: tenantId,
+      subdomain: 'oldsub',
+    });
+
+    await svc.updateSettings(tenantId, { subdomain: 'oldsub' } as any);
+
+    const data = (prisma.tenant.update as any).mock.calls[0][0].data;
+    expect(data).toEqual({ subdomain: 'oldsub' });
+    // The outgoing 'currentsub' is parked in turn, stamped with the owner.
+    const reserveArgs = (prisma.reservedSubdomain.upsert as any).mock
+      .calls[0][0];
+    expect(reserveArgs.where.subdomain).toBe('currentsub');
+    expect(reserveArgs.create.tenantId).toBe(tenantId);
+  });
+
   it('happy path: reserves the outgoing subdomain, updates, and writes an audit activity', async () => {
     (prisma.tenant.findUnique as any).mockResolvedValue(activeTenant());
     entitlements.getForTenant.mockResolvedValue({
@@ -133,11 +182,14 @@ describe('TenantsService.updateSettings', () => {
       'actor-7',
     );
 
-    // outgoing subdomain 'oldsub' parked
+    // outgoing subdomain 'oldsub' parked, stamped with the releasing tenant
+    // so it can reclaim the name later (own-quarantine reclaim).
     const reserveArgs = (prisma.reservedSubdomain.upsert as any).mock
       .calls[0][0];
     expect(reserveArgs.where.subdomain).toBe('oldsub');
     expect(reserveArgs.create.reason).toBe('subdomain_changed');
+    expect(reserveArgs.create.tenantId).toBe(tenantId);
+    expect(reserveArgs.update.tenantId).toBe(tenantId);
     // audit activity records the changed field NAMES (not values)
     const activity = (prisma.userActivity.create as any).mock.calls[0][0].data;
     expect(activity.userId).toBe('actor-7');

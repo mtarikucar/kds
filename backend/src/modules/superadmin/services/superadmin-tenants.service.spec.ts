@@ -108,10 +108,13 @@ describe("SuperAdminTenantsService", () => {
         ACTOR_EMAIL,
       );
 
+      // 4th arg: the owner stamp — a reactivated tenant may reclaim its own
+      // parked subdomain while other tenants stay blocked.
       expect(reserveSubdomain).toHaveBeenCalledWith(
         prisma,
         "acme",
         "tenant_suspended",
+        TENANT_ID,
       );
       expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -154,6 +157,7 @@ describe("SuperAdminTenantsService", () => {
         prisma,
         "acme",
         "tenant_deleted",
+        TENANT_ID,
       );
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "DELETE" }),
