@@ -160,33 +160,60 @@ export default function ProductEditorPage() {
       name: fetchedProduct.name,
       description: fetchedProduct.description || "",
       ingredients: fetchedProduct.ingredients || "",
-      price: fetchedProduct.price,
+      // The detail endpoint serializes Prisma Decimal columns as STRINGS
+      // ("45.5"); register()'s valueAsNumber/setValueAs do not run on reset
+      // values, so without coercion the z.number() schema rejects every
+      // existing product at save time ("Expected number, received string").
+      price: Number(fetchedProduct.price),
       categoryId: fetchedProduct.categoryId,
-      currentStock: fetchedProduct.currentStock,
+      currentStock:
+        fetchedProduct.currentStock != null
+          ? Number(fetchedProduct.currentStock)
+          : undefined,
       image: fetchedProduct.image || "",
       imageIds: imgs.map((img) => img.id),
       isAvailable: fetchedProduct.isAvailable ?? true,
       stockTracked: fetchedProduct.stockTracked ?? false,
-      taxRate: fetchedProduct.taxRate ?? 10,
+      taxRate: fetchedProduct.taxRate != null ? Number(fetchedProduct.taxRate) : 10,
       productType: fetchedProduct.productType ?? "STANDARD",
-      campaignPrice: fetchedProduct.campaignPrice ?? null,
+      campaignPrice:
+        fetchedProduct.campaignPrice != null
+          ? Number(fetchedProduct.campaignPrice)
+          : null,
       campaignLabel: fetchedProduct.campaignLabel ?? null,
       campaignStartAt: isoToLocalInput(fetchedProduct.campaignStartAt),
       campaignEndAt: isoToLocalInput(fetchedProduct.campaignEndAt),
     });
   }, [fetchedProduct, product, productForm, t]);
 
-  const buildSubmitData = (data: ProductFormData) => {
+  const buildSubmitData = (data: ProductFormData, opts?: { forUpdate?: boolean }) => {
     const { image, campaignStartAt, campaignEndAt, ...rest } = data;
     const productType = data.productType ?? "STANDARD";
     const cp =
       data.campaignPrice != null && Number(data.campaignPrice) > 0
         ? Number(data.campaignPrice)
         : null;
+    // Live stock is decremented by POS sales while the editor is open, so an
+    // update must not round-trip the page-load snapshot: send currentStock /
+    // isAvailable only when the operator actually edited them, and treat a
+    // cleared stock field as "don't change", never as 0.
+    const dirty = productForm.formState.dirtyFields;
+    const stockPatch = opts?.forUpdate
+      ? {
+          ...(dirty.currentStock && data.currentStock != null
+            ? { currentStock: Number(data.currentStock) }
+            : {}),
+          ...(dirty.isAvailable ? { isAvailable: data.isAvailable } : {}),
+        }
+      : { currentStock: data.currentStock != null ? Number(data.currentStock) : 0 };
+    if (opts?.forUpdate) {
+      delete (rest as Partial<ProductFormData>).currentStock;
+      delete (rest as Partial<ProductFormData>).isAvailable;
+    }
     return {
       ...rest,
+      ...stockPatch,
       price: Number(data.price),
-      currentStock: data.currentStock ? Number(data.currentStock) : 0,
       taxRate: data.taxRate != null ? Number(data.taxRate) : 10,
       imageIds: productImages.map((img) => img.id),
       productType,
@@ -233,7 +260,7 @@ export default function ProductEditorPage() {
       try {
         await updateProduct({
           id: product.id,
-          data: buildSubmitData(productForm.getValues()),
+          data: buildSubmitData(productForm.getValues(), { forUpdate: true }),
         });
         await persistModifiers(product.id);
         return product.id;
@@ -264,14 +291,23 @@ export default function ProductEditorPage() {
   };
 
   const onSubmit = async (data: ProductFormData) => {
-    const submitData = buildSubmitData(data);
     try {
       if (product?.id) {
-        await updateProduct({ id: product.id, data: submitData });
+        await updateProduct({
+          id: product.id,
+          data: buildSubmitData(data, { forUpdate: true }),
+        });
         await persistModifiers(product.id);
       } else {
-        const created = (await createProduct(submitData)) as Product;
-        if (created?.id) await persistModifiers(created.id);
+        const created = (await createProduct(buildSubmitData(data))) as Product;
+        if (created?.id) {
+          // Adopt the created row IMMEDIATELY: if persistModifiers fails below,
+          // the next Save must run the update path — re-running create would
+          // silently duplicate the product.
+          setProduct(created);
+          navigate(`/admin/menu/products/${created.id}/edit`, { replace: true });
+          await persistModifiers(created.id);
+        }
       }
       toast.success(t("menu.itemSaved", "Ürün kaydedildi"));
       navigate("/admin/menu");
@@ -599,6 +635,7 @@ export default function ProductEditorPage() {
                   label={t("menu.campaignPrice", "Kampanya fiyatı (₺)")}
                   type="number"
                   step="0.01"
+                  error={productForm.formState.errors.campaignPrice?.message}
                   {...productForm.register("campaignPrice", {
                     setValueAs: (v) =>
                       v === "" || v === null ? null : Number(v),
@@ -671,7 +708,18 @@ export default function ProductEditorPage() {
         isOpen={imageLibraryOpen}
         onClose={() => setImageLibraryOpen(false)}
         onSelectImages={(images) => {
-          setProductImages(images);
+          // Preserve the existing attachment order — images[0] is the primary
+          // photo on QR/POS. The library lists newest-first, so replacing the
+          // array wholesale would silently promote the newest upload to
+          // primary; instead keep still-selected images in place and append
+          // the newly added ones.
+          setProductImages((prev) => {
+            const selectedById = new Map(images.map((img) => [img.id, img]));
+            const kept = prev.filter((img) => selectedById.has(img.id));
+            const keptIds = new Set(kept.map((img) => img.id));
+            const added = images.filter((img) => !keptIds.has(img.id));
+            return [...kept, ...added];
+          });
           setImageLibraryOpen(false);
         }}
         selectedImageIds={productImages.map((img) => img.id)}

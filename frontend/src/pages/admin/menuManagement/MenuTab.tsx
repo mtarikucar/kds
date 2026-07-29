@@ -103,41 +103,33 @@ const MenuTab = ({
 
   // Drag & Drop handler
   const handleDragEnd = useCallback((result: DropResult) => {
-    const { source, destination, type, draggableId } = result;
+    const { source, destination, type } = result;
 
-    console.log('handleDragEnd called:', { source, destination, type, draggableId });
-
-    if (!destination) {
-      console.log('No destination, returning');
-      return;
-    }
+    if (!destination) return;
     if (source.index === destination.index && source.droppableId === destination.droppableId) {
-      console.log('Same position, returning');
       return;
     }
 
     if (type === 'CATEGORY') {
-      console.log('Reordering categories');
       const reordered = reorder(sortedCategories, source.index, destination.index);
       reorderCategories(reordered.map(c => c.id));
     } else if (type === 'PRODUCT') {
+      // Cross-category drops are not a supported move: the payload below only
+      // reorders the SOURCE category, so accepting one would scramble that
+      // category's order while the product visibly snaps back. Bail instead.
+      if (source.droppableId !== destination.droppableId) return;
+
       // droppableId is "products-{categoryId}"
       const categoryId = source.droppableId.replace('products-', '');
-      console.log('Reordering products in category:', categoryId);
       const categoryProducts = productsByCategory[categoryId] || [];
-      console.log('Category products:', categoryProducts.map(p => ({ id: p.id, name: p.name, displayOrder: p.displayOrder })));
 
       const sortedCategoryProducts = [...categoryProducts].sort((a, b) => {
         const orderA = a.displayOrder ?? 0;
         const orderB = b.displayOrder ?? 0;
         return orderA - orderB;
       });
-      console.log('Sorted products before reorder:', sortedCategoryProducts.map(p => p.name));
 
       const reordered = reorder(sortedCategoryProducts, source.index, destination.index);
-      console.log('Reordered products:', reordered.map(p => p.name));
-      console.log('Sending IDs to API:', reordered.map(p => p.id));
-
       reorderProducts(reordered.map(p => p.id));
     }
   }, [sortedCategories, productsByCategory, reorderCategories, reorderProducts]);
