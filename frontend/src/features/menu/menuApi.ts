@@ -303,15 +303,10 @@ export const useReorderCategories = () => {
 
   return useMutation({
     mutationFn: async (orderedIds: string[]): Promise<void> => {
-      const updates = orderedIds.map((id, index) => ({
-        id,
-        displayOrder: index,
-      }));
-      await Promise.all(
-        updates.map(({ id, displayOrder }) =>
-          api.patch(`/menu/categories/${id}`, { displayOrder }),
-        ),
-      );
+      // Single atomic batch — the server applies displayOrder = array index
+      // inside ONE transaction, so a failure can never leave a half-applied
+      // order (the old per-category PATCH fan-out could).
+      await api.patch("/menu/categories/reorder", { orderedIds });
     },
     // Optimistic update - immediately update the cache
     onMutate: async (orderedIds: string[]) => {
@@ -342,10 +337,10 @@ export const useReorderCategories = () => {
           i18n.t("common:notifications.operationFailed"),
         ),
       );
-      // The per-category PATCH fan-out is non-atomic: on a partial failure the
-      // server holds a half-applied order, so the optimistic rollback above
-      // would LIE for the rest of the session (5-min staleTime, no focus
-      // refetch). Refetch to converge on the server's real order.
+      // The batch endpoint is atomic (nothing half-applies), but the rollback
+      // above restores a pre-drag snapshot that may itself be stale (5-min
+      // staleTime, no focus refetch). Refetch to converge on the server's
+      // real order.
       queryClient.invalidateQueries({ queryKey: categoriesKey });
     },
     // NOTE: on success we intentionally do NOT invalidate — the optimistic
@@ -359,15 +354,12 @@ export const useReorderProducts = () => {
 
   return useMutation({
     mutationFn: async (orderedIds: string[]): Promise<void> => {
-      const updates = orderedIds.map((id, index) => ({
-        id,
-        displayOrder: index,
-      }));
-      await Promise.all(
-        updates.map(({ id, displayOrder }) =>
-          api.patch(`/menu/products/${id}`, { displayOrder }),
-        ),
-      );
+      // Single atomic batch — the server applies displayOrder = array index
+      // inside ONE transaction and requires every id to sit in ONE category
+      // (the drag UI only reorders within a category droppable), so a failure
+      // can never leave a half-applied order (the old per-product PATCH
+      // fan-out could).
+      await api.patch("/menu/products/reorder", { orderedIds });
     },
     onSuccess: () => {
       // Invalidate all product queries to refetch with new order
@@ -380,9 +372,9 @@ export const useReorderProducts = () => {
           i18n.t("common:notifications.operationFailed"),
         ),
       );
-      // The fan-out is non-atomic: some PATCHes may have landed before the
-      // failure. Refetch so the UI shows the server's real order instead of
-      // silently keeping a stale local one.
+      // The batch endpoint is atomic, but the list shown locally may be stale.
+      // Refetch so the UI shows the server's real order instead of silently
+      // keeping a stale local one.
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
   });

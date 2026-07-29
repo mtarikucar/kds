@@ -419,4 +419,95 @@ describe("ProductsService — create/update/remove/transform", () => {
       expect(uploadService.deleteProductImage).not.toHaveBeenCalled();
     });
   });
+
+  // -- reorderProducts: atomic displayOrder = array index --------------
+
+  describe("reorderProducts", () => {
+    beforeEach(() => {
+      // Interactive tx forwards onto the same deep mock so the assertions
+      // below see the writes the service issued inside the transaction.
+      (prisma.$transaction as any).mockImplementation(async (work: any) =>
+        work(prisma),
+      );
+      (prisma.product.updateMany as any).mockResolvedValue({ count: 1 });
+    });
+
+    it("applies displayOrder = array index for every id inside ONE transaction", async () => {
+      (prisma.product.findMany as any)
+        // 1st call: in-tx bulk ownership + same-category check.
+        .mockResolvedValueOnce([
+          { id: "p3", categoryId: "cat-1" },
+          { id: "p1", categoryId: "cat-1" },
+          { id: "p2", categoryId: "cat-1" },
+        ])
+        // 2nd call: post-tx findAll(tenantId, categoryId) re-read.
+        .mockResolvedValueOnce([]);
+
+      await svc.reorderProducts(["p3", "p1", "p2"], TENANT);
+
+      expect((prisma.$transaction as any).mock.calls.length).toBe(1);
+      const writes = (prisma.product.updateMany as any).mock.calls.map(
+        (c: any[]) => c[0],
+      );
+      expect(writes).toEqual([
+        { where: { id: "p3", tenantId: TENANT }, data: { displayOrder: 0 } },
+        { where: { id: "p1", tenantId: TENANT }, data: { displayOrder: 1 } },
+        { where: { id: "p2", tenantId: TENANT }, data: { displayOrder: 2 } },
+      ]);
+      // The post-tx re-read is scoped to the affected category.
+      const reread = (prisma.product.findMany as any).mock.calls[1][0];
+      expect(reread.where).toMatchObject({
+        tenantId: TENANT,
+        categoryId: "cat-1",
+      });
+    });
+
+    it("rejects a foreign-tenant / unknown id before ANY write (tx rolls back)", async () => {
+      // Ownership check only finds p1 — p-foreign is another tenant's row.
+      (prisma.product.findMany as any).mockResolvedValueOnce([
+        { id: "p1", categoryId: "cat-1" },
+      ]);
+
+      await expect(
+        svc.reorderProducts(["p1", "p-foreign"], TENANT),
+      ).rejects.toThrow(BadRequestException);
+      expect((prisma.product.updateMany as any).mock.calls.length).toBe(0);
+    });
+
+    it("rejects ids spanning two categories before ANY write", async () => {
+      (prisma.product.findMany as any).mockResolvedValueOnce([
+        { id: "p1", categoryId: "cat-1" },
+        { id: "p2", categoryId: "cat-2" },
+      ]);
+
+      await expect(svc.reorderProducts(["p1", "p2"], TENANT)).rejects.toThrow(
+        "All products in a reorder must belong to the same category",
+      );
+      expect((prisma.product.updateMany as any).mock.calls.length).toBe(0);
+    });
+
+    it("rejects empty and duplicate id lists without touching the DB", async () => {
+      await expect(svc.reorderProducts([], TENANT)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(svc.reorderProducts(["p1", "p1"], TENANT)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect((prisma.$transaction as any).mock.calls.length).toBe(0);
+    });
+
+    it("aborts the batch when a row vanishes between check and write", async () => {
+      (prisma.product.findMany as any).mockResolvedValueOnce([
+        { id: "p1", categoryId: "cat-1" },
+        { id: "p2", categoryId: "cat-1" },
+      ]);
+      (prisma.product.updateMany as any)
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      await expect(svc.reorderProducts(["p1", "p2"], TENANT)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
 });

@@ -6,11 +6,14 @@ import type { Category } from '../../types';
 
 /**
  * Specs for menuApi's reorder mutations — the only hooks here with real
- * logic beyond pass-through CRUD. useReorderCategories does an optimistic
- * cache rewrite in onMutate (remap each category's displayOrder to its
- * index in the new id order, leaving unknown ids untouched) and rolls the
- * snapshot back on error. We deep-mock the axios-ish `api` and the toast,
- * and assert the exact PATCH payloads + cache transitions.
+ * logic beyond pass-through CRUD. Both hooks now issue a SINGLE atomic
+ * batch PATCH (/menu/{categories,products}/reorder with { orderedIds })
+ * instead of the old non-atomic per-row fan-out. useReorderCategories does
+ * an optimistic cache rewrite in onMutate (remap each category's
+ * displayOrder to its index in the new id order, leaving unknown ids
+ * untouched) and rolls the snapshot back on error; useReorderProducts
+ * invalidates on success AND on error. We deep-mock the axios-ish `api`
+ * and the toast, and assert the exact PATCH payload + cache transitions.
  */
 
 const patchMock = vi.fn();
@@ -24,7 +27,7 @@ vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastErrorMock(.
 vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 import { useBranchScopeStore } from '../../store/branchScopeStore';
-import { useReorderCategories } from './menuApi';
+import { useReorderCategories, useReorderProducts } from './menuApi';
 
 function wrapper(client: QueryClient) {
   return ({ children }: { children: ReactNode }) => (
@@ -47,7 +50,7 @@ beforeEach(() => {
 });
 
 describe('useReorderCategories — mutationFn payloads', () => {
-  it('PATCHes each category with its new index as displayOrder', async () => {
+  it('sends ONE atomic batch PATCH with the full ordered id list', async () => {
     patchMock.mockResolvedValue({ data: {} });
     const client = new QueryClient();
     const { result } = renderHook(() => useReorderCategories(), {
@@ -58,10 +61,12 @@ describe('useReorderCategories — mutationFn payloads', () => {
       await result.current.mutateAsync(['c3', 'c1', 'c2']);
     });
 
-    expect(patchMock).toHaveBeenCalledTimes(3);
-    expect(patchMock).toHaveBeenCalledWith('/menu/categories/c3', { displayOrder: 0 });
-    expect(patchMock).toHaveBeenCalledWith('/menu/categories/c1', { displayOrder: 1 });
-    expect(patchMock).toHaveBeenCalledWith('/menu/categories/c2', { displayOrder: 2 });
+    // Single batch call — NOT a per-category fan-out (that shape was
+    // non-atomic: a partial failure left a half-applied order server-side).
+    expect(patchMock).toHaveBeenCalledTimes(1);
+    expect(patchMock).toHaveBeenCalledWith('/menu/categories/reorder', {
+      orderedIds: ['c3', 'c1', 'c2'],
+    });
   });
 });
 
@@ -131,5 +136,61 @@ describe('useReorderCategories — error rollback', () => {
     expect(after.find((c) => c.id === 'c2')!.displayOrder).toBe(1);
     expect(after.find((c) => c.id === 'c1')!.displayOrder).toBe(0);
     expect(toastErrorMock).toHaveBeenCalledWith('boom');
+  });
+
+  it('invalidates the branch-keyed categories query on error (converge on server order)', async () => {
+    patchMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'boom' } } });
+    const client = new QueryClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    client.setQueryData(['categories', 'b-1'], [cat('c1', 0), cat('c2', 1)]);
+
+    const { result } = renderHook(() => useReorderCategories(), {
+      wrapper: wrapper(client),
+    });
+    await act(async () => {
+      await result.current.mutateAsync(['c2', 'c1']).catch(() => undefined);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['categories', 'b-1'] });
+  });
+});
+
+describe('useReorderProducts — single batch call + invalidation', () => {
+  it('sends ONE atomic batch PATCH and invalidates products on success', async () => {
+    patchMock.mockResolvedValue({ data: {} });
+    const client = new QueryClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useReorderProducts(), {
+      wrapper: wrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync(['p2', 'p3', 'p1']);
+    });
+
+    // Single batch call — NOT a per-product fan-out (that shape was
+    // non-atomic: a partial failure left a half-applied order server-side).
+    expect(patchMock).toHaveBeenCalledTimes(1);
+    expect(patchMock).toHaveBeenCalledWith('/menu/products/reorder', {
+      orderedIds: ['p2', 'p3', 'p1'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['products'] });
+  });
+
+  it('surfaces a toast and still invalidates products on error', async () => {
+    patchMock.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'nope' } } });
+    const client = new QueryClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useReorderProducts(), {
+      wrapper: wrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync(['p1', 'p2']).catch(() => undefined);
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toastErrorMock).toHaveBeenCalledWith('nope');
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['products'] });
   });
 });
