@@ -6,30 +6,21 @@ import {
   useCancelOrder,
 } from '../../features/orders/ordersApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
-import { Order, OrderStatus } from '../../types';
+import { OrderStatus } from '../../types';
 import { cn } from '../../lib/utils';
 import Spinner from '../ui/Spinner';
 import { useTranslation } from 'react-i18next';
 import DeliveryOrderBadge from '../delivery-platforms/DeliveryOrderBadge';
 import DeliveryOrderModerationPanel from '../delivery-platforms/DeliveryOrderModerationPanel';
 import { PLATFORM_DISPLAY } from '../delivery-platforms/platformDisplay';
+// Active-window statuses + delivery predicate are shared with the persistent
+// header DeliveryInboxButton (same query key → single cache entry).
+import { DELIVERY_INBOX_ACTIVE_STATUSES, isDeliveryOrder } from './deliveryInbox';
 
 interface PendingOrdersPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-// Delivery orders travel a wider lifecycle (accepted → preparing → ready)
-// than the internal QR/in-house approve queue (which only lives in
-// PENDING_APPROVAL). Fetch the full active window so the POS panel is the
-// single "Paket Siparişleri" inbox — the standalone /admin/delivery-orders
-// page was folded in here.
-const ACTIVE_STATUSES = [
-  OrderStatus.PENDING_APPROVAL,
-  OrderStatus.PENDING,
-  OrderStatus.PREPARING,
-  OrderStatus.READY,
-].join(',');
 
 const PLATFORM_FILTERS = ['ALL', ...Object.keys(PLATFORM_DISPLAY)];
 
@@ -40,8 +31,6 @@ const STATUS_PILL: Record<string, string> = {
   [OrderStatus.READY]: 'bg-emerald-100 text-emerald-700',
 };
 
-const isDelivery = (o: Order) => !!o.source && !!o.externalOrderId;
-
 const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   const { t } = useTranslation('pos');
   const { t: td } = useTranslation('deliveryOrders');
@@ -51,7 +40,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   // Single query for both surfaces; refetch keeps the inbox live like the
   // old standalone page did.
   const { data: orders = [], isLoading } = useOrders(
-    { status: ACTIVE_STATUSES },
+    { status: DELIVERY_INBOX_ACTIVE_STATUSES },
     { refetchInterval: 15_000, keepPreviousData: true, enabled: isOpen },
   );
   const approveOrder = useApproveOrder();
@@ -61,7 +50,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   const deliveryOrders = useMemo(
     () =>
       orders
-        .filter(isDelivery)
+        .filter(isDeliveryOrder)
         .filter(
           (o) => platform === 'ALL' || o.source?.toUpperCase() === platform,
         )
@@ -77,16 +66,16 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   const internalPending = useMemo(
     () =>
       orders.filter(
-        (o) => !isDelivery(o) && o.status === OrderStatus.PENDING_APPROVAL,
+        (o) => !isDeliveryOrder(o) && o.status === OrderStatus.PENDING_APPROVAL,
       ),
     [orders],
   );
 
-  const hasDelivery = orders.some(isDelivery);
+  const hasDelivery = orders.some(isDeliveryOrder);
   const pendingApprovalCount = useMemo(
     () =>
       orders.filter(
-        (o) => isDelivery(o) && o.status === OrderStatus.PENDING_APPROVAL,
+        (o) => isDeliveryOrder(o) && o.status === OrderStatus.PENDING_APPROVAL,
       ).length,
     [orders],
   );
