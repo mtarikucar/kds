@@ -23,7 +23,7 @@
     "marketplace": "Marketplace",
     "subscriptions": "Subscriptions",
     "auditLogs": "Audit Logs",
-    "legal": "Legal Documents",
+    "legal": "المستندات القانونية",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -179,7 +179,7 @@
     "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
     "current": "Current",
     "changePlanError": "Failed to change plan",
-    "newAmountInfo": "After the change the billing amount will be {{amount}} ({{cycle}}).",
+    "newAmountInfo": "بعد التغيير سيصبح مبلغ الفوترة {{amount}} ({{cycle}}).",
     "cycle": {
       "MONTHLY": "Monthly",
       "YEARLY": "Yearly"
@@ -208,29 +208,29 @@
       "maxMonthlyOrders": "Max Monthly Orders",
       "maxBranches": "الحد الأقصى للفروع"
     },
-    "statusUpdated": "Tenant status updated.",
-    "statusUpdateFailed": "Status update failed.",
-    "overridesSaveFailed": "Failed to save overrides.",
-    "overridesResetFailed": "Failed to reset overrides.",
+    "statusUpdated": "تم تحديث حالة المستأجر.",
+    "statusUpdateFailed": "فشل تحديث الحالة.",
+    "overridesSaveFailed": "فشل حفظ التجاوزات.",
+    "overridesResetFailed": "فشلت إعادة تعيين التجاوزات.",
     "suspendModal": {
-      "title": "Suspend Tenant",
-      "intro": "{{name}} will be suspended: all user sessions are revoked immediately, the subdomain is parked and the tenant admins are notified. This is reversible (Activate).",
+      "title": "تعليق المستأجر",
+      "intro": "سيتم تعليق {{name}}: تُلغى جميع جلسات المستخدمين فورًا، ويُوقَف النطاق الفرعي، ويُخطَر مسؤولو المستأجر. هذا الإجراء قابل للتراجع («تفعيل»).",
       "confirm": "Suspend"
     },
     "deleteModal": {
-      "title": "Delete Tenant",
-      "intro": "{{name}} will be moved to DELETED. Consequences:",
-      "consequenceSessions": "All user sessions are revoked immediately (access tokens invalidated).",
-      "consequenceSubdomain": "The subdomain is parked and cannot be claimed by another tenant.",
-      "consequenceEmail": "Every tenant admin receives an \"Account Deleted\" email and notification.",
-      "reversibleNote": "No data is erased; this can be undone from this screen via Activate.",
-      "typeNameLabel": "Type the tenant name to confirm: {{name}}",
-      "confirm": "Delete Tenant"
+      "title": "حذف المستأجر",
+      "intro": "سيتم نقل {{name}} إلى الحالة «محذوف». العواقب:",
+      "consequenceSessions": "تُلغى جميع جلسات المستخدمين فورًا (تُبطَل رموز الوصول).",
+      "consequenceSubdomain": "يُوقَف النطاق الفرعي ولا يمكن لمستأجر آخر المطالبة به.",
+      "consequenceEmail": "يتلقى كل مسؤول لدى المستأجر بريدًا إلكترونيًا وإشعارًا بعنوان «تم حذف الحساب».",
+      "reversibleNote": "لا تُمحى أي بيانات؛ يمكن التراجع عن هذا الإجراء من هذه الشاشة عبر «تفعيل».",
+      "typeNameLabel": "اكتب اسم المستأجر للتأكيد: {{name}}",
+      "confirm": "حذف المستأجر"
     },
     "statusModal": {
-      "reasonRequired": "Reason (required — recorded in the audit log and included in the admin email)",
-      "reasonOptional": "Reason (optional — recorded in the audit log and included in the admin email)",
-      "reasonPlaceholder": "E.g. non-payment, abuse report…"
+      "reasonRequired": "السبب (إلزامي — يُسجَّل في سجل التدقيق ويُدرَج في البريد المرسَل إلى المسؤولين)",
+      "reasonOptional": "السبب (اختياري — يُسجَّل في سجل التدقيق ويُدرَج في البريد المرسَل إلى المسؤولين)",
+      "reasonPlaceholder": "مثال: عدم السداد، بلاغ عن إساءة استخدام…"
     }
   },
   "subscriptions": {
@@ -254,28 +254,28 @@
     },
     "extend": "Extend",
     "cancel": "Cancel",
-    "extendSuccess": "Subscription extended.",
-    "extendFailed": "Failed to extend the subscription.",
-    "cancelSuccess": "Subscription cancelled.",
-    "cancelFailed": "Failed to cancel the subscription.",
+    "extendSuccess": "تم تمديد الاشتراك.",
+    "extendFailed": "فشل تمديد الاشتراك.",
+    "cancelSuccess": "تم إلغاء الاشتراك.",
+    "cancelFailed": "فشل إلغاء الاشتراك.",
     "extendModal": {
-      "title": "Extend Subscription",
-      "subtitle": "The period end of {{tenant}}'s subscription will be pushed forward.",
-      "reinstateWarning": "This subscription is {{status}}. Extending will REINSTATE it to ACTIVE and unlock the tenant.",
-      "days": "Days to extend",
-      "reason": "Reason (optional)",
+      "title": "تمديد الاشتراك",
+      "subtitle": "سيتم تأجيل تاريخ انتهاء فترة اشتراك {{tenant}}.",
+      "reinstateWarning": "هذا الاشتراك في الحالة {{status}}. سيؤدي التمديد إلى إعادته إلى الحالة «نشط» وفتح قفل المستأجر.",
+      "days": "عدد أيام التمديد",
+      "reason": "السبب (اختياري)",
       "back": "Back",
       "confirm": "Extend",
       "extending": "Extending..."
     },
     "cancelModal": {
-      "title": "Cancel Subscription",
-      "subtitle": "{{tenant}}'s subscription will be cancelled.",
-      "atPeriodEnd": "At period end (default) — access continues until the current period ends.",
-      "immediate": "Immediately — the subscription is CANCELLED right now and access stops.",
-      "reason": "Reason (optional)",
-      "keep": "Keep subscription",
-      "confirm": "Confirm Cancellation",
+      "title": "إلغاء الاشتراك",
+      "subtitle": "سيتم إلغاء اشتراك {{tenant}}.",
+      "atPeriodEnd": "في نهاية الفترة (الافتراضي) — يستمر الوصول حتى نهاية الفترة الحالية.",
+      "immediate": "فورًا — يُلغى الاشتراك الآن ويتوقف الوصول.",
+      "reason": "السبب (اختياري)",
+      "keep": "الإبقاء على الاشتراك",
+      "confirm": "تأكيد الإلغاء",
       "cancelling": "Cancelling..."
     }
   },
@@ -307,7 +307,7 @@
       "entity": "Entity",
       "target": "Target"
     },
-    "exportFailed": "Export failed."
+    "exportFailed": "فشل التصدير."
   },
   "users": {
     "title": "Users",
@@ -340,7 +340,7 @@
     "addPlan": "Add Plan",
     "confirmDelete": "Delete this plan?",
     "demoLockBadge": "Locked",
-    "demoLockTooltip": "The DEMO plan's name keys the guard that blocks the demo tenant's real money paths; this plan cannot be edited or deleted.",
+    "demoLockTooltip": "اسم خطة DEMO هو مفتاح الحماية التي تحظر مسارات الدفع الحقيقية للمستأجر التجريبي؛ لا يمكن تعديل هذه الخطة أو حذفها.",
     "defaultDiscountLabel": "INDIRIM",
     "perMonth": "/mo",
     "perYear": "/year",
@@ -476,17 +476,17 @@
       "create": "Create"
     },
     "toasts": {
-      "addonCreated": "Add-on created.",
-      "addonUpdated": "Add-on updated.",
-      "addonArchived": "Add-on archived.",
-      "productCreated": "Product created.",
-      "productUpdated": "Product updated.",
-      "productArchived": "Product archived.",
-      "stockReceived": "Stock received.",
-      "createFailed": "Create failed.",
-      "updateFailed": "Update failed.",
-      "archiveFailed": "Archive failed.",
-      "stockFailed": "Stock receive failed."
+      "addonCreated": "تم إنشاء الإضافة.",
+      "addonUpdated": "تم تحديث الإضافة.",
+      "addonArchived": "تمت أرشفة الإضافة.",
+      "productCreated": "تم إنشاء المنتج.",
+      "productUpdated": "تم تحديث المنتج.",
+      "productArchived": "تمت أرشفة المنتج.",
+      "stockReceived": "تم استلام المخزون.",
+      "createFailed": "فشل الإنشاء.",
+      "updateFailed": "فشل التحديث.",
+      "archiveFailed": "فشلت الأرشفة.",
+      "stockFailed": "فشل استلام المخزون."
     }
   },
   "legal": {
@@ -494,7 +494,7 @@
     "subtitle": "KVKK / Mesafeli Satış / İade ve diğer yasal metinleri yönetin. Yeni versiyon yayınladığınızda eski versiyon devre dışı kalır ama silinmez — mevcut Consent kayıtları geçerliliğini korur.",
     "publishNewVersion": "Yeni versiyon yayınla",
     "loading": "Yükleniyor...",
-    "loadFailed": "Failed to load legal documents.",
+    "loadFailed": "فشل تحميل المستندات القانونية.",
     "empty": "Henüz yasal belge yok. Yeni versiyon yayınlayın ya da seed'i çalıştırın.",
     "versionCount": "({{count}} versiyon)",
     "kindLabels": {
@@ -533,12 +533,12 @@
   },
   "bankTransfer": {
     "toasts": {
-      "settingsSaved": "Bank-transfer settings saved.",
-      "settingsSaveFailed": "Saving failed.",
-      "confirmed": "Transfer confirmed, subscription activated.",
-      "confirmFailed": "Confirmation failed.",
-      "rejected": "Transfer rejected.",
-      "rejectFailed": "Rejection failed."
+      "settingsSaved": "تم حفظ إعدادات التحويل البنكي.",
+      "settingsSaveFailed": "فشل الحفظ.",
+      "confirmed": "تم تأكيد التحويل وتفعيل الاشتراك.",
+      "confirmFailed": "فشل التأكيد.",
+      "rejected": "تم رفض التحويل.",
+      "rejectFailed": "فشل الرفض."
     }
   }
 }

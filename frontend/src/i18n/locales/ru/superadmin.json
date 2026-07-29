@@ -23,7 +23,7 @@
     "marketplace": "Marketplace",
     "subscriptions": "Subscriptions",
     "auditLogs": "Audit Logs",
-    "legal": "Legal Documents",
+    "legal": "Юридические документы",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -179,7 +179,7 @@
     "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
     "current": "Current",
     "changePlanError": "Failed to change plan",
-    "newAmountInfo": "After the change the billing amount will be {{amount}} ({{cycle}}).",
+    "newAmountInfo": "После изменения сумма к оплате составит {{amount}} ({{cycle}}).",
     "cycle": {
       "MONTHLY": "Monthly",
       "YEARLY": "Yearly"
@@ -208,29 +208,29 @@
       "maxMonthlyOrders": "Max Monthly Orders",
       "maxBranches": "Макс. филиалов"
     },
-    "statusUpdated": "Tenant status updated.",
-    "statusUpdateFailed": "Status update failed.",
-    "overridesSaveFailed": "Failed to save overrides.",
-    "overridesResetFailed": "Failed to reset overrides.",
+    "statusUpdated": "Статус тенанта обновлён.",
+    "statusUpdateFailed": "Не удалось обновить статус.",
+    "overridesSaveFailed": "Не удалось сохранить переопределения.",
+    "overridesResetFailed": "Не удалось сбросить переопределения.",
     "suspendModal": {
-      "title": "Suspend Tenant",
-      "intro": "{{name}} will be suspended: all user sessions are revoked immediately, the subdomain is parked and the tenant admins are notified. This is reversible (Activate).",
+      "title": "Приостановить тенанта",
+      "intro": "{{name}} будет приостановлен: все сессии пользователей немедленно отзываются, поддомен блокируется, а администраторы тенанта получают уведомление. Действие обратимо («Активировать»).",
       "confirm": "Suspend"
     },
     "deleteModal": {
-      "title": "Delete Tenant",
-      "intro": "{{name}} will be moved to DELETED. Consequences:",
-      "consequenceSessions": "All user sessions are revoked immediately (access tokens invalidated).",
-      "consequenceSubdomain": "The subdomain is parked and cannot be claimed by another tenant.",
-      "consequenceEmail": "Every tenant admin receives an \"Account Deleted\" email and notification.",
-      "reversibleNote": "No data is erased; this can be undone from this screen via Activate.",
-      "typeNameLabel": "Type the tenant name to confirm: {{name}}",
-      "confirm": "Delete Tenant"
+      "title": "Удалить тенанта",
+      "intro": "{{name}} будет переведён в статус «УДАЛЁН». Последствия:",
+      "consequenceSessions": "Все сессии пользователей немедленно отзываются (токены доступа аннулируются).",
+      "consequenceSubdomain": "Поддомен блокируется и не может быть занят другим тенантом.",
+      "consequenceEmail": "Каждый администратор тенанта получает письмо и уведомление «Аккаунт удалён».",
+      "reversibleNote": "Данные не стираются; действие можно отменить на этом экране кнопкой «Активировать».",
+      "typeNameLabel": "Введите название тенанта для подтверждения: {{name}}",
+      "confirm": "Удалить тенанта"
     },
     "statusModal": {
-      "reasonRequired": "Reason (required — recorded in the audit log and included in the admin email)",
-      "reasonOptional": "Reason (optional — recorded in the audit log and included in the admin email)",
-      "reasonPlaceholder": "E.g. non-payment, abuse report…"
+      "reasonRequired": "Причина (обязательно — записывается в журнал аудита и включается в письмо администраторам)",
+      "reasonOptional": "Причина (необязательно — записывается в журнал аудита и включается в письмо администраторам)",
+      "reasonPlaceholder": "Напр. неуплата, жалоба на злоупотребление…"
     }
   },
   "subscriptions": {
@@ -254,28 +254,28 @@
     },
     "extend": "Extend",
     "cancel": "Cancel",
-    "extendSuccess": "Subscription extended.",
-    "extendFailed": "Failed to extend the subscription.",
-    "cancelSuccess": "Subscription cancelled.",
-    "cancelFailed": "Failed to cancel the subscription.",
+    "extendSuccess": "Подписка продлена.",
+    "extendFailed": "Не удалось продлить подписку.",
+    "cancelSuccess": "Подписка отменена.",
+    "cancelFailed": "Не удалось отменить подписку.",
     "extendModal": {
-      "title": "Extend Subscription",
-      "subtitle": "The period end of {{tenant}}'s subscription will be pushed forward.",
-      "reinstateWarning": "This subscription is {{status}}. Extending will REINSTATE it to ACTIVE and unlock the tenant.",
-      "days": "Days to extend",
-      "reason": "Reason (optional)",
+      "title": "Продлить подписку",
+      "subtitle": "Дата окончания периода подписки {{tenant}} будет перенесена вперёд.",
+      "reinstateWarning": "Эта подписка в статусе {{status}}. Продление снова сделает её АКТИВНОЙ и разблокирует тенанта.",
+      "days": "Количество дней продления",
+      "reason": "Причина (необязательно)",
       "back": "Back",
       "confirm": "Extend",
       "extending": "Extending..."
     },
     "cancelModal": {
-      "title": "Cancel Subscription",
-      "subtitle": "{{tenant}}'s subscription will be cancelled.",
-      "atPeriodEnd": "At period end (default) — access continues until the current period ends.",
-      "immediate": "Immediately — the subscription is CANCELLED right now and access stops.",
-      "reason": "Reason (optional)",
-      "keep": "Keep subscription",
-      "confirm": "Confirm Cancellation",
+      "title": "Отменить подписку",
+      "subtitle": "Подписка {{tenant}} будет отменена.",
+      "atPeriodEnd": "В конце периода (по умолчанию) — доступ сохраняется до окончания текущего периода.",
+      "immediate": "Немедленно — подписка отменяется прямо сейчас, и доступ прекращается.",
+      "reason": "Причина (необязательно)",
+      "keep": "Оставить подписку",
+      "confirm": "Подтвердить отмену",
       "cancelling": "Cancelling..."
     }
   },
@@ -307,7 +307,7 @@
       "entity": "Entity",
       "target": "Target"
     },
-    "exportFailed": "Export failed."
+    "exportFailed": "Не удалось выполнить экспорт."
   },
   "users": {
     "title": "Users",
@@ -340,7 +340,7 @@
     "addPlan": "Add Plan",
     "confirmDelete": "Delete this plan?",
     "demoLockBadge": "Locked",
-    "demoLockTooltip": "The DEMO plan's name keys the guard that blocks the demo tenant's real money paths; this plan cannot be edited or deleted.",
+    "demoLockTooltip": "Название плана DEMO — ключ защиты, блокирующей реальные платёжные пути демо-тенанта; этот план нельзя редактировать или удалять.",
     "defaultDiscountLabel": "INDIRIM",
     "perMonth": "/mo",
     "perYear": "/year",
@@ -476,17 +476,17 @@
       "create": "Create"
     },
     "toasts": {
-      "addonCreated": "Add-on created.",
-      "addonUpdated": "Add-on updated.",
-      "addonArchived": "Add-on archived.",
-      "productCreated": "Product created.",
-      "productUpdated": "Product updated.",
-      "productArchived": "Product archived.",
-      "stockReceived": "Stock received.",
-      "createFailed": "Create failed.",
-      "updateFailed": "Update failed.",
-      "archiveFailed": "Archive failed.",
-      "stockFailed": "Stock receive failed."
+      "addonCreated": "Дополнение создано.",
+      "addonUpdated": "Дополнение обновлено.",
+      "addonArchived": "Дополнение архивировано.",
+      "productCreated": "Товар создан.",
+      "productUpdated": "Товар обновлён.",
+      "productArchived": "Товар архивирован.",
+      "stockReceived": "Поступление на склад оформлено.",
+      "createFailed": "Не удалось создать.",
+      "updateFailed": "Не удалось обновить.",
+      "archiveFailed": "Не удалось архивировать.",
+      "stockFailed": "Не удалось оформить поступление."
     }
   },
   "legal": {
@@ -494,7 +494,7 @@
     "subtitle": "KVKK / Mesafeli Satış / İade ve diğer yasal metinleri yönetin. Yeni versiyon yayınladığınızda eski versiyon devre dışı kalır ama silinmez — mevcut Consent kayıtları geçerliliğini korur.",
     "publishNewVersion": "Yeni versiyon yayınla",
     "loading": "Yükleniyor...",
-    "loadFailed": "Failed to load legal documents.",
+    "loadFailed": "Не удалось загрузить юридические документы.",
     "empty": "Henüz yasal belge yok. Yeni versiyon yayınlayın ya da seed'i çalıştırın.",
     "versionCount": "({{count}} versiyon)",
     "kindLabels": {
@@ -533,12 +533,12 @@
   },
   "bankTransfer": {
     "toasts": {
-      "settingsSaved": "Bank-transfer settings saved.",
-      "settingsSaveFailed": "Saving failed.",
-      "confirmed": "Transfer confirmed, subscription activated.",
-      "confirmFailed": "Confirmation failed.",
-      "rejected": "Transfer rejected.",
-      "rejectFailed": "Rejection failed."
+      "settingsSaved": "Настройки банковского перевода сохранены.",
+      "settingsSaveFailed": "Не удалось сохранить.",
+      "confirmed": "Перевод подтверждён, подписка активирована.",
+      "confirmFailed": "Не удалось подтвердить.",
+      "rejected": "Перевод отклонён.",
+      "rejectFailed": "Не удалось отклонить."
     }
   }
 }
