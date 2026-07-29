@@ -324,42 +324,42 @@ describe('resolvePaymentTarget', () => {
 const ord = (id: string, status: OrderStatus): Pick<Order, 'id' | 'status'> => ({ id, status });
 
 describe('hasRemainingUnpaidOrders', () => {
-  it('is false when the only order is the one just paid', () => {
-    expect(hasRemainingUnpaidOrders([ord('o-1', OrderStatus.PENDING)], 'o-1')).toBe(false);
+  it('is false when the refetched list is empty (fully-paid order already dropped out)', () => {
+    expect(hasRemainingUnpaidOrders([])).toBe(false);
+  });
+
+  it('is true when the just-paid order is STILL present (partial payment) — table must not be freed', () => {
+    // The old excluded-id parameter hid exactly this: a stale-low charge
+    // records a PARTIAL payment, the order stays in the status-filtered
+    // refetch, and the table would have been released with an open balance.
+    expect(hasRemainingUnpaidOrders([ord('o-1', OrderStatus.SERVED)])).toBe(true);
   });
 
   it('is true when another unpaid order remains on the table', () => {
     expect(
-      hasRemainingUnpaidOrders(
-        [ord('o-1', OrderStatus.PAID), ord('o-2', OrderStatus.PENDING)],
-        'o-1',
-      ),
+      hasRemainingUnpaidOrders([
+        ord('o-1', OrderStatus.PAID),
+        ord('o-2', OrderStatus.PENDING),
+      ]),
     ).toBe(true);
   });
 
   it('ignores PAID and CANCELLED orders (table can still be freed)', () => {
     expect(
-      hasRemainingUnpaidOrders(
-        [
-          ord('o-1', OrderStatus.PAID),
-          ord('o-2', OrderStatus.PAID),
-          ord('o-3', OrderStatus.CANCELLED),
-        ],
-        'o-1',
-      ),
+      hasRemainingUnpaidOrders([
+        ord('o-1', OrderStatus.PAID),
+        ord('o-2', OrderStatus.PAID),
+        ord('o-3', OrderStatus.CANCELLED),
+      ]),
     ).toBe(false);
-  });
-
-  it('is false for an empty order list', () => {
-    expect(hasRemainingUnpaidOrders([], 'o-1')).toBe(false);
   });
 
   it('counts a SERVED/READY sibling order as still unpaid', () => {
     expect(
-      hasRemainingUnpaidOrders(
-        [ord('o-1', OrderStatus.PAID), ord('o-2', OrderStatus.SERVED)],
-        'o-1',
-      ),
+      hasRemainingUnpaidOrders([
+        ord('o-1', OrderStatus.PAID),
+        ord('o-2', OrderStatus.READY),
+      ]),
     ).toBe(true);
   });
 });

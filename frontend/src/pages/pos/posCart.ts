@@ -238,20 +238,20 @@ export function resolvePaymentTarget(args: {
 }
 
 /**
- * Whether any unpaid order remains on the table after `paidOrderId` is
- * settled — the guard that decides if the table can be freed to AVAILABLE.
- * Excludes the just-paid order, PAID orders, and CANCELLED orders. Must run
- * against freshly-refetched orders (a stale snapshot could free a table that
- * still has an unpaid bill — the documented race this guards). Pure
- * extraction of the `remainingOrders` filter (~L626-633).
+ * Whether any unpaid order remains on the table after a payment settles —
+ * the guard that decides if the table can be freed to AVAILABLE. Must run
+ * against freshly-refetched, status-filtered orders (a stale snapshot could
+ * free a table that still has an unpaid bill — the documented race this
+ * guards). The refetched list is authoritative as-is: a fully paid order has
+ * already dropped out of it, while a PARTIALLY paid one remains and must
+ * block the release — the old excluded-`paidOrderId` parameter hid exactly
+ * that case, freeing the table with an open balance.
  */
 export function hasRemainingUnpaidOrders(
-  orders: Pick<Order, 'id' | 'status'>[],
-  paidOrderId: string,
+  orders: Pick<Order, 'status'>[],
 ): boolean {
   return orders.some(
     (order) =>
-      order.id !== paidOrderId &&
       order.status !== OrderStatus.PAID &&
       order.status !== OrderStatus.CANCELLED,
   );
