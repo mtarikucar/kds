@@ -5,6 +5,7 @@ import MarketplaceAdminPage from './MarketplaceAdminPage';
 
 const archiveAddOnMutate = vi.fn();
 const updateAddOnMutate = vi.fn();
+const updateAddOnAsync = vi.fn().mockResolvedValue({});
 const createAddOnAsync = vi.fn().mockResolvedValue({});
 const archiveProductMutate = vi.fn();
 const updateProductMutate = vi.fn();
@@ -17,7 +18,7 @@ let products: any[];
 vi.mock('../../features/superadmin/api/superadminMarketplaceApi', () => ({
   useSaListAddOns: () => ({ data: addons, isLoading: false }),
   useSaCreateAddOn: () => ({ mutateAsync: createAddOnAsync }),
-  useSaUpdateAddOn: () => ({ mutate: updateAddOnMutate, mutateAsync: vi.fn().mockResolvedValue({}) }),
+  useSaUpdateAddOn: () => ({ mutate: updateAddOnMutate, mutateAsync: updateAddOnAsync }),
   useSaArchiveAddOn: () => ({ mutate: archiveAddOnMutate }),
   useSaListProducts: () => ({ data: products, isLoading: false }),
   useSaCreateProduct: () => ({ mutateAsync: createProductAsync }),
@@ -140,6 +141,32 @@ describe('MarketplaceAdminPage — add-on editor grants JSON parse', () => {
 
     expect(await screen.findByText('marketplace.addons.grantsInvalid')).toBeInTheDocument();
     expect(createAddOnAsync).not.toHaveBeenCalled();
+  });
+
+  it('F5: a FAILED create keeps the editor modal open (input preserved)', async () => {
+    createAddOnAsync.mockRejectedValueOnce(new Error('409 dup code'));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.new' }));
+
+    const codeWrap = screen.getByText('marketplace.addons.fields.code').closest('label') as HTMLElement;
+    fireEvent.change(within(codeWrap).getByRole('textbox'), { target: { value: 'kds_dup' } });
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.create' }));
+
+    await vi.waitFor(() => expect(createAddOnAsync).toHaveBeenCalledTimes(1));
+    // Modal is still open (title present) and the typed code is preserved.
+    expect(screen.getByText('marketplace.addons.newTitle')).toBeInTheDocument();
+    expect((within(codeWrap).getByRole('textbox') as HTMLInputElement).value).toBe('kds_dup');
+  });
+
+  it('F5: a FAILED edit keeps the editor modal open', async () => {
+    addons = [addon({ id: 'a-edit', status: 'draft' })];
+    updateAddOnAsync.mockRejectedValueOnce(new Error('500'));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.save' }));
+
+    await vi.waitFor(() => expect(updateAddOnAsync).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('marketplace.addons.editTitle')).toBeInTheDocument();
   });
 
   it('parses valid grants JSON and submits create() with the parsed object', async () => {

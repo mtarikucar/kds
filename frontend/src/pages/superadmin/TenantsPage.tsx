@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, ChevronRight } from 'lucide-react';
-import { useTenants, useUpdateTenantStatus } from '../../features/superadmin/api/superAdminApi';
+import { useTenants } from '../../features/superadmin/api/superAdminApi';
 import { TenantFilter, TenantListItem } from '../../features/superadmin/types';
 
 const statusStyles = {
@@ -22,17 +22,10 @@ export default function TenantsPage() {
   const [search, setSearch] = useState('');
 
   const { data, isLoading } = useTenants({ ...filters, search: search || undefined });
-  const updateStatusMutation = useUpdateTenantStatus();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setFilters((prev) => ({ ...prev, page: 1 }));
-  };
-
-  const handleStatusChange = (id: string, status: string) => {
-    if (window.confirm(t('tenants.confirmStatusChange', { status }))) {
-      updateStatusMutation.mutate({ id, status });
-    }
   };
 
   return (

@@ -32,6 +32,9 @@ vi.mock('axios', () => ({
     create: () => h.instance,
     post: vi.fn(),
   },
+  // getApiErrorMessage (lib/api-error) calls the named isAxiosError export at
+  // runtime when an onError path fires (e.g. the F7 failed-save test).
+  isAxiosError: (e: unknown) => !!(e as { isAxiosError?: boolean } | null)?.isAxiosError,
 }));
 
 vi.mock('../../../store/superAdminAuthStore', () => {
@@ -53,6 +56,8 @@ import {
   usePlans,
   useCreatePlan,
   useChangeSubscriptionPlan,
+  useExtendSubscription,
+  useCancelSubscription,
   useAuditLogs,
 } from './superAdminApi';
 
@@ -196,6 +201,39 @@ describe('superadmin mutations', () => {
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: ['superadmin', 'tenants', 't1'],
     });
+  });
+
+  it('F7: useUpdateTenantOverrides re-fetches the server truth when the save FAILS', async () => {
+    h.instance.patch.mockRejectedValue({
+      isAxiosError: true,
+      response: { data: { message: 'boom' } },
+    });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateTenantOverrides(), { wrapper });
+    await result.current.mutateAsync({ tenantId: 't1', data: {} as never }).catch(() => undefined);
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ['superadmin', 'tenants', 't1', 'overrides'],
+    });
+  });
+
+  it('F8: useExtendSubscription POSTs days + reason', async () => {
+    h.instance.post.mockResolvedValue({ data: {} });
+    const { result } = renderHook(() => useExtendSubscription(), { wrapper });
+    await result.current.mutateAsync({ id: 's1', days: 14, reason: 'goodwill' });
+    expect(h.instance.post).toHaveBeenCalledWith(
+      '/superadmin/subscriptions/s1/extend',
+      { days: 14, reason: 'goodwill' },
+    );
+  });
+
+  it('F8: useCancelSubscription POSTs the DTO mode alongside the reason', async () => {
+    h.instance.post.mockResolvedValue({ data: {} });
+    const { result } = renderHook(() => useCancelSubscription(), { wrapper });
+    await result.current.mutateAsync({ id: 's1', mode: 'IMMEDIATE', reason: 'fraud' });
+    expect(h.instance.post).toHaveBeenCalledWith(
+      '/superadmin/subscriptions/s1/cancel',
+      { mode: 'IMMEDIATE', reason: 'fraud' },
+    );
   });
 
   it('useCreatePlan POSTs and invalidates the plans cache', async () => {

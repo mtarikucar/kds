@@ -9,6 +9,10 @@ const enableMutate = vi.fn();
 let setupLoading = false;
 let enableState: any;
 
+// The page now toasts (instead of alert()) on successful 2FA enablement.
+const th = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { success: th.success, error: th.error } }));
+
 vi.mock('../../features/superadmin/api/superAdminApi', () => ({
   useSetup2FA: () => ({ refetch: fetchSetup, isLoading: setupLoading }),
   useEnable2FA: () => ({ mutate: enableMutate, ...enableState }),
@@ -87,9 +91,8 @@ describe('SuperAdminSettingsPage', () => {
     expect(screen.queryByText('settings.setupModalTitle')).not.toBeInTheDocument();
   });
 
-  it('enables 2FA with the entered code and alerts on success', async () => {
+  it('enables 2FA with the entered code: toasts success and flips the store flag', async () => {
     fetchSetup.mockResolvedValue({ data: { secret: 'SECRET32', qrCodeUrl: 'data:image/png;base64,zzz' } });
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     // enable mutate: call onSuccess synchronously
     enableMutate.mockImplementation((_code: string, opts: any) => opts.onSuccess());
     renderPage();
@@ -101,7 +104,13 @@ describe('SuperAdminSettingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'settings.enable2fa' }));
 
     expect(enableMutate.mock.calls[0][0]).toBe('123456');
-    expect(alertSpy).toHaveBeenCalledWith('settings.enabledSuccess');
+    expect(th.success).toHaveBeenCalledWith('settings.enabledSuccess');
+    // The store's twoFactorEnabled flag refreshes in place, so the page
+    // immediately reads "enabled" instead of offering setup again until the
+    // next login rehydrates the snapshot.
+    expect(useSuperAdminAuthStore.getState().superAdmin?.twoFactorEnabled).toBe(true);
+    expect(screen.getByText('settings.twoFactorEnabled')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'settings.setup2fa' })).not.toBeInTheDocument();
     // modal closes after success
     expect(screen.queryByText('settings.setupModalTitle')).not.toBeInTheDocument();
   });

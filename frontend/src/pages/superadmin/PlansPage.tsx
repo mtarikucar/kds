@@ -271,10 +271,16 @@ export default function PlansPage() {
               onError: (err: unknown) =>
                 toast.error(getApiErrorMessage(err, t('plans.saveFailed', 'Plan kaydedilemedi.'))),
             };
+            // F4: currency is CREATE-only. The form never edits it (the
+            // picker is TRY-locked), so sending it on update would silently
+            // re-denominate a legacy non-TRY plan (USD 49 → TRY 49) — those
+            // plans are deliberately supported (see the banner above). The
+            // backend additionally refuses currency changes on subscribed
+            // plans (PLAN_CURRENCY_LOCKED).
             if (editingPlan) {
               updateMutation.mutate({ id: editingPlan.id, ...payload }, opts);
             } else {
-              createMutation.mutate(payload, opts);
+              createMutation.mutate({ ...payload, currency: 'TRY' }, opts);
             }
           }}
         />
@@ -301,7 +307,9 @@ function PlanModal({
     description: plan?.description || '',
     monthlyPrice: plan?.monthlyPrice || 0,
     yearlyPrice: plan?.yearlyPrice || 0,
-    currency: 'TRY', // TRY-only platform — never carry a legacy non-TRY value forward
+    // NOTE: currency is intentionally NOT part of the form state. New plans
+    // get TRY appended at the create call site; updates never send currency
+    // so a legacy non-TRY plan keeps its denomination (F4).
     // Limits are `number | ''`. Use ?? (NOT ||) so a stored 0 displays as 0
     // (visible + fixable) rather than being silently shown as the default —
     // and so -1 (unlimited) round-trips. A cleared input becomes '' (handled
@@ -431,16 +439,18 @@ function PlanModal({
               <label className="block text-sm font-medium text-zinc-700 mb-1.5">
                 {t('plans.modal.currency', 'Para birimi')}
               </label>
-              {/* TRY-only: PayTR collects Turkish Lira exclusively, so plans are
-                  priced in TRY. The currency is fixed (not selectable) to keep
-                  the catalog consistent with what the platform can actually
-                  charge. */}
+              {/* TRY-only: PayTR collects Turkish Lira exclusively, so new plans
+                  are priced in TRY. The currency is fixed (not selectable) and
+                  NEVER sent on update — an edited legacy non-TRY plan keeps its
+                  stored denomination, which is what this read-only field shows. */}
               <select
-                value="TRY"
+                value={plan?.currency || 'TRY'}
                 disabled
                 className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-lg text-sm text-zinc-600 cursor-not-allowed focus:outline-none"
               >
-                <option value="TRY">TRY (₺)</option>
+                <option value={plan?.currency || 'TRY'}>
+                  {plan?.currency && plan.currency !== 'TRY' ? plan.currency : 'TRY (₺)'}
+                </option>
               </select>
             </div>
 

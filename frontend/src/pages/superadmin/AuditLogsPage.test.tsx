@@ -88,6 +88,21 @@ describe('AuditLogsPage — export flow', () => {
     expect(exportAsync.mock.calls[0][0]).toMatchObject({ format: 'json' });
   });
 
+  it('F9: a FAILED export is caught (no download attempted, page keeps working)', async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    exportAsync.mockRejectedValue(new Error('500'));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'auditLogs.csv' }));
+    await vi.waitFor(() => expect(exportAsync).toHaveBeenCalledTimes(1));
+    // The rejection is swallowed by the page handler (the hook's onError
+    // toasts); no anchor click / object URL is ever attempted.
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect((window.URL.createObjectURL as any)).not.toHaveBeenCalled();
+    // The page is still interactive — a retry fires the mutation again.
+    fireEvent.click(screen.getByRole('button', { name: 'auditLogs.json' }));
+    await vi.waitFor(() => expect(exportAsync).toHaveBeenCalledTimes(2));
+  });
+
   it('disables both export buttons while an export is pending', () => {
     exportPending = true;
     renderPage();

@@ -23,7 +23,7 @@
     "marketplace": "Marketplace",
     "subscriptions": "Subscriptions",
     "auditLogs": "Audit Logs",
-    "legal": "Legal Documents",
+    "legal": "Huquqiy hujjatlar",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -104,7 +104,6 @@
     "title": "Tenants",
     "subtitle": "Manage restaurant tenants",
     "searchPlaceholder": "Search tenants...",
-    "confirmStatusChange": "Change status to {{status}}?",
     "filters": {
       "allStatus": "All Status",
       "active": "Active",
@@ -180,7 +179,7 @@
     "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
     "current": "Current",
     "changePlanError": "Failed to change plan",
-    "newAmountInfo": "After the change the billing amount will be {{amount}} ({{cycle}}).",
+    "newAmountInfo": "O'zgarishdan so'ng hisob-kitob summasi {{amount}} bo'ladi ({{cycle}}).",
     "cycle": {
       "MONTHLY": "Monthly",
       "YEARLY": "Yearly"
@@ -208,14 +207,35 @@
       "maxCategories": "Max Categories",
       "maxMonthlyOrders": "Max Monthly Orders",
       "maxBranches": "Maksimal filiallar"
+    },
+    "statusUpdated": "Tenant holati yangilandi.",
+    "statusUpdateFailed": "Holatni yangilab bo'lmadi.",
+    "overridesSaveFailed": "Maxsus sozlamalarni saqlab bo'lmadi.",
+    "overridesResetFailed": "Maxsus sozlamalarni asliga qaytarib bo'lmadi.",
+    "suspendModal": {
+      "title": "Tenantni to'xtatib turish",
+      "intro": "{{name}} to'xtatib qo'yiladi: barcha foydalanuvchi seanslari darhol bekor qilinadi, subdomen band qilib qo'yiladi va tenant administratorlariga xabar yuboriladi. Bu amalni ortga qaytarish mumkin («Faollashtirish»).",
+      "confirm": "Suspend"
+    },
+    "deleteModal": {
+      "title": "Tenantni o'chirish",
+      "intro": "{{name}} O'CHIRILGAN holatiga o'tkaziladi. Oqibatlari:",
+      "consequenceSessions": "Barcha foydalanuvchi seanslari darhol bekor qilinadi (kirish tokenlari yaroqsiz bo'ladi).",
+      "consequenceSubdomain": "Subdomen band qilib qo'yiladi va uni boshqa tenant egallay olmaydi.",
+      "consequenceEmail": "Har bir tenant administratori «Hisob o'chirildi» xati va bildirishnomasini oladi.",
+      "reversibleNote": "Hech qanday ma'lumot o'chirilmaydi; bu amalni shu ekrandan «Faollashtirish» orqali ortga qaytarish mumkin.",
+      "typeNameLabel": "Tasdiqlash uchun tenant nomini yozing: {{name}}",
+      "confirm": "Tenantni o'chirish"
+    },
+    "statusModal": {
+      "reasonRequired": "Sabab (majburiy — audit jurnaliga yoziladi va administratorlarga yuboriladigan xatga qo'shiladi)",
+      "reasonOptional": "Sabab (ixtiyoriy — audit jurnaliga yoziladi va administratorlarga yuboriladigan xatga qo'shiladi)",
+      "reasonPlaceholder": "Masalan: to'lov qilinmagan, suiiste'mol haqida shikoyat…"
     }
   },
   "subscriptions": {
     "title": "Subscriptions",
     "subtitle": "Manage tenant subscriptions",
-    "promptExtendDays": "Enter number of days to extend:",
-    "confirmCancel": "Cancel this subscription?",
-    "promptCancelReason": "Enter cancellation reason (optional):",
     "filters": {
       "allStatus": "All Status",
       "active": "Active",
@@ -233,7 +253,31 @@
       "ends": "Ends"
     },
     "extend": "Extend",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "extendSuccess": "Obuna uzaytirildi.",
+    "extendFailed": "Obunani uzaytirib bo'lmadi.",
+    "cancelSuccess": "Obuna bekor qilindi.",
+    "cancelFailed": "Obunani bekor qilib bo'lmadi.",
+    "extendModal": {
+      "title": "Obunani uzaytirish",
+      "subtitle": "{{tenant}} obunasining davr tugash sanasi keyinga suriladi.",
+      "reinstateWarning": "Bu obuna {{status}} holatida. Uzaytirish uni yana FAOL holatiga qaytaradi va tenant qulfini ochadi.",
+      "days": "Uzaytiriladigan kunlar soni",
+      "reason": "Sabab (ixtiyoriy)",
+      "back": "Back",
+      "confirm": "Extend",
+      "extending": "Extending..."
+    },
+    "cancelModal": {
+      "title": "Obunani bekor qilish",
+      "subtitle": "{{tenant}} obunasi bekor qilinadi.",
+      "atPeriodEnd": "Davr oxirida (standart) — kirish joriy davr tugagunga qadar davom etadi.",
+      "immediate": "Darhol — obuna hoziroq BEKOR qilinadi va kirish to'xtaydi.",
+      "reason": "Sabab (ixtiyoriy)",
+      "keep": "Obunani saqlab qolish",
+      "confirm": "Bekor qilishni tasdiqlash",
+      "cancelling": "Cancelling..."
+    }
   },
   "auditLogs": {
     "title": "Audit Logs",
@@ -262,7 +306,8 @@
       "action": "Action",
       "entity": "Entity",
       "target": "Target"
-    }
+    },
+    "exportFailed": "Eksport amalga oshmadi."
   },
   "users": {
     "title": "Users",
@@ -295,7 +340,7 @@
     "addPlan": "Add Plan",
     "confirmDelete": "Delete this plan?",
     "demoLockBadge": "Locked",
-    "demoLockTooltip": "The DEMO plan's name keys the guard that blocks the demo tenant's real money paths; this plan cannot be edited or deleted.",
+    "demoLockTooltip": "DEMO tarifining nomi demo tenantning haqiqiy to'lov yo'llarini bloklaydigan himoya kalitidir; bu tarifni tahrirlab ham, o'chirib ham bo'lmaydi.",
     "defaultDiscountLabel": "INDIRIM",
     "perMonth": "/mo",
     "perYear": "/year",
@@ -429,6 +474,19 @@
       },
       "cancel": "Cancel",
       "create": "Create"
+    },
+    "toasts": {
+      "addonCreated": "Qo'shimcha yaratildi.",
+      "addonUpdated": "Qo'shimcha yangilandi.",
+      "addonArchived": "Qo'shimcha arxivlandi.",
+      "productCreated": "Mahsulot yaratildi.",
+      "productUpdated": "Mahsulot yangilandi.",
+      "productArchived": "Mahsulot arxivlandi.",
+      "stockReceived": "Ombor kirimi qayd etildi.",
+      "createFailed": "Yaratib bo'lmadi.",
+      "updateFailed": "Yangilab bo'lmadi.",
+      "archiveFailed": "Arxivlab bo'lmadi.",
+      "stockFailed": "Ombor kirimini qayd etib bo'lmadi."
     }
   },
   "legal": {
@@ -436,7 +494,7 @@
     "subtitle": "KVKK / Mesafeli Satış / İade ve diğer yasal metinleri yönetin. Yeni versiyon yayınladığınızda eski versiyon devre dışı kalır ama silinmez — mevcut Consent kayıtları geçerliliğini korur.",
     "publishNewVersion": "Yeni versiyon yayınla",
     "loading": "Yükleniyor...",
-    "loadFailed": "Failed to load legal documents.",
+    "loadFailed": "Huquqiy hujjatlarni yuklab bo'lmadi.",
     "empty": "Henüz yasal belge yok. Yeni versiyon yayınlayın ya da seed'i çalıştırın.",
     "versionCount": "({{count}} versiyon)",
     "kindLabels": {
@@ -471,6 +529,16 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
+    }
+  },
+  "bankTransfer": {
+    "toasts": {
+      "settingsSaved": "Bank o'tkazmasi sozlamalari saqlandi.",
+      "settingsSaveFailed": "Saqlab bo'lmadi.",
+      "confirmed": "O'tkazma tasdiqlandi, obuna faollashtirildi.",
+      "confirmFailed": "Tasdiqlab bo'lmadi.",
+      "rejected": "O'tkazma rad etildi.",
+      "rejectFailed": "Rad etib bo'lmadi."
     }
   }
 }

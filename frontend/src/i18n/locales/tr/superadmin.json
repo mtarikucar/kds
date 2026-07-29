@@ -104,7 +104,6 @@
     "title": "Kiracılar",
     "subtitle": "Restoran kiracılarını yönetin",
     "searchPlaceholder": "Kiracı ara...",
-    "confirmStatusChange": "Durum {{status}} olarak değiştirilsin mi?",
     "filters": {
       "allStatus": "Tüm Durumlar",
       "active": "Aktif",
@@ -208,14 +207,35 @@
       "maxCategories": "Maks. Kategori",
       "maxMonthlyOrders": "Maks. Aylık Sipariş",
       "maxBranches": "Maks. Şube"
+    },
+    "statusUpdated": "Kiracı durumu güncellendi.",
+    "statusUpdateFailed": "Durum güncellenemedi.",
+    "overridesSaveFailed": "Geçersiz kılmalar kaydedilemedi.",
+    "overridesResetFailed": "Geçersiz kılmalar sıfırlanamadı.",
+    "suspendModal": {
+      "title": "Kiracıyı Askıya Al",
+      "intro": "{{name}} askıya alınacak: tüm kullanıcı oturumları anında sonlandırılır, alt alan adı park edilir ve yöneticilere bilgilendirme gönderilir. Bu işlem geri alınabilir (Etkinleştir).",
+      "confirm": "Askıya Al"
+    },
+    "deleteModal": {
+      "title": "Kiracıyı Sil",
+      "intro": "{{name}} SİLİNDİ durumuna alınacak. Sonuçları:",
+      "consequenceSessions": "Tüm kullanıcı oturumları anında iptal edilir (erişim tokenları geçersizleşir).",
+      "consequenceSubdomain": "Alt alan adı park edilir; başka bir kiracı tarafından alınamaz.",
+      "consequenceEmail": "Tüm kiracı yöneticilerine \"Hesap Silindi\" e-postası ve bildirimi gönderilir.",
+      "reversibleNote": "Veri silinmez; bu ekrandan Etkinleştir ile geri alınabilir.",
+      "typeNameLabel": "Onaylamak için kiracı adını yazın: {{name}}",
+      "confirm": "Kiracıyı Sil"
+    },
+    "statusModal": {
+      "reasonRequired": "Neden (zorunlu — denetim kaydına ve yöneticilere giden e-postaya eklenir)",
+      "reasonOptional": "Neden (isteğe bağlı — denetim kaydına ve yöneticilere giden e-postaya eklenir)",
+      "reasonPlaceholder": "Örn. ödeme yapılmadı, kötüye kullanım bildirimi…"
     }
   },
   "subscriptions": {
     "title": "Abonelikler",
     "subtitle": "Kiracı aboneliklerini yönetin",
-    "promptExtendDays": "Uzatılacak gün sayısını girin:",
-    "confirmCancel": "Bu abonelik iptal edilsin mi?",
-    "promptCancelReason": "İptal nedenini girin (isteğe bağlı):",
     "filters": {
       "allStatus": "Tüm Durumlar",
       "active": "Aktif",
@@ -233,7 +253,31 @@
       "ends": "Bitiş"
     },
     "extend": "Uzat",
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "extendSuccess": "Abonelik uzatıldı.",
+    "extendFailed": "Abonelik uzatılamadı.",
+    "cancelSuccess": "Abonelik iptal edildi.",
+    "cancelFailed": "Abonelik iptal edilemedi.",
+    "extendModal": {
+      "title": "Aboneliği Uzat",
+      "subtitle": "{{tenant}} aboneliğinin dönem sonu ileri alınacak.",
+      "reinstateWarning": "Bu abonelik {{status}} durumunda. Uzatma, aboneliği yeniden AKTİF yapar ve kiracının kilidini açar.",
+      "days": "Uzatılacak gün sayısı",
+      "reason": "Neden (isteğe bağlı)",
+      "back": "Vazgeç",
+      "confirm": "Uzat",
+      "extending": "Uzatılıyor..."
+    },
+    "cancelModal": {
+      "title": "Aboneliği İptal Et",
+      "subtitle": "{{tenant}} aboneliği iptal edilecek.",
+      "atPeriodEnd": "Dönem sonunda (varsayılan) — erişim mevcut dönem bitene kadar sürer.",
+      "immediate": "Hemen — abonelik şimdi İPTAL edilir ve erişim kapanır.",
+      "reason": "Neden (isteğe bağlı)",
+      "keep": "Vazgeç",
+      "confirm": "İptali Onayla",
+      "cancelling": "İptal ediliyor..."
+    }
   },
   "auditLogs": {
     "title": "Denetim Kayıtları",
@@ -262,7 +306,8 @@
       "action": "İşlem",
       "entity": "Varlık",
       "target": "Hedef"
-    }
+    },
+    "exportFailed": "Dışa aktarma başarısız oldu."
   },
   "users": {
     "title": "Kullanıcılar",
@@ -429,6 +474,19 @@
       },
       "cancel": "İptal",
       "create": "Oluştur"
+    },
+    "toasts": {
+      "addonCreated": "Eklenti oluşturuldu.",
+      "addonUpdated": "Eklenti güncellendi.",
+      "addonArchived": "Eklenti arşivlendi.",
+      "productCreated": "Ürün oluşturuldu.",
+      "productUpdated": "Ürün güncellendi.",
+      "productArchived": "Ürün arşivlendi.",
+      "stockReceived": "Stok girişi yapıldı.",
+      "createFailed": "Oluşturma başarısız oldu.",
+      "updateFailed": "Güncelleme başarısız oldu.",
+      "archiveFailed": "Arşivleme başarısız oldu.",
+      "stockFailed": "Stok girişi başarısız oldu."
     }
   },
   "legal": {
@@ -471,6 +529,16 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
+    }
+  },
+  "bankTransfer": {
+    "toasts": {
+      "settingsSaved": "Havale ayarları kaydedildi.",
+      "settingsSaveFailed": "Kaydetme başarısız oldu.",
+      "confirmed": "Havale onaylandı, abonelik etkinleştirildi.",
+      "confirmFailed": "Onaylama başarısız oldu.",
+      "rejected": "Havale reddedildi.",
+      "rejectFailed": "Reddetme başarısız oldu."
     }
   }
 }

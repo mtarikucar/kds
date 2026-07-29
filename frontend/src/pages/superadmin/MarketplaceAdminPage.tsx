@@ -145,10 +145,17 @@ function AddOnsSection() {
             setCreating(false);
           }}
           onSubmit={async (body) => {
-            if (editing) await update.mutateAsync({ id: editing.id, ...body });
-            else await create.mutateAsync(body);
-            setEditing(null);
-            setCreating(false);
+            // F5: only close on success. The mutation hooks toast the error;
+            // catching here keeps the modal (and the operator's input) open
+            // instead of surfacing an unhandled rejection and losing the edit.
+            try {
+              if (editing) await update.mutateAsync({ id: editing.id, ...body });
+              else await create.mutateAsync(body);
+              setEditing(null);
+              setCreating(false);
+            } catch {
+              // Error toast already shown by the hook's onError.
+            }
           }}
         />
       )}
@@ -383,8 +390,13 @@ function ProductsSection() {
         <ProductEditorModal
           onClose={() => setCreating(false)}
           onSubmit={async (body) => {
-            await create.mutateAsync(body);
-            setCreating(false);
+            // F5: keep the modal open on failure (hook onError toasts).
+            try {
+              await create.mutateAsync(body);
+              setCreating(false);
+            } catch {
+              // Error toast already shown by the hook's onError.
+            }
           }}
         />
       )}

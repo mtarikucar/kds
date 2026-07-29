@@ -171,10 +171,31 @@ export class SuperAdminSubscriptionsService {
   ) {
     const existingPlan = await this.prisma.subscriptionPlan.findUnique({
       where: { id },
+      include: { _count: { select: { subscriptions: true } } },
     });
 
     if (!existingPlan) {
       throw new NotFoundException("Plan not found");
+    }
+
+    // F4: refuse re-denominating a plan that already has subscriptions.
+    // Legacy non-TRY plans are deliberately supported (havale is their only
+    // payment path), and subscription rows carry amounts priced in the plan's
+    // currency — flipping e.g. USD → TRY would silently rewrite "USD 49" to
+    // "TRY 49" for every subscriber. A plan with zero subscriptions may still
+    // fix a mistaken currency; a no-op resend of the current value is allowed.
+    if (
+      updateDto.currency !== undefined &&
+      updateDto.currency !== existingPlan.currency &&
+      (existingPlan._count?.subscriptions ?? 0) > 0
+    ) {
+      throw new ConflictException({
+        errorCode: "PLAN_CURRENCY_LOCKED",
+        message:
+          "Cannot change the currency of a plan that has subscriptions: " +
+          "existing subscription amounts are denominated in the plan's " +
+          "current currency and would be silently re-priced.",
+      });
     }
 
     // The DEMO plan's internal name is load-bearing for the demo money-path

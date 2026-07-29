@@ -96,7 +96,7 @@ function overrideButton(label: string) {
   return within(row);
 }
 
-describe('TenantDetailPage — status-change confirm flow', () => {
+describe('TenantDetailPage — status-change modal flow (F6)', () => {
   beforeEach(() => {
     updateStatusMutate.mockReset();
     tenant = baseTenant();
@@ -106,19 +106,70 @@ describe('TenantDetailPage — status-change confirm flow', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('fires updateStatus({ id, status: SUSPENDED }) when the operator confirms Suspend', () => {
+  it('Suspend opens a modal and sends { id, status: SUSPENDED } with the optional reason', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.suspend' }));
-    expect(window.confirm).toHaveBeenCalledWith('tenantDetail.confirmStatusChange::SUSPENDED');
+    expect(screen.getByText('tenantDetail.suspendModal.title')).toBeInTheDocument();
+    // reason is optional for suspend — confirm works without it
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.suspendModal.confirm' }));
     expect(updateStatusMutate).toHaveBeenCalledTimes(1);
-    expect(updateStatusMutate).toHaveBeenCalledWith({ id: 'tid-1', status: 'SUSPENDED' });
+    expect(updateStatusMutate).toHaveBeenCalledWith(
+      { id: 'tid-1', status: 'SUSPENDED', reason: undefined },
+      expect.any(Object),
+    );
   });
 
-  it('does NOT fire the mutation when the operator cancels the confirm', () => {
-    (window.confirm as any).mockReturnValue(false);
+  it('Suspend forwards a typed reason to the DTO', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.suspend' }));
+    fireEvent.change(screen.getByPlaceholderText('tenantDetail.statusModal.reasonPlaceholder'), {
+      target: { value: 'non-payment' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.suspendModal.confirm' }));
+    expect(updateStatusMutate).toHaveBeenCalledWith(
+      { id: 'tid-1', status: 'SUSPENDED', reason: 'non-payment' },
+      expect.any(Object),
+    );
+  });
+
+  it('Delete opens the destructive modal: consequences listed, confirm disabled until reason + name typed', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.delete' }));
-    expect(window.confirm).toHaveBeenCalledWith('tenantDetail.confirmStatusChange::DELETED');
+    expect(screen.getByText('tenantDetail.deleteModal.title')).toBeInTheDocument();
+    expect(screen.getByText('tenantDetail.deleteModal.consequenceSessions')).toBeInTheDocument();
+    expect(screen.getByText('tenantDetail.deleteModal.consequenceSubdomain')).toBeInTheDocument();
+    expect(screen.getByText('tenantDetail.deleteModal.consequenceEmail')).toBeInTheDocument();
+
+    const confirm = screen.getByRole('button', { name: 'tenantDetail.deleteModal.confirm' });
+    expect(confirm).toBeDisabled();
+
+    // reason alone is not enough — the tenant name must be typed back
+    fireEvent.change(screen.getByPlaceholderText('tenantDetail.statusModal.reasonPlaceholder'), {
+      target: { value: 'fraud' },
+    });
+    expect(screen.getByRole('button', { name: 'tenantDetail.deleteModal.confirm' })).toBeDisabled();
+
+    // a WRONG name keeps it disabled
+    fireEvent.change(screen.getByPlaceholderText('Acme Diner'), { target: { value: 'Other' } });
+    expect(screen.getByRole('button', { name: 'tenantDetail.deleteModal.confirm' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.deleteModal.confirm' }));
+    expect(updateStatusMutate).not.toHaveBeenCalled();
+
+    // exact name unlocks the destructive action; the DTO carries the reason
+    fireEvent.change(screen.getByPlaceholderText('Acme Diner'), { target: { value: 'Acme Diner' } });
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.deleteModal.confirm' }));
+    expect(updateStatusMutate).toHaveBeenCalledTimes(1);
+    expect(updateStatusMutate).toHaveBeenCalledWith(
+      { id: 'tid-1', status: 'DELETED', reason: 'fraud' },
+      expect.any(Object),
+    );
+  });
+
+  it('closing the modal via Cancel fires no mutation', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.cancel' }));
+    expect(screen.queryByText('tenantDetail.deleteModal.title')).not.toBeInTheDocument();
     expect(updateStatusMutate).not.toHaveBeenCalled();
   });
 
@@ -127,7 +178,22 @@ describe('TenantDetailPage — status-change confirm flow', () => {
     renderPage();
     expect(screen.queryByRole('button', { name: 'tenantDetail.suspend' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.activate' }));
-    expect(updateStatusMutate).toHaveBeenCalledWith({ id: 'tid-1', status: 'ACTIVE' });
+    expect(window.confirm).toHaveBeenCalledWith('tenantDetail.confirmStatusChange::ACTIVE');
+    expect(updateStatusMutate).toHaveBeenCalledWith(
+      { id: 'tid-1', status: 'ACTIVE' },
+      expect.any(Object),
+    );
+  });
+
+  it('F6: a DELETED tenant gets an Activate action (backend flip is reversible)', () => {
+    tenant = baseTenant({ status: 'DELETED' });
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'tenantDetail.delete' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.activate' }));
+    expect(updateStatusMutate).toHaveBeenCalledWith(
+      { id: 'tid-1', status: 'ACTIVE' },
+      expect.any(Object),
+    );
   });
 
   it('renders the not-found state when the tenant is missing', () => {
@@ -232,6 +298,25 @@ describe('TenantDetailPage — feature override default→on→off cycle', () =>
     expect(arg.data.limitOverrides.maxUsers).toBe(9);
     // untouched maxTables remains null (removed override)
     expect(arg.data.limitOverrides.maxTables).toBeNull();
+  });
+
+  it('F7: a FAILED save re-syncs the form from the server state (Effective stops lying)', () => {
+    // Simulate a server rejection: the mutation invokes the page-level onError.
+    updateOverridesMutate.mockImplementation((_vars: any, opts: any) => opts.onError(new Error('boom')));
+    renderPage();
+
+    // advancedReports (plan default false) → force ON locally: Effective shows ✓
+    fireEvent.click(overrideButton('Advanced Reports').getByText('tenantDetail.default'));
+    expect(overrideButton('Advanced Reports').getByText('✓')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /tenantDetail\.save/ }));
+
+    // The save failed — the form snaps back to the persisted truth: the
+    // override is gone and Effective reflects the plan default (✗) again.
+    expect(overrideButton('Advanced Reports').getByText('tenantDetail.default')).toBeInTheDocument();
+    expect(overrideButton('Advanced Reports').getByText('✗')).toBeInTheDocument();
+    // No pending edits remain, so Save is disabled again.
+    expect(screen.getByRole('button', { name: /tenantDetail\.save/ })).toBeDisabled();
   });
 
   it('Reset All confirms then fires resetOverrides(tenantId)', () => {

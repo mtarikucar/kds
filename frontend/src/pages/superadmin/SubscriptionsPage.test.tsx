@@ -66,7 +66,7 @@ function renderPage() {
   );
 }
 
-describe('SubscriptionsPage — extend-days NaN guard', () => {
+describe('SubscriptionsPage — extend modal (F8)', () => {
   beforeEach(() => {
     extendMutate.mockReset();
     cancelMutate.mockReset();
@@ -76,41 +76,68 @@ describe('SubscriptionsPage — extend-days NaN guard', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('extends when the prompt returns a numeric string', () => {
-    vi.spyOn(window, 'prompt').mockReturnValue('30');
+  function openExtendModal() {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
+  }
+
+  it('opens the modal (days prefilled 30) and submits { id, days, reason: undefined }', () => {
+    openExtendModal();
+    expect(screen.getByText('subscriptions.extendModal.title')).toBeInTheDocument();
+    expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe('30');
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extendModal.confirm' }));
     expect(extendMutate).toHaveBeenCalledTimes(1);
-    // deep-review FM11: mutate now passes per-call onSuccess/onError options.
     expect(extendMutate).toHaveBeenCalledWith(
-      { id: 'sub-1', days: 30 },
+      { id: 'sub-1', days: 30, reason: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
 
-  it('does NOT extend when the prompt is cancelled (null)', () => {
-    vi.spyOn(window, 'prompt').mockReturnValue(null);
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
+  it('forwards the typed days + reason to the DTO', () => {
+    openExtendModal();
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '7' } });
+    // the only free-text textbox in the extend modal is the reason field
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'goodwill' } });
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extendModal.confirm' }));
+    expect(extendMutate).toHaveBeenCalledWith(
+      { id: 'sub-1', days: 7, reason: 'goodwill' },
+      expect.any(Object),
+    );
+  });
+
+  it('disables Confirm and does NOT extend when the days input is cleared', () => {
+    openExtendModal();
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } });
+    const confirm = screen.getByRole('button', { name: 'subscriptions.extendModal.confirm' });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
     expect(extendMutate).not.toHaveBeenCalled();
   });
 
-  it('does NOT extend when the prompt is non-numeric (NaN guard)', () => {
-    vi.spyOn(window, 'prompt').mockReturnValue('abc');
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
-    expect(extendMutate).not.toHaveBeenCalled();
+  it('shows the REINSTATE warning for a non-ACTIVE row (extend flips status → ACTIVE)', () => {
+    subsData = payload([sub({ status: 'EXPIRED' })]);
+    openExtendModal();
+    expect(
+      screen.getByText('subscriptions.extendModal.reinstateWarning::EXPIRED'),
+    ).toBeInTheDocument();
   });
 
-  it('does NOT extend on an empty string', () => {
-    vi.spyOn(window, 'prompt').mockReturnValue('');
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
+  it('does NOT show the reinstate warning for an ACTIVE row', () => {
+    openExtendModal();
+    expect(
+      screen.queryByText(/subscriptions\.extendModal\.reinstateWarning/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Back closes the modal without extending', () => {
+    openExtendModal();
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extendModal.back' }));
+    expect(screen.queryByText('subscriptions.extendModal.title')).not.toBeInTheDocument();
     expect(extendMutate).not.toHaveBeenCalled();
   });
 });
 
-describe('SubscriptionsPage — cancel-reason flow', () => {
+describe('SubscriptionsPage — cancel modal (F8)', () => {
   beforeEach(() => {
     extendMutate.mockReset();
     cancelMutate.mockReset();
@@ -120,35 +147,38 @@ describe('SubscriptionsPage — cancel-reason flow', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('confirms, prompts for a reason, and cancels with that reason', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    vi.spyOn(window, 'prompt').mockReturnValue('Non-payment');
+  function openCancelModal() {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancel' }));
-    expect(window.confirm).toHaveBeenCalledWith('subscriptions.confirmCancel');
+  }
+
+  it('defaults to AT_PERIOD_END and sends the mode + reason: undefined', () => {
+    openCancelModal();
+    expect(screen.getByText('subscriptions.cancelModal.title')).toBeInTheDocument();
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+    expect(radios[0].checked).toBe(true); // AT_PERIOD_END is the default
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancelModal.confirm' }));
     expect(cancelMutate).toHaveBeenCalledWith(
-      { id: 'sub-1', reason: 'Non-payment' },
+      { id: 'sub-1', mode: 'AT_PERIOD_END', reason: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
 
-  it('cancels with reason=undefined when the reason prompt is left blank', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    vi.spyOn(window, 'prompt').mockReturnValue('');
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancel' }));
+  it('selecting IMMEDIATE sends mode IMMEDIATE with the typed reason', () => {
+    openCancelModal();
+    fireEvent.click(screen.getAllByRole('radio')[1]); // IMMEDIATE
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Non-payment' } });
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancelModal.confirm' }));
     expect(cancelMutate).toHaveBeenCalledWith(
-      { id: 'sub-1', reason: undefined },
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      { id: 'sub-1', mode: 'IMMEDIATE', reason: 'Non-payment' },
+      expect.any(Object),
     );
   });
 
-  it('does NOT prompt or cancel when the confirm is declined', () => {
-    const promptSpy = vi.spyOn(window, 'prompt');
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancel' }));
-    expect(promptSpy).not.toHaveBeenCalled();
+  it('Keep closes the modal without cancelling', () => {
+    openCancelModal();
+    fireEvent.click(screen.getByRole('button', { name: 'subscriptions.cancelModal.keep' }));
+    expect(screen.queryByText('subscriptions.cancelModal.title')).not.toBeInTheDocument();
     expect(cancelMutate).not.toHaveBeenCalled();
   });
 
@@ -201,13 +231,12 @@ describe('SubscriptionsPage — in-flight double-submit guard (FM11)', () => {
     expect(screen.getByRole('button', { name: 'subscriptions.cancel' })).toBeDisabled();
   });
 
-  it('does not re-open the prompt when an extend is already in flight', () => {
+  it('does not open the extend modal while a mutation is already in flight', () => {
     extendState = { isPending: true, variables: { id: 'sub-1', days: 30 } };
-    const promptSpy = vi.spyOn(window, 'prompt');
     renderPage();
     // Button is disabled, but assert the handler short-circuit even if invoked.
     fireEvent.click(screen.getByRole('button', { name: 'subscriptions.extend' }));
-    expect(promptSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText('subscriptions.extendModal.title')).not.toBeInTheDocument();
     expect(extendMutate).not.toHaveBeenCalled();
   });
 });

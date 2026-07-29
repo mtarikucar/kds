@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import Modal from '../../components/ui/Modal';
 import { useSuperAdminAuthStore } from '../../store/superAdminAuthStore';
 import { useSetup2FA, useEnable2FA } from '../../features/superadmin/api/superAdminApi';
@@ -7,7 +8,7 @@ import { getApiErrorMessage } from '../../lib/api-error';
 
 export default function SuperAdminSettingsPage() {
   const { t } = useTranslation('superadmin');
-  const { superAdmin } = useSuperAdminAuthStore();
+  const { superAdmin, setSuperAdmin } = useSuperAdminAuthStore();
   const [showSetup2FA, setShowSetup2FA] = useState(false);
   const [code, setCode] = useState('');
   const [qrData, setQrData] = useState<{ secret: string; qrCodeUrl: string } | null>(null);
@@ -29,7 +30,13 @@ export default function SuperAdminSettingsPage() {
         setShowSetup2FA(false);
         setQrData(null);
         setCode('');
-        alert(t('settings.enabledSuccess'));
+        // The store's superAdmin snapshot only refreshes on login, so flip
+        // the 2FA flag in place — otherwise the page keeps offering "Setup
+        // 2FA" (and the status line reads disabled) until the next login.
+        if (superAdmin) {
+          setSuperAdmin({ ...superAdmin, twoFactorEnabled: true });
+        }
+        toast.success(t('settings.enabledSuccess'));
       },
     });
   };

@@ -856,6 +856,88 @@ describe("SuperAdminSubscriptionsService DEMO-plan protection (plans)", () => {
 });
 
 /**
+ * Plan currency lock (review F4). Subscription rows carry amounts denominated
+ * in the plan's currency; re-denominating a subscribed plan (e.g. legacy
+ * USD 49 → TRY 49) would silently re-price every subscriber. The service must
+ * refuse a currency CHANGE while subscriptions exist, while still allowing
+ * no-op resends and currency fixes on unused plans.
+ */
+describe("SuperAdminSubscriptionsService plan currency lock (F4)", () => {
+  let prisma: MockPrismaClient;
+  let audit: any;
+  let svc: SuperAdminSubscriptionsService;
+
+  const usdPlan: any = {
+    id: "plan-usd",
+    name: "LEGACY_USD",
+    currency: "USD",
+    _count: { subscriptions: 3 },
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    svc = new SuperAdminSubscriptionsService(
+      prisma as any,
+      audit,
+      {} as any,
+      {
+        handleSubscriptionPeriodEnd: jest.fn(),
+        handleSubscriptionExpiryReminders: jest.fn(),
+      } as any,
+      {} as any,
+    );
+  });
+
+  it("refuses changing the currency of a plan with subscriptions", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(usdPlan);
+    await expect(
+      svc.updatePlan("plan-usd", { currency: "TRY" } as any, "a1", "a@x"),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.subscriptionPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("allows a no-op resend of the plan's current currency", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(usdPlan);
+    prisma.subscriptionPlan.update.mockResolvedValue(usdPlan);
+    await svc.updatePlan(
+      "plan-usd",
+      { currency: "USD", monthlyPrice: 49 } as any,
+      "a1",
+      "a@x",
+    );
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a currency change on a plan with zero subscriptions", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({
+      ...usdPlan,
+      _count: { subscriptions: 0 },
+    });
+    prisma.subscriptionPlan.update.mockResolvedValue({
+      ...usdPlan,
+      currency: "TRY",
+    });
+    await svc.updatePlan("plan-usd", { currency: "TRY" } as any, "a1", "a@x");
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves other-field updates on a subscribed plan untouched (currency omitted)", async () => {
+    prisma.subscriptionPlan.findUnique.mockResolvedValue(usdPlan);
+    prisma.subscriptionPlan.update.mockResolvedValue(usdPlan);
+    await svc.updatePlan(
+      "plan-usd",
+      { monthlyPrice: 59 } as any,
+      "a1",
+      "a@x",
+    );
+    expect(prisma.subscriptionPlan.update).toHaveBeenCalledTimes(1);
+    const data = prisma.subscriptionPlan.update.mock.calls[0][0].data;
+    expect(data.currency).toBeUndefined();
+  });
+});
+
+/**
  * updateSubscription plan-assignment guards + amount recompute (review F2/F3).
  */
 describe("SuperAdminSubscriptionsService.updateSubscription plan assignment", () => {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../../i18n/config';
 import { getApiErrorMessage } from '../../../lib/api-error';
 import { superAdminApi as api } from './superAdminApi';
 
@@ -75,9 +76,10 @@ export const useUpdateBankTransferSettings = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: saBankTransferKeys.settings() });
-      toast.success('Havale ayarları kaydedildi.');
+      toast.success(i18n.t('superadmin:bankTransfer.toasts.settingsSaved'));
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Kaydetme başarısız oldu.')),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:bankTransfer.toasts.settingsSaveFailed'))),
   });
 };
 
@@ -102,9 +104,10 @@ export const useConfirmBankTransfer = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: saBankTransferKeys.pending() });
       qc.invalidateQueries({ queryKey: ['superadmin', 'subscriptions'] });
-      toast.success('Havale onaylandı, abonelik etkinleştirildi.');
+      toast.success(i18n.t('superadmin:bankTransfer.toasts.confirmed'));
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Onaylama başarısız oldu.')),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:bankTransfer.toasts.confirmFailed'))),
   });
 };
 
@@ -117,8 +120,9 @@ export const useRejectBankTransfer = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: saBankTransferKeys.pending() });
-      toast.success('Havale reddedildi.');
+      toast.success(i18n.t('superadmin:bankTransfer.toasts.rejected'));
     },
-    onError: (e) => toast.error(getApiErrorMessage(e, 'Reddetme başarısız oldu.')),
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:bankTransfer.toasts.rejectFailed'))),
   });
 };

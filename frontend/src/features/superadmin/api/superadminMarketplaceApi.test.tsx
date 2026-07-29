@@ -108,6 +108,13 @@ describe('marketplace add-on hooks', () => {
     );
   });
 
+  it('F5: useSaUpdateAddOn toasts a server error instead of failing silently', async () => {
+    h.patch.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'no such addon' } } });
+    const { result } = renderHook(() => useSaUpdateAddOn(), { wrapper });
+    await result.current.mutateAsync({ id: 'a1', name: 'X' } as never).catch(() => undefined);
+    expect(h.toastError).toHaveBeenCalledWith('no such addon');
+  });
+
   it('useSaArchiveAddOn DELETEs by id', async () => {
     h.del.mockResolvedValue({ data: {} });
     const { result } = renderHook(() => useSaArchiveAddOn(), { wrapper });
@@ -115,6 +122,13 @@ describe('marketplace add-on hooks', () => {
     expect(h.del).toHaveBeenCalledWith(
       '/v1/superadmin/marketplace/addons/a9',
     );
+  });
+
+  it('F5: useSaArchiveAddOn toasts a server error', async () => {
+    h.del.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'in use' } } });
+    const { result } = renderHook(() => useSaArchiveAddOn(), { wrapper });
+    await result.current.mutateAsync('a9').catch(() => undefined);
+    expect(h.toastError).toHaveBeenCalledWith('in use');
   });
 });
 
@@ -150,5 +164,12 @@ describe('marketplace catalog hooks', () => {
       '/v1/superadmin/catalog/products/p1/stock',
       { qty: 5, serials: ['s1'] },
     );
+  });
+
+  it('F5: useSaReceiveStock toasts a server error', async () => {
+    h.post.mockRejectedValue({ isAxiosError: true, response: { data: { message: 'serial mismatch' } } });
+    const { result } = renderHook(() => useSaReceiveStock(), { wrapper });
+    await result.current.mutateAsync({ id: 'p1', qty: 5 }).catch(() => undefined);
+    expect(h.toastError).toHaveBeenCalledWith('serial mismatch');
   });
 });

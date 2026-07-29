@@ -4,9 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TenantsPage from './TenantsPage';
 
-// Mocks for the feature api-hooks. useTenants is the read; useUpdateTenantStatus
-// is the write whose .mutate we assert is fired with the exact { id, status }.
-const updateStatusMutate = vi.fn();
+// Mocks for the feature api-hooks. TenantsPage is read-only (the status
+// writes live on TenantDetailPage), so useTenants is the only hook consumed.
 let tenantsArg: any;
 const useTenantsImpl = vi.fn();
 
@@ -15,11 +14,10 @@ vi.mock('../../features/superadmin/api/superAdminApi', () => ({
     tenantsArg = filters;
     return useTenantsImpl(filters);
   },
-  useUpdateTenantStatus: () => ({ mutate: updateStatusMutate, isPending: false }),
 }));
 
-// i18n: echo keys but interpolate args so we can assert the confirm() message
-// the component actually builds (e.g. tenants.confirmStatusChange::SUSPENDED).
+// i18n: echo keys but interpolate args so we can assert the interpolated
+// strings the component actually builds (e.g. tenants.usage::3,42).
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, arg?: Record<string, unknown>) => {
@@ -66,7 +64,6 @@ function renderPage() {
 
 describe('TenantsPage', () => {
   beforeEach(() => {
-    updateStatusMutate.mockReset();
     useTenantsImpl.mockReset();
     tenantsArg = undefined;
     useTenantsImpl.mockReturnValue({
@@ -130,7 +127,6 @@ describe('TenantsPage', () => {
 
 describe('TenantsPage — pagination & navigation', () => {
   beforeEach(() => {
-    updateStatusMutate.mockReset();
     useTenantsImpl.mockReset();
     useTenantsImpl.mockReturnValue({
       data: pagePayload([makeTenant({ id: 'tid-9', status: 'ACTIVE' })]),
