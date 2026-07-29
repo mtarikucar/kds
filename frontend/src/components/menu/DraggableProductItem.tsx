@@ -115,9 +115,21 @@ const DraggableProductItem: React.FC<DraggableProductItemProps> = ({
             </div>
           </div>
 
-          {/* Price */}
+          {/* Price — findAll serves the campaign-effective price in `price`;
+              when a campaign is active show the struck-through list price and
+              a badge so admins see the discount context, not a bare number. */}
           <div className="flex-shrink-0 text-right">
-            <p className="font-semibold text-primary-600">
+            {product.campaignActive && (
+              <Badge variant="warning" className="mb-0.5 text-[10px]">
+                {product.campaignLabel || t("menu.campaign", "Kampanya")}
+              </Badge>
+            )}
+            <p className="flex items-center justify-end gap-1.5 font-semibold text-primary-600">
+              {product.campaignActive && product.listPrice != null && (
+                <span className="text-xs font-medium text-slate-400 line-through">
+                  {formatCurrency(product.listPrice)}
+                </span>
+              )}
               {formatCurrency(product.price)}
             </p>
             <p className="text-xs text-slate-500">

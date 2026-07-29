@@ -283,6 +283,48 @@ describe("ProductsService — create/update/remove/transform", () => {
       );
     });
 
+    it("names the combo blocker when the combo-component FK is violated (meta.constraint)", async () => {
+      const fkErr = new Prisma.PrismaClientKnownRequestError("FK violation", {
+        code: "P2003",
+        clientVersion: "5",
+        meta: { constraint: "combo_group_items_componentProductId_fkey" },
+      } as any);
+      (prisma.product.delete as any).mockRejectedValue(fkErr);
+
+      await expect(svc.remove("p-1", TENANT)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(svc.remove("p-1", TENANT)).rejects.toThrow(
+        /component of a combo/,
+      );
+    });
+
+    it("names the combo blocker via the older meta.field_name shape too", async () => {
+      const fkErr = new Prisma.PrismaClientKnownRequestError("FK violation", {
+        code: "P2003",
+        clientVersion: "5",
+        meta: { field_name: "combo_group_items_componentProductId_fkey (index)" },
+      } as any);
+      (prisma.product.delete as any).mockRejectedValue(fkErr);
+
+      await expect(svc.remove("p-1", TENANT)).rejects.toThrow(
+        /component of a combo/,
+      );
+    });
+
+    it("keeps the orders message for the order-item FK constraint", async () => {
+      const fkErr = new Prisma.PrismaClientKnownRequestError("FK violation", {
+        code: "P2003",
+        clientVersion: "5",
+        meta: { constraint: "order_items_productId_fkey" },
+      } as any);
+      (prisma.product.delete as any).mockRejectedValue(fkErr);
+
+      await expect(svc.remove("p-1", TENANT)).rejects.toThrow(
+        /Mark it as unavailable instead/,
+      );
+    });
+
     it("rethrows a non-P2003 error unchanged", async () => {
       const other = new Error("boom");
       (prisma.product.delete as any).mockRejectedValue(other);

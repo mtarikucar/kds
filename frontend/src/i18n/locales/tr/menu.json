@@ -125,7 +125,11 @@
       "unusedImages": "Kullanılmayan",
       "unusedHint": "Hiçbir ürüne eklenmemiş görseller. Depolama alanı için silin.",
       "noUnusedImages": "Kullanılmayan görsel yok",
-      "noUnusedHint": "Her görsel en az bir ürüne ekli."
+      "noUnusedHint": "Her görsel en az bir ürüne ekli.",
+      "rejectedTooLarge": "5MB sınırını aştığı için yüklenmedi: {{files}}",
+      "rejectedNotImage": "Görsel dosyası olmadığı için yüklenmedi: {{files}}",
+      "bulkDeleted": "{{count}} görsel silindi",
+      "bulkDeleteFailed": "{{failed}}/{{total}} görsel silinemedi — seçili bırakıldı"
     },
     "comboSlots": "Kombo içeriği",
     "campaign": "Kampanya",
@@ -136,7 +140,17 @@
     "campaignEnd": "Bitiş",
     "collections": "Koleksiyonlar",
     "productTypeStandard": "Normal ürün",
-    "productTypeCombo": "Kombo / Menü"
+    "productTypeCombo": "Kombo / Menü",
+    "importCloseConfirm": "İçe aktarma taslağı kaydedilmedi — kapatırsanız taslak ve düzenlemeleriniz silinecek. Yine de kapatılsın mı?",
+    "comboValidation": {
+      "slotName": "Slot adı boş olamaz",
+      "noItems": "Slota en az bir seçenek ekleyin",
+      "itemProduct": "Her seçenek için bir ürün seçin",
+      "itemQty": "Adet en az 1 olmalı",
+      "maxSelectMin": "\"En çok\" en az 1 olmalı",
+      "minMax": "\"En az\", \"en çok\" değerini ve seçenek sayısını aşamaz",
+      "summary": "Kombo içeriğinde hatalar var — işaretli slotları düzeltin"
+    }
   },
   "media": {
     "title": "Yapay zeka stüdyo",
@@ -179,5 +193,8 @@
   "threeD": {
     "quotaLabel": "3D",
     "quotaExhausted": "Aylık 3D model üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin."
+  },
+  "import": {
+    "invalidRows": "{{n}} satır eksik veya hatalı (boş ad ya da negatif fiyat) — düzeltin veya silin"
   }
 }

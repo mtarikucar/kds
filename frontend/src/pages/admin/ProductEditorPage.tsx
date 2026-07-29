@@ -27,6 +27,10 @@ import ImageLibraryModal from "../../components/product/ImageLibraryModal";
 import Product3dPanel from "../../components/product/Product3dPanel";
 import ProductMediaPanel from "../../components/product/ProductMediaPanel";
 import ComboBuilder from "./menuManagement/ComboBuilder";
+import {
+  validateComboGroups,
+  type ComboSlotErrors,
+} from "./menuManagement/comboValidation";
 import CollectionMultiSelect from "./menuManagement/CollectionMultiSelect";
 import {
   createProductSchema,
@@ -105,6 +109,7 @@ export default function ProductEditorPage() {
     string[]
   >([]);
   const [comboGroups, setComboGroups] = useState<ComboGroupInput[]>([]);
+  const [comboErrors, setComboErrors] = useState<ComboSlotErrors>({});
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(
     [],
   );
@@ -290,7 +295,32 @@ export default function ProductEditorPage() {
     return id;
   };
 
+  // After a failed submit, revalidate live so the inline slot errors clear as
+  // the operator fixes them.
+  const handleComboGroupsChange = (next: ComboGroupInput[]) => {
+    setComboGroups(next);
+    if (Object.keys(comboErrors).length > 0) {
+      setComboErrors(validateComboGroups(next));
+    }
+  };
+
   const onSubmit = async (data: ProductFormData) => {
+    // Combos: block unsellable configurations (empty slot, unselected product,
+    // qty/maxSelect 0, minSelect > options) BEFORE the backend — it persists
+    // some of these silently and the POS only fails at sale time.
+    if ((data.productType ?? "STANDARD") === "COMBO") {
+      const errs = validateComboGroups(comboGroups);
+      setComboErrors(errs);
+      if (Object.keys(errs).length > 0) {
+        toast.error(
+          t(
+            "menu.comboValidation.summary",
+            "Kombo içeriğinde hatalar var — işaretli slotları düzeltin",
+          ),
+        );
+        return;
+      }
+    }
     try {
       if (product?.id) {
         await updateProduct({
@@ -613,8 +643,9 @@ export default function ProductEditorPage() {
             >
               <ComboBuilder
                 groups={comboGroups}
-                onChange={setComboGroups}
+                onChange={handleComboGroupsChange}
                 components={componentOptions}
+                errors={comboErrors}
               />
             </Section>
           )}

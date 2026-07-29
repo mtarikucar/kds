@@ -1,6 +1,8 @@
 import { Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import Button from "../../../components/ui/Button";
 import type { ComboGroupInput } from "../../../types";
+import type { ComboSlotErrors } from "./comboValidation";
 
 type ComponentOption = { id: string; name: string; price: number };
 
@@ -8,17 +10,21 @@ type ComponentOption = { id: string; name: string; price: number };
  * Inline combo builder: an array of slots ("groups"), each with min/max
  * selection and a list of selectable component products (quantity, priceDelta,
  * default). Controlled — holds no state of its own; the ProductEditor owns the
- * `comboGroups` array. Mirrors the modifier-group editing pattern.
+ * `comboGroups` array (and the submit-time validation errors, keyed by slot
+ * index). Mirrors the modifier-group editing pattern.
  */
 export default function ComboBuilder({
   groups,
   onChange,
   components,
+  errors,
 }: {
   groups: ComboGroupInput[];
   onChange: (groups: ComboGroupInput[]) => void;
   components: ComponentOption[];
+  errors?: ComboSlotErrors;
 }) {
+  const { t } = useTranslation("menu");
   const patchGroup = (gi: number, patch: Partial<ComboGroupInput>) =>
     onChange(groups.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
 
@@ -75,7 +81,9 @@ export default function ComboBuilder({
       {groups.map((group, gi) => (
         <div
           key={gi}
-          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+          className={`rounded-xl border bg-slate-50 p-3 ${
+            errors?.[gi]?.length ? "border-red-300" : "border-slate-200"
+          }`}
         >
           <div className="mb-2 flex items-center gap-2">
             <input
@@ -202,6 +210,16 @@ export default function ComboBuilder({
           >
             <Plus className="h-3.5 w-3.5" /> Seçenek ekle
           </button>
+
+          {(errors?.[gi]?.length ?? 0) > 0 && (
+            <div className="mt-2 space-y-0.5">
+              {errors![gi].map((key) => (
+                <p key={key} className="text-xs text-red-600">
+                  {t(key)}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 

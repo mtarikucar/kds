@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -33,15 +33,26 @@ const cellCls =
  * PRO+ only (feature.aiContentGeneration): the /parse endpoint 403s on lower
  * plans (the non-AI bulk-add path stays open to everyone via BulkAddModal).
  */
-export default function MenuImportTab() {
+export default function MenuImportTab({
+  onDirtyChange,
+}: {
+  /** Reports whether an unsaved draft (or a pending parse) exists, so the
+      hosting modal can confirm before an Escape/backdrop close destroys a
+      quota-consuming parse + manual edits. */
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   return (
     <FeatureGate feature="aiContentGeneration" showUpgradePrompt>
-      <MenuImportTabInner />
+      <MenuImportTabInner onDirtyChange={onDirtyChange} />
     </FeatureGate>
   );
 }
 
-function MenuImportTabInner() {
+function MenuImportTabInner({
+  onDirtyChange,
+}: {
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { t } = useTranslation(["menu", "common"]);
   const parse = useParseMenuPhotos();
   const commit = useCommitMenuImport();
@@ -54,6 +65,37 @@ function MenuImportTabInner() {
     () => draft?.categories.reduce((n, c) => n + c.products.length, 0) ?? 0,
     [draft],
   );
+
+  // Rows the commit endpoint would reject/ignore: blank product name or a
+  // negative price, plus a blank category name over real rows. Counted (for
+  // the blocking toast) and highlighted inline instead of silently dropped —
+  // the commit button advertises the FULL row count.
+  const invalidRowCount = useMemo(() => {
+    if (!draft) return 0;
+    return draft.categories.reduce((n, c) => {
+      const badRows = c.products.filter(
+        (p) => !p.name.trim() || p.price < 0,
+      ).length;
+      const badCatName = !c.name.trim() && c.products.length > 0 ? 1 : 0;
+      return n + badRows + badCatName;
+    }, 0);
+  }, [draft]);
+
+  // One object URL per File, revoked when the photo set changes/unmounts —
+  // creating them inline in render leaked a blob URL on every render.
+  const photoUrls = useMemo(
+    () => photos.map((f) => URL.createObjectURL(f)),
+    [photos],
+  );
+  useEffect(
+    () => () => photoUrls.forEach((u) => URL.revokeObjectURL(u)),
+    [photoUrls],
+  );
+
+  const dirty = !!draft || parse.isPending;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   const addPhotos = (files: FileList | null) => {
     if (!files) return;
@@ -137,7 +179,19 @@ function MenuImportTabInner() {
 
   const handleCommit = async () => {
     if (!draft) return;
-    // Drop empty rows/categories before sending.
+    // Block instead of silently filtering: the button advertises the full
+    // count, so a blank-name/negative-price row must be fixed or deleted.
+    if (invalidRowCount > 0) {
+      toast.error(
+        t(
+          "menu:import.invalidRows",
+          "{{n}} satır eksik veya hatalı (boş ad ya da negatif fiyat) — düzeltin veya silin",
+          { n: invalidRowCount },
+        ),
+      );
+      return;
+    }
+    // Drop empty categories (no products) before sending.
     const cleaned: MenuImportDraft = {
       categories: draft.categories
         .map((c) => ({
@@ -218,10 +272,10 @@ function MenuImportTabInner() {
           {photos.length > 0 && (
             <>
               <div className="mt-4 flex flex-wrap gap-3">
-                {photos.map((f, i) => (
+                {photos.map((_f, i) => (
                   <div key={i} className="relative">
                     <img
-                      src={URL.createObjectURL(f)}
+                      src={photoUrls[i]}
                       alt=""
                       className="h-24 w-24 rounded-md object-cover ring-1 ring-gray-200"
                     />
@@ -294,7 +348,11 @@ function MenuImportTabInner() {
                   placeholder={
                     t("menu:import.categoryName", "Kategori adı") as string
                   }
-                  className={`${cellCls} max-w-xs font-semibold`}
+                  className={`${cellCls} max-w-xs font-semibold ${
+                    !cat.name.trim() && cat.products.length > 0
+                      ? "!border-red-500"
+                      : ""
+                  }`}
                 />
                 <button
                   type="button"
@@ -320,7 +378,9 @@ function MenuImportTabInner() {
                       placeholder={
                         t("menu:import.itemName", "Ürün adı") as string
                       }
-                      className={`${cellCls} col-span-4`}
+                      className={`${cellCls} col-span-4 ${
+                        !p.name.trim() ? "!border-red-500" : ""
+                      }`}
                     />
                     <input
                       value={p.description ?? ""}
@@ -342,7 +402,9 @@ function MenuImportTabInner() {
                           price: Number(e.target.value) || 0,
                         })
                       }
-                      className={`${cellCls} col-span-2 text-right`}
+                      className={`${cellCls} col-span-2 text-right ${
+                        p.price < 0 ? "!border-red-500" : ""
+                      }`}
                     />
                     <select
                       value={p.taxRate ?? 10}

@@ -26,7 +26,9 @@ export default function CollectionsTab() {
 
   const add = async () => {
     const name = newName.trim();
-    if (!name) return;
+    // `creating` guard: the Add BUTTON is disabled while pending, but the
+    // Enter handler isn't — two quick Enters would create the row twice.
+    if (!name || creating) return;
     await create({ name });
     setNewName("");
   };
