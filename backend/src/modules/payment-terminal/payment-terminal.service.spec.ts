@@ -134,4 +134,61 @@ describe("PaymentTerminalService (simulator money-safety)", () => {
     expect(prisma.paymentTerminalCharge.create).not.toHaveBeenCalled();
     expect(payments.create).not.toHaveBeenCalled();
   });
+
+  // Single-live-charge guard: a Retry arrives with a FRESH idempotency key, so
+  // the key dedupe can't stop it — the order-level guard must, or the card can
+  // be charged twice for one order (second APPROVED parks as
+  // APPROVED-unrecorded needing a manual void).
+  describe("single-live-charge guard (409 while a live charge exists)", () => {
+    const liveGuardFindFirst =
+      (liveRow: any) =>
+      async ({ where }: any) => {
+        if (where?.idempotencyKey) return null; // key dedupe: no match
+        if (where?.status?.in) return liveRow; // order-level live-charge probe
+        return null;
+      };
+
+    it("rejects START with 409 while a PENDING charge exists for the order", async () => {
+      (prisma.paymentTerminalCharge.findFirst as any).mockImplementation(
+        liveGuardFindFirst({ id: "chg-live", status: "PENDING" }),
+      );
+      await expect(
+        svc.charge(scope as any, "o1", { amount: 100 }, "u1"),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.paymentTerminalCharge.create).not.toHaveBeenCalled();
+      expect(payments.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects START with 409 while an APPROVED-unrecorded charge awaits reconciliation", async () => {
+      (prisma.paymentTerminalCharge.findFirst as any).mockImplementation(
+        liveGuardFindFirst({ id: "chg-live", status: "APPROVED" }),
+      );
+      await expect(
+        svc.charge(scope as any, "o1", { amount: 100 }, "u1"),
+      ).rejects.toThrow(/reconciliation/);
+      expect(prisma.paymentTerminalCharge.create).not.toHaveBeenCalled();
+    });
+
+    it("probes only LIVE statuses (terminal states must not block a new charge)", async () => {
+      // Wrap the beforeEach implementation: intercept the live-charge probe to
+      // capture WHICH statuses it blocks on, delegate everything else so the
+      // charge lifecycle (create → applyResult → RECORDED) runs unchanged.
+      let probedStatuses: string[] | null = null;
+      const prevImpl = (
+        prisma.paymentTerminalCharge.findFirst as any
+      ).getMockImplementation();
+      (prisma.paymentTerminalCharge.findFirst as any).mockImplementation(
+        async (args: any) => {
+          if (args?.where?.status?.in) {
+            probedStatuses = args.where.status.in;
+            return null; // no live charge → START proceeds
+          }
+          return prevImpl(args);
+        },
+      );
+      const res = await svc.charge(scope as any, "o1", { amount: 100 }, "u1");
+      expect(res.status).toBe("RECORDED"); // happy path unaffected by the guard
+      expect(probedStatuses).toEqual(["PENDING", "APPROVED", "NEEDS_REVIEW"]);
+    });
+  });
 });

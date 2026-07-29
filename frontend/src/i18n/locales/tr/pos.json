@@ -327,7 +327,8 @@
     "timeout": "Zaman aşımı — terminal yanıt vermedi",
     "error": "Ödeme hatası",
     "cancelled": "Çekim iptal edildi",
-    "recorded": "Ödeme alındı"
+    "recorded": "Ödeme alındı",
+    "retryCancelFailed": "Önceki çekim denemesi iptal edilemedi — yine de tamamlanırsa mutabakat ekranından çözümleyin."
   },
   "campaign": "Kampanya",
   "startingFrom": "başlangıç",

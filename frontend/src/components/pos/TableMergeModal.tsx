@@ -35,6 +35,29 @@ const TableMergeModal = ({
     setSelectedIds(new Set());
   }, [currentTable?.id]);
 
+  // A socket-driven refetch can drop a table out of the selectable grid (it
+  // went RESERVED, or joined the current group) while its id silently stays
+  // in selectedIds — and would then be submitted with the merge. Prune the
+  // selection against the live selectable list whenever the data changes.
+  useEffect(() => {
+    if (!tables) return;
+    setSelectedIds(prev => {
+      if (prev.size === 0) return prev;
+      const selectable = new Set(
+        tables
+          .filter(
+            tb =>
+              tb.id !== currentTable?.id &&
+              tb.status !== 'RESERVED' &&
+              !(currentTable?.groupId && tb.groupId === currentTable.groupId)
+          )
+          .map(tb => tb.id)
+      );
+      const next = new Set(Array.from(prev).filter(id => selectable.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tables, currentTable?.id, currentTable?.groupId]);
+
   const isInGroup = !!currentTable?.groupId;
   const groupTables = isInGroup
     ? (tables || []).filter(t => t.groupId === currentTable?.groupId)
