@@ -107,8 +107,12 @@ export function writePersistedCart<T>(
  * localStorage and a write-through persistence effect. Returns the same
  * tuple POSPage used inline plus the active storage key (so other reset
  * paths can clear it if ever needed — POSPage currently does not).
+ *
+ * `normalize` (optional) runs once on the loaded items — POSPage passes
+ * posCart.normalizeCartLines so carts persisted before line identity existed
+ * get their `lineId`s backfilled before any line operation targets them.
  */
-export function useCartPersistence<T>(): {
+export function useCartPersistence<T>(normalize?: (items: T[]) => T[]): {
   cartItems: T[];
   setCartItems: React.Dispatch<React.SetStateAction<T[]>>;
   cartStorageKey: string | null;
@@ -116,9 +120,10 @@ export function useCartPersistence<T>(): {
   const user = useAuthStore((s) => s.user);
   const cartStorageKey = buildCartStorageKey(user);
 
-  const [cartItems, setCartItems] = useState<T[]>(() =>
-    readPersistedCart<T>(cartStorageKey),
-  );
+  const [cartItems, setCartItems] = useState<T[]>(() => {
+    const items = readPersistedCart<T>(cartStorageKey);
+    return normalize ? normalize(items) : items;
+  });
 
   useEffect(() => {
     writePersistedCart(cartStorageKey, cartItems);

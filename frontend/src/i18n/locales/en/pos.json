@@ -188,7 +188,8 @@
   "awaitingPayment": {
     "title": "Awaiting Payment",
     "collectPayment": "Collect Payment",
-    "orderTotal": "Order Total"
+    "orderTotal": "Order Total",
+    "remainingDue": "Remaining Due"
   },
   "tableGrid": {
     "selected": "Selected",

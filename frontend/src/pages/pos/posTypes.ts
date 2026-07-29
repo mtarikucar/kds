@@ -15,4 +15,9 @@ export interface CartItem extends Product {
   // For a COMBO line: the chosen component per slot. `price` on this item is
   // already the effective combo price (base + chosen slot deltas).
   comboSelections?: ComboSelectionInput[];
+  // CLIENT-ONLY line identity (product + modifier set + combo picks — see
+  // posCart.computeCartLineId). Targets qty/remove ops and React keys; never
+  // sent to the API (buildOrderData maps explicit fields only). Optional so
+  // persisted pre-lineId carts type-check; normalizeCartLines backfills it.
+  lineId?: string;
 }

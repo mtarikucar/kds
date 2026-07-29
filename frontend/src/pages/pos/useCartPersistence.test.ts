@@ -14,6 +14,7 @@ import type { User } from '../../types';
 interface Item {
   id: string;
   quantity: number;
+  lineId?: string;
 }
 
 const KEY = 'pos_cart::tenant-1::user-1';
@@ -172,5 +173,16 @@ describe('useCartPersistence hook', () => {
     const persisted = JSON.parse(localStorage.getItem(KEY)!);
     expect(persisted.items).toEqual([{ id: 'new', quantity: 7 }]);
     expect(typeof persisted.savedAt).toBe('number');
+  });
+
+  it('applies the normalize hook to loaded items (lineId back-compat backfill)', () => {
+    const items: Item[] = [{ id: 'p1', quantity: 2 }];
+    localStorage.setItem(KEY, JSON.stringify({ items, savedAt: Date.now() }));
+    useAuthStore.setState({ user: fakeUser('tenant-1', 'user-1') });
+
+    const normalize = (loaded: Item[]) =>
+      loaded.map((i) => ({ ...i, lineId: `${i.id}::` }));
+    const { result } = renderHook(() => useCartPersistence<Item>(normalize));
+    expect(result.current.cartItems).toEqual([{ id: 'p1', quantity: 2, lineId: 'p1::' }]);
   });
 });

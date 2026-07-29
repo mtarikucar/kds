@@ -188,7 +188,8 @@
   "awaitingPayment": {
     "title": "Ödeme Bekleyen",
     "collectPayment": "Ödeme Al",
-    "orderTotal": "Sipariş Toplamı"
+    "orderTotal": "Sipariş Toplamı",
+    "remainingDue": "Kalan Tutar"
   },
   "tableGrid": {
     "selected": "Seçili",

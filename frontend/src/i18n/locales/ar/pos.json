@@ -283,7 +283,8 @@
   "awaitingPayment": {
     "title": "بانتظار الدفع",
     "collectPayment": "تحصيل الدفع",
-    "orderTotal": "إجمالي الطلب"
+    "orderTotal": "إجمالي الطلب",
+    "remainingDue": "المبلغ المتبقي"
   },
   "dineInPaymentRequiresServed": "لا يمكن دفع طلبات تناول الطعام بالمطعم إلا بعد تقديمها",
   "dineInPaymentRequiresReadyOrServed": "لا يمكن دفع طلبات تناول الطعام بالمطعم إلا عندما تكون جاهزة أو مقدمة",

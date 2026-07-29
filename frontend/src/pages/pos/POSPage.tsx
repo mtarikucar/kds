@@ -38,6 +38,11 @@ import {
   resolvePaymentTarget,
   hasRemainingUnpaidOrders,
   mergeCartItem,
+  normalizeCartLines,
+  orderRemainingDue,
+  removeLine,
+  stepProductLine,
+  updateLineQuantity,
 } from './posCart';
 import { useCartPersistence } from './useCartPersistence';
 import { usePosTourSync } from './usePosTourSync';
@@ -69,7 +74,8 @@ const POSPage = () => {
   // doesn't wipe an in-progress order. The per-user key shape
   // (`pos_cart::<tenantId>::<userId>`, v2.8.97), the 12h TTL, and the
   // legacy-key migration all live in useCartPersistence (unit-tested).
-  const { cartItems, setCartItems } = useCartPersistence<CartItem>();
+  // normalizeCartLines backfills lineId on carts persisted pre-line-identity.
+  const { cartItems, setCartItems } = useCartPersistence<CartItem>(normalizeCartLines);
   const [discount, setDiscount] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
@@ -221,15 +227,17 @@ const POSPage = () => {
   // could charge a stale-low total — the backend accepts any amount ≤
   // remaining and records a silent PARTIAL payment. Resolve against the
   // freshest server row at render, falling back to the snapshot only while
-  // the live row isn't loaded. finalAmount may serialize as a string
-  // (Prisma Decimal) → Number().
+  // the live row isn't loaded. The live amount is the REMAINING due
+  // (finalAmount − COMPLETED payments), not the gross total: after a
+  // partial/progressive payment the backend rejects anything above the
+  // remainder, so charging finalAmount would dead-end the settle-up.
   const liveCurrentOrderAmount = currentOrder
-    ? Number(currentOrder.finalAmount)
+    ? orderRemainingDue(currentOrder)
     : currentOrderAmount;
   const livePayingOrderAmount = useMemo(() => {
     if (!payingOrderId) return payingOrderAmount;
     const live = tableOrders?.find((o) => o.id === payingOrderId);
-    return live ? Number(live.finalAmount) : payingOrderAmount;
+    return live ? orderRemainingDue(live) : payingOrderAmount;
   }, [payingOrderId, payingOrderAmount, tableOrders]);
 
   // Payment eligibility calculation for two-step checkout. The gate logic
@@ -343,18 +351,17 @@ const POSPage = () => {
     setProductForOptions(null);
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  // Line ops target lineId (product + modifiers + combo picks), NOT the bare
+  // product id — two lines of the same product with different modifiers are
+  // distinct bills, and a product-id match updated/removed every one of them.
+  const handleUpdateQuantity = (lineId: string, quantity: number) => {
     if (quantity < 1) return;
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.id === productId ? { ...item, quantity } : item
-      )
-    );
+    setCartItems((prev) => updateLineQuantity(prev, lineId, quantity));
     markCartDirty();
   };
 
-  const handleRemoveItem = (productId: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== productId));
+  const handleRemoveItem = (lineId: string) => {
+    setCartItems((prev) => removeLine(prev, lineId));
     markCartDirty();
   };
 
@@ -369,25 +376,16 @@ const POSPage = () => {
   }, [cartItems]);
 
   // Inline +/- from a MenuPanel card. Only wired for non-modifier items (the
-  // panel hides the steppers for required-modifier products), which always
-  // collapse to a single cart line, so targeting by product id is safe.
+  // panel hides the steppers for required-modifier products/combos), which
+  // merge into a single plain line. stepProductLine resolves that ONE line
+  // (never a sibling modifier line a reopened order may have added).
   const handleMenuIncrement = (productId: string) => {
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.id === productId ? { ...item, quantity: item.quantity + 1 } : item,
-      ),
-    );
+    setCartItems((prev) => stepProductLine(prev, productId, 1));
     markCartDirty();
   };
 
   const handleMenuDecrement = (productId: string) => {
-    setCartItems((prev) =>
-      prev.flatMap((item) => {
-        if (item.id !== productId) return [item];
-        // Drop the line when it would hit zero, otherwise decrement.
-        return item.quantity <= 1 ? [] : [{ ...item, quantity: item.quantity - 1 }];
-      }),
-    );
+    setCartItems((prev) => stepProductLine(prev, productId, -1));
     markCartDirty();
   };
 
