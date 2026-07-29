@@ -218,8 +218,16 @@ const KitchenDisplayPage = () => {
         />
       </div>
 
-      {/* Mobile/Tablet: Tab Navigation */}
-      <div className="lg:hidden flex-1 min-h-0 flex flex-col">
+      {/* Mobile/Tablet: Tab Navigation. Carries the SAME data-tour anchor as
+          the desktop grid — the two containers are self-exclusive (grid is
+          hidden <lg, tabs hidden ≥lg) so exactly one is ever visible, and the
+          kitchen tour's order-queues step can resolve a VISIBLE target at any
+          width. Pre-fix the anchor only existed on the desktop grid, so on
+          tablets (<1024px) the tour hit TARGET_NOT_FOUND forever at step 3. */}
+      <div
+        className="lg:hidden flex-1 min-h-0 flex flex-col"
+        data-tour="order-queues"
+      >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
           <TabsList className="w-full grid grid-cols-3 p-1 bg-slate-100 rounded-xl">
             {tabConfig.map((tab) => (

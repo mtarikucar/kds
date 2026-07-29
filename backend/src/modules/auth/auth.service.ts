@@ -587,6 +587,10 @@ export class AuthService {
         tenantId: true,
         primaryBranchId: true,
         branchAssignments: { select: { branchId: true } },
+        // tenantName lets the /welcome page prefill the business-name field
+        // so an admin re-visiting the form doesn't retype (and accidentally
+        // re-rename) the restaurant.
+        tenant: { select: { name: true } },
       },
     });
 
@@ -594,7 +598,7 @@ export class AuthService {
       throw new UnauthorizedException("User not found");
     }
 
-    const { branchAssignments, ...rest } = user;
+    const { branchAssignments, tenant, ...rest } = user;
     // Mirror token.service: an owner ADMIN/MANAGER with a null primaryBranchId
     // (pre-v3.0.0, never backfilled) must still receive a concrete home
     // branch here, or the SPA's /me refetch re-nulls branchScopeStore and
@@ -606,6 +610,7 @@ export class AuthService {
     );
     return {
       ...rest,
+      tenantName: tenant?.name ?? null,
       primaryBranchId,
       allowedBranchIds: branchAssignments.map((a) => a.branchId),
     };
@@ -1053,6 +1058,15 @@ export class AuthService {
    * User + Tenant + the Main branch. Used by the post-social-login (and any
    * incomplete-profile) /welcome page. Returns the refreshed profile so the
    * SPA's completion gate sees phone populated and releases into the app.
+   *
+   * SECURITY: the tenant + Main-branch mutations are ADMIN-only. The endpoint
+   * is JWT-only (any authenticated role can call it), and pre-fix a WAITER /
+   * KITCHEN / COURIER "completing their profile" could rename the restaurant
+   * (tenant.name feeds the QR menu and receipts), rewrite taxId/taxOffice and
+   * overwrite the HQ address. Non-admin callers still get their user-scoped
+   * fields (phone/name/locale) saved — the call succeeds, the tenant/branch
+   * fields are simply ignored. The role is read from the DB (not the JWT
+   * claim) so a stale token can't widen the write.
    */
   async completeProfile(
     userId: string,
@@ -1060,6 +1074,12 @@ export class AuthService {
     dto: CompleteProfileDto,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      const caller = await tx.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      const isAdmin = caller?.role === UserRole.ADMIN;
+
       await tx.user.update({
         where: { id: userId },
         data: {
@@ -1069,6 +1089,9 @@ export class AuthService {
           ...(dto.locale ? { locale: dto.locale } : {}),
         },
       });
+
+      // Everything below writes tenant/branch state — ADMIN only.
+      if (!isAdmin) return;
 
       const tenantData: Record<string, unknown> = {};
       if (dto.businessName) tenantData.name = dto.businessName;

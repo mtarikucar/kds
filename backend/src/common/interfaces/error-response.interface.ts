@@ -63,6 +63,12 @@ export enum ErrorCode {
   TOKEN_INVALID = "TOKEN_INVALID",
   UNAUTHORIZED = "UNAUTHORIZED",
   ACCOUNT_ROLE_INVALID = "ACCOUNT_ROLE_INVALID",
+  // Staff account exists but an admin hasn't approved it yet (login rejected).
+  ACCOUNT_PENDING_APPROVAL = "ACCOUNT_PENDING_APPROVAL",
+  // Password-reset token unknown, expired, or already consumed.
+  RESET_TOKEN_INVALID = "RESET_TOKEN_INVALID",
+  // Email-verification code unknown, expired, or already consumed.
+  VERIFICATION_CODE_INVALID = "VERIFICATION_CODE_INVALID",
 
   // Authorization errors
   FORBIDDEN = "FORBIDDEN",

@@ -98,6 +98,13 @@ describe('PasswordService.validateUser', () => {
     await expect(svc.validateUser('u@test.com', 'correct-horse')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+    // Machine-readable code so the SPA can localize (the message itself is
+    // hardcoded Turkish and must not be the only signal).
+    await expect(
+      svc.validateUser('u@test.com', 'correct-horse'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: 'ACCOUNT_PENDING_APPROVAL' }),
+    });
   });
 
   it('throws when the tenant is not ACTIVE', async () => {
@@ -133,6 +140,22 @@ describe('PasswordService.forgotPassword', () => {
     const stored = prisma.user.update.mock.calls[0][0].data.resetTokenHash;
     const emailedRaw = localEmail.sendPasswordResetEmail.mock.calls[0][1];
     expect(stored).not.toBe(emailedRaw);
+  });
+});
+
+describe('PasswordService.resetPassword', () => {
+  it('rejects an unknown/expired token with the RESET_TOKEN_INVALID errorCode', async () => {
+    const prisma = makePrisma();
+    prisma.user.findFirst.mockResolvedValue(null);
+    const svc = new PasswordService(prisma as any, makeConfig(), email);
+    await expect(
+      svc.resetPassword({ token: 'nope', newPassword: 'Newpass1' } as any),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: 'RESET_TOKEN_INVALID' }),
+    });
+    await expect(
+      svc.resetPassword({ token: 'nope', newPassword: 'Newpass1' } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 

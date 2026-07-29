@@ -33,7 +33,10 @@
     "SAME_PLAN_ACTIVE": "Bu plana zaten abonesiniz.",
     "HARDWARE_OUT_OF_STOCK": "Bu ürün stokta yok.",
     "ACCOUNT_ROLE_INVALID": "Hesap rolü geçersiz. Lütfen destek ekibiyle iletişime geçin.",
-    "DEMO_PAYMENT_BLOCKED": "Demo modunda ödeme alınamaz."
+    "DEMO_PAYMENT_BLOCKED": "Demo modunda ödeme alınamaz.",
+    "ACCOUNT_PENDING_APPROVAL": "Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.",
+    "RESET_TOKEN_INVALID": "Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş. Lütfen yeni bir bağlantı isteyin.",
+    "VERIFICATION_CODE_INVALID": "Doğrulama kodu geçersiz veya süresi dolmuş. Lütfen yeni bir kod isteyin."
   },
   "errors": {
     "title": "Hata",

@@ -25,6 +25,24 @@ const POS_ORDER_VIEW_TARGETS = new Set<string>([
 // route transitions need a bit more.
 const TARGET_RETRY_DELAY_MS = 800;
 
+// How many re-nonce retries a single step may consume before we give up and
+// advance. Without a cap, a target that keeps failing Joyride's own
+// visibility check (but passes ours) would remount-loop forever.
+const MAX_TARGET_RETRIES = 3;
+
+/**
+ * A target only counts when it is actually VISIBLE — `querySelector` truthiness
+ * is not enough. The admin tour hung forever on the settings step because the
+ * mobile-drawer copy of the sidebar (display:none on desktop) matched the
+ * selector first: the retry loop saw a node, re-nonced, Joyride's visibility
+ * check failed again → infinite 800ms remount loop. `getClientRects().length`
+ * is the robust presence-in-layout signal (`offsetParent` is null for
+ * position:fixed elements too, so it would misreport those as hidden).
+ */
+function isTargetVisible(el: Element | null): boolean {
+  return el instanceof HTMLElement && el.getClientRects().length > 0;
+}
+
 interface UseOnboardingReturn {
   // State
   isWelcomeModalOpen: boolean;
@@ -123,6 +141,9 @@ export function useOnboarding(): UseOnboardingReturn {
   // Tracks the step index currently waiting on a retry timer, so repeat
   // TARGET_NOT_FOUND events for the same step don't queue multiple skips.
   const retryRef = useRef<number | null>(null);
+  // Per-step count of re-nonce attempts — capped at MAX_TARGET_RETRIES so a
+  // step whose target never satisfies Joyride can't remount-loop forever.
+  const retryCountRef = useRef<Record<number, number>>({});
 
   const hasCompletedTour = tourId
     ? onboarding.tourProgress[tourId]?.completed ?? false
@@ -171,6 +192,7 @@ export function useOnboarding(): UseOnboardingReturn {
   // step starts with a clean slate.
   useEffect(() => {
     retryRef.current = null;
+    retryCountRef.current = {};
   }, [currentStep]);
 
   const openWelcomeModal = useCallback(() => {
@@ -320,14 +342,24 @@ export function useOnboarding(): UseOnboardingReturn {
           }
           retryRef.current = null;
 
-          // Target appeared during the wait → force Joyride to remount and
-          // re-evaluate the DOM (it doesn't poll on its own).
-          if (typeof target === 'string' && document.querySelector(target)) {
+          // Target appeared during the wait AND is actually visible → force
+          // Joyride to remount and re-evaluate the DOM (it doesn't poll on
+          // its own). A present-but-invisible node (e.g. a display:none
+          // duplicate of the anchor) must NOT re-nonce: Joyride would fail
+          // its own visibility check again and we'd loop forever. Capped at
+          // MAX_TARGET_RETRIES as a hard stop.
+          const attempts = (retryCountRef.current[index] ?? 0) + 1;
+          retryCountRef.current[index] = attempts;
+          if (
+            typeof target === 'string' &&
+            isTargetVisible(document.querySelector(target)) &&
+            attempts <= MAX_TARGET_RETRIES
+          ) {
             setRetryNonce((n) => n + 1);
             return;
           }
 
-          // Still missing — advance past it.
+          // Still missing / invisible / retries exhausted — advance past it.
           const nextIndex = index + 1;
           if (nextIndex < steps.length) {
             const nextStep = steps[nextIndex];

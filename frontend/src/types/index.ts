@@ -25,6 +25,10 @@ export interface User {
   locale?: string | null;
   role: string;
   tenantId: string | null;
+  /** Restaurant (tenant) display name. Populated by GET /auth/profile so the
+   *  /welcome form can prefill the business name instead of forcing a blind
+   *  retype; token-minting responses may omit it. */
+  tenantName?: string | null;
   /** v3.0.0 — the user's home branch. Hard-restricted roles
    *  (WAITER/KITCHEN/COURIER) always carry a non-null value; ADMIN /
    *  MANAGER may carry null when they legitimately roam (in that

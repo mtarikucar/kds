@@ -30,7 +30,17 @@ const RegisterPage = () => {
     email: z.string().email(t('validation:validation.email', 'Please enter a valid email address')),
     password: z
       .string()
-      .min(8, t('validation:validation.minLength', { count: 8, defaultValue: 'Must be at least {{count}} characters' })),
+      .min(8, t('validation:validation.minLength', { count: 8, defaultValue: 'Must be at least {{count}} characters' }))
+      // Mirrors the backend RegisterDto complexity rule — without it the API
+      // rejected the form with an untranslated English class-validator
+      // message after a "valid" client-side pass.
+      .regex(
+        /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+        t(
+          'validation:validation.passwordRequirements',
+          'Password must contain at least 8 characters, including uppercase, lowercase, and numbers',
+        ),
+      ),
     firstName: z.string().min(1, t('validation:validation.required', 'This field is required')),
     lastName: z.string().min(1, t('validation:validation.required', 'This field is required')),
     // Required: PayTR checkout needs a phone. PhoneInput emits E.164 ("+90…")
@@ -41,18 +51,28 @@ const RegisterPage = () => {
     role: z.nativeEnum(UserRole),
     restaurantName: z.string().optional(),
     tenantId: z.string().optional(),
-  }).refine(
-    (data) => {
-      if (data.role === UserRole.ADMIN) {
-        return !!data.restaurantName;
+  }).superRefine((data, ctx) => {
+    // Attach the error to the field the CURRENT role actually renders:
+    // admins see the restaurant-name input, staff see the tenant select.
+    // Pre-fix the error always landed on ['restaurantName'], which is not
+    // rendered for staff roles — a staff submit without a restaurant
+    // silently did nothing.
+    if (data.role === UserRole.ADMIN) {
+      if (!data.restaurantName) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t('auth:register.roleRequired'),
+          path: ['restaurantName'],
+        });
       }
-      return !!data.tenantId;
-    },
-    {
-      message: t('auth:register.roleRequired'),
-      path: ['restaurantName'],
+    } else if (!data.tenantId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: t('auth:register.roleRequired'),
+        path: ['tenantId'],
+      });
     }
-  );
+  });
 
   type RegisterFormData = z.infer<typeof registerSchema>;
 

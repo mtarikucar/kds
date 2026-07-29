@@ -22,7 +22,17 @@ const ResetPasswordPage = () => {
     .object({
       newPassword: z
         .string()
-        .min(8, t('validation:validation.minLength', { count: 8, defaultValue: 'Must be at least {{count}} characters' })),
+        .min(8, t('validation:validation.minLength', { count: 8, defaultValue: 'Must be at least {{count}} characters' }))
+        // Mirrors the backend ResetPasswordDto complexity rule — without it
+        // the API rejected the reset with an untranslated English
+        // class-validator message after a "valid" client-side pass.
+        .regex(
+          /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+          t(
+            'validation:validation.passwordRequirements',
+            'Password must contain at least 8 characters, including uppercase, lowercase, and numbers',
+          ),
+        ),
       confirmPassword: z.string(),
     })
     .refine((data) => data.newPassword === data.confirmPassword, {

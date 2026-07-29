@@ -78,3 +78,46 @@ describe('SettingsLayout nav gating', () => {
     expect(links).not.toContain('/admin/settings/online-orders');
   });
 });
+
+/**
+ * Tour-anchor regression guard (review F3). The sidebar renders TWICE — an
+ * always-mounted mobile drawer (display:none on ≥lg via `lg:hidden` on its
+ * container) and the desktop copy. react-joyride resolves its target with the
+ * FIRST document.querySelector match and requires it to be visible; when the
+ * hidden drawer copy carried data-tour="settings-nav" too, the admin tour's
+ * settings step hit TARGET_NOT_FOUND forever.
+ *
+ * LIMITATION: jsdom performs no real layout, so "visible at desktop width" is
+ * approximated structurally — a node counts as desktop-visible when neither
+ * it nor any ancestor carries the Tailwind `lg:hidden` class (mobile-only
+ * subtree). That is exactly the class split SettingsLayout uses, so the
+ * approximation is faithful for this layout.
+ */
+function isDesktopVisible(el: Element): boolean {
+  let node: Element | null = el;
+  while (node) {
+    if (node.classList?.contains('lg:hidden')) return false;
+    node = node.parentElement;
+  }
+  return true;
+}
+
+describe('SettingsLayout tour anchor uniqueness', () => {
+  it('exposes exactly ONE desktop-visible [data-tour="settings-nav"], and querySelector finds it first', () => {
+    sub.hasFeature.mockReturnValue(true);
+    sub.hasIntegration.mockReturnValue(true);
+    const { container } = renderLayout();
+
+    const anchors = Array.from(
+      container.querySelectorAll('[data-tour="settings-nav"]'),
+    );
+    const visibleAnchors = anchors.filter(isDesktopVisible);
+    expect(visibleAnchors).toHaveLength(1);
+
+    // joyride uses the FIRST match — it must be the desktop-visible copy,
+    // not a display:none drawer duplicate.
+    const first = container.querySelector('[data-tour="settings-nav"]');
+    expect(first).not.toBeNull();
+    expect(isDesktopVisible(first as Element)).toBe(true);
+  });
+});

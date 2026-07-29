@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useProfile, useCompleteProfile } from '../../features/auth/authApi';
 import { useLogout } from '../../features/auth/authApi';
+import { UserRole } from '../../types';
 import Input from '../../components/ui/Input';
 import PhoneInput from '../../components/ui/PhoneInput';
 import FormSelect from '../../components/ui/FormSelect';
@@ -29,7 +30,14 @@ const TIMEZONES = [
  * Post-social-login (and any incomplete-profile) onboarding. Collects the
  * required phone plus the business details we want up front (name, address,
  * tax info) and preferences (timezone, language), then drops the user into the
- * app. Reached via ProfileCompletionGate when the account has no phone yet.
+ * app. Reached via ProfileCompletionGate when an ADMIN account has no phone
+ * yet.
+ *
+ * ROLE-AWARE: business name / tax / address / timezone are TENANT-scoped and
+ * only an ADMIN may edit them (the backend ignores them for anyone else — a
+ * waiter must never rename the restaurant). For a non-admin that lands here
+ * via a direct visit, those sections are hidden and businessName is optional,
+ * so the form stays submittable with just the user-scoped fields.
  */
 const WelcomePage = () => {
   const { t, i18n } = useTranslation(['auth', 'validation', 'common']);
@@ -37,6 +45,8 @@ const WelcomePage = () => {
   const { data: profile } = useProfile();
   const { mutate: complete, isPending } = useCompleteProfile();
   const { mutate: logout } = useLogout();
+
+  const isAdmin = profile?.role === UserRole.ADMIN;
 
   const schema = z.object({
     phone: z
@@ -47,7 +57,10 @@ const WelcomePage = () => {
       ),
     firstName: z.string().min(1, t('validation:validation.required', 'This field is required')),
     lastName: z.string().min(1, t('validation:validation.required', 'This field is required')),
-    businessName: z.string().min(1, t('validation:validation.required', 'This field is required')),
+    // Tenant-scoped: required only for the ADMIN who actually owns the field.
+    businessName: isAdmin
+      ? z.string().min(1, t('validation:validation.required', 'This field is required'))
+      : z.string().optional(),
     taxId: z.string().optional(),
     taxOffice: z.string().optional(),
     addressLine: z.string().optional(),
@@ -75,7 +88,9 @@ const WelcomePage = () => {
     },
   });
 
-  // Pre-fill name from the social profile once it loads.
+  // Pre-fill from the profile once it loads: name/phone/locale from the user,
+  // businessName from the tenant — a re-visit must not force a blind retype
+  // (that retype is how an accidental restaurant rename happens).
   useEffect(() => {
     if (profile) {
       reset((prev) => ({
@@ -83,13 +98,25 @@ const WelcomePage = () => {
         firstName: profile.firstName || prev.firstName,
         lastName: profile.lastName || prev.lastName,
         phone: profile.phone || prev.phone,
+        businessName: profile.tenantName || prev.businessName,
+        locale: profile.locale || prev.locale,
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
   const onSubmit = (data: FormData) => {
-    complete(data, {
+    // Non-admins can't edit tenant/branch fields (hidden below) — don't send
+    // them at all; the backend would ignore them anyway.
+    const payload = isAdmin
+      ? data
+      : {
+          phone: data.phone,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          locale: data.locale,
+        };
+    complete(payload, {
       onSuccess: () => {
         if (data.locale && data.locale !== i18n.language) {
           i18n.changeLanguage(data.locale);
@@ -139,45 +166,49 @@ const WelcomePage = () => {
             />
           </div>
 
-          <Input
-            label={`${t('auth:welcome.businessName', 'İşletme adı')} *`}
-            placeholder={t('auth:welcome.businessNamePlaceholder', 'Restoranınızın adı')}
-            error={errors.businessName?.message}
-            {...register('businessName')}
-          />
+          {isAdmin && (
+            <>
+              <Input
+                label={`${t('auth:welcome.businessName', 'İşletme adı')} *`}
+                placeholder={t('auth:welcome.businessNamePlaceholder', 'Restoranınızın adı')}
+                error={errors.businessName?.message}
+                {...register('businessName')}
+              />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label={t('auth:welcome.taxId', 'Vergi No / TC Kimlik')}
-              error={errors.taxId?.message}
-              {...register('taxId')}
-            />
-            <Input
-              label={t('auth:welcome.taxOffice', 'Vergi Dairesi')}
-              error={errors.taxOffice?.message}
-              {...register('taxOffice')}
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label={t('auth:welcome.taxId', 'Vergi No / TC Kimlik')}
+                  error={errors.taxId?.message}
+                  {...register('taxId')}
+                />
+                <Input
+                  label={t('auth:welcome.taxOffice', 'Vergi Dairesi')}
+                  error={errors.taxOffice?.message}
+                  {...register('taxOffice')}
+                />
+              </div>
 
-          <Input
-            label={t('auth:welcome.address', 'Adres')}
-            error={errors.addressLine?.message}
-            {...register('addressLine')}
-          />
+              <Input
+                label={t('auth:welcome.address', 'Adres')}
+                error={errors.addressLine?.message}
+                {...register('addressLine')}
+              />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label={t('auth:welcome.city', 'Şehir')}
-              error={errors.city?.message}
-              {...register('city')}
-            />
-            <FormSelect
-              label={t('auth:welcome.timezone', 'Saat dilimi')}
-              options={TIMEZONES}
-              error={errors.timezone?.message}
-              {...register('timezone')}
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label={t('auth:welcome.city', 'Şehir')}
+                  error={errors.city?.message}
+                  {...register('city')}
+                />
+                <FormSelect
+                  label={t('auth:welcome.timezone', 'Saat dilimi')}
+                  options={TIMEZONES}
+                  error={errors.timezone?.message}
+                  {...register('timezone')}
+                />
+              </div>
+            </>
+          )}
 
           <FormSelect
             label={t('auth:welcome.language', 'Dil')}
