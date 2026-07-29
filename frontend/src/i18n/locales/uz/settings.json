@@ -103,7 +103,23 @@
     },
     "credentials": {
       "restaurantId": "Restoran ID (platformada)",
-      "restaurantIdPlaceholder": "Platformadagi restoran/sotuvchi ID"
+      "restaurantIdPlaceholder": "Platformadagi restoran/sotuvchi ID",
+      "fieldPlaceholder": "{{field}} kiriting",
+      "apiVersionPlaceholder": "v1 yoki v2",
+      "fields": {
+        "appSecretKey": "Ilova maxfiy kaliti",
+        "restaurantSecretKey": "Restoran maxfiy kaliti",
+        "clientId": "Mijoz ID (Client ID)",
+        "clientSecret": "Mijoz maxfiy kaliti (Client Secret)",
+        "chainCode": "Tarmoq kodi",
+        "posVendorId": "POS ta'minotchi ID",
+        "apiVersion": "API versiyasi",
+        "username": "Foydalanuvchi nomi",
+        "password": "Parol",
+        "integratorId": "Integrator ID raqami (v2)",
+        "integratorSecret": "Integrator maxfiy kaliti (v2)",
+        "apiKey": "API kaliti"
+      }
     },
     "autoAccept": "Buyurtmalarni avtomatik qabul qilish",
     "autoAcceptDescription": "Kiruvchi buyurtmalarni xodimlar roziligisiz avtomatik qabul qilish",
@@ -164,6 +180,18 @@
       "sandbox": "Sandbox",
       "sandboxWarning": "Sandbox ushbu platformani sinov endpointlariga yo‘naltiradi va o‘rnatilgan sinov buyurtma simulyatorini yoqadi. Haqiqiy buyurtmalar qayta ishlanmaydi.",
       "noSandbox": "Bu platformada sandbox yo‘q — sinov endpointi sozlanmagan, sandbox tanlab bo‘lmaydi."
+    },
+    "platformDescriptions": {
+      "GETIR": "So'rovga (polling) asoslangan integratsiya (har 15 soniyada)",
+      "YEMEKSEPETI": "Webhook asosidagi integratsiya (real vaqtda)",
+      "TRENDYOL": "Webhook + so'rov (polling) integratsiyasi",
+      "MIGROS": "So'rovga (polling) asoslangan integratsiya (har 20 soniyada)"
+    },
+    "aria": {
+      "enablePlatform": "{{name}} integratsiyasini yoqish",
+      "disablePlatform": "{{name}} integratsiyasini o'chirish",
+      "enableAutoAccept": "{{name}} uchun avtomatik qabulni yoqish",
+      "disableAutoAccept": "{{name}} uchun avtomatik qabulni o'chirish"
     }
   },
   "autoSave": {
@@ -288,12 +316,11 @@
     "removeEmail": "Olib tashlash",
     "noEmails": "Email qabul qiluvchilar sozlanmagan",
     "invalidEmail": "Iltimos, to'g'ri email manzilni kiriting",
-    "emailAdded": "Email muvaffaqiyatli qo'shildi",
-    "emailRemoved": "Email olib tashlandi",
     "settingsSaved": "Hisobot sozlamalari muvaffaqiyatli saqlandi",
     "settingsFailed": "Hisobot sozlamalarini saqlab bo'lmadi",
     "emailAlreadyAdded": "Email allaqachon qo'shilgan",
-    "emailReportInfo": "Yoqilganda, Z-hisobot xulosalari avtomatik yaratiladi va har kuni yopilish vaqtida sozlangan qabul qiluvchilarga yuboriladi."
+    "emailReportInfo": "Yoqilganda, Z-hisobot xulosalari avtomatik yaratiladi va har kuni yopilish vaqtida sozlangan qabul qiluvchilarga yuboriladi.",
+    "unsavedEmailsHint": "Email ro'yxatidagi o'zgarishlar hali saqlanmadi"
   },
   "downloadNotAvailable": "Bu platforma uchun yuklab olish hali mavjud emas.",
   "preview": {

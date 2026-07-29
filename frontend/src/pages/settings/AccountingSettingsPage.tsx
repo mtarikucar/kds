@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Building2, Receipt, Plug } from 'lucide-react';
 import { useGetAccountingSettings, useUpdateAccountingSettings, useTestAccountingConnection, useAccountingSyncStatus } from '../../features/accounting/accountingApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsToggle, SettingsSelect, SettingsInput } from '../../components/settings/SettingsToggle';
 
@@ -91,42 +92,6 @@ export const AccountingSettingsPanel = () => {
 
   const [settings, setSettings] = useState<AccountingSettingsState>(defaultSettings);
 
-  useEffect(() => {
-    if (accountingSettings) {
-      setSettings((prev) => ({
-        ...prev,
-        autoGenerateInvoice: accountingSettings.autoGenerateInvoice,
-        companyName: accountingSettings.companyName || '',
-        companyTaxId: accountingSettings.companyTaxId || '',
-        companyTaxOffice: accountingSettings.companyTaxOffice || '',
-        companyAddress: accountingSettings.companyAddress || '',
-        companyPhone: accountingSettings.companyPhone || '',
-        companyEmail: accountingSettings.companyEmail || '',
-        provider: accountingSettings.provider || 'NONE',
-        autoSync: accountingSettings.autoSync,
-        invoicePrefix: accountingSettings.invoicePrefix || 'INV',
-        nextInvoiceNumber: accountingSettings.nextInvoiceNumber || 1,
-        defaultPaymentTermDays: accountingSettings.defaultPaymentTermDays || 0,
-        // Non-secret provider credential fields MUST hydrate too: saveSettings
-        // PATCHes the whole state object and only skips the 5 SECRET fields,
-        // so leaving these unhydrated meant any autosave after a reload
-        // silently wiped the stored values (e.g. nilveraApiUrl → '' broke the
-        // whole e-invoice rail). Secrets stay blank by design — sanitize()
-        // never returns them; the has*Credentials placeholders signal storage.
-        parasutCompanyId: accountingSettings.parasutCompanyId || '',
-        parasutClientId: accountingSettings.parasutClientId || '',
-        parasutUsername: accountingSettings.parasutUsername || '',
-        logoApiUrl: accountingSettings.logoApiUrl || '',
-        logoUsername: accountingSettings.logoUsername || '',
-        logoFirmNumber: accountingSettings.logoFirmNumber || '',
-        foribaApiUrl: accountingSettings.foribaApiUrl || '',
-        foribaUsername: accountingSettings.foribaUsername || '',
-        foribaServiceType: accountingSettings.foribaServiceType || '',
-        nilveraApiUrl: accountingSettings.nilveraApiUrl || '',
-      }));
-    }
-  }, [accountingSettings]);
-
   const saveSettings = useCallback(
     async (newSettings: AccountingSettingsState) => {
       // Don't send empty credential fields (they would wipe stored values)
@@ -176,6 +141,7 @@ export const AccountingSettingsPanel = () => {
     setValue: triggerSave,
     retry: retrySave,
     save: flushSave,
+    isDirty,
   } = useAutoSave(settings, saveSettings, {
     debounceMs: 500,
     onSuccess: () => {
@@ -185,6 +151,46 @@ export const AccountingSettingsPanel = () => {
       toast.error(t('settingsFailed'));
     },
   });
+
+  // Guarded hydration — a refetch landing while an edit/save is pending must
+  // not revert the newer local state (see useServerHydratedState).
+  useServerHydratedState(
+    accountingSettings,
+    (data) => {
+      setSettings((prev) => ({
+        ...prev,
+        autoGenerateInvoice: data.autoGenerateInvoice,
+        companyName: data.companyName || '',
+        companyTaxId: data.companyTaxId || '',
+        companyTaxOffice: data.companyTaxOffice || '',
+        companyAddress: data.companyAddress || '',
+        companyPhone: data.companyPhone || '',
+        companyEmail: data.companyEmail || '',
+        provider: data.provider || 'NONE',
+        autoSync: data.autoSync,
+        invoicePrefix: data.invoicePrefix || 'INV',
+        nextInvoiceNumber: data.nextInvoiceNumber || 1,
+        defaultPaymentTermDays: data.defaultPaymentTermDays || 0,
+        // Non-secret provider credential fields MUST hydrate too: saveSettings
+        // PATCHes the whole state object and only skips the 5 SECRET fields,
+        // so leaving these unhydrated meant any autosave after a reload
+        // silently wiped the stored values (e.g. nilveraApiUrl → '' broke the
+        // whole e-invoice rail). Secrets stay blank by design — sanitize()
+        // never returns them; the has*Credentials placeholders signal storage.
+        parasutCompanyId: data.parasutCompanyId || '',
+        parasutClientId: data.parasutClientId || '',
+        parasutUsername: data.parasutUsername || '',
+        logoApiUrl: data.logoApiUrl || '',
+        logoUsername: data.logoUsername || '',
+        logoFirmNumber: data.logoFirmNumber || '',
+        foribaApiUrl: data.foribaApiUrl || '',
+        foribaUsername: data.foribaUsername || '',
+        foribaServiceType: data.foribaServiceType || '',
+        nilveraApiUrl: data.nilveraApiUrl || '',
+      }));
+    },
+    { skipWhile: isDirty || saveStatus === 'saving' }
+  );
 
   const handleChange = (field: keyof AccountingSettingsState, value: string | boolean | number) => {
     const newSettings = { ...settings, [field]: value };

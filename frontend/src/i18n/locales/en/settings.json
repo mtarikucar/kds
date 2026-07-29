@@ -103,7 +103,23 @@
     },
     "credentials": {
       "restaurantId": "Restaurant ID (on platform)",
-      "restaurantIdPlaceholder": "Platform's restaurant/vendor ID"
+      "restaurantIdPlaceholder": "Platform's restaurant/vendor ID",
+      "fieldPlaceholder": "Enter {{field}}",
+      "apiVersionPlaceholder": "v1 or v2",
+      "fields": {
+        "appSecretKey": "App Secret Key",
+        "restaurantSecretKey": "Restaurant Secret Key",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "chainCode": "Chain Code",
+        "posVendorId": "POS Vendor ID",
+        "apiVersion": "API Version",
+        "username": "Username",
+        "password": "Password",
+        "integratorId": "Integrator ID (v2)",
+        "integratorSecret": "Integrator Secret (v2)",
+        "apiKey": "API Key"
+      }
     },
     "autoAccept": "Auto-accept orders",
     "autoAcceptDescription": "Automatically accept incoming orders without staff approval",
@@ -164,6 +180,18 @@
       "sandbox": "Sandbox",
       "sandboxWarning": "Sandbox routes this platform to its test endpoints and enables the built-in test-order simulator. No real orders are processed.",
       "noSandbox": "This platform has no sandbox — no test endpoint is configured, sandbox cannot be selected."
+    },
+    "platformDescriptions": {
+      "GETIR": "Polling-based integration (every 15s)",
+      "YEMEKSEPETI": "Webhook-based integration (real-time)",
+      "TRENDYOL": "Webhook + polling integration",
+      "MIGROS": "Polling-based integration (every 20s)"
+    },
+    "aria": {
+      "enablePlatform": "Enable {{name}}",
+      "disablePlatform": "Disable {{name}}",
+      "enableAutoAccept": "Enable auto-accept for {{name}}",
+      "disableAutoAccept": "Disable auto-accept for {{name}}"
     }
   },
   "autoSave": {
@@ -309,12 +337,11 @@
     "removeEmail": "Remove",
     "noEmails": "No email recipients configured",
     "invalidEmail": "Please enter a valid email address",
-    "emailAdded": "Email added successfully",
-    "emailRemoved": "Email removed",
     "settingsSaved": "Report settings saved successfully",
     "settingsFailed": "Failed to save report settings",
     "emailAlreadyAdded": "Email already added",
-    "emailReportInfo": "When enabled, Z-Report summaries will be automatically generated and emailed to the configured recipients at the closing time each day."
+    "emailReportInfo": "When enabled, Z-Report summaries will be automatically generated and emailed to the configured recipients at the closing time each day.",
+    "unsavedEmailsHint": "Changes to the email list have not been saved yet"
   },
   "downloadNotAvailable": "Download not available for this platform yet.",
   "preview": {

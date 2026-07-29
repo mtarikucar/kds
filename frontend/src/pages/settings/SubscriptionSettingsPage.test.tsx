@@ -10,7 +10,12 @@ import SubscriptionSettingsPage from './SubscriptionSettingsPage';
 const navigate = vi.fn();
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigate }));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string, d?: unknown) => (typeof d === 'string' ? d : k) }),
+  useTranslation: () => ({
+    t: (k: string, d?: unknown) => (typeof d === 'string' ? d : k),
+    // The page formats dates with the ACTIVE UI language (i18n.language),
+    // so the mock must provide it like the real hook does.
+    i18n: { language: 'en' },
+  }),
   initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useTranslation } from 'react-i18next';
@@ -8,12 +9,16 @@ import { useGetTenantSettings, useUpdateTenantSettings } from '../../hooks/useCu
 import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
 
-// Fix for default marker icon in React-Leaflet
+// Fix for default marker icon in React-Leaflet. Served from OUR origin
+// (frontend/public/leaflet/, copied from node_modules/leaflet/dist/images) —
+// the previous cdnjs URLs made the marker depend on a third-party CDN, so it
+// vanished offline/behind strict CSPs and leaked admin IPs to the CDN.
+const LEAFLET_ASSET_BASE = `${import.meta.env.BASE_URL || '/'}leaflet`;
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconRetinaUrl: `${LEAFLET_ASSET_BASE}/marker-icon-2x.png`,
+  iconUrl: `${LEAFLET_ASSET_BASE}/marker-icon.png`,
+  shadowUrl: `${LEAFLET_ASSET_BASE}/marker-shadow.png`,
 });
 
 // Map click handler component
@@ -92,20 +97,24 @@ export default function LocationSettings({ compact = false }: LocationSettingsPr
   const defaultZoom = 5;
   const selectedZoom = 17;
 
-  // Load existing settings
-  useEffect(() => {
-    if (settings) {
-      if (settings.latitude !== undefined && settings.latitude !== null) {
-        setLatitude(settings.latitude);
+  // Load existing settings — guarded: the tenantSettings query is shared with
+  // the WiFi/report settings sections, whose autosaves invalidate it; a
+  // refetch landing mid-edit must not clobber an unsaved location change.
+  useServerHydratedState(
+    settings,
+    (data) => {
+      if (data.latitude !== undefined && data.latitude !== null) {
+        setLatitude(data.latitude);
       }
-      if (settings.longitude !== undefined && settings.longitude !== null) {
-        setLongitude(settings.longitude);
+      if (data.longitude !== undefined && data.longitude !== null) {
+        setLongitude(data.longitude);
       }
-      if (settings.locationRadius !== undefined && settings.locationRadius !== null) {
-        setRadius(settings.locationRadius);
+      if (data.locationRadius !== undefined && data.locationRadius !== null) {
+        setRadius(data.locationRadius);
       }
-    }
-  }, [settings]);
+    },
+    { skipWhile: hasChanges || updateSettings.isPending }
+  );
 
   // Handle location selection from map click or marker drag
   const handleLocationSelect = (lat: number, lng: number) => {

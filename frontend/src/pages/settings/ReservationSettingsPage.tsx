@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
@@ -18,6 +18,8 @@ import {
 } from '../../features/reservations/reservationsApi';
 import { useAuthStore } from '../../store/authStore';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
+import { getApiErrorMessage } from '../../lib/api-error';
 import {
   SettingsSection,
   SettingsDivider,
@@ -29,6 +31,7 @@ import {
   SettingsInput,
 } from '../../components/settings/SettingsToggle';
 import FeatureGate from '../../components/subscriptions/FeatureGate';
+import type { UpdateReservationSettingsDto } from '../../types';
 
 interface ReservationSettingsState {
   isEnabled: boolean;
@@ -60,6 +63,47 @@ const DEFAULT_OPERATING_HOURS: Record<string, { open: string; close: string; clo
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
+// Backend bounds (UpdateReservationSettingsDto @Min/@Max). Values outside a
+// field's range are shown as an inline error AND held back from the autosave
+// payload (accounting-page pattern) — one invalid field must not 400 every
+// other change on this full-state autosave page.
+const NUMBER_FIELD_LIMITS = {
+  minAdvanceBooking: { min: 0 },
+  maxAdvanceDays: { min: 1, max: 365 },
+  defaultDuration: { min: 15 },
+  maxGuestsPerReservation: { min: 1 },
+  cancellationDeadline: { min: 0 },
+  holdOffsetMinutes: { min: 0, max: 240 },
+} as const;
+
+type LimitedNumberField = keyof typeof NUMBER_FIELD_LIMITS;
+
+function numberFieldViolation(
+  field: LimitedNumberField,
+  value: number
+): { min: number; max?: number } | null {
+  const limits = NUMBER_FIELD_LIMITS[field] as { min: number; max?: number };
+  if (!Number.isInteger(value)) return limits;
+  if (value < limits.min) return limits;
+  if (limits.max !== undefined && value > limits.max) return limits;
+  return null;
+}
+
+const timeToMinutes = (t: string): number => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+
+// Mirrors the backend's assertValidOperatingHours: same-day windows only —
+// close must be strictly after open (overnight windows produce zero slots).
+function isInvalidDayWindow(day: { open: string; close: string; closed: boolean }): boolean {
+  if (day.closed) return false;
+  const open = timeToMinutes(day.open);
+  const close = timeToMinutes(day.close);
+  if (Number.isNaN(open) || Number.isNaN(close)) return true;
+  return close <= open;
+}
+
 const ReservationSettingsPage = () => {
   const { t } = useTranslation(['reservations', 'settings']);
   const { data: reservationSettings, isLoading } = useReservationSettings();
@@ -74,10 +118,16 @@ const ReservationSettingsPage = () => {
 
   const handleCopyLink = async () => {
     if (!reservationLink) return;
-    await navigator.clipboard.writeText(reservationLink);
-    setLinkCopied(true);
-    toast.success(t('reservations:settings.linkCopied'));
-    setTimeout(() => setLinkCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(reservationLink);
+      setLinkCopied(true);
+      toast.success(t('reservations:settings.linkCopied'));
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // Clipboard API can reject (permissions policy, insecure context,
+      // browser denial) — surface it instead of showing a false "copied".
+      toast.error(t('reservations:settings.copyFailed'));
+    }
   };
 
   const [settings, setSettings] = useState<ReservationSettingsState>({
@@ -98,34 +148,38 @@ const ReservationSettingsPage = () => {
     customMessage: '',
   });
 
-  useEffect(() => {
-    if (reservationSettings) {
-      setSettings({
-        isEnabled: reservationSettings.isEnabled,
-        requireApproval: reservationSettings.requireApproval,
-        timeSlotInterval: reservationSettings.timeSlotInterval,
-        minAdvanceBooking: reservationSettings.minAdvanceBooking,
-        maxAdvanceDays: reservationSettings.maxAdvanceDays,
-        defaultDuration: reservationSettings.defaultDuration,
-        maxGuestsPerReservation: reservationSettings.maxGuestsPerReservation,
-        maxReservationsPerSlot: reservationSettings.maxReservationsPerSlot ?? null,
-        allowCancellation: reservationSettings.allowCancellation,
-        cancellationDeadline: reservationSettings.cancellationDeadline,
-        holdOffsetMinutes: reservationSettings.holdOffsetMinutes ?? 30,
-        operatingHours: reservationSettings.operatingHours ?? DEFAULT_OPERATING_HOURS,
-        bannerTitle: reservationSettings.bannerTitle ?? '',
-        bannerDescription: reservationSettings.bannerDescription ?? '',
-        customMessage: reservationSettings.customMessage ?? '',
-      });
-    }
-  }, [reservationSettings]);
-
   const saveSettings = useCallback(
     async (newSettings: ReservationSettingsState) => {
-      await updateReservationSettings({
+      const payload: UpdateReservationSettingsDto = {
         ...newSettings,
-        maxReservationsPerSlot: newSettings.maxReservationsPerSlot ?? undefined,
-      });
+        // Cleared field = "unlimited". The backend encodes unlimited as 0
+        // (@Min(0); the availability check is skipped when falsy). Mapping
+        // null→undefined made the PATCH a no-op: the UI showed unlimited
+        // while the server silently kept the old cap.
+        maxReservationsPerSlot: newSettings.maxReservationsPerSlot ?? 0,
+      };
+      // Hold transient out-of-range values back from the payload instead of
+      // letting one invalid field 400 the whole full-state autosave; the
+      // inline field error tells the operator what to fix.
+      for (const field of Object.keys(NUMBER_FIELD_LIMITS) as LimitedNumberField[]) {
+        if (numberFieldViolation(field, newSettings[field])) {
+          delete payload[field];
+        }
+      }
+      // @Min(0): a negative/fractional cap would 400 — hold it back too.
+      if (
+        payload.maxReservationsPerSlot !== undefined &&
+        (!Number.isInteger(payload.maxReservationsPerSlot) ||
+          payload.maxReservationsPerSlot < 0)
+      ) {
+        delete payload.maxReservationsPerSlot;
+      }
+      // Same for operating hours: an overnight/malformed day window is
+      // rejected by the backend, so keep the stored hours until it's fixed.
+      if (Object.values(newSettings.operatingHours).some(isInvalidDayWindow)) {
+        delete payload.operatingHours;
+      }
+      await updateReservationSettings(payload);
     },
     [updateReservationSettings]
   );
@@ -134,15 +188,56 @@ const ReservationSettingsPage = () => {
     status: saveStatus,
     setValue: triggerSave,
     retry: retrySave,
+    isDirty,
   } = useAutoSave(settings, saveSettings, {
     debounceMs: 300,
     onSuccess: () => {
       toast.success(t('settings:autoSave.savedSuccess'), { duration: 2000 });
     },
-    onError: () => {
-      toast.error(t('settings:settingsFailed'));
+    onError: (error) => {
+      // Surface the backend's own message (e.g. the operating-hours
+      // validation detail) rather than collapsing everything into the
+      // generic "settings failed" key.
+      toast.error(getApiErrorMessage(error, t('settings:settingsFailed')));
     },
   });
+
+  // Guarded hydration — a refetch triggered by save A must not clobber a
+  // newer edit B made while A was in flight (see useServerHydratedState).
+  useServerHydratedState(
+    reservationSettings,
+    (data) => {
+      setSettings({
+        isEnabled: data.isEnabled,
+        requireApproval: data.requireApproval,
+        timeSlotInterval: data.timeSlotInterval,
+        minAdvanceBooking: data.minAdvanceBooking,
+        maxAdvanceDays: data.maxAdvanceDays,
+        defaultDuration: data.defaultDuration,
+        maxGuestsPerReservation: data.maxGuestsPerReservation,
+        // Server encodes "unlimited" as 0 (or legacy NULL) — both render as
+        // the empty input with the "unlimited" placeholder.
+        maxReservationsPerSlot: data.maxReservationsPerSlot || null,
+        allowCancellation: data.allowCancellation,
+        cancellationDeadline: data.cancellationDeadline,
+        holdOffsetMinutes: data.holdOffsetMinutes ?? 30,
+        operatingHours: data.operatingHours ?? DEFAULT_OPERATING_HOURS,
+        bannerTitle: data.bannerTitle ?? '',
+        bannerDescription: data.bannerDescription ?? '',
+        customMessage: data.customMessage ?? '',
+      });
+    },
+    { skipWhile: isDirty || saveStatus === 'saving' }
+  );
+
+  // Inline error text for a bounded number field (undefined when valid).
+  const numberFieldError = (field: LimitedNumberField): string | undefined => {
+    const violation = numberFieldViolation(field, settings[field]);
+    if (!violation) return undefined;
+    return violation.max !== undefined
+      ? t('reservations:settings.validationRange', { min: violation.min, max: violation.max })
+      : t('reservations:settings.validationMin', { min: violation.min });
+  };
 
   const handleToggleChange = (field: keyof ReservationSettingsState, value: boolean) => {
     const newSettings = { ...settings, [field]: value };
@@ -316,6 +411,7 @@ const ReservationSettingsPage = () => {
               type="number"
               value={String(settings.minAdvanceBooking)}
               onChange={(value) => handleNumberChange('minAdvanceBooking', value)}
+              error={numberFieldError('minAdvanceBooking')}
             />
 
             <SettingsDivider />
@@ -326,6 +422,7 @@ const ReservationSettingsPage = () => {
               type="number"
               value={String(settings.maxAdvanceDays)}
               onChange={(value) => handleNumberChange('maxAdvanceDays', value)}
+              error={numberFieldError('maxAdvanceDays')}
             />
 
             <SettingsDivider />
@@ -336,6 +433,7 @@ const ReservationSettingsPage = () => {
               type="number"
               value={String(settings.defaultDuration)}
               onChange={(value) => handleNumberChange('defaultDuration', value)}
+              error={numberFieldError('defaultDuration')}
             />
 
             <SettingsDivider />
@@ -346,6 +444,7 @@ const ReservationSettingsPage = () => {
               type="number"
               value={String(settings.holdOffsetMinutes)}
               onChange={(value) => handleNumberChange('holdOffsetMinutes', value)}
+              error={numberFieldError('holdOffsetMinutes')}
             />
           </SettingsGroup>
         </SettingsSection>
@@ -365,6 +464,7 @@ const ReservationSettingsPage = () => {
               type="number"
               value={String(settings.maxGuestsPerReservation)}
               onChange={(value) => handleNumberChange('maxGuestsPerReservation', value)}
+              error={numberFieldError('maxGuestsPerReservation')}
             />
 
             <SettingsDivider />
@@ -376,6 +476,13 @@ const ReservationSettingsPage = () => {
               value={settings.maxReservationsPerSlot !== null ? String(settings.maxReservationsPerSlot) : ''}
               onChange={(value) => handleOptionalNumberChange('maxReservationsPerSlot', value)}
               placeholder={t('reservations:settings.unlimited')}
+              error={
+                settings.maxReservationsPerSlot !== null &&
+                (!Number.isInteger(settings.maxReservationsPerSlot) ||
+                  settings.maxReservationsPerSlot < 0)
+                  ? t('reservations:settings.validationMin', { min: 0 })
+                  : undefined
+              }
             />
           </SettingsGroup>
         </SettingsSection>
@@ -406,6 +513,7 @@ const ReservationSettingsPage = () => {
                   type="number"
                   value={String(settings.cancellationDeadline)}
                   onChange={(value) => handleNumberChange('cancellationDeadline', value)}
+                  error={numberFieldError('cancellationDeadline')}
                 />
               </>
             )}
@@ -424,6 +532,7 @@ const ReservationSettingsPage = () => {
             <div className="space-y-3">
               {DAYS.map((day, index) => {
                 const dayHours = settings.operatingHours[day] || { open: '09:00', close: '22:00', closed: false };
+                const dayInvalid = isInvalidDayWindow(dayHours);
                 return (
                   <div key={day}>
                     {index > 0 && <SettingsDivider />}
@@ -472,6 +581,13 @@ const ReservationSettingsPage = () => {
                         </label>
                       </div>
                     </div>
+                    {/* Same-day windows only (backend rejects overnight);
+                        this day's hours are held back until fixed. */}
+                    {dayInvalid && (
+                      <p className="text-xs text-red-600 px-1 pb-1">
+                        {t('reservations:settings.overnightNotSupported')}
+                      </p>
+                    )}
                   </div>
                 );
               })}

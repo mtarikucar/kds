@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Monitor } from 'lucide-react';
 import { useGetPosSettings, useUpdatePosSettings } from '../../features/pos/posApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsToggle, SettingsSelect } from '../../components/settings/SettingsToggle';
 
@@ -32,20 +33,6 @@ const POSSettingsPage = () => {
     requireServedForDineInPayment: false,
   });
 
-  useEffect(() => {
-    if (posSettings) {
-      setSettings({
-        enableTablelessMode: posSettings.enableTablelessMode,
-        enableTwoStepCheckout: posSettings.enableTwoStepCheckout,
-        showProductImages: posSettings.showProductImages,
-        enableCustomerOrdering: posSettings.enableCustomerOrdering,
-        enableCustomerSelfPay: (posSettings as any).enableCustomerSelfPay ?? false,
-        defaultMapView: posSettings.defaultMapView ?? '2d',
-        requireServedForDineInPayment: posSettings.requireServedForDineInPayment ?? false,
-      });
-    }
-  }, [posSettings]);
-
   const savePosSettings = useCallback(
     async (newSettings: PosSettingsState) => {
       await updatePosSettings(newSettings);
@@ -57,6 +44,7 @@ const POSSettingsPage = () => {
     status: posStatus,
     setValue: triggerPosSave,
     retry: retryPosSave,
+    isDirty,
   } = useAutoSave(settings, savePosSettings, {
     debounceMs: 300,
     onSuccess: () => {
@@ -66,6 +54,24 @@ const POSSettingsPage = () => {
       toast.error(t('settingsFailed'));
     },
   });
+
+  // Guarded hydration: never let a refetch clobber a newer local edit while
+  // a save is pending (see useServerHydratedState).
+  useServerHydratedState(
+    posSettings,
+    (data) => {
+      setSettings({
+        enableTablelessMode: data.enableTablelessMode,
+        enableTwoStepCheckout: data.enableTwoStepCheckout,
+        showProductImages: data.showProductImages,
+        enableCustomerOrdering: data.enableCustomerOrdering,
+        enableCustomerSelfPay: (data as any).enableCustomerSelfPay ?? false,
+        defaultMapView: data.defaultMapView ?? '2d',
+        requireServedForDineInPayment: data.requireServedForDineInPayment ?? false,
+      });
+    },
+    { skipWhile: isDirty || posStatus === 'saving' }
+  );
 
   const handleToggleChange = (
     field: keyof PosSettingsState,

@@ -38,7 +38,7 @@ import { formatCurrency } from '../../lib/currency';
  * invoices live on one page. The old routes redirect to /admin/plan.
  */
 const SubscriptionManagementSection = () => {
-  const { t } = useTranslation('subscriptions');
+  const { t, i18n } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const demoMode = useAuthStore((state) => state.demoMode);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -140,7 +140,9 @@ const SubscriptionManagementSection = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Follow the active UI language (tr/en/ru/ar/uz) — hardcoding 'en-US'
+    // rendered English month names for every locale.
+    return new Date(dateString).toLocaleDateString(i18n.language, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
