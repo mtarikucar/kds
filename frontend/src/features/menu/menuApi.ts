@@ -342,8 +342,14 @@ export const useReorderCategories = () => {
           i18n.t("common:notifications.operationFailed"),
         ),
       );
+      // The per-category PATCH fan-out is non-atomic: on a partial failure the
+      // server holds a half-applied order, so the optimistic rollback above
+      // would LIE for the rest of the session (5-min staleTime, no focus
+      // refetch). Refetch to converge on the server's real order.
+      queryClient.invalidateQueries({ queryKey: categoriesKey });
     },
-    // NOTE: We intentionally do NOT invalidate queries here.
+    // NOTE: on success we intentionally do NOT invalidate — the optimistic
+    // cache already matches what the server accepted.
   });
 };
 
@@ -353,45 +359,31 @@ export const useReorderProducts = () => {
 
   return useMutation({
     mutationFn: async (orderedIds: string[]): Promise<void> => {
-      console.log("useReorderProducts mutation called with:", orderedIds);
       const updates = orderedIds.map((id, index) => ({
         id,
         displayOrder: index,
       }));
-      console.log("Sending updates:", updates);
-
-      const results = await Promise.all(
+      await Promise.all(
         updates.map(({ id, displayOrder }) =>
-          api
-            .patch(`/menu/products/${id}`, { displayOrder })
-            .then((res) => {
-              console.log(
-                `Product ${id} updated to displayOrder ${displayOrder}:`,
-                res.data,
-              );
-              return res;
-            })
-            .catch((err) => {
-              console.error(`Failed to update product ${id}:`, err);
-              throw err;
-            }),
+          api.patch(`/menu/products/${id}`, { displayOrder }),
         ),
       );
-      console.log("All updates complete:", results);
     },
-    // Optimistic update - immediately update the cache
     onSuccess: () => {
       // Invalidate all product queries to refetch with new order
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
-      console.error("Reorder products error:", error);
       toast.error(
         getApiErrorMessage(
           error,
           i18n.t("common:notifications.operationFailed"),
         ),
       );
+      // The fan-out is non-atomic: some PATCHes may have landed before the
+      // failure. Refetch so the UI shows the server's real order instead of
+      // silently keeping a stale local one.
+      queryClient.invalidateQueries({ queryKey: ["products"] });
     },
   });
 };
