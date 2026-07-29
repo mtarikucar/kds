@@ -327,6 +327,29 @@ export class PaymentTerminalService {
       return this.toView(existing);
     }
 
+    // Single-live-charge guard: a Retry arrives with a FRESH idempotency key,
+    // so the dedupe above cannot stop it — without this check it would open a
+    // SECOND live charge and the card could be charged twice for one order.
+    // Live = PENDING (still on the terminal) or APPROVED/NEEDS_REVIEW (the
+    // bank already took the money but no Payment landed — reconciliation
+    // territory, never grounds for charging again). Terminal states
+    // (RECORDED/DECLINED/TIMEOUT/ERROR/CANCELLED/VOIDED) don't block.
+    const live = await this.prisma.paymentTerminalCharge.findFirst({
+      where: {
+        tenantId: scope.tenantId,
+        orderId,
+        status: { in: ["PENDING", "APPROVED", "NEEDS_REVIEW"] },
+      },
+      select: { id: true, status: true },
+    });
+    if (live) {
+      throw new ConflictException(
+        live.status === "PENDING"
+          ? "A card charge for this order is already in progress — cancel it or wait for it to finish before starting a new one"
+          : "This order already has an approved card charge awaiting reconciliation — resolve it before charging again",
+      );
+    }
+
     const charge = await this.prisma.paymentTerminalCharge.create({
       data: {
         tenantId: scope.tenantId,

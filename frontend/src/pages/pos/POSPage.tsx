@@ -167,8 +167,8 @@ const POSPage = () => {
   const { mutate: updateTableStatus } = useUpdateTableStatus();
   const { mutate: transferTableOrders, isPending: isTransferring } = useTransferTableOrders();
   const { mutate: mergeTables, isPending: isMerging } = useMergeTables();
-  const { mutate: unmergeTable } = useUnmergeTable();
-  const { mutate: unmergeAll } = useUnmergeAll();
+  const { mutate: unmergeTable, isPending: isUnmergingTable } = useUnmergeTable();
+  const { mutate: unmergeAll, isPending: isUnmergingAll } = useUnmergeAll();
   const { mutate: splitBill, isPending: isSplitting } = useSplitBill();
 
   // Determine if tableless mode is enabled
@@ -562,11 +562,21 @@ const POSPage = () => {
     wasExistingOrderPayment: boolean;
   }) => {
     setTerminalCharge({ status: 'PENDING', error: null, chargeId: null, target });
+    // Track the id locally too: the catch below must NOT lose it when a
+    // mid-poll failure lands — an ERROR state without the id would make the
+    // still-live PENDING charge uncancellable from the modal.
+    let knownChargeId: string | null = null;
     try {
       let view = await startTerminalCharge(
         target.orderId,
         target.amount,
         crypto.randomUUID(),
+      );
+      knownChargeId = view.chargeId;
+      // Surface the id as soon as START returns so Cancel can abort the
+      // still-pending charge server-side (not just dismiss the modal).
+      setTerminalCharge((prev) =>
+        prev ? { ...prev, chargeId: view.chargeId } : prev,
       );
       // In-process providers (simulator) resolve on START; bridge providers
       // return PENDING — poll up to ~90s while the cashier taps the card.
@@ -617,7 +627,10 @@ const POSPage = () => {
       setTerminalCharge({
         status: 'ERROR',
         error: e?.response?.data?.message ?? t('orderPaymentFailed', 'Ödeme başarısız'),
-        chargeId: null,
+        // Keep the id from the failed attempt: the charge may still be live
+        // (PENDING) server-side, so Cancel must stay possible and Retry must
+        // be able to abort it before opening a new one.
+        chargeId: knownChargeId,
         target,
       });
     }
@@ -636,8 +649,28 @@ const POSPage = () => {
     setTerminalCharge(null);
   };
 
-  const handleTerminalRetry = () => {
-    if (terminalCharge) void startCardTerminalCharge(terminalCharge.target);
+  const handleTerminalRetry = async () => {
+    if (!terminalCharge) return;
+    const { chargeId, target } = terminalCharge;
+    // Kill the previous attempt BEFORE starting a new charge — a retry runs
+    // with a fresh idempotency key, so an un-cancelled prior charge could
+    // settle alongside the new one and double-charge the card. The backend
+    // START guard additionally 409s while a live charge exists for the order.
+    if (chargeId) {
+      try {
+        await cancelTerminalCharge(target.orderId, chargeId);
+      } catch {
+        // Best-effort: proceed — the backend guard blocks a live duplicate,
+        // but tell the operator the old attempt may still settle.
+        toast.warning(
+          t(
+            'terminalCharge.retryCancelFailed',
+            'Önceki çekim denemesi iptal edilemedi — yine de tamamlanırsa mutabakat ekranından çözümleyin.',
+          ),
+        );
+      }
+    }
+    void startCardTerminalCharge(target);
   };
 
   const handleTerminalClose = () => setTerminalCharge(null);
@@ -1303,7 +1336,10 @@ const POSPage = () => {
         onMerge={handleMergeTables}
         onUnmerge={handleUnmergeTable}
         onUnmergeAll={handleUnmergeAll}
-        isLoading={isMerging}
+        // The modal's merge/unmerge/unmerge-all buttons share one disable —
+        // gate it on ALL three mutations, not just merge, so a double-tap on
+        // unmerge can't fire twice while its own request is in flight.
+        isLoading={isMerging || isUnmergingTable || isUnmergingAll}
       />
 
       {/* Bill Split Modal */}

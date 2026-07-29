@@ -327,7 +327,8 @@
     "timeout": "Timed out — the terminal did not respond",
     "error": "Payment error",
     "cancelled": "Charge cancelled",
-    "recorded": "Payment received"
+    "recorded": "Payment received",
+    "retryCancelFailed": "The previous charge attempt could not be cancelled — if it still completes, resolve it from the reconciliation screen."
   },
   "campaign": "Campaign",
   "startingFrom": "from",

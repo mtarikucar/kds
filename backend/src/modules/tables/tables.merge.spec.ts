@@ -58,6 +58,38 @@ describe('TablesService merge/unmerge state transitions', () => {
       expect(prisma.table.updateMany as any).not.toHaveBeenCalled();
     });
 
+    it('refuses to merge when a target table is RESERVED (stale client selection)', async () => {
+      (prisma.table.findMany as any).mockResolvedValue([
+        { id: 'tbl-1', number: '1', groupId: null, branchId: 'b1', status: 'OCCUPIED' },
+        { id: 'tbl-2', number: '2', groupId: null, branchId: 'b1', status: 'RESERVED' },
+      ]);
+
+      await expect(
+        svc.mergeTables(scope, { tableIds: ['tbl-1', 'tbl-2'] } as any),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.table.updateMany as any).not.toHaveBeenCalled();
+      expect(gateway.emitTableMerge).not.toHaveBeenCalled();
+    });
+
+    it('refuses to merge when a target table carries a reservation auto-hold', async () => {
+      (prisma.table.findMany as any).mockResolvedValue([
+        { id: 'tbl-1', number: '1', groupId: null, branchId: 'b1', status: 'OCCUPIED' },
+        {
+          id: 'tbl-2',
+          number: '2',
+          groupId: null,
+          branchId: 'b1',
+          status: 'AVAILABLE',
+          reservationHoldId: 'res-1',
+        },
+      ]);
+
+      await expect(
+        svc.mergeTables(scope, { tableIds: ['tbl-1', 'tbl-2'] } as any),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.table.updateMany as any).not.toHaveBeenCalled();
+    });
+
     it('refuses to merge tables that already belong to two different groups', async () => {
       (prisma.table.findMany as any).mockResolvedValue([
         { id: 'tbl-1', number: '1', groupId: 'grp-A', branchId: 'b1' },

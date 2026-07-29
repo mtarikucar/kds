@@ -678,6 +678,23 @@ export class TablesService {
             );
           }
 
+          // A RESERVED table (or one carrying a reservation auto-hold) must
+          // never be swallowed into a merge group. The POS hides RESERVED
+          // tables from the merge picker, but a stale client selection (the
+          // table flipped RESERVED between render and submit) can still put
+          // its id in the payload — refuse server-side.
+          const reserved = tables.filter(
+            (t) => t.status === "RESERVED" || t.reservationHoldId,
+          );
+          if (reserved.length > 0) {
+            throw new ConflictException(
+              `Table(s) ${reserved
+                .map((t) => t.number)
+                .join(", ")} are reserved and cannot be merged. ` +
+                "Seat or cancel the reservation first.",
+            );
+          }
+
           // Cross-group merge protection. Previously a user picking one
           // table out of group A and one out of group B would silently
           // pull every member of both groups into a single new group.

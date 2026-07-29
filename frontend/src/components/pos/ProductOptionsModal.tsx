@@ -74,7 +74,13 @@ const ProductOptionsModal = ({
       const cur = next.get(group.id) || [];
       const selected = cur.includes(item.componentProductId);
       if (group.maxSelect === 1) {
-        next.set(group.id, [item.componentProductId]);
+        // An OPTIONAL single-choice slot (minSelect 0) must be deselectable:
+        // re-tapping the selected item clears the slot instead of re-selecting
+        // it (which would trap the selection forever).
+        next.set(
+          group.id,
+          selected && group.minSelect === 0 ? [] : [item.componentProductId],
+        );
       } else if (selected) {
         next.set(group.id, cur.filter((x) => x !== item.componentProductId));
       } else if (cur.length < group.maxSelect) {
@@ -310,7 +316,10 @@ const ProductOptionsModal = ({
                             <span
                               className={`text-sm font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}
                             >
-                              +{formatPrice(Number(item.priceDelta))}
+                              {/* Shown = charged: both the client fold and the
+                                  server multiply priceDelta by the slot item's
+                                  quantity — mirror that here. */}
+                              +{formatPrice(Number(item.priceDelta) * (item.quantity ?? 1))}
                             </span>
                           )}
                         </button>

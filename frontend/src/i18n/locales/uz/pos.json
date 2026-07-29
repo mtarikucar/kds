@@ -327,7 +327,8 @@
     "timeout": "Vaqt tugadi — terminal javob bermadi",
     "error": "To‘lov xatosi",
     "cancelled": "To‘lov bekor qilindi",
-    "recorded": "To‘lov qabul qilindi"
+    "recorded": "To‘lov qabul qilindi",
+    "retryCancelFailed": "Oldingi to‘lov urinishini bekor qilib bo‘lmadi — agar u baribir yakunlansa, solishtirish oynasidan hal qiling."
   },
   "campaign": "Aksiya",
   "startingFrom": "dan",

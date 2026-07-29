@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { toast } from 'sonner';
 
 /**
  * Specs for POSPage — the register orchestrator. Its heavy lifting lives
@@ -15,7 +16,16 @@ import { render, screen, fireEvent } from '@testing-library/react';
 // --- child components: lightweight stubs --------------------------------
 vi.mock('../../components/pos/MenuPanel', () => ({ default: () => <div data-testid="menu-panel" /> }));
 vi.mock('../../components/pos/OrderCart', () => ({ default: () => <div data-testid="order-cart" /> }));
-vi.mock('../../components/pos/PaymentModal', () => ({ default: () => <div data-testid="payment-modal" /> }));
+// PaymentModal: expose onConfirm so the terminal-flow spec can fire a CARD
+// payment (the stub renders regardless of isOpen — POSPage mounts it always).
+vi.mock('../../components/pos/PaymentModal', () => ({
+  default: ({ onConfirm }: any) => (
+    <button
+      data-testid="pay-card-confirm"
+      onClick={() => onConfirm({ method: 'CARD' })}
+    />
+  ),
+}));
 vi.mock('../../components/pos/ProductOptionsModal', () => ({ default: () => null }));
 vi.mock('../../components/pos/StickyCartBar', () => ({ default: () => <div data-testid="sticky-cart" /> }));
 vi.mock('../../components/pos/CartDrawer', () => ({ default: () => null }));
@@ -30,20 +40,42 @@ vi.mock('../../components/pos/BillSplitModal', () => ({ default: () => null }));
 vi.mock('../../components/pos/ProgressiveSplitModal', () => ({ default: () => null }));
 vi.mock('../../components/pos/ReservationActionDialog', () => ({ default: () => null }));
 vi.mock('../../components/pos/ManualLockDialog', () => ({ default: () => null }));
-vi.mock('../../components/pos/TerminalChargeModal', () => ({ default: () => null }));
+// TerminalChargeModal: surface the charge state POSPage passes down (status +
+// chargeId) and the retry/cancel wires, so the poll-failure/retry specs can
+// assert the ERROR state KEEPS the chargeId and Retry cancels before restarting.
+vi.mock('../../components/pos/TerminalChargeModal', () => ({
+  default: ({ charge, onRetry, onCancel }: any) =>
+    charge ? (
+      <div
+        data-testid="terminal-modal"
+        data-status={charge.status}
+        data-charge-id={charge.chargeId ?? ''}
+      >
+        <button data-testid="terminal-retry" onClick={onRetry} />
+        <button data-testid="terminal-cancel" onClick={onCancel} />
+      </div>
+    ) : null,
+}));
 vi.mock('../../components/ui/Spinner', () => ({ default: () => <div data-testid="spinner" /> }));
 // Heavy Konva live map — stub it (jsdom has no canvas, and its import chain
 // pulls i18n/config which this test's react-i18next mock doesn't initialize).
 vi.mock('../../features/floor-plan/components/LiveFloorMap', () => ({ default: () => <div data-testid="live-floor-map" /> }));
 
-// Payment terminal: inert (no active terminal → manual-card flow, no useQuery
-// so the test needs no QueryClientProvider).
+// Payment terminal: controllable (defaults to inert in beforeEach — no active
+// terminal → manual-card flow, no useQuery so the test needs no
+// QueryClientProvider). The terminal-flow describe flips it active and drives
+// the start/poll/cancel fns. isTerminalDone mirrors the real predicate.
+let activeTerminalResult: any;
+const startTerminalChargeMock = vi.fn();
+const pollTerminalChargeMock = vi.fn();
+const cancelTerminalChargeMock = vi.fn();
 vi.mock('../../features/payment-terminal/paymentTerminalApi', () => ({
-  useActiveTerminal: () => ({ data: { active: false } }),
-  startTerminalCharge: vi.fn(),
-  pollTerminalCharge: vi.fn(),
-  cancelTerminalCharge: vi.fn(),
-  isTerminalDone: () => true,
+  useActiveTerminal: () => activeTerminalResult,
+  startTerminalCharge: (...a: unknown[]) => startTerminalChargeMock(...a),
+  pollTerminalCharge: (...a: unknown[]) => pollTerminalChargeMock(...a),
+  cancelTerminalCharge: (...a: unknown[]) => cancelTerminalChargeMock(...a),
+  isTerminalDone: (s: string) =>
+    s === 'RECORDED' || s === 'DECLINED' || s === 'TIMEOUT' || s === 'ERROR' || s === 'CANCELLED',
 }));
 
 // --- i18n ----------------------------------------------------------------
@@ -89,14 +121,21 @@ vi.mock('./useCartPersistence', () => ({
 vi.mock('./usePosTourSync', () => ({ usePosTourSync: () => {} }));
 
 const handleSelectTable = vi.fn();
+// Capture the args POSPage hands to useTableSelection — they carry the page's
+// state setters (setCurrentOrderId/-Amount), which the terminal-flow spec uses
+// to put the page into a payable state without driving the whole cart UI.
+let tableSelectionArgs: any;
 vi.mock('./useTableSelection', () => ({
-  useTableSelection: () => ({
-    handleSelectTable,
-    handleReservationSeated: vi.fn(),
-    handleManualLockOverride: vi.fn(),
-    handleBackToTables: vi.fn(),
-    handleTakeawayMode: vi.fn(),
-  }),
+  useTableSelection: (args: any) => {
+    tableSelectionArgs = args;
+    return {
+      handleSelectTable,
+      handleReservationSeated: vi.fn(),
+      handleManualLockOverride: vi.fn(),
+      handleBackToTables: vi.fn(),
+      handleTakeawayMode: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('../../hooks/useResponsive', () => ({ useResponsive: () => ({ isDesktop: true }) }));
@@ -111,6 +150,7 @@ import POSPage from './POSPage';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  activeTerminalResult = { data: { active: false } };
   tablesResult = {
     data: [
       { id: 'tbl-1', number: '1', status: 'AVAILABLE' },
@@ -145,5 +185,101 @@ describe('POSPage — table selection screen', () => {
     tablesResult = { data: undefined, isLoading: true };
     render(<POSPage />);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Integrated card-terminal flow (money path). Pins the double-charge guards:
+ * a mid-poll failure must KEEP the chargeId (so the still-live PENDING charge
+ * stays cancellable), and Retry must cancel the prior charge BEFORE opening a
+ * new one (a retry runs with a fresh idempotency key, so an un-cancelled prior
+ * charge could settle alongside the new one).
+ */
+describe('POSPage — terminal charge retry safety', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    activeTerminalResult = { data: { active: true, simulator: true } };
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Render, put the page into a payable state, fire a CARD payment whose
+   *  START returns PENDING chg-1, then fail the first poll → ERROR state. */
+  const driveToPollFailure = async () => {
+    startTerminalChargeMock.mockResolvedValue({
+      chargeId: 'chg-1',
+      status: 'PENDING',
+      error: null,
+      orderId: 'o1',
+      amount: 100,
+    });
+    pollTerminalChargeMock.mockRejectedValue({
+      response: { data: { message: 'network blew up mid-poll' } },
+    });
+    render(<POSPage />);
+    act(() => {
+      tableSelectionArgs.order.setCurrentOrderId('o1');
+      tableSelectionArgs.order.setCurrentOrderAmount(100);
+    });
+    fireEvent.click(screen.getByTestId('pay-card-confirm'));
+    // Flush the START promise, then advance past the 2s poll delay so the
+    // first (rejecting) poll runs and the catch path executes.
+    await act(async () => {});
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+  };
+
+  it('a mid-poll failure keeps the chargeId in the ERROR state (Cancel stays possible)', async () => {
+    await driveToPollFailure();
+    const modal = screen.getByTestId('terminal-modal');
+    expect(modal.dataset.status).toBe('ERROR');
+    expect(modal.dataset.chargeId).toBe('chg-1'); // pre-fix: '' (discarded)
+    expect(startTerminalChargeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('Retry cancels the prior live charge BEFORE starting a new one', async () => {
+    await driveToPollFailure();
+    cancelTerminalChargeMock.mockResolvedValue({ status: 'CANCELLED' });
+    startTerminalChargeMock.mockClear();
+    startTerminalChargeMock.mockResolvedValue({
+      chargeId: 'chg-2',
+      status: 'DECLINED',
+      error: 'declined',
+      orderId: 'o1',
+      amount: 100,
+    });
+    fireEvent.click(screen.getByTestId('terminal-retry'));
+    await act(async () => {});
+    expect(cancelTerminalChargeMock).toHaveBeenCalledWith('o1', 'chg-1');
+    expect(startTerminalChargeMock).toHaveBeenCalledTimes(1);
+    expect(cancelTerminalChargeMock.mock.invocationCallOrder[0]).toBeLessThan(
+      startTerminalChargeMock.mock.invocationCallOrder[0],
+    );
+    // The new attempt settled DECLINED and is on screen with ITS id.
+    const modal = screen.getByTestId('terminal-modal');
+    expect(modal.dataset.status).toBe('DECLINED');
+    expect(modal.dataset.chargeId).toBe('chg-2');
+  });
+
+  it('Retry still starts (with a warning toast) when cancelling the prior charge fails', async () => {
+    await driveToPollFailure();
+    cancelTerminalChargeMock.mockRejectedValue(new Error('bridge offline'));
+    startTerminalChargeMock.mockClear();
+    startTerminalChargeMock.mockResolvedValue({
+      chargeId: 'chg-3',
+      status: 'DECLINED',
+      error: 'declined',
+      orderId: 'o1',
+      amount: 100,
+    });
+    fireEvent.click(screen.getByTestId('terminal-retry'));
+    await act(async () => {});
+    expect(cancelTerminalChargeMock).toHaveBeenCalledWith('o1', 'chg-1');
+    expect(toast.warning).toHaveBeenCalled();
+    // The retry proceeds — the backend START guard is the hard stop for a
+    // still-live duplicate (it 409s), surfaced through the same ERROR path.
+    expect(startTerminalChargeMock).toHaveBeenCalledTimes(1);
   });
 });
