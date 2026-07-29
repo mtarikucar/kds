@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import api from '../../lib/api';
+// Admin endpoints live under /superadmin/legal/* behind SuperAdminGuard, so
+// they MUST go through the superadmin axios instance: the tenant client
+// (lib/api.ts) attaches the tenant token (a superadmin session has none),
+// gets a 401, and its interceptor then logs the operator out of the TENANT
+// app and redirects to the tenant /login.
+import { superAdminApi } from '../superadmin/api/superAdminApi';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 /**
  * Legal documents — KVKK, mesafeli satış, iade politikası, terms,
@@ -83,7 +91,7 @@ export const useListLegalDocuments = (
   return useQuery({
     queryKey: legalKeys.list(filters.kind, filters.locale),
     queryFn: async (): Promise<LegalDocument[]> => {
-      const response = await api.get('/superadmin/legal/documents', {
+      const response = await superAdminApi.get('/superadmin/legal/documents', {
         params: filters,
       });
       return response.data;
@@ -97,7 +105,10 @@ export const usePublishLegalDocument = () => {
     mutationFn: async (
       input: PublishLegalDocumentInput,
     ): Promise<LegalDocument> => {
-      const response = await api.post('/superadmin/legal/documents/publish', input);
+      const response = await superAdminApi.post(
+        '/superadmin/legal/documents/publish',
+        input,
+      );
       return response.data;
     },
     // After a new version lands every consumer should refetch — the
@@ -105,5 +116,8 @@ export const usePublishLegalDocument = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: legalKeys.all });
     },
+    // Surface a failed publish (mirrors the superadminBankTransferApi
+    // sonner + getApiErrorMessage convention) so it never fails silently.
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Yayınlama başarısız oldu.')),
   });
 };

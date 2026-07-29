@@ -5,11 +5,23 @@ import LegalDocumentsPage from './LegalDocumentsPage';
 
 const publishAsync = vi.fn().mockResolvedValue({});
 let docsData: any;
+let listState: Partial<{ isError: boolean; error: unknown }> = {};
 
 vi.mock('../../features/legal/legalApi', () => ({
-  useListLegalDocuments: () => ({ data: docsData, isLoading: false }),
+  useListLegalDocuments: () => ({
+    data: docsData,
+    isLoading: false,
+    isError: false,
+    error: null,
+    ...listState,
+  }),
   usePublishLegalDocument: () => ({ mutateAsync: publishAsync, isPending: false }),
 }));
+
+// The page now renders list failures via getApiErrorMessage (lib/api-error),
+// which pulls in i18n/config; stub it so the partial react-i18next mock above
+// doesn't trip over initReactI18next at import time (mirrors PlansPage.test).
+vi.mock('../../i18n/config', () => ({ default: { t: (k: string) => k } }));
 
 // ReactMarkdown is ESM-heavy; stub it to a passthrough so the modal renders.
 vi.mock('react-markdown', () => ({
@@ -76,6 +88,7 @@ describe('LegalDocumentsPage — listing', () => {
   beforeEach(() => {
     publishAsync.mockClear();
     docsData = [doc()];
+    listState = {};
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -90,12 +103,31 @@ describe('LegalDocumentsPage — listing', () => {
     renderPage();
     expect(screen.getByText('legal.empty')).toBeInTheDocument();
   });
+
+  it('surfaces a list-load failure instead of a silent empty state', () => {
+    docsData = undefined;
+    listState = { isError: true, error: new Error('boom') };
+    renderPage();
+    // Non-axios error → getApiErrorMessage falls back to the i18n fallback.
+    expect(screen.getByText('Yasal belgeler yüklenemedi.')).toBeInTheDocument();
+    expect(screen.queryByText('legal.empty')).not.toBeInTheDocument();
+  });
+
+  it('F11 regression: rows render inside a single tbody (no nested tbody), preview included', () => {
+    docsData = [doc(), doc({ id: 'd2', version: '2.0', isCurrent: false })];
+    renderPage();
+    // Expand the first row's markdown preview so BOTH tr kinds are in the DOM.
+    fireEvent.click(screen.getAllByText('legal.preview')[0]);
+    expect(screen.getByText('# Hello')).toBeInTheDocument();
+    expect(document.querySelectorAll('tbody tbody')).toHaveLength(0);
+  });
 });
 
 describe('LegalDocumentsPage — PublishModal version-regex gate', () => {
   beforeEach(() => {
     publishAsync.mockClear();
     docsData = [];
+    listState = {};
   });
   afterEach(() => vi.restoreAllMocks());
 

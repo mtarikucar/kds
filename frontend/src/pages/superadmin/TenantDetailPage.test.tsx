@@ -292,3 +292,65 @@ describe('TenantDetailPage — change-plan modal', () => {
     expect(changePlanMutate).not.toHaveBeenCalled();
   });
 });
+
+describe('TenantDetailPage — change-plan modal: DEMO/inactive filtering + amount preview (F2/F3)', () => {
+  beforeEach(() => {
+    changePlanMutate.mockReset();
+    tenant = baseTenant();
+    overridesData = undefined;
+    plans = [
+      { id: 'p1', name: 'PRO', isActive: true, displayName: 'Pro Plan', monthlyPrice: 500, yearlyPrice: 5000, maxUsers: 5, maxTables: 10, maxProducts: 100 },
+      { id: 'p2', name: 'BUSINESS', isActive: true, displayName: 'Enterprise', monthlyPrice: 1500, yearlyPrice: 15000, maxUsers: 50, maxTables: 100, maxProducts: 1000 },
+      { id: 'p-demo', name: 'DEMO', isActive: false, displayName: 'Demo Plan', monthlyPrice: 0, yearlyPrice: 0, maxUsers: 999, maxTables: 999, maxProducts: 999 },
+      { id: 'p-old', name: 'LEGACY', isActive: false, displayName: 'Legacy Plan', monthlyPrice: 100, yearlyPrice: 1000, maxUsers: 1, maxTables: 1, maxProducts: 1 },
+    ];
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  function openModal() {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.changePlan' }));
+  }
+
+  it('offers neither the DEMO plan nor inactive plans', () => {
+    openModal();
+    // "Pro Plan" also appears in the subscription summary card, so assert
+    // presence without the single-match constraint.
+    expect(screen.getAllByText('Pro Plan').length).toBeGreaterThan(0);
+    expect(screen.getByText('Enterprise')).toBeInTheDocument();
+    expect(screen.queryByText('Demo Plan')).not.toBeInTheDocument();
+    expect(screen.queryByText('Legacy Plan')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+  });
+
+  it('shows the resulting billing amount for the selected plan on the MONTHLY cycle', () => {
+    openModal();
+    // Preselected current plan (p1) → no preview yet.
+    expect(screen.queryByText(/tenantDetail\.newAmountInfo/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('radio')[1]); // Enterprise
+    // t(key, {amount, cycle}) mock → "key::amount,cycle"; cycle label falls
+    // back to the raw cycle since t(key, fallbackString) returns the fallback.
+    expect(
+      screen.getByText('tenantDetail.newAmountInfo::₺1,500,MONTHLY'),
+    ).toBeInTheDocument();
+  });
+
+  it('uses the yearly price when the subscription bills YEARLY', () => {
+    tenant = baseTenant({
+      subscriptions: [
+        {
+          id: 'sub-1',
+          status: 'ACTIVE',
+          plan: { displayName: 'Pro Plan' },
+          billingCycle: 'YEARLY',
+          currentPeriodEnd: '2026-12-31T00:00:00.000Z',
+        },
+      ],
+    });
+    openModal();
+    fireEvent.click(screen.getAllByRole('radio')[1]);
+    expect(
+      screen.getByText('tenantDetail.newAmountInfo::₺15,000,YEARLY'),
+    ).toBeInTheDocument();
+  });
+});

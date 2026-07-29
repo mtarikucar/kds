@@ -42,6 +42,7 @@ describe('SuperAdminSidebar', () => {
       '/superadmin/marketplace',
       '/superadmin/subscriptions',
       '/superadmin/audit-logs',
+      '/superadmin/legal',
       '/superadmin/settings',
     ];
     const hrefs = screen

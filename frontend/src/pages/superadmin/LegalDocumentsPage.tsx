@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -9,6 +9,7 @@ import {
   usePublishLegalDocument,
 } from '../../features/legal/legalApi';
 import { canSubmitPublish, groupDocsByKind } from './legalDocuments.helpers';
+import { getApiErrorMessage } from '../../lib/api-error';
 
 const KIND_LABELS: Record<LegalDocumentKind, string> = {
   KVKK: 'KVKK Aydınlatma Metni',
@@ -41,7 +42,7 @@ const PUBLISH_KINDS: LegalDocumentKind[] = [
  */
 export default function LegalDocumentsPage() {
   const { t } = useTranslation('superadmin');
-  const { data: docs, isLoading } = useListLegalDocuments();
+  const { data: docs, isLoading, isError, error } = useListLegalDocuments();
   const publishMutation = usePublishLegalDocument();
   const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -68,7 +69,15 @@ export default function LegalDocumentsPage() {
 
       {isLoading && <div className="text-slate-500">{t('legal.loading')}</div>}
 
-      {!isLoading && Object.keys(docsByKind).length === 0 && (
+      {/* useQuery (v5) has no onError — surface the list failure here so a
+          broken session/endpoint never renders as a silent empty state. */}
+      {isError && (
+        <div className="bg-red-50 border border-red-100 rounded-lg p-4 text-sm text-red-600">
+          {getApiErrorMessage(error, t('legal.loadFailed', 'Yasal belgeler yüklenemedi.'))}
+        </div>
+      )}
+
+      {!isLoading && !isError && Object.keys(docsByKind).length === 0 && (
         <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-slate-500">
           {t('legal.empty')}
         </div>
@@ -95,8 +104,11 @@ export default function LegalDocumentsPage() {
               </tr>
             </thead>
             <tbody>
+              {/* F11: the per-doc pair (row + optional preview row) used to be
+                  wrapped in a NESTED <tbody> — invalid DOM. A keyed Fragment
+                  groups the two <tr>s inside the single tbody instead. */}
               {items.map((d) => (
-                <tbody key={d.id}>
+                <Fragment key={d.id}>
                   <tr className="border-b border-slate-100">
                     <td className="px-4 py-2 font-mono text-xs">{d.version}</td>
                     <td className="px-4 py-2">{d.locale}</td>
@@ -135,7 +147,7 @@ export default function LegalDocumentsPage() {
                       </td>
                     </tr>
                   )}
-                </tbody>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -175,8 +187,13 @@ function PublishModal({ onClose, onPublished, publishMutation }: PublishModalPro
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    await publishMutation.mutateAsync(form);
-    onPublished();
+    try {
+      await publishMutation.mutateAsync(form);
+      onPublished();
+    } catch {
+      // The mutation's onError toast already surfaced the failure; keep the
+      // modal open so the operator's draft is preserved for a retry.
+    }
   };
 
   return (

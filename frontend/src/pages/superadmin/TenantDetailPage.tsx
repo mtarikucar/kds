@@ -26,6 +26,7 @@ import {
   initLimitValues,
 } from './tenantOverrides.helpers';
 import { getApiErrorMessage } from '../../lib/api-error';
+import { isDemoPlan, resolvePlanAmountForCycle } from './plans.helpers';
 
 const statusStyles = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -127,6 +128,24 @@ export default function TenantDetailPage() {
   const activeSubscription = tenant.subscriptions?.find(
     (sub: { status: string }) => sub.status === 'ACTIVE' || sub.status === 'TRIALING',
   );
+
+  // Plan-change modal offers only assignable plans: the internal DEMO plan
+  // (its name keys the demo money-path guard; the backend refuses assigning
+  // it) and retired isActive:false plans are excluded.
+  const selectablePlans = (plans ?? []).filter(
+    (plan) => !isDemoPlan(plan) && plan.isActive !== false,
+  );
+
+  // F3 preview: the subscription keeps its billing cycle across a SA plan
+  // change, so the resulting amount is the NEW plan's price for the CURRENT
+  // cycle (discount-window aware — mirrors backend resolvePlanAmount, which
+  // recomputes the authoritative value on apply).
+  const billingCycle: string = activeSubscription?.billingCycle || 'MONTHLY';
+  const selectedPlan = selectablePlans.find((plan) => plan.id === selectedPlanId);
+  const newAmountPreview =
+    selectedPlan && selectedPlan.id !== tenant.currentPlan?.id
+      ? resolvePlanAmountForCycle(selectedPlan, billingCycle)
+      : null;
 
   const handleChangePlan = () => {
     if (!activeSubscription || !selectedPlanId) return;
@@ -560,7 +579,7 @@ export default function TenantDetailPage() {
               </p>
 
               <div className="space-y-2 mb-6">
-                {plans?.map((plan) => (
+                {selectablePlans.map((plan) => (
                   <label
                     key={plan.id}
                     className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${
@@ -596,6 +615,19 @@ export default function TenantDetailPage() {
                   </label>
                 ))}
               </div>
+
+              {/* F3: show the resulting billing amount so the operator sees
+                  the price the subscription row will carry after the change. */}
+              {newAmountPreview !== null && (
+                <div className="mb-4 p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                  <p className="text-sm text-zinc-700">
+                    {t('tenantDetail.newAmountInfo', {
+                      amount: `₺${newAmountPreview.toLocaleString()}`,
+                      cycle: t(`tenantDetail.cycle.${billingCycle}`, billingCycle),
+                    })}
+                  </p>
+                </div>
+              )}
 
               {changePlanMutation.isError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
