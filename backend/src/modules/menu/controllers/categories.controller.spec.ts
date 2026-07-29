@@ -18,6 +18,7 @@ describe('CategoriesController', () => {
       findOne: jest.fn().mockResolvedValue({ id: 'c1' }),
       update: jest.fn().mockResolvedValue({ id: 'c1' }),
       remove: jest.fn().mockResolvedValue({ id: 'c1' }),
+      reorder: jest.fn().mockResolvedValue([]),
     };
     ctrl = new CategoriesController(svc as any);
   });
@@ -52,5 +53,10 @@ describe('CategoriesController', () => {
   it('remove forwards id + tenantId', () => {
     ctrl.remove('c1', req as any);
     expect(svc.remove).toHaveBeenCalledWith('c1', 't1');
+  });
+
+  it('reorder forwards orderedIds (from dto) + tenantId', () => {
+    ctrl.reorder({ orderedIds: ['c2', 'c1'] } as any, req as any);
+    expect(svc.reorder).toHaveBeenCalledWith(['c2', 'c1'], 't1');
   });
 });

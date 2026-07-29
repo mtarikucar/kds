@@ -598,6 +598,65 @@ export class ProductsService {
     return this.findOne(id, tenantId);
   }
 
+  /**
+   * Atomic batch reorder of products WITHIN one category: displayOrder =
+   * array index, applied inside ONE transaction so a partial failure can
+   * never leave a half-applied order (the failure mode of the old
+   * per-product PATCH fan-out). The admin drag UI only reorders inside a
+   * single category droppable, so a payload spanning two categories is a
+   * client bug — rejected rather than silently scrambling both lists.
+   */
+  async reorderProducts(orderedIds: string[], tenantId: string) {
+    // The DTO already enforces non-empty/unique — re-check cheaply so a
+    // future internal caller that bypasses the pipe can't half-apply junk.
+    if (!orderedIds || orderedIds.length === 0) {
+      throw new BadRequestException("orderedIds must not be empty");
+    }
+    if (new Set(orderedIds).size !== orderedIds.length) {
+      throw new BadRequestException("orderedIds must not contain duplicates");
+    }
+
+    let categoryId = "";
+    await this.prisma.$transaction(async (tx) => {
+      // Bulk ownership check (same shape as attachImagesToProduct's bulk
+      // verify): one round-trip catches both "wrong tenant" and
+      // "id doesn't exist".
+      const owned = await tx.product.findMany({
+        where: { id: { in: orderedIds }, tenantId },
+        select: { id: true, categoryId: true },
+      });
+      if (owned.length !== orderedIds.length) {
+        const foundSet = new Set(owned.map((o) => o.id));
+        const missing = orderedIds.filter((id) => !foundSet.has(id));
+        throw new BadRequestException(
+          `Product(s) not found or do not belong to your tenant: ${missing.join(", ")}`,
+        );
+      }
+      const categoryIds = new Set(owned.map((p) => p.categoryId));
+      if (categoryIds.size > 1) {
+        throw new BadRequestException(
+          "All products in a reorder must belong to the same category",
+        );
+      }
+      categoryId = owned[0].categoryId;
+      for (const [index, id] of orderedIds.entries()) {
+        // Compound WHERE — IDOR guard (B41-B45 pattern). count===0 means the
+        // row vanished between the check and the write; abort the whole tx.
+        const claim = await tx.product.updateMany({
+          where: { id, tenantId },
+          data: { displayOrder: index },
+        });
+        if (claim.count === 0) {
+          throw new BadRequestException(`Product with ID ${id} not found`);
+        }
+      }
+    });
+
+    // Fresh, campaign-decorated list of the affected category (mirrors the
+    // image reorder returning getProductImages).
+    return this.findAll(tenantId, categoryId);
+  }
+
   // Image management methods
   private async attachImagesToProduct(
     productId: string,

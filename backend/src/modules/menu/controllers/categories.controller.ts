@@ -20,6 +20,7 @@ import {
 import { CategoriesService } from "../services/categories.service";
 import { CreateCategoryDto } from "../dto/create-category.dto";
 import { UpdateCategoryDto } from "../dto/update-category.dto";
+import { ReorderMenuDto } from "../dto/reorder-menu.dto";
 import { ListQueryDto } from "../../../common/dto/list-query.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
@@ -77,6 +78,21 @@ export class CategoriesController {
   @ApiResponse({ status: 404, description: "Category not found" })
   findOne(@Param("id") id: string, @Request() req) {
     return this.categoriesService.findOne(id, req.tenantId);
+  }
+
+  // ROUTE ORDER: must stay ABOVE @Patch(":id") — Nest matches routes in
+  // declaration order, so a later "reorder" literal would be swallowed as
+  // :id="reorder" and 404 in the update handler.
+  @Patch("reorder")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: "Reorder categories in one atomic batch (ADMIN, MANAGER)",
+  })
+  @ApiResponse({ status: 200, description: "Categories reordered" })
+  @ApiResponse({ status: 400, description: "Invalid category IDs" })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
+  reorder(@Body() reorderDto: ReorderMenuDto, @Request() req) {
+    return this.categoriesService.reorder(reorderDto.orderedIds, req.tenantId);
   }
 
   @Patch(":id")

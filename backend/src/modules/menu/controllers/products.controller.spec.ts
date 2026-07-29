@@ -20,6 +20,7 @@ describe("ProductsController", () => {
       remove: jest.fn().mockResolvedValue({ id: "p1" }),
       updateStock: jest.fn().mockResolvedValue({ id: "p1" }),
       getProductImages: jest.fn().mockResolvedValue([]),
+      reorderProducts: jest.fn().mockResolvedValue([]),
       reorderProductImages: jest.fn().mockResolvedValue([]),
       removeImageFromProduct: jest.fn().mockResolvedValue({ id: "p1" }),
     };
@@ -98,6 +99,11 @@ describe("ProductsController", () => {
   it("getProductImages forwards id + tenantId", () => {
     ctrl.getProductImages("p1", req as any);
     expect(svc.getProductImages).toHaveBeenCalledWith("p1", "t1");
+  });
+
+  it("reorderProducts forwards orderedIds (from dto) + tenantId", () => {
+    ctrl.reorderProducts({ orderedIds: ["p2", "p1"] } as any, req as any);
+    expect(svc.reorderProducts).toHaveBeenCalledWith(["p2", "p1"], "t1");
   });
 
   it("reorderImages forwards id, imageIds (from @Body), tenantId", () => {

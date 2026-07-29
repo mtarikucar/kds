@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ConflictException,
@@ -89,6 +90,53 @@ export class CategoriesService {
     // miss the constraint. Same pattern iter-9 closed across tables/
     // suppliers/stock-categories.
     return this.prisma.category.findFirstOrThrow({ where: { id, tenantId } });
+  }
+
+  /**
+   * Atomic batch reorder: displayOrder = array index, applied inside ONE
+   * transaction so a partial failure can never leave a half-applied order
+   * (the failure mode of the old per-category PATCH fan-out). Ownership is
+   * validated INSIDE the transaction; any invalid id rolls everything back.
+   */
+  async reorder(orderedIds: string[], tenantId: string) {
+    // The DTO already enforces non-empty/unique — re-check cheaply so a
+    // future internal caller that bypasses the pipe can't half-apply junk.
+    if (!orderedIds || orderedIds.length === 0) {
+      throw new BadRequestException("orderedIds must not be empty");
+    }
+    if (new Set(orderedIds).size !== orderedIds.length) {
+      throw new BadRequestException("orderedIds must not contain duplicates");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Bulk ownership check (same shape as the product-image reorder's
+      // bulk verify): one round-trip catches both "wrong tenant" and
+      // "id doesn't exist".
+      const owned = await tx.category.findMany({
+        where: { id: { in: orderedIds }, tenantId },
+        select: { id: true },
+      });
+      if (owned.length !== orderedIds.length) {
+        const foundSet = new Set(owned.map((o) => o.id));
+        const missing = orderedIds.filter((id) => !foundSet.has(id));
+        throw new BadRequestException(
+          `Category(ies) not found or do not belong to your tenant: ${missing.join(", ")}`,
+        );
+      }
+      for (const [index, id] of orderedIds.entries()) {
+        // Compound WHERE — IDOR guard (B41-B45 pattern). count===0 means the
+        // row vanished between the check and the write; abort the whole tx.
+        const claim = await tx.category.updateMany({
+          where: { id, tenantId },
+          data: { displayOrder: index },
+        });
+        if (claim.count === 0) {
+          throw new BadRequestException(`Category with ID ${id} not found`);
+        }
+      }
+    });
+
+    return this.findAll(tenantId);
   }
 
   async remove(id: string, tenantId: string) {

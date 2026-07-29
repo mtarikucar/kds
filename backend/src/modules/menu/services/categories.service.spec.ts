@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CategoriesService } from './categories.service';
 import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
@@ -164,6 +164,71 @@ describe('CategoriesService', () => {
       expect(call.take).toBeUndefined();
       expect(call.skip).toBeUndefined();
       expect(result.map((c: any) => c.id)).toEqual(['a', 'b', 'c']);
+    });
+  });
+
+  // -- Batch reorder: atomic displayOrder = array index ----------------
+
+  describe('reorder', () => {
+    beforeEach(() => {
+      // Interactive tx forwards onto the same deep mock so the assertions
+      // below see the writes the service issued inside the transaction.
+      (prisma.$transaction as any).mockImplementation(async (work: any) =>
+        work(prisma),
+      );
+      (prisma.category.updateMany as any).mockResolvedValue({ count: 1 });
+    });
+
+    it('applies displayOrder = array index for every id inside ONE transaction', async () => {
+      (prisma.category.findMany as any)
+        // 1st call: in-tx bulk ownership check.
+        .mockResolvedValueOnce([{ id: 'c3' }, { id: 'c1' }, { id: 'c2' }])
+        // 2nd call: post-tx findAll re-read.
+        .mockResolvedValueOnce([]);
+
+      await svc.reorder(['c3', 'c1', 'c2'], 't1');
+
+      expect((prisma.$transaction as any).mock.calls.length).toBe(1);
+      const writes = (prisma.category.updateMany as any).mock.calls.map(
+        (c: any[]) => c[0],
+      );
+      expect(writes).toEqual([
+        { where: { id: 'c3', tenantId: 't1' }, data: { displayOrder: 0 } },
+        { where: { id: 'c1', tenantId: 't1' }, data: { displayOrder: 1 } },
+        { where: { id: 'c2', tenantId: 't1' }, data: { displayOrder: 2 } },
+      ]);
+    });
+
+    it('rejects a foreign-tenant / unknown id before ANY write (tx rolls back)', async () => {
+      // Ownership check only finds c1 — c-foreign is another tenant's row.
+      (prisma.category.findMany as any).mockResolvedValueOnce([{ id: 'c1' }]);
+
+      await expect(svc.reorder(['c1', 'c-foreign'], 't1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect((prisma.category.updateMany as any).mock.calls.length).toBe(0);
+    });
+
+    it('rejects empty and duplicate id lists without touching the DB', async () => {
+      await expect(svc.reorder([], 't1')).rejects.toThrow(BadRequestException);
+      await expect(svc.reorder(['c1', 'c1'], 't1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect((prisma.$transaction as any).mock.calls.length).toBe(0);
+    });
+
+    it('aborts the batch when a row vanishes between check and write', async () => {
+      (prisma.category.findMany as any).mockResolvedValueOnce([
+        { id: 'c1' },
+        { id: 'c2' },
+      ]);
+      (prisma.category.updateMany as any)
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      await expect(svc.reorder(['c1', 'c2'], 't1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

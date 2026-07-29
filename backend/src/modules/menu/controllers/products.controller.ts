@@ -20,6 +20,7 @@ import {
 import { ProductsService } from "../services/products.service";
 import { CreateProductDto } from "../dto/create-product.dto";
 import { UpdateProductDto } from "../dto/update-product.dto";
+import { ReorderMenuDto } from "../dto/reorder-menu.dto";
 import { ListQueryDto } from "../../../common/dto/list-query.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
@@ -103,6 +104,28 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: "Product not found" })
   findOne(@Param("id") id: string, @Request() req) {
     return this.productsService.findOne(id, req.tenantId);
+  }
+
+  // ROUTE ORDER: must stay ABOVE @Patch(":id") — Nest matches routes in
+  // declaration order, so a later "reorder" literal would be swallowed as
+  // :id="reorder" and 404 in the update handler.
+  @Patch("reorder")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Reorder products of one category in one atomic batch (ADMIN, MANAGER)",
+  })
+  @ApiResponse({ status: 200, description: "Products reordered" })
+  @ApiResponse({
+    status: 400,
+    description: "Invalid product IDs or ids span multiple categories",
+  })
+  @ApiResponse({ status: 403, description: "Insufficient permissions" })
+  reorderProducts(@Body() reorderDto: ReorderMenuDto, @Request() req) {
+    return this.productsService.reorderProducts(
+      reorderDto.orderedIds,
+      req.tenantId,
+    );
   }
 
   @Patch(":id")
