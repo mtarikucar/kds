@@ -307,7 +307,11 @@ export class OrdersService {
       // groupId — resolve an empty/unknown groupId by finding the slot that
       // offers that component. Lets update()/re-save re-explode a reopened
       // combo without losing which slot each component filled.
-      const normalizedSelections = (item.comboSelections ?? []).map((sel) => {
+      // C2: absence must survive normalization (`?? []` would turn "field
+      // absent" into "explicit empty"). Absent → combo defaults; a present
+      // array (even empty/partial) is explicit — omitted groups add nothing,
+      // required groups still validate.
+      const normalizedSelections = item.comboSelections?.map((sel) => {
         if (sel.groupId) return sel;
         const g = catalog.groups.find((gr) =>
           gr.items.some(

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, ChefHat, CheckCircle2, Utensils, User, Receipt, RefreshCcw, ChevronDown, ChevronUp, ShoppingBag, ArrowLeft, CreditCard } from 'lucide-react';
 import { Order, OrderItem } from '../../types';
@@ -51,20 +52,61 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
 
     setReorderingOrderId(order.id);
 
-    // Add each item to cart
-    for (const item of order.orderItems) {
-      if (item.product) {
-        // Convert order item modifiers to cart modifiers format
-        const cartModifiers = item.modifiers?.map(mod => ({
-          id: mod.modifierId,
-          name: mod.modifier?.name || mod.modifier?.displayName || '',
-          displayName: mod.modifier?.displayName || '',
-          priceAdjustment: mod.modifier?.priceAdjustment || 0,
-          quantity: mod.quantity || 1,
-        })) || [];
+    // Review C3 (money): combos are STORED as a 0₺ parent row + child rows
+    // that carry the money. Looping every row re-added the parent at its raw
+    // menu price AND each child at full menu price — roughly a 2× charge on
+    // reorder. Minimal safe fix: skip combo parents (productType COMBO, or
+    // any row other rows reference as parent) and all child rows, and tell
+    // the guest combos must be re-picked from the menu.
+    const parentIds = new Set(
+      order.orderItems
+        .map((item) => item.parentOrderItemId)
+        .filter((id): id is string => !!id),
+    );
+    let skippedCombo = false;
 
-        addItem(item.product, item.quantity, cartModifiers, item.notes || undefined);
+    for (const item of order.orderItems) {
+      if (!item.product) continue;
+
+      const isComboParent =
+        item.product.productType === 'COMBO' || parentIds.has(item.id);
+      const isComboChild = !!item.parentOrderItemId;
+      if (isComboParent || isComboChild) {
+        skippedCombo = true;
+        continue;
       }
+
+      // Convert order item modifiers to cart modifiers format
+      const cartModifiers = item.modifiers?.map(mod => ({
+        id: mod.modifierId,
+        name: mod.modifier?.name || mod.modifier?.displayName || '',
+        displayName: mod.modifier?.displayName || '',
+        priceAdjustment: mod.modifier?.priceAdjustment || 0,
+        quantity: mod.quantity || 1,
+      })) || [];
+
+      // Review C3: re-add at the CHARGED unit price from the order row (falls
+      // back to the current menu price only when the row lacks it). Using
+      // item.product.price over-showed campaign-discounted items. Number():
+      // Prisma Decimal serializes as a string.
+      const chargedUnitPrice =
+        item.unitPrice != null ? Number(item.unitPrice) : Number(item.product.price);
+
+      addItem(
+        { ...item.product, price: chargedUnitPrice },
+        item.quantity,
+        cartModifiers,
+        item.notes || undefined,
+      );
+    }
+
+    if (skippedCombo) {
+      toast.info(
+        t(
+          'orders.reorderComboSkipped',
+          'Combo items were skipped — please add them from the menu again.',
+        ),
+      );
     }
 
     // Simulate a slight delay for feedback

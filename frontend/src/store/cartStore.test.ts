@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useCartStore } from './cartStore';
+import { useCartStore, SERVER_SESSION_ID_REGEX } from './cartStore';
 import type { Product, CartModifier } from '../types';
+
+const HEX64 = 'a'.repeat(64);
 
 /**
  * Behavior guard for the customer POS cart — a money-adjacent store with zero
@@ -47,6 +49,7 @@ describe('cartStore', () => {
     useCartStore.getState().clearCart();
     useCartStore.setState({
       sessionId: null,
+      sessionExpiresAt: null,
       tenantId: null,
       tableId: null,
       currency: null,
@@ -293,34 +296,40 @@ describe('cartStore', () => {
   });
 
   describe('initializeSession — cart isolation', () => {
-    it('creates a session and keeps the (empty) cart on first init', () => {
+    it('binds tenant/table/currency on first init WITHOUT fabricating a session (C1)', () => {
       useCartStore.getState().initializeSession('t-1', 'table-1', 'USD');
       const s = useCartStore.getState();
-      expect(s.sessionId).toBeTruthy();
+      // Review C1: the ONLY valid session is server-minted; the store must
+      // never invent a local id (the old crypto.randomUUID() one was rejected
+      // by every backend DTO).
+      expect(s.sessionId).toBeNull();
       expect(s.tenantId).toBe('t-1');
       expect(s.tableId).toBe('table-1');
       expect(s.currency).toBe('USD');
     });
 
-    it('wipes the cart when switching to a different tenant', () => {
+    it('wipes the cart and drops the session when switching to a different tenant', () => {
       const store = useCartStore.getState();
       store.initializeSession('t-1', 'table-1');
+      store.setServerSession(HEX64, null);
       store.addItem(makeProduct(), 1, []);
-      const firstSession = useCartStore.getState().sessionId;
       store.initializeSession('t-2', 'table-9');
       const s = useCartStore.getState();
       expect(s.tenantId).toBe('t-2');
       expect(s.items).toHaveLength(0);
-      expect(s.sessionId).not.toBe(firstSession);
+      expect(s.sessionId).toBeNull();
+      expect(s.sessionExpiresAt).toBeNull();
     });
 
-    it('keeps the cart when re-initializing the same tenant', () => {
+    it('keeps the cart AND the server session when re-initializing the same tenant', () => {
       const store = useCartStore.getState();
       store.initializeSession('t-1', 'table-1');
+      store.setServerSession(HEX64, null);
       store.addItem(makeProduct(), 2, []);
       store.initializeSession('t-1', 'table-1');
       expect(useCartStore.getState().items).toHaveLength(1);
       expect(useCartStore.getState().items[0].quantity).toBe(2);
+      expect(useCartStore.getState().sessionId).toBe(HEX64);
     });
 
     it('clears tableId for a tenant-wide QR (null tableId) while keeping the cart', () => {
@@ -335,35 +344,88 @@ describe('cartStore', () => {
 
     // deep-review FM3: a different table on the same shared device is a new
     // guest — the previous guest's cart must NOT leak across.
-    it('wipes the cart and rotates the session when the table changes', () => {
+    it('wipes the cart and drops the session when the table changes', () => {
       const store = useCartStore.getState();
       store.initializeSession('t-1', 'table-1');
+      store.setServerSession(HEX64, null);
       store.addItem(makeProduct(), 1, []);
-      const firstSession = useCartStore.getState().sessionId;
       store.initializeSession('t-1', 'table-2');
       const s = useCartStore.getState();
       expect(s.tableId).toBe('table-2');
       expect(s.items).toHaveLength(0);
-      expect(s.sessionId).not.toBe(firstSession);
+      expect(s.sessionId).toBeNull();
     });
+  });
 
-    // deep-review FM3: an externally-issued per-guest session id that differs
-    // from the stored one forces a clean cart, even on a tenant-wide QR (no
-    // tableId) where the table check can't tell guests apart.
-    it('wipes the cart when a new url-issued sessionId is provided', () => {
-      const store = useCartStore.getState();
-      store.initializeSession('t-1', null, 'TRY', 'sess-A');
-      store.addItem(makeProduct(), 1, []);
-      expect(useCartStore.getState().sessionId).toBe('sess-A');
-      store.initializeSession('t-1', null, 'TRY', 'sess-B');
+  // Review C1: the session identity is server-minted and shape-guarded.
+  describe('server session (C1)', () => {
+    it('setServerSession stores a 64-hex token with its expiry', () => {
+      const expires = new Date(Date.now() + 3_600_000);
+      useCartStore.getState().setServerSession(HEX64, expires.toISOString());
       const s = useCartStore.getState();
-      expect(s.sessionId).toBe('sess-B');
-      expect(s.items).toHaveLength(0);
+      expect(s.sessionId).toBe(HEX64);
+      expect(s.sessionExpiresAt).toBe(expires.getTime());
     });
 
-    it('adopts the url-issued sessionId on first init', () => {
-      useCartStore.getState().initializeSession('t-1', 'table-1', 'TRY', 'sess-X');
-      expect(useCartStore.getState().sessionId).toBe('sess-X');
+    it('setServerSession REFUSES a non-server-shaped id (UUID can never come back)', () => {
+      useCartStore
+        .getState()
+        .setServerSession('0198c7a2-1111-4222-8333-444455556666', null);
+      expect(useCartStore.getState().sessionId).toBeNull();
+    });
+
+    it('clearServerSession drops id + expiry', () => {
+      useCartStore.getState().setServerSession(HEX64, null);
+      useCartStore.getState().clearServerSession();
+      const s = useCartStore.getState();
+      expect(s.sessionId).toBeNull();
+      expect(s.sessionExpiresAt).toBeNull();
+    });
+
+    it('persist migration discards a legacy locally-fabricated UUID session', async () => {
+      // Simulate the pre-C1 persisted shape (version 0: no version field,
+      // sessionId = crypto.randomUUID()). Rehydrating must DISCARD the UUID
+      // so a real server session gets minted instead of 400/401-ing forever.
+      localStorage.setItem(
+        'customer-cart-storage',
+        JSON.stringify({
+          state: {
+            items: [],
+            sessionId: '0198c7a2-1111-4222-8333-444455556666',
+            tenantId: 't-1',
+            tableId: 'table-1',
+            currency: 'TRY',
+            savedAt: Date.now(),
+          },
+        }),
+      );
+      await useCartStore.persist.rehydrate();
+      const s = useCartStore.getState();
+      expect(s.sessionId).toBeNull();
+      expect(s.tenantId).toBe('t-1'); // binding survives, identity does not
+    });
+
+    it('persist migration keeps a valid server-minted 64-hex session', async () => {
+      localStorage.setItem(
+        'customer-cart-storage',
+        JSON.stringify({
+          state: {
+            items: [],
+            sessionId: HEX64,
+            sessionExpiresAt: Date.now() + 3_600_000,
+            tenantId: 't-1',
+            tableId: null,
+            currency: 'TRY',
+            savedAt: Date.now(),
+          },
+          version: 1,
+        }),
+      );
+      await useCartStore.persist.rehydrate();
+      expect(useCartStore.getState().sessionId).toBe(HEX64);
+      expect(SERVER_SESSION_ID_REGEX.test(useCartStore.getState().sessionId!)).toBe(
+        true,
+      );
     });
   });
 

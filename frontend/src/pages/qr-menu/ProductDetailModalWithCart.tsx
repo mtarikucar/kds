@@ -292,12 +292,17 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
       productForCart = { ...product, price: comboUnitPrice() };
     }
 
+    // Review C2: for a COMBO the selections array is passed EVEN WHEN EMPTY.
+    // Collapsing an emptied optional group (or an all-empty pick) to
+    // undefined made the server fall back to the combo defaults and CHARGE
+    // the deselected default — shown price ≠ charged price. An explicit
+    // (possibly empty) array tells the server "these are ALL my picks".
     addItem(
       productForCart,
       quantity,
       allModifiers,
       notes || undefined,
-      comboSel && comboSel.length ? comboSel : undefined,
+      comboSel,
     );
 
     setShowSuccess(true);

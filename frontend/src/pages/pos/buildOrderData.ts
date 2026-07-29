@@ -68,7 +68,11 @@ export function buildOrderData({
         modifierId: m.modifierId,
         quantity: m.quantity,
       })),
-      ...(item.comboSelections && item.comboSelections.length
+      // Review C2: forward the selections field whenever the cart line
+      // carries one — INCLUDING an empty array. Collapsing empty → absent
+      // made the server re-apply (and charge) the combo's default items after
+      // the cashier explicitly deselected an optional default.
+      ...(item.comboSelections
         ? { comboSelections: item.comboSelections }
         : {}),
     })),

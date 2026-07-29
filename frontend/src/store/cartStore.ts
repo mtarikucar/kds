@@ -15,6 +15,15 @@ const comboKey = (sel?: ComboSelectionInput[]): string =>
 // QR kiosk/tablet must never rehydrate into the next guest's session.
 const CART_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
+// Review C1: the ONLY valid customer session identity is a SERVER-MINTED
+// token — 32 random bytes hex-encoded = exactly 64 lower-hex chars, minted by
+// POST /customer-public/sessions and backed by a CustomerSession row. The
+// store used to fabricate a crypto.randomUUID() here, which every backend DTO
+// (/^[0-9a-f]{64}$/) rejected — orders 400'd, tracking/self-pay/loyalty 401'd.
+// The store no longer generates ANY local id: sessionId is either a
+// server-minted token or null (features/qr-menu/customerSession.ts mints it).
+export const SERVER_SESSION_ID_REGEX = /^[0-9a-f]{64}$/;
+
 interface CartState {
   items: CartItem[];
   sessionId: string | null;
@@ -24,14 +33,19 @@ interface CartState {
   // deep-review FM3: wall-clock timestamp of the last mutating write; used to
   // expire stale carts on rehydrate.
   savedAt: number | null;
+  // Review C1: server-reported expiry (epoch ms) of the minted session, so
+  // ensureCustomerSession can re-mint proactively instead of eating a 401.
+  sessionExpiresAt: number | null;
 
   // Actions
   initializeSession: (
     tenantId: string,
     tableId: string | null,
-    currency?: string,
-    urlSessionId?: string | null
+    currency?: string
   ) => void;
+  // Review C1: store the server-minted session (customerSession.ts only).
+  setServerSession: (sessionId: string, expiresAt: string | Date | null) => void;
+  clearServerSession: () => void;
   setTableId: (tableId: string) => void;
   setCurrency: (currency: string) => void;
   addItem: (
@@ -52,10 +66,6 @@ interface CartState {
   getSubtotal: () => number;
   getTotal: () => number;
 }
-
-const generateSessionId = () => {
-  return crypto.randomUUID();
-};
 
 const calculateItemTotal = (
   productPrice: number,
@@ -106,48 +116,38 @@ export const useCartStore = create<CartState>()(
       tableId: null,
       currency: null,
       savedAt: null,
+      sessionExpiresAt: null,
 
+      // Review C1 + FH5: this action NEVER creates a session id. It only binds
+      // the cart to a tenant/table and invalidates the stored server session
+      // when the guest context changes; customerSession.ts mints the real
+      // 64-hex token from the server afterwards. A sessionId is NEVER read
+      // from the URL — it is a bearer credential (FH5).
       initializeSession: (
         tenantId: string,
         tableId: string | null,
-        currency?: string,
-        urlSessionId?: string | null
+        currency?: string
       ) => {
-        const currentSession = get().sessionId;
         const currentTenantId = get().tenantId;
         const currentTableId = get().tableId;
 
-        // If changing tenant, clear cart and create new session
         if (currentTenantId !== tenantId) {
+          // Different tenant → new guest context: clear the cart and drop the
+          // old tenant's session (it would be rejected server-side anyway).
           set({
-            sessionId: urlSessionId || generateSessionId(),
+            sessionId: null,
+            sessionExpiresAt: null,
             tenantId,
             tableId,
             currency: currency || null,
-            items: [],
-          });
-        } else if (!currentSession) {
-          // First time initialization
-          set({
-            sessionId: urlSessionId || generateSessionId(),
-            tenantId,
-            tableId,
-            currency: currency || null,
-          });
-        } else if (urlSessionId && urlSessionId !== currentSession) {
-          // deep-review FM3: the kiosk/server issued a fresh per-guest session
-          // id that differs from the stored one => new guest. Start a clean cart
-          // even on a tenant-wide QR where tableId can't distinguish guests.
-          set({
-            sessionId: urlSessionId,
-            tableId,
             items: [],
           });
         } else if (tableId && currentTableId !== tableId) {
-          // deep-review FM3: a different table on the same device is a new guest
-          // on a shared kiosk/tablet. Previously this preserved the cart, which
-          // leaked the prior guest's items. Start a clean cart + new session.
-          set({ sessionId: generateSessionId(), tableId, items: [] });
+          // deep-review FM3: a different table on the same device is a new
+          // guest on a shared kiosk/tablet. Start a clean cart and drop the
+          // session so a fresh one is minted for the new table. (Same-guest
+          // in-app table picks go through setTableId, which keeps both.)
+          set({ sessionId: null, sessionExpiresAt: null, tableId, items: [] });
         } else if (tableId === null && currentTableId !== null) {
           // Clear tableId when using tenant-wide QR (no tableId in URL)
           // This ensures table selection modal appears for general QR codes
@@ -157,6 +157,20 @@ export const useCartStore = create<CartState>()(
         if (currency) {
           set({ currency });
         }
+      },
+
+      setServerSession: (sessionId: string, expiresAt: string | Date | null) => {
+        // Defensive: refuse to store anything that is not a server-shaped
+        // token, so a non-hex value can never become the device identity.
+        if (!SERVER_SESSION_ID_REGEX.test(sessionId)) return;
+        set({
+          sessionId,
+          sessionExpiresAt: expiresAt ? new Date(expiresAt).getTime() : null,
+        });
+      },
+
+      clearServerSession: () => {
+        set({ sessionId: null, sessionExpiresAt: null });
       },
 
       setTableId: (tableId: string) => {
@@ -299,6 +313,22 @@ export const useCartStore = create<CartState>()(
     {
       name: 'customer-cart-storage', // LocalStorage key
       storage: createJSONStorage(() => localStorage),
+      // Review C1: v1 marks the switch to server-minted 64-hex sessions. Any
+      // pre-v1 persisted state carries a locally fabricated UUID sessionId
+      // that the backend rejects — migrate discards it so a real session is
+      // minted on load instead of every call 400/401-ing forever.
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as Partial<CartState> | undefined;
+        if (
+          state &&
+          (!state.sessionId || !SERVER_SESSION_ID_REGEX.test(state.sessionId))
+        ) {
+          state.sessionId = null;
+          state.sessionExpiresAt = null;
+        }
+        return state as CartState;
+      },
       partialize: (state) => ({
         items: state.items,
         sessionId: state.sessionId,
@@ -306,6 +336,7 @@ export const useCartStore = create<CartState>()(
         tableId: state.tableId,
         currency: state.currency,
         savedAt: state.savedAt,
+        sessionExpiresAt: state.sessionExpiresAt,
       }),
       // deep-review FM3: expire stale carts on rehydrate so a previous guest's
       // items/session/table never surface to the next guest on a shared device.
@@ -314,7 +345,14 @@ export const useCartStore = create<CartState>()(
         if (!state.savedAt || Date.now() - state.savedAt > CART_TTL_MS) {
           state.items = [];
           state.sessionId = null;
+          state.sessionExpiresAt = null;
           state.tableId = null;
+        }
+        // Review C1 belt-and-braces: never rehydrate a non-server-shaped
+        // session id (e.g. a same-version write that predates a hotfix).
+        if (state.sessionId && !SERVER_SESSION_ID_REGEX.test(state.sessionId)) {
+          state.sessionId = null;
+          state.sessionExpiresAt = null;
         }
       },
     }

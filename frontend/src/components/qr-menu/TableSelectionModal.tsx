@@ -9,10 +9,11 @@ interface TableSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTable: (tableId: string) => void;
-  // tenantId optional: subdomain-routed pages already have the tenant
-  // baked into the API base URL (axios `api` is subdomain-aware), so
-  // the legacy CartPage path can omit it.
-  tenantId?: string;
+  // Review C5: REQUIRED. The fetch below interpolates the tenant into
+  // /tables/public/:tenantId — with the prop omitted both cart pages made the
+  // modal request /tables/public/undefined, so the dine-in "pick a table"
+  // flow dead-ended with an error for every guest.
+  tenantId: string;
   primaryColor: string;
   // Secondary colour falls back to the primary when omitted — keeps
   // the visual identity coherent without forcing every caller to pass

@@ -10,6 +10,7 @@ import {
 } from '../../features/qr-menu/customerPayApi';
 import { formatCurrency } from '../../lib/utils';
 import { getApiErrorMessage } from '../../lib/api-error';
+import { remintCustomerSessionOn401 } from '../../features/qr-menu/customerSession';
 import PhoneInput from '../ui/PhoneInput';
 
 interface SelfPayModalProps {
@@ -122,6 +123,10 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
       window.location.href = response.paymentLink;
     } catch (err: any) {
       inflight.current = false;
+      // Review C1: on an expired server session re-mint in the background so
+      // the parent re-renders this modal with a fresh sessionId and the next
+      // tap succeeds.
+      remintCustomerSessionOn401(err);
       // Self-pay-domain errors (SELF_PAY_DISABLED, ORDER_ALREADY_PAID, …)
       // carry a stable `code` field — see selfPayError() in
       // self-pay-pricing.util.ts — mapped under common:payment.errors.*.

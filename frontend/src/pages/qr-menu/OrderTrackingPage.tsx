@@ -8,6 +8,10 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { Order } from '../../types';
 import { getApiErrorMessage } from '../../lib/api-error';
+import {
+  remintCustomerSessionOn401,
+  retryWith401Remint,
+} from '../../features/qr-menu/customerSession';
 
 const OrderTrackingPage = () => {
   const { t } = useTranslation('common');
@@ -36,6 +40,9 @@ const OrderTrackingPage = () => {
         const response = await axios.get(`${API_URL}/customer-orders/session/${sessionId}?tenantId=${tenantId}`);
         setOrders(response.data);
       } catch (error) {
+        // Review C1: a 401 means the server session expired — re-mint in the
+        // background; the layout pushes the fresh id and the poll recovers.
+        remintCustomerSessionOn401(error);
         console.error('Error fetching orders:', error);
       }
     };
@@ -58,11 +65,16 @@ const OrderTrackingPage = () => {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      await axios.post(`${API_URL}/customer-orders/waiter-requests`, {
-        tenantId,
-        tableId,
+      // Review C1: transparently re-mint + retry once on 401 (expired session).
+      await retryWith401Remint(
+        (sid) =>
+          axios.post(`${API_URL}/customer-orders/waiter-requests`, {
+            tenantId,
+            tableId,
+            sessionId: sid,
+          }),
         sessionId,
-      });
+      );
       toast.success(t('waiter.callSuccess'));
     } catch (error) {
       toast.error(getApiErrorMessage(error, t('waiter.callError')));
@@ -77,11 +89,16 @@ const OrderTrackingPage = () => {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      await axios.post(`${API_URL}/customer-orders/bill-requests`, {
-        tenantId,
-        tableId: tableId || null,
+      // Review C1: transparently re-mint + retry once on 401 (expired session).
+      await retryWith401Remint(
+        (sid) =>
+          axios.post(`${API_URL}/customer-orders/bill-requests`, {
+            tenantId,
+            tableId: tableId || null,
+            sessionId: sid,
+          }),
         sessionId,
-      });
+      );
       toast.success(t('bill.requestSuccess'));
     } catch (error) {
       toast.error(getApiErrorMessage(error, t('bill.requestError')));

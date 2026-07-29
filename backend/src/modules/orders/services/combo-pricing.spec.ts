@@ -105,7 +105,9 @@ describe("explodeComboLine — fixed content (2 Dürüm + 2 Ayran)", () => {
   };
 
   it("explodes into 4 qty-1 children summing to the combo price", () => {
-    const r = explodeComboLine(catalog, [], 1, NOW); // no selections → defaults
+    // C2: selections ABSENT (undefined) → defaults. An explicit [] no longer
+    // falls back to defaults — see the "explicit selections" describe below.
+    const r = explodeComboLine(catalog, undefined, 1, NOW);
     expect(r.children).toHaveLength(4); // 2 dürüm + 2 ayran
     r.children.forEach((c) => expect(c.quantity).toBe(1));
     const sum = r.children.reduce((s, c) => s + c.subtotal, 0);
@@ -120,12 +122,12 @@ describe("explodeComboLine — fixed content (2 Dürüm + 2 Ayran)", () => {
   });
 
   it("keeps the invariant subtotal === unitPrice for every child (qty 1)", () => {
-    const r = explodeComboLine(catalog, [], 1, NOW);
+    const r = explodeComboLine(catalog, undefined, 1, NOW);
     r.children.forEach((c) => expect(c.subtotal).toBeCloseTo(c.unitPrice, 2));
   });
 
   it("extracts per-line VAT from each child subtotal", () => {
-    const r = explodeComboLine(catalog, [], 1, NOW);
+    const r = explodeComboLine(catalog, undefined, 1, NOW);
     r.children.forEach((c) =>
       expect(c.taxAmount).toBeCloseTo(extract(c.subtotal, c.taxRate), 2),
     );
@@ -305,5 +307,92 @@ describe("explodeComboLine — choice slot + priceDelta + mixed VAT", () => {
         NOW,
       ),
     ).toThrow(ComboValidationError);
+  });
+});
+
+// C2 (money): explicit selections vs absent selections. A deselected optional
+// default must NOT be re-added (and charged) server-side; "shown == charged".
+describe("explodeComboLine — explicit vs absent selections (C2)", () => {
+  // Burger (required, default) + optional dessert slot with a DEFAULT item.
+  const catalog: ComboCatalog = {
+    combo: { id: "duo", price: 100 },
+    groups: [
+      {
+        id: "g-main",
+        name: "Ana Ürün",
+        minSelect: 1,
+        maxSelect: 1,
+        items: [
+          {
+            componentProductId: "burger",
+            quantity: 1,
+            priceDelta: 0,
+            isDefault: true,
+            component: { id: "burger", price: 90, taxRate: 10 },
+          },
+        ],
+      },
+      {
+        id: "g-dessert",
+        name: "Tatlı",
+        minSelect: 0,
+        maxSelect: 1,
+        items: [
+          {
+            componentProductId: "baklava",
+            quantity: 1,
+            priceDelta: 15,
+            isDefault: true,
+            component: { id: "baklava", price: 30, taxRate: 10 },
+          },
+        ],
+      },
+    ],
+  };
+
+  it("absent selections (undefined) → defaults incl. the optional default", () => {
+    const r = explodeComboLine(catalog, undefined, 1, NOW);
+    expect(r.children.map((c) => c.productId).sort()).toEqual([
+      "baklava",
+      "burger",
+    ]);
+    // 100 base + 15 default-dessert delta
+    expect(r.lineTotal).toBeCloseTo(115, 2);
+  });
+
+  it("null selections behave like absent (defaults)", () => {
+    const r = explodeComboLine(catalog, null, 1, NOW);
+    expect(r.children).toHaveLength(2);
+    expect(r.lineTotal).toBeCloseTo(115, 2);
+  });
+
+  it("explicit partial list omitting an optional group charges NOTHING for it", () => {
+    // The guest deselected the default dessert; the FE sends only the main
+    // pick. The old resolver re-added baklava per-group and charged +15.
+    const r = explodeComboLine(
+      catalog,
+      [{ groupId: "g-main", componentProductId: "burger" }],
+      1,
+      NOW,
+    );
+    expect(r.children.map((c) => c.productId)).toEqual(["burger"]);
+    expect(r.lineTotal).toBeCloseTo(100, 2);
+  });
+
+  it("explicit list omitting a REQUIRED group is a validation error", () => {
+    expect(() =>
+      explodeComboLine(
+        catalog,
+        [{ groupId: "g-dessert", componentProductId: "baklava" }],
+        1,
+        NOW,
+      ),
+    ).toThrow(ComboValidationError);
+  });
+
+  it("explicit empty list on a combo with a required group is a validation error (not defaults)", () => {
+    expect(() => explodeComboLine(catalog, [], 1, NOW)).toThrow(
+      ComboValidationError,
+    );
   });
 });

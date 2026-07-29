@@ -37,6 +37,11 @@ interface CartContentProps {
   tenantId?: string;
   tableId?: string | null;
   subdomain?: string;
+  // Review C4: order-level notes are OWNED by the page (controlled input) so
+  // the submit handler can actually send them — the previous local state was
+  // captured here and silently discarded on submit.
+  specialNotes: string;
+  onSpecialNotesChange: (notes: string) => void;
 }
 
 // Animated number component
@@ -78,12 +83,13 @@ const CartContent: React.FC<CartContentProps> = ({
   tenantId,
   tableId,
   subdomain,
+  specialNotes,
+  onSpecialNotesChange,
 }) => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const isRTL = useIsRTL();
   const { items, updateItemQuantity, removeItem, reorderItems, getSubtotal, getTotal, sessionId } = useCartStore();
-  const [specialNotes, setSpecialNotes] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -267,7 +273,8 @@ const CartContent: React.FC<CartContentProps> = ({
           </label>
           <textarea
             value={specialNotes}
-            onChange={(e) => setSpecialNotes(e.target.value)}
+            onChange={(e) => onSpecialNotesChange(e.target.value)}
+            maxLength={500}
             placeholder={t('cart.notesPlaceholder', 'Any special requests for your order?')}
             className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 focus:border-transparent resize-none text-sm transition-all"
             style={{ '--tw-ring-color': settings.primaryColor } as React.CSSProperties}

@@ -8,6 +8,10 @@ import { toast } from 'sonner';
 import Spinner from '../../components/ui/Spinner';
 import MenuDrawer from '../../components/qr-menu/MenuDrawer';
 import { useCartStore } from '../../store/cartStore';
+import {
+  ensureCustomerSession,
+  retryWith401Remint,
+} from '../../features/qr-menu/customerSession';
 import { buildQRMenuUrl } from '../../utils/subdomain';
 import { formatCurrency } from '../../lib/utils';
 import { RTL_LANGUAGES } from '../../i18n/config';
@@ -110,11 +114,11 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
   // would otherwise let an attacker drive THIS device's order-history /
   // self-pay PII fetches as the victim. The earlier `storeSessionId ||
   // urlSessionId` fallback still leaked on a FRESH device (null store), where
-  // the URL value won before initializeSession minted a real id. The identity
-  // is now ONLY the per-device store session (minted locally by
-  // initializeSession); a fresh device simply has no session until then.
-  // Combined with buildQRMenuUrl no longer emitting the id, shareable links
-  // carry no credential at all.
+  // the URL value won before a real id existed. The identity is now ONLY the
+  // per-device store session — a SERVER-MINTED 64-hex token persisted by
+  // ensureCustomerSession (review C1); a fresh device simply has no session
+  // until the mint resolves. Combined with buildQRMenuUrl no longer emitting
+  // the id, shareable links carry no credential at all.
   const sessionId = storeSessionId;
 
   const [menuData, setMenuData] = useState<MenuData | null>(null);
@@ -164,10 +168,19 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
     }
   }, [urlTenantId, subdomain, isSubdomainMode, tableId, t]);
 
-  // Initialize cart session
+  // Initialize cart session binding, then mint the SERVER session (review
+  // C1): the backend only accepts its own 64-hex CustomerSession tokens, so
+  // the store never fabricates an id — we POST /customer-public/sessions once
+  // per guest context and persist the result. Fire-and-forget: pages render
+  // without a session and light up when the mint lands; action rails also
+  // ensure on demand.
   useEffect(() => {
     if (menuData && tenantId) {
       initializeSession(tenantId, tableId || null, menuData.tenant.currency);
+      ensureCustomerSession().catch(() => {
+        // Menu browsing works without a session; ordering rails re-ensure
+        // (with their own error surface) when the guest acts.
+      });
     }
   }, [menuData, tenantId, tableId, initializeSession]);
 
@@ -209,11 +222,18 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
     setIsCallingWaiter(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      await axios.post(`${API_URL}/customer-orders/waiter-requests`, {
-        tenantId,
-        tableId,
+      // Review C1: on 401 (expired server session) transparently re-mint and
+      // retry once — requireSession runs before any write, so nothing was
+      // created by the failed attempt.
+      await retryWith401Remint(
+        (sid) =>
+          axios.post(`${API_URL}/customer-orders/waiter-requests`, {
+            tenantId,
+            tableId,
+            sessionId: sid,
+          }),
         sessionId,
-      });
+      );
       toast.success(t('waiter.callSuccess'));
       setWaiterCooldown(60);
     } catch (error: any) {

@@ -75,6 +75,14 @@ vi.mock('../../store/cartStore', () => ({
   }),
 }));
 
+// Review C1: the layout bootstraps the SERVER session mint after binding the
+// cart. The rail itself is unit-tested in customerSession.test.ts.
+const ensureCustomerSession = vi.fn().mockResolvedValue('a'.repeat(64));
+vi.mock('../../features/qr-menu/customerSession', () => ({
+  ensureCustomerSession: (...a: unknown[]) => ensureCustomerSession(...a),
+  retryWith401Remint: async (fn: (sid: string) => Promise<unknown>, sid: string) => fn(sid),
+}));
+
 let mockParams: Record<string, string | null> = {};
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<any>('react-router-dom');
@@ -132,6 +140,12 @@ describe('QRMenuLayout — successful fetch', () => {
     await waitFor(() => expect(screen.getByText('Acme Diner')).toBeInTheDocument());
     // Cart session initialized from the loaded tenant.
     expect(initializeSession).toHaveBeenCalledWith('t-1', null, 'TRY');
+  });
+
+  it('mints a SERVER customer session once the menu is loaded (C1)', async () => {
+    get.mockResolvedValue({ data: menuData });
+    renderLayout();
+    await waitFor(() => expect(ensureCustomerSession).toHaveBeenCalled());
   });
 
   it('uses the subdomain endpoint in subdomain mode', async () => {

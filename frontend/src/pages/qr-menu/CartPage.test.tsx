@@ -3,16 +3,29 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 /**
  * Specs for CartPage — the QR customer order-submit flow. The submit
- * handler has the real logic: it blocks without a session (toast), opens
- * table selection when no table + tableless mode is off, maps cart items
- * into the customer-orders POST body, and on success clears the cart and
- * navigates to the orders page. We mock the layout/content/modal, the
- * cart store, geolocation, axios, toast and router.
+ * handler has the real logic: it opens table selection when no table +
+ * tableless mode is off, submits with a SERVER-MINTED session id (C1) via
+ * withCustomerSession, threads the order-level notes (C4), latches against
+ * double-taps synchronously (C6), maps cart items into the customer-orders
+ * POST body, and on success clears the cart and navigates to the orders
+ * page. We mock the layout/content/modal, the cart store, the session rail,
+ * geolocation, axios, toast and router.
  */
 
 const post = vi.fn();
 vi.mock("axios", () => ({
   default: { post: (...a: unknown[]) => post(...a) },
+}));
+
+// Review C1: the session rail is its own module (unit-tested in
+// features/qr-menu/customerSession.test.ts). Here we assert the page routes
+// its POST through it and uses the id the rail returns.
+const MINTED_SESSION = "f".repeat(64);
+const ensureCustomerSession = vi.fn();
+vi.mock("../../features/qr-menu/customerSession", () => ({
+  ensureCustomerSession: (...a: unknown[]) => ensureCustomerSession(...a),
+  withCustomerSession: async (fn: (sid: string) => Promise<unknown>) =>
+    fn(await ensureCustomerSession()),
 }));
 
 const toastSuccess = vi.fn();
@@ -70,8 +83,13 @@ vi.mock("./QRMenuLayout", () => ({
   ),
 }));
 vi.mock("../../components/qr-menu/CartContent", () => ({
-  default: ({ onSubmitOrder }: any) => (
-    <button onClick={onSubmitOrder}>submit</button>
+  default: ({ onSubmitOrder, onSpecialNotesChange }: any) => (
+    <div>
+      <button onClick={() => onSpecialNotesChange("less salt please")}>
+        type-notes
+      </button>
+      <button onClick={onSubmitOrder}>submit</button>
+    </div>
   ),
 }));
 vi.mock("../../components/qr-menu/TableSelectionModal", () => ({
@@ -87,12 +105,14 @@ import CartPage from "./CartPage";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ensureCustomerSession.mockResolvedValue(MINTED_SESSION);
   tableIdParam = null;
   cart = {
     items: [{ product: { id: "p1" }, quantity: 2, modifiers: [], notes: "x" }],
-    sessionId: "sess-1",
+    sessionId: null,
     tableId: null,
     clearCart,
+    setTableId: vi.fn(),
   };
   menuFixture = {
     settings: { primaryColor: "#fff" },
@@ -109,10 +129,12 @@ async function loadAndSubmit() {
 }
 
 describe("CartPage — submit guards", () => {
-  it("toasts and aborts when there is no session", async () => {
-    cart.sessionId = null;
+  it("toasts and aborts when the server session cannot be minted (C1)", async () => {
+    ensureCustomerSession.mockRejectedValue(new Error("mint down"));
     await loadAndSubmit();
-    expect(toastError).toHaveBeenCalledWith("cart.sessionExpired");
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("messages.operationFailed"),
+    );
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -139,7 +161,7 @@ describe("CartPage — submit guards", () => {
 });
 
 describe("CartPage — order submission", () => {
-  it("POSTs the mapped cart, clears it and navigates to orders on success", async () => {
+  it("POSTs the mapped cart with the SERVER-MINTED session id (C1 flow), clears it and navigates", async () => {
     post.mockResolvedValue({ data: {} });
     await loadAndSubmit();
 
@@ -148,14 +170,55 @@ describe("CartPage — order submission", () => {
     expect(url).toContain("/customer-orders");
     expect(body).toMatchObject({
       tenantId: "t-1",
-      sessionId: "sess-1",
+      // Review C1: the id on the wire is EXACTLY what the mint rail returned
+      // (64-hex server token) — never a locally fabricated UUID.
+      sessionId: MINTED_SESSION,
       items: [{ productId: "p1", quantity: 2, modifiers: [], notes: "x" }],
     });
+    expect(ensureCustomerSession).toHaveBeenCalled();
     await waitFor(() => expect(clearCart).toHaveBeenCalled());
     expect(toastSuccess).toHaveBeenCalledWith("cart.orderSubmitted");
     expect(navigate).toHaveBeenCalledWith(
       expect.stringContaining("/qr-menu/t-1/orders"),
     );
+  });
+
+  it("threads the typed order-level notes into the POST body (C4)", async () => {
+    post.mockResolvedValue({ data: {} });
+    render(<CartPage />);
+    fireEvent.click(screen.getByText("load"));
+    fireEvent.click(screen.getByText("type-notes"));
+    fireEvent.click(screen.getByText("submit"));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.notes).toBe("less salt please");
+  });
+
+  it("omits order-level notes when none were typed (C4)", async () => {
+    post.mockResolvedValue({ data: {} });
+    await loadAndSubmit();
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.notes).toBeUndefined();
+  });
+
+  it("two rapid submit taps produce exactly ONE POST (C6 latch)", async () => {
+    // Make the session mint span a tick so the second tap lands inside the
+    // async window that used to double-post.
+    ensureCustomerSession.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(MINTED_SESSION), 20)),
+    );
+    post.mockResolvedValue({ data: {} });
+    render(<CartPage />);
+    fireEvent.click(screen.getByText("load"));
+    fireEvent.click(screen.getByText("submit"));
+    fireEvent.click(screen.getByText("submit"));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    // Give any (buggy) second submission time to land before asserting.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(post).toHaveBeenCalledTimes(1);
   });
 
   it("remaps selected modifiers from cart `id` to server `modifierId` (sweep-3 B1)", async () => {

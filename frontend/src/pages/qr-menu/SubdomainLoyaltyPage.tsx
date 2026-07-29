@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import QRMenuLayout, { MenuData } from './QRMenuLayout';
 import LoyaltyContent from '../../components/qr-menu/LoyaltyContent';
 import axios from 'axios';
+import { remintCustomerSessionOn401 } from '../../features/qr-menu/customerSession';
 
 interface Transaction {
   id: string;
@@ -32,6 +33,9 @@ const SubdomainLoyaltyPage: React.FC<SubdomainLoyaltyPageProps> = ({ subdomain }
         );
         setTransactions(response.data);
       } catch (error) {
+        // Review C1: expired server session → background re-mint; the layout
+        // pushes the fresh id and this effect re-runs with it.
+        remintCustomerSessionOn401(error);
         console.error('Error fetching transactions:', error);
       }
     };

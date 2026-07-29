@@ -65,11 +65,23 @@ vi.mock('./QRMenuLayout', () => ({
 }));
 
 import OrderTrackingPage from './OrderTrackingPage';
+// REAL store + REAL customerSession module: the 401 re-mint tests below
+// exercise the actual re-mint flow end to end against the mocked axios.
+import { useCartStore } from '../../store/cartStore';
+
+const MINTED = 'e'.repeat(64);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  get.mockResolvedValue({ data: [] });
   tableIdParam = 'tbl-5';
   menuFixture = { settings: {}, tenant: { id: 't-1' }, enableCustomerSelfPay: true };
+  useCartStore.setState({
+    sessionId: null,
+    sessionExpiresAt: null,
+    tenantId: 't-1',
+    tableId: null,
+  });
 });
 
 function load() {
@@ -131,5 +143,59 @@ describe('OrderTrackingPage — browse menu + self-pay gate', () => {
     menuFixture.enableCustomerSelfPay = false;
     load();
     expect(screen.getByTestId('can-pay').textContent).toBe('no');
+  });
+});
+
+describe('OrderTrackingPage — C1 session re-mint on 401', () => {
+  it('re-mints the server session and retries the waiter call once on 401', async () => {
+    let waiterAttempts = 0;
+    post.mockImplementation((url: string) => {
+      if (url.includes('/customer-public/sessions')) {
+        return Promise.resolve({
+          data: {
+            sessionId: MINTED,
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          },
+        });
+      }
+      // waiter-requests: expired session on the first attempt, then success.
+      waiterAttempts += 1;
+      if (waiterAttempts === 1) {
+        return Promise.reject({ response: { status: 401 } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    load();
+    fireEvent.click(screen.getByText('call'));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('waiter.callSuccess'));
+    // The retry carried the freshly MINTED 64-hex token.
+    const waiterCalls = post.mock.calls.filter(([url]) =>
+      String(url).includes('/waiter-requests'),
+    );
+    expect(waiterCalls).toHaveLength(2);
+    expect(waiterCalls[1][1]).toMatchObject({ sessionId: MINTED });
+    expect(useCartStore.getState().sessionId).toBe(MINTED);
+  });
+
+  it('re-mints in the background when the orders poll 401s', async () => {
+    get.mockRejectedValue({ response: { status: 401 } });
+    post.mockResolvedValue({
+      data: {
+        sessionId: MINTED,
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    });
+
+    load();
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        expect.stringContaining('/customer-public/sessions'),
+        expect.objectContaining({ tenantId: 't-1' }),
+      ),
+    );
+    await waitFor(() => expect(useCartStore.getState().sessionId).toBe(MINTED));
   });
 });

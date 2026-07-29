@@ -1241,7 +1241,8 @@
     "noOrders": "Hali buyurtmalar yo'q",
     "noOrdersDescription": "Menyumizni ko'rishdan boshlang",
     "total": "Jami",
-    "note": "Eslatma"
+    "note": "Eslatma",
+    "reorderComboSkipped": "Kombo taomlar o'tkazib yuborildi — iltimos, ularni menyudan qaytadan qo'shing."
   },
   "waiter": {
     "call": "Ofitsiantni chaqirish",

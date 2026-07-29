@@ -204,12 +204,10 @@ const ProductOptionsModal = ({
       productForCart = { ...product, price: comboUnitPrice() };
     }
 
-    onAddToCart(
-      productForCart,
-      quantity,
-      allModifiers,
-      comboSel && comboSel.length ? comboSel : undefined,
-    );
+    // Review C2: keep the (possibly empty) selections array for combos so an
+    // explicitly emptied optional slot reaches the server as "none" instead
+    // of collapsing to absent — which re-applied and charged the default.
+    onAddToCart(productForCart, quantity, allModifiers, comboSel);
     onClose();
   };
 

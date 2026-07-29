@@ -86,7 +86,11 @@ export class CreateOrderItemDto {
   @ApiPropertyOptional({
     type: [ComboSelectionDto],
     description:
-      "For a COMBO product: chosen component per slot. Omitted slots use their default items.",
+      "For a COMBO product: chosen component per slot. Omit the FIELD " +
+      "entirely to apply the combo's default items. When the field is " +
+      "present (even empty), only the listed selections apply — a group " +
+      "with no entries adds nothing, and groups with minSelect > 0 must " +
+      "still be covered.",
   })
   @IsArray()
   @ArrayMaxSize(30)
