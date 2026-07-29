@@ -102,6 +102,14 @@ export interface CompleteProfilePayload {
  * Post-social-login (and any incomplete-profile) onboarding submit. Saves the
  * required phone + optional business details, then refreshes the cached profile
  * so the ProfileCompletionGate releases into the app.
+ *
+ * The cached ['profile', userId, tenantId] entry is updated SYNCHRONOUSLY from
+ * the endpoint's returned fresh user. `invalidateQueries` alone is async — the
+ * /welcome page navigated away before the refetch landed, the gate then read
+ * the STALE no-phone cache and bounced the user straight back to /welcome
+ * (where a second submit re-applied the business fields). setQueryData merges
+ * over the existing entry so profile-only fields (allowedBranchIds,
+ * tenantName, …) survive; the invalidate stays as an eventual re-sync.
  */
 export const useCompleteProfile = () => {
   const setUser = useAuthStore((state) => state.setUser);
@@ -113,6 +121,10 @@ export const useCompleteProfile = () => {
     },
     onSuccess: (user) => {
       setUser(user);
+      // Same key shape as useProfile: ['profile', userId, tenantId].
+      qc.setQueryData(['profile', user.id, user.tenantId], (old: User | undefined) =>
+        old ? { ...old, ...user } : user,
+      );
       qc.invalidateQueries({ queryKey: ['profile'] });
       toast.success(
         i18n.t('auth:welcome.saved', { defaultValue: 'Bilgileriniz kaydedildi.' }),

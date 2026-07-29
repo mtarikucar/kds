@@ -55,6 +55,7 @@ import {
   useRegister,
   useLogout,
   useProfile,
+  useCompleteProfile,
   useForgotPassword,
   useResetPassword,
   useGoogleAuth,
@@ -183,6 +184,51 @@ describe('useProfile', () => {
 
     expect(result.current.fetchStatus).toBe('idle');
     expect(getMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useCompleteProfile', () => {
+  it('seeds the profile cache SYNCHRONOUSLY with the returned user so the gate releases without a refetch', async () => {
+    // F2 regression: invalidateQueries alone is async — the /welcome page
+    // navigated, ProfileCompletionGate read the STALE no-phone cache and
+    // bounced straight back to /welcome (second submit = second tenant
+    // rename). The mutation must write the fresh user into the exact
+    // ['profile', userId, tenantId] key the gate reads.
+    const freshUser = { id: 'u1', tenantId: 't1', phone: '+905551234567', role: 'ADMIN' };
+    postMock.mockResolvedValue({ data: freshUser });
+    const client = new QueryClient();
+    // Pre-fix state: the cached profile has no phone (plus profile-only
+    // fields that must survive the merge).
+    client.setQueryData(['profile', 'u1', 't1'], {
+      id: 'u1',
+      tenantId: 't1',
+      phone: null,
+      role: 'ADMIN',
+      allowedBranchIds: ['b1'],
+    });
+
+    const { result } = renderHook(() => useCompleteProfile(), { wrapper: wrapper(client) });
+    result.current.mutate({ phone: '+905551234567' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(postMock).toHaveBeenCalledWith('/auth/complete-profile', { phone: '+905551234567' });
+    const cached = client.getQueryData(['profile', 'u1', 't1']) as any;
+    // Phone landed (gate releases) AND profile-only fields survived.
+    expect(cached.phone).toBe('+905551234567');
+    expect(cached.allowedBranchIds).toEqual(['b1']);
+    expect(setUserFn).toHaveBeenCalledWith(freshUser);
+  });
+
+  it('seeds the cache even when no prior profile entry exists', async () => {
+    const freshUser = { id: 'u1', tenantId: 't1', phone: '+905551112233', role: 'ADMIN' };
+    postMock.mockResolvedValue({ data: freshUser });
+    const client = new QueryClient();
+
+    const { result } = renderHook(() => useCompleteProfile(), { wrapper: wrapper(client) });
+    result.current.mutate({ phone: '+905551112233' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.getQueryData(['profile', 'u1', 't1'])).toEqual(freshUser);
   });
 });
 

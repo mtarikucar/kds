@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { STATUS, EVENTS, ACTIONS } from 'react-joyride';
 import { useOnboarding } from './useOnboarding';
@@ -208,5 +208,137 @@ describe('useOnboarding.handleJoyrideCallback', () => {
     });
     expect(updateTourProgress).toHaveBeenCalledWith('admin-tour', 2, true);
     expect(result.current.isTourRunning).toBe(false);
+  });
+});
+
+/**
+ * Review F3 — the TARGET_NOT_FOUND retry must be VISIBILITY-aware. A bare
+ * querySelector truthiness check let a present-but-display:none node (e.g.
+ * the mobile-drawer duplicate of the settings sidebar) pass, so the hook
+ * re-nonced forever: Joyride remounted, failed its own visibility check,
+ * fired TARGET_NOT_FOUND again → infinite 800ms loop and the tour never
+ * completed. Now: re-nonce ONLY for a visible target (getClientRects), and
+ * advance past the step when the target is missing, invisible, or the retry
+ * cap is exhausted.
+ */
+describe('useOnboarding TARGET_NOT_FOUND retry (visibility-aware)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+  });
+
+  function fireTargetNotFound(result: any, index: number) {
+    act(() => {
+      result.current.handleJoyrideCallback({
+        type: EVENTS.TARGET_NOT_FOUND,
+        action: ACTIONS.UPDATE,
+        index,
+        status: STATUS.RUNNING,
+        lifecycle: 'init',
+      } as any);
+    });
+  }
+
+  function mountTarget(tour: string, visible: boolean) {
+    const el = document.createElement('div');
+    el.setAttribute('data-tour', tour);
+    // jsdom has no layout — stub the signal the hook reads explicitly.
+    (el as any).getClientRects = () => (visible ? [{ width: 10, height: 10 }] : []);
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('re-nonces (remounts Joyride) when the target appears AND is visible', () => {
+    mountTarget('b', true);
+    const { result } = renderHook(() => useOnboarding());
+    const nonceBefore = result.current.retryNonce;
+
+    fireTargetNotFound(result, 1);
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(result.current.retryNonce).toBe(nonceBefore + 1);
+    // No advance, no navigation — Joyride gets another chance at this step.
+    expect(navigate).not.toHaveBeenCalled();
+    expect(result.current.currentStep).toBe(0);
+  });
+
+  it('ADVANCES past the step (no re-nonce) when the target is present but INVISIBLE', () => {
+    mountTarget('b', false); // exists in the DOM, display:none-equivalent
+    const { result } = renderHook(() => useOnboarding());
+    const nonceBefore = result.current.retryNonce;
+
+    fireTargetNotFound(result, 1);
+    act(() => {
+      vi.advanceTimersByTime(800); // retry timer: sees invisible node → skip
+    });
+
+    expect(result.current.retryNonce).toBe(nonceBefore); // never re-nonced
+    // Step 2 shares /pos — navigate fires because the mocked pathname is
+    // /dashboard, then the 300ms defer lands the step change.
+    expect(navigate).toHaveBeenCalledWith('/pos');
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.currentStep).toBe(2);
+  });
+
+  it('advances when the target is entirely missing from the DOM', () => {
+    const { result } = renderHook(() => useOnboarding());
+
+    fireTargetNotFound(result, 1);
+    act(() => {
+      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(result.current.currentStep).toBe(2);
+  });
+
+  it('stops re-noncing after the retry cap and advances instead (no infinite loop)', () => {
+    mountTarget('b', true); // visible forever, but Joyride keeps rejecting it
+    const { result } = renderHook(() => useOnboarding());
+    const nonceBefore = result.current.retryNonce;
+
+    // MAX_TARGET_RETRIES = 3 re-nonces, then the 4th attempt must bail out.
+    for (let i = 0; i < 3; i++) {
+      fireTargetNotFound(result, 1);
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+    }
+    expect(result.current.retryNonce).toBe(nonceBefore + 3);
+    expect(result.current.currentStep).toBe(0);
+
+    fireTargetNotFound(result, 1);
+    act(() => {
+      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.retryNonce).toBe(nonceBefore + 3); // capped
+    expect(result.current.currentStep).toBe(2); // advanced past the step
+  });
+
+  it('finishes the tour when the last step target never materializes', () => {
+    const { result } = renderHook(() => useOnboarding());
+    act(() => {
+      result.current.startTour();
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.isTourRunning).toBe(true);
+
+    fireTargetNotFound(result, 2); // last step, nothing in the DOM
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(result.current.isTourRunning).toBe(false);
+    expect(updateTourProgress).toHaveBeenCalledWith('admin-tour', 2, true);
   });
 });

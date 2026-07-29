@@ -134,7 +134,13 @@ const SettingsLayout = () => {
     setIsMobileMenuOpen(false);
   };
 
-  const SidebarContent = () => (
+  // `tourAnchor`: whether this copy carries data-tour="settings-nav".
+  // SidebarContent renders TWICE (always-mounted mobile drawer + desktop
+  // sidebar). react-joyride resolves its target via the FIRST querySelector
+  // match and requires it to be visible — when the drawer copy (display:none
+  // on ≥lg) carried the attribute too, the admin tour's settings step hit
+  // TARGET_NOT_FOUND forever. Only the desktop copy may carry the anchor.
+  const SidebarContent = ({ tourAnchor = false }: { tourAnchor?: boolean }) => (
     <>
       <div className="mb-4">
         <div className="flex items-center gap-2">
@@ -143,7 +149,7 @@ const SettingsLayout = () => {
         </div>
       </div>
 
-      <nav className="space-y-0.5" data-tour="settings-nav">
+      <nav className="space-y-0.5" data-tour={tourAnchor ? 'settings-nav' : undefined}>
         {settingsNavItems.map((item) => {
           const isActive = location.pathname === item.to ||
             (item.to !== '/admin/settings/subscription' && location.pathname.startsWith(item.to));
@@ -218,9 +224,9 @@ const SettingsLayout = () => {
         </div>
       </div>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar — the only copy carrying the tour anchor */}
       <div className="hidden lg:block w-52 bg-slate-50/50 border-r border-slate-200/60 p-4 flex-shrink-0">
-        <SidebarContent />
+        <SidebarContent tourAnchor />
       </div>
 
       {/* Settings Content */}

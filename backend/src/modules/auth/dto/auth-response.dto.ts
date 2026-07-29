@@ -28,6 +28,15 @@ export class UserResponseDto {
   tenantId: string;
 
   /**
+   * Restaurant (tenant) display name. Returned by GET /auth/profile so the
+   * /welcome onboarding form can prefill the business-name field instead of
+   * forcing a retype (a blind retype is how an accidental tenant rename
+   * happens). Optional: token-minting paths don't populate it.
+   */
+  @ApiProperty({ required: false, nullable: true })
+  tenantName?: string | null;
+
+  /**
    * v3.0.0 — the user's home branch.
    *
    * The frontend's `branchScopeStore` hydrates from this on login.

@@ -11,6 +11,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { EmailService } from "../../../common/services/email.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { NotificationType } from "../../notifications/dto/create-notification.dto";
+import { ErrorCode } from "../../../common/interfaces/error-response.interface";
 
 /**
  * EmailVerificationService — owns the 6-digit email verification lifecycle:
@@ -158,7 +159,13 @@ export class EmailVerificationService {
       user.emailVerificationCodeExpires <= new Date() ||
       !submittedOk
     ) {
-      throw new BadRequestException("Invalid or expired verification code");
+      // errorCode → localized toast on the SPA; English message = fallback.
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Bad Request",
+        errorCode: ErrorCode.VERIFICATION_CODE_INVALID,
+        message: "Invalid or expired verification code",
+      });
     }
 
     // Atomic claim: filter by the current hash so a concurrent verify
@@ -176,7 +183,12 @@ export class EmailVerificationService {
       },
     });
     if (consumed.count === 0) {
-      throw new BadRequestException("Invalid or expired verification code");
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Bad Request",
+        errorCode: ErrorCode.VERIFICATION_CODE_INVALID,
+        message: "Invalid or expired verification code",
+      });
     }
 
     // Send success notification

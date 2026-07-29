@@ -7,7 +7,10 @@ import {
 /**
  * AuthService.completeProfile — post-social-login onboarding. Saves the
  * required phone + optional business details atomically across User + Tenant +
- * the Main branch.
+ * the Main branch. Tenant/branch mutations are ADMIN-only (the DB role is
+ * consulted inside the transaction); staff callers still get their
+ * user-scoped fields saved but can never rename the restaurant or rewrite
+ * tax/address data.
  */
 describe("AuthService.completeProfile", () => {
   let prisma: MockPrismaClient;
@@ -27,8 +30,11 @@ describe("AuthService.completeProfile", () => {
     (prisma.$transaction as any).mockImplementation(async (fn: any) =>
       fn(prisma),
     );
+    // Default caller is an ADMIN — the tx role lookup and the final profile
+    // refetch share this mock.
     (prisma.user.findUnique as any).mockResolvedValue({
       id: USER,
+      role: "ADMIN",
       phone: "+905551234567",
     });
   });
@@ -96,5 +102,66 @@ describe("AuthService.completeProfile", () => {
     );
     expect(prisma.tenant.update).not.toHaveBeenCalled();
     expect(prisma.branch.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["WAITER", "KITCHEN", "COURIER", "MANAGER"])(
+    "SECURITY: a %s caller sending business/tax/address fields saves ONLY user fields — tenant and branch stay untouched",
+    async (role) => {
+      (prisma.user.findUnique as any).mockResolvedValue({
+        id: USER,
+        role,
+        phone: "+905551112233",
+      });
+      (prisma.branch.findFirst as any).mockResolvedValue({
+        id: "b1",
+        address: {},
+      });
+
+      await svc.completeProfile(USER, TENANT, {
+        phone: "+905551112233",
+        firstName: "Wai",
+        lastName: "Ter",
+        locale: "en",
+        businessName: "HIJACKED NAME",
+        taxId: "666",
+        taxOffice: "Nowhere",
+        addressLine: "Evil St. 1",
+        city: "Gotham",
+        timezone: "UTC",
+      } as any);
+
+      // User-scoped fields still land (the call must succeed for staff).
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: USER },
+          data: expect.objectContaining({
+            phone: "+905551112233",
+            firstName: "Wai",
+            lastName: "Ter",
+            locale: "en",
+          }),
+        }),
+      );
+      // Tenant identity + HQ address must be untouched by non-admin callers.
+      expect(prisma.tenant.update).not.toHaveBeenCalled();
+      expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+      expect(prisma.branch.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it("admin caller still updates tenant + branch (role read from DB, not JWT)", async () => {
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: "b1", address: {} });
+
+    await svc.completeProfile(USER, TENANT, {
+      phone: "+905551234567",
+      businessName: "Legit Rename",
+    } as any);
+
+    expect(prisma.tenant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: TENANT },
+        data: expect.objectContaining({ name: "Legit Rename" }),
+      }),
+    );
   });
 });

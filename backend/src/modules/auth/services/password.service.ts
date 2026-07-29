@@ -13,6 +13,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { MetricsService } from "../../../common/metrics/metrics.service";
 import { EmailService } from "../../../common/services/email.service";
 import { TenantStatus } from "../../../common/constants/subscription.enum";
+import { ErrorCode } from "../../../common/interfaces/error-response.interface";
 import {
   ForgotPasswordDto,
   ResetPasswordDto,
@@ -137,9 +138,16 @@ export class PasswordService {
     }
 
     if (user.status === "PENDING_APPROVAL") {
-      throw new UnauthorizedException(
-        "Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.",
-      );
+      // errorCode lets the SPA localize (the hardcoded message is Turkish and
+      // leaked as-is to en/ru/ar/uz users); the message stays as the fallback.
+      // Same object-body pattern as jwt.strategy's ACCOUNT_ROLE_INVALID.
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: "Account Pending Approval",
+        errorCode: ErrorCode.ACCOUNT_PENDING_APPROVAL,
+        message:
+          "Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.",
+      });
     }
     if (user.status !== "ACTIVE") {
       throw new UnauthorizedException("User account is inactive");
@@ -219,7 +227,13 @@ export class PasswordService {
     });
 
     if (!user) {
-      throw new BadRequestException("Invalid or expired reset token");
+      // errorCode → localized toast on the SPA; English message = fallback.
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Bad Request",
+        errorCode: ErrorCode.RESET_TOKEN_INVALID,
+        message: "Invalid or expired reset token",
+      });
     }
 
     // Hash new password
@@ -252,7 +266,12 @@ export class PasswordService {
 
     if (updateResult.count === 0) {
       // Lost the race: another request already consumed this token.
-      throw new BadRequestException("Invalid or expired reset token");
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Bad Request",
+        errorCode: ErrorCode.RESET_TOKEN_INVALID,
+        message: "Invalid or expired reset token",
+      });
     }
 
     // Audit: reset-password successfully consumed a valid token. We had

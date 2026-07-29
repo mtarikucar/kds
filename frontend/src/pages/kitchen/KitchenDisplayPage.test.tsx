@@ -266,4 +266,44 @@ describe('KitchenDisplayPage', () => {
     fireEvent.click(screen.getByText('refresh-probe'));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * Tour-anchor regression guard (review F4). The kitchen tour's
+   * "order-queues" step must resolve a VISIBLE target at ANY viewport width:
+   * the desktop 3-column grid is `hidden lg:grid` (display:none below lg) and
+   * the mobile tabs are `lg:hidden` (display:none at ≥lg). Pre-fix only the
+   * desktop grid carried data-tour="order-queues", so on tablets (<1024px)
+   * the tour hit TARGET_NOT_FOUND forever at step 3/5.
+   *
+   * LIMITATION: jsdom performs no layout, so width-visibility is asserted
+   * structurally via the exact Tailwind classes that gate each container:
+   * exactly one anchor is desktop-visible (no `lg:hidden` on it or an
+   * ancestor) and exactly one is mobile-visible (no `hidden` base class on it
+   * or an ancestor). The two are self-exclusive by construction.
+   */
+  it('carries exactly one order-queues tour anchor per viewport class (desktop grid + mobile tabs)', () => {
+    const { container } = render(<KitchenDisplayPage />);
+    const anchors = Array.from(
+      container.querySelectorAll('[data-tour="order-queues"]'),
+    );
+    expect(anchors).toHaveLength(2);
+
+    const hasClassUp = (el: Element, cls: string): boolean => {
+      let node: Element | null = el;
+      while (node) {
+        if (node.classList?.contains(cls)) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    // Visible at ≥lg (desktop): not inside a `lg:hidden` subtree.
+    const desktopVisible = anchors.filter((a) => !hasClassUp(a, 'lg:hidden'));
+    expect(desktopVisible).toHaveLength(1);
+    // Visible below lg (mobile/tablet): not inside a base-`hidden` subtree.
+    const mobileVisible = anchors.filter((a) => !hasClassUp(a, 'hidden'));
+    expect(mobileVisible).toHaveLength(1);
+    // Self-exclusive: no anchor is visible in both regimes, none in neither.
+    expect(desktopVisible[0]).not.toBe(mobileVisible[0]);
+  });
 });

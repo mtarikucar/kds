@@ -99,6 +99,13 @@ describe('EmailVerificationService.verifyEmailWithCode', () => {
     await expect(svc.verifyEmailWithCode('u@test.com', '000000')).rejects.toBeInstanceOf(
       BadRequestException,
     );
+    // Machine-readable code — the SPA localizes off this, keeping the
+    // English message as a fallback only.
+    await expect(
+      svc.verifyEmailWithCode('u@test.com', '000000'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: 'VERIFICATION_CODE_INVALID' }),
+    });
   });
 
   it('verifies on a matching, unexpired code (atomic claim succeeds)', async () => {

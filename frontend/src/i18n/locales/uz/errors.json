@@ -33,7 +33,10 @@
     "SAME_PLAN_ACTIVE": "Siz allaqachon shu tarifga obuna boʻlgansiz.",
     "HARDWARE_OUT_OF_STOCK": "Bu mahsulot omborda mavjud emas.",
     "ACCOUNT_ROLE_INVALID": "Hisobingizning roli yaroqsiz. Iltimos, qoʻllab-quvvatlash xizmati bilan bogʻlaning.",
-    "DEMO_PAYMENT_BLOCKED": "Demo rejimida toʻlov qabul qilinmaydi."
+    "DEMO_PAYMENT_BLOCKED": "Demo rejimida toʻlov qabul qilinmaydi.",
+    "ACCOUNT_PENDING_APPROVAL": "Hisobingiz hali tasdiqlanmagan. Iltimos, administrator tasdig'ini kuting.",
+    "RESET_TOKEN_INVALID": "Parolni tiklash havolasi yaroqsiz yoki muddati o'tgan. Iltimos, yangisini so'rang.",
+    "VERIFICATION_CODE_INVALID": "Tasdiqlash kodi yaroqsiz yoki muddati o'tgan. Iltimos, yangi kod so'rang."
   },
   "errors": {
     "title": "Xatolik",
