@@ -11,10 +11,18 @@ import {
   hasRemainingUnpaidOrders,
   mapOrderItemsToCart,
   mergeCartItem,
+  orderPaidAmount,
+  orderRemainingDue,
+  computeCartLineId,
+  getCartLineId,
+  normalizeCartLines,
+  updateLineQuantity,
+  removeLine,
+  stepProductLine,
   type PosCartItem,
 } from './posCart';
 import type { CartItem } from './posTypes';
-import { OrderType, OrderStatus, type Order, type OrderItem, type Product, type OrderItemModifier, type Modifier } from '../../types';
+import { OrderType, OrderStatus, PaymentStatus, type Order, type OrderItem, type Product, type OrderItemModifier, type Modifier, type Payment } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 import { buildOrderData } from './buildOrderData';
 
@@ -378,7 +386,9 @@ describe('mapOrderItemsToCart', () => {
     const cart = mapOrderItemsToCart({
       orderItems: [orderItem({ quantity: 2, notes: '', product: { id: 'p-7', name: 'Fries', price: 5 } as Product })],
     } as Pick<Order, 'orderItems' | 'items'>);
-    expect(cart).toEqual([{ id: 'p-7', name: 'Fries', price: 5, quantity: 2, notes: undefined }]);
+    expect(cart).toEqual([
+      { id: 'p-7', name: 'Fries', price: 5, quantity: 2, notes: undefined, modifiers: undefined, lineId: 'p-7::::' },
+    ]);
   });
 
   it('keeps a real note', () => {
@@ -550,5 +560,181 @@ describe('mergeCartItem', () => {
     const start: CartItem[] = [{ ...product('p1'), quantity: 1, modifiers: [] }];
     const out = mergeCartItem(start, product('p2'), 1, []);
     expect(out.map((i) => i.id)).toEqual(['p1', 'p2']);
+  });
+});
+
+const payment = (
+  amount: number | string,
+  status: PaymentStatus = PaymentStatus.COMPLETED,
+): Payment => ({ id: `pay-${amount}-${status}`, amount, status } as unknown as Payment);
+
+const payableOrder = (
+  finalAmount: number | string,
+  payments?: Payment[],
+): Pick<Order, 'finalAmount' | 'payments'> =>
+  ({ finalAmount, payments } as Pick<Order, 'finalAmount' | 'payments'>);
+
+describe('orderPaidAmount / orderRemainingDue (settle-up after partial payments)', () => {
+  it('sums only COMPLETED payments — PENDING/FAILED/REFUNDED never count', () => {
+    expect(
+      orderPaidAmount(
+        payableOrder(100, [
+          payment(30),
+          payment(20, PaymentStatus.PENDING),
+          payment(15, PaymentStatus.FAILED),
+          payment(30, PaymentStatus.REFUNDED),
+        ]),
+      ),
+    ).toBe(30);
+  });
+
+  it('coerces string Decimal amounts from the API', () => {
+    expect(orderPaidAmount(payableOrder(100, [payment('12.50'), payment('7.25')]))).toBe(19.75);
+  });
+
+  it('treats a missing payments array as nothing paid (full amount due)', () => {
+    expect(orderPaidAmount(payableOrder(80))).toBe(0);
+    expect(orderRemainingDue(payableOrder(80))).toBe(80);
+    expect(orderRemainingDue({ finalAmount: '80.00' } as unknown as Order)).toBe(80);
+  });
+
+  it('remaining = finalAmount − completed paid (the amount the backend will accept)', () => {
+    // The old flow charged the gross 100 here → backend "exceeds remaining (40)"
+    // rejection with NO path to settle. 60 paid ⇒ collect exactly 40.
+    expect(orderRemainingDue(payableOrder(100, [payment(60)]))).toBe(40);
+  });
+
+  it('rounds to kuruş so float noise never leaks into the charged amount', () => {
+    // 10.3 − 10.2 = 0.09999999999999964 raw
+    expect(orderRemainingDue(payableOrder(10.3, [payment(10.2)]))).toBe(0.1);
+    expect(orderRemainingDue(payableOrder(0.3, [payment(0.1), payment(0.1)]))).toBe(0.1);
+  });
+
+  it('clamps at 0 when the order is already fully (or over-) covered', () => {
+    expect(orderRemainingDue(payableOrder(50, [payment(50)]))).toBe(0);
+    expect(orderRemainingDue(payableOrder(50, [payment(60)]))).toBe(0);
+  });
+});
+
+describe('cart line identity (lineId)', () => {
+  it('computeCartLineId keys product + modifier set + combo picks, selection-order-insensitive', () => {
+    expect(computeCartLineId('p1', [sel('m1'), sel('m2')])).toBe(
+      computeCartLineId('p1', [sel('m2'), sel('m1')]),
+    );
+    expect(computeCartLineId('p1', [sel('m1')])).not.toBe(computeCartLineId('p1', [sel('m2')]));
+    expect(
+      computeCartLineId('p1', [], [{ groupId: 'g1', componentProductId: 'c1' }]),
+    ).not.toBe(computeCartLineId('p1', []));
+  });
+
+  it('mergeCartItem stamps a deterministic lineId on appended lines', () => {
+    const out = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    expect(out[0].lineId).toBe(computeCartLineId('p1', [sel('m1')]));
+  });
+
+  it('same product with different modifier sets gets DISTINCT lineIds (unique React keys)', () => {
+    let cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    cart = mergeCartItem(cart, product('p1'), 2, [sel('m2')]);
+    expect(cart).toHaveLength(2);
+    expect(getCartLineId(cart[0])).not.toBe(getCartLineId(cart[1]));
+  });
+
+  it('updateLineQuantity touches ONLY the targeted line of a same-product pair', () => {
+    let cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    cart = mergeCartItem(cart, product('p1'), 2, [sel('m2')]);
+    const out = updateLineQuantity(cart, getCartLineId(cart[0]), 5);
+    expect(out[0].quantity).toBe(5);
+    expect(out[1].quantity).toBe(2); // sibling line untouched
+  });
+
+  it('removeLine removes ONLY the targeted line, never every line of the product', () => {
+    let cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    cart = mergeCartItem(cart, product('p1'), 2, [sel('m2')]);
+    const out = removeLine(cart, getCartLineId(cart[0]));
+    expect(out).toHaveLength(1);
+    expect(out[0].modifiers).toEqual([sel('m2')]);
+  });
+
+  it('normalizeCartLines backfills lineId on persisted pre-lineId carts (localStorage back-compat)', () => {
+    const legacy = [
+      { ...product('p1'), quantity: 1, modifiers: [sel('m1')] },
+      { ...product('p1'), quantity: 2, modifiers: [sel('m2')] },
+    ] as CartItem[];
+    const out = normalizeCartLines(legacy);
+    expect(out[0].lineId).toBe(computeCartLineId('p1', [sel('m1')]));
+    expect(out[1].lineId).toBe(computeCartLineId('p1', [sel('m2')]));
+  });
+
+  it('normalizeCartLines keeps an existing lineId and suffixes duplicate identities', () => {
+    const kept = { ...product('p1'), quantity: 1, lineId: 'custom-id' } as CartItem;
+    const dupA = { ...product('p2'), quantity: 1 } as CartItem;
+    const dupB = { ...product('p2'), quantity: 3 } as CartItem;
+    const out = normalizeCartLines([kept, dupA, dupB]);
+    expect(out[0].lineId).toBe('custom-id');
+    expect(out[1].lineId).toBe('p2::::');
+    expect(out[2].lineId).toBe('p2::::::2'); // unique despite identical identity
+  });
+
+  it('buildOrderData payload carries NO lineId (client-only, DTO unchanged)', () => {
+    let cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    cart = mergeCartItem(cart, product('p1'), 2, []);
+    const built = buildOrderData({
+      isTablelessMode: false,
+      selectedTable: { id: 't-1' } as never,
+      customerName: '',
+      orderNotes: '',
+      discount: 0,
+      cartItems: cart,
+      generateId: () => 'fixed-id',
+    });
+    for (const item of built.items) {
+      expect('lineId' in item).toBe(false);
+    }
+    expect(JSON.stringify(built)).not.toContain('lineId');
+  });
+
+  it('mapOrderItemsToCart stamps unique lineIds even for duplicate-identity order rows', () => {
+    const cart = mapOrderItemsToCart({
+      orderItems: [
+        orderItem({ id: 'oi-1', product: { id: 'p-1', name: 'Burger', price: 10 } as Product }),
+        orderItem({ id: 'oi-2', product: { id: 'p-1', name: 'Burger', price: 10 } as Product }),
+      ],
+    } as Pick<Order, 'orderItems' | 'items'>);
+    expect(cart).toHaveLength(2);
+    expect(cart[0].lineId).toBeDefined();
+    expect(cart[0].lineId).not.toBe(cart[1].lineId);
+  });
+});
+
+describe('stepProductLine (MenuPanel inline steppers, product-id addressed)', () => {
+  it('increments the plain line, never a modifier sibling of the same product', () => {
+    let cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    cart = mergeCartItem(cart, product('p1'), 2, []);
+    const out = stepProductLine(cart, 'p1', 1);
+    expect(out[0].quantity).toBe(1); // modifier line untouched
+    expect(out[1].quantity).toBe(3);
+  });
+
+  it('decrements and drops the plain line at quantity 1', () => {
+    const cart = mergeCartItem([], product('p1'), 1, []);
+    expect(stepProductLine(cart, 'p1', -1)).toHaveLength(0);
+    const two = mergeCartItem([], product('p1'), 2, []);
+    expect(stepProductLine(two, 'p1', -1)[0].quantity).toBe(1);
+  });
+
+  it('falls back to a sole line even when it carries modifiers', () => {
+    const cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    expect(stepProductLine(cart, 'p1', 1)[0].quantity).toBe(2);
+  });
+
+  it('touches nothing when several modifier lines make the target ambiguous', () => {
+    let cart = mergeCartItem([], product('p1'), 1, [sel('m1')]);
+    cart = mergeCartItem(cart, product('p1'), 2, [sel('m2')]);
+    expect(stepProductLine(cart, 'p1', 1)).toEqual(cart);
+  });
+
+  it('is a no-op for a product not in the cart', () => {
+    const cart = mergeCartItem([], product('p1'), 1, []);
+    expect(stepProductLine(cart, 'p9', 1)).toEqual(cart);
   });
 });

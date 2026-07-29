@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, CreditCard, Clock } from 'lucide-react';
 import { Order } from '../../types';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
+import { orderPaidAmount, orderRemainingDue } from '../../pages/pos/posCart';
 
 interface AwaitingPaymentSectionProps {
   orders: Order[];
@@ -50,6 +51,11 @@ const AwaitingPaymentSection = ({
       {isExpanded && (
         <div className="border-t border-amber-200 divide-y divide-amber-200">
           {orders.map((order) => {
+            // Charge the REMAINING due, not the gross finalAmount — after a
+            // partial/progressive payment the backend rejects anything above
+            // the remainder, which left the cashier with no settle-up path.
+            const remainingDue = orderRemainingDue(order);
+            const hasPartialPayment = orderPaidAmount(order) > 0;
             const itemCount =
               order.items?.length || order.orderItems?.length || 0;
             const itemsSummary =
@@ -83,17 +89,22 @@ const AwaitingPaymentSection = ({
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-xs text-slate-500">
-                      {t('awaitingPayment.orderTotal')}
+                      {hasPartialPayment
+                        ? t('awaitingPayment.remainingDue')
+                        : t('awaitingPayment.orderTotal')}
                     </div>
                     <div className="font-semibold text-slate-900">
-                      {formatPrice(Number(order.finalAmount))}
+                      {formatPrice(remainingDue)}
                     </div>
+                    {hasPartialPayment && (
+                      <div className="text-xs text-slate-400 line-through">
+                        {formatPrice(Number(order.finalAmount))}
+                      </div>
+                    )}
                   </div>
 
                   <button
-                    onClick={() =>
-                      onCollectPayment(order.id, Number(order.finalAmount))
-                    }
+                    onClick={() => onCollectPayment(order.id, remainingDue)}
                     className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
                   >
                     {t('awaitingPayment.collectPayment')}

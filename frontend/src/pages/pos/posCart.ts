@@ -1,4 +1,4 @@
-import { OrderType, OrderStatus, type Order, type OrderItem, type Product } from '../../types';
+import { OrderType, OrderStatus, PaymentStatus, type Order, type OrderItem, type Product } from '../../types';
 import type { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 import type { CartItem } from './posTypes';
 
@@ -99,6 +99,37 @@ export function isTenderSufficient(total: number, tendered: number): boolean {
 }
 
 /**
+ * Sum of COMPLETED payments already recorded on an order. `payments` rides on
+ * every /orders list row (ORDER_DETAIL_INCLUDE serializes it); amounts may
+ * arrive as strings (Prisma Decimal) → Number(). Non-COMPLETED rows (PENDING/
+ * FAILED/REFUNDED) don't count — mirrors the backend's remaining-validation
+ * aggregate (payments.service, status: COMPLETED), so the two sides can never
+ * disagree on what "already paid" means. Kuruş-rounded like computeChangeDue.
+ */
+export function orderPaidAmount(order: Pick<Order, 'payments'>): number {
+  const paid = (order.payments ?? []).reduce(
+    (sum, p) =>
+      p.status === PaymentStatus.COMPLETED ? sum + Number(p.amount) : sum,
+    0,
+  );
+  return Math.round(paid * 100) / 100;
+}
+
+/**
+ * True balance still owed on an order — what "collect payment" must charge.
+ * After a partial/progressive payment the backend rejects anything above this
+ * ("Payment amount exceeds remaining"), so charging the gross finalAmount
+ * dead-ends the cashier with no way to settle the bill. Clamped at 0 (an
+ * over-paid order owes nothing) and kuruş-rounded against float noise.
+ */
+export function orderRemainingDue(
+  order: Pick<Order, 'finalAmount' | 'payments'>,
+): number {
+  const remaining = Number(order.finalAmount) - orderPaidAmount(order);
+  return Math.max(0, Math.round(remaining * 100) / 100);
+}
+
+/**
  * Stable identity key for a cart line: product id is implicit (caller already
  * matched on it); this keys the *modifier set* so the same product with
  * different modifiers stays a separate line. Modifier ids are sorted so order
@@ -119,6 +150,98 @@ function comboKeyOf(
     .map((s) => `${s.groupId}:${s.componentProductId}`)
     .sort()
     .join('|');
+}
+
+/**
+ * Client-only cart-line identity: product + modifier set + combo picks —
+ * EXACTLY the keys mergeCartItem merges on, so "same lineId" ⇔ "would merge".
+ * Line-level operations (update qty / remove / React keys) must target this,
+ * never the bare product id: two lines of the same product with different
+ * modifiers are distinct bills, and a product-id update/remove corrupted both.
+ */
+export function computeCartLineId(
+  productId: string,
+  modifiers?: { modifierId: string }[],
+  comboSelections?: { groupId: string; componentProductId: string }[],
+): string {
+  return `${productId}::${modifierKeyOf(modifiers ?? [])}::${comboKeyOf(comboSelections)}`;
+}
+
+/**
+ * Resolve a line's id, deriving it for legacy lines that lack one (a persisted
+ * pre-lineId cart that slipped past normalizeCartLines still targets correctly).
+ */
+export function getCartLineId(
+  item: Pick<CartItem, 'id' | 'lineId' | 'modifiers' | 'comboSelections'>,
+): string {
+  return (
+    item.lineId ?? computeCartLineId(item.id, item.modifiers, item.comboSelections)
+  );
+}
+
+/**
+ * Backfill `lineId` on carts persisted before line identity existed
+ * (localStorage back-compat) and on order-loaded lines. Deterministic —
+ * derived from the same merge keys — with an index suffix when two lines
+ * share an identity (possible when a reopened order carried duplicate item
+ * rows), so React keys and line targeting stay unique.
+ */
+export function normalizeCartLines(items: CartItem[]): CartItem[] {
+  const taken = new Set<string>();
+  return items.map((item) => {
+    const base = getCartLineId(item);
+    let lineId = base;
+    for (let n = 2; taken.has(lineId); n++) lineId = `${base}::${n}`;
+    taken.add(lineId);
+    return lineId === item.lineId ? item : { ...item, lineId };
+  });
+}
+
+/** Set a line's quantity by lineId, leaving sibling lines of the same product intact. */
+export function updateLineQuantity(
+  prev: CartItem[],
+  lineId: string,
+  quantity: number,
+): CartItem[] {
+  return prev.map((item) =>
+    getCartLineId(item) === lineId ? { ...item, quantity } : item,
+  );
+}
+
+/** Remove exactly one line by lineId (never every line of the product). */
+export function removeLine(prev: CartItem[], lineId: string): CartItem[] {
+  return prev.filter((item) => getCartLineId(item) !== lineId);
+}
+
+/**
+ * Resolve which line a MenuPanel inline stepper targets. Steppers pass a bare
+ * PRODUCT id and only render for simple products (no required modifiers,
+ * never combos), which merge into one plain line — but a reopened order can
+ * put an optional-modifier line of the same product in the cart. Prefer the
+ * plain line (the one a card-tap add merges into); fall back to a sole line;
+ * when several modifier lines make the target ambiguous, touch nothing rather
+ * than corrupt sibling lines.
+ */
+export function stepProductLine(
+  prev: CartItem[],
+  productId: string,
+  delta: 1 | -1,
+): CartItem[] {
+  const matches = prev.filter((item) => item.id === productId);
+  const plainKey = computeCartLineId(productId, [], undefined);
+  const target =
+    matches.find(
+      (item) =>
+        computeCartLineId(item.id, item.modifiers, item.comboSelections) ===
+        plainKey,
+    ) ?? (matches.length === 1 ? matches[0] : undefined);
+  if (!target) return prev;
+  return prev.flatMap((item) => {
+    if (item !== target) return [item];
+    const quantity = item.quantity + delta;
+    // Drop the line when it would hit zero, otherwise adjust.
+    return quantity < 1 ? [] : [{ ...item, quantity }];
+  });
 }
 
 /**
@@ -151,7 +274,17 @@ export function mergeCartItem(
         : item,
     );
   }
-  return [...prev, { ...product, quantity, modifiers, comboSelections }];
+  // Collision-free: a line sharing this identity would have merged above.
+  return [
+    ...prev,
+    {
+      ...product,
+      quantity,
+      modifiers,
+      comboSelections,
+      lineId: computeCartLineId(product.id, modifiers, comboSelections),
+    },
+  ];
 }
 
 /**
@@ -319,5 +452,6 @@ export function mapOrderItemsToCart(
       });
     }
   }
-  return result;
+  // Stamp line identities (suffix-deduped) so loaded lines are targetable.
+  return normalizeCartLines(result);
 }

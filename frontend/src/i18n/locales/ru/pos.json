@@ -283,7 +283,8 @@
   "awaitingPayment": {
     "title": "Ожидание оплаты",
     "collectPayment": "Принять оплату",
-    "orderTotal": "Сумма заказа"
+    "orderTotal": "Сумма заказа",
+    "remainingDue": "Осталось оплатить"
   },
   "dineInPaymentRequiresServed": "Заказы в зале можно оплатить только после подачи блюд",
   "dineInPaymentRequiresReadyOrServed": "Заказы в зале можно оплатить только когда они готовы или поданы",

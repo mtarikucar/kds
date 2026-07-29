@@ -163,7 +163,8 @@ describe('useTableSelection — occupied-load effect', () => {
     expect(result.current.state.discount).toBe(7);
     expect(result.current.state.orderNotes).toBe('table notes');
     expect(result.current.state.cartItems).toEqual([
-      { id: 'p-1', price: 10, quantity: 2, notes: undefined },
+      // lineId stamped by mapOrderItemsToCart (client-only line identity).
+      { id: 'p-1', price: 10, quantity: 2, notes: undefined, modifiers: undefined, lineId: 'p-1::::' },
     ]);
     expect(toast.info).toHaveBeenCalledWith('loadedExistingOrder');
   });

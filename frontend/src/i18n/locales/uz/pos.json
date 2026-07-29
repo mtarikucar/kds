@@ -283,7 +283,8 @@
   "awaitingPayment": {
     "title": "To'lov kutilmoqda",
     "collectPayment": "To'lovni qabul qilish",
-    "orderTotal": "Buyurtma jami"
+    "orderTotal": "Buyurtma jami",
+    "remainingDue": "Qolgan summa"
   },
   "dineInPaymentRequiresServed": "Zalda buyurtmalar uchun to'lov faqat taom uzatilgandan so'ng amalga oshiriladi",
   "dineInPaymentRequiresReadyOrServed": "Zalda buyurtmalar uchun to'lov faqat tayyor yoki uzatilgan holatda amalga oshiriladi",
