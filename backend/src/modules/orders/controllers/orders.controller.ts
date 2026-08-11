@@ -47,7 +47,7 @@ export class OrdersController {
   ) {}
 
   @Post()
-    @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: "Create a new order (ADMIN, MANAGER, WAITER)" })
   @ApiResponse({ status: 201, description: "Order successfully created" })
   @ApiResponse({ status: 400, description: "Invalid data" })

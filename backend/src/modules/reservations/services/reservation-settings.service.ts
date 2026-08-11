@@ -156,10 +156,7 @@ export class ReservationSettingsService {
     // unavailable" instead of taking a booking into a void. NOT coupled to
     // ReservationSettings.isEnabled (schema default true, never plan-linked).
     const featureEnabled = this.entitlements
-      ? await isReservationFeatureEnabled(
-        this.entitlements,
-          tenantId,
-        )
+      ? await isReservationFeatureEnabled(this.entitlements, tenantId)
       : true;
 
     return {

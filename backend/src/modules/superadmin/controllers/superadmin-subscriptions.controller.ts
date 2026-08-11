@@ -12,10 +12,6 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { SuperAdminSubscriptionsService } from "../services/superadmin-subscriptions.service";
 import {
-  UpdateBankTransferSettingsDto,
-  RejectBankTransferDto,
-} from "../../payments/dto/bank-transfer.dto";
-import {
   SubscriptionFilterDto,
   CreatePlanDto,
   UpdatePlanDto,
@@ -165,5 +161,4 @@ export class SuperAdminSubscriptionsController {
   }
 
   // --- Bank transfer (havale) -------------------------------------------------
-
 }
