@@ -45,10 +45,6 @@ else
   NEW="$(git rev-parse HEAD)"
 fi
 
-# The remote already has main; only send objects reachable from HEAD but not
-# from origin/main (a normal, self-contained pack — no --thin).
-BASE="$(git rev-parse main)"
-
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 PACK="$WORK/push.pack"
@@ -70,7 +66,8 @@ curl -sS --cacert "$CA_BUNDLE" \
   -o "$ADV" \
   "${REMOTE_URL}/info/refs?service=git-upload-pack"
 
-OLD="$(python3 - "$ADV" "$REF" <<'PY'
+adv_sha() {
+  python3 - "$ADV" "$1" <<'PY'
 import sys
 data = open(sys.argv[1], "rb").read()
 want = sys.argv[2]
@@ -91,7 +88,10 @@ while i + 4 <= len(data):
     i += n
 print(out)
 PY
-)"
+}
+
+OLD="$(adv_sha "$REF")"
+REMOTE_MAIN="$(adv_sha refs/heads/main)"
 
 if [[ "$OLD" == "$ZERO" ]]; then
   echo "remote ${REF}: absent → creating"
@@ -107,8 +107,20 @@ else
   fi
 fi
 
-printf '%s\n^%s\n' "$NEW" "$BASE" | git pack-objects --stdout --revs --delta-base-offset > "$PACK"
-echo "pack: $(wc -c < "$PACK") bytes, $(printf '%s\n^%s\n' "$NEW" "$BASE" | git rev-list --objects --stdin --revs | wc -l) objects"
+# Send only what the remote is missing: everything reachable from NEW minus
+# what it already has at this ref and on main. Excluding a hardcoded local
+# `main` instead — which is what this did — produces an empty pack whenever the
+# local branch has moved past it, and the server answers "missing necessary
+# objects".
+REVS="$NEW"
+for have in "$OLD" "$REMOTE_MAIN"; do
+  [[ "$have" == "$ZERO" ]] && continue
+  git cat-file -e "$have" 2>/dev/null || continue   # not local → cannot exclude
+  REVS+=$'\n'"^$have"
+done
+
+printf '%s\n' "$REVS" | git pack-objects --stdout --revs --delta-base-offset > "$PACK"
+echo "pack: $(wc -c < "$PACK") bytes, $(printf '%s\n' "$REVS" | git rev-list --objects --stdin --revs | wc -l) objects"
 
 # Build the receive-pack request body:
 #   PKT-LINE( "<old> <new> <ref>\0 report-status" )  <flush-pkt 0000>  <packfile>
