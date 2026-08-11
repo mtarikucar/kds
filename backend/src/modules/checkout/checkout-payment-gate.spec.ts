@@ -11,6 +11,10 @@ import { CheckoutService } from "./checkout.service";
  * REQUIRES a settled CheckoutIntent (status 'succeeded' | 'provisioned') for
  * (tenantId, paymentRef) before provisioning anything.
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService — confirmAndProvision payment gate (C1)", () => {
   let prisma: any;
   let outbox: any;
@@ -56,6 +60,7 @@ describe("CheckoutService — confirmAndProvision payment gate (C1)", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
     );
   });
 
@@ -97,11 +102,20 @@ describe("CheckoutService — confirmAndProvision payment gate (C1)", () => {
   // cart that was actually paid for (intent.cartJson), never the client cart.
   it("provisions intent.cartJson, not a swapped client cart, for a settled ref", async () => {
     const paidCart = {
-      items: [{ type: "plan", code: "PRO", billingCycle: "MONTHLY" }],
+      items: [{ type: "addon", code: "advanced_reports" }],
     };
+    const pricedAt = new Date("2026-03-20T20:58:00.000Z");
     prisma.checkoutIntent.findFirst.mockResolvedValue({
       status: "succeeded",
       cartJson: paidCart,
+      // v3.3.0 — the frozen pricing instant is replayed into the re-quote so
+      // an intent that crosses midnight cannot re-price a day cheaper and
+      // strand a cart the buyer already paid for.
+      pricedAt,
+      expiresAt: new Date(Date.now() + 24 * 3600_000),
+      referralCode: null,
+      referredByMarketingUserId: null,
+      renewalCycleId: null,
     });
 
     const swappedCart = {
@@ -109,9 +123,16 @@ describe("CheckoutService — confirmAndProvision payment gate (C1)", () => {
     };
     await svc.confirmAndProvision("t-1", swappedCart as any, "CK-paid");
 
-    // Priced + provisioned the PAID cart, never the attacker's swapped cart.
-    expect(quoteSvc.quote).toHaveBeenCalledWith(paidCart);
-    expect(quoteSvc.quote).not.toHaveBeenCalledWith(swappedCart);
+    // Priced + provisioned the PAID cart, never the attacker's swapped cart,
+    // and at the FROZEN instant rather than "now".
+    expect(quoteSvc.quote).toHaveBeenCalledWith(paidCart, "t-1", {
+      now: pricedAt,
+    });
+    expect(quoteSvc.quote).not.toHaveBeenCalledWith(
+      swappedCart,
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("allows the null-paymentRef internal comp path only with an explicit allowComp flag", async () => {

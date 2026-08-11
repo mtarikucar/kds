@@ -10,6 +10,10 @@ import { CheckoutService } from "./checkout.service";
  * demo tenant. DemoGuardService is mocked here to keep this spec
  * unit-scoped.
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService.confirmAndProvision demo-tenant block", () => {
   const TENANT = "tenant-demo";
 
@@ -49,6 +53,7 @@ describe("CheckoutService.confirmAndProvision demo-tenant block", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
       undefined, // metrics
       undefined, // devices
       demoGuard as any,

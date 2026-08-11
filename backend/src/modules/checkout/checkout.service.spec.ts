@@ -8,6 +8,10 @@ import { CheckoutService } from "./checkout.service";
  *    amount (a price change between intent and settlement);
  *  - add-on grants JOIN the outer transaction (purchase receives the tx).
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
   const PAYMENT_REF = "CK-1";
   const TENANT = "t-1";
@@ -77,6 +81,7 @@ describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
     );
   });
 

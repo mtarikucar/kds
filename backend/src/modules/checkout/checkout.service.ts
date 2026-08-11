@@ -12,6 +12,8 @@ import { MetricsService } from "../../common/metrics/metrics.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
+import { TenantInvoiceService } from "./tenant-invoice.service";
+import { EventTypes } from "../outbox/event-types";
 import { DeviceService } from "../device-mesh/device.service";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
@@ -47,6 +49,9 @@ export class CheckoutService {
     private readonly quoteSvc: QuoteService,
     private readonly catalog: CatalogService,
     private readonly tenantMarketplace: TenantMarketplaceService,
+    // Itemized à-la-carte invoicing, written inside the provisioning
+    // transaction so a granted product can never exist without its invoice.
+    private readonly tenantInvoices: TenantInvoiceService,
     // Optional so unit tests constructing the service bare keep working.
     @Optional() private readonly metrics?: MetricsService,
     // Optional: provisions device-mesh slots for purchased device-class
@@ -60,6 +65,24 @@ export class CheckoutService {
     // bare-`new`-constructed spec compiling).
     private readonly demoGuard?: DemoGuardService,
   ) {}
+
+  /**
+   * Per-product commission rate for the marketing-rep ledger.
+   *
+   * Replaces `SubscriptionPlan.commissionRate`, which is meaningless once
+   * plans retire. Falls back to the historical 0.10 default so a catalog row
+   * created before the column existed still pays a rep.
+   */
+  private async resolveCommissionRate(
+    tx: Prisma.TransactionClient,
+    code: string,
+  ): Promise<number> {
+    const row = await tx.marketplaceAddOn.findUnique({
+      where: { code },
+      select: { commissionRate: true },
+    });
+    return row?.commissionRate ? Number(row.commissionRate) : 0.1;
+  }
 
   /**
    * Re-price the cart at confirm time so the user can't tamper with totals.
@@ -131,10 +154,30 @@ export class CheckoutService {
     // gated above by opts.allowComp (no public caller can reach it).
     let effectiveCart: Cart = cart;
     let chargedAmountCents: number | null = null;
+    // Frozen pricing instant, replayed from the settled intent so the
+    // re-quote below is deterministic for day-prorated annual lines.
+    let pricedAt: Date | undefined;
+    // Kept for the provisioning transaction: the referral snapshot it carries
+    // is what makes the commission event possible, and renewalCycleId is what
+    // lets settlement close out the renewal it paid for.
+    let settledIntent: {
+      referralCode: string | null;
+      referredByMarketingUserId: string | null;
+      renewalCycleId: string | null;
+    } | null = null;
     if (paymentRef) {
       const intent = await this.prisma.checkoutIntent.findFirst({
         where: { tenantId, paymentRef },
-        select: { status: true, cartJson: true, amountCents: true },
+        select: {
+          status: true,
+          cartJson: true,
+          amountCents: true,
+          pricedAt: true,
+          expiresAt: true,
+          referralCode: true,
+          referredByMarketingUserId: true,
+          renewalCycleId: true,
+        },
       });
       if (
         !intent ||
@@ -151,17 +194,42 @@ export class CheckoutService {
       effectiveCart = intent.cartJson as unknown as Cart;
       // The frozen amount PayTR actually charged (authoritative).
       chargedAmountCents = intent.amountCents;
+      // REPLAY the frozen pricing instant. Annual lines are day-prorated, so
+      // re-quoting at "now" would legitimately return a different number for
+      // an intent that crossed midnight — and the tolerance check below would
+      // then refuse to provision a cart the buyer has already paid for, every
+      // single night. Passing pricedAt back in makes the comparison
+      // deterministic and leaves the check doing what it is actually for:
+      // catching a CATALOG price edit between intent and settlement.
+      pricedAt = intent.pricedAt ?? undefined;
+      // A stale intent settled long after the fact would provision a period
+      // that has already ended.
+      if (intent.expiresAt && intent.expiresAt.getTime() < Date.now()) {
+        this.logger.error(
+          `Rejected confirmAndProvision for tenant=${tenantId} ref=${paymentRef}: intent expired at ${intent.expiresAt.toISOString()}`,
+        );
+        throw new BadRequestException(
+          "This checkout has expired; please start a new one.",
+        );
+      }
+      settledIntent = {
+        referralCode: intent.referralCode,
+        referredByMarketingUserId: intent.referredByMarketingUserId,
+        renewalCycleId: intent.renewalCycleId,
+      };
     }
 
-    const quote = await this.quoteSvc.quote(effectiveCart);
+    const quote = await this.quoteSvc.quote(effectiveCart, tenantId, {
+      now: pricedAt,
+    });
 
     // The cart stores only codes/qty — the re-quote re-reads LIVE prices. If a
-    // plan/add-on/hardware price changed between intent and settlement, the
-    // re-quoted total would differ from what was charged, provisioning at a
-    // price the buyer never agreed to. Refuse to provision on divergence and
-    // leave the intent 'succeeded' for manual review (settlement's catch keeps
-    // it retryable; an operator re-prices or refunds). A 1-cent tolerance
-    // absorbs benign rounding.
+    // catalog price changed between intent and settlement, the re-quoted total
+    // would differ from what was charged, provisioning at a price the buyer
+    // never agreed to. Refuse to provision on divergence and leave the intent
+    // 'succeeded' for manual review (settlement's catch keeps it retryable; an
+    // operator re-prices or refunds). A 1-cent tolerance absorbs benign
+    // rounding.
     if (
       chargedAmountCents !== null &&
       Math.abs(quote.totalCents - chargedAmountCents) > 1
@@ -360,14 +428,55 @@ export class CheckoutService {
           }
         }
 
-        // 2. Add-ons. Each line is one TenantAddOn row at the requested qty.
-        // Already-deduped by the catalog service; dependency checks run inside
-        // tenantMarketplace.purchase.
-        for (const l of addOnLines) {
+        // 2. Catalog products.
+        //
+        // ORDER MATTERS, in two independent ways:
+        //   - The licence line must be provisioned FIRST. It is what stamps
+        //     Tenant.licenseAnchorAt, and every sibling annual line resolves
+        //     its period against that anchor. (The priced lines already carry
+        //     an explicit periodEnd, so this is belt-and-braces — but a
+        //     direct caller without one would silently get a different year.)
+        //   - Dependencies must exist before their dependents. An opening
+        //     cart is legitimately "licence + AI module + AI credit pack",
+        //     and purchase()'s dep check reads ACTIVE ownership rows, so the
+        //     module has to land before the pack that depends on it.
+        // A stable rank over the catalog kind gives both.
+        const KIND_RANK: Record<string, number> = {
+          license: 0,
+          module: 1,
+          integration: 1,
+          capacity: 2,
+          service: 3,
+          credit: 4,
+        };
+        const orderedAddOnLines = [...addOnLines].sort(
+          (a, b) =>
+            (KIND_RANK[a.meta?.kind ?? ""] ?? 9) -
+            (KIND_RANK[b.meta?.kind ?? ""] ?? 9),
+        );
+
+        for (const l of orderedAddOnLines) {
           const branchId = l.meta?.branchId;
-          // Pass the outer tx so the add-on grant + its outbox emit commit
+          // Pass the outer tx so the grant + its outbox emit commit
           // atomically with the hardware order / stock allocation — a later
           // failure rolls the grant back instead of orphaning a paid entitlement.
+          if (l.meta?.kind === "credit") {
+            // Credits mint a CreditLot, never an ownership row: they are a
+            // consumable balance, they do not renew, and they are read live
+            // inside the advisory-locked claim rather than from the 30s
+            // entitlement cache.
+            await this.tenantMarketplace.purchaseCredits(
+              tenantId,
+              {
+                addOnCode: l.code,
+                quantity: l.qty,
+                paymentRef: paymentRef ?? undefined,
+                chargedCents: l.subtotalCents,
+              },
+              tx,
+            );
+            continue;
+          }
           const ta = await this.tenantMarketplace.purchase(
             tenantId,
             {
@@ -375,10 +484,85 @@ export class CheckoutService {
               quantity: l.qty,
               branchId,
               paymentRef: paymentRef ?? undefined,
+              // Snapshot what was ACTUALLY charged (the prorated slice) and
+              // the period it bought, so the provisioned row can never
+              // disagree with the money that changed hands.
+              chargedCents: l.subtotalCents,
+              pricingMeta: {
+                annualPriceCents: l.meta?.annualPriceCents,
+                prorationMode: l.meta?.prorationMode,
+                proratedDays: l.meta?.proratedDays,
+                cycleDays: l.meta?.cycleDays,
+              },
+              periodStart: l.meta?.periodStart
+                ? new Date(l.meta.periodStart)
+                : undefined,
+              periodEnd: l.meta?.periodEnd
+                ? new Date(l.meta.periodEnd)
+                : undefined,
             },
             tx,
           );
           addOnIds.push(ta.id);
+        }
+
+        // 2b. Itemized invoice for the à-la-carte world. Written inside the
+        // same transaction as the provisioning so a tenant can never end up
+        // with a granted product and no invoice, or vice versa.
+        if (paymentRef) {
+          await this.tenantInvoices.createFromQuote(tx, {
+            tenantId,
+            quote,
+            paymentRef,
+            kind: settledIntent?.renewalCycleId ? "renewal" : "purchase",
+            renewalCycleId: settledIntent?.renewalCycleId ?? null,
+            referralCode: settledIntent?.referralCode ?? null,
+            referredByMarketingUserId:
+              settledIntent?.referredByMarketingUserId ?? null,
+          });
+        }
+
+        // 2c. Marketing-rep commission.
+        //
+        // This rail has NEVER emitted PaymentSucceeded — only the legacy
+        // subscription rail did, and that is the sole input to the marketing
+        // service's commission ledger. Moving all money here without this
+        // emit would take rep commissions to zero silently, because
+        // MarketingEventRelayService PARKS events when the marketing service
+        // is unconfigured rather than erroring.
+        if (paymentRef && settledIntent?.referredByMarketingUserId) {
+          const primary = [...orderedAddOnLines].sort(
+            (a, b) => b.subtotalCents - a.subtotalCents,
+          )[0];
+          const commissionRate = primary
+            ? await this.resolveCommissionRate(tx, primary.code)
+            : 0.1;
+          await tx.outboxEvent.create({
+            data: {
+              id: uuidv7(),
+              type: EventTypes.PaymentSucceeded,
+              tenantId,
+              payload: {
+                tenantId,
+                paymentId: paymentRef,
+                amount: quote.totalCents / 100,
+                currency: quote.currency,
+                // A cart containing the licence is the tenant's first paid
+                // purchase; anything later is an upsell.
+                kind: orderedAddOnLines.some((l) => l.meta?.kind === "license")
+                  ? "signup"
+                  : "upsell",
+                planCode: primary?.code ?? null,
+                commissionRate,
+                referralCode: settledIntent.referralCode ?? null,
+                referredByMarketingUserId:
+                  settledIntent.referredByMarketingUserId,
+              } as any,
+              idempotencyKey: `payment-succeeded:${paymentRef}`,
+              status: "queued",
+              nextAttemptAt: new Date(),
+            },
+          });
         }
 
         // NOTE: checkout no longer touches subscriptions. Plan changes go
@@ -389,6 +573,23 @@ export class CheckoutService {
         // changed even though money was charged for the plan line. QuoteService
         // now REJECTS `type:'plan'` lines, so a plan line can never reach
         // provisioning here in the first place — the emit is gone, not gated.
+
+        // 2d. Close out the renewal this cart paid for, in the same
+        // transaction as the provisioning it renewed.
+        if (settledIntent?.renewalCycleId) {
+          await tx.renewalCycle.updateMany({
+            where: {
+              id: settledIntent.renewalCycleId,
+              tenantId,
+              status: "open",
+            },
+            data: {
+              status: "paid",
+              paidAt: new Date(),
+              paymentRef,
+            },
+          });
+        }
 
         // Audit event — one row per provisioned cart so ops can answer
         // "where did this provisioning come from".

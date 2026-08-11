@@ -1,14 +1,12 @@
-// Mixed-cart input contract. One cart can carry any combination of plan
-// changes, add-on purchases, hardware SKUs, and service line items.
-
-export interface CartItemPlan {
-  type: "plan";
-  // PlanCode resolves to a SubscriptionPlan.name (FREE|BASIC|PRO|BUSINESS) for
-  // now. Once Plan-as-data lands in a separate model, this becomes a row id.
-  code: string;
-  billingCycle?: "MONTHLY" | "YEARLY";
-  qty?: number;
-}
+// Mixed-cart input contract. One cart can carry any combination of catalog
+// products (licence, modules, integrations, capacity, credits), hardware SKUs
+// and service line items.
+//
+// v3.3.0 removed `CartItemPlan`. Plans are retired, and the line type had
+// already been hard-rejected by QuoteService since the day it was found to
+// charge for a plan change that never applied. Keeping ONE `addon` line type
+// whose behaviour is driven by the catalog row's `kind` is what lets the
+// renewal cart be an ordinary multi-line cart with no special casing.
 
 export interface CartItemAddOn {
   type: "addon";
@@ -44,11 +42,7 @@ export interface CartItemService {
   notes?: string;
 }
 
-export type CartItem =
-  | CartItemPlan
-  | CartItemAddOn
-  | CartItemHardware
-  | CartItemService;
+export type CartItem = CartItemAddOn | CartItemHardware | CartItemService;
 
 export interface Cart {
   items: CartItem[];
@@ -61,6 +55,11 @@ export interface Cart {
   // moving / archiving later doesn't rewrite this order's address.
   // Validated tenant-scoped + active in CheckoutService.confirmAndProvision.
   branchId?: string;
+  /**
+   * Set when this cart settles a generated RenewalCycle, so settlement can
+   * mark that cycle paid in the same transaction as the provisioning.
+   */
+  renewalCycleId?: string;
 }
 
 // Per-line metadata the QuoteService producer attaches and the
@@ -71,11 +70,29 @@ export interface Cart {
 // productId/acquisition/warrantyMonths; service: branchId/serviceMeta/
 // preferredDates/notes).
 export interface PricedLineMeta {
-  planId?: string;
-  billingCycle?: string;
   addOnId?: string;
+  /** Catalog kind: license | module | integration | capacity | credit | service. */
   kind?: string;
   branchId?: string;
+  // --- annual lines (v3.3.0 proration) ---
+  /** Catalog list price for a WHOLE cycle. `unitCents` is the prorated slice. */
+  annualPriceCents?: number;
+  /** full | prorated | rollForward — renders the invoice footnote. */
+  prorationMode?: string;
+  /** Days this charge actually covers. */
+  proratedDays?: number;
+  /** Length of the cycle it was prorated against — 365 or 366. */
+  cycleDays?: number;
+  /** ISO dates. The period the purchase provisions. */
+  periodStart?: string;
+  periodEnd?: string;
+  /** Whether an active licence gates this product. */
+  requiresLicense?: boolean;
+  // --- credit packs ---
+  creditKind?: string;
+  /** Units to mint, ALREADY multiplied by the line quantity. */
+  creditUnits?: number;
+  // --- hardware / service ---
   productId?: string;
   acquisition?: "sell" | "rent";
   warrantyMonths?: number;

@@ -108,4 +108,17 @@ export class CreateCheckoutIntentDto {
   @IsOptional()
   @IsUUID()
   branchId?: string;
+
+  // v3.3.0 — marketing-rep attribution, mirroring the subscription rail's
+  // CreatePaymentIntentDto.referralCode. Resolved through
+  // ReferralDirectoryPort and snapshotted onto the CheckoutIntent at intent
+  // time so a later code rotation cannot re-attribute a past sale. Without
+  // it the checkout rail has no referral to put on the PaymentSucceeded
+  // event, and once the subscription rail retires rep commissions would
+  // silently drop to zero.
+  @ApiPropertyOptional({ maxLength: 64 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  referralCode?: string;
 }

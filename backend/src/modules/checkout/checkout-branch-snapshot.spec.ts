@@ -19,6 +19,10 @@ import { CheckoutService } from "./checkout.service";
  * is the snapshot. If Branch.address mutates after the order is placed,
  * the order row must not move.
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
   let prisma: any;
   let outbox: any;
@@ -63,6 +67,7 @@ describe("CheckoutService — branchId snapshot (v2.8.99.3)", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
     );
   });
 

@@ -17,7 +17,25 @@ import { EntitlementSet } from "../entitlements/entitlement.types";
  * call assertPurchasable() and never mint an intent for a doomed purchase
  * (DEF-1/2/4/8).
  */
+/**
+ * Baseline entitlement set for a LICENSED tenant.
+ *
+ * Every rule in this file other than the licence prerequisite itself assumes
+ * the tenant is licensed — an unlicensed tenant is rejected before any of them
+ * is reached, which is the point of the prerequisite. `unlicensed()` is the
+ * explicit opt-out for the tests that are about that rule.
+ */
 function ent(partial: Partial<EntitlementSet> = {}): EntitlementSet {
+  return {
+    limits: {},
+    integrations: {},
+    computedAt: new Date("2026-01-01").toISOString(),
+    ...partial,
+    features: { "feature.license": true, ...(partial.features ?? {}) },
+  } as EntitlementSet;
+}
+
+function unlicensed(partial: Partial<EntitlementSet> = {}): EntitlementSet {
   return {
     features: {},
     limits: {},
@@ -33,6 +51,13 @@ function addonRow(overrides: Record<string, unknown> = {}) {
     code: "advanced_reports",
     name: "Advanced reports",
     status: "published",
+    kind: "module",
+    billing: "annual",
+    priceCents: 129_000,
+    // v3.3.0 — everything paid is licence-gated by default; the fixtures that
+    // exercise the non-licence rules grant the licence in the entitlement set.
+    requiresLicense: true,
+    maxQuantity: null,
     grants: { "feature.advancedReports": true },
     deps: [] as string[],
     ...overrides,
@@ -50,6 +75,8 @@ describe("AddonPurchasabilityService.assertPurchasable", () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     catalog = { findByCodeOrThrow: jest.fn() } as any;
+    // Baseline: a LICENSED tenant, so the scenarios below exercise the rule
+    // they are actually about rather than tripping the licence prerequisite.
     entitlements = { getForTenant: jest.fn().mockResolvedValue(ent()) };
     svc = new AddonPurchasabilityService(
       prisma as any,
@@ -77,8 +104,8 @@ describe("AddonPurchasabilityService.assertPurchasable", () => {
     expect(threw).toBe(true);
   }
 
-  // ── Scenario 1: plan already includes the add-on's grants ────────────
-  it("ADDON_INCLUDED_IN_PLAN — PRO tenant already has feature.advancedReports", async () => {
+  // ── Scenario 1: the tenant's entitlements already cover the grants ────
+  it("ADDON_ALREADY_GRANTED — the feature is already active on the account", async () => {
     catalog.findByCodeOrThrow.mockResolvedValue(
       addonRow({ code: "advanced_reports", grants: { "feature.advancedReports": true } }),
     );
@@ -88,7 +115,7 @@ describe("AddonPurchasabilityService.assertPurchasable", () => {
 
     await assertRejects(
       svc.assertPurchasable(TENANT, { addOnCode: "advanced_reports" }),
-      "ADDON_INCLUDED_IN_PLAN",
+      "ADDON_ALREADY_GRANTED",
       "advanced_reports",
     );
     // Must never even reach the ownership/deps DB checks — no point.
@@ -126,56 +153,189 @@ describe("AddonPurchasabilityService.assertPurchasable", () => {
     );
   });
 
-  // ── Scenario 3: deps tier semantics — "plan:X and above" ─────────────
-  describe("ADDON_REQUIRES_PLAN — deps tier semantics", () => {
-    function fiscalHuginRow() {
-      return addonRow({
-        code: "fiscal_hugin",
-        name: "Hugin yazarkasa integration",
-        grants: { "integration.fiscal": ["hugin"] },
-        deps: ["plan:PRO"],
-      });
-    }
-
-    it("BASIC tenant is rejected (below the plan:PRO dep)", async () => {
-      catalog.findByCodeOrThrow.mockResolvedValue(fiscalHuginRow());
-      entitlements.getForTenant.mockResolvedValue(ent());
-      (prisma.tenant.findUnique as any).mockResolvedValue({
-        id: TENANT,
-        currentPlan: { name: "BASIC" },
-      });
+  // ── Scenario 3: the LICENCE prerequisite ─────────────────────────────
+  //
+  // Plans are retired, so "plan:PRO and above" deps are gone. What replaced
+  // them is a single, sharper rule: every `requiresLicense` product needs a
+  // live licence, because the projector SUPPRESSES the grants of every such
+  // product while the licence is dark. Selling one to an unlicensed tenant
+  // would take money for access they cannot exercise.
+  describe("LICENSE_REQUIRED", () => {
+    it("rejects a licence-gated product when the tenant has no licence", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(addonRow());
+      entitlements.getForTenant.mockResolvedValue(unlicensed());
 
       await assertRejects(
-        svc.assertPurchasable(TENANT, { addOnCode: "fiscal_hugin" }),
-        "ADDON_REQUIRES_PLAN",
-        "fiscal_hugin",
+        svc.assertPurchasable(TENANT, { addOnCode: "advanced_reports" }),
+        "LICENSE_REQUIRED",
+        "advanced_reports",
       );
     });
 
-    it("BUSINESS tenant PASSES the same plan:PRO dep (tier 'and above' semantics)", async () => {
-      catalog.findByCodeOrThrow.mockResolvedValue(fiscalHuginRow());
-      entitlements.getForTenant.mockResolvedValue(ent());
-      (prisma.tenant.findUnique as any).mockResolvedValue({
-        id: TENANT,
-        currentPlan: { name: "BUSINESS" },
-      });
+    it("ACCEPTS it when the licence is a sibling line in the same cart", async () => {
+      // The opening cart a first-time buyer must be able to submit: the
+      // licence and the first module it unlocks, together. Without cart
+      // awareness this is unbuyable.
+      catalog.findByCodeOrThrow.mockResolvedValue(addonRow());
+      entitlements.getForTenant.mockResolvedValue(unlicensed());
 
       await expect(
-        svc.assertPurchasable(TENANT, { addOnCode: "fiscal_hugin" }),
+        svc.assertPurchasable(
+          TENANT,
+          { addOnCode: "advanced_reports" },
+          { cartCodes: new Set(["license_annual"]) },
+        ),
       ).resolves.toBeUndefined();
     });
 
-    it("PRO tenant also PASSES (exact tier match)", async () => {
-      catalog.findByCodeOrThrow.mockResolvedValue(fiscalHuginRow());
+    it("does not gate a product that declares requiresLicense=false", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(
+        addonRow({
+          code: "onsite_install_full",
+          kind: "service",
+          billing: "oneTime",
+          requiresLicense: false,
+          grants: {},
+        }),
+      );
+      entitlements.getForTenant.mockResolvedValue(unlicensed());
+
+      await expect(
+        svc.assertPurchasable(TENANT, { addOnCode: "onsite_install_full" }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("refuses a SECOND licence — renewal goes through the renewal cycle", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(
+        addonRow({
+          code: "license_annual",
+          kind: "license",
+          requiresLicense: false,
+          grants: { "feature.license": true },
+        }),
+      );
       entitlements.getForTenant.mockResolvedValue(ent());
-      (prisma.tenant.findUnique as any).mockResolvedValue({
-        id: TENANT,
-        currentPlan: { name: "PRO" },
+
+      await assertRejects(
+        svc.assertPurchasable(TENANT, { addOnCode: "license_annual" }),
+        "ADDON_ALREADY_OWNED",
+        "license_annual",
+      );
+    });
+  });
+
+  // ── Scenario 3b: product dependencies are bare catalog codes ──────────
+  describe("ADDON_REQUIRES_DEPENDENCY", () => {
+    function creditPackRow() {
+      return addonRow({
+        code: "credit_ai_photo_100",
+        name: "100 AI image credits",
+        kind: "credit",
+        billing: "oneTime",
+        requiresLicense: false,
+        grants: {},
+        deps: ["module_ai_studio"],
+      });
+    }
+
+    it("rejects a credit pack when the module that spends it is not owned", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(creditPackRow());
+      (prisma.tenant.findUnique as any).mockResolvedValue({ id: TENANT });
+      (prisma.tenantAddOn.findMany as any).mockResolvedValue([]);
+      (prisma.marketplaceAddOn.findUnique as any).mockResolvedValue({
+        name: "AI Menu Studio",
+      });
+
+      await assertRejects(
+        svc.assertPurchasable(TENANT, { addOnCode: "credit_ai_photo_100" }),
+        "ADDON_REQUIRES_DEPENDENCY",
+        "credit_ai_photo_100",
+      );
+    });
+
+    it("accepts it when the module is already an active ownership row", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(creditPackRow());
+      (prisma.tenant.findUnique as any).mockResolvedValue({ id: TENANT });
+      (prisma.tenantAddOn.findMany as any).mockResolvedValue([
+        { addOn: { code: "module_ai_studio", name: "AI Menu Studio" } },
+      ]);
+
+      await expect(
+        svc.assertPurchasable(TENANT, { addOnCode: "credit_ai_photo_100" }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("accepts it when the module is a sibling line in the same cart", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(creditPackRow());
+      (prisma.tenant.findUnique as any).mockResolvedValue({ id: TENANT });
+      (prisma.tenantAddOn.findMany as any).mockResolvedValue([]);
+
+      await expect(
+        svc.assertPurchasable(
+          TENANT,
+          { addOnCode: "credit_ai_photo_100" },
+          { cartCodes: new Set(["module_ai_studio", "license_annual"]) },
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it("buying a SECOND credit pack is always allowed (credits are consumable)", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(creditPackRow());
+      (prisma.tenant.findUnique as any).mockResolvedValue({ id: TENANT });
+      (prisma.tenantAddOn.findMany as any).mockResolvedValue([
+        { addOn: { code: "module_ai_studio", name: "AI Menu Studio" } },
+      ]);
+      // An existing "ownership" row must not block a repeat purchase.
+      (prisma.tenantAddOn.findFirst as any).mockResolvedValue({
+        id: "ta-1",
+        quantity: 1,
       });
 
       await expect(
-        svc.assertPurchasable(TENANT, { addOnCode: "fiscal_hugin" }),
+        svc.assertPurchasable(TENANT, { addOnCode: "credit_ai_photo_100" }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  // ── Scenario 3c: capacity is quantity-based ───────────────────────────
+  describe("capacity quantity", () => {
+    function branchRow(maxQuantity: number | null = 100) {
+      return addonRow({
+        code: "extra_branch",
+        name: "Extra branch",
+        kind: "capacity",
+        maxQuantity,
+        grants: { "limit.maxBranches": 1 },
+      });
+    }
+
+    it("allows buying another unit when one is already owned", async () => {
+      // Pre-3.3 this threw "already active — change quantity instead" and
+      // pointed at a path that did not exist, so capacity was unsellable past
+      // a single unit.
+      catalog.findByCodeOrThrow.mockResolvedValue(branchRow());
+      (prisma.tenantAddOn.findFirst as any).mockResolvedValue({
+        id: "ta-1",
+        quantity: 2,
+      });
+
+      await expect(
+        svc.assertPurchasable(TENANT, { addOnCode: "extra_branch", quantity: 1 }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("enforces the catalog ceiling", async () => {
+      catalog.findByCodeOrThrow.mockResolvedValue(branchRow(3));
+      (prisma.tenantAddOn.findFirst as any).mockResolvedValue({
+        id: "ta-1",
+        quantity: 3,
+      });
+
+      await assertRejects(
+        svc.assertPurchasable(TENANT, { addOnCode: "extra_branch", quantity: 1 }),
+        "ADDON_MAX_QUANTITY",
+        "extra_branch",
+      );
     });
   });
 

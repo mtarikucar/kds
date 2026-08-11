@@ -27,6 +27,10 @@ import { CheckoutService } from "./checkout.service";
  * Legacy code-prefix path stays as a fallback so the 2 hardcoded codes
  * still trigger installation (no serviceMeta on the legacy lines).
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService — installation trigger (v2.8.87)", () => {
   let prisma: any;
   let outbox: any;
@@ -78,6 +82,7 @@ describe("CheckoutService — installation trigger (v2.8.87)", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
     );
   });
 

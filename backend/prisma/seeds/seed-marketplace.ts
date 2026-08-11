@@ -999,11 +999,11 @@ async function main() {
   });
 
   for (const a of ALACARTE_CATALOG) {
-    // Mirrors 20260811100000_alacarte_catalog: annual and credit products
-    // land as DRAFT until P2 teaches the quote engine to prorate an annual
-    // cadence. Publishing one now would sell a yearly price as a flat charge
-    // with a 30-day period. Services are unaffected and stay purchasable.
-    const status = a.kind === "service" ? "published" : "draft";
+    // P2 (20260811110000_alacarte_publish_catalog) took the catalog live once
+    // the quote engine could day-prorate an annual cadence and settlement
+    // could replay the frozen pricing instant. A freshly seeded database
+    // therefore starts published, matching a migrated one.
+    const status = "published";
     const fields = {
       name: a.name,
       description: a.description,

@@ -102,18 +102,29 @@ describe("à-la-carte catalog migration", () => {
     }
   });
 
-  it("lands every annual and credit product as draft", () => {
-    // P1 cannot publish an annual row: QuoteService still maps a non-recurring
-    // cadence to oneTime and purchase() still gives it a 30-day period, so a
-    // published ₺2.990/yr licence would be sold as a flat 30-day charge.
-    // P2 publishes them alongside the proration engine.
+  it("lands every annual and credit product as draft, then publishes them in P2", () => {
+    // P1 could not publish an annual row: QuoteService still mapped a
+    // non-recurring cadence to oneTime and purchase() still gave it a 30-day
+    // period, so a published ₺2.990/yr licence would have been sold as a flat
+    // 30-day charge. The follow-up migration takes them live alongside the
+    // proration engine — and must cover EVERY product it drafted, or a
+    // product silently stays unbuyable forever.
+    const publishSql = readFileSync(
+      join(
+        __dirname,
+        "../../../prisma/migrations/20260811110000_alacarte_publish_catalog/migration.sql",
+      ),
+      "utf8",
+    );
     for (const row of parsed) {
       if (row.kind === "service") {
         expect(row.status).toBe("published");
       } else {
         expect(row.status).toBe("draft");
+        expect(publishSql).toContain(`'${row.code}'`);
       }
     }
+    expect(publishSql).toMatch(/SET "status" = 'published'/);
   });
 
   it("archives — never deletes — the retired device-capacity products", () => {
