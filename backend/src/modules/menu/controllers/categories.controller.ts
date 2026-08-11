@@ -25,24 +25,18 @@ import { ListQueryDto } from "../../../common/dto/list-query.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
-import {
-  CheckLimit,
-  LimitType,
-} from "../../subscriptions/decorators/check-limit.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 
 @ApiTags("menu-categories")
 @ApiBearerAuth()
 @Controller("menu/categories")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @CheckLimit(LimitType.CATEGORIES)
   @ApiOperation({ summary: "Create a new category (ADMIN, MANAGER)" })
   @ApiResponse({ status: 201, description: "Category successfully created" })
   @ApiResponse({ status: 403, description: "Insufficient permissions" })

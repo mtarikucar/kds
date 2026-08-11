@@ -23,8 +23,6 @@ import { SubscriptionController } from "./controllers/subscription.controller";
 import { InvoiceController } from "./controllers/invoice.controller";
 
 // Guards
-import { SubscriptionGuard } from "./guards/subscription.guard";
-import { PlanFeatureGuard } from "./guards/plan-feature.guard";
 
 // v2.8.99.1 — @Global() so @UseGuards(PlanFeatureGuard) works in
 // any consumer module without that module re-importing
@@ -64,13 +62,9 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
     DowngradeUsageGuardService,
 
     // Guards
-    SubscriptionGuard,
-    PlanFeatureGuard,
   ],
   exports: [
     SubscriptionService,
-    SubscriptionGuard,
-    PlanFeatureGuard,
     BillingService,
     // Webhook controller (PaymentsModule) sends activation / payment
     // emails post-commit, so the service must be exported.

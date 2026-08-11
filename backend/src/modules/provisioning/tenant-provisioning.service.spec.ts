@@ -109,39 +109,17 @@ describe("TenantProvisioningService", () => {
     );
   });
 
-  it("seeds featureOverrides from the plan flags so PlanFeatureGuard's warm-up fallback resolves (parity with register/social)", async () => {
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({
-      id: "plan-pro",
-      name: "PRO",
-      isActive: true,
-      monthlyPrice: new Prisma.Decimal(1299),
-      currency: "TRY",
-      trialDays: 14,
-      commissionRate: new Prisma.Decimal(0.15),
-      posAccess: true,
-      advancedReports: true,
-      reservationSystem: true,
-      apiAccess: false,
-    } as any);
-
+  it("seeds NO featureOverrides — the free core is projected, not overridden", async () => {
+    // The seed used to mirror the plan's TRUE flags so PlanFeatureGuard's
+    // fallback resolved during the projector's warm-up window. Under
+    // à-la-carte the projector turns every key in that map into an
+    // `override:admin` grant, so seeding it would hand a brand-new tenant the
+    // whole paid feature set permanently — and the nightly reconcile would
+    // keep re-asserting it. FREE_BASELINE_GRANTS covers every tenant instead,
+    // with no warm-up window to paper over.
     await svc.provisionTenantForLead(command);
-
-    const data = (prisma.tenant.create as any).mock.calls[0][0].data;
-    expect(data.currentPlanId).toBe("plan-pro");
-    // Without this seed a marketing-converted tenant had NO features until the
-    // projector produced grants from currentPlan. posAccess is the v3.0.7-class
-    // field — it MUST be present and reflect the plan.
-    expect(data.featureOverrides).toEqual(
-      expect.objectContaining({
-        posAccess: true,
-        advancedReports: true,
-        reservationSystem: true,
-      }),
-    );
-    // A flag the plan does NOT grant is OMITTED, never seeded as `false`: a
-    // false override becomes an override:admin {__replace:false} grant that
-    // would later suppress a legitimately-purchased add-on for that feature.
-    expect(data.featureOverrides).not.toHaveProperty("apiAccess");
+    const data = (prisma.tenant.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.featureOverrides).toBeUndefined();
   });
 
   it("is idempotent: a prior ledger row returns the same tenant without writing", async () => {

@@ -5,8 +5,7 @@ import {
 } from "./integrations/integrations.controller";
 import { IntegrationsService } from "./integrations/integrations.service";
 import { PrismaModule } from "../../prisma/prisma.module";
-// v2.8.99.1 — IntegrationsController has @UseGuards(PlanFeatureGuard)
-// + @RequiresFeature(API_ACCESS); the v2.8.88 entitlement-engine
+// v2.8.99.1 — IntegrationsController has // + @RequiresFeature(API_ACCESS); the v2.8.88 entitlement-engine
 // rewire pulled EntitlementService into PlanFeatureGuard's
 // constructor. Pre-fix the SettingsModule didn't import the
 // engine-providing module, so SettingsModule's instance of

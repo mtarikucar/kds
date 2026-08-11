@@ -16,9 +16,7 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
-import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
-import { PlanFeature } from "../../../common/constants/subscription.enum";
+import { RequiresIntegration } from "../../subscriptions/decorators/requires-integration.decorator";
 
 // Gated on ADVANCED_REPORTS — the same feature the Muhasebe page (which now
 // hosts these settings as its "Ayarlar" tab) is gated on. The prior
@@ -28,8 +26,11 @@ import { PlanFeature } from "../../../common/constants/subscription.enum";
 @ApiTags("accounting-settings")
 @ApiBearerAuth()
 @Controller("accounting-settings")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
-@RequiresFeature(PlanFeature.ADVANCED_REPORTS)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+// v3.3.0 — gated on the FISCAL INTEGRATION, not on advancedReports: the
+// e-document provider settings belong to whoever bought e-Fatura / ÖKC, not
+// to whoever bought the reporting module. See e-document.controller.
+@RequiresIntegration("fiscal")
 export class AccountingSettingsController {
   constructor(
     private readonly service: AccountingSettingsService,

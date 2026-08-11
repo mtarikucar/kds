@@ -55,38 +55,20 @@ export class PartnerKeyGuard implements CanActivate {
     // stops being live, not after entitlement-projection convergence.
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: key.tenantId },
-      include: { currentPlan: true },
-    });
-    if (!tenant || !tenant.currentPlan) {
-      throw new ForbiddenException("No active subscription plan found");
-    }
-    const liveSubscription = await this.prisma.subscription.findFirst({
-      where: {
-        tenantId: key.tenantId,
-        status: { in: LIVE_SUBSCRIPTION_STATUSES },
-      },
       select: { id: true },
     });
-    if (!liveSubscription) {
-      throw new ForbiddenException(
-        "Your subscription is not active. Please renew to use the Partner Display API.",
-      );
+    if (!tenant) {
+      throw new ForbiddenException("Tenant not found");
     }
 
-    // Feature resolution identical to PlanFeatureGuard: trust the engine when
-    // it has any grants for the tenant, else fall back to override → plan flag
-    // (the projector-warmup path the create-key guard already relies on).
+    // v3.3.0 — one source of truth. The pre-3.3 shape required a live
+    // SUBSCRIPTION and then fell back through featureOverrides to a plan
+    // column when the engine looked empty. None of those exist any more:
+    // access is decided by the folded entitlement set, which already carries
+    // the free baseline, every owned product, the licence suppression rule and
+    // any admin override.
     const set = await this.entitlements.getForTenant(key.tenantId, null);
-    const hasAnyEngineGrants = Object.keys(set.features).length > 0;
-    const featureOverrides = tenant.featureOverrides as Record<
-      string,
-      boolean
-    > | null;
-    const featureEnabled = hasAnyEngineGrants
-      ? set.features["feature.externalDisplay"] === true
-      : (featureOverrides?.externalDisplay ??
-          (tenant.currentPlan as any).externalDisplay) === true;
-    if (!featureEnabled) {
+    if (set.features["feature.externalDisplay"] !== true) {
       throw new ForbiddenException(
         "The externalDisplay feature is not enabled for this tenant",
       );

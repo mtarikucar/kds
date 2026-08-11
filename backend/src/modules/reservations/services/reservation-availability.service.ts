@@ -118,7 +118,6 @@ export class ReservationAvailabilityService {
     // ⇒ ungated for bare-constructed unit-test instances (prod DI always sets).
     if (this.entitlements) {
       const featureEnabled = await isReservationFeatureEnabled(
-        this.prisma,
         this.entitlements,
         tenantId,
       );
@@ -156,7 +155,6 @@ export class ReservationAvailabilityService {
     // not see bookable slots. Returning [] makes the wizard show no slots.
     if (this.entitlements) {
       const featureEnabled = await isReservationFeatureEnabled(
-        this.prisma,
         this.entitlements,
         tenantId,
       );
@@ -341,7 +339,6 @@ export class ReservationAvailabilityService {
     // must not surface bookable tables.
     if (this.entitlements) {
       const featureEnabled = await isReservationFeatureEnabled(
-        this.prisma,
         this.entitlements,
         tenantId,
       );

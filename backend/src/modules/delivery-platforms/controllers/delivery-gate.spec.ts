@@ -1,29 +1,29 @@
 import { ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
-import { REQUIRED_INTEGRATIONS_KEY } from "../../subscriptions/decorators/requires-integration.decorator";
-import { REQUIRED_FEATURES_KEY } from "../../subscriptions/decorators/requires-feature.decorator";
+import { REQUIRE_ENTITLEMENT_KEY } from "../../entitlements/require-entitlement.decorator";
+import { EntitlementGuard } from "../../entitlements/entitlement.guard";
 import { DeliveryPlatformsController } from "./delivery-platforms.controller";
 import { DeliveryDlqController } from "./delivery-dlq.controller";
 
 /**
- * DEF-3 regression: the delivery route gate used to read ONLY
- * feature.deliveryIntegration (@RequiresFeature(PlanFeature.DELIVERY_INTEGRATION)),
- * while the delivery_yemeksepeti/getir/trendyol_yemek add-ons grant
- * integration.delivery=[vendor]. A BASIC tenant who bought the add-on had
- * integration.delivery populated but no feature.deliveryIntegration, so
- * every delivery-platforms route still 403'd — paid-but-broken.
+ * DEF-3 regression, carried forward to the à-la-carte guard.
  *
- * Fix: the controllers now gate on @RequiresIntegration('delivery'), and
- * PlanFeatureGuard's integration branch accepts EITHER a non-empty vendor
- * list OR the covering plan feature (INTEGRATION_COVERED_BY_FEATURE) being
- * true — so a plan-delivery tenant and an add-on-delivery tenant both pass.
+ * The delivery routes used to gate on `feature.deliveryIntegration` alone,
+ * while the delivery add-ons grant `integration.delivery=[vendor]`. A tenant
+ * who BOUGHT a delivery platform therefore still got a 403 on every delivery
+ * route — paid and broken. The controllers were moved to
+ * `@RequiresIntegration('delivery')`.
+ *
+ * v3.3.0 kept that contract while replacing the guard beneath it. The subtle
+ * part is that `@RequiresIntegration('delivery')` must emit a requirement with
+ * NO provider: "the tenant owns at least one delivery vendor". If the alias
+ * ever started naming a specific vendor, a Getir customer would 403 on a route
+ * a Yemeksepeti customer could reach.
  */
 describe("Delivery route gate (DEF-3)", () => {
   let reflector: Reflector;
-  let prisma: any;
   let entitlements: any;
-  let guard: PlanFeatureGuard;
+  let guard: EntitlementGuard;
 
   function ctx(handlerMeta: Record<string, unknown>) {
     return {
@@ -45,80 +45,85 @@ describe("Delivery route gate (DEF-3)", () => {
         return undefined;
       },
     );
-    prisma = {
-      tenant: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "t-1",
-          currentPlan: { name: "BASIC", displayName: "Basic" },
-          featureOverrides: null,
-          limitOverrides: null,
-        }),
-      },
-      subscription: {
-        findFirst: jest.fn().mockResolvedValue({ status: "ACTIVE" }),
-      },
-    };
     entitlements = { getForTenant: jest.fn() };
-    guard = new PlanFeatureGuard(reflector, prisma as any, entitlements as any);
+    guard = new EntitlementGuard(reflector, entitlements as any);
   });
 
-  it("both delivery controllers gate on @RequiresIntegration('delivery'), not @RequiresFeature", () => {
-    expect(
-      Reflect.getMetadata(REQUIRED_INTEGRATIONS_KEY, DeliveryPlatformsController),
-    ).toEqual(["delivery"]);
-    expect(
-      Reflect.getMetadata(REQUIRED_FEATURES_KEY, DeliveryPlatformsController),
-    ).toBeUndefined();
-
-    expect(
-      Reflect.getMetadata(REQUIRED_INTEGRATIONS_KEY, DeliveryDlqController),
-    ).toEqual(["delivery"]);
-    expect(
-      Reflect.getMetadata(REQUIRED_FEATURES_KEY, DeliveryDlqController),
-    ).toBeUndefined();
+  it("both delivery controllers gate on the integration domain, not a feature", () => {
+    const real = new Reflector();
+    for (const target of [
+      DeliveryPlatformsController,
+      DeliveryDlqController,
+    ]) {
+      const reqs = real.get(REQUIRE_ENTITLEMENT_KEY, target);
+      expect(reqs).toEqual([{ integration: "integration.delivery" }]);
+    }
   });
 
-  it("a plan-delivery BASIC tenant (feature.deliveryIntegration=true, NO integration.delivery grant) passes the gate", async () => {
+  it("passes a tenant who owns ANY delivery vendor", async () => {
     entitlements.getForTenant.mockResolvedValue({
-      features: { "feature.deliveryIntegration": true },
+      features: {},
       limits: {},
-      integrations: {},
-      computedAt: new Date().toISOString(),
+      integrations: { "integration.delivery": ["getir"] },
     });
-    const c = ctx({ [REQUIRED_INTEGRATIONS_KEY]: ["delivery"] });
-    await expect(guard.canActivate(c)).resolves.toBe(true);
+
+    await expect(
+      guard.canActivate(
+        ctx({
+          [REQUIRE_ENTITLEMENT_KEY]: [{ integration: "integration.delivery" }],
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 
-  it("an add-on-delivery BASIC tenant (integration.delivery=[yemeksepeti], NO covering feature) passes the gate — the add-on they paid for actually unlocks the route", async () => {
+  it("passes a tenant who owns a DIFFERENT vendor in the same domain", async () => {
+    // The regression this guards: a provider-specific check would 403 here.
     entitlements.getForTenant.mockResolvedValue({
       features: {},
       limits: {},
       integrations: { "integration.delivery": ["yemeksepeti"] },
-      computedAt: new Date().toISOString(),
     });
-    const c = ctx({ [REQUIRED_INTEGRATIONS_KEY]: ["delivery"] });
-    await expect(guard.canActivate(c)).resolves.toBe(true);
+
+    await expect(
+      guard.canActivate(
+        ctx({
+          [REQUIRE_ENTITLEMENT_KEY]: [{ integration: "integration.delivery" }],
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 
-  it("a tenant with neither the feature nor the integration grant is rejected", async () => {
+  it("denies a tenant with no delivery vendor at all", async () => {
     entitlements.getForTenant.mockResolvedValue({
       features: {},
       limits: {},
       integrations: {},
-      computedAt: new Date().toISOString(),
     });
-    const c = ctx({ [REQUIRED_INTEGRATIONS_KEY]: ["delivery"] });
-    await expect(guard.canActivate(c)).rejects.toThrow(/delivery/);
+
+    await expect(
+      guard.canActivate(
+        ctx({
+          [REQUIRE_ENTITLEMENT_KEY]: [{ integration: "integration.delivery" }],
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ errorCode: "ENTITLEMENT_REQUIRED" }),
+    });
   });
 
-  it("fiscal is unaffected: feature.deliveryIntegration=true does NOT spuriously cover a fiscal gate", async () => {
+  it("denies when the domain key exists but is empty", async () => {
     entitlements.getForTenant.mockResolvedValue({
-      features: { "feature.deliveryIntegration": true },
+      features: {},
       limits: {},
-      integrations: {}, // no fiscal vendor grant
-      computedAt: new Date().toISOString(),
+      integrations: { "integration.delivery": [] },
     });
-    const c = ctx({ [REQUIRED_INTEGRATIONS_KEY]: ["fiscal"] });
-    await expect(guard.canActivate(c)).rejects.toThrow(/fiscal/);
+
+    await expect(
+      guard.canActivate(
+        ctx({
+          [REQUIRE_ENTITLEMENT_KEY]: [{ integration: "integration.delivery" }],
+        }),
+      ),
+    ).rejects.toBeDefined();
   });
 });

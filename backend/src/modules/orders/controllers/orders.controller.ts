@@ -29,11 +29,6 @@ import { TransferTableOrdersDto } from "../dto/transfer-table.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
-import {
-  CheckLimit,
-  LimitType,
-} from "../../subscriptions/decorators/check-limit.decorator";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../../common/scoping/branch-scope";
@@ -52,9 +47,7 @@ export class OrdersController {
   ) {}
 
   @Post()
-  @UseGuards(PlanFeatureGuard)
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @CheckLimit(LimitType.MONTHLY_ORDERS)
+    @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: "Create a new order (ADMIN, MANAGER, WAITER)" })
   @ApiResponse({ status: 201, description: "Order successfully created" })
   @ApiResponse({ status: 400, description: "Invalid data" })

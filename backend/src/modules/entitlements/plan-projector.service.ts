@@ -6,6 +6,10 @@ import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { EntitlementService } from "./entitlement.service";
 import { EntitlementGrant } from "./entitlement.types";
 import { ADDON_GRACE_DAYS } from "../marketplace/marketplace.types";
+import {
+  FREE_BASELINE_GRANTS,
+  FREE_BASELINE_SOURCE,
+} from "./free-baseline.const";
 
 /**
  * Projects the legacy SubscriptionPlan + Tenant.featureOverrides /
@@ -31,54 +35,6 @@ import { ADDON_GRACE_DAYS } from "../marketplace/marketplace.types";
 export class PlanProjectorService {
   private readonly logger = new Logger(PlanProjectorService.name);
 
-  // Map SubscriptionPlan column names → entitlement keys. These mirror the
-  // PlanFeature enum but live here so the engine never imports legacy types.
-  //
-  // ⚠ DRIFT TRIPWIRE: This list must include every Boolean feature column
-  // on the SubscriptionPlan model in prisma/schema.prisma. Forgetting to
-  // add a new column here means the projector silently never surfaces it
-  // and tenants on the paying plan don't get the feature. A snapshot
-  // test in plan-projector.service.spec.ts (iter-24) pins the expected
-  // list and fails when the projector and schema diverge. If you're
-  // adding a new flag, update both.
-  private static readonly FEATURE_COLUMNS = [
-    "advancedReports",
-    "multiLocation",
-    "customBranding",
-    "apiAccess",
-    "prioritySupport",
-    "inventoryTracking",
-    "kdsIntegration",
-    "reservationSystem",
-    "personnelManagement",
-    "deliveryIntegration",
-    // v3.0.0 — POS access is tier-gated (FREE post-trial fallback loses
-    // POS UI). The column is sourced directly from SubscriptionPlan,
-    // mirrored as feature.posAccess on the engine; PlanFeatureGuard +
-    // <FeatureGate feature="posAccess"> both read the engine grant.
-    "posAccess",
-    // Partner Display API gate — see PlanFeature.EXTERNAL_DISPLAY.
-    "externalDisplay",
-    // AI menu studio gate — see PlanFeature.AI_CONTENT_GENERATION.
-    "aiContentGeneration",
-  ] as const;
-
-  private static readonly LIMIT_COLUMNS = [
-    "maxUsers",
-    "maxTables",
-    // v3.0.0 — branches were implicitly capped at "1 unless multiLocation"
-    // before; now the column carries the per-tier cap (FREE/BASIC=1,
-    // PRO=3, BUSINESS=-1) and the extra_branch add-on SUMs onto it.
-    "maxBranches",
-    "maxProducts",
-    "maxCategories",
-    "maxMonthlyOrders",
-    // AI menu-studio monthly generation caps (photo+frame vs video vs 3D).
-    "maxMonthlyAiPhotos",
-    "maxMonthlyAiVideos",
-    "maxMonthlyAi3dModels",
-  ] as const;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
@@ -95,27 +51,6 @@ export class PlanProjectorService {
    * what the first wrote and is a no-op.
    */
   private readonly tenantLocks = new Map<string, Promise<void>>();
-
-  // v2.8.89: cache the FREE plan row for ~5 minutes so the projector
-  // doesn't issue a separate findUnique on every projection. Looked up
-  // by name (the seed contract — `SubscriptionPlanType.FREE`). On miss
-  // we fall through to plan:NONE which projects no grants — same
-  // behavior as a tenant without `currentPlanId` today.
-  private freePlanCache: { plan: any; expiresAt: number } | null = null;
-
-  private async resolveFreePlan(): Promise<any | null> {
-    const now = Date.now();
-    if (this.freePlanCache && this.freePlanCache.expiresAt > now) {
-      return this.freePlanCache.plan;
-    }
-    const plan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: "FREE" as any },
-    });
-    if (plan) {
-      this.freePlanCache = { plan, expiresAt: now + 5 * 60_000 };
-    }
-    return plan;
-  }
 
   /** Project one tenant. Call after any subscription/override mutation. */
   async projectTenant(tenantId: string): Promise<void> {
@@ -145,87 +80,26 @@ export class PlanProjectorService {
     });
     if (!tenant) return;
 
-    // v2.8.89: subscription-status-aware projection (the belt half of
-    // "belt + suspenders" for the 4 critical lifecycle bugs the v2.8.88
-    // audit surfaced). Pre-v2.8.89 the projector read tenant.currentPlan
-    // directly and never looked at Subscription.status. Cancel/expire
-    // flows that flipped status without also flipping currentPlanId
-    // (cancelSubscription immediate, period-end cron, past-due cron,
-    // PayTR settlement) caused the projector to KEEP re-writing the
-    // paid plan grants every time a SubscriptionCancelled event fired
-    // (or worse: never fire at all when currentPlanId mutation went
-    // unaccompanied by a lifecycle event, as in PayTR settlement). The
-    // EXPIRED tenant therefore retained full paid entitlements until
-    // the nightly reconcile cron ran 24h later.
+    // ---------------------------------------------------------------------
+    // FREE BASELINE (v3.3.0)
+    // ---------------------------------------------------------------------
+    // The core product is free and unlimited for every tenant, so there is no
+    // plan to read, no subscription status to interrogate, and no FREE-plan
+    // fallback. What used to be "project the plan's columns, or the FREE
+    // plan's columns if the subscription lapsed" is now one constant.
     //
-    // The suspenders are explicit currentPlanId flips in the lifecycle
-    // services; the belt is here. If the active subscription row is
-    // not ACTIVE/TRIALING we project FREE plan grants regardless of
-    // what currentPlanId points at. Any lifecycle flow that forgets to
-    // update currentPlanId degrades gracefully — the engine surfaces
-    // exactly the access the tenant has paid for at that moment.
-    const activeSub = await this.prisma.subscription.findFirst({
-      where: {
-        tenantId,
-        status: { in: ["ACTIVE", "TRIALING"] },
-      },
-      select: { id: true, status: true },
-      orderBy: { updatedAt: "desc" },
-    });
-    const isAccessPaid = activeSub != null;
-    const effectivePlan = isAccessPaid
-      ? tenant.currentPlan
-      : await this.resolveFreePlan();
-
-    // v2.8.97 — surface the drift case for ops/audit. When the active
-    // subscription's plan doesn't match the tenant's currentPlanId
-    // pointer we want to know — it's a lifecycle bug somewhere, and
-    // even though the engine fold below uses the right grants, the
-    // tenant's billing UI / receipts read currentPlanId directly and
-    // will mislead the operator. The reconcile cron eventually heals
-    // this but the log lets us pre-empt the discovery.
-    if (
-      effectivePlan &&
-      tenant.currentPlanId &&
-      effectivePlan.id !== tenant.currentPlanId
-    ) {
-      this.logger.warn(
-        `Plan pointer drift detected for tenant=${tenantId}: ` +
-          `Tenant.currentPlanId=${tenant.currentPlanId} vs effectivePlan.id=${effectivePlan.id} (${effectivePlan.name}). ` +
-          `Engine projection uses effectivePlan; lifecycle flow likely missed a currentPlanId update.`,
-      );
-    }
-
-    const planSource = effectivePlan
-      ? `plan:${effectivePlan.name}`
-      : "plan:NONE";
-    const planGrants: Array<Omit<EntitlementGrant, "tenantId" | "source">> = [];
-
-    if (effectivePlan) {
-      for (const col of PlanProjectorService.FEATURE_COLUMNS) {
-        if ((effectivePlan as any)[col]) {
-          planGrants.push({
-            scope: "tenant",
-            branchId: null,
-            key: `feature.${col}`,
-            value: true,
-            validUntil: null,
-          });
-        }
-      }
-      for (const col of PlanProjectorService.LIMIT_COLUMNS) {
-        const v = (effectivePlan as any)[col];
-        if (typeof v === "number") {
-          planGrants.push({
-            scope: "tenant",
-            branchId: null,
-            key: `limit.${col}`,
-            value: v,
-            validUntil: null,
-          });
-        }
-      }
-    }
+    // The keys the old plan columns carried still exist here — the retired
+    // caps are granted as -1. That is not decoration: -1 DOMINATES the engine
+    // limit fold, so any stale plan-sourced row that outlives the migration
+    // cannot cap a tenant who is supposed to be unlimited.
+    const baselineGrants: Array<Omit<EntitlementGrant, "tenantId" | "source">> =
+      Object.entries(FREE_BASELINE_GRANTS).map(([key, value]) => ({
+        scope: "tenant",
+        branchId: null,
+        key,
+        value,
+        validUntil: null,
+      }));
 
     const overrideGrants: Array<Omit<EntitlementGrant, "tenantId" | "source">> =
       [];
@@ -234,14 +108,45 @@ export class PlanProjectorService {
     const limitOverrides =
       (tenant.limitOverrides as Record<string, number> | null) ?? null;
     if (featureOverrides) {
-      for (const [k, v] of Object.entries(featureOverrides)) {
-        overrideGrants.push({
-          scope: "tenant",
-          branchId: null,
-          key: `feature.${k}`,
-          value: { __replace: Boolean(v) } as any,
-          validUntil: null,
-        });
+      for (const [k, raw] of Object.entries(featureOverrides)) {
+        // TRI-STATE OVERRIDES (v3.3.0).
+        //
+        // Pre-3.3 every key here — including `false` — was projected as
+        // `{__replace: v}`. Because __replace is applied AFTER the additive
+        // OR pass, a `false` override permanently SUPPRESSED a feature the
+        // tenant might later legitimately BUY: they paid, the guard still
+        // 403'd, and nothing in the UI explained why. Worse, provisioning
+        // seeded this map with the plan's TRUE features, so after the flip
+        // every existing tenant would have carried `__replace:true` grants
+        // and received paid modules free forever. The P3 migration archives
+        // and clears the column; this is the shape that replaces it.
+        //
+        // `grant` projects a PLAIN true, which OR-folds and can never block a
+        // later purchase. Only `suppress` uses __replace — the one shape with
+        // teeth, now named, and reserved for abuse handling.
+        const mode =
+          typeof raw === "object" && raw !== null
+            ? (raw as { mode?: string }).mode
+            : raw === true
+              ? "grant"
+              : "suppress";
+        if (mode === "grant") {
+          overrideGrants.push({
+            scope: "tenant",
+            branchId: null,
+            key: `feature.${k}`,
+            value: true,
+            validUntil: null,
+          });
+        } else {
+          overrideGrants.push({
+            scope: "tenant",
+            branchId: null,
+            key: `feature.${k}`,
+            value: { __replace: false } as any,
+            validUntil: null,
+          });
+        }
       }
     }
     if (limitOverrides) {
@@ -280,18 +185,15 @@ export class PlanProjectorService {
       await this.entitlements.setGrantsForSourceTx(
         tx,
         tenantId,
-        planSource,
-        planGrants,
+        FREE_BASELINE_SOURCE,
+        baselineGrants,
       );
 
-      // Clear stale plan:* sources from prior plans (downgrade, switch).
-      // Now inside the txn so the window where both plans' grants are
-      // visible doesn't exist for any external reader.
+      // Sweep EVERY plan-sourced row. Plans are retired; a survivor would
+      // fold into the set as free access nobody is paying for. Inside the txn
+      // so no reader ever sees baseline and plan grants at the same time.
       await tx.featureEntitlement.deleteMany({
-        where: {
-          tenantId,
-          source: { startsWith: "plan:", not: planSource },
-        },
+        where: { tenantId, source: { startsWith: "plan:" } },
       });
 
       // Overrides → admin source. Overrides REPLACE the plan value via
@@ -344,6 +246,29 @@ export class PlanProjectorService {
       include: { addOn: true },
     });
 
+    // LICENCE SUPPRESSION (v3.3.0).
+    //
+    // Every `requiresLicense` product is unusable without a live licence, so
+    // while the licence is dark its grants are withheld — WITHOUT touching a
+    // single row of business data. The ownership rows stay `active`, their
+    // chargedCents stay, and stock / reservations / personnel / generated AI
+    // media all stay exactly where they are. Paying the licence back re-lights
+    // everything on the next projection.
+    //
+    // This is the real enforcement point. The cart-level LICENSE_REQUIRED
+    // check stops the sale; this stops the ACCESS, which is what matters when
+    // a tenant renews some lines of their anniversary invoice but not the
+    // licence itself.
+    const now = Date.now();
+    const licenceLive = activeAddOns.some(
+      (ta) =>
+        ta.addOn.kind === "license" &&
+        (ta.currentPeriodEnd == null ||
+          ta.currentPeriodEnd.getTime() +
+            (ta.status === "past_due" ? ADDON_GRACE_DAYS * 86_400_000 : 0) >
+            now),
+    );
+
     const desiredSources = new Set<string>();
     for (const ta of activeAddOns) {
       const source = `addon:${ta.addOn.code}:${ta.id}`;
@@ -351,18 +276,31 @@ export class PlanProjectorService {
 
       const grants: Array<Omit<EntitlementGrant, "tenantId" | "source">> = [];
       const catalogGrants = (ta.addOn.grants as Record<string, unknown>) ?? {};
-      // past_due keeps the grant alive through the 7-day grace window; extend
-      // validUntil past currentPeriodEnd so the engine's own validUntil sweep
-      // doesn't expire it before the marketplace sweeper revokes at grace end.
-      const validUntil =
-        ta.status === "past_due" && ta.currentPeriodEnd
-          ? new Date(
-              ta.currentPeriodEnd.getTime() +
-                ADDON_GRACE_DAYS * 24 * 3600 * 1000,
-            )
-          : (ta.currentPeriodEnd ?? null);
 
-      for (const [key, raw] of Object.entries(catalogGrants)) {
+      // The source row is still written (so the tenant's owned-items list
+      // stays complete) but with an EMPTY grant array.
+      const suppressed = ta.addOn.requiresLicense && !licenceLive;
+
+      // GRACE WINDOW — v3.3.0 fix for an annual blackout.
+      //
+      // Pre-3.3 an `active` row's validUntil was exactly currentPeriodEnd,
+      // while only `past_due` got the +7d grace. But the engine's own
+      // validUntil sweep runs every 5 MINUTES and the add-on sweeper that
+      // flips active → past_due runs on a daily cron. At every tenant's
+      // anniversary those two clocks disagreed for hours: the grant expired
+      // at midnight and nothing re-granted it until the sweeper woke up —
+      // a yearly, hours-long lockout for every paying customer. Give ACTIVE
+      // rows the same grace horizon so the sweeper, not the clock, is what
+      // ends access.
+      const validUntil = ta.currentPeriodEnd
+        ? new Date(
+            ta.currentPeriodEnd.getTime() + ADDON_GRACE_DAYS * 24 * 3600 * 1000,
+          )
+        : null;
+
+      for (const [key, raw] of Object.entries(
+        suppressed ? {} : catalogGrants,
+      )) {
         if (key.startsWith("feature.")) {
           grants.push({
             scope: ta.branchId ? "branch" : "tenant",
@@ -381,6 +319,12 @@ export class PlanProjectorService {
             value: scaled,
             validUntil,
           });
+        } else if (key.startsWith("credit.")) {
+          // Credits are a prepaid BALANCE, read live inside the
+          // advisory-locked claim. Projecting them would put a 30s-cached
+          // number in front of a real vendor charge. Skip — writing the row
+          // would only accumulate dead entitlements the engine ignores.
+          continue;
         } else if (key.startsWith("integration.")) {
           if (Array.isArray(raw)) {
             grants.push({

@@ -1,4 +1,3 @@
-import { PrismaService } from "../../../prisma/prisma.service";
 import { EntitlementService } from "../../entitlements/entitlement.service";
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 
@@ -6,48 +5,27 @@ import { PlanFeature } from "../../../common/constants/subscription.enum";
  * Shared "is the reservation system entitled for this tenant?" check for the
  * PUBLIC (@Public(), un-guarded) reservation surface.
  *
- * The authenticated ReservationsController is gated by PlanFeatureGuard +
- * @RequiresFeature(RESERVATION_SYSTEM). The public booking endpoints are all
- * @Public(), so PlanFeatureGuard short-circuits to `true` for them and nothing
- * enforces the plan — a tenant whose plan excludes reservations would still
- * accept guest bookings the operator can never see/act on (book-into-a-void).
+ * The authenticated ReservationsController is gated by
+ * `@RequiresFeature(RESERVATION_SYSTEM)`. The public booking endpoints are all
+ * `@Public()`, so the guard short-circuits to `true` for them and nothing
+ * enforces entitlement — a tenant without the reservation module would still
+ * accept guest bookings the operator can never see or act on
+ * (book-into-a-void). This helper closes that gap.
  *
- * This helper reproduces the SAME resolution PlanFeatureGuard uses
- * (entitlement engine first — honoring plan + add-on grants + admin overrides —
- * with the plan-only fallback for the projector race / fresh signup), so the
- * public surface matches the admin gate exactly. It deliberately does NOT rely
- * on ReservationSettings.isEnabled (schema default `true`, never coupled to the
- * plan feature).
+ * v3.3.0 reduced it to a single engine read. The pre-3.3 version mirrored
+ * PlanFeatureGuard's fallback chain (engine → featureOverrides → plan column)
+ * because the engine could legitimately be empty during the projector's
+ * warm-up. That window is gone: the free baseline is projected for every
+ * tenant unconditionally, so an empty set means "no access", not "not ready".
+ * It deliberately does NOT consult `ReservationSettings.isEnabled`, whose
+ * schema default is `true` and was never coupled to entitlement.
  */
-const FEATURE_KEY = `feature.${PlanFeature.RESERVATION_SYSTEM}`; // "feature.reservationSystem"
+const FEATURE_KEY = `feature.${PlanFeature.RESERVATION_SYSTEM}`;
 
 export async function isReservationFeatureEnabled(
-  prisma: PrismaService,
   entitlements: EntitlementService,
   tenantId: string,
 ): Promise<boolean> {
   const set = await entitlements.getForTenant(tenantId, null);
-
-  // Engine populated — trust it (its fold already applied plan + add-on +
-  // admin overrides), mirroring PlanFeatureGuard.canActivate.
-  if (Object.keys(set.features).length > 0) {
-    return set.features[FEATURE_KEY] === true;
-  }
-
-  // Engine empty for this tenant (projector race / new signup). Fall back to
-  // the plan-only view exactly like the guard's fallback branch:
-  // featureOverride (if set) else the current plan's column.
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: tenantId },
-    include: { currentPlan: true },
-  });
-  if (!tenant || !tenant.currentPlan) {
-    return false;
-  }
-  const overrides = tenant.featureOverrides as Record<string, boolean> | null;
-  const key = PlanFeature.RESERVATION_SYSTEM; // "reservationSystem"
-  if (overrides && overrides[key] !== undefined) {
-    return overrides[key] === true;
-  }
-  return (tenant.currentPlan as Record<string, unknown>)[key] === true;
+  return set.features[FEATURE_KEY] === true;
 }

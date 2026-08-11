@@ -242,7 +242,6 @@ export class ReservationsService {
     // operator can never see/confirm/manage (book-into-a-void).
     if (this.entitlements) {
       const featureEnabled = await isReservationFeatureEnabled(
-        this.prisma,
         this.entitlements,
         tenantId,
       );

@@ -13,7 +13,6 @@ import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
@@ -30,7 +29,7 @@ import { PARTNER_SCOPES } from "../partner.constants";
  */
 @ApiTags("Partner · API Keys")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 @RequiresFeature(PlanFeature.EXTERNAL_DISPLAY)
 @SkipBranchScope()

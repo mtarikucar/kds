@@ -5,7 +5,6 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import {
@@ -25,7 +24,7 @@ interface CachedGuidance {
 @ApiTags("stock-management/guidance")
 @ApiBearerAuth()
 @Controller("stock-management/guidance")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class GuidanceController {
   // Per-(tenant,branch) 5-minute cache — guidance is derived from up-to-180d

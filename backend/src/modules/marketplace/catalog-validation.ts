@@ -1,5 +1,6 @@
 import {
   CREDIT_KINDS,
+  LICENSE_PRODUCT_CODE,
   isCreditKind,
   isKnownGrantKey,
 } from "../entitlements/entitlement-keys.const";
@@ -54,8 +55,8 @@ export interface CatalogRowShape {
   maxQuantity?: number | null;
 }
 
-/** The catalog code of the singleton annual License product. */
-export const LICENSE_ADDON_CODE = "license_annual";
+/** Re-exported for catalog-side callers; defined in the neutral vocabulary. */
+export const LICENSE_ADDON_CODE = LICENSE_PRODUCT_CODE;
 
 function grantKeysWithPrefix(
   grants: Record<string, unknown>,

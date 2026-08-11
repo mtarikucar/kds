@@ -88,6 +88,16 @@ export const INTEGRATION_KEYS = [
  */
 export const CREDIT_KINDS = ["PHOTO", "VIDEO", "MODEL3D", "SMS"] as const;
 
+/**
+ * Catalog code of the singleton annual Licence product.
+ *
+ * Lives here, in the neutral vocabulary, rather than in the marketplace: the
+ * entitlement guard and its offer resolver both need it, and importing it from
+ * the marketplace would put a cycle between the two modules (marketplace
+ * already imports this file).
+ */
+export const LICENSE_PRODUCT_CODE = "license_annual";
+
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 export type IntegrationKey = (typeof INTEGRATION_KEYS)[number];

@@ -157,8 +157,7 @@ export class ReservationSettingsService {
     // ReservationSettings.isEnabled (schema default true, never plan-linked).
     const featureEnabled = this.entitlements
       ? await isReservationFeatureEnabled(
-          this.prisma,
-          this.entitlements,
+        this.entitlements,
           tenantId,
         )
       : true;

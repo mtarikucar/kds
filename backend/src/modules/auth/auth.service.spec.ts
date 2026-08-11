@@ -755,7 +755,10 @@ describe('AuthService', () => {
           data: expect.objectContaining({
             currentPlanId: 'plan-business',
             trialUsed: true,
-            featureOverrides: expect.objectContaining({ multiLocation: true }),
+            // v3.3.0 — provisioning seeds NOTHING here. Mirroring the plan's
+          // flags would become permanent `override:admin` grants for the
+          // whole paid feature set.
+          featureOverrides: {},
           }),
         }),
       );

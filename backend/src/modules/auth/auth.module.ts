@@ -16,7 +16,8 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { TenantGuard } from "./guards/tenant.guard";
 import { BranchGuard } from "./guards/branch.guard";
-import { SubscriptionStatusGuard } from "../subscriptions/guards/subscription-status.guard";
+import { TenantStatusGuard } from "./guards/tenant-status.guard";
+import { EntitlementGuard } from "../entitlements/entitlement.guard";
 import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
@@ -66,12 +67,22 @@ import { NotificationsModule } from "../notifications/notifications.module";
       provide: APP_GUARD,
       useClass: BranchGuard,
     },
-    // Onboarding-trial lock — runs LAST (after Jwt/Tenant/Branch set
-    // req.user.tenantId). A tenant with no live subscription (TRIAL_ENDED /
-    // EXPIRED) is gated to the plan-selection + checkout flow.
+    // v3.3.0 — the core product is free, so there is no subscription state
+    // left to lock on and SubscriptionStatusGuard is gone. What replaces it in
+    // the same position is the ONLY global lockout lever the app has:
+    // TenantGuard resolves the tenant without ever reading Tenant.status, so
+    // without this a superadmin suspension would do nothing at all — which
+    // matters more, not less, once the product costs nothing to use.
     {
       provide: APP_GUARD,
-      useClass: SubscriptionStatusGuard,
+      useClass: TenantStatusGuard,
+    },
+    // Entitlement gates. Registered globally so the @RequiresFeature /
+    // @RequiresIntegration aliases resolve everywhere the old PlanFeatureGuard
+    // did; routes without a decorator pass straight through.
+    {
+      provide: APP_GUARD,
+      useClass: EntitlementGuard,
     },
   ],
   exports: [AuthService],

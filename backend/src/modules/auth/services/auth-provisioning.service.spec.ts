@@ -88,33 +88,21 @@ describe("AuthProvisioningService.loadTrialPlanOrThrow", () => {
 });
 
 describe("AuthProvisioningService.buildPlanFeatureOverrides", () => {
-  const svc = new AuthProvisioningService(makePrisma() as any);
-
-  it("emits truthy flags as true and OMITS falsy ones (so no __replace:false suppresses a purchased add-on)", () => {
-    const overrides = svc.buildPlanFeatureOverrides({
-      advancedReports: true,
-      multiLocation: false,
-      customBranding: null,
-      apiAccess: undefined,
-      inventoryTracking: true,
-    });
-    expect(overrides.advancedReports).toBe(true);
-    expect(overrides.inventoryTracking).toBe(true);
-    // Falsy plan features are ABSENT — NOT seeded as `false`. A false override
-    // becomes an override:admin {__replace:false} grant that would later
-    // suppress a legitimately-purchased marketplace add-on for that feature.
-    expect(overrides).not.toHaveProperty("multiLocation");
-    expect(overrides).not.toHaveProperty("customBranding");
-    expect(overrides).not.toHaveProperty("apiAccess");
-  });
-
-  it("returns an empty map when the plan grants no features (nothing to over-grant)", () => {
-    expect(svc.buildPlanFeatureOverrides({})).toEqual({});
-  });
-
-  it("includes posAccess=true when the plan grants POS (v3.0.7: never hide POS during warm-up)", () => {
-    const overrides = svc.buildPlanFeatureOverrides({ posAccess: true });
-    expect(overrides.posAccess).toBe(true);
-    expect(Object.values(overrides).every((v) => v === true)).toBe(true);
+  it("seeds NOTHING — the free core is projected, not overridden", () => {
+    // This used to mirror the plan's TRUE feature flags onto the tenant so
+    // PlanFeatureGuard's fallback resolved during the projector's warm-up.
+    //
+    // Under à-la-carte that seed is the single most dangerous line in
+    // provisioning: the projector turns every key in this map into an
+    // `override:admin` grant, so a tenant created this way would hold
+    // permanent overrides for the entire paid feature set — every module,
+    // free, forever, and re-asserted nightly by the reconcile cron.
+    //
+    // Nothing replaces it. FREE_BASELINE_GRANTS is projected for every tenant
+    // unconditionally and paid products come from ownership rows, so there is
+    // no warm-up window left to paper over.
+    expect(new AuthProvisioningService(
+      {} as any, {} as any, {} as any, {} as any,
+    ).buildPlanFeatureOverrides()).toEqual({});
   });
 });

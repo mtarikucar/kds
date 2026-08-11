@@ -12,7 +12,6 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresIntegration } from "../subscriptions/decorators/requires-integration.decorator";
 import { FiscalService } from "./fiscal.service";
 import { CancelReceiptDto } from "./dto/cancel-receipt.dto";
@@ -27,7 +26,7 @@ import { BranchScope } from "../../common/scoping/branch-scope";
 // `fiscal_efatura` add-ons unlock it.
 @ApiTags("Fiscal")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.MANAGER)
 @RequiresIntegration("fiscal")
 @Controller("v1/fiscal")

@@ -17,7 +17,6 @@ import { UpdatePosSettingsDto } from "./dto/update-pos-settings.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -38,7 +37,7 @@ import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator"
 @ApiTags("pos-settings")
 @ApiBearerAuth()
 @Controller("pos-settings")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresFeature(PlanFeature.POS_ACCESS)
 @SkipBranchScope()
 export class PosSettingsController {

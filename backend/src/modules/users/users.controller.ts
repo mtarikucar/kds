@@ -32,11 +32,6 @@ import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator"
 // path on top of @RequireEntitlement and @RequiresFeature. Both legacy
 // surfaces now resolve via the entitlement engine after v2.8.90, so
 // the legacy code path is dead-weight and has been deleted.
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
-import {
-  CheckLimit,
-  LimitType,
-} from "../subscriptions/decorators/check-limit.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 
 /**
@@ -48,7 +43,6 @@ import { UserRole } from "../../common/constants/roles.enum";
 @ApiTags("users")
 @ApiBearerAuth()
 @Controller("users")
-@UseGuards(PlanFeatureGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -57,7 +51,6 @@ export class UsersController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @CheckLimit(LimitType.USERS)
   @ApiOperation({ summary: "Create a new user (ADMIN, MANAGER)" })
   @ApiResponse({ status: 201, description: "User successfully created" })
   @ApiResponse({ status: 409, description: "Email already in use" })
@@ -182,7 +175,6 @@ export class UsersController {
 
   @Patch(":id/reactivate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @CheckLimit(LimitType.USERS)
   @ApiOperation({ summary: "Reactivate an inactive user (ADMIN, MANAGER)" })
   reactivateUser(
     @Param("id") id: string,

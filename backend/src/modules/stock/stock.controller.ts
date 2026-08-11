@@ -28,7 +28,6 @@ import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator"
 import { BranchScope } from "../../common/scoping/branch-scope";
 import { UserRole } from "../../common/constants/roles.enum";
 import { StockMovementType } from "../../common/constants/order-status.enum";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../common/constants/subscription.enum";
 
@@ -39,7 +38,7 @@ import { PlanFeature } from "../../common/constants/subscription.enum";
 @ApiTags("stock")
 @ApiBearerAuth()
 @Controller("stock")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
