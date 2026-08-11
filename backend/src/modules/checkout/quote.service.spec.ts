@@ -144,7 +144,7 @@ describe('QuoteService', () => {
   it('still mixes addon + hardware + service into one quote (no plan)', async () => {
     addons.findByCodeOrThrow.mockResolvedValue({
       code: 'kds_extra_screen', name: 'Extra KDS screen', status: 'published',
-      billing: 'recurring', priceCents: 5000, currency: 'TRY', id: 'a-1', kind: 'capacity',
+      billing: 'oneTime', priceCents: 5000, currency: 'TRY', id: 'a-1', kind: 'capacity',
     } as any);
     // v2.8.87: catalog.findBySkuOrThrow is now hit for BOTH hardware and
     // service items (services live as HardwareProduct rows with
@@ -182,6 +182,45 @@ describe('QuoteService', () => {
     expect(q.totalCents).toBe(340_000); // 335000 gross + 5000 shipping
     expect(q.shippingCents).toBe(5_000);
     expect(q.isPureRecurring).toBe(false);
+  });
+
+  it('refuses to price a legacy monthly row instead of selling it flat', async () => {
+    // Shipped-and-caught: the à-la-carte catalog went live alongside the old
+    // monthly rows, which were still published. The pricer treated everything
+    // non-`annual` as oneTime, so personnel_management at ₺49,99/MONTH was
+    // quoted as ₺49,99 ONCE — a permanent grant of the same feature the annual
+    // product sells for ₺990/yr, with no period to ever expire.
+    addons.findByCodeOrThrow.mockResolvedValue({
+      id: 'legacy-1', code: 'personnel_management', name: 'Personel Yonetimi',
+      status: 'published', kind: 'SOFTWARE', billing: 'MONTHLY',
+      priceCents: 4_999, currency: 'TRY', requiresLicense: true,
+    } as any);
+
+    const q = await priceCart({
+      items: [{ type: 'addon', code: 'personnel_management' }],
+    });
+
+    expect(q.lines).toHaveLength(0);
+    expect(q.totalCents).toBe(0);
+    expect(q.warnings).toContainEqual({
+      code: 'addon_not_purchasable',
+      ref: 'personnel_management',
+    });
+  });
+
+  it('refuses any cadence the pricer does not understand', async () => {
+    // Not just 'MONTHLY' — the guard is an allowlist, so a future or
+    // hand-edited cadence cannot fall through to a flat charge either.
+    addons.findByCodeOrThrow.mockResolvedValue({
+      id: 'weird-1', code: 'weekly_thing', name: 'Weekly thing',
+      status: 'published', kind: 'module', billing: 'weekly',
+      priceCents: 1_000, currency: 'TRY', requiresLicense: true,
+    } as any);
+
+    const q = await priceCart({ items: [{ type: 'addon', code: 'weekly_thing' }] });
+
+    expect(q.lines).toHaveLength(0);
+    expect(q.warnings.map((w: any) => w.code)).toContain('addon_not_purchasable');
   });
 
   it('refuses to price a rental for SKUs without a rental price', async () => {
@@ -298,7 +337,7 @@ describe('QuoteService', () => {
 
   it('does not double-count KDV: a KDV-inclusive add-on totals the displayed price', async () => {
     addons.findByCodeOrThrow.mockResolvedValue({
-      billing: 'recurring',
+      billing: 'oneTime',
       priceCents: 49_900,
       currency: 'TRY',
       id: 'a-kdv',

@@ -112,6 +112,18 @@ export class QuoteService {
               requiresLicense: addOn.requiresLicense,
             },
           });
+        } else if (addOn.billing !== "oneTime") {
+          // Fail-closed on anything that is neither annual nor oneTime.
+          //
+          // This branch used to be a bare `else`, which meant a row carrying a
+          // legacy cadence — the pre-à-la-carte catalog wrote billing='MONTHLY'
+          // — was priced as a flat one-time charge with no period at all. A
+          // ₺49,99/month product became ₺49,99 once, granting its feature
+          // permanently, while the annual product covering the same feature
+          // cost ₺990/year. Only `oneTime` may be sold as a flat price; a
+          // cadence the pricer does not understand is not purchasable.
+          warnings.push({ code: "addon_not_purchasable", ref: addOn.code });
+          continue;
         } else {
           // oneTime — credit packs and services. Flat price, no period.
           lines.push({
