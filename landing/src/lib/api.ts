@@ -54,13 +54,29 @@ export interface CatalogProduct {
   sortOrder: number;
 }
 
+/**
+ * Join the configured base with an API path exactly once.
+ *
+ * Prod builds pass NEXT_PUBLIC_API_URL=https://hummytummy.com/api — already
+ * carrying the prefix — while a dev build points at http://localhost:3000,
+ * which does not. The previous code appended `/api` unconditionally, so every
+ * production fetch went to /api/api/... and 404'd. That failure was invisible:
+ * the fetch swallowed it, returned [], and the pricing section fell back to
+ * hardcoded tier prices, so the page looked right while showing numbers no
+ * API had confirmed for months.
+ */
+function apiUrl(path: string): string {
+  const root = API_BASE.replace(/\/+$/, '');
+  return `${root}${root.endsWith('/api') ? '' : '/api'}${path}`;
+}
+
 export async function getCatalog(locale = 'tr'): Promise<CatalogProduct[]> {
   // Static generation with no API base configured renders the free core and a
   // contact CTA. A missing price is recoverable; a stale one is not.
   if (!API_BASE) return [];
   try {
     const res = await fetch(
-      `${API_BASE}/api/v1/catalog/pricing?locale=${encodeURIComponent(locale)}`,
+      apiUrl(`/v1/catalog/pricing?locale=${encodeURIComponent(locale)}`),
       { next: { revalidate: 300 } },
     );
     if (!res.ok) return [];
