@@ -14,13 +14,16 @@ async function errs(dto: object): Promise<string[]> {
 }
 
 describe("CreateAddOnDto", () => {
+  // v3.3.0 vocabulary. `kds_extra_screen`/`limit.kdsScreens` was the old
+  // fixture and is deliberately gone: that product is archived and the key it
+  // granted was never read by anything.
   const base = {
-    code: "kds_extra_screen",
-    name: "Extra KDS Screen",
+    code: "extra_branch",
+    name: "Extra Branch",
     kind: "capacity",
-    billing: "recurring",
-    priceCents: 4900,
-    grants: { "limit.kdsScreens": 1 },
+    billing: "annual",
+    priceCents: 399_000,
+    grants: { "limit.maxBranches": 1 },
   };
 
   it("accepts a valid add-on", async () => {
@@ -40,6 +43,44 @@ describe("CreateAddOnDto", () => {
     expect((await errs(dto)).some((m) => /kind/.test(m))).toBe(true);
   });
 
+  it("rejects the retired pre-3.3 kind and billing vocabulary", async () => {
+    const kind = plainToInstance(CreateAddOnDto, { ...base, kind: "software" });
+    expect((await errs(kind)).some((m) => /kind/.test(m))).toBe(true);
+    const billing = plainToInstance(CreateAddOnDto, {
+      ...base,
+      billing: "recurring",
+    });
+    expect((await errs(billing)).some((m) => /billing/.test(m))).toBe(true);
+  });
+
+  it("accepts the a-la-carte credit-pack fields", async () => {
+    const dto = plainToInstance(CreateAddOnDto, {
+      ...base,
+      code: "credit_ai_photo_100",
+      kind: "credit",
+      billing: "oneTime",
+      grants: {},
+      requiresLicense: false,
+      creditKind: "PHOTO",
+      creditUnits: 100,
+      sortOrder: 40,
+      i18n: { tr: { name: "100 AI Gorsel", description: "aciklama" } },
+      commissionRate: 0.1,
+    });
+    expect(await errs(dto)).toEqual([]);
+  });
+
+  it("rejects an unknown creditKind and an out-of-range commissionRate", async () => {
+    const dto = plainToInstance(CreateAddOnDto, {
+      ...base,
+      creditKind: "BOGUS",
+      commissionRate: 1.5,
+    });
+    const msgs = await errs(dto);
+    expect(msgs.some((m) => /creditKind/.test(m))).toBe(true);
+    expect(msgs.some((m) => /commissionRate/.test(m))).toBe(true);
+  });
+
   it("rejects a negative price", async () => {
     const dto = plainToInstance(CreateAddOnDto, { ...base, priceCents: -1 });
     expect((await errs(dto)).some((m) => /priceCents/.test(m))).toBe(true);
@@ -53,7 +94,7 @@ describe("CreateAddOnDto", () => {
   it("rejects non-string entries in deps", async () => {
     const dto = plainToInstance(CreateAddOnDto, {
       ...base,
-      deps: ["plan:PRO", 5],
+      deps: ["module_ai_studio", 5],
     });
     expect((await errs(dto)).some((m) => /deps|each/.test(m))).toBe(true);
   });

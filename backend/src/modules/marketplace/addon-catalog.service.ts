@@ -7,6 +7,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateAddOnDto, UpdateAddOnDto } from "./dto/addon.dto";
+import { CatalogRowShape, validateCatalogRow } from "./catalog-validation";
 
 /**
  * Catalog management for marketplace add-ons.
@@ -19,11 +20,13 @@ import { CreateAddOnDto, UpdateAddOnDto } from "./dto/addon.dto";
  *   archived  — already-purchased tenants keep their entitlement; new
  *               purchases blocked. Equivalent to soft-delete.
  *
- * The service deliberately does NOT validate that `grants` keys match the
- * entitlement key namespace ("feature.*", "limit.*", "integration.*").
- * Those validations live in the projector, where they are coupled to the
- * engine's actual fold rules. Keeping the catalog permissive lets us
- * roll out new key prefixes without redeploying this service.
+ * v3.3.0 REVERSED the previous "keep the catalog permissive" policy. That was
+ * defensible while the catalog was a 14-row seed file edited by developers;
+ * with à-la-carte it is the only thing between a superadmin's JSON blob and
+ * what a paying tenant receives, and the permissive policy had already cost
+ * money twice (`limit.branches` sold a branch cap that never rose;
+ * `limit.kdsScreens`/`kdsStations`/`tablets` are granted by published rows and
+ * read by nothing). Every write now goes through `validateCatalogRow`.
  */
 @Injectable()
 export class AddOnCatalogService {
@@ -35,15 +38,15 @@ export class AddOnCatalogService {
         ...(filters?.status ? { status: filters.status } : {}),
         ...(filters?.kind ? { kind: filters.kind } : {}),
       },
-      orderBy: [{ kind: "asc" }, { name: "asc" }],
+      orderBy: [{ kind: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     });
   }
 
-  /** Public marketplace — returns only published rows, fields trimmed for UI. */
+  /** Public storefront — returns only published rows, fields trimmed for UI. */
   async listPublic() {
     const rows = await this.prisma.marketplaceAddOn.findMany({
       where: { status: "published" },
-      orderBy: [{ kind: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { kind: "asc" }, { name: "asc" }],
     });
     return rows.map((r) => ({
       code: r.code,
@@ -54,6 +57,12 @@ export class AddOnCatalogService {
       priceCents: r.priceCents,
       currency: r.currency,
       deps: r.deps,
+      requiresLicense: r.requiresLicense,
+      creditKind: r.creditKind,
+      creditUnits: r.creditUnits,
+      maxQuantity: r.maxQuantity,
+      sortOrder: r.sortOrder,
+      i18n: r.i18n,
     }));
   }
 
@@ -65,7 +74,36 @@ export class AddOnCatalogService {
     return row;
   }
 
+  /**
+   * Reject a row that would take money and grant nothing. Reports EVERY
+   * problem at once so the admin UI can show them in a single pass.
+   */
+  private assertValid(row: CatalogRowShape) {
+    const problems = validateCatalogRow(row);
+    if (problems.length > 0) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Invalid catalog product",
+        errorCode: "CATALOG_INVALID",
+        message: problems,
+      });
+    }
+  }
+
   async create(dto: CreateAddOnDto) {
+    this.assertValid({
+      code: dto.code,
+      kind: dto.kind,
+      billing: dto.billing,
+      priceCents: dto.priceCents,
+      status: dto.status ?? "draft",
+      grants: dto.grants ?? {},
+      deps: dto.deps ?? [],
+      requiresLicense: dto.requiresLicense ?? true,
+      creditKind: dto.creditKind,
+      creditUnits: dto.creditUnits,
+      maxQuantity: dto.maxQuantity,
+    });
     try {
       return await this.prisma.marketplaceAddOn.create({
         data: {
@@ -79,6 +117,15 @@ export class AddOnCatalogService {
           grants: dto.grants as any,
           deps: dto.deps ?? [],
           status: dto.status ?? "draft",
+          requiresLicense: dto.requiresLicense ?? true,
+          creditKind: dto.creditKind ?? null,
+          creditUnits: dto.creditUnits ?? null,
+          maxQuantity: dto.maxQuantity ?? null,
+          sortOrder: dto.sortOrder ?? 0,
+          i18n: (dto.i18n ?? undefined) as any,
+          ...(dto.commissionRate != null
+            ? { commissionRate: dto.commissionRate }
+            : {}),
         },
       });
     } catch (e) {
@@ -97,6 +144,28 @@ export class AddOnCatalogService {
       where: { id },
     });
     if (!exists) throw new NotFoundException("Add-on not found");
+
+    // PATCH semantics: validate the row as it will look AFTER the merge, not
+    // just the fields being sent. Validating the delta alone would let
+    // "change kind to credit" through while creditKind stays null.
+    const merged: CatalogRowShape = {
+      code: exists.code,
+      kind: dto.kind ?? exists.kind,
+      billing: dto.billing ?? exists.billing,
+      priceCents: dto.priceCents ?? exists.priceCents,
+      status: dto.status ?? exists.status,
+      grants: (dto.grants ?? (exists.grants as any) ?? {}) as Record<
+        string,
+        unknown
+      >,
+      deps: dto.deps ?? exists.deps,
+      requiresLicense: dto.requiresLicense ?? exists.requiresLicense,
+      creditKind: dto.creditKind ?? exists.creditKind,
+      creditUnits: dto.creditUnits ?? exists.creditUnits,
+      maxQuantity: dto.maxQuantity ?? exists.maxQuantity,
+    };
+    this.assertValid(merged);
+
     return this.prisma.marketplaceAddOn.update({
       where: { id },
       data: {
@@ -109,41 +178,55 @@ export class AddOnCatalogService {
         grants: dto.grants as any,
         deps: dto.deps,
         status: dto.status,
+        requiresLicense: dto.requiresLicense,
+        creditKind: dto.creditKind,
+        creditUnits: dto.creditUnits,
+        maxQuantity: dto.maxQuantity,
+        sortOrder: dto.sortOrder,
+        i18n: (dto.i18n ?? undefined) as any,
+        ...(dto.commissionRate != null
+          ? { commissionRate: dto.commissionRate }
+          : {}),
       },
     });
   }
 
+  /**
+   * Soft-delete. Bypasses assertValid deliberately: a row may have become
+   * invalid under newer rules (a legacy `kind`, a dead grant key) and
+   * retiring it must never be blocked by the very problem being retired.
+   */
   async archive(id: string) {
-    return this.update(id, { status: "archived" });
+    const exists = await this.prisma.marketplaceAddOn.findUnique({
+      where: { id },
+    });
+    if (!exists) throw new NotFoundException("Add-on not found");
+    return this.prisma.marketplaceAddOn.update({
+      where: { id },
+      data: { status: "archived" },
+    });
   }
 
   /**
-   * Verify dependency strings resolve to existing things. Returns an array
-   * of "missing dep" strings; an empty array means the deps are satisfiable
-   * (independent of the asking tenant — that check lives in TenantMarketplace).
+   * Verify dependency strings resolve to existing catalog rows. Returns an
+   * array of "missing dep" strings; an empty array means the deps are
+   * satisfiable (independent of the asking tenant — that check lives in
+   * TenantMarketplaceService).
+   *
+   * v3.3.0 dropped the `plan:<NAME>` form. Plans are retired, so such a dep
+   * could never be satisfied and would 400 every purchase of the product
+   * carrying it. `validateCatalogRow` rejects it at write time; this method
+   * no longer resolves it at all.
    */
   async resolveDeps(deps: string[]): Promise<string[]> {
     const missing: string[] = [];
-    const addonCodes = deps.filter((d) => !d.startsWith("plan:"));
-    const planNames = deps
-      .filter((d) => d.startsWith("plan:"))
-      .map((d) => d.slice("plan:".length));
-
-    if (addonCodes.length > 0) {
+    if (deps.length > 0) {
       const found = await this.prisma.marketplaceAddOn.findMany({
-        where: { code: { in: addonCodes } },
+        where: { code: { in: deps } },
         select: { code: true },
       });
       const have = new Set(found.map((r) => r.code));
-      for (const c of addonCodes) if (!have.has(c)) missing.push(c);
-    }
-    if (planNames.length > 0) {
-      const found = await this.prisma.subscriptionPlan.findMany({
-        where: { name: { in: planNames } },
-        select: { name: true },
-      });
-      const have = new Set(found.map((r) => r.name));
-      for (const n of planNames) if (!have.has(n)) missing.push(`plan:${n}`);
+      for (const c of deps) if (!have.has(c)) missing.push(c);
     }
     if (missing.length > 0) {
       throw new BadRequestException(`Unresolved deps: ${missing.join(", ")}`);

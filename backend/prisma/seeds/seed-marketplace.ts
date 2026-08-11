@@ -44,164 +44,20 @@ export const SEED_DEFAULT_COMPLIANCE = {
 // executing the seed. The `main()` invocation at the bottom is guarded by
 // `require.main === module` so importing this file has no side effects.
 
-export const ADDONS = [
-  // Capacity
-  {
-    code: "kds_extra_screen",
-    name: "Extra KDS screen",
-    description:
-      "Adds one additional kitchen display screen slot to your branch.",
-    kind: "capacity",
-    billing: "recurring",
-    priceCents: 9900,
-    grants: { "limit.kdsScreens": 1 },
-    deps: [] as string[],
-  },
-  {
-    code: "kds_extra_station",
-    name: "Extra KDS station",
-    description:
-      "Adds one routing station (bar / grill / dessert) on top of the default kitchen.",
-    kind: "capacity",
-    billing: "recurring",
-    priceCents: 14900,
-    grants: { "limit.kdsStations": 1 },
-    deps: [],
-  },
-  {
-    code: "extra_tablet",
-    name: "Extra waiter tablet",
-    description: "Increases your waiter-tablet seat limit by one.",
-    kind: "capacity",
-    billing: "recurring",
-    priceCents: 7900,
-    grants: { "limit.tablets": 1 },
-    deps: [],
-  },
-  {
-    code: "extra_branch",
-    name: "Extra branch",
-    description: "Adds one branch beyond your plan limit. Required for chains.",
-    kind: "capacity",
-    billing: "recurring",
-    priceCents: 39900,
-    grants: { "limit.maxBranches": 1, "feature.multiLocation": true },
-    deps: [],
-  },
-  // Integrations
-  {
-    code: "fiscal_efatura",
-    name: "e-Fatura / e-Arşiv integration",
-    description:
-      "Issue tax-compliant electronic invoices (cloud, no hardware required).",
-    kind: "integration",
-    billing: "recurring",
-    priceCents: 19900,
-    grants: { "integration.fiscal": ["efatura"] },
-    deps: [],
-  },
-  {
-    code: "fiscal_hugin",
-    name: "Hugin yazarkasa integration",
-    description: "Drive a Hugin fiscal device via the Local Bridge Agent.",
-    kind: "integration",
-    billing: "recurring",
-    priceCents: 29900,
-    grants: { "integration.fiscal": ["hugin"] },
-    deps: ["plan:PRO"],
-  },
-  {
-    code: "delivery_yemeksepeti",
-    name: "Yemeksepeti integration",
-    description: "Receive Yemeksepeti orders directly into your KDS.",
-    kind: "integration",
-    billing: "recurring",
-    priceCents: 24900,
-    grants: { "integration.delivery": ["yemeksepeti"] },
-    deps: [],
-  },
-  {
-    code: "delivery_getir",
-    name: "Getir Yemek integration",
-    description: "Receive Getir Yemek orders directly into your KDS.",
-    kind: "integration",
-    billing: "recurring",
-    priceCents: 24900,
-    grants: { "integration.delivery": ["getir"] },
-    deps: [],
-  },
-  {
-    code: "delivery_trendyol_yemek",
-    name: "Trendyol Yemek integration",
-    description: "Receive Trendyol Yemek orders directly into your KDS.",
-    kind: "integration",
-    billing: "recurring",
-    priceCents: 24900,
-    grants: { "integration.delivery": ["trendyol_yemek"] },
-    deps: [],
-  },
-  {
-    code: "caller_id_integration",
-    name: "Caller ID / phone-order integration",
-    description: "Open a customer card automatically on every inbound call.",
-    kind: "integration",
-    billing: "recurring",
-    priceCents: 14900,
-    // The caller feed is gated as an INTEGRATION on every surface: the
-    // frontend route + sidebar use FeatureGate integration={{domain:'caller'}}
-    // and the backend endpoint uses @RequiresIntegration('caller') — all three
-    // resolve the engine key `integration.caller`. A `feature.*` grant here
-    // satisfied none of them, so buying the add-on unlocked nothing (feed
-    // stayed 403 + nav hidden behind the upsell). Grant the integration vendor
-    // list instead, mirroring the delivery add-ons (`integration.delivery`).
-    grants: { "integration.caller": ["generic"] },
-    deps: [],
-  },
-  // Software / features
-  {
-    code: "advanced_reports",
-    name: "Advanced reports",
-    description: "Cohort analysis, custom reports, scheduled email delivery.",
-    kind: "software",
-    billing: "recurring",
-    priceCents: 12900,
-    grants: { "feature.advancedReports": true },
-    deps: [],
-  },
-  {
-    code: "api_access",
-    name: "API access",
-    description: "Public API key + outbound webhooks for your integrations.",
-    kind: "software",
-    billing: "recurring",
-    priceCents: 24900,
-    grants: { "feature.apiAccess": true },
-    deps: [],
-  },
-  // Support
-  {
-    code: "priority_support",
-    name: "Priority support",
-    description:
-      "24-hour SLA on critical tickets. Direct line during business hours.",
-    kind: "support",
-    billing: "recurring",
-    priceCents: 19900,
-    grants: { "feature.prioritySupport": true },
-    deps: [],
-  },
-  {
-    code: "onsite_install_full",
-    name: "On-site setup (one-time)",
-    description:
-      "A HummyTummy technician comes to your venue, installs the bridge + devices, and trains your staff.",
-    kind: "support",
-    billing: "oneTime",
-    priceCents: 750_000,
-    grants: {}, // no entitlement delta; just a service line
-    deps: [],
-  },
-];
+// v3.3.0: the add-on catalog moved to
+// src/modules/marketplace/alacarte-catalog.const.ts so the seed, the
+// 20260811100000_alacarte_catalog data migration and the invariant specs all
+// read ONE list. A price that lives only here means a freshly seeded
+// developer database and a migrated production database charge different
+// amounts for the same product, and nothing catches it until a customer is
+// billed the wrong figure.
+//
+// Still exported as ADDONS for the existing catalog-invariant specs.
+export { ALACARTE_CATALOG as ADDONS } from "../../src/modules/marketplace/alacarte-catalog.const";
+import {
+  ALACARTE_CATALOG,
+  RETIRED_ADDON_CODES,
+} from "../../src/modules/marketplace/alacarte-catalog.const";
 
 // ---- Launch hardware SKUs ---------------------------------------------
 //
@@ -1133,33 +989,46 @@ const PROVIDERS = [
 async function main() {
   console.log("[seed-marketplace] starting");
 
-  for (const a of ADDONS) {
+  // Retire the pre-3.3 device-capacity products. ARCHIVED, never deleted:
+  // `code` is not reusable and TenantAddOn.addOnId is onDelete: Restrict.
+  // All three granted limit.kdsScreens / limit.kdsStations / limit.tablets —
+  // keys no enforcement code has ever read.
+  const retired = await prisma.marketplaceAddOn.updateMany({
+    where: { code: { in: [...RETIRED_ADDON_CODES] }, status: { not: "archived" } },
+    data: { status: "archived" },
+  });
+
+  for (const a of ALACARTE_CATALOG) {
+    // Mirrors 20260811100000_alacarte_catalog: annual and credit products
+    // land as DRAFT until P2 teaches the quote engine to prorate an annual
+    // cadence. Publishing one now would sell a yearly price as a flat charge
+    // with a 30-day period. Services are unaffected and stay purchasable.
+    const status = a.kind === "service" ? "published" : "draft";
+    const fields = {
+      name: a.name,
+      description: a.description,
+      kind: a.kind,
+      billing: a.billing,
+      priceCents: a.priceCents,
+      grants: a.grants as any,
+      deps: a.deps,
+      status,
+      requiresLicense: a.requiresLicense,
+      creditKind: a.creditKind ?? null,
+      creditUnits: a.creditUnits ?? null,
+      maxQuantity: a.maxQuantity ?? null,
+      sortOrder: a.sortOrder,
+      i18n: a.i18n as any,
+    };
     await prisma.marketplaceAddOn.upsert({
       where: { code: a.code },
-      update: {
-        name: a.name,
-        description: a.description,
-        kind: a.kind,
-        billing: a.billing,
-        priceCents: a.priceCents,
-        grants: a.grants as any,
-        deps: a.deps,
-        status: "published",
-      },
-      create: {
-        code: a.code,
-        name: a.name,
-        description: a.description,
-        kind: a.kind,
-        billing: a.billing,
-        priceCents: a.priceCents,
-        grants: a.grants as any,
-        deps: a.deps,
-        status: "published",
-      },
+      update: fields,
+      create: { code: a.code, ...fields },
     });
   }
-  console.log(`[seed-marketplace] add-ons: ${ADDONS.length}`);
+  console.log(
+    `[seed-marketplace] add-ons: ${ALACARTE_CATALOG.length} upserted, ${retired.count} retired`,
+  );
 
   // v2.8.87: PRODUCTS + SERVICES go through the same upsert path; SERVICES
   // are HardwareProduct rows with category='service'. The shared helper

@@ -14,7 +14,8 @@ import { AddOnCatalogService } from './addon-catalog.service';
  * Spec for AddOnCatalogService — the catalog CRUD branches: filter-building
  * for list, the trimmed public projection, P2002→Conflict on create, the
  * not-found guards, default-applying create, archive-as-status-update, and
- * the dependency resolver's plan:/addon split + missing-dep aggregation.
+ * the dependency resolver's missing-dep aggregation, and (v3.3.0) the
+ * catalog invariant gate that now runs on every create/update.
  */
 describe('AddOnCatalogService', () => {
   let prisma: MockPrismaClient;
@@ -55,13 +56,19 @@ describe('AddOnCatalogService', () => {
           code: 'pro_pack',
           name: 'Pro Pack',
           description: 'desc',
-          kind: 'feature',
-          billing: 'monthly',
+          kind: 'module',
+          billing: 'annual',
           priceCents: 999,
           currency: 'TRY',
-          deps: ['plan:Pro'],
+          deps: ['dep_a'],
           grants: { 'feature.x': true }, // must NOT leak
           status: 'published',
+          requiresLicense: true,
+          creditKind: null,
+          creditUnits: null,
+          maxQuantity: null,
+          sortOrder: 3,
+          i18n: { tr: { name: 'Pro Paket', description: 'aciklama' } },
         },
       ]);
 
@@ -75,11 +82,17 @@ describe('AddOnCatalogService', () => {
         code: 'pro_pack',
         name: 'Pro Pack',
         description: 'desc',
-        kind: 'feature',
-        billing: 'monthly',
+        kind: 'module',
+        billing: 'annual',
         priceCents: 999,
         currency: 'TRY',
-        deps: ['plan:Pro'],
+        deps: ['dep_a'],
+        requiresLicense: true,
+        creditKind: null,
+        creditUnits: null,
+        maxQuantity: null,
+        sortOrder: 3,
+        i18n: { tr: { name: 'Pro Paket', description: 'aciklama' } },
       });
       expect(res[0]).not.toHaveProperty('grants');
       expect(res[0]).not.toHaveProperty('id');
@@ -105,10 +118,10 @@ describe('AddOnCatalogService', () => {
         code: 'a',
         name: 'A',
         description: 'd',
-        kind: 'feature',
-        billing: 'monthly',
+        kind: 'module',
+        billing: 'annual',
         priceCents: 100,
-        grants: {},
+        grants: { 'feature.advancedReports': true },
       } as any);
 
       const data = (prisma.marketplaceAddOn.create as any).mock.calls[0][0].data;
@@ -129,10 +142,10 @@ describe('AddOnCatalogService', () => {
           code: 'dupcode',
           name: 'A',
           description: 'd',
-          kind: 'feature',
-          billing: 'monthly',
+          kind: 'module',
+          billing: 'annual',
           priceCents: 100,
-          grants: {},
+          grants: { 'feature.advancedReports': true },
         } as any),
       ).rejects.toBeInstanceOf(ConflictException);
     });
@@ -145,10 +158,10 @@ describe('AddOnCatalogService', () => {
           code: 'c',
           name: 'A',
           description: 'd',
-          kind: 'feature',
-          billing: 'monthly',
+          kind: 'module',
+          billing: 'annual',
           priceCents: 100,
-          grants: {},
+          grants: { 'feature.advancedReports': true },
         } as any),
       ).rejects.toBe(boom);
     });
@@ -162,7 +175,7 @@ describe('AddOnCatalogService', () => {
       );
     });
 
-    it('archive delegates to update with status=archived', async () => {
+    it('archives by writing status directly, without re-validating', async () => {
       (prisma.marketplaceAddOn.findUnique as any).mockResolvedValue({
         id: 'x',
       });
@@ -176,38 +189,28 @@ describe('AddOnCatalogService', () => {
   });
 
   describe('resolveDeps', () => {
-    it('returns [] when every addon-code and plan dep resolves', async () => {
+    it('returns [] when every dep resolves to a catalog row', async () => {
       (prisma.marketplaceAddOn.findMany as any).mockResolvedValue([
         { code: 'dep_a' },
-      ]);
-      (prisma.subscriptionPlan.findMany as any).mockResolvedValue([
-        { name: 'Pro' },
+        { code: 'dep_b' },
       ]);
 
-      const missing = await svc.resolveDeps(['dep_a', 'plan:Pro']);
+      const missing = await svc.resolveDeps(['dep_a', 'dep_b']);
 
       expect(missing).toEqual([]);
-      // addon codes queried without the plan ones
       const addonWhere = (prisma.marketplaceAddOn.findMany as any).mock
         .calls[0][0].where;
-      expect(addonWhere.code.in).toEqual(['dep_a']);
-      const planWhere = (prisma.subscriptionPlan.findMany as any).mock
-        .calls[0][0].where;
-      expect(planWhere.name.in).toEqual(['Pro']);
+      expect(addonWhere.code.in).toEqual(['dep_a', 'dep_b']);
+      // v3.3.0: plans are retired, so the resolver must not touch them at all.
+      expect(prisma.subscriptionPlan.findMany).not.toHaveBeenCalled();
     });
 
-    it('throws BadRequest listing every unresolved addon and plan dep', async () => {
-      (prisma.marketplaceAddOn.findMany as any).mockResolvedValue([]); // dep_a missing
-      (prisma.subscriptionPlan.findMany as any).mockResolvedValue([]); // plan:Pro missing
+    it('throws BadRequest listing every unresolved dep', async () => {
+      (prisma.marketplaceAddOn.findMany as any).mockResolvedValue([]);
 
-      await expect(
-        svc.resolveDeps(['dep_a', 'plan:Pro']),
-      ).rejects.toMatchObject({
+      await expect(svc.resolveDeps(['dep_a'])).rejects.toMatchObject({
         message: expect.stringContaining('dep_a'),
       });
-      await expect(svc.resolveDeps(['dep_a', 'plan:Pro'])).rejects.toMatchObject(
-        { message: expect.stringContaining('plan:Pro') },
-      );
       await expect(
         svc.resolveDeps(['dep_a']),
       ).rejects.toBeInstanceOf(BadRequestException);

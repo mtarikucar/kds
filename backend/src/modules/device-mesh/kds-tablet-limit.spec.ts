@@ -9,6 +9,7 @@ import {
 import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { LimitType } from "../subscriptions/decorators/check-limit.decorator";
 import { ADDONS } from "../../../prisma/seeds/seed-marketplace";
+import { RETIRED_ADDON_CODES } from "../marketplace/alacarte-catalog.const";
 
 /**
  * DEF-7 / Task 6 regression coverage: the `kds_extra_screen` (₺99/mo,
@@ -34,23 +35,26 @@ import { ADDONS } from "../../../prisma/seeds/seed-marketplace";
  * station table/column/DeviceKind), so there is no anchor to enforce
  * against without inventing one.
  */
-describe("DEF-7: kds_extra_screen / extra_tablet grant keys", () => {
-  it("catalog fixture sanity: grants match the LimitType enum values exactly", () => {
-    const screen = ADDONS.find((a) => a.code === "kds_extra_screen");
-    const tablet = ADDONS.find((a) => a.code === "extra_tablet");
-    expect(screen?.grants).toEqual({ "limit.kdsScreens": 1 });
-    expect(tablet?.grants).toEqual({ "limit.tablets": 1 });
-    // The literal regression this task fixes: LimitType values must equal
-    // the grant key suffix (guard builds `limit.${limitType}`), NOT
-    // "maxKdsScreens"/"maxTablets".
-    expect(LimitType.KDS_SCREENS).toBe("kdsScreens");
-    expect(LimitType.TABLETS).toBe("tablets");
+describe("DEF-7 aftermath: the device-capacity products are retired", () => {
+  it("no longer ships kds_extra_screen / kds_extra_station / extra_tablet", () => {
+    // v3.3.0 à-la-carte retired all three (archived, not deleted — `code` is
+    // not reusable and TenantAddOn.addOnId is onDelete: Restrict). Device
+    // capacity is no longer a priced dimension: only extra BRANCHES are.
+    for (const code of RETIRED_ADDON_CODES) {
+      expect(ADDONS.find((a) => a.code === code)).toBeUndefined();
+    }
   });
 
-  it("kds_extra_station grants limit.kdsStations but has NO LimitType member (no persisted anchor to count — see report)", () => {
-    const station = ADDONS.find((a) => a.code === "kds_extra_station");
-    expect(station?.grants).toEqual({ "limit.kdsStations": 1 });
-    expect((LimitType as Record<string, string>).KDS_STATIONS).toBeUndefined();
+  it("leaves device creation UNCAPPED rather than blocked", () => {
+    // The safety property behind retiring them. `limit.kdsScreens` and
+    // `limit.tablets` were 100% add-on-sourced (no SubscriptionPlan column),
+    // so with the products gone no tenant can ever hold such a grant.
+    // enforceDeviceCapacity returns early when there is neither an engine
+    // limit nor an admin override — a ceiling, not a deny-by-default quota —
+    // so archiving the products opens device slots up instead of bricking
+    // them. The tests below pin that behaviour.
+    expect(LimitType.KDS_SCREENS).toBe("kdsScreens");
+    expect(LimitType.TABLETS).toBe("tablets");
   });
 });
 

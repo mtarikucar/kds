@@ -86,7 +86,9 @@ export function anchorDateFor(instant: Date, tz = DEFAULT_TENANT_TZ): Date {
 
 /** Strip the time component of an already-UTC calendar date. */
 function utcMidnight(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+  );
 }
 
 function daysInMonth(year: number, monthIndex: number): number {
@@ -130,7 +132,9 @@ export function previousAnniversary(anchorAt: Date, from: Date): Date {
 
 /** Whole days between two UTC-midnight dates. Exact — UTC has no DST. */
 export function daysBetweenUtc(a: Date, b: Date): number {
-  return Math.round((utcMidnight(b).getTime() - utcMidnight(a).getTime()) / MS_PER_DAY);
+  return Math.round(
+    (utcMidnight(b).getTime() - utcMidnight(a).getTime()) / MS_PER_DAY,
+  );
 }
 
 export function prorate(args: ProrateArgs): ProrationResult {
@@ -143,7 +147,9 @@ export function prorate(args: ProrateArgs): ProrationResult {
     );
   }
   if (!Number.isInteger(quantity) || quantity < 1) {
-    throw new RangeError(`quantity must be a positive integer, got ${quantity}`);
+    throw new RangeError(
+      `quantity must be a positive integer, got ${quantity}`,
+    );
   }
 
   const today = anchorDateFor(now, tz);
