@@ -166,7 +166,6 @@ model Tenant {
   // accidental tenantId typo at write-time would silently succeed. The
   // cascade aligns with how every other tenant-scoped table is wired.
   featureEntitlements FeatureEntitlement[]
-  aiGenerationUsage   AiGenerationUsage[]
 
   // v2.8.93 — Branch + Device picked up the missing tenant FK + cascade.
   // Inverse relations declared here so Prisma keeps the TS-side graph
@@ -622,28 +621,13 @@ model ProductMediaJob {
   @@map("product_media_jobs")
 }
 
-// Append-only AI generation quota ledger. One row per quota claim, written
-// atomically with the ProductMediaJob insert. Deliberately NOT FK-linked to
-// Product/ProductMediaJob: product deletion cascades jobs away, and usage
-// must survive that (otherwise "delete product → quota refunded" farms free
-// generations). `voided` flips true when the generation FAILS (failJob or a
-// fal submit error) so failed attempts don't burn the tenant's allowance.
-model AiGenerationUsage {
-  id       String @id @default(uuid())
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+// The AI generation quota ledger moved to credit_ledger in v3.3.0
+// (20260811130000_credits_ledger_migration). Credits are bought and valid
+// until consumed, so consumption is counted against purchased lots for all
+// time rather than against a calendar month. The refund machinery — no FK to
+// products or jobs, so "delete the product, get the credit back" cannot farm
+// free generations — carried over unchanged.
 
-  kind  String // PHOTO | VIDEO | MODEL3D (FRAME + OCR-parse draw from PHOTO)
-  units Int     @default(1) // image variations requested; video always 1
-  jobId String? // ProductMediaJob id, soft reference (no FK — survives cascades)
-
-  voided    Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@index([tenantId, kind, createdAt])
-  @@index([jobId])
-  @@map("ai_generation_usage")
-}
 
 model ProductImage {
   id       String @id @default(uuid())

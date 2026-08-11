@@ -1,4 +1,5 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { CreditService } from "../credits/credit.service";
 import { SmsService } from "../customers/sms.service";
 import { SmsSettingsService } from "./sms-settings.service";
 import { maskPhone } from "../../common/helpers/pii-mask.helper";
@@ -10,6 +11,11 @@ export class SmsNotificationService {
   constructor(
     private smsService: SmsService,
     private smsSettingsService: SmsSettingsService,
+    // v3.3.0 — SMS is metered. Optional so bare-constructed specs still
+    // compile; when absent the send proceeds unmetered rather than silently
+    // failing, because a missing collaborator must not stop a customer being
+    // told their order is ready.
+    @Optional() private readonly credits?: CreditService,
   ) {}
 
   // === RESERVATION SMS ===
@@ -187,10 +193,32 @@ export class SmsNotificationService {
       if (!settings.isEnabled) return;
       if (!settings[settingKey]) return;
 
-      this.smsService.send(phone, message).catch((err) => {
+      // Meter the send. Pre-3.3 nothing counted SMS at all, so selling an SMS
+      // credit pack would have taken money against a balance that never
+      // moved. Claim FIRST — a claim that fails must not send — and refund if
+      // the gateway then rejects the message, so a failed send never costs
+      // the customer a credit.
+      let ledgerId: string | null = null;
+      if (this.credits) {
+        try {
+          ledgerId = await this.credits.claim(tenantId, "SMS", 1, {
+            type: "sms_message",
+          });
+        } catch (err: any) {
+          // Out of credit is a normal state, not an error worth alerting on:
+          // the operator sees the balance in the app and buys another pack.
+          this.logger.warn(
+            `SMS skipped for tenant=${tenantId}: ${err?.message ?? "no credit"}`,
+          );
+          return;
+        }
+      }
+
+      this.smsService.send(phone, message).catch(async (err) => {
         this.logger.error(
           `SMS send failed for ${maskPhone(phone)}: ${err.message}`,
         );
+        if (ledgerId) await this.credits?.void(ledgerId).catch(() => undefined);
       });
     } catch (err) {
       this.logger.error(`SMS notification check failed: ${err.message}`);
