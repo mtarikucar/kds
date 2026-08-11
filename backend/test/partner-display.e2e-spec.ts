@@ -31,25 +31,77 @@ describe("Partner Display API (HTTP, real guards)", () => {
     await resetDb(prisma);
   });
 
-  // Set the seeded tenant's plan feature flag, wire tenant.currentPlanId (which
-  // PlanFeatureGuard requires — seedLiveTenant leaves it null), then project
-  // entitlements so the engine surfaces feature.externalDisplay (what both
-  // PlanFeatureGuard and PartnerKeyGuard read). Mirrors a real TRIAL/BUSINESS
-  // tenant. Pass externalDisplay:false to seed a live plan WITHOUT the feature.
-  async function setupPlan(tenantId: string, externalDisplay: boolean): Promise<void> {
-    const sub = await prisma.subscription.findFirst({
-      where: { tenantId },
-      select: { planId: true },
+  /**
+   * Grant (or withhold) feature.externalDisplay the way the product now does:
+   * by OWNING the module, on top of a live licence.
+   *
+   * The pre-3.3 version flipped a SubscriptionPlan column and pointed
+   * tenant.currentPlanId at it. Nothing reads plan columns any more — the
+   * projector emits a fixed free baseline plus one source per owned product —
+   * so that fixture granted nothing and every request 403'd. Creating the
+   * catalog rows and the ownership rows is not fixture bloat; it is the only
+   * way a tenant can actually hold this feature.
+   *
+   * The licence matters independently: the projector SUPPRESSES the grants of
+   * every requiresLicense product while the licence is dark, so a module
+   * without one would still leave the tenant locked out.
+   */
+  async function grantExternalDisplay(
+    tenantId: string,
+    externalDisplay: boolean,
+  ): Promise<void> {
+    const periodEnd = new Date(Date.now() + 365 * 24 * 3600 * 1000);
+
+    const licence = await prisma.marketplaceAddOn.upsert({
+      where: { code: "license_annual" },
+      update: {},
+      create: {
+        code: "license_annual",
+        name: "Licence",
+        kind: "license",
+        billing: "annual",
+        priceCents: 299_000,
+        grants: { "feature.license": true },
+        status: "published",
+        requiresLicense: false,
+      },
     });
-    if (!sub?.planId) throw new Error("seed: tenant has no subscription/plan");
-    await prisma.subscriptionPlan.update({
-      where: { id: sub.planId },
-      data: { externalDisplay },
+    await prisma.tenantAddOn.create({
+      data: {
+        tenantId,
+        addOnId: licence.id,
+        status: "active",
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: periodEnd,
+      },
     });
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: { currentPlanId: sub.planId },
-    });
+
+    if (externalDisplay) {
+      const module = await prisma.marketplaceAddOn.upsert({
+        where: { code: "module_external_display" },
+        update: {},
+        create: {
+          code: "module_external_display",
+          name: "Partner Display API",
+          kind: "module",
+          billing: "annual",
+          priceCents: 199_000,
+          grants: { "feature.externalDisplay": true },
+          status: "published",
+          requiresLicense: true,
+        },
+      });
+      await prisma.tenantAddOn.create({
+        data: {
+          tenantId,
+          addOnId: module.id,
+          status: "active",
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: periodEnd,
+        },
+      });
+    }
+
     await app.get(PlanProjectorService).projectTenant(tenantId);
   }
 
@@ -76,7 +128,7 @@ describe("Partner Display API (HTTP, real guards)", () => {
 
   it("full chain: ADMIN issues key → partner mints screen token → screen reads menu", async () => {
     const t = await seedLiveTenant(prisma);
-    await setupPlan(t.tenantId, true);
+    await grantExternalDisplay(t.tenantId, true);
     const token = await loginAs(app, t.email, t.password);
 
     const keyRes = await issueKey(token, {
@@ -102,14 +154,14 @@ describe("Partner Display API (HTTP, real guards)", () => {
 
   it("denies key issuance for a tenant WITHOUT the externalDisplay feature (403)", async () => {
     const t = await seedLiveTenant(prisma);
-    await setupPlan(t.tenantId, false); // live plan, but feature OFF
+    await grantExternalDisplay(t.tenantId, false); // live plan, but feature OFF
     const token = await loginAs(app, t.email, t.password);
     await issueKey(token).expect(403);
   });
 
   it("rejects a screen mint missing X-Partner-Secret (401)", async () => {
     const t = await seedLiveTenant(prisma);
-    await setupPlan(t.tenantId, true);
+    await grantExternalDisplay(t.tenantId, true);
     const token = await loginAs(app, t.email, t.password);
     const keyRes = await issueKey(token).expect(201);
     await mintScreen(keyRes.body.keyId, undefined, t.branchId).expect(401);
@@ -121,7 +173,7 @@ describe("Partner Display API (HTTP, real guards)", () => {
 
   it("revoking the key cascades: the screen token stops working (401)", async () => {
     const t = await seedLiveTenant(prisma);
-    await setupPlan(t.tenantId, true);
+    await grantExternalDisplay(t.tenantId, true);
     const token = await loginAs(app, t.email, t.password);
     const keyRes = await issueKey(token).expect(201);
     const mintRes = await mintScreen(
