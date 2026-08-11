@@ -415,7 +415,7 @@ const UserManagementPage = ({ embedded = false }: UserManagementPageProps) => {
       {/* Upgrade Prompt when limit reached */}
       {!canAddUser && (
         <UpgradePrompt
-          limitType="maxUsers"
+          limitKey="maxUsers"
           currentCount={users.length}
           limit={userLimit.limit}
         />

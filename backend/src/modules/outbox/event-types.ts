@@ -21,6 +21,13 @@ export const EventTypes = {
   // Add-on lifecycle (marketplace).
   AddOnPurchased: "addon.purchased.v1",
   AddOnCancelled: "addon.cancelled.v1",
+  /**
+   * The tenant's annual renewal is approaching. Fired at 30 / 7 / 1 days out
+   * by RenewalSchedulerService; the notifications consumer turns it into the
+   * reminder email. Idempotency is enforced upstream by
+   * RenewalCycle.remindersSent, so a consumer may treat every delivery as new.
+   */
+  RenewalReminder: "renewal.reminder.v1",
   // Recurring add-on whose paid period ended without re-payment. Manual-
   // renewal model (no PayTR card vault) — the add-on enters a 7-day grace
   // window in which the entitlement is KEPT live; this event drives the

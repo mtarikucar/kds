@@ -66,6 +66,24 @@ describe("extra_branch grant key (DEF-6 regression)", () => {
 
   it("projecting a tenant's active extra_branch TenantAddOn raises effective limit.maxBranches", async () => {
     (prisma.tenantAddOn.findMany as any).mockResolvedValue([
+      // v3.3.0 — extra_branch is licence-gated, and the projector SUPPRESSES
+      // the grants of every requiresLicense product while the licence is
+      // dark. A capacity test without a live licence would be asserting the
+      // suppression, not the grant key.
+      {
+        id: "ta-licence",
+        tenantId: TENANT,
+        branchId: null,
+        quantity: 1,
+        status: "active",
+        currentPeriodEnd: new Date(Date.now() + 300 * 24 * 3600 * 1000),
+        addOn: {
+          code: "license_annual",
+          kind: "license",
+          requiresLicense: false,
+          grants: { "feature.license": true },
+        },
+      },
       {
         id: "ta-branch-1",
         tenantId: TENANT,
@@ -85,9 +103,9 @@ describe("extra_branch grant key (DEF-6 regression)", () => {
     expect(addOnCall).toBeDefined();
     const grants = addOnCall[3];
 
-    // THE regression: pre-fix this key is `limit.branches`, which nothing
-    // in the guard stack (PlanFeatureGuard.checkLimit, check-limit
-    // decorator, LIMIT_COLUMNS) reads — the cap never rises.
+    // THE regression: pre-fix this key was `limit.branches`, which nothing in
+    // the enforcement path reads — the cap never rose and the tenant paid for
+    // a branch they could not create.
     const branchGrant = grants.find(
       (g: any) => g.key === "limit.maxBranches",
     );

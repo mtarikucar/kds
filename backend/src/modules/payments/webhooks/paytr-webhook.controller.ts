@@ -12,7 +12,6 @@ import { Public } from "../../auth/decorators/public.decorator";
 import { verifyCallbackHash } from "./paytr-hash.util";
 import { PaytrIpAllowlistGuard } from "./paytr-ip-allowlist.guard";
 import { CustomerSelfPayService } from "../../customer-orders/services/customer-self-pay.service";
-import { PaytrSettlementService } from "../services/paytr-settlement.service";
 import { CheckoutSettlementService } from "../../checkout/checkout-settlement.service";
 
 interface PaytrCallbackBody {
@@ -53,7 +52,6 @@ export class PaytrWebhookController {
   constructor(
     private readonly config: ConfigService,
     private readonly selfPay: CustomerSelfPayService,
-    private readonly settlement: PaytrSettlementService,
     // v2.8.85: "CK-" prefix lands here for the mixed-cart checkout flow.
     private readonly checkoutSettlement: CheckoutSettlementService,
   ) {}
@@ -104,9 +102,15 @@ export class PaytrWebhookController {
     }
 
     // Dispatch by merchantOid prefix:
-    //   "SP" → customer self-pay (QR-menu restaurant-order flow)
-    //   "CK-" → mixed-cart hardware/addon/plan checkout (v2.8.85)
-    //   default → subscription settlement (the original path)
+    //   "SP"  → customer self-pay (QR-menu restaurant-order flow)
+    //   "CK-" → the mixed-cart checkout rail (catalog products + hardware)
+    //
+    // v3.3.0 removed the third branch. Anything without a known prefix used to
+    // fall through to subscription settlement; plans are retired and that rail
+    // is gone, so an unknown oid is now logged and acknowledged rather than
+    // handed to a settler that would not know what to do with it. "OK" is
+    // still the right reply: returning "FAIL" makes PayTR retry four times,
+    // and a retry cannot fix an oid we do not recognise.
     if (merchantOid.startsWith("SP")) {
       try {
         if (status === "success") {
@@ -158,21 +162,9 @@ export class PaytrWebhookController {
       return "OK";
     }
 
-    await this.settlement.settlePayment(
-      merchantOid,
-      status === "success"
-        ? {
-            kind: "success",
-            paymentType: body.payment_type,
-            totalAmount,
-          }
-        : {
-            kind: "failure",
-            failureCode: body.failed_reason_code,
-            failureMessage: body.failed_reason_msg,
-          },
+    this.logger.warn(
+      `PayTR callback for an unrecognised merchant oid=${merchantOid} (status=${status}) — acknowledged, no settlement path`,
     );
-
     return "OK";
   }
 }

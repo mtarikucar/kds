@@ -43,6 +43,8 @@ import { ProvisioningModule } from "./modules/provisioning/provisioning.module";
 import { AccountingModule } from "./modules/accounting/accounting.module";
 import { SmsSettingsModule } from "./modules/sms-settings/sms-settings.module";
 import { EntitlementsModule } from "./modules/entitlements/entitlements.module";
+import { LicensingModule } from "./modules/licensing/licensing.module";
+import { CreditsModule } from "./modules/credits/credits.module";
 import { OutboxModule } from "./modules/outbox/outbox.module";
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module";
 import { DeviceMeshModule } from "./modules/device-mesh/device-mesh.module";
@@ -134,6 +136,8 @@ import { validate } from "./config/env.validation";
     // need not re-import it. Entitlements depends on Prisma only.
     OutboxModule,
     EntitlementsModule,
+    LicensingModule,
+    CreditsModule,
     // HummyTummy Phase 2: add-on marketplace.
     MarketplaceModule,
     // HummyTummy Phase 3: branches + device mesh + local bridge.

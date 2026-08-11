@@ -176,14 +176,14 @@ const MenuTab = ({
         <div className="mb-4">
           {!canAddCategory && (
             <UpgradePrompt
-              limitType="maxCategories"
+              limitKey="maxCategories"
               currentCount={categories?.length ?? 0}
               limit={categoryLimit.limit}
             />
           )}
           {!canAddProduct && canAddCategory && (
             <UpgradePrompt
-              limitType="maxProducts"
+              limitKey="maxProducts"
               currentCount={products?.length ?? 0}
               limit={productLimit.limit}
             />

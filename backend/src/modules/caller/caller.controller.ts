@@ -18,7 +18,6 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresIntegration } from "../subscriptions/decorators/requires-integration.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { CallerService } from "./caller.service";
@@ -41,7 +40,7 @@ export class CallerController {
   // see a sidebar entry advertising a feature they can't use, and the
   // backend mirrors the gate (defence in depth). The provider webhook
   // below stays @Public (it's HMAC-signed by the adapter).
-  @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresIntegration("caller")
   @ApiBearerAuth()

@@ -99,7 +99,7 @@ describe('usePurchaseAddOnViaCheckout', () => {
       expect.objectContaining({
         cart: { items: [{ type: 'addon', code: 'kds_extra_screen', qty: 1, branchId: undefined }] },
         buyer: { email: 'a@b.com', name: 'Ada Lovelace', phone: '+905551112233' },
-        returnUrl: expect.stringContaining('/admin/plan'),
+        returnUrl: expect.stringContaining('/admin/license'),
       }),
     );
     // Hands off to PayTR's hosted page so payment is actually collected.

@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../types';
 import SetupChecklist from '../features/onboarding/SetupChecklist';
-import { useGetUsageSnapshot, type UsageDimension } from '../features/plan/planApi';
 import {
   useSalesReport,
   useSalesComparison,
@@ -141,7 +140,6 @@ const DashboardPage = () => {
               Reuses /reports/sales + /reports/sales-comparison; hidden for
               tenants without the advancedReports feature (the endpoints 403). */}
           <TodayKpiStrip />
-          <QuotaStrip />
         </>
       )}
 
@@ -284,55 +282,13 @@ function KpiPill({
   );
 }
 
-// v2.8.88 — quota strip surfaced on the dashboard top section. Same
-// endpoint feeds Plan & Erişim sayfası; React Query caches it per
-// session so the dashboard doesn't double-fetch.
-function QuotaStrip() {
-  const { t } = useTranslation('common');
-  const { data: snapshot } = useGetUsageSnapshot();
-  if (!snapshot) return null;
-  return (
-    <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2 flex-shrink-0">
-      <QuotaPill icon={Users} label={t('dashboard.quotaUsers')} dim={snapshot.users} />
-      <QuotaPill icon={Building2} label={t('dashboard.quotaBranches')} dim={snapshot.branches} />
-      <QuotaPill icon={Package} label={t('dashboard.quotaProducts')} dim={snapshot.products} />
-      <QuotaPill icon={ShoppingCart} label={t('dashboard.quotaMonthlyOrders')} dim={snapshot.monthlyOrders} />
-    </div>
-  );
-}
-
-function QuotaPill({
-  icon: Icon,
-  label,
-  dim,
-}: {
-  icon: LucideIcon;
-  label: string;
-  dim: UsageDimension;
-}) {
-  const unlimited = dim.max === -1;
-  const pct = unlimited ? 0 : Math.min(100, Math.round((dim.current / Math.max(1, dim.max)) * 100));
-  const status = unlimited ? 'ok' : pct >= 100 ? 'full' : pct >= 80 ? 'warn' : 'ok';
-  const tone = status === 'full'
-    ? 'border-rose-200 bg-rose-50'
-    : status === 'warn'
-      ? 'border-amber-200 bg-amber-50'
-      : 'border-slate-200 bg-white';
-  const textTone = status === 'full' ? 'text-rose-700' : status === 'warn' ? 'text-amber-700' : 'text-slate-700';
-  return (
-    <Link
-      to="/admin/plan"
-      className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${tone}`}
-    >
-      <Icon className={`h-4 w-4 ${textTone}`} />
-      <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-wide text-slate-500 truncate">{label}</div>
-        <div className={`text-xs font-semibold ${textTone}`}>
-          {dim.current} {unlimited ? '/ ∞' : `/ ${dim.max}`}
-        </div>
-      </div>
-    </Link>
-  );
-}
+// v3.3.0 — the dashboard quota strip is gone.
+//
+// It showed users / branches / products / monthly-orders against plan caps.
+// Four of those five limits no longer exist (they are unlimited and free), and
+// the one that survived — branch capacity — is a purchase decision that
+// belongs next to the products that change it, on the licence page. A strip
+// permanently reading "unlimited" four times over is noise on the screen an
+// operator looks at most.
 
 export default DashboardPage;

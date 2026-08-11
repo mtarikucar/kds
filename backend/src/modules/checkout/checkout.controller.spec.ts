@@ -31,15 +31,17 @@ describe('CheckoutController', () => {
 
   it('quote prices the cart via QuoteService (no DB write)', () => {
     const cart = { items: [] } as any;
-    const result = ctrl.quote(cart);
-    expect(quoteSvc.quote).toHaveBeenCalledWith(cart);
+    const result = ctrl.quote({ user: { tenantId: 't1' } } as any, cart);
+    // v3.3.0 — pricing is tenant-scoped (annual lines prorate to the
+    // tenant's anniversary), so the controller must forward the tenant.
+    expect(quoteSvc.quote).toHaveBeenCalledWith(cart, 't1');
     expect(result).toEqual({ total: 100 });
   });
 
   it('start re-prices the cart (no provisioning) via QuoteService', async () => {
     const cart = { items: [] } as any;
     await ctrl.start({ user: { tenantId: 't1' } }, cart);
-    expect(quoteSvc.quote).toHaveBeenCalledWith(cart);
+    expect(quoteSvc.quote).toHaveBeenCalledWith(cart, 't1');
   });
 
   it('intent folds the top-level branchId into the cart and threads buyer/ip/returnUrl', () => {

@@ -61,7 +61,6 @@ describe("PaytrWebhookController", () => {
     return new PaytrWebhookController(
       config,
       selfPay as any,
-      settlement as any,
       checkoutSettlement as any,
     );
   }
@@ -148,40 +147,5 @@ describe("PaytrWebhookController", () => {
       signedBody({ merchant_oid: "CK-9", status: "success" }),
     );
     expect(res).toBe("OK");
-  });
-
-  it("routes a default (subscription) success to settlePayment with success payload", async () => {
-    const ctrl = make();
-    const res = await ctrl.handle(
-      signedBody({
-        merchant_oid: "SUB1",
-        status: "success",
-        payment_type: "card",
-        total_amount: "4990",
-      }),
-    );
-    expect(res).toBe("OK");
-    expect(settlement.settlePayment).toHaveBeenCalledWith("SUB1", {
-      kind: "success",
-      paymentType: "card",
-      totalAmount: "4990",
-    });
-  });
-
-  it("routes a default failure to settlePayment with failure payload", async () => {
-    const ctrl = make();
-    await ctrl.handle(
-      signedBody({
-        merchant_oid: "SUB1",
-        status: "failed",
-        failed_reason_code: "10",
-        failed_reason_msg: "insufficient funds",
-      }),
-    );
-    expect(settlement.settlePayment).toHaveBeenCalledWith("SUB1", {
-      kind: "failure",
-      failureCode: "10",
-      failureMessage: "insufficient funds",
-    });
   });
 });

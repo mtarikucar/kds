@@ -2,7 +2,7 @@ import { Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 
 /**
- * Postgres advisory-lock wrapper, factored out of SubscriptionSchedulerService
+ * Postgres advisory-lock wrapper, factored out of the subscription scheduler
  * so every new cron in the codebase uses the same coordination scheme.
  *
  * Under multi-replica deploy, every replica fires its @Cron decorators on

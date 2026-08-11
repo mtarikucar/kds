@@ -9,6 +9,11 @@ import { Cart } from "./checkout.types";
  * addon-purchasability / hardware-stock checks or the re-price/PayTR call.
  * DemoGuardService is mocked here to keep this spec unit-scoped.
  */
+// v3.3.0 — the checkout rail snapshots marketing-rep attribution itself now
+// (the retiring subscription rail was the only emitter of PaymentSucceeded,
+// the sole input to the commission ledger).
+const referralDirectory = { resolveReferralCode: jest.fn().mockResolvedValue(null) };
+
 describe("CheckoutIntentService.createIntent demo-tenant block", () => {
   let prisma: any;
   let payments: any;
@@ -40,6 +45,7 @@ describe("CheckoutIntentService.createIntent demo-tenant block", () => {
       payments,
       addonGuard,
       catalog,
+      referralDirectory as any,
       demoGuard as any,
     );
   });

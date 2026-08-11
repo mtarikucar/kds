@@ -23,7 +23,6 @@ describe('LandingPage (marketing homepage)', () => {
     // module appears in nav/grid/footer/spotlight
     expect(screen.getAllByText('QR Menü').length).toBeGreaterThan(0);
     // pricing teaser + faq are present
-    expect(screen.getAllByText('En popüler').length).toBeGreaterThan(0);
     expect(screen.getByText('Sıkça sorulan sorular')).toBeInTheDocument();
     // honest delivery integrations, exactly the real platforms
     expect(screen.getByText('Yemeksepeti')).toBeInTheDocument();

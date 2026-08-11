@@ -1,194 +1,155 @@
-import { createContext, useContext, useMemo, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useMemo } from 'react';
 import {
-  useGetCurrentSubscription,
-  useGetPlans,
-  useGetEffectiveFeatures,
-} from '../features/subscriptions/subscriptionsApi';
-import { Plan, PlanFeatures, PlanLimits, Subscription } from '../types';
+  LicenseState,
+  LicensingSnapshot,
+  Offer,
+  OwnedProduct,
+  RenewalSummary,
+  useLicensing,
+} from '../features/licensing/licensingApi';
 
-// Limit check result interface
-interface LimitCheckResult {
+/**
+ * Entitlement + licence state for the authenticated shell.
+ *
+ * Backed by ONE request (`GET /v1/me/licensing`) instead of the three the app
+ * used to make. The important part is not the round trips: the snapshot also
+ * carries the CURRENT PRICE of every purchasable capability, so an upsell and
+ * the checkout it leads to quote the same number. The previous implementation
+ * derived upsell copy from a hardcoded feature→plan table in the frontend —
+ * a second source of pricing truth that nothing kept in sync with the catalog,
+ * and one that could only ever say "upgrade to PRO".
+ *
+ * The file keeps its name and its `useSubscription()` export so the ~25
+ * consumers migrate by rename rather than in this commit.
+ */
+
+export interface LimitCheckResult {
   allowed: boolean;
   current: number;
   limit: number;
   remaining: number;
 }
 
-// Context interface
-interface SubscriptionContextType {
-  subscription: Subscription | null;
-  plan: Plan | null;
+interface EntitlementContextType {
   isLoading: boolean;
-  hasFeature: (feature: keyof PlanFeatures) => boolean;
-  checkLimit: (resource: keyof PlanLimits, currentCount: number) => LimitCheckResult;
-  /**
-   * v2.8.88 — integration grants from the entitlement engine (plan +
-   * TenantAddOn). Domains like `delivery`, `fiscal`, `caller`; values
-   * are vendor lists (`['yemeksepeti', 'getir']`).
-   *
-   * `vendor` undefined → "any vendor in this domain present?"
-   * `vendor` given     → "is this exact vendor in the domain?"
-   *
-   * Pre-v2.8.88 this concept didn't exist on the frontend at all —
-   * the only signal was the flat `feature.deliveryIntegration: true`
-   * boolean, which couldn't distinguish "tenant has yemeksepeti" from
-   * "tenant has getir". The integrations map enables per-vendor UI.
-   */
+  /** Accepts a bare name ("posAccess") or a prefixed key. */
+  hasFeature: (feature: string) => boolean;
   hasIntegration: (domain: string, vendor?: string) => boolean;
-  /** ACTIVE or TRIALING — full paid access. */
-  isSubscriptionActive: boolean;
-  /**
-   * PAST_DUE — 7-day grace period after trial expiry / failed renewal.
-   * Backend `PlanFeatureGuard` still grants feature access here, so the
-   * UI should show a "renew now" banner without locking the user out.
-   */
-  isInGracePeriod: boolean;
+  checkLimit: (resource: string, currentCount: number) => LimitCheckResult;
+  license: LicenseState;
+  credits: Record<string, number>;
+  owned: OwnedProduct[];
+  renewal: RenewalSummary | null;
+  /** The cheapest product granting `key`, priced for this tenant today. */
+  offerFor: (key: string) => Offer | null;
+  snapshot: LicensingSnapshot | null;
 }
 
-// Create context with default values
-const SubscriptionContext = createContext<SubscriptionContextType>({
-  subscription: null,
-  plan: null,
+const NO_LICENSE: LicenseState = {
+  status: 'none',
+  anchorAt: null,
+  anniversaryAt: null,
+  daysRemaining: null,
+};
+
+const EntitlementContext = createContext<EntitlementContextType>({
   isLoading: true,
   hasFeature: () => false,
-  checkLimit: () => ({ allowed: false, current: 0, limit: 0, remaining: 0 }),
   hasIntegration: () => false,
-  isSubscriptionActive: false,
-  isInGracePeriod: false,
+  checkLimit: () => ({ allowed: false, current: 0, limit: 0, remaining: 0 }),
+  license: NO_LICENSE,
+  credits: {},
+  owned: [],
+  renewal: null,
+  offerFor: () => null,
+  snapshot: null,
 });
 
-// Provider component
-interface SubscriptionProviderProps {
-  children: ReactNode;
-}
+/** `posAccess` and `feature.posAccess` both resolve. */
+const prefixed = (key: string, ns: 'feature' | 'limit' | 'integration') =>
+  key.startsWith(`${ns}.`) ? key : `${ns}.${key}`;
 
-export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) => {
-  const { data: subscription, isLoading: subLoading } = useGetCurrentSubscription();
-  const { data: plans, isLoading: plansLoading } = useGetPlans();
-  const {
-    data: effectiveFeatures,
-    isLoading: effLoading,
-    isError: effError,
-  } = useGetEffectiveFeatures();
+export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
+  const { data, isLoading } = useLicensing();
 
-  // deep-review FL2 — effective-features is the documented source of truth for
-  // gates (it folds in per-tenant featureOverrides, including negative/abuse
-  // overrides). Treat its load as part of `isLoading` so FeatureGate's loading
-  // short-circuit covers the window and we never flash content gated only by
-  // the raw plan.features (which ignores overrides).
-  const isLoading = subLoading || plansLoading || effLoading;
+  const value = useMemo<EntitlementContextType>(() => {
+    const ent = data?.entitlements;
 
-  // Find the current plan from plans list
-  const plan = useMemo(() => {
-    if (!subscription || !plans) return null;
-    return plans.find((p) => p.id === subscription.planId) || null;
-  }, [subscription, plans]);
-
-  // Check if a feature is enabled (effective features = plan + overrides)
-  const hasFeature = (feature: keyof PlanFeatures): boolean => {
-    // deep-review FL2 — fail closed when effective-features is unavailable
-    // (still loading, or persistently errored after retry). Do NOT fall back
-    // to raw plan.features: it ignores per-tenant featureOverrides and would
-    // over-grant a feature an admin/abuse override has explicitly disabled.
-    if (!effectiveFeatures) return false;
-    return effectiveFeatures.features[feature] ?? false;
-  };
-
-  // Check if a resource limit allows creating more items (effective limits = plan + overrides)
-  const checkLimit = (resource: keyof PlanLimits, currentCount: number): LimitCheckResult => {
-    // deep-review FL2 — fail closed: only consult effective limits (plan +
-    // overrides), never the raw plan when overrides may have lowered the cap.
-    const limit = effectiveFeatures ? effectiveFeatures.limits[resource] : undefined;
-
-    if (limit === undefined || limit === null) {
-      return { allowed: false, current: currentCount, limit: 0, remaining: 0 };
-    }
-
-    // -1 means unlimited
-    if (limit === -1) {
-      return { allowed: true, current: currentCount, limit: -1, remaining: Infinity };
-    }
-
-    const remaining = Math.max(0, limit - currentCount);
-    const allowed = currentCount < limit;
-
-    return { allowed, current: currentCount, limit, remaining };
-  };
-
-  // v2.8.88 — integration grants. Engine surfaces them as
-  // `effectiveFeatures.integrations.<domain> = [...vendors]`. v3.0.0
-  // — `integrations` is now a typed field on EffectiveFeatures, so
-  // the `as any` cast that used to live here is gone.
-  const hasIntegration = (domain: string, vendor?: string): boolean => {
-    const vendors = effectiveFeatures?.integrations?.[domain];
-    if (!Array.isArray(vendors) || vendors.length === 0) return false;
-    if (!vendor) return true;
-    return vendors.includes(vendor);
-  };
-
-  // Check if subscription is active (ACTIVE or TRIALING status)
-  const isSubscriptionActive = useMemo(() => {
-    if (!subscription) return false;
-    return subscription.status === 'ACTIVE' || subscription.status === 'TRIALING';
-  }, [subscription]);
-
-  // PAST_DUE — backend grants 7-day feature access while the user
-  // is expected to renew. UI surfaces this as a banner, not a lockout.
-  const isInGracePeriod = useMemo(() => {
-    return subscription?.status === 'PAST_DUE';
-  }, [subscription]);
-
-  const value = useMemo(
-    () => ({
-      subscription: subscription ?? null,
-      plan,
+    return {
       isLoading,
-      hasFeature,
-      checkLimit,
-      hasIntegration,
-      isSubscriptionActive,
-      isInGracePeriod,
-    }),
-    // deep-review FL2 — effLoading/effError included so consumers re-render
-    // when the effective-features query settles (gate opens once it resolves).
-    [
-      subscription,
-      plan,
-      isLoading,
-      isSubscriptionActive,
-      isInGracePeriod,
-      effectiveFeatures,
-      effLoading,
-      effError,
-    ]
-  );
+
+      // FAIL CLOSED while loading or on error. Deliberate (deep-review FL2):
+      // flashing a gated screen and then yanking it away is worse than a
+      // moment of nothing, and there is no safe fallback source — the folded
+      // set is the only thing that knows about suppression overrides.
+      hasFeature: (feature) =>
+        ent ? ent.features[prefixed(feature, 'feature')] === true : false,
+
+      hasIntegration: (domain, vendor) => {
+        const vendors = ent?.integrations?.[prefixed(domain, 'integration')];
+        if (!Array.isArray(vendors) || vendors.length === 0) return false;
+        if (vendors.includes('*')) return true;
+        return vendor ? vendors.includes(vendor) : true;
+      },
+
+      checkLimit: (resource, currentCount) => {
+        const limit = ent?.limits?.[prefixed(resource, 'limit')];
+        if (limit === undefined || limit === null) {
+          return { allowed: false, current: currentCount, limit: 0, remaining: 0 };
+        }
+        if (limit === -1) {
+          return {
+            allowed: true,
+            current: currentCount,
+            limit: -1,
+            remaining: Infinity,
+          };
+        }
+        return {
+          allowed: currentCount < limit,
+          current: currentCount,
+          limit,
+          remaining: Math.max(0, limit - currentCount),
+        };
+      },
+
+      license: data?.license ?? NO_LICENSE,
+      credits: data?.credits ?? {},
+      owned: data?.owned ?? [],
+      renewal: data?.renewal ?? null,
+
+      offerFor: (key) => {
+        if (!data?.offers) return null;
+        return (
+          data.offers[key] ??
+          data.offers[prefixed(key, 'feature')] ??
+          data.offers[prefixed(key, 'limit')] ??
+          data.offers[prefixed(key, 'integration')] ??
+          null
+        );
+      },
+
+      snapshot: data ?? null,
+    };
+  }, [data, isLoading]);
 
   return (
-    <SubscriptionContext.Provider value={value}>
+    <EntitlementContext.Provider value={value}>
       {children}
-    </SubscriptionContext.Provider>
+    </EntitlementContext.Provider>
   );
 };
 
-// Custom hook to use subscription context
-export const useSubscription = () => {
-  const context = useContext(SubscriptionContext);
-  if (!context) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider');
-  }
-  return context;
-};
+/** Primary hook. */
+export const useEntitlements = () => useContext(EntitlementContext);
 
-// Helper hook to check if a specific feature is enabled
-export const useFeatureEnabled = (feature: keyof PlanFeatures): boolean => {
-  const { hasFeature } = useSubscription();
-  return hasFeature(feature);
-};
+/** @deprecated Renamed to useEntitlements; kept so consumers migrate gradually. */
+export const useSubscription = useEntitlements;
 
-// Helper hook to check limits for a resource
-export const useLimitCheck = (resource: keyof PlanLimits, currentCount: number): LimitCheckResult => {
-  const { checkLimit } = useSubscription();
-  return checkLimit(resource, currentCount);
-};
+export const useFeatureEnabled = (feature: string): boolean =>
+  useEntitlements().hasFeature(feature);
 
-export default SubscriptionContext;
+export const useLimitCheck = (
+  resource: string,
+  currentCount: number,
+): LimitCheckResult => useEntitlements().checkLimit(resource, currentCount);

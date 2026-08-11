@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
 } from "@nestjs/common";
@@ -13,6 +14,10 @@ import { CheckoutBuyerDto } from "./dto/create-intent.dto";
 import { AddonPurchasabilityService } from "./addon-purchasability.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { DemoGuardService } from "../demo/demo-guard.service";
+import {
+  REFERRAL_DIRECTORY_PORT,
+  ReferralDirectoryPort,
+} from "../../core-contracts/referral/referral-directory.port";
 
 // v2.8.85 — turns a mixed cart into a PayTR iframe token.
 //
@@ -39,6 +44,13 @@ import { DemoGuardService } from "../demo/demo-guard.service";
 // well under the cap.
 const PAYMENT_REF_PREFIX = "CK-";
 
+/**
+ * How long a priced intent stays settleable. Long enough to cover a bank's
+ * 3-D Secure round trip and a buyer who wanders off mid-payment, short enough
+ * that a settlement can never provision a period that has already ended.
+ */
+const INTENT_TTL_HOURS = 48;
+
 export interface CreateIntentResult {
   paymentRef: string;
   iframeToken: string;
@@ -59,6 +71,10 @@ export class CheckoutIntentService {
     private readonly addonGuard: AddonPurchasabilityService,
     // Task 4 — pre-payment hardware stock guard.
     private readonly catalog: CatalogService,
+    // Marketing-rep attribution. Same port the subscription rail uses, so
+    // core never reads marketing_users directly.
+    @Inject(REFERRAL_DIRECTORY_PORT)
+    private readonly referralDirectory: ReferralDirectoryPort,
     // Demo-tenant real-money block. REQUIRED (no @Optional) —
     // CheckoutModule imports DemoGuardModule, so DI fails loud at boot if a
     // future module-wiring regression ever drops that import, instead of
@@ -74,8 +90,9 @@ export class CheckoutIntentService {
     buyer: CheckoutBuyerDto;
     buyerIp: string;
     returnUrl?: string;
+    referralCode?: string;
   }): Promise<CreateIntentResult> {
-    const { tenantId, cart, buyer, buyerIp, returnUrl } = args;
+    const { tenantId, cart, buyer, buyerIp, returnUrl, referralCode } = args;
 
     // Demo-tenant real-money block — the shared "explore demo" tenant must
     // never reach PayTR via marketplace/hardware checkout. First statement,
@@ -88,16 +105,41 @@ export class CheckoutIntentService {
     // here throws ConflictException and nothing downstream is ever touched
     // — no intent row, no payment gateway call. purchase()'s own guards
     // stay in place as defence in depth for non-checkout callers.
+    //
+    // v3.3.0: the guard is CART-AWARE. A prerequisite can be satisfied by a
+    // sibling line rather than by something already owned — the opening cart
+    // necessarily contains both the licence and the first module it unlocks,
+    // and an AI credit pack is legitimately bought alongside the AI module.
+    // Without this, a first-time buyer's only possible cart would be rejected.
+    const cartCodes = new Set(
+      cart.items.filter((i) => i.type === "addon").map((i) => i.code),
+    );
     for (const item of cart.items) {
       if (item.type !== "addon") continue;
-      await this.addonGuard.assertPurchasable(tenantId, {
-        addOnCode: item.code,
-        branchId: item.branchId,
-        quantity: item.qty,
-      });
+      await this.addonGuard.assertPurchasable(
+        tenantId,
+        {
+          addOnCode: item.code,
+          branchId: item.branchId,
+          quantity: item.qty,
+        },
+        // A generated renewal re-buys what the tenant already owns; the
+        // ownership checks would otherwise reject every single line.
+        { cartCodes, isRenewal: !!cart.renewalCycleId },
+      );
     }
 
-    const quote = await this.quoteSvc.quote(cart);
+    // FREEZE the pricing instant before quoting.
+    //
+    // Annual lines are day-prorated, so their price is a function of `now`.
+    // CheckoutService re-quotes at settlement and refuses to provision when
+    // the total moved by more than a kuruş — so an intent created at 23:58
+    // and settled at 00:03 would re-quote one day cheaper and strand a cart
+    // the buyer has already paid for. Persisting `pricedAt` and replaying it
+    // at settlement makes the comparison deterministic and leaves the
+    // tolerance doing its real job: catching catalog price edits in flight.
+    const pricedAt = new Date();
+    const quote = await this.quoteSvc.quote(cart, tenantId, { now: pricedAt });
 
     // Tahsilat-önü guard (Task 4 / Donanım #1): every `hardware` line must
     // have enough REAL stock BEFORE we mint a CheckoutIntent row or call
@@ -193,6 +235,15 @@ export class CheckoutIntentService {
     // it 'failed' later; if we'd called PayTR first and the DB write
     // failed, the buyer would see a working iframe but we'd have no
     // server-side record to settle against.
+    // Referral snapshot, mirroring PaymentsService.createIntent on the
+    // subscription rail: resolve the supplied code through the directory port
+    // and freeze the RESOLVED value, so a marketer rotating their code later
+    // cannot re-attribute this sale. Never throws on a bad code — an unknown
+    // code simply attributes to nobody.
+    const referral = referralCode
+      ? await this.referralDirectory.resolveReferralCode(referralCode)
+      : null;
+
     await this.prisma.checkoutIntent.create({
       data: {
         id: uuidv7(),
@@ -203,6 +254,14 @@ export class CheckoutIntentService {
         currency: quote.currency,
         providerId: "paytr",
         status: "pending",
+        pricedAt,
+        quoteJson: quote as any,
+        // A stale intent settled after the anniversary would provision a
+        // period that has already ended.
+        expiresAt: new Date(pricedAt.getTime() + INTENT_TTL_HOURS * 3600_000),
+        referralCode: referral?.referralCode ?? null,
+        referredByMarketingUserId: referral?.marketingUserId ?? null,
+        renewalCycleId: cart.renewalCycleId ?? null,
       },
     });
 

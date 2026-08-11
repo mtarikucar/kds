@@ -2,10 +2,14 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DeviceService } from "./device.service";
 import { BranchGuard } from "../auth/guards/branch.guard";
+import { EntitlementService } from "../entitlements/entitlement.service";
+import { EntitlementOfferResolver } from "../entitlements/entitlement-offer.resolver";
+import { EntitlementRequiredException } from "../entitlements/entitlement-required.exception";
 
 /** The caller's branch-access context (role + allow-list) for hub scoping. */
 export interface BranchAccess {
@@ -26,6 +30,12 @@ export class BranchesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly devices: DeviceService,
+    // Required: branch capacity is a paid dimension, and a missing
+    // EntitlementService must never silently skip the cap.
+    private readonly entitlements: EntitlementService,
+    // Optional — without it the cap still holds, the 403 just cannot name
+    // the product to buy.
+    @Optional() private readonly offers?: EntitlementOfferResolver,
   ) {}
 
   list(tenantId: string) {
@@ -63,14 +73,52 @@ export class BranchesService {
       address?: Record<string, unknown>;
     },
   ) {
-    return this.prisma.branch.create({
-      data: {
-        tenantId,
-        name: input.name ?? "New Branch",
-        code: input.code ?? null,
-        timezone: input.timezone ?? "UTC",
-        address: (input.address ?? null) as any,
-      },
+    // Branch count is the ONE numeric limit that survived à-la-carte: the
+    // first branch is free, each `extra_branch` unit adds one.
+    //
+    // Enforced HERE rather than in a guard, for two reasons. A guard's usage
+    // callback only receives the request and cannot reach Prisma to count
+    // rows; and more importantly a guard check is TOCTOU on the single limit
+    // where losing the race means a tenant gets capacity they did not pay
+    // for. The advisory lock + count + insert inside one transaction is the
+    // same shape the AI credit claim uses, for the same reason.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`branch-cap:${tenantId}`}, 0))`;
+
+      const set = await this.entitlements.getForTenant(tenantId, null);
+      const cap = set?.limits?.["limit.maxBranches"] ?? 1;
+      if (cap !== -1) {
+        const used = await tx.branch.count({
+          where: { tenantId, status: "active" },
+        });
+        if (used >= cap) {
+          const offer = await this.offers
+            ?.forKey(tenantId, "limit.maxBranches")
+            .catch(() => null);
+          throw new EntitlementRequiredException({
+            requirement: {
+              type: "limit",
+              key: "limit.maxBranches",
+              usage: used,
+              cap,
+            },
+            offer: offer ?? null,
+            licenseRequired: set?.features?.["feature.license"] !== true,
+            reason: "not_owned",
+            message: `Şube limitinize ulaştınız (${used}/${cap}). Ek şube satın alarak devam edebilirsiniz.`,
+          });
+        }
+      }
+
+      return tx.branch.create({
+        data: {
+          tenantId,
+          name: input.name ?? "New Branch",
+          code: input.code ?? null,
+          timezone: input.timezone ?? "UTC",
+          address: (input.address ?? null) as any,
+        },
+      });
     });
   }
 

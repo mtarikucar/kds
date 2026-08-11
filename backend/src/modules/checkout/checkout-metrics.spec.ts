@@ -14,6 +14,10 @@ import { CheckoutService } from "./checkout.service";
  * $transaction, and ?.-guarded so a missing collaborator can never break the
  * provisioning write.
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService — checkout_provisions_total counter", () => {
   let prisma: any;
   let outbox: any;
@@ -55,6 +59,7 @@ describe("CheckoutService — checkout_provisions_total counter", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
       metrics as any,
     );
   });
@@ -115,6 +120,7 @@ describe("CheckoutService — checkout_provisions_total counter", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
     );
     await expect(
       bare.confirmAndProvision("t-1", { items: [] as any }, "pay-ref-1"),

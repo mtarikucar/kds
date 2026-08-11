@@ -260,7 +260,7 @@ export class AuthService {
       // fallback path resolves correctly during the first ~30 seconds while the
       // entitlement engine projector is still warming up.
       const planFeatureOverrides =
-        this.provisioning.buildPlanFeatureOverrides(trialPlan);
+        this.provisioning.buildPlanFeatureOverrides();
 
       try {
         const txResult = await this.prisma.$transaction(async (tx) =>

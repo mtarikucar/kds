@@ -199,9 +199,9 @@ export class ProductMediaService {
   ) {
     return this.prisma.$transaction(async (tx) => {
       const job = await tx.productMediaJob.create({ data });
-      await tx.aiGenerationUsage.update({
+      await tx.creditLedger.update({
         where: { id: usageId },
-        data: { jobId: job.id },
+        data: { refType: "media_job", refId: job.id },
       });
       return job;
     });

@@ -8,8 +8,7 @@ import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
 import { OnboardingProvider } from '../../features/onboarding';
 import { DemoBanner } from '../../features/demo';
 import { RTL_LANGUAGES } from '../../i18n/config';
-import SubscriptionStatusBanner from '../subscriptions/SubscriptionStatusBanner';
-import SubscriptionGate from '../subscriptions/SubscriptionGate';
+import RenewalBanner from '../subscriptions/SubscriptionStatusBanner';
 import ProfileCompletionGate from '../onboarding/ProfileCompletionGate';
 import BranchSelectionGate from '../branches/BranchSelectionGate';
 
@@ -47,17 +46,15 @@ const Layout = () => {
           <DemoBanner />
           {/* Status banner — sits between header and main content. Renders
               null when there's nothing to surface, so layout doesn't shift. */}
-          <SubscriptionStatusBanner />
+          <RenewalBanner />
           <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6 lg:p-8 relative">
             {/* Onboarding gates: first ensure the account is complete (phone —
                 e.g. a social signup → /welcome), then enforce the trial lock
                 (TRIAL_ENDED → plan selection). */}
             <ProfileCompletionGate>
-              <SubscriptionGate>
-                <BranchSelectionGate>
+              <BranchSelectionGate>
                   <Outlet />
                 </BranchSelectionGate>
-              </SubscriptionGate>
             </ProfileCompletionGate>
             {import.meta.env.VITE_APP_VERSION && (
               <div

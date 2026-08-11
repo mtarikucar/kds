@@ -13,7 +13,7 @@ export type TenantAddOnStatus = "active" | "past_due" | "cancelled" | "expired";
 /**
  * Manual-renewal grace window for recurring add-ons, in days. Mirrors the
  * Subscription PAST_DUE → EXPIRED grace (hardcoded 7 days in
- * SubscriptionSchedulerService.handlePastDueSubscriptions). A recurring
+ * the renewal lapse cron). A recurring
  * add-on whose period ends without re-payment goes `past_due` and keeps its
  * entitlement for this many days, then `expired` (entitlement revoked).
  * Shared by TenantAddOnSweeperService (the lifecycle driver) and

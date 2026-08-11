@@ -4,15 +4,28 @@ import { MemoryRouter } from 'react-router-dom';
 
 const h = vi.hoisted(() => ({
   branches: { data: [] as any[], isLoading: false },
-  snapshot: { data: undefined as any },
+  // v3.3.0 — branch capacity comes from the folded entitlement set (the same
+  // number the server enforces inside the create transaction) rather than a
+  // separate usage endpoint that no longer exists.
+  cap: 1 as number,
   create: { mutate: vi.fn(), isPending: false },
 }));
 vi.mock('./branchesApi', () => ({
   useBranchOverview: () => h.branches,
   useCreateBranch: () => h.create,
 }));
-vi.mock('../plan/planApi', () => ({
-  useGetUsageSnapshot: () => h.snapshot,
+vi.mock('../../contexts/SubscriptionContext', () => ({
+  useEntitlements: () => ({
+    checkLimit: (_key: string, current: number) =>
+      h.cap === -1
+        ? { allowed: true, current, limit: -1, remaining: Infinity }
+        : {
+            allowed: current < h.cap,
+            current,
+            limit: h.cap,
+            remaining: Math.max(0, h.cap - current),
+          },
+  }),
 }));
 
 import BranchesPage from './BranchesPage';
@@ -29,7 +42,7 @@ const renderPage = () =>
 beforeEach(() => {
   h.branches.data = [];
   h.branches.isLoading = false;
-  h.snapshot.data = undefined;
+  h.cap = 10;
   h.create.mutate = vi.fn();
   h.create.isPending = false;
 });
@@ -71,7 +84,10 @@ describe('BranchesPage', () => {
   });
 
   it('disables the add button and shows the hint when at the branch limit', () => {
-    h.snapshot.data = { branches: { current: 2, max: 2 } };
+    h.cap = 1;
+    h.branches.data = [
+      { id: 'b1', name: 'Main', status: 'active', devices: { total: 0, online: 0, pending: 0 }, bridges: 0, createdAt: '2024-01-01T00:00:00Z' },
+    ];
     renderPage();
     expect(
       screen.getByTestId('branches-at-limit-hint'),
@@ -84,7 +100,7 @@ describe('BranchesPage', () => {
   });
 
   it('treats max === -1 as unlimited (no at-limit hint)', () => {
-    h.snapshot.data = { branches: { current: 5, max: -1 } };
+    h.cap = -1;
     renderPage();
     expect(
       screen.queryByTestId('branches-at-limit-hint'),

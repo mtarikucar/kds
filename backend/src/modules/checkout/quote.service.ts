@@ -2,12 +2,25 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
+import { LicensingService } from "../licensing/licensing.service";
 import { Cart, CartQuote, PricedLine, QuoteWarning } from "./checkout.types";
 
 /**
  * Pure-ish pricing engine. Given a Cart, returns line-by-line pricing plus a
  * total. NO database writes — quote is the gateway to checkout, where the
  * actual orders land in a single transaction.
+ *
+ * v3.3.0 — annual lines are DAY-PRORATED to the tenant's licence anniversary,
+ * which makes pricing tenant-scoped (hence the `tenantId` parameter) and
+ * time-dependent (hence `opts.now`).
+ *
+ * `opts.now` is not a convenience for tests. CheckoutService re-quotes the
+ * cart at settlement and refuses to provision when the total diverges by more
+ * than one kuruş. Proration depends on "how many days are left", so an intent
+ * created at 23:58 and settled at 00:03 would re-quote a day cheaper: the card
+ * is charged and nothing is provisioned. Settlement therefore passes
+ * `CheckoutIntent.pricedAt` back in, and the tolerance keeps doing its real
+ * job — catching catalog price edits between intent and settlement.
  *
  * Tax is simplified: a single VAT rate per tenant currency (TR KDV defaults
  * to 20%). Real-world calculation will plug into the existing `accounting`
@@ -38,9 +51,14 @@ export class QuoteService {
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
     private readonly addons: AddOnCatalogService,
+    private readonly licensing: LicensingService,
   ) {}
 
-  async quote(cart: Cart): Promise<CartQuote> {
+  async quote(
+    cart: Cart,
+    tenantId: string,
+    opts: { now?: Date } = {},
+  ): Promise<CartQuote> {
     if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
       throw new BadRequestException("Cart is empty");
     }
@@ -49,42 +67,75 @@ export class QuoteService {
     const warnings: QuoteWarning[] = [];
     let currency = "TRY";
 
+    // FROZEN pricing instant. Settlement passes CheckoutIntent.pricedAt back
+    // in so the re-quote is deterministic; see the class doc.
+    const now = opts.now ?? new Date();
+    // Loaded once for the whole cart — the opening cart contains the licence
+    // that DEFINES the anniversary, so every line must be priced against one
+    // resolved anchor.
+    const licensing = await this.licensing.loadContext(tenantId, now);
+
     for (const item of cart.items) {
       const qty = Math.max(1, "qty" in item && item.qty ? item.qty : 1);
-      if (item.type === "plan") {
-        // Plan changes do NOT belong in checkout. A `plan` line here used to be
-        // priced + CHARGED, then emit subscription.upgrade.requested.v1 — an
-        // event with NO consumer, so the plan never actually changed: money was
-        // collected for a no-op. The real, money-honest plan-change rail is the
-        // separate subscription flow (POST /subscriptions/change-plan →
-        // pendingPlanChange → settlement), which prorates and applies the new
-        // plan. Reject the line up-front so nothing can ever charge for a plan
-        // change through checkout — fail loud instead of taking money silently.
-        // (No UI sends plan lines today; this closes a latent money-loss path.)
-        throw new BadRequestException(
-          "Plan changes go through /subscriptions/change-plan, not checkout",
-        );
-      } else if (item.type === "addon") {
+      if (item.type === "addon") {
         const addOn = await this.addons.findByCodeOrThrow(item.code);
         if (addOn.status !== "published") {
           warnings.push({ code: "addon_not_purchasable", ref: addOn.code });
           continue;
         }
         currency = addOn.currency;
-        lines.push({
-          type: "addon",
-          code: addOn.code,
-          name: addOn.name,
-          qty,
-          unitCents: addOn.priceCents,
-          subtotalCents: addOn.priceCents * qty,
-          cadence: addOn.billing === "recurring" ? "monthly" : "oneTime",
-          meta: {
-            addOnId: addOn.id,
-            kind: addOn.kind,
-            branchId: "branchId" in item ? item.branchId : undefined,
-          },
-        });
+
+        if (addOn.billing === "annual") {
+          // Day-prorated to the tenant's anniversary so the whole account
+          // renews on ONE date with ONE itemized invoice.
+          const p = this.licensing.price(licensing, addOn.priceCents, {
+            quantity: qty,
+          });
+          lines.push({
+            type: "addon",
+            code: addOn.code,
+            name: addOn.name,
+            qty,
+            unitCents: p.unitCents,
+            subtotalCents: p.subtotalCents,
+            cadence: "yearly",
+            meta: {
+              addOnId: addOn.id,
+              kind: addOn.kind,
+              branchId: "branchId" in item ? item.branchId : undefined,
+              annualPriceCents: addOn.priceCents,
+              prorationMode: p.mode,
+              proratedDays: p.billedDays,
+              cycleDays: p.cycleDays,
+              periodStart: p.periodStart.toISOString(),
+              periodEnd: p.periodEnd.toISOString(),
+              requiresLicense: addOn.requiresLicense,
+            },
+          });
+        } else {
+          // oneTime — credit packs and services. Flat price, no period.
+          lines.push({
+            type: "addon",
+            code: addOn.code,
+            name: addOn.name,
+            qty,
+            unitCents: addOn.priceCents,
+            subtotalCents: addOn.priceCents * qty,
+            cadence: "oneTime",
+            meta: {
+              addOnId: addOn.id,
+              kind: addOn.kind,
+              branchId: "branchId" in item ? item.branchId : undefined,
+              requiresLicense: addOn.requiresLicense,
+              ...(addOn.creditKind
+                ? {
+                    creditKind: addOn.creditKind,
+                    creditUnits: (addOn.creditUnits ?? 0) * qty,
+                  }
+                : {}),
+            },
+          });
+        }
       } else if (item.type === "hardware") {
         const product = await this.catalog.findBySkuOrThrow(item.sku);
         if (product.status !== "published") {
@@ -269,9 +320,7 @@ export class QuoteService {
       shippingCents,
       totalCents: grossLines + shippingCents,
       warnings,
-      isPureRecurring: lines.every(
-        (l) => l.type === "plan" || l.type === "addon",
-      ),
+      isPureRecurring: lines.every((l) => l.type === "addon"),
     };
   }
 }

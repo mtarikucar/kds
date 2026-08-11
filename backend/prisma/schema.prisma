@@ -71,6 +71,15 @@ model Tenant {
   featureOverrides Json? // { "advancedReports": true, "reservationSystem": false }
   limitOverrides   Json? // { "maxUsers": 50, "maxTables": 100 }
 
+  /// À-la-carte licensing: the tenant's IMMUTABLE anniversary anchor. Written
+  /// exactly once, when the first paid License is provisioned, and never
+  /// rewritten by a renewal — a renewal paid 3 days late must not shift the
+  /// anniversary forever. Stored as UTC midnight of the TENANT-LOCAL calendar
+  /// date of purchase so downstream arithmetic is pure calendar math
+  /// (see modules/licensing/anniversary.ts). Null = no paid license yet, which
+  /// is the normal steady state for a free-core tenant.
+  licenseAnchorAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -157,7 +166,6 @@ model Tenant {
   // accidental tenantId typo at write-time would silently succeed. The
   // cascade aligns with how every other tenant-scoped table is wired.
   featureEntitlements FeatureEntitlement[]
-  aiGenerationUsage   AiGenerationUsage[]
 
   // v2.8.93 — Branch + Device picked up the missing tenant FK + cascade.
   // Inverse relations declared here so Prisma keeps the TS-side graph
@@ -167,8 +175,15 @@ model Tenant {
   // v3.0.0 — m:n user↔branch allow-list (BranchGuard reads it).
   userBranchAssignments UserBranchAssignment[]
 
+  // À-la-carte licensing (v3.3.0).
+  creditLots     CreditLot[]
+  creditLedger   CreditLedger[]
+  renewalCycles  RenewalCycle[]
+  tenantInvoices TenantInvoice[]
+
   @@index([currentPlanId])
   @@index([status])
+  @@index([licenseAnchorAt])
   @@map("tenants")
 }
 
@@ -606,28 +621,13 @@ model ProductMediaJob {
   @@map("product_media_jobs")
 }
 
-// Append-only AI generation quota ledger. One row per quota claim, written
-// atomically with the ProductMediaJob insert. Deliberately NOT FK-linked to
-// Product/ProductMediaJob: product deletion cascades jobs away, and usage
-// must survive that (otherwise "delete product → quota refunded" farms free
-// generations). `voided` flips true when the generation FAILS (failJob or a
-// fal submit error) so failed attempts don't burn the tenant's allowance.
-model AiGenerationUsage {
-  id       String @id @default(uuid())
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+// The AI generation quota ledger moved to credit_ledger in v3.3.0
+// (20260811130000_credits_ledger_migration). Credits are bought and valid
+// until consumed, so consumption is counted against purchased lots for all
+// time rather than against a calendar month. The refund machinery — no FK to
+// products or jobs, so "delete the product, get the credit back" cannot farm
+// free generations — carried over unchanged.
 
-  kind  String // PHOTO | VIDEO | MODEL3D (FRAME + OCR-parse draw from PHOTO)
-  units Int     @default(1) // image variations requested; video always 1
-  jobId String? // ProductMediaJob id, soft reference (no FK — survives cascades)
-
-  voided    Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@index([tenantId, kind, createdAt])
-  @@index([jobId])
-  @@map("ai_generation_usage")
-}
 
 model ProductImage {
   id       String @id @default(uuid())
@@ -1350,7 +1350,6 @@ model SubscriptionPlan {
   subscriptions       Subscription[]
   currentPlanTenants  Tenant[]            @relation("CurrentPlan")
   scheduledDowngrades Subscription[]      @relation("ScheduledDowngrade")
-  pendingPlanChanges  PendingPlanChange[] @relation("PendingPlanChange")
   // Step-F decoupling: LeadOffer.planId is now a soft (no-FK) reference + plan snapshot.
 
   @@map("subscription_plans")
@@ -1417,7 +1416,6 @@ model Subscription {
   // Relations
   payments           SubscriptionPayment[]
   invoices           Invoice[]
-  pendingPlanChanges PendingPlanChange[]
 
   @@index([tenantId])
   @@index([planId])
@@ -1516,20 +1514,14 @@ model BankTransferSettings {
  * and calls applyUpgrade() — keeps the intent endpoint stateless about
  * what plan was being purchased.
  */
-model PendingPlanChange {
-  id             String           @id @default(uuid())
-  subscriptionId String
-  subscription   Subscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  targetPlanId   String
-  targetPlan     SubscriptionPlan @relation("PendingPlanChange", fields: [targetPlanId], references: [id], onDelete: Restrict)
-  billingCycle   String // MONTHLY, YEARLY
-  merchantOid    String           @unique
-  expiresAt      DateTime
-  createdAt      DateTime         @default(now())
 
-  @@index([subscriptionId])
-  @@map("pending_plan_changes")
-}
+// PendingPlanChange was dropped in v3.3.0
+// (20260811140000_retire_subscription_rail). It recorded "when this PayTR
+// payment settles, switch the tenant to that plan" — and there are no plans to
+// switch between. Products are bought and dropped individually through the
+// checkout rail; capacity downgrades apply at renewal via
+// TenantAddOn.pendingQuantity.
+
 
 model Invoice {
   id String @id @default(uuid())
@@ -4710,31 +4702,78 @@ model MarketplaceAddOn {
   code        String   @unique
   name        String
   description String?
-  // Coarse buckets for filtering in the marketplace UI:
-  //   software     — extra modules (advanced reports, multi-branch)
+  // Coarse buckets for filtering in the store UI. v3.3.0 (à-la-carte)
+  // vocabulary — the pre-3.3 values (software|support) are remapped by the
+  // catalog data migration:
+  //   license      — the annual base License. Singleton; prerequisite for
+  //                  every `requiresLicense` row. Defines the anniversary.
+  //   module       — a paid feature module (reports, stock, reservations…)
   //   integration  — provider grants (fiscal-hugin, delivery-yemeksepeti)
-  //   capacity     — numeric add-ons (extra-kds-screen, extra-tablet)
-  //   support      — service tiers (priority support, on-site install)
+  //   capacity     — numeric add-ons, multiplied by TenantAddOn.quantity
+  //   credit       — prepaid consumption pack (AI generations, SMS). Does
+  //                  NOT create a TenantAddOn; mints a CreditLot instead.
+  //   service      — one-time human services (on-site install, training)
   kind        String
-  // Recurring add-ons charge each subscription cycle; one-time add-ons fire
-  // once at purchase (typical for setup/install fees).
-  billing     String   @default("recurring") // recurring|oneTime
+  // annual  — billed once per licensing cycle, day-prorated to the tenant's
+  //           anniversary on first purchase, full list price on renewal.
+  // oneTime — charged once at purchase (credits, services, setup fees).
+  // ("recurring" is the pre-3.3 value, remapped to "annual" by migration.)
+  billing     String   @default("annual") // annual|oneTime
+  // KDV-INCLUSIVE list price in kuruş: per CYCLE for annual rows, flat for
+  // oneTime rows. Proration divides this; it is never the charged amount.
   priceCents  Int
   currency    String   @default("TRY")
   // Entitlement delta — see header comment.
   grants      Json
-  // Other add-on codes (or plan:<NAME>) required before purchase.
+  // Other add-on codes required before purchase. Bare codes are matched
+  // against the tenant's ACTIVE TenantAddOn rows. The pre-3.3 "plan:<NAME>"
+  // form is retired and rejected by the catalog validator — plans no longer
+  // exist, so such a dep can never be satisfied.
   deps        String[] @default([])
   // Lifecycle: draft can be edited freely; published is offered for sale;
   // archived stays in the catalog for already-active tenants but is hidden
-  // from the marketplace.
+  // from the store. Retired products are ARCHIVED, never deleted: `code` may
+  // not be reused and TenantAddOn.addOnId is onDelete: Restrict.
   status      String   @default("draft")
+
+  /// Hard prerequisite: an active License is required both to BUY and to USE
+  /// this row. False for the license itself, credit packs and one-time
+  /// services. Enforced twice — at quote time (LICENSE_REQUIRED) and, as the
+  /// real backstop, in the projector, which suppresses the grants of every
+  /// requiresLicense row while the license is dark. Suppression touches no
+  /// business data: access goes out, nothing is deleted.
+  requiresLicense Boolean @default(true)
+
+  /// kind:'credit' only — which balance this pack tops up and by how much.
+  /// Vocabulary matches AiGenerationUsage.kind plus SMS:
+  /// PHOTO | VIDEO | MODEL3D | SMS.
+  creditKind  String?
+  creditUnits Int?
+
+  /// kind:'capacity' only — purchase ceiling per tenant. Null = unbounded.
+  maxQuantity Int?
+
+  /// Storefront ordering within a kind.
+  sortOrder   Int      @default(0)
+
+  /// Localized catalog copy: { tr: {name, description}, en: {...}, ar, ru, uz }.
+  /// Deliberately in the DB, not in locale files: shipping a product must not
+  /// require a 5-locale frontend PR, and "everything is superadmin-editable"
+  /// is a hard product requirement.
+  i18n        Json?
+
+  /// Marketing-rep commission rate for this product. Replaces
+  /// SubscriptionPlan.commissionRate in the PaymentSucceeded payload once the
+  /// SUB rail retires — without it, rep commissions silently go to zero.
+  commissionRate Decimal @default(0.10) @db.Decimal(5, 4)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   tenantAddOns TenantAddOn[]
 
   @@index([status, kind])
+  @@index([status, kind, sortOrder])
   @@map("marketplace_addons")
 }
 
@@ -4775,10 +4814,243 @@ model TenantAddOn {
   // add-ons (promo grants, admin-issued comps).
   paymentRef         String?
 
+  /// What was ACTUALLY charged for the current period, in kuruş — the
+  /// prorated figure, not the catalog list price. 0 for operator comps.
+  /// Drives the invoice and the "you paid X" UI; renewals deliberately do
+  /// NOT price from this, they re-read the live catalog.
+  chargedCents       Int?
+  currency           String           @default("TRY")
+
+  /// { annualPriceCents, proratedDays, cycleDays, anchorAt, mode,
+  ///   quantityHistory: [{ at, from, to, chargedCents, paymentRef }] }
+  /// Kept as an audit trail so a mid-cycle quantity bump can never be
+  /// mistaken for a re-proration of already-paid units.
+  pricingMeta        Json?
+
+  /// Quantity to apply at the NEXT anniversary. Capacity DOWNGRADES are
+  /// renewal-time only — there are no mid-cycle refunds.
+  pendingQuantity    Int?
+
+  /// purchase | comp | migration — provenance for audit and for keeping
+  /// operator comps out of revenue reporting.
+  origin             String           @default("purchase")
+  compReason         String?
+  compActorId        String?
+
   @@index([tenantId, status])
   @@index([addOnId])
   @@index([tenantId, branchId])
+  @@index([status, currentPeriodEnd])
   @@map("tenant_addons")
+}
+
+// ========================================
+// À-LA-CARTE LICENSING (v3.3.0)
+// ========================================
+//
+// PREPAID CREDITS
+//
+// Consumption products (AI photo/video/3D generation, SMS) have a real
+// per-unit vendor cost, so they are sold as prepaid packs that are valid
+// UNTIL CONSUMED rather than as a monthly allowance that resets.
+//
+// Credits are deliberately NOT entitlements. The entitlement set is cached
+// in-process for 30s; a stale balance during a burst is a real money bug
+// (one Meshy 3D generation is a ~₺12 vendor charge). Balance is therefore
+// read LIVE inside the advisory-locked claim transaction, never from the
+// entitlement engine, and `credit.*` keys are skipped by the projector.
+//
+//   balance(tenant, kind) = Σ CreditLot.units   WHERE !voided
+//                         − Σ CreditLedger.units WHERE !voided
+
+model CreditLot {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// PHOTO | VIDEO | MODEL3D | SMS — same vocabulary as CreditLedger.
+  kind  String
+  units Int
+
+  /// purchase:<addOnCode> | comp:admin:<userId> | migration:legacy
+  source     String
+  addOnCode  String?
+  paymentRef String?
+  priceCents Int?
+  currency   String @default("TRY")
+
+  /// Business rule is "valid until consumed", so this is null in practice.
+  /// The column exists so a future promo lot can be time-boxed without a
+  /// migration.
+  expiresAt DateTime?
+  voided    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  /// Checkout idempotency: a webhook replay must not double-grant. One lot
+  /// per (tenant, payment, product).
+  @@unique([tenantId, paymentRef, addOnCode])
+  @@index([tenantId, kind, voided])
+  @@map("credit_lots")
+}
+
+/// Append-only consumption ledger. Generalizes AiGenerationUsage: same
+/// refund machinery (`voided` on a failed generation so a failure never
+/// burns credit), same deliberate absence of an FK on the job reference
+/// (product deletion cascades jobs away, and consumption must survive that
+/// — otherwise "delete product → credit refunded" farms free generations),
+/// but with no monthly window and with SMS as a first-class kind.
+model CreditLedger {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  kind  String // PHOTO | VIDEO | MODEL3D | SMS
+  units Int    @default(1)
+
+  /// FIFO attribution to the lot this draw came from. Null for rows
+  /// migrated from the pre-3.3 ai_generation_usage table.
+  lotId String?
+
+  /// Soft reference — NO FK by design (see model comment).
+  refType String? // media_job | sms_message
+  refId   String?
+
+  voided    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, kind, voided])
+  @@index([refId])
+  @@index([lotId])
+  @@map("credit_ledger")
+}
+
+/// The tenant's annual renewal, materialized ~30 days ahead so the reminder
+/// cron has a stable target, the "ONE itemized invoice at the anniversary"
+/// promise has somewhere to live, and the grace/expiry job has a ledger of
+/// what was actually owed.
+///
+/// Line prices are read LIVE from the catalog at generation time (the
+/// catalog is superadmin-editable — that is the point) and then FROZEN into
+/// cartJson/quoteJson, so the tenant pays exactly what the reminder email
+/// quoted them.
+model RenewalCycle {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// The anniversary this cycle covers (UTC midnight).
+  anniversaryAt DateTime
+  /// open | paid | lapsed | cancelled
+  status        String   @default("open")
+
+  /// Frozen Cart (checkout.types.Cart) and its CartQuote.
+  cartJson   Json
+  quoteJson  Json
+  totalCents Int
+  currency   String @default("TRY")
+
+  /// anniversaryAt + ADDON_GRACE_DAYS. After this, unrenewed items expire.
+  graceEndsAt DateTime
+
+  /// Which of [30, 7, 1] reminders have fired. Appending inside the same
+  /// UPDATE makes the cron idempotent across replicas.
+  remindersSent Int[] @default([])
+
+  invoiceId   String?
+  paymentRef  String?
+  generatedAt DateTime  @default(now())
+  paidAt      DateTime?
+  lapsedAt    DateTime?
+
+  @@unique([tenantId, anniversaryAt])
+  @@index([status, graceEndsAt])
+  @@index([status, anniversaryAt])
+  @@map("renewal_cycles")
+}
+
+/// Itemized invoice for the à-la-carte world.
+///
+/// This is a NEW table rather than a relaxation of `Invoice`: that model's
+/// `subscriptionId` is NOT NULL with a cascade FK, and Turkish VUK requires
+/// invoice retention for years. Making it nullable would produce an
+/// unwritable down migration — you cannot restore NOT NULL once à-la-carte
+/// rows exist, and a down that deletes them would be destroying tax records.
+/// `Invoice`/`SubscriptionPayment` are frozen as read-only legacy archives.
+///
+/// Numbering deliberately SHARES the existing atomic InvoiceCounter via
+/// common/helpers/invoice-number.helper.ts. Two independent counters over the
+/// same INV-{YYYYMM}-{seq}-{hex} format would eventually collide on the
+/// unique index — and that collision surfaces at settlement, AFTER the card
+/// has been charged.
+model TenantInvoice {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  invoiceNumber String @unique
+  /// DRAFT | OPEN | PAID | VOID
+  status        String @default("PAID")
+  /// purchase | renewal | credit | hardware | comp
+  kind          String
+
+  paymentRef     String? @unique
+  renewalCycleId String?
+
+  /// NET (KDV derived OUT of the gross line prices, never added on top).
+  subtotalCents Int
+  taxCents      Int
+  shippingCents Int    @default(0)
+  /// GROSS — exactly what was charged.
+  totalCents    Int
+  currency      String @default("TRY")
+
+  periodStart DateTime?
+  periodEnd   DateTime?
+  issuedAt    DateTime  @default(now())
+  paidAt      DateTime?
+
+  /// Frozen at issuance so later tenant edits never rewrite history.
+  taxIdSnapshot String?
+
+  /// Marketing-rep attribution, carried from the CheckoutIntent.
+  referralCode              String?
+  referredByMarketingUserId String?
+
+  pdfUrl String?
+
+  lines TenantInvoiceLine[]
+
+  @@index([tenantId, issuedAt])
+  @@index([status])
+  @@index([renewalCycleId])
+  @@map("tenant_invoices")
+}
+
+model TenantInvoiceLine {
+  id        String        @id @default(uuid())
+  invoiceId String
+  invoice   TenantInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  lineNo Int
+  /// license | module | integration | capacity | credit | hardware | service
+  kind   String
+  code   String
+  /// Localized name snapshot at issuance — the catalog may be renamed later.
+  name   String
+
+  qty           Int @default(1)
+  /// GROSS per unit, AFTER proration.
+  unitCents     Int
+  subtotalCents Int
+
+  /// { annualPriceCents, proratedDays, cycleDays, mode } — renders the
+  /// "10 Mar 2027'ye kadar · 355/365 gün" footnote on the PDF.
+  prorationMeta Json?
+  periodStart   DateTime?
+  periodEnd     DateTime?
+
+  @@index([invoiceId, lineNo])
+  @@map("tenant_invoice_lines")
 }
 
 // ========================================
@@ -5205,6 +5477,31 @@ model CheckoutIntent {
   failureReason   String?
   hardwareOrderId String?
   addOnIds        String[]  @default([])
+
+  /// FROZEN pricing instant (v3.3.0). Annual proration depends on `now`, and
+  /// settlement re-quotes the cart and refuses to provision on >1 kuruş
+  /// divergence. Without this, an intent created at 23:58 and settled at
+  /// 00:03 loses a day of remaining-days, the re-quote diverges, and the card
+  /// is charged while NOTHING is provisioned — every night. Settlement passes
+  /// this as `now`, so the tolerance keeps doing its real job: catching
+  /// catalog price edits between intent and settlement.
+  pricedAt        DateTime  @default(now())
+  /// Frozen CartQuote snapshot — the invoice source and the audit trail.
+  quoteJson       Json?
+  /// Intents older than this are refused at settlement. A stale intent
+  /// settled after the anniversary would provision an already-ended period.
+  expiresAt       DateTime?
+
+  /// Marketing-rep referral snapshot, carried from the buyer's tenant at
+  /// intent time and forwarded to the invoice + the PaymentSucceeded event.
+  /// The legacy SUB rail kept these on SubscriptionPayment; the CK rail had
+  /// nowhere to put them, which is why commissions must not depend on it.
+  referralCode              String?
+  referredByMarketingUserId String?
+
+  /// Set when this intent settles a generated RenewalCycle.
+  renewalCycleId  String?
+
   createdAt       DateTime  @default(now())
   succeededAt     DateTime?
   provisionedAt   DateTime?
@@ -5212,6 +5509,7 @@ model CheckoutIntent {
 
   @@index([tenantId, status])
   @@index([createdAt])
+  @@index([status, expiresAt])
   @@map("checkout_intents")
 }
 

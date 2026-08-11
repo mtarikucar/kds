@@ -1,0 +1,90 @@
+{
+  "page": {
+    "title": "Litsenziya va kirish",
+    "subtitle": "Sizdagi modullar, yangilanish sanasi va kredit qoldiqlari."
+  },
+  "license": {
+    "heading": "HummyTummy litsenziyasi",
+    "status": {
+      "active": "Faol",
+      "grace": "Qo'shimcha muddat — to'lov kutilmoqda",
+      "expired": "Muddati tugagan",
+      "none": "Litsenziya yo'q"
+    },
+    "anniversary": "Yangilanish {{date}} ({{days}} kun qoldi)",
+    "buyCta": "Litsenziya sotib olish",
+    "renewCta": "Litsenziyani yangilash",
+    "freeCoreNote": "POS, oshxona ekrani, menyu, stollar va zal rejasi, QR menyu, buyurtmalar, kassa va jamoa boshqaruvi litsenziyasiz — cheksiz va bepul."
+  },
+  "owned": {
+    "title": "Sizdagi mahsulotlar",
+    "empty": "Hali pullik mahsulot sotib olmagansiz.",
+    "comped": "Bepul berilgan",
+    "perYear": "/yil",
+    "pendingQuantity": "Yangilashda {{qty}} taga tushadi",
+    "col": {
+      "product": "Mahsulot",
+      "until": "Tugash",
+      "status": "Holat",
+      "renewal": "Yangilash"
+    },
+    "status": {
+      "active": "Faol",
+      "past_due": "Qo'shimcha muddat",
+      "expired": "Tugagan",
+      "cancelled": "Bekor qilingan"
+    }
+  },
+  "credits": {
+    "title": "Kredit qoldiqlari",
+    "empty": "Kreditingiz yo'q.",
+    "note": "Kreditlar muddatsiz; tugaguncha amal qiladi.",
+    "kind": {
+      "PHOTO": "AI rasm",
+      "VIDEO": "AI video",
+      "MODEL3D": "AI 3D model",
+      "SMS": "SMS"
+    }
+  },
+  "renewal": {
+    "title": "{{date}} sanasida yangilash",
+    "body": "Jami {{total}} — {{days}} kun qoldi.",
+    "cta": "Yangilashni ko'rish",
+    "notFound": "Ochiq yangilanish topilmadi.",
+    "backToLicense": "Litsenziyaga qaytish",
+    "graceNote": "To'lov muddati {{date}}. Undan keyin pullik modullar o'chadi, ma'lumotlaringiz saqlanadi.",
+    "total": "Jami",
+    "payCta": "{{total}} to'lash"
+  },
+  "store": {
+    "title": "Do'kon",
+    "subtitle": "Faqat kerakli modullarni bitta-bitta sotib oling.",
+    "tabs": {
+      "catalog": "Katalog",
+      "hardware": "Uskunalar",
+      "orders": "Buyurtmalar"
+    },
+    "kind": {
+      "license": "Litsenziya",
+      "module": "Modullar",
+      "integration": "Integratsiyalar",
+      "capacity": "Sig'im",
+      "credit": "Kreditlar",
+      "service": "Xizmatlar"
+    },
+    "owned": "Sizda bor",
+    "buy": "Sotib olish",
+    "add": "Savatga qo'shish",
+    "perYear": "/yil",
+    "oneTime": "bir martalik",
+    "todayPrice": "Bugun olsangiz {{prorated}}",
+    "untilDate": "{{date}} sanasigacha",
+    "licenceFirst": "Bu mahsulot uchun litsenziya kerak — savatga qo'shiladi.",
+    "empty": "Bu toifada mahsulot yo'q."
+  },
+  "invoices": {
+    "title": "Hisob-fakturalar",
+    "empty": "Hali hisob-faktura yo'q.",
+    "lineCount": "{{count}} ta qator"
+  }
+}

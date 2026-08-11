@@ -19,7 +19,6 @@ import { FloorPlanService } from "./floor-plan.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../common/scoping/branch-scope";
@@ -44,7 +43,7 @@ import { SaveLayoutDto } from "./dto/save-layout.dto";
 @ApiTags("floor-plan")
 @ApiBearerAuth()
 @Controller("floor-plan")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class FloorPlanController {
   constructor(private readonly floorPlan: FloorPlanService) {}
 

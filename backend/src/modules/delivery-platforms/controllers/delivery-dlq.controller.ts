@@ -14,7 +14,6 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
 import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { RequiresIntegration } from "../../subscriptions/decorators/requires-integration.decorator";
 import { DeliveryLogService } from "../services/delivery-log.service";
 
@@ -40,7 +39,7 @@ interface RequeueBody {
 @ApiTags("delivery-platforms/dlq")
 @ApiBearerAuth()
 @Controller("delivery-platforms/dlq")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresIntegration("delivery")
 export class DeliveryDlqController {
   constructor(private readonly logService: DeliveryLogService) {}

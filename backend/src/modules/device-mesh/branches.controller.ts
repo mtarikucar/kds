@@ -16,12 +16,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 import { BranchesService } from "./branches.service";
 import { CreateBranchDto, UpdateBranchDto } from "./dto/branch.dto";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
-import {
-  CheckLimit,
-  LimitType,
-} from "../subscriptions/decorators/check-limit.decorator";
 import { PlanFeature } from "../../common/constants/subscription.enum";
 import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
 import { HARD_RESTRICTED_ROLES } from "../../common/constants/roles.enum";
@@ -29,7 +24,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 
 @ApiTags("Branches")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @SkipBranchScope()
 @Controller("v1/branches")
 export class BranchesController {
@@ -156,7 +151,6 @@ export class BranchesController {
   @Post()
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.MULTI_LOCATION)
-  @CheckLimit(LimitType.BRANCHES)
   @ApiOperation({
     summary: "Create a new branch (ADMIN only, MULTI_LOCATION feature)",
   })

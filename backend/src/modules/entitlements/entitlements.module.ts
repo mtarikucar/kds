@@ -18,6 +18,7 @@ import { EntitlementsController } from "./entitlements.controller";
 import { InternalEntitlementsController } from "./internal-entitlements.controller";
 import { EntitlementService } from "./entitlement.service";
 import { EntitlementGuard } from "./entitlement.guard";
+import { EntitlementOfferResolver } from "./entitlement-offer.resolver";
 import { PlanProjectorService } from "./plan-projector.service";
 import { EntitlementInvalidationBus } from "./entitlement-invalidation.bus";
 
@@ -50,10 +51,19 @@ import { EntitlementInvalidationBus } from "./entitlement-invalidation.bus";
   providers: [
     EntitlementService,
     EntitlementGuard,
+    // Resolves "you are missing X" into "buy this product, it costs Y today".
+    // Lives here rather than in the marketplace so the guard can depend on it
+    // without putting a cycle between the two modules.
+    EntitlementOfferResolver,
     PlanProjectorService,
     EntitlementInvalidationBus,
   ],
-  exports: [EntitlementService, EntitlementGuard, PlanProjectorService],
+  exports: [
+    EntitlementService,
+    EntitlementGuard,
+    EntitlementOfferResolver,
+    PlanProjectorService,
+  ],
 })
 export class EntitlementsModule
   implements OnApplicationBootstrap, OnModuleInit

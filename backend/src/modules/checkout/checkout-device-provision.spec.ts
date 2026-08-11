@@ -10,6 +10,10 @@ import { CheckoutService } from "./checkout.service";
  * swallowed) and idempotent — so it also runs on the idempotent-replay path to
  * self-heal a run that crashed after commit but before the hook.
  */
+// v3.3.0 — CheckoutService writes the itemized tenant invoice inside the
+// provisioning transaction, so a bare construction needs the collaborator.
+const tenantInvoices = { createFromQuote: jest.fn().mockResolvedValue({ id: "inv-1" }) };
+
 describe("CheckoutService — hardware → device provisioning", () => {
   let prisma: any;
   let outbox: any;
@@ -55,6 +59,7 @@ describe("CheckoutService — hardware → device provisioning", () => {
       quoteSvc,
       catalog,
       tenantMarketplace,
+      tenantInvoices as any,
       null as any, // metrics
       devices as any,
     );

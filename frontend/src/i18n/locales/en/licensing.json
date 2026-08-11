@@ -1,0 +1,90 @@
+{
+  "page": {
+    "title": "Licence & Access",
+    "subtitle": "The modules you own, your renewal date and your credit balances."
+  },
+  "license": {
+    "heading": "HummyTummy Licence",
+    "status": {
+      "active": "Active",
+      "grace": "Grace period — payment pending",
+      "expired": "Expired",
+      "none": "No licence"
+    },
+    "anniversary": "Renews on {{date}} ({{days}} days left)",
+    "buyCta": "Buy licence",
+    "renewCta": "Renew licence",
+    "freeCoreNote": "POS, kitchen display, menu, tables & floor plan, QR menu, orders, cash and team management need no licence — they are unlimited and free."
+  },
+  "owned": {
+    "title": "Products you own",
+    "empty": "You have not bought a paid product yet.",
+    "comped": "Complimentary",
+    "perYear": "/yr",
+    "pendingQuantity": "Drops to {{qty}} at renewal",
+    "col": {
+      "product": "Product",
+      "until": "Until",
+      "status": "Status",
+      "renewal": "Renewal"
+    },
+    "status": {
+      "active": "Active",
+      "past_due": "Grace",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    }
+  },
+  "credits": {
+    "title": "Credit balances",
+    "empty": "You have no credits.",
+    "note": "Credits never expire; they are valid until consumed.",
+    "kind": {
+      "PHOTO": "AI image",
+      "VIDEO": "AI video",
+      "MODEL3D": "AI 3D model",
+      "SMS": "SMS"
+    }
+  },
+  "renewal": {
+    "title": "Renewal on {{date}}",
+    "body": "{{total}} total — {{days}} days left.",
+    "cta": "View renewal",
+    "notFound": "No open renewal found.",
+    "backToLicense": "Back to licence",
+    "graceNote": "Payment due by {{date}}. After that paid modules switch off; your data is kept.",
+    "total": "Total",
+    "payCta": "Pay {{total}}"
+  },
+  "store": {
+    "title": "Store",
+    "subtitle": "Buy exactly the modules you need, one at a time.",
+    "tabs": {
+      "catalog": "Catalogue",
+      "hardware": "Hardware",
+      "orders": "Orders"
+    },
+    "kind": {
+      "license": "Licence",
+      "module": "Modules",
+      "integration": "Integrations",
+      "capacity": "Capacity",
+      "credit": "Credits",
+      "service": "Services"
+    },
+    "owned": "Owned",
+    "buy": "Buy",
+    "add": "Add to cart",
+    "perYear": "/yr",
+    "oneTime": "one-time",
+    "todayPrice": "{{prorated}} if you buy today",
+    "untilDate": "until {{date}}",
+    "licenceFirst": "This product needs a licence — it will be added to your cart.",
+    "empty": "No products in this category."
+  },
+  "invoices": {
+    "title": "Invoices",
+    "empty": "No invoices yet.",
+    "lineCount": "{{count}} line(s)"
+  }
+}

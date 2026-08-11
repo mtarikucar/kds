@@ -42,7 +42,13 @@
     "defaultDescription": "ستحتاج إلى ترقية خطتك أو شراء الإضافة المناسبة للوصول إلى هذه الصفحة.",
     "upgradePlanCta": "ترقية الخطة",
     "viewAddOnCta": "عرض الإضافة",
-    "helpHint": "تواصل مع الدعم إذا كانت لديك أي أسئلة."
+    "helpHint": "تواصل مع الدعم إذا كانت لديك أي أسئلة.",
+    "buyCta": "شراء",
+    "renewCta": "تجديد",
+    "perYear": "/سنة",
+    "proratedPrice": "{{prorated}} إذا اشتريت اليوم ({{annual}}/سنة)",
+    "licenceRequired": "تحتاج هذه الميزة إلى ترخيص سنوي نشط.",
+    "limitReached": "لقد وصلت إلى الحد ({{current}}/{{limit}})."
   },
   "branchPicker": {
     "activeBranch": "حدد الفرع النشط",

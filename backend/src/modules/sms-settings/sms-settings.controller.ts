@@ -19,7 +19,6 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresIntegration } from "../subscriptions/decorators/requires-integration.decorator";
 
 // v2.8.90 — SMS credential surface gated on integration. Provider
@@ -29,7 +28,7 @@ import { RequiresIntegration } from "../subscriptions/decorators/requires-integr
 @ApiTags("sms-settings")
 @ApiBearerAuth()
 @Controller("sms-settings")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresIntegration("sms")
 export class SmsSettingsController {
   constructor(private readonly smsSettingsService: SmsSettingsService) {}

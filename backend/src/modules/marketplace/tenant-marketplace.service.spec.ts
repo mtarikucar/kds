@@ -10,6 +10,24 @@ import {
  * the security-relevant part — a tenant must not be able to buy something
  * whose entitlements would clash with a missing prerequisite.
  */
+// v3.3.0 — purchase() resolves anniversary-aligned periods and stamps the
+// licence anchor, so a bare construction needs LicensingService.
+const licensing = {
+  loadContext: jest.fn().mockResolvedValue({
+    tenantId: 't1', anchorAt: null, hasLicense: false,
+    now: new Date('2026-03-10T00:00:00.000Z'), tz: 'Europe/Istanbul',
+  }),
+  price: jest.fn().mockReturnValue({
+    mode: 'full', unitCents: 0, subtotalCents: 0, remainingDays: 365,
+    billedDays: 365, cycleDays: 365,
+    periodStart: new Date('2026-03-10T00:00:00.000Z'),
+    periodEnd: new Date('2027-03-10T00:00:00.000Z'),
+    anchorAt: new Date('2026-03-10T00:00:00.000Z'),
+  }),
+  resolveAnchorFor: jest.fn().mockReturnValue(new Date('2026-03-10T00:00:00.000Z')),
+  stampAnchorIfAbsent: jest.fn().mockResolvedValue(undefined),
+};
+
 describe("TenantMarketplaceService.purchase", () => {
   let prisma: MockPrismaClient;
   let catalog: jest.Mocked<AddOnCatalogService>;
@@ -22,7 +40,13 @@ describe("TenantMarketplaceService.purchase", () => {
     prisma = mockPrismaClient();
     catalog = { findByCodeOrThrow: jest.fn() } as any;
     outbox = { append: jest.fn().mockResolvedValue("ok") };
-    svc = new TenantMarketplaceService(prisma as any, catalog, outbox as any, { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {} }) } as any);
+    svc = new TenantMarketplaceService(
+      prisma as any,
+      catalog,
+      outbox as any,
+      { getForTenant: jest.fn().mockResolvedValue({ features: {}, limits: {}, integrations: {} }) } as any,
+      licensing as any,
+    );
     // Iter-68 wrapped the dup-check + create in a Serializable
     // $transaction. The deep-mocked prisma's $transaction doesn't
     // forward the callback by default — wire it through so the inner

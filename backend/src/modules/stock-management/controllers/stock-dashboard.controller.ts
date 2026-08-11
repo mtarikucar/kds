@@ -5,7 +5,6 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { UserRole } from "../../../common/constants/roles.enum";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { StockDashboardService } from "../services/stock-dashboard.service";
@@ -20,7 +19,7 @@ import { BranchScope } from "../../../common/scoping/branch-scope";
 @ApiTags("stock-management/dashboard")
 @ApiBearerAuth()
 @Controller("stock-management/dashboard")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class StockDashboardController {
   constructor(

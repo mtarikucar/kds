@@ -27,12 +27,16 @@ import { EntitlementSet } from "../entitlements/entitlement.types";
  * no money in flight.
  */
 function ent(partial: Partial<EntitlementSet> = {}): EntitlementSet {
+  // v3.3.0 baseline: a LICENSED tenant. Every rule other than the licence
+  // prerequisite assumes one, because an unlicensed tenant is rejected before
+  // any of them is reached.
   return {
-    features: {},
+    features: { "feature.license": true },
     limits: {},
     integrations: {},
     computedAt: new Date("2026-01-01").toISOString(),
     ...partial,
+    features: { "feature.license": true, ...(partial.features ?? {}) },
   } as EntitlementSet;
 }
 
@@ -42,11 +46,21 @@ function addonRow(overrides: Record<string, unknown> = {}) {
     code: "advanced_reports",
     name: "Advanced reports",
     status: "published",
+    kind: "module",
+    billing: "annual",
+    priceCents: 129_000,
+    requiresLicense: true,
+    maxQuantity: null,
     grants: { "feature.advancedReports": true },
     deps: [] as string[],
     ...overrides,
   };
 }
+
+// v3.3.0 — the checkout rail snapshots marketing-rep attribution itself now
+// (the retiring subscription rail was the only emitter of PaymentSucceeded,
+// the sole input to the commission ledger).
+const referralDirectory = { resolveReferralCode: jest.fn().mockResolvedValue(null) };
 
 describe("CheckoutIntentService.createIntent — add-on purchasability guard (Task 1)", () => {
   let prisma: MockPrismaClient;
@@ -86,11 +100,12 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
       entitlements as any,
     );
     svc = new CheckoutIntentService(
-      prisma as any,
+prisma as any,
       quoteSvc,
       payments,
       addonGuard,
       hardwareCatalog,
+      referralDirectory as any,
     );
   });
 
@@ -144,7 +159,7 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
     expect(quoteSvc.quote).not.toHaveBeenCalled();
   }
 
-  it("1) ADDON_INCLUDED_IN_PLAN — PRO tenant (advancedReports included) adds advanced_reports", async () => {
+  it("1) ADDON_ALREADY_GRANTED — the feature is already active on the account", async () => {
     catalog.findByCodeOrThrow.mockResolvedValue(
       addonRow({ code: "advanced_reports", grants: { "feature.advancedReports": true } }),
     );
@@ -152,7 +167,7 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
       ent({ features: { "feature.advancedReports": true } }),
     );
 
-    await expectRejected("ADDON_INCLUDED_IN_PLAN", "advanced_reports");
+    await expectRejected("ADDON_ALREADY_GRANTED", "advanced_reports");
   });
 
   it("2) ADDON_ALREADY_OWNED — tenant already has an active advanced_reports TenantAddOn", async () => {
@@ -171,38 +186,54 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
     await expectRejected("ADDON_ALREADY_OWNED", "advanced_reports");
   });
 
-  it("3a) ADDON_REQUIRES_PLAN — BASIC tenant adds fiscal_hugin (deps plan:PRO)", async () => {
+  it("3a) LICENSE_REQUIRED — an unlicensed tenant is stopped before PayTR", async () => {
+    // Plans are retired, so "plan:PRO and above" deps are gone. The rule that
+    // replaced them is sharper: a licence-gated product is unusable without a
+    // licence (the projector suppresses its grants), so selling one to an
+    // unlicensed tenant would take money for access they cannot exercise.
     catalog.findByCodeOrThrow.mockResolvedValue(
       addonRow({
         code: "fiscal_hugin",
         name: "Hugin yazarkasa integration",
+        kind: "integration",
         grants: { "integration.fiscal": ["hugin"] },
-        deps: ["plan:PRO"],
       }),
     );
-    entitlements.getForTenant.mockResolvedValue(ent());
-    (prisma.tenant.findUnique as any).mockResolvedValue({
-      id: "t-1",
-      currentPlan: { name: "BASIC" },
-    });
+    entitlements.getForTenant.mockResolvedValue({
+      features: {},
+      limits: {},
+      integrations: {},
+      computedAt: new Date("2026-01-01").toISOString(),
+    } as any);
 
-    await expectRejected("ADDON_REQUIRES_PLAN", "fiscal_hugin");
+    await expectRejected("LICENSE_REQUIRED", "fiscal_hugin");
   });
 
-  it("3b) BUSINESS tenant PASSES the same fiscal_hugin plan:PRO dep (tier 'and above') and reaches PayTR", async () => {
-    catalog.findByCodeOrThrow.mockResolvedValue(
-      addonRow({
-        code: "fiscal_hugin",
-        name: "Hugin yazarkasa integration",
-        grants: { "integration.fiscal": ["hugin"] },
-        deps: ["plan:PRO"],
-      }),
+  it("3b) the SAME cart passes once the licence rides along, and reaches PayTR", async () => {
+    catalog.findByCodeOrThrow.mockImplementation(async (code: string) =>
+      code === "license_annual"
+        ? addonRow({
+            id: "addon-lic",
+            code: "license_annual",
+            name: "HummyTummy Licence",
+            kind: "license",
+            requiresLicense: false,
+            priceCents: 299_000,
+            grants: { "feature.license": true },
+          })
+        : addonRow({
+            code: "fiscal_hugin",
+            name: "Hugin yazarkasa integration",
+            kind: "integration",
+            grants: { "integration.fiscal": ["hugin"] },
+          }),
     );
-    entitlements.getForTenant.mockResolvedValue(ent());
-    (prisma.tenant.findUnique as any).mockResolvedValue({
-      id: "t-1",
-      currentPlan: { name: "BUSINESS" },
-    });
+    entitlements.getForTenant.mockResolvedValue({
+      features: {},
+      limits: {},
+      integrations: {},
+      computedAt: new Date("2026-01-01").toISOString(),
+    } as any);
     quoteSvc.quote.mockResolvedValue(validQuote());
     payments.createIntent.mockResolvedValue({
       providerId: "paytr",
@@ -216,14 +247,20 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
     await expect(
       svc.createIntent({
         tenantId: "t-1",
-        cart: addonCart("fiscal_hugin"),
-        buyer,
-        buyerIp: "1.2.3.4",
+        cart: {
+          items: [
+            { type: "addon", code: "license_annual" },
+            { type: "addon", code: "fiscal_hugin" },
+          ],
+        } as any,
+        buyer: {
+          email: "a@b.c",
+          name: "A",
+          phone: "+905551112233",
+        } as any,
+        buyerIp: "127.0.0.1",
       }),
-    ).resolves.toBeDefined();
-
-    expect(prisma.checkoutIntent.create).toHaveBeenCalledTimes(1);
-    expect(payments.createIntent).toHaveBeenCalledTimes(1);
+    ).resolves.toMatchObject({ paymentLink: "https://pay.test/x" });
   });
 
   it("4) ADDON_LIMIT_REDUNDANT — BUSINESS tenant (maxBranches=-1) adds extra_branch", async () => {
@@ -278,7 +315,7 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
     } catch (e: any) {
       threw = true;
       expect(e).toBeInstanceOf(ConflictException);
-      expect(e.getResponse().code).toBe("ADDON_INCLUDED_IN_PLAN");
+      expect(e.getResponse().code).toBe("ADDON_ALREADY_GRANTED");
     }
     expect(threw).toBe(true);
     expect(prisma.checkoutIntent.create).not.toHaveBeenCalled();

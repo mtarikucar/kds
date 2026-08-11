@@ -1,29 +1,26 @@
-import { SetMetadata } from "@nestjs/common";
+import { RequireEntitlement } from "../../entitlements/require-entitlement.decorator";
 
+/** @deprecated Kept only as the metadata key some old specs assert on. */
 export const REQUIRED_INTEGRATIONS_KEY = "requiredIntegrations";
 
 /**
- * v2.8.88 — gate a route on the presence of at least one
- * integration grant for a given domain.
+ * Gate a route on owning at least one vendor in an integration domain.
  *
- * Use cases:
- *   - `@RequiresIntegration('fiscal')` on `/v1/fiscal/*` routes —
- *     visible only to tenants who own `fiscal_hugin` / `fiscal_efatura`
- *     / similar add-ons.
- *   - `@RequiresIntegration('delivery')` on `/v1/delivery-platforms/*`
- *     routes (cross-checks with `feature.deliveryIntegration` so the
- *     plan-level grant works too).
- *   - `@RequiresIntegration('caller')` once a caller integration
- *     add-on family ships.
+ *   - `@RequiresIntegration('fiscal')` on `/v1/fiscal/*` — open to tenants who
+ *     own `fiscal_hugin`, `fiscal_efatura`, or any future fiscal product.
+ *   - `@RequiresIntegration('delivery')` on `/v1/delivery-platforms/*`.
+ *   - `@RequiresIntegration('caller')`, `('sms')`, `('accounting')`.
  *
- * Backing: `PlanFeatureGuard` (the same guard that handles
- * `@RequiresFeature` and `@CheckLimit`). The guard consults the
- * entitlement engine's resolved view, so plan grants + TenantAddOn
- * grants + admin overrides all count.
+ * v3.3.0: a thin ALIAS over `@RequireEntitlement`, like `@RequiresFeature`.
+ * Note the requirement is emitted WITHOUT a `provider` — that is what makes
+ * `EntitlementGuard` apply "the domain has ≥1 vendor" rather than "this exact
+ * vendor is permitted". Emitting a provider here would 403 every one of these
+ * routes for tenants who own a different vendor in the same domain.
  *
- * Multiple domains are AND'd. To gate on "fiscal OR delivery" use a
- * single domain that's typed correctly upstream — the engine doesn't
- * model OR at the decorator layer.
+ * Multiple domains are AND'd; the engine does not model OR at the decorator
+ * layer.
  */
 export const RequiresIntegration = (...domains: string[]) =>
-  SetMetadata(REQUIRED_INTEGRATIONS_KEY, domains);
+  RequireEntitlement(
+    ...domains.map((d) => ({ integration: `integration.${d}` })),
+  );

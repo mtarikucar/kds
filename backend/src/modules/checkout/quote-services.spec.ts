@@ -24,6 +24,12 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
   let catalog: any;
   let addons: any;
   let svc: QuoteService;
+  let licensing: any;
+
+  // v3.3.0 — pricing is tenant-scoped; service lines are unaffected by
+  // proration but the signature carries the tenant.
+  const TENANT = 'tenant-1';
+  const priceCart = (cart: any, opts?: any) => svc.quote(cart, TENANT, opts);
 
   beforeEach(() => {
     prisma = {
@@ -31,7 +37,14 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
     };
     catalog = { findBySkuOrThrow: jest.fn() };
     addons = { findByCodeOrThrow: jest.fn() };
-    svc = new QuoteService(prisma, catalog, addons);
+    licensing = {
+      loadContext: jest.fn().mockResolvedValue({
+        tenantId: TENANT, anchorAt: null, hasLicense: false,
+        now: new Date('2026-03-10T00:00:00.000Z'), tz: 'Europe/Istanbul',
+      }),
+      price: jest.fn(),
+    };
+    svc = new QuoteService(prisma, catalog, addons, licensing as any);
   });
 
   it('resolves a service via catalog.findBySkuOrThrow and forwards serviceMeta on the priced line', async () => {
@@ -46,7 +59,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       saleMode: 'DIRECT_SALE',
     });
 
-    const q = await svc.quote({
+    const q = await priceCart({
       items: [
         {
           type: 'service',
@@ -81,7 +94,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       currency: 'TRY',
     });
 
-    const q = await svc.quote({
+    const q = await priceCart({
       items: [{ type: 'service', code: 'kds-21in' } as any],
     });
 
@@ -92,7 +105,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
   it('falls back to the legacy in-memory map when the catalog lookup throws (spec stability for old fixtures)', async () => {
     catalog.findBySkuOrThrow.mockRejectedValue(new Error('not found'));
 
-    const q = await svc.quote({
+    const q = await priceCart({
       items: [{ type: 'service', code: 'onsite_install_kds' } as any],
     });
 
@@ -103,7 +116,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
 
   it('warns and skips an unknown service that misses both catalog and legacy', async () => {
     catalog.findBySkuOrThrow.mockRejectedValue(new Error('not found'));
-    const q = await svc.quote({
+    const q = await priceCart({
       items: [{ type: 'service', code: 'totally-not-a-service' } as any],
     });
     expect(q.lines).toHaveLength(0);
@@ -120,7 +133,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       currency: 'TRY',
     });
 
-    const q = await svc.quote({
+    const q = await priceCart({
       items: [{ type: 'service', code: 'install-test' } as any],
     });
     expect(q.lines).toHaveLength(0);
@@ -139,7 +152,7 @@ describe('QuoteService — service pricing via catalog (v2.8.87)', () => {
       saleMode: 'DIRECT_SALE',
     });
 
-    const q = await svc.quote({
+    const q = await priceCart({
       items: [{ type: 'service', code: 'integration-yemeksepeti' } as any],
     });
     expect(q.lines).toHaveLength(1);

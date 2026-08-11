@@ -41,8 +41,22 @@ export class DemoService {
   private static readonly PLAN_NAME = DEMO_PLAN_NAME;
   private static readonly BRANCH_CODE = "MAIN";
 
-  // All plan features ON so every screen is reachable in the demo. Mirrors the
-  // tenant featureOverrides contract (PlanFeatureGuard fallback reads these).
+  /**
+   * Everything the demo tenant is given, as `override:admin` GRANTS.
+   *
+   * v3.3.0 changed what this map means. It used to be the pre-3.3
+   * `featureOverrides` shape, where the projector wrapped every entry —
+   * including `false` — in `{__replace: v}`. Under à-la-carte the tri-state
+   * form is explicit: `mode:'grant'` projects a PLAIN `true`, which OR-folds
+   * with everything else and can never suppress a product. The demo tenant
+   * never buys anything, so a grant-mode override is exactly right for it:
+   * every screen is reachable, and no poison-pill `__replace:false` is
+   * written anywhere.
+   *
+   * The free core (POS, KDS, menu, tables, orders…) is NOT listed — it comes
+   * from FREE_BASELINE_GRANTS like it does for every other tenant, which is
+   * the point of the demo being representative.
+   */
   private static readonly ALL_FEATURES = {
     advancedReports: true,
     multiLocation: true,
@@ -62,6 +76,11 @@ export class DemoService {
     // screen reachable in the demo". Fixed alongside the AI limits below
     // (see plan-mapper-parity.spec.ts for the drift-class tripwire).
     aiContentGeneration: true,
+    // Without this the demo would be dark: the projector suppresses every
+    // requiresLicense product for an unlicensed tenant, and the demo owns no
+    // products to be suppressed — but the guard still reads feature.license
+    // when deciding whether a denial is "you need a licence".
+    license: true,
   };
 
   constructor(private readonly prisma: PrismaService) {}
@@ -109,7 +128,7 @@ export class DemoService {
         // silently fell through to the Prisma schema default (1) — even
         // though ALL_FEATURES.multiLocation is true and BranchesController
         // gates branch creation on BOTH the MULTI_LOCATION feature AND the
-        // maxBranches limit (@CheckLimit(BRANCHES)). A demo visitor with the
+        // maxBranches limit. A demo visitor with the
         // "add another branch" feature visibly on would hit the cap on the
         // very first attempt (the seeded Main branch already consumes the
         // only slot). Matches BUSINESS-tier's unlimited value (prisma/seed.ts)
@@ -142,7 +161,12 @@ export class DemoService {
         subdomain: DemoService.SUBDOMAIN,
         status: "ACTIVE",
         currentPlanId: plan.id,
-        featureOverrides: DemoService.ALL_FEATURES as any,
+        // Grant-mode overrides: plain `true` grants, never `__replace:false`.
+        featureOverrides: Object.fromEntries(
+          Object.entries(DemoService.ALL_FEATURES)
+            .filter(([, on]) => on)
+            .map(([key]) => [key, { mode: "grant" }]),
+        ) as any,
       },
     });
 

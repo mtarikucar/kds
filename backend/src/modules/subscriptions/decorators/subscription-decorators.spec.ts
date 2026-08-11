@@ -1,70 +1,73 @@
 import { Reflector } from "@nestjs/core";
-import {
-  RequiresFeature,
-  REQUIRED_FEATURES_KEY,
-} from "./requires-feature.decorator";
-import { RequiresPlan, REQUIRED_PLANS_KEY } from "./requires-plan.decorator";
-import {
-  RequiresActiveSubscription,
-  REQUIRES_ACTIVE_SUBSCRIPTION_KEY,
-} from "./requires-active-subscription.decorator";
-import { CheckLimit, CHECK_LIMIT_KEY, LimitType } from "./check-limit.decorator";
-import {
-  PlanFeature,
-  SubscriptionPlanType,
-} from "../../../common/constants/subscription.enum";
+import { RequiresFeature } from "./requires-feature.decorator";
+import { RequiresIntegration } from "./requires-integration.decorator";
+import { REQUIRE_ENTITLEMENT_KEY } from "../../entitlements/require-entitlement.decorator";
+import { PlanFeature } from "../../../common/constants/subscription.enum";
 
 /**
- * Long-tail spec for the subscription gating decorators. These are
- * SetMetadata factories read by SubscriptionGuard/PlanFeatureGuard. The
- * load-bearing contract is the metadata KEY + VALUE attached to the handler
- * — a wrong key would silently disable the gate (route becomes open).
+ * The gating decorators are SetMetadata factories read by EntitlementGuard.
+ * The load-bearing contract is the metadata KEY + VALUE on the handler — a
+ * wrong key silently disables the gate and the route becomes open.
+ *
+ * v3.3.0 made both decorators thin aliases over `@RequireEntitlement`, which
+ * is how 85 call sites across ~40 controllers migrated without being edited.
+ * These tests pin the translation, because it is the thing standing between
+ * "the decorator still compiles" and "the decorator still gates".
+ *
+ * `@RequiresPlan`, `@RequiresActiveSubscription` and `@CheckLimit` are gone:
+ * the first two had zero call sites, and numeric limits (except branches, now
+ * enforced inside the branch-creation transaction) no longer exist.
  */
 describe("subscription gating decorators", () => {
   const reflector = new Reflector();
 
-  it("RequiresFeature stores the feature list under REQUIRED_FEATURES_KEY", () => {
+  it("RequiresFeature emits prefixed feature requirements", () => {
     class C {
       @RequiresFeature(PlanFeature.ADVANCED_REPORTS, PlanFeature.API_ACCESS)
       m() {}
     }
-    const meta = reflector.get(REQUIRED_FEATURES_KEY, C.prototype.m);
-    expect(meta).toEqual([
-      PlanFeature.ADVANCED_REPORTS,
-      PlanFeature.API_ACCESS,
+    expect(reflector.get(REQUIRE_ENTITLEMENT_KEY, C.prototype.m)).toEqual([
+      { feature: "feature.advancedReports" },
+      { feature: "feature.apiAccess" },
     ]);
   });
 
-  it("RequiresPlan stores the allowed plan list under REQUIRED_PLANS_KEY", () => {
+  it("maps every PlanFeature value to its engine key verbatim", () => {
+    // The identity that makes the alias safe. If an enum value and its
+    // entitlement key ever diverge, the decorator resolves to a key nothing
+    // grants and the route 403s for everybody.
+    for (const feature of Object.values(PlanFeature)) {
+      class C {
+        @RequiresFeature(feature)
+        m() {}
+      }
+      expect(reflector.get(REQUIRE_ENTITLEMENT_KEY, C.prototype.m)).toEqual([
+        { feature: `feature.${feature}` },
+      ]);
+    }
+  });
+
+  it("RequiresIntegration emits a requirement with NO provider", () => {
+    // Deliberate: an integration route means "the tenant owns at least one
+    // vendor in this domain". Emitting a provider here would 403 a tenant who
+    // owns a different vendor in the same domain — e.g. an e-Fatura customer
+    // hitting a fiscal route gated on Hugin.
     class C {
-      @RequiresPlan(SubscriptionPlanType.PRO, SubscriptionPlanType.BUSINESS)
+      @RequiresIntegration("fiscal", "delivery")
       m() {}
     }
-    const meta = reflector.get(REQUIRED_PLANS_KEY, C.prototype.m);
-    expect(meta).toEqual([
-      SubscriptionPlanType.PRO,
-      SubscriptionPlanType.BUSINESS,
+    expect(reflector.get(REQUIRE_ENTITLEMENT_KEY, C.prototype.m)).toEqual([
+      { integration: "integration.fiscal" },
+      { integration: "integration.delivery" },
     ]);
   });
 
-  it("RequiresActiveSubscription stores true under its key", () => {
+  it("attaches nothing when the decorator is absent (gates are opt-in)", () => {
     class C {
-      @RequiresActiveSubscription()
       m() {}
     }
     expect(
-      reflector.get(REQUIRES_ACTIVE_SUBSCRIPTION_KEY, C.prototype.m),
-    ).toBe(true);
-  });
-
-  it("CheckLimit stores the limit type under CHECK_LIMIT_KEY", () => {
-    class C {
-      @CheckLimit(LimitType.PRODUCTS)
-      m() {}
-    }
-    expect(reflector.get(CHECK_LIMIT_KEY, C.prototype.m)).toBe(
-      LimitType.PRODUCTS,
-    );
-    expect(LimitType.PRODUCTS).toBe("maxProducts");
+      reflector.get(REQUIRE_ENTITLEMENT_KEY, C.prototype.m),
+    ).toBeUndefined();
   });
 });

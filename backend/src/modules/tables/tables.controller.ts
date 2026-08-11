@@ -27,28 +27,22 @@ import { MergeTablesDto, UnmergeTableDto } from "./dto/merge-tables.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
 import { BranchScope } from "../../common/scoping/branch-scope";
-import {
-  CheckLimit,
-  LimitType,
-} from "../subscriptions/decorators/check-limit.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
 
 @ApiTags("tables")
 @ApiBearerAuth()
 @Controller("tables")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class TablesController {
   constructor(private readonly tablesService: TablesService) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @CheckLimit(LimitType.TABLES)
   @ApiOperation({ summary: "Create a new table (ADMIN, MANAGER)" })
   @ApiResponse({ status: 201, description: "Table successfully created" })
   @ApiResponse({ status: 409, description: "Table number already exists" })

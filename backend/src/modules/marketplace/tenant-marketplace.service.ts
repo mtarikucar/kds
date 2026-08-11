@@ -14,6 +14,11 @@ import { AddOnCatalogService } from "./addon-catalog.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { EntitlementSet } from "../entitlements/entitlement.types";
 import { INTEGRATION_COVERED_BY_FEATURE } from "../entitlements/integration-coverage";
+import { featureKey } from "../entitlements/entitlement-keys.const";
+import { LicensingService } from "../licensing/licensing.service";
+
+/** `feature.license` — the grant that marks a live annual licence. */
+const LICENSE_FEATURE_KEY = featureKey("license");
 
 /**
  * Tenant-facing operations: purchase, cancel, list-mine.
@@ -28,9 +33,11 @@ import { INTEGRATION_COVERED_BY_FEATURE } from "../entitlements/integration-cove
  * free grant cannot be minted even if a future caller forgets to route
  * through checkout. Only zero-priced add-ons may be provisioned for free.
  *
- * Dependency check rule: every entry in `deps` must currently apply to the
- * tenant. Plan deps (`plan:PRO`) match Tenant.currentPlan.name. Add-on deps
- * match the codes of currently-active TenantAddOn rows for the tenant.
+ * Dependency check rule: every entry in `deps` is a bare catalog code and
+ * must match a currently-ACTIVE TenantAddOn row for the tenant. The pre-3.3
+ * `plan:<NAME>` form is retired along with plans themselves — the catalog
+ * validator rejects it at write time, and any that survive in old data are
+ * treated as unsatisfiable, which is the truth.
  */
 @Injectable()
 export class TenantMarketplaceService {
@@ -41,6 +48,7 @@ export class TenantMarketplaceService {
     private readonly catalog: AddOnCatalogService,
     private readonly outbox: OutboxService,
     private readonly entitlements: EntitlementService,
+    private readonly licensing: LicensingService,
   ) {}
 
   /**
@@ -105,6 +113,14 @@ export class TenantMarketplaceService {
     const entries = Object.entries(grants ?? {});
     if (entries.length === 0) return false;
     for (const [key, value] of entries) {
+      if (key === LICENSE_FEATURE_KEY) {
+        // The licence is a TERM product, not a capability the tenant either
+        // has or doesn't. Treating "you already hold a licence" as "included"
+        // would mark it covered the moment it is bought and make it
+        // unsellable — including at renewal, which is exactly when it must be
+        // buyable. Never redundant.
+        return false;
+      }
       if (key.startsWith("limit.")) {
         // Additive capacity — never redundant.
         return false;
@@ -147,11 +163,27 @@ export class TenantMarketplaceService {
       quantity?: number;
       branchId?: string;
       paymentRef?: string;
+      /** Prorated amount actually charged, in kuruş. Snapshot for the invoice. */
+      chargedCents?: number;
+      /** { annualPriceCents, proratedDays, cycleDays, mode } from the quote. */
+      pricingMeta?: Record<string, unknown>;
+      /** Anniversary-aligned period from the priced line. */
+      periodStart?: Date;
+      periodEnd?: Date;
     },
     // When supplied (checkout/PayTR settlement), the grant joins the caller's
     // transaction so it rolls back atomically with the rest of the cart instead
     // of committing on a separate connection.
     callerTx?: Prisma.TransactionClient,
+    /**
+     * Operator comp. The documented way to hand a tenant a product for free —
+     * NOT `Tenant.featureOverrides`, which projects `{__replace:false}` for
+     * every key it carries and would permanently suppress a product the
+     * tenant later pays for. A comp is an ordinary ownership row: auditable,
+     * expiring on the anniversary like everything else, visible in the
+     * tenant's owned list, and incapable of poisoning a future purchase.
+     */
+    opts?: { comp?: { actorId: string; reason: string } },
   ) {
     const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
     // Default-deny: an add-on status the catalog UI doesn't know about
@@ -177,7 +209,8 @@ export class TenantMarketplaceService {
     // regardless of which controller calls it (defence in depth behind the
     // removal of the tenant-facing free /addons/purchase endpoint). Free
     // add-ons (priceCents === 0) may still be provisioned without payment.
-    if (addOn.priceCents > 0 && !input.paymentRef) {
+    const isComp = !!opts?.comp;
+    if (addOn.priceCents > 0 && !input.paymentRef && !isComp) {
       throw new ForbiddenException(
         `Add-on "${addOn.code}" requires payment; purchase it through checkout.`,
       );
@@ -186,45 +219,67 @@ export class TenantMarketplaceService {
     // Verify deps are satisfied for this specific tenant. Catalog-level
     // resolveDeps only confirms the dep references exist; this is the
     // tenant-specific apply-time check.
+    //
+    // Deps are bare catalog codes. Checkout's AddonPurchasabilityService runs
+    // the same check BEFORE payment and additionally accepts a sibling cart
+    // line as satisfying a dep, which is why an opening cart of
+    // licence + module + credit pack settles cleanly: CheckoutService
+    // provisions in dependency order, so by the time this runs each
+    // prerequisite is already an active row.
     if (addOn.deps.length > 0) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-        include: { currentPlan: { select: { name: true } } },
-      });
-      if (!tenant) throw new NotFoundException("Tenant not found");
-
-      const planName = tenant.currentPlan?.name ?? null;
       const activeAddOns = await this.prisma.tenantAddOn.findMany({
         where: { tenantId, status: "active" },
         include: { addOn: { select: { code: true } } },
       });
       const haveAddOnCodes = new Set(activeAddOns.map((ta) => ta.addOn.code));
 
-      const missing: string[] = [];
-      for (const dep of addOn.deps) {
-        if (dep.startsWith("plan:")) {
-          if (`plan:${planName ?? ""}` !== dep) missing.push(dep);
-        } else if (!haveAddOnCodes.has(dep)) {
-          missing.push(dep);
-        }
-      }
+      const missing = addOn.deps.filter((dep) => !haveAddOnCodes.has(dep));
       if (missing.length > 0) {
         throw new BadRequestException(
-          `Add-on requires: ${missing.join(", ")}. Upgrade your plan or purchase the required add-ons first.`,
+          `Add-on requires: ${missing.join(", ")}. Purchase the required products first.`,
         );
       }
+    }
+
+    // Credit packs are balances, not entitlements — they mint a CreditLot and
+    // never an ownership row. Routing one through here would create a
+    // TenantAddOn that grants nothing and renews forever.
+    if (addOn.kind === "credit") {
+      throw new BadRequestException(
+        `"${addOn.code}" is a credit pack — provision it with purchaseCredits().`,
+      );
     }
 
     const qty = input.quantity ?? 1;
     const now = new Date();
 
-    // Recurring add-ons project a 30-day window so the cancellation flow has
-    // a meaningful `currentPeriodEnd`. Real billing cycles are aligned to
-    // the parent Subscription cycle once Phase 5 checkout wires them up.
-    const currentPeriodEnd =
-      addOn.billing === "oneTime"
-        ? null
-        : new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+    // Annual products run to the tenant's ANNIVERSARY, not to a rolling
+    // window, so the whole account renews on one date with one invoice. The
+    // caller (checkout) passes the period from the priced line so the charged
+    // proration and the provisioned period can never disagree; the fallback
+    // resolves it fresh for direct callers such as an operator comp.
+    let currentPeriodEnd: Date | null = null;
+    let currentPeriodStart = now;
+    if (addOn.billing !== "oneTime") {
+      if (input.periodEnd) {
+        currentPeriodEnd = input.periodEnd;
+        currentPeriodStart = input.periodStart ?? now;
+      } else {
+        const ctx = await this.licensing.loadContext(tenantId, now);
+        const priced = this.licensing.price(ctx, addOn.priceCents);
+        currentPeriodEnd = priced.periodEnd;
+        currentPeriodStart = priced.periodStart;
+      }
+    }
+
+    const ownershipMeta = {
+      chargedCents: isComp ? 0 : (input.chargedCents ?? null),
+      currency: addOn.currency,
+      pricingMeta: (input.pricingMeta ?? null) as Prisma.InputJsonValue | null,
+      origin: isComp ? "comp" : "purchase",
+      compReason: opts?.comp?.reason ?? null,
+      compActorId: opts?.comp?.actorId ?? null,
+    };
 
     // Wrap the idempotency-check, dup-check, and create in a SERIALIZABLE
     // transaction. The TenantAddOn table has no partial unique index on
@@ -276,16 +331,21 @@ export class TenantMarketplaceService {
           where: { id: renewable.id },
           data: {
             status: "active",
-            quantity: qty,
+            // A renewal honours any pending capacity downgrade the tenant
+            // scheduled; otherwise it keeps what they had.
+            quantity: renewable.pendingQuantity ?? qty,
+            pendingQuantity: null,
             activatedAt: now,
-            currentPeriodStart: now,
+            currentPeriodStart,
             currentPeriodEnd,
             cancelAtPeriodEnd: false,
             cancelledAt: null,
             endedAt: null,
             paymentRef: input.paymentRef ?? null,
+            ...ownershipMeta,
           },
         });
+        await this.stampLicenceAnchor(tx, tenantId, addOn.kind, now);
         await this.outbox.append(
           {
             type: EventTypes.AddOnPurchased,
@@ -313,8 +373,60 @@ export class TenantMarketplaceService {
         },
       });
       if (dup) {
+        // CAPACITY is quantity-based: buying a third branch when you own two
+        // must ADD one, not fail. Pre-3.3 this threw "change quantity
+        // instead" and pointed at a path that did not exist, which made
+        // capacity unsellable past a single unit. Already-paid units are
+        // never re-prorated — only the delta was charged — so the history
+        // entry records what this increment actually cost.
+        if (addOn.kind === "capacity") {
+          const history = Array.isArray(
+            (dup.pricingMeta as any)?.quantityHistory,
+          )
+            ? (dup.pricingMeta as any).quantityHistory
+            : [];
+          const bumped = await tx.tenantAddOn.update({
+            where: { id: dup.id },
+            data: {
+              quantity: { increment: qty },
+              paymentRef: input.paymentRef ?? dup.paymentRef,
+              chargedCents:
+                (dup.chargedCents ?? 0) + (ownershipMeta.chargedCents ?? 0),
+              pricingMeta: {
+                ...((dup.pricingMeta as any) ?? {}),
+                ...((input.pricingMeta as any) ?? {}),
+                quantityHistory: [
+                  ...history,
+                  {
+                    at: now.toISOString(),
+                    from: dup.quantity,
+                    to: dup.quantity + qty,
+                    chargedCents: ownershipMeta.chargedCents ?? 0,
+                    paymentRef: input.paymentRef ?? null,
+                  },
+                ],
+              } as Prisma.InputJsonValue,
+            },
+          });
+          await this.outbox.append(
+            {
+              type: EventTypes.AddOnPurchased,
+              tenantId,
+              payload: {
+                tenantId,
+                addOnId: bumped.id,
+                addOnCode: addOn.code,
+                branchId: input.branchId ?? null,
+                quantity: bumped.quantity,
+              },
+            },
+            tx,
+          );
+          return bumped;
+        }
+
         throw new BadRequestException(
-          `Add-on "${addOn.code}" is already active for this ${input.branchId ? "branch" : "tenant"}. Cancel the existing subscription or change quantity instead.`,
+          `Add-on "${addOn.code}" is already active for this ${input.branchId ? "branch" : "tenant"}.`,
         );
       }
 
@@ -326,11 +438,14 @@ export class TenantMarketplaceService {
           quantity: qty,
           status: "active",
           activatedAt: now,
-          currentPeriodStart: now,
+          currentPeriodStart,
           currentPeriodEnd,
           paymentRef: input.paymentRef ?? null,
+          ...ownershipMeta,
         },
       });
+
+      await this.stampLicenceAnchor(tx, tenantId, addOn.kind, now);
 
       await this.outbox.append(
         {
@@ -374,6 +489,117 @@ export class TenantMarketplaceService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Stamp the tenant's anniversary anchor the first time they are licensed.
+   *
+   * No-op for every other product kind, and no-op on renewal — the update is
+   * scoped to `licenseAnchorAt: null`. That "write once" property is the
+   * entire reason the anchor lives on Tenant instead of on the ownership row:
+   * `purchase()` rewrites `activatedAt` on every renewal, so an anchor
+   * derived from it would drift forward each time a customer paid late.
+   */
+  private async stampLicenceAnchor(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    kind: string,
+    now: Date,
+  ): Promise<void> {
+    if (kind !== "license") return;
+    const ctx = await this.licensing.loadContext(tenantId, now);
+    await this.licensing.stampAnchorIfAbsent(
+      tx,
+      tenantId,
+      this.licensing.resolveAnchorFor(ctx),
+    );
+  }
+
+  /**
+   * Provision a prepaid credit pack.
+   *
+   * Deliberately separate from `purchase()`: credits are a BALANCE, not an
+   * entitlement. They create no ownership row, never renew, and are read live
+   * inside the advisory-locked consumption transaction rather than from the
+   * 30-second entitlement cache — a stale balance during a burst would be a
+   * real money bug (one 3D generation is a ~₺12 vendor charge).
+   *
+   * Idempotent on (tenantId, paymentRef, addOnCode) so an aggressive PayTR
+   * webhook retry cannot double-grant.
+   */
+  async purchaseCredits(
+    tenantId: string,
+    input: {
+      addOnCode: string;
+      quantity?: number;
+      paymentRef?: string;
+      chargedCents?: number;
+    },
+    callerTx?: Prisma.TransactionClient,
+    opts?: { comp?: { actorId: string; reason: string } },
+  ) {
+    const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
+    if (addOn.kind !== "credit") {
+      throw new BadRequestException(`"${addOn.code}" is not a credit pack.`);
+    }
+    if (addOn.status !== "published" && !opts?.comp) {
+      throw new BadRequestException(
+        `Credit pack "${addOn.code}" is not available for purchase.`,
+      );
+    }
+    if (!addOn.creditKind || !addOn.creditUnits) {
+      throw new BadRequestException(
+        `Credit pack "${addOn.code}" is misconfigured: no creditKind/creditUnits.`,
+      );
+    }
+    const isComp = !!opts?.comp;
+    if (addOn.priceCents > 0 && !input.paymentRef && !isComp) {
+      throw new ForbiddenException(
+        `Credit pack "${addOn.code}" requires payment; purchase it through checkout.`,
+      );
+    }
+
+    const qty = input.quantity ?? 1;
+    const units = addOn.creditUnits * qty;
+    const source = isComp
+      ? `comp:admin:${opts!.comp!.actorId}`
+      : `purchase:${addOn.code}`;
+
+    const write = async (tx: Prisma.TransactionClient) => {
+      // The unique index is (tenantId, paymentRef, addOnCode). A comp has no
+      // paymentRef, so two comps of the same pack are both allowed — which is
+      // correct: an operator granting credits twice means twice the credits.
+      if (input.paymentRef) {
+        const existing = await tx.creditLot.findFirst({
+          where: {
+            tenantId,
+            paymentRef: input.paymentRef,
+            addOnCode: addOn.code,
+          },
+        });
+        if (existing) return existing;
+      }
+      return tx.creditLot.create({
+        data: {
+          tenantId,
+          kind: addOn.creditKind!,
+          units,
+          source,
+          addOnCode: addOn.code,
+          paymentRef: input.paymentRef ?? null,
+          priceCents: isComp
+            ? 0
+            : (input.chargedCents ?? addOn.priceCents * qty),
+          currency: addOn.currency,
+        },
+      });
+    };
+
+    const lot = callerTx ? await write(callerTx) : await write(this.prisma);
+    this.logger.log(
+      `Credits granted: tenant=${tenantId} kind=${addOn.creditKind} units=${units} source=${source}`,
+    );
+    return lot;
   }
 
   async cancel(tenantId: string, tenantAddOnId: string, immediate = false) {

@@ -1,149 +1,102 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock, Sparkles, ArrowRight } from 'lucide-react';
-import { PlanFeatures, PlanLimits, SubscriptionPlanType } from '../../types';
+import { Lock, ArrowRight, RefreshCw } from 'lucide-react';
+import { useEntitlements } from '../../contexts/SubscriptionContext';
+import { formatCents } from '../../features/licensing/licensingApi';
 import Button from '../ui/Button';
 
-// Map features to their minimum required plan
-const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
-  kdsIntegration: SubscriptionPlanType.FREE,
-  inventoryTracking: SubscriptionPlanType.BASIC,
-  // v3.0.0 — POS access bundled with BASIC and above.
-  posAccess: SubscriptionPlanType.BASIC,
-  advancedReports: SubscriptionPlanType.PRO,
-  multiLocation: SubscriptionPlanType.PRO,
-  customBranding: SubscriptionPlanType.PRO,
-  prioritySupport: SubscriptionPlanType.PRO,
-  reservationSystem: SubscriptionPlanType.PRO,
-  personnelManagement: SubscriptionPlanType.PRO,
-  deliveryIntegration: SubscriptionPlanType.PRO,
-  apiAccess: SubscriptionPlanType.BUSINESS,
-  externalDisplay: SubscriptionPlanType.BUSINESS,
-  // AI menu studio (photo/video generation, 3D, OCR import) — PRO and above.
-  aiContentGeneration: SubscriptionPlanType.PRO,
-};
-
-// Map limit types to their display names
-const limitDisplayNames: Record<keyof PlanLimits, string> = {
-  maxUsers: 'users',
-  maxTables: 'tables',
-  // v3.0.0 — branches usage card key, paired with maxBranches limit.
-  maxBranches: 'branches',
-  maxProducts: 'products',
-  maxCategories: 'categories',
-  maxMonthlyOrders: 'monthlyOrders',
-  maxMonthlyAiPhotos: 'aiPhotos',
-  maxMonthlyAiVideos: 'aiVideos',
-  maxMonthlyAi3dModels: 'ai3dModels',
-};
-
-interface UpgradePromptProps {
-  feature?: keyof PlanFeatures;
-  limitType?: keyof PlanLimits;
+interface PurchasePromptProps {
+  /** Entitlement key the caller needs — bare or prefixed. */
+  feature?: string;
+  limitKey?: string;
   currentCount?: number;
   limit?: number;
   compact?: boolean;
-  className?: string;
 }
 
 /**
- * Component to show an upgrade prompt when a feature or limit is restricted.
+ * "You need X — here is what X costs you today."
+ *
+ * The price comes from the licensing snapshot, which is the same catalog read
+ * checkout prices from, so the number shown here is the number charged. The
+ * previous implementation mapped each feature to a plan tier through a
+ * hardcoded table in this file and told the user to "upgrade to PRO" — a
+ * second source of pricing truth that nothing kept in sync, and meaningless
+ * once products are sold one at a time.
+ *
+ * The prorated figure is the honest one to lead with: a module bought in
+ * month ten costs a tenth of the year, and quoting the full annual price would
+ * overstate what the customer is about to pay by an order of magnitude.
  */
 const UpgradePrompt = ({
   feature,
-  limitType,
+  limitKey,
   currentCount,
   limit,
-  compact = false,
-  className = '',
-}: UpgradePromptProps) => {
-  const { t } = useTranslation(['subscriptions', 'common']);
+  compact,
+}: PurchasePromptProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation(['plan', 'common']);
+  const { offerFor, license } = useEntitlements();
 
-  const handleUpgrade = () => {
-    navigate('/subscription/change-plan');
-  };
+  const key = feature ?? limitKey ?? '';
+  const offer = offerFor(key);
+  const needsLicense = license.status === 'none' || license.status === 'expired';
+  const isRenewal = license.status === 'expired';
 
-  // Determine the required plan for upgrade message
-  const requiredPlan = feature ? featurePlanMap[feature] : SubscriptionPlanType.PRO;
-
-  // Get feature or limit display name
-  const getDisplayName = () => {
-    if (feature) {
-      return t(`subscriptions:subscriptions.feature${feature.charAt(0).toUpperCase() + feature.slice(1)}`, {
-        defaultValue: feature,
-      });
-    }
-    if (limitType) {
-      const key = limitDisplayNames[limitType];
-      return t(`subscriptions:subscriptions.planLimits.${key}`, { defaultValue: limitType });
-    }
-    return '';
-  };
-
-  // Compact version for inline use
-  if (compact) {
-    return (
-      <div className={`flex items-center gap-2 text-sm text-amber-600 ${className}`}>
-        <Lock className="h-4 w-4" />
-        <span>
-          {limitType && currentCount !== undefined && limit !== undefined
-            ? t('subscriptions:subscriptions.limitReached', {
-                current: currentCount,
-                limit: limit,
-              })
-            : t('subscriptions:subscriptions.featureRequiresPlan', {
-                plan: requiredPlan,
-              })}
-        </span>
-        <button
-          onClick={handleUpgrade}
-          className="text-blue-600 hover:text-blue-700 font-medium underline"
-        >
-          {t('subscriptions:subscriptions.upgrade')}
-        </button>
-      </div>
+  const goToStore = () =>
+    navigate(
+      offer
+        ? `/admin/store?tab=catalog&focus=${encodeURIComponent(offer.code)}`
+        : '/admin/store?tab=catalog',
     );
-  }
 
-  // Full version for page-level blocks
+  const title = offer?.name ?? t('plan:upsell.defaultTitle');
+  const priceLine = offer
+    ? offer.proratedCents === offer.annualPriceCents
+      ? `${formatCents(offer.annualPriceCents, offer.currency)} ${t('plan:upsell.perYear')}`
+      : t('plan:upsell.proratedPrice', {
+          prorated: formatCents(offer.proratedCents, offer.currency),
+          annual: formatCents(offer.annualPriceCents, offer.currency),
+        })
+    : null;
+
   return (
     <div
-      className={`bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-8 text-center ${className}`}
+      className={`flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-center dark:border-gray-700 dark:bg-gray-900 ${
+        compact ? 'gap-2 p-4' : 'gap-3 p-8'
+      }`}
+      data-testid="purchase-prompt"
     >
-      <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mb-4">
-        <Sparkles className="h-8 w-8 text-amber-600" />
+      <div className="rounded-full bg-amber-100 p-3 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
+        {isRenewal ? <RefreshCw size={compact ? 18 : 24} /> : <Lock size={compact ? 18 : 24} />}
       </div>
 
-      <h3 className="text-xl font-bold text-slate-900 mb-2">
-        {t('subscriptions:subscriptions.upgradeRequired')}
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+        {title}
       </h3>
 
-      <p className="text-slate-600 mb-6 max-w-md mx-auto">
-        {limitType && currentCount !== undefined && limit !== undefined ? (
-          <>
-            {t('subscriptions:subscriptions.limitReachedDescription', {
-              resource: getDisplayName(),
-              current: currentCount,
-              limit: limit,
-            })}
-          </>
-        ) : (
-          <>
-            {t('subscriptions:subscriptions.featureNotAvailable', {
-              feature: getDisplayName(),
-            })}
-            <br />
-            {t('subscriptions:subscriptions.upgradeToAccess', {
-              plan: requiredPlan,
-            })}
-          </>
-        )}
-      </p>
+      {limitKey && limit !== undefined ? (
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('plan:upsell.limitReached', { current: currentCount ?? 0, limit })}
+        </p>
+      ) : (
+        <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
+          {needsLicense
+            ? t('plan:upsell.licenceRequired')
+            : t('plan:upsell.defaultDescription')}
+        </p>
+      )}
 
-      <Button variant="primary" onClick={handleUpgrade} className="inline-flex items-center gap-2">
-        {t('subscriptions:subscriptions.viewPlans')}
-        <ArrowRight className="h-4 w-4" />
+      {priceLine && (
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {priceLine}
+        </p>
+      )}
+
+      <Button onClick={goToStore} className="mt-1">
+        {isRenewal ? t('plan:upsell.renewCta') : t('plan:upsell.buyCta')}
+        <ArrowRight size={16} className="ml-1" />
       </Button>
     </div>
   );

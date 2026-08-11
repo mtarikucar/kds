@@ -24,7 +24,6 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -33,7 +32,7 @@ import { PlanFeature } from "../../common/constants/subscription.enum";
 @ApiTags("reports")
 @ApiBearerAuth()
 @Controller("reports")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 

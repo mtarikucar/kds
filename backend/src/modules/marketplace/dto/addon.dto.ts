@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -11,9 +13,22 @@ import {
   Min,
 } from "class-validator";
 
-const KIND = ["software", "integration", "capacity", "support"] as const;
-const BILLING = ["recurring", "oneTime"] as const;
+// v3.3.0 à-la-carte vocabulary. Shape validation stops at "is this one of the
+// allowed strings"; the semantic invariants (a credit pack must declare
+// creditKind/creditUnits, an integration must actually grant integration.*,
+// a published row must cost more than zero) live in catalog-validation.ts so
+// the seed, the data migration and the admin API all check the same rules.
+const KIND = [
+  "license",
+  "module",
+  "integration",
+  "capacity",
+  "credit",
+  "service",
+] as const;
+const BILLING = ["annual", "oneTime"] as const;
 const STATUS = ["draft", "published", "archived"] as const;
+const CREDIT_KIND = ["PHOTO", "VIDEO", "MODEL3D", "SMS"] as const;
 
 export class CreateAddOnDto {
   // Code is the immutable handle other systems reference. ASCII letters,
@@ -76,6 +91,52 @@ export class CreateAddOnDto {
   @IsOptional()
   @IsIn(STATUS as any)
   status?: (typeof STATUS)[number];
+
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      "Whether an active licence is required to buy AND use this product. False for the licence itself, credit packs and one-time services.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  requiresLicense?: boolean;
+
+  @ApiPropertyOptional({ enum: CREDIT_KIND })
+  @IsOptional()
+  @IsIn(CREDIT_KIND as any)
+  creditKind?: (typeof CREDIT_KIND)[number];
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  creditUnits?: number;
+
+  @ApiPropertyOptional({ description: "Capacity purchase ceiling per tenant." })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxQuantity?: number;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Localized copy: { tr: { name, description }, en: {...}, ar, ru, uz }. Lives in the DB so shipping a product needs no frontend release.",
+  })
+  @IsOptional()
+  @IsObject()
+  i18n?: Record<string, { name?: string; description?: string }>;
+
+  @ApiPropertyOptional({ example: 0.1, minimum: 0, maximum: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  commissionRate?: number;
 }
 
 export class UpdateAddOnDto {
@@ -128,4 +189,43 @@ export class UpdateAddOnDto {
   @IsOptional()
   @IsIn(STATUS as any)
   status?: (typeof STATUS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresLicense?: boolean;
+
+  @ApiPropertyOptional({ enum: CREDIT_KIND })
+  @IsOptional()
+  @IsIn(CREDIT_KIND as any)
+  creditKind?: (typeof CREDIT_KIND)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  creditUnits?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxQuantity?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  i18n?: Record<string, { name?: string; description?: string }>;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  commissionRate?: number;
 }

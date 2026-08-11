@@ -1,13 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
-import { randomBytes } from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { InvoiceStatus } from "../../../common/constants/subscription.enum";
 import {
   splitGrossAmount,
   DEFAULT_KDV_RATE,
 } from "../../../common/helpers/kdv.helper";
+import { generateInvoiceNumber } from "../../../common/helpers/invoice-number.helper";
 
 type PrismaLike = Prisma.TransactionClient | PrismaService;
 
@@ -34,26 +34,15 @@ export class BillingService {
 
   /**
    * Atomically obtain a new invoice number using an InvoiceCounter row.
-   * Running inside the invoice transaction gives us a serialized
-   * sequence per YYYYMM scope, so two concurrent `createInvoice` calls
-   * can never clash on the same number. A 6-hex suffix also makes raw
-   * enumeration ("guess INV-202604-0001") considerably harder.
+   *
+   * v3.3.0: the implementation moved to common/helpers/invoice-number.helper
+   * so the à-la-carte TenantInvoice writer shares the SAME counter. Both
+   * tables have a unique invoiceNumber over the same format, so a second,
+   * independent sequence would eventually collide — and that collision lands
+   * inside settlement, after the card has already been charged.
    */
-  private async generateInvoiceNumber(tx: PrismaLike): Promise<string> {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const scope = `${year}${month}`;
-
-    const counter = await tx.invoiceCounter.upsert({
-      where: { scope },
-      create: { scope, sequence: 1 },
-      update: { sequence: { increment: 1 } },
-    });
-
-    const sequence = String(counter.sequence).padStart(4, "0");
-    const suffix = randomBytes(3).toString("hex"); // 6 hex chars
-    return `INV-${scope}-${sequence}-${suffix}`;
+  private generateInvoiceNumber(tx: PrismaLike): Promise<string> {
+    return generateInvoiceNumber(tx);
   }
 
   /**

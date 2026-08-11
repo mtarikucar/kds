@@ -42,7 +42,13 @@
     "defaultDescription": "Bu sahifaga kirish uchun tarifingizni yangilashingiz yoki mos qoʻshimchani sotib olishingiz kerak.",
     "upgradePlanCta": "Tarifni yangilash",
     "viewAddOnCta": "Qoʻshimchani koʻrish",
-    "helpHint": "Savollaringiz boʻlsa, qoʻllab-quvvatlash xizmatiga murojaat qiling."
+    "helpHint": "Savollaringiz boʻlsa, qoʻllab-quvvatlash xizmatiga murojaat qiling.",
+    "buyCta": "Sotib olish",
+    "renewCta": "Yangilash",
+    "perYear": "/yil",
+    "proratedPrice": "Bugun olsangiz {{prorated}} ({{annual}}/yil)",
+    "licenceRequired": "Bu funksiya uchun faol yillik litsenziya kerak.",
+    "limitReached": "Limitga yetdingiz ({{current}}/{{limit}})."
   },
   "branchPicker": {
     "activeBranch": "Faol filialni tanlang",

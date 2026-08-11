@@ -15,6 +15,7 @@ import { CheckoutIntentService } from "./checkout-intent.service";
 import { CheckoutSettlementService } from "./checkout-settlement.service";
 import { CheckoutNotificationsService } from "./checkout-notifications.service";
 import { AddonPurchasabilityService } from "./addon-purchasability.service";
+import { TenantInvoiceService } from "./tenant-invoice.service";
 
 @Module({
   imports: [
@@ -46,12 +47,17 @@ import { AddonPurchasabilityService } from "./addon-purchasability.service";
     // Task 1 — tahsilat-önü guard: included/owned/deps-tier/redundant-limit
     // checks BEFORE createIntent ever mints a CheckoutIntent row.
     AddonPurchasabilityService,
+    // v3.3.0 — itemized à-la-carte invoices (tenant_invoices), written inside
+    // the provisioning transaction. Separate from the legacy subscription
+    // Invoice table, which is frozen as a tax-retention archive.
+    TenantInvoiceService,
   ],
   exports: [
     QuoteService,
     CheckoutService,
     HardwareOrdersService,
     CheckoutIntentService,
+    TenantInvoiceService,
     // Exported so PaymentsModule's PaytrWebhookController can dispatch
     // CK- prefix callbacks here.
     CheckoutSettlementService,

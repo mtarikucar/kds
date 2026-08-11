@@ -16,7 +16,7 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { TenantGuard } from "./guards/tenant.guard";
 import { BranchGuard } from "./guards/branch.guard";
-import { SubscriptionStatusGuard } from "../subscriptions/guards/subscription-status.guard";
+import { EntitlementGuard } from "../entitlements/entitlement.guard";
 import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
@@ -66,12 +66,20 @@ import { NotificationsModule } from "../notifications/notifications.module";
       provide: APP_GUARD,
       useClass: BranchGuard,
     },
-    // Onboarding-trial lock — runs LAST (after Jwt/Tenant/Branch set
-    // req.user.tenantId). A tenant with no live subscription (TRIAL_ENDED /
-    // EXPIRED) is gated to the plan-selection + checkout flow.
+    // v3.3.0 — SubscriptionStatusGuard is gone: the core product is free, so
+    // there is no subscription state left to lock on.
+    //
+    // Nothing replaces it, deliberately. The global lockout lever already
+    // exists one layer up: JwtStrategy.validate rejects any request whose
+    // tenant is not ACTIVE with a 401, on every authenticated route, from a
+    // LIVE read. A second guard here would be a weaker duplicate — cached,
+    // allowlist-scoped, and able to disagree with the check that already ran.
+    // Entitlement gates. Registered globally so the @RequiresFeature /
+    // @RequiresIntegration aliases resolve everywhere the old PlanFeatureGuard
+    // did; routes without a decorator pass straight through.
     {
       provide: APP_GUARD,
-      useClass: SubscriptionStatusGuard,
+      useClass: EntitlementGuard,
     },
   ],
   exports: [AuthService],

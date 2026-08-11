@@ -7,13 +7,12 @@ import {
   MockPrismaClient,
 } from '../../common/test/prisma-mock.service';
 
-// Drift tripwire (mirror of plan-mapper-parity.spec.ts's FEATURE_COLUMNS
+// Drift tripwire (see plan-projector.service.spec.ts's baseline snapshot
 // pin): the demo plan's `subscriptionPlan.upsert` create block hand-mirrors
 // every SubscriptionPlan.LIMIT_COLUMNS entry as a generous top-tier value.
 // Reaches the same private static via the same `as any` escape hatch used
 // throughout plan-projector.service.spec.ts / plan-mapper-parity.spec.ts.
-const LIMIT_COLUMNS: readonly string[] = (PlanProjectorService as any)
-  .LIMIT_COLUMNS;
+
 
 /**
  * Guards the self-contained demo environment:
@@ -113,19 +112,36 @@ describe('DemoService', () => {
     expect(planArgs.create.maxMonthlyAiPhotos).toBeGreaterThan(0);
     expect(planArgs.create.maxMonthlyAiVideos).toBeGreaterThan(0);
     expect(planArgs.create.maxMonthlyAi3dModels).toBeGreaterThan(0);
-    // Durable tripwire: every SubscriptionPlan.LIMIT_COLUMNS entry (the
-    // single source of truth PlanProjectorService projects from) must be
-    // set explicitly on this create block, so a future limit column added
-    // to the schema fails LOUDLY here instead of silently falling through
-    // to the Prisma column default the way `maxBranches` did (was missing
-    // -> defaulted to 1 even though ALL_FEATURES.multiLocation is true and
-    // branch creation is separately capped by maxBranches — a demo visitor
-    // could never add a second branch despite the feature reading granted;
-    // fixed alongside this pin — see plan-mapper-parity.spec.ts).
-    for (const col of LIMIT_COLUMNS) {
-      expect(planArgs.create).toHaveProperty(col);
-      expect(typeof planArgs.create[col]).toBe('number');
+    // v3.3.0 tripwire, re-pointed. The old one pinned that every
+    // SubscriptionPlan limit column was set explicitly, because a forgotten
+    // column silently fell through to the Prisma default (maxBranches did
+    // exactly that, capping the demo at one branch while the multiLocation
+    // feature read as granted). Plans no longer decide anything, so what
+    // matters now is that the demo GRANTS every paid capability — otherwise a
+    // screen quietly disappears from the tour and nobody notices.
+    const overrides = (prisma.tenant.upsert as jest.Mock).mock.calls[0][0]
+      .create.featureOverrides;
+    for (const paid of [
+      "license",
+      "advancedReports",
+      "inventoryTracking",
+      "reservationSystem",
+      "personnelManagement",
+      "aiContentGeneration",
+      "apiAccess",
+      "externalDisplay",
+      "prioritySupport",
+      "deliveryIntegration",
+    ]) {
+      expect(overrides[paid]).toEqual({ mode: "grant" });
     }
+    // And that it uses GRANT mode throughout: a `false`/suppress entry
+    // projects `{__replace:false}`, which is the poison pill that
+    // permanently blocks a feature even after it is legitimately bought.
+    for (const value of Object.values(overrides as Record<string, unknown>)) {
+      expect(value).toEqual({ mode: "grant" });
+    }
+
     // Idempotent: tenant/branch/admin go through upsert on their unique keys so
     // a pre-existing/partial demo never collides on the subdomain.
     const tenantArgs = (prisma.tenant.upsert as jest.Mock).mock.calls[0][0];

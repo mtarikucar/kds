@@ -19,7 +19,6 @@ import { RefundSubscriptionPaymentDto } from "../dto/refund-subscription-payment
 import { SuperAdminAuditService } from "./superadmin-audit.service";
 import { AuditAction, EntityType } from "../dto/audit-filter.dto";
 import { SubscriptionService } from "../../subscriptions/services/subscription.service";
-import { SubscriptionSchedulerService } from "../../subscriptions/services/subscription-scheduler.service";
 import { resolvePlanAmount } from "../../subscriptions/plan-pricing.helper";
 import { DEMO_PLAN_NAME } from "../../demo/demo.constants";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
@@ -46,39 +45,15 @@ export class SuperAdminSubscriptionsService {
     private prisma: PrismaService,
     private auditService: SuperAdminAuditService,
     private subscriptionService: SubscriptionService,
-    private scheduler: SubscriptionSchedulerService,
     private paytr: PaytrAdapter,
   ) {}
 
   /**
-   * Manually fire the scheduled trial-expiry sweep. Same code path as
-   * the nightly cron, just triggered on-demand from a superadmin
-   * session or an E2E test that needs to verify the post-expiry state
-   * (TRIALING BUSINESS → ACTIVE FREE) without waiting for midnight.
+   * v3.3.0 — the subscription period-end and expiry-reminder crons are gone
+   * with subscriptions themselves. The equivalents now live on
+   * RenewalSchedulerService (generate / remind / lapse), which ops triggers
+   * through the renewal endpoints rather than through here.
    */
-  async triggerExpireTrials() {
-    return this.subscriptionService.expireTrials();
-  }
-
-  /**
-   * Manually fire the period-end → PAST_DUE sweep. Same code path as
-   * the 02:00 daily cron — used by ops to confirm a tenant whose period
-   * ended a few minutes ago is correctly demoted, and by E2E tests that
-   * can't wait until 02:00.
-   */
-  async triggerPeriodEndSweep() {
-    await this.scheduler.handleSubscriptionPeriodEnd();
-    return { success: true };
-  }
-
-  /**
-   * Manually fire the 7d/3d/1d pre-expiry reminder cron. Same code path
-   * as the 10:00 daily cron.
-   */
-  async triggerExpiryReminders() {
-    await this.scheduler.handleSubscriptionExpiryReminders();
-    return { success: true };
-  }
 
   // Plans
   async findAllPlans() {

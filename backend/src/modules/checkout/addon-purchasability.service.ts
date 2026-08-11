@@ -7,14 +7,16 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
-import { SUBSCRIPTION_PLANS } from "../../common/constants/subscription-plans.const";
-import { SubscriptionPlanType } from "../../common/constants/subscription.enum";
+import { featureKey } from "../entitlements/entitlement-keys.const";
+import { LICENSE_ADDON_CODE } from "../marketplace/catalog-validation";
 
 export type AddonPurchasabilityErrorCode =
-  | "ADDON_INCLUDED_IN_PLAN"
+  | "ADDON_ALREADY_GRANTED"
   | "ADDON_ALREADY_OWNED"
-  | "ADDON_REQUIRES_PLAN"
-  | "ADDON_LIMIT_REDUNDANT";
+  | "ADDON_REQUIRES_DEPENDENCY"
+  | "ADDON_LIMIT_REDUNDANT"
+  | "ADDON_MAX_QUANTITY"
+  | "LICENSE_REQUIRED";
 
 export interface AssertPurchasableInput {
   addOnCode: string;
@@ -23,23 +25,35 @@ export interface AssertPurchasableInput {
 }
 
 /**
- * Pre-payment purchasability gate for marketplace add-ons.
+ * Codes present in the SAME cart. A prerequisite may be satisfied by a
+ * sibling line rather than by something the tenant already owns — the opening
+ * cart necessarily contains both the licence and the first module, and an AI
+ * credit pack is legitimately bought alongside the AI module.
+ */
+export interface CartContext {
+  cartCodes?: ReadonlySet<string>;
+  /**
+   * This cart is a generated RENEWAL. Every line is something the tenant
+   * already owns — that is what a renewal IS — so the ownership and
+   * already-granted checks must not fire. Without this the renewal cart is
+   * rejected line by line and nobody can ever pay their anniversary invoice.
+   *
+   * The licence prerequisite and the dependency check still run: a renewal
+   * that drops the licence but keeps a module is exactly the case the
+   * prerequisite exists for.
+   */
+  isRenewal?: boolean;
+}
+
+/**
+ * Pre-payment purchasability gate for catalog products.
  *
- * `TenantMarketplaceService.purchase()` already runs an included-in-plan
- * fold, an active-duplicate guard, and a deps check — but ONLY inside
- * `purchase()` / `confirmAndProvision`, which runs AFTER PayTR has settled
- * the charge. That means a tenant can pay full price for an add-on their
- * plan already includes, one they already actively own, or one whose deps
- * they don't meet: `purchase()` then rejects the grant and there is no
- * refund rail (DEF-1 / DEF-2 / DEF-4).
- *
- * This service lifts the SAME three checks (plus the DEF-8 redundant-limit
- * check) in front of payment. `CheckoutIntentService.createIntent` calls
- * `assertPurchasable()` for every `addon` cart line BEFORE minting a
- * CheckoutIntent row or calling PayTR, so a doomed purchase never reaches
- * the payment gateway. `purchase()`'s own guards are NOT removed — they
- * stay as defence in depth for any caller that bypasses checkout (a direct
- * superadmin-comp path, a future integration, a replayed request).
+ * `TenantMarketplaceService.purchase()` runs equivalent checks, but only
+ * inside `confirmAndProvision` — AFTER PayTR has settled the charge. Without
+ * this service a tenant can pay full price for something they already have,
+ * or whose prerequisites they don't meet: the grant is then refused and there
+ * is no refund rail (DEF-1 / DEF-2 / DEF-4). purchase()'s own guards stay as
+ * defence in depth for callers that bypass checkout.
  */
 @Injectable()
 export class AddonPurchasabilityService {
@@ -52,24 +66,69 @@ export class AddonPurchasabilityService {
   async assertPurchasable(
     tenantId: string,
     input: AssertPurchasableInput,
+    ctx: CartContext = {},
   ): Promise<void> {
     const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
     const grants = (addOn.grants as Record<string, unknown> | null) ?? null;
     const ent = await this.entitlements.getForTenant(tenantId);
+    const cartCodes = ctx.cartCodes ?? new Set<string>();
+    const hasLicense = ent.features?.[featureKey("license")] === true;
 
-    // 1) Already covered by the tenant's effective entitlements (plan +
-    // existing add-ons + overrides) — paying again buys nothing (DEF-1).
-    if (TenantMarketplaceService.isIncludedInEntitlements(grants, ent)) {
+    // 1) The licence prerequisite. Everything gated on it is unusable without
+    // one — the projector suppresses the grants of every `requiresLicense`
+    // product while the licence is dark — so selling one first would take
+    // money for access the buyer cannot exercise.
+    if (addOn.requiresLicense && !hasLicense) {
+      if (!cartCodes.has(LICENSE_ADDON_CODE)) {
+        this.reject(
+          "LICENSE_REQUIRED",
+          addOn.code,
+          `"${addOn.name}" requires an active HummyTummy licence. Add the licence to your cart first.`,
+        );
+      }
+    }
+
+    // 2) The licence itself: one at a time — EXCEPT on a renewal, which
+    // re-pays the existing row rather than minting a second one.
+    if (addOn.kind === "license") {
+      if (hasLicense && !ctx.isRenewal) {
+        this.reject(
+          "ADDON_ALREADY_OWNED",
+          addOn.code,
+          `Your licence is already active. It renews on your anniversary.`,
+        );
+      }
+      return; // no ownership/redundancy checks apply to the licence
+    }
+
+    // 3) Credit packs are consumable, not entitlements: buying a second pack
+    // is always meaningful, so none of the ownership or redundancy checks
+    // below apply. Only the dependency check does — a pack whose spending
+    // module the tenant does not own is money they cannot use.
+    if (addOn.kind === "credit") {
+      await this.assertDeps(tenantId, addOn, cartCodes);
+      return;
+    }
+
+    // 4) Already covered by the tenant's effective entitlements — paying
+    // again buys nothing (DEF-1). A renewal is the one case where paying for
+    // something you already have is the whole point.
+    if (
+      !ctx.isRenewal &&
+      TenantMarketplaceService.isIncludedInEntitlements(grants, ent)
+    ) {
       this.reject(
-        "ADDON_INCLUDED_IN_PLAN",
+        "ADDON_ALREADY_GRANTED",
         addOn.code,
-        `"${addOn.name}" is already included in your current plan.`,
+        `"${addOn.name}" is already active on your account.`,
       );
     }
 
-    // 2) Already actively owned for this exact (tenant, addOn, branch)
-    // identity — re-buying just gets rejected downstream with no refund
-    // rail (DEF-2). Mirrors purchase()'s tenant-scope duplicate guard.
+    // 5) Capacity is quantity-based: owning one extra branch must not block
+    // buying a second. Enforce the catalog ceiling instead of an
+    // already-owned rejection (pre-3.3 this threw "change quantity instead",
+    // pointing at a path that did not exist — capacity was unsellable past
+    // one unit).
     const activeOwned = await this.prisma.tenantAddOn.findFirst({
       where: {
         tenantId,
@@ -77,62 +136,34 @@ export class AddonPurchasabilityService {
         branchId: input.branchId ?? null,
         status: "active",
       },
+      select: { id: true, quantity: true },
     });
-    if (activeOwned) {
+
+    if (addOn.kind === "capacity") {
+      // A renewal re-buys the units already held rather than adding to them.
+      const owned = ctx.isRenewal ? 0 : (activeOwned?.quantity ?? 0);
+      const wanted = owned + (input.quantity ?? 1);
+      if (addOn.maxQuantity != null && wanted > addOn.maxQuantity) {
+        this.reject(
+          "ADDON_MAX_QUANTITY",
+          addOn.code,
+          `"${addOn.name}" is limited to ${addOn.maxQuantity} per account (you have ${owned}).`,
+        );
+      }
+    } else if (activeOwned && !ctx.isRenewal) {
       this.reject(
         "ADDON_ALREADY_OWNED",
         addOn.code,
         `"${addOn.name}" is already active for this ${
-          input.branchId ? "branch" : "tenant"
-        }. Cancel the existing subscription or change quantity instead.`,
+          input.branchId ? "branch" : "account"
+        }.`,
       );
     }
 
-    // 3) Deps — tenant-tier-aware "plan:X and above" semantics for
-    // plan:<NAME> deps, plus active-add-on deps. purchase() checks this
-    // too, but with STRICT plan-name equality (`plan:${planName} !== dep`),
-    // which incorrectly blocks a BUSINESS tenant from an addon that only
-    // requires plan:PRO. Moved here tier-aware (DEF-4).
-    if (addOn.deps.length > 0) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-        include: { currentPlan: { select: { name: true } } },
-      });
-      if (!tenant) throw new NotFoundException("Tenant not found");
-      const planName = tenant.currentPlan?.name ?? null;
+    await this.assertDeps(tenantId, addOn, cartCodes);
 
-      const activeAddOns = await this.prisma.tenantAddOn.findMany({
-        where: { tenantId, status: "active" },
-        include: { addOn: { select: { code: true } } },
-      });
-      const haveAddOnCodes = new Set(activeAddOns.map((ta) => ta.addOn.code));
-
-      for (const dep of addOn.deps) {
-        if (dep.startsWith("plan:")) {
-          const depPlan = dep.slice("plan:".length);
-          if (this.planRank(planName) < this.planRank(depPlan)) {
-            this.reject(
-              "ADDON_REQUIRES_PLAN",
-              addOn.code,
-              `"${addOn.name}" requires the ${depPlan} plan or above. Upgrade your plan first.`,
-            );
-          }
-        } else if (!haveAddOnCodes.has(dep)) {
-          this.reject(
-            "ADDON_REQUIRES_PLAN",
-            addOn.code,
-            `"${addOn.name}" requires the "${dep}" add-on first.`,
-          );
-        }
-      }
-    }
-
-    // 4) Redundant capacity (DEF-8) — a limit.* grant whose corresponding
-    // effective limit is already unlimited (-1) buys nothing. Grant keys
-    // match the engine's effective-limit namespace 1:1 (Task 5 fixed
-    // extra_branch's grant to write `limit.maxBranches`, the same key
-    // PlanProjectorService.LIMIT_COLUMNS / PlanFeatureGuard.checkLimit
-    // read), so no key-remapping layer is needed here anymore.
+    // 6) Redundant capacity (DEF-8) — a limit.* grant whose effective limit
+    // is already unlimited (-1) buys nothing.
     for (const [key] of Object.entries(grants ?? {})) {
       if (!key.startsWith("limit.")) continue;
       if (ent.limits?.[key] === -1) {
@@ -146,28 +177,47 @@ export class AddonPurchasabilityService {
   }
 
   /**
-   * Rank source for "plan:X and above" deps semantics.
+   * Dependencies are bare catalog codes, satisfied by an ACTIVE ownership row
+   * or by a sibling line in the same cart.
    *
-   * `SUBSCRIPTION_PLANS[*].monthlyPrice` is monotonically increasing —
-   * FREE(0) < BASIC(499) < PRO(1299) < BUSINESS(2999) — which is the exact
-   * ordering `subscription.service.ts`'s `changePlan()` already derives
-   * `isUpgrade` from (`newAmount.gt(currentAmount)`), and the invariant
-   * `feature-plan-matrix.spec.ts` pins as "feature grants are monotonic up
-   * the tiers (FREE subset BASIC subset PRO subset BUSINESS)". Reusing this
-   * price ordering (instead of a fresh hardcoded rank array) keeps the
-   * "and above" semantics from silently drifting out of sync with the rest
-   * of the upgrade/downgrade logic if plan pricing is ever restructured.
-   *
-   * TRIAL and an unrecognised/absent plan both rank at -1 (below every paid
-   * tier). This matches purchase()'s PRE-EXISTING strict-equality behaviour
-   * for TRIAL — today `plan:TRIAL !== plan:PRO` already blocks the
-   * purchase — so routing TRIAL through the tier rank instead of a string
-   * compare is not a regression, just the same fail-closed outcome.
+   * The pre-3.3 `plan:<NAME>` form is gone with plans themselves; the catalog
+   * validator rejects it at write time, so any that survive in old data are
+   * treated as unsatisfiable — which is the truth.
    */
-  private planRank(planName: string | null | undefined): number {
-    if (!planName) return -1;
-    const cfg = SUBSCRIPTION_PLANS[planName as SubscriptionPlanType];
-    return cfg ? cfg.monthlyPrice : -1;
+  private async assertDeps(
+    tenantId: string,
+    addOn: { code: string; name: string; deps: string[] },
+    cartCodes: ReadonlySet<string>,
+  ): Promise<void> {
+    if (addOn.deps.length === 0) return;
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) throw new NotFoundException("Tenant not found");
+
+    const activeAddOns = await this.prisma.tenantAddOn.findMany({
+      where: { tenantId, status: "active" },
+      include: { addOn: { select: { code: true, name: true } } },
+    });
+    const have = new Set(activeAddOns.map((ta) => ta.addOn.code));
+
+    for (const dep of addOn.deps) {
+      if (have.has(dep) || cartCodes.has(dep)) continue;
+      const depName =
+        (
+          await this.prisma.marketplaceAddOn.findUnique({
+            where: { code: dep },
+            select: { name: true },
+          })
+        )?.name ?? dep;
+      this.reject(
+        "ADDON_REQUIRES_DEPENDENCY",
+        addOn.code,
+        `"${addOn.name}" requires "${depName}". Add it to your cart first.`,
+      );
+    }
   }
 
   private reject(

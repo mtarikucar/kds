@@ -19,7 +19,6 @@ import {
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../../common/constants/subscription.enum";
 import { Roles } from "../../auth/decorators/roles.decorator";
@@ -38,7 +37,7 @@ import { CreateStaffReservationDto } from "../dto/create-staff-reservation.dto";
 @ApiTags("reservations")
 @ApiBearerAuth()
 @Controller("reservations")
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresFeature(PlanFeature.RESERVATION_SYSTEM)
 export class ReservationsController {
   constructor(

@@ -119,41 +119,28 @@ export class AuthProvisioningService {
    * used to be omitted entirely, briefly hiding POS on a fresh BUSINESS tenant
    * — a truthy posAccess is now included via the map below.)
    */
-  buildPlanFeatureOverrides(businessPlan: {
-    advancedReports?: boolean | null;
-    multiLocation?: boolean | null;
-    customBranding?: boolean | null;
-    apiAccess?: boolean | null;
-    externalDisplay?: boolean | null;
-    prioritySupport?: boolean | null;
-    inventoryTracking?: boolean | null;
-    kdsIntegration?: boolean | null;
-    reservationSystem?: boolean | null;
-    personnelManagement?: boolean | null;
-    deliveryIntegration?: boolean | null;
-    posAccess?: boolean | null;
-    aiContentGeneration?: boolean | null;
-  }): Record<string, boolean> {
-    return Object.fromEntries(
-      Object.entries({
-        advancedReports: !!businessPlan.advancedReports,
-        multiLocation: !!businessPlan.multiLocation,
-        customBranding: !!businessPlan.customBranding,
-        apiAccess: !!businessPlan.apiAccess,
-        externalDisplay: !!businessPlan.externalDisplay,
-        prioritySupport: !!businessPlan.prioritySupport,
-        inventoryTracking: !!businessPlan.inventoryTracking,
-        kdsIntegration: !!businessPlan.kdsIntegration,
-        reservationSystem: !!businessPlan.reservationSystem,
-        personnelManagement: !!businessPlan.personnelManagement,
-        deliveryIntegration: !!businessPlan.deliveryIntegration,
-        posAccess: !!businessPlan.posAccess,
-        // Drift fix: aiContentGeneration was missing from this mirror (kept
-        // in lockstep with TenantProvisioningService's featureOverrides
-        // seed, fixed the same way — see plan-mapper-parity.spec.ts).
-        aiContentGeneration: !!businessPlan.aiContentGeneration,
-      }).filter(([, v]) => v),
-    );
+  /**
+   * v3.3.0 — provisioning no longer seeds `featureOverrides`, and this
+   * returns nothing.
+   *
+   * It used to mirror the plan's TRUE feature flags onto the tenant so
+   * PlanFeatureGuard's fallback resolved during the projector's warm-up
+   * window. Under à-la-carte that seed is actively dangerous: the projector
+   * turns every key in that map into an `override:admin` grant, so a tenant
+   * provisioned this way would hold permanent overrides for the full paid
+   * feature set — every module, free, forever, re-asserted nightly by the
+   * reconcile cron. The P3 migration archives and clears the column for
+   * existing tenants; this stops new ones being created with it.
+   *
+   * Nothing needs to replace it. The free core is projected from
+   * FREE_BASELINE_GRANTS for every tenant unconditionally, and paid products
+   * come from ownership rows — neither has a warm-up window to paper over.
+   *
+   * Kept as a method (rather than deleted) so the ~6 call sites read as a
+   * deliberate empty seed rather than a forgotten one.
+   */
+  buildPlanFeatureOverrides(): Record<string, boolean> {
+    return {};
   }
 
   /**
@@ -354,9 +341,8 @@ export class AuthProvisioningService {
     const now = new Date();
     const trialEnd = addDays(now, trialPlan.trialDays);
 
-    // Seed the plan's flag set so PlanFeatureGuard's fallback resolves while
-    // the entitlement projector warms up — see register() for the full story.
-    const planFeatureOverrides = this.buildPlanFeatureOverrides(trialPlan);
+    // v3.3.0 — empty by design. See buildPlanFeatureOverrides().
+    const planFeatureOverrides = this.buildPlanFeatureOverrides();
 
     // Tenant + subscription + Main branch + user in one transaction so a
     // failure midway does not leave orphaned rows.

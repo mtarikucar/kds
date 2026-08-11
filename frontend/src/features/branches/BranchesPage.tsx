@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEntitlements } from '../../contexts/SubscriptionContext';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -18,7 +19,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useCreateBranch, useBranchOverview } from './branchesApi';
-import { useGetUsageSnapshot } from '../plan/planApi';
 import Card from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -34,13 +34,17 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'default'> = {
 export default function BranchesPage() {
   const { t } = useTranslation('common');
   const { data: branches = [], isLoading } = useBranchOverview();
-  const { data: snapshot } = useGetUsageSnapshot();
-  const create = useCreateBranch();
+    const create = useCreateBranch();
   const [draft, setDraft] = useState({ name: '', code: '', timezone: 'Europe/Istanbul' });
 
-  const usage = snapshot?.branches;
-  const max = usage?.max ?? Number.POSITIVE_INFINITY;
-  const current = usage?.current ?? branches.length;
+  // Branch capacity is the one numeric limit à-la-carte kept, and it now
+  // comes from the folded entitlement set rather than a separate usage
+  // endpoint — same number the server enforces inside the create transaction.
+  const { checkLimit } = useEntitlements();
+  const activeBranches = branches.filter((b) => b.status === 'active').length;
+  const usage = checkLimit('maxBranches', activeBranches);
+  const max = usage.limit;
+  const current = usage.current;
   const isUnlimited = max === -1;
   const atLimit = !isUnlimited && current >= max;
   const activeCount = branches.filter((b) => b.status === 'active').length;

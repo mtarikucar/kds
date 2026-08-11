@@ -20,7 +20,6 @@ import { UserRole } from "../../common/constants/roles.enum";
 import { Public } from "../auth/decorators/public.decorator";
 import { LocalBridgeService } from "./local-bridge.service";
 import { BridgeTokenGuard } from "./bridge-token.guard";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
 import { PlanFeature } from "../../common/constants/subscription.enum";
 import { CommandQueueService } from "../device-mesh/command-queue.service";
@@ -81,7 +80,7 @@ export class LocalBridgeController {
   // v2.8.90 — provisioning a bridge implies multi-branch ops (the sidebar
   // gates this entry on multiLocation). Pre-v2.8.90 the backend missed
   // the feature gate so direct URL hits worked on FREE plans.
-  @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.MULTI_LOCATION)
   @ApiBearerAuth()

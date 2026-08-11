@@ -35,15 +35,18 @@ export class CheckoutController {
   @Post("quote")
   @ApiOperation({
     summary:
-      "Price a mixed cart (plan + add-ons + hardware + service). No DB writes.",
+      "Price a mixed cart (catalog products + hardware + service). No DB writes.",
   })
-  quote(@Body() cart: CartDto) {
-    // Cart's items[] uses a discriminated union (CartItemPlan|AddOn|Hardware|
+  quote(@Req() req: any, @Body() cart: CartDto) {
+    // Cart's items[] uses a discriminated union (CartItemAddOn|Hardware|
     // Service) for the in-engine type-narrowing; CartDto carries the wider
     // type because class-validator can't express discriminated unions at
     // runtime. The DTO has already been validated by ValidationPipe so the
     // cast is safe.
-    return this.quoteSvc.quote(cart as unknown as Cart);
+    //
+    // v3.3.0: pricing is tenant-scoped — annual lines are day-prorated to
+    // this tenant's licence anniversary.
+    return this.quoteSvc.quote(cart as unknown as Cart, req.user.tenantId);
   }
 
   @Post("start")
@@ -58,7 +61,7 @@ export class CheckoutController {
     // the UI can call to lock in the quote before redirecting to the payment
     // gateway. Iter-88 restricted to ADMIN/MANAGER since pricing snapshots
     // tie into the subscription/hardware-order audit trail.
-    return this.quoteSvc.quote(cart as unknown as Cart);
+    return this.quoteSvc.quote(cart as unknown as Cart, req.user.tenantId);
   }
 
   // v2.8.85: take a mixed cart and return a PayTR iframe token + paymentRef.
@@ -90,6 +93,7 @@ export class CheckoutController {
       buyer: body.buyer,
       buyerIp,
       returnUrl: body.returnUrl,
+      referralCode: body.referralCode,
     });
   }
 

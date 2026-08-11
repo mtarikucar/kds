@@ -11,11 +11,6 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { SuperAdminSubscriptionsService } from "../services/superadmin-subscriptions.service";
-import { BankTransferService } from "../../payments/services/bank-transfer.service";
-import {
-  UpdateBankTransferSettingsDto,
-  RejectBankTransferDto,
-} from "../../payments/dto/bank-transfer.dto";
 import {
   SubscriptionFilterDto,
   CreatePlanDto,
@@ -37,7 +32,6 @@ import { CurrentSuperAdmin } from "../decorators/current-superadmin.decorator";
 export class SuperAdminSubscriptionsController {
   constructor(
     private readonly subscriptionsService: SuperAdminSubscriptionsService,
-    private readonly bankTransfer: BankTransferService,
   ) {}
 
   // Plans
@@ -84,40 +78,8 @@ export class SuperAdminSubscriptionsController {
   }
 
   // Subscriptions
-  @Post("subscriptions/expire-trials")
-  @ApiOperation({
-    summary:
-      "Manually run the trial-expiry sweep (same code path as the nightly cron). " +
-      "Each subscription whose trialEnd has passed is moved to ACTIVE FREE. " +
-      "Used by support to force a tenant off trial early, and by E2E tests.",
-  })
-  async expireTrials() {
-    return this.subscriptionsService.triggerExpireTrials();
-  }
-
-  @Post("subscriptions/sweep-period-end")
-  @ApiOperation({
-    summary:
-      "Manually run the period-end sweep (same code path as the 02:00 daily cron). " +
-      "Each ACTIVE subscription with currentPeriodEnd in the past gets demoted to PAST_DUE " +
-      "and the tenant admin receives a past-due email.",
-  })
-  async sweepPeriodEnd() {
-    return this.subscriptionsService.triggerPeriodEndSweep();
-  }
-
-  @Post("subscriptions/send-expiry-reminders")
-  @ApiOperation({
-    summary:
-      "Manually fire the 7d/3d/1d pre-expiry reminder cron. Used by support to " +
-      "hand-trigger a notification window for a specific batch, and by E2E tests.",
-  })
-  async sendExpiryReminders() {
-    return this.subscriptionsService.triggerExpiryReminders();
-  }
-
   @Get("subscriptions")
-  @ApiOperation({ summary: "List all subscriptions" })
+  @ApiOperation({ summary: "List subscriptions" })
   async findAllSubscriptions(@Query() filters: SubscriptionFilterDto) {
     return this.subscriptionsService.findAllSubscriptions(filters);
   }
@@ -199,46 +161,4 @@ export class SuperAdminSubscriptionsController {
   }
 
   // --- Bank transfer (havale) -------------------------------------------------
-
-  @Get("bank-transfer/settings")
-  @ApiOperation({ summary: "Get the platform bank-transfer settings" })
-  async getBankTransferSettings() {
-    return this.bankTransfer.getSettings();
-  }
-
-  @Patch("bank-transfer/settings")
-  @ApiOperation({ summary: "Update the platform bank-transfer settings" })
-  async updateBankTransferSettings(
-    @Body() dto: UpdateBankTransferSettingsDto,
-    @CurrentSuperAdmin("email") actorEmail: string,
-  ) {
-    return this.bankTransfer.updateSettings(dto, actorEmail);
-  }
-
-  @Get("bank-transfer/pending")
-  @ApiOperation({ summary: "List pending bank-transfer payments" })
-  async listPendingBankTransfers() {
-    return this.bankTransfer.listPending();
-  }
-
-  @Post("bank-transfer/:paymentId/confirm")
-  @ApiOperation({
-    summary: "Confirm a received bank transfer (activates the subscription)",
-  })
-  async confirmBankTransfer(
-    @Param("paymentId") paymentId: string,
-    @CurrentSuperAdmin("email") actorEmail: string,
-  ) {
-    return this.bankTransfer.confirm(paymentId, actorEmail);
-  }
-
-  @Post("bank-transfer/:paymentId/reject")
-  @ApiOperation({ summary: "Reject a pending bank transfer" })
-  async rejectBankTransfer(
-    @Param("paymentId") paymentId: string,
-    @Body() dto: RejectBankTransferDto,
-    @CurrentSuperAdmin("email") actorEmail: string,
-  ) {
-    return this.bankTransfer.reject(paymentId, dto.reason, actorEmail);
-  }
 }

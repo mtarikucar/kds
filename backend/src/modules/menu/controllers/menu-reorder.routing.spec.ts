@@ -14,7 +14,6 @@ import { ProductsService } from "../services/products.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
-import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
 
 /**
  * HTTP-level routing spec for the batch reorder endpoints, run through a real
@@ -64,8 +63,6 @@ describe("menu reorder routing (real HTTP)", () => {
       .overrideGuard(TenantGuard)
       .useClass(StubTenantGuard)
       .overrideGuard(RolesGuard)
-      .useValue(passGuard)
-      .overrideGuard(PlanFeatureGuard)
       .useValue(passGuard)
       .compile();
 

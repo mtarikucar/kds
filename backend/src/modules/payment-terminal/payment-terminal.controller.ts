@@ -12,7 +12,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../auth/guards/tenant.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentScope } from "../auth/decorators/current-scope.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -26,7 +25,7 @@ import { SetTerminalActivationDto } from "./dto/set-terminal-activation.dto";
 @ApiTags("payment-terminal")
 @ApiBearerAuth()
 @Controller()
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class PaymentTerminalController {
   constructor(private readonly terminal: PaymentTerminalService) {}
 
