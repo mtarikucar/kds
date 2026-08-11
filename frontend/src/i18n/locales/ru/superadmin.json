@@ -19,9 +19,7 @@
     "dashboard": "Dashboard",
     "tenants": "Tenants",
     "users": "Users",
-    "plans": "Plans",
-    "marketplace": "Marketplace",
-    "subscriptions": "Subscriptions",
+    "marketplace": "Каталог",
     "auditLogs": "Audit Logs",
     "legal": "Юридические документы",
     "settings": "Settings",
@@ -126,8 +124,6 @@
     "confirmStatusChange": "Change status to {{status}}?",
     "confirmResetOverrides": "Reset all overrides to plan defaults?",
     "overview": "Overview",
-    "plan": "Plan",
-    "changePlanTitle": "Change Plan",
     "currency": "Currency",
     "created": "Created",
     "statistics": "Statistics",
@@ -139,12 +135,8 @@
     "products": "Products",
     "tables": "Tables",
     "customers": "Customers",
-    "activeSubscription": "Active Subscription",
     "status": "Status",
-    "billingCycle": "Billing Cycle",
-    "periodEnd": "Period End",
     "actions": "Actions",
-    "changePlan": "Change Plan",
     "suspend": "Suspend",
     "activate": "Activate",
     "delete": "Delete",
@@ -175,16 +167,6 @@
       "role": "Role",
       "status": "Status"
     },
-    "selectNewPlan": "Select a new plan for",
-    "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
-    "current": "Current",
-    "changePlanError": "Failed to change plan",
-    "newAmountInfo": "После изменения сумма к оплате составит {{amount}} ({{cycle}}).",
-    "cycle": {
-      "MONTHLY": "Monthly",
-      "YEARLY": "Yearly"
-    },
-    "changing": "Changing...",
     "cancel": "Cancel",
     "featureLabels": {
       "advancedReports": "Advanced Reports",
@@ -231,52 +213,39 @@
       "reasonRequired": "Причина (обязательно — записывается в журнал аудита и включается в письмо администраторам)",
       "reasonOptional": "Причина (необязательно — записывается в журнал аудита и включается в письмо администраторам)",
       "reasonPlaceholder": "Напр. неуплата, жалоба на злоупотребление…"
-    }
-  },
-  "subscriptions": {
-    "title": "Subscriptions",
-    "subtitle": "Manage tenant subscriptions",
-    "filters": {
-      "allStatus": "All Status",
-      "active": "Active",
-      "cancelled": "Cancelled",
-      "expired": "Expired",
-      "pastDue": "Past Due",
-      "trialing": "Trialing",
-      "allPlans": "All Plans"
     },
-    "col": {
-      "tenant": "Tenant",
-      "plan": "Plan",
-      "status": "Status",
-      "billing": "Billing",
-      "ends": "Ends"
+    "licence": "Лицензия",
+    "licenceActive": "Активна",
+    "licenceNone": "Нет",
+    "owned": {
+      "title": "Приобретённые продукты",
+      "empty": "Платных продуктов нет — ядро уже бесплатно и без ограничений.",
+      "darkWarning": "Нет лицензии: платные права подавлены",
+      "col": {
+        "product": "Продукт",
+        "origin": "Источник",
+        "until": "До",
+        "status": "Статус"
+      },
+      "comp": "выдано",
+      "purchased": "куплено",
+      "suppressed": "подавлено",
+      "revoke": "Отозвать",
+      "confirmRevoke": "Отозвать выдачу «{{name}}»?"
     },
-    "extend": "Extend",
-    "cancel": "Cancel",
-    "extendSuccess": "Подписка продлена.",
-    "extendFailed": "Не удалось продлить подписку.",
-    "cancelSuccess": "Подписка отменена.",
-    "cancelFailed": "Не удалось отменить подписку.",
-    "extendModal": {
-      "title": "Продлить подписку",
-      "subtitle": "Дата окончания периода подписки {{tenant}} будет перенесена вперёд.",
-      "reinstateWarning": "Эта подписка в статусе {{status}}. Продление снова сделает её АКТИВНОЙ и разблокирует тенанта.",
-      "days": "Количество дней продления",
-      "reason": "Причина (необязательно)",
-      "back": "Back",
-      "confirm": "Extend",
-      "extending": "Extending..."
-    },
-    "cancelModal": {
-      "title": "Отменить подписку",
-      "subtitle": "Подписка {{tenant}} будет отменена.",
-      "atPeriodEnd": "В конце периода (по умолчанию) — доступ сохраняется до окончания текущего периода.",
-      "immediate": "Немедленно — подписка отменяется прямо сейчас, и доступ прекращается.",
-      "reason": "Причина (необязательно)",
-      "keep": "Оставить подписку",
-      "confirm": "Подтвердить отмену",
-      "cancelling": "Cancelling..."
+    "comp": {
+      "action": "Выдать продукт",
+      "title": "Выдать продукт",
+      "subtitle": "Продукт для бесплатной выдачи:",
+      "product": "Продукт",
+      "selectProduct": "Выберите…",
+      "quantity": "Количество",
+      "reason": "Причина",
+      "reasonPlaceholder": "Пилотный клиент — договор Q3 2026",
+      "reasonHint": "Хранится в строке владения; отвечает на вопрос «кто и почему» спустя месяцы.",
+      "noLicenceWarning": "У аккаунта нет активной лицензии. Выдача продукта с требованием лицензии создаст владение, но права останутся подавленными до активации лицензии.",
+      "grant": "Выдать",
+      "granting": "Выдача…"
     }
   },
   "auditLogs": {
@@ -334,74 +303,6 @@
       "time": "Time"
     }
   },
-  "plans": {
-    "title": "Plans",
-    "subtitle": "Manage subscription plans",
-    "addPlan": "Add Plan",
-    "confirmDelete": "Delete this plan?",
-    "demoLockBadge": "Locked",
-    "demoLockTooltip": "Название плана DEMO — ключ защиты, блокирующей реальные платёжные пути демо-тенанта; этот план нельзя редактировать или удалять.",
-    "defaultDiscountLabel": "INDIRIM",
-    "perMonth": "/mo",
-    "perYear": "/year",
-    "users": "Users",
-    "tables": "Tables",
-    "products": "Products",
-    "ordersPerMonth": "Orders/mo",
-    "activeSubscriptions": "{{count}} active subscriptions",
-    "featureTags": {
-      "reports": "Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "api": "API",
-      "priority": "Priority",
-      "inventory": "Inventory",
-      "kds": "KDS",
-      "reservations": "Reservations",
-      "personnel": "Personnel"
-    },
-    "modal": {
-      "editTitle": "Edit Plan",
-      "createTitle": "Create Plan",
-      "internalName": "Internal Name",
-      "displayName": "Display Name",
-      "monthlyPrice": "Monthly Price (₺)",
-      "yearlyPrice": "Yearly Price (₺)",
-      "maxUsers": "Max Users",
-      "maxTables": "Max Tables",
-      "maxBranches": "Макс. филиалов",
-      "maxProducts": "Max Products",
-      "categories": "Categories",
-      "ordersPerMonth": "Orders/mo",
-      "limitHint": "-1 = безлимит",
-      "advancedReports": "Advanced Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "apiAccess": "API Access",
-      "prioritySupport": "Priority Support",
-      "inventoryTracking": "Inventory Tracking",
-      "kdsIntegration": "KDS Integration",
-      "reservations": "Reservations",
-      "personnelManagement": "Personnel Management",
-      "active": "Active",
-      "discountSettings": "Discount Settings",
-      "discountPercent": "Discount %",
-      "label": "Label",
-      "labelPlaceholder": "e.g. Ramazan Kampanyasi",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "cancel": "Cancel",
-      "update": "Update",
-      "create": "Create",
-      "deliveryIntegration": "Интеграция доставки",
-      "externalDisplay": "Внешний дисплей (партнёрский)",
-      "posAccess": "Доступ к POS",
-      "aiPhotosPerMonth": "ИИ-фото/мес",
-      "aiVideosPerMonth": "ИИ-видео/мес",
-      "aiContentGeneration": "Генерация ИИ-контента",
-      "ai3dPerMonth": "ИИ 3D/мес"
-    }
-  },
   "marketplace": {
     "title": "Marketplace Admin",
     "tabAddons": "Add-ons",
@@ -417,7 +318,8 @@
         "kind": "Kind",
         "billing": "Billing",
         "price": "Price",
-        "status": "Status"
+        "status": "Status",
+        "licence": "Лицензия"
       },
       "edit": "Edit",
       "publish": "Publish",
@@ -435,11 +337,25 @@
         "status": "Status",
         "deps": "Deps (comma-separated; plan:PRO or addon code)",
         "description": "Description",
-        "grants": "Grants (JSON)"
+        "grants": "Grants (JSON)",
+        "requiresLicense": "Требует лицензию",
+        "creditKind": "Тип кредита",
+        "creditUnits": "Количество кредитов",
+        "maxQuantity": "Макс. количество",
+        "sortOrder": "Порядок"
       },
       "grantsInvalid": "grants must be valid JSON",
       "save": "Save",
-      "create": "Create"
+      "create": "Create",
+      "needsLicence": "требуется",
+      "perYear": "/год",
+      "creditIncomplete": "Для пакета кредитов нужны тип и количество.",
+      "publishedNeedsPrice": "Опубликованный продукт должен стоить больше нуля.",
+      "licenceSelfRequire": "Лицензия не может требовать саму себя.",
+      "planDepsGone": "Зависимости `plan:` удалены — используйте код продукта.",
+      "i18nTitle": "Локализованные тексты (5 языков)",
+      "requiresLicenseHint": "Если включено: без лицензии нельзя купить, а права подавляются, пока лицензия неактивна (данные не удаляются).",
+      "grantsHint": "Ключи: feature.*, limit.*, integration.*, credit.*"
     },
     "products": {
       "catalogue": "Hardware catalogue",
@@ -486,7 +402,11 @@
       "createFailed": "Не удалось создать.",
       "updateFailed": "Не удалось обновить.",
       "archiveFailed": "Не удалось архивировать.",
-      "stockFailed": "Не удалось оформить поступление."
+      "stockFailed": "Не удалось оформить поступление.",
+      "comped": "Продукт выдан.",
+      "compFailed": "Не удалось выдать продукт.",
+      "compRevoked": "Выдача отозвана.",
+      "revokeFailed": "Не удалось отозвать."
     }
   },
   "legal": {
@@ -529,16 +449,6 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
-    }
-  },
-  "bankTransfer": {
-    "toasts": {
-      "settingsSaved": "Настройки банковского перевода сохранены.",
-      "settingsSaveFailed": "Не удалось сохранить.",
-      "confirmed": "Перевод подтверждён, подписка активирована.",
-      "confirmFailed": "Не удалось подтвердить.",
-      "rejected": "Перевод отклонён.",
-      "rejectFailed": "Не удалось отклонить."
     }
   }
 }

@@ -19,9 +19,7 @@
     "dashboard": "Dashboard",
     "tenants": "Tenants",
     "users": "Users",
-    "plans": "Plans",
-    "marketplace": "Marketplace",
-    "subscriptions": "Subscriptions",
+    "marketplace": "Katalog",
     "auditLogs": "Audit Logs",
     "legal": "Huquqiy hujjatlar",
     "settings": "Settings",
@@ -126,8 +124,6 @@
     "confirmStatusChange": "Change status to {{status}}?",
     "confirmResetOverrides": "Reset all overrides to plan defaults?",
     "overview": "Overview",
-    "plan": "Plan",
-    "changePlanTitle": "Change Plan",
     "currency": "Currency",
     "created": "Created",
     "statistics": "Statistics",
@@ -139,12 +135,8 @@
     "products": "Products",
     "tables": "Tables",
     "customers": "Customers",
-    "activeSubscription": "Active Subscription",
     "status": "Status",
-    "billingCycle": "Billing Cycle",
-    "periodEnd": "Period End",
     "actions": "Actions",
-    "changePlan": "Change Plan",
     "suspend": "Suspend",
     "activate": "Activate",
     "delete": "Delete",
@@ -175,16 +167,6 @@
       "role": "Role",
       "status": "Status"
     },
-    "selectNewPlan": "Select a new plan for",
-    "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
-    "current": "Current",
-    "changePlanError": "Failed to change plan",
-    "newAmountInfo": "O'zgarishdan so'ng hisob-kitob summasi {{amount}} bo'ladi ({{cycle}}).",
-    "cycle": {
-      "MONTHLY": "Monthly",
-      "YEARLY": "Yearly"
-    },
-    "changing": "Changing...",
     "cancel": "Cancel",
     "featureLabels": {
       "advancedReports": "Advanced Reports",
@@ -231,52 +213,39 @@
       "reasonRequired": "Sabab (majburiy — audit jurnaliga yoziladi va administratorlarga yuboriladigan xatga qo'shiladi)",
       "reasonOptional": "Sabab (ixtiyoriy — audit jurnaliga yoziladi va administratorlarga yuboriladigan xatga qo'shiladi)",
       "reasonPlaceholder": "Masalan: to'lov qilinmagan, suiiste'mol haqida shikoyat…"
-    }
-  },
-  "subscriptions": {
-    "title": "Subscriptions",
-    "subtitle": "Manage tenant subscriptions",
-    "filters": {
-      "allStatus": "All Status",
-      "active": "Active",
-      "cancelled": "Cancelled",
-      "expired": "Expired",
-      "pastDue": "Past Due",
-      "trialing": "Trialing",
-      "allPlans": "All Plans"
     },
-    "col": {
-      "tenant": "Tenant",
-      "plan": "Plan",
-      "status": "Status",
-      "billing": "Billing",
-      "ends": "Ends"
+    "licence": "Litsenziya",
+    "licenceActive": "Faol",
+    "licenceNone": "Yo‘q",
+    "owned": {
+      "title": "Egalik qilingan mahsulotlar",
+      "empty": "Hali pullik mahsulot yo‘q — yadro allaqachon bepul va cheksiz.",
+      "darkWarning": "Litsenziya yo‘q: pullik huquqlar to‘xtatilgan",
+      "col": {
+        "product": "Mahsulot",
+        "origin": "Manba",
+        "until": "Tugash",
+        "status": "Holat"
+      },
+      "comp": "sovg‘a",
+      "purchased": "sotib olingan",
+      "suppressed": "to‘xtatilgan",
+      "revoke": "Qaytarish",
+      "confirmRevoke": "{{name}} sovg‘asi qaytarilsinmi?"
     },
-    "extend": "Extend",
-    "cancel": "Cancel",
-    "extendSuccess": "Obuna uzaytirildi.",
-    "extendFailed": "Obunani uzaytirib bo'lmadi.",
-    "cancelSuccess": "Obuna bekor qilindi.",
-    "cancelFailed": "Obunani bekor qilib bo'lmadi.",
-    "extendModal": {
-      "title": "Obunani uzaytirish",
-      "subtitle": "{{tenant}} obunasining davr tugash sanasi keyinga suriladi.",
-      "reinstateWarning": "Bu obuna {{status}} holatida. Uzaytirish uni yana FAOL holatiga qaytaradi va tenant qulfini ochadi.",
-      "days": "Uzaytiriladigan kunlar soni",
-      "reason": "Sabab (ixtiyoriy)",
-      "back": "Back",
-      "confirm": "Extend",
-      "extending": "Extending..."
-    },
-    "cancelModal": {
-      "title": "Obunani bekor qilish",
-      "subtitle": "{{tenant}} obunasi bekor qilinadi.",
-      "atPeriodEnd": "Davr oxirida (standart) — kirish joriy davr tugagunga qadar davom etadi.",
-      "immediate": "Darhol — obuna hoziroq BEKOR qilinadi va kirish to'xtaydi.",
-      "reason": "Sabab (ixtiyoriy)",
-      "keep": "Obunani saqlab qolish",
-      "confirm": "Bekor qilishni tasdiqlash",
-      "cancelling": "Cancelling..."
+    "comp": {
+      "action": "Mahsulot sovg‘a qilish",
+      "title": "Mahsulot sovg‘a qilish",
+      "subtitle": "Bepul beriladigan mahsulot:",
+      "product": "Mahsulot",
+      "selectProduct": "Tanlang…",
+      "quantity": "Soni",
+      "reason": "Sabab",
+      "reasonPlaceholder": "Pilot mijoz — 2026 Q3 shartnomasi",
+      "reasonHint": "Egalik yozuvida saqlanadi; oylar o‘tib «kim va nega» degan savolga javob beradi.",
+      "noLicenceWarning": "Bu hisobda faol litsenziya yo‘q. Litsenziya talab qiladigan mahsulot berilsa, egalik yaratiladi, lekin huquqlar litsenziya faollashguncha to‘xtatilgan qoladi.",
+      "grant": "Berish",
+      "granting": "Berilmoqda…"
     }
   },
   "auditLogs": {
@@ -334,74 +303,6 @@
       "time": "Time"
     }
   },
-  "plans": {
-    "title": "Plans",
-    "subtitle": "Manage subscription plans",
-    "addPlan": "Add Plan",
-    "confirmDelete": "Delete this plan?",
-    "demoLockBadge": "Locked",
-    "demoLockTooltip": "DEMO tarifining nomi demo tenantning haqiqiy to'lov yo'llarini bloklaydigan himoya kalitidir; bu tarifni tahrirlab ham, o'chirib ham bo'lmaydi.",
-    "defaultDiscountLabel": "INDIRIM",
-    "perMonth": "/mo",
-    "perYear": "/year",
-    "users": "Users",
-    "tables": "Tables",
-    "products": "Products",
-    "ordersPerMonth": "Orders/mo",
-    "activeSubscriptions": "{{count}} active subscriptions",
-    "featureTags": {
-      "reports": "Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "api": "API",
-      "priority": "Priority",
-      "inventory": "Inventory",
-      "kds": "KDS",
-      "reservations": "Reservations",
-      "personnel": "Personnel"
-    },
-    "modal": {
-      "editTitle": "Edit Plan",
-      "createTitle": "Create Plan",
-      "internalName": "Internal Name",
-      "displayName": "Display Name",
-      "monthlyPrice": "Monthly Price (₺)",
-      "yearlyPrice": "Yearly Price (₺)",
-      "maxUsers": "Max Users",
-      "maxTables": "Max Tables",
-      "maxBranches": "Maks. filiallar",
-      "maxProducts": "Max Products",
-      "categories": "Categories",
-      "ordersPerMonth": "Orders/mo",
-      "limitHint": "-1 = cheksiz",
-      "advancedReports": "Advanced Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "apiAccess": "API Access",
-      "prioritySupport": "Priority Support",
-      "inventoryTracking": "Inventory Tracking",
-      "kdsIntegration": "KDS Integration",
-      "reservations": "Reservations",
-      "personnelManagement": "Personnel Management",
-      "active": "Active",
-      "discountSettings": "Discount Settings",
-      "discountPercent": "Discount %",
-      "label": "Label",
-      "labelPlaceholder": "e.g. Ramazan Kampanyasi",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "cancel": "Cancel",
-      "update": "Update",
-      "create": "Create",
-      "deliveryIntegration": "Yetkazib berish integratsiyasi",
-      "externalDisplay": "Tashqi displey (hamkor displey)",
-      "posAccess": "POS kirish",
-      "aiPhotosPerMonth": "AI surat/oy",
-      "aiVideosPerMonth": "AI video/oy",
-      "aiContentGeneration": "AI kontent yaratish",
-      "ai3dPerMonth": "AI 3D/oy"
-    }
-  },
   "marketplace": {
     "title": "Marketplace Admin",
     "tabAddons": "Add-ons",
@@ -417,7 +318,8 @@
         "kind": "Kind",
         "billing": "Billing",
         "price": "Price",
-        "status": "Status"
+        "status": "Status",
+        "licence": "Litsenziya"
       },
       "edit": "Edit",
       "publish": "Publish",
@@ -435,11 +337,25 @@
         "status": "Status",
         "deps": "Deps (comma-separated; plan:PRO or addon code)",
         "description": "Description",
-        "grants": "Grants (JSON)"
+        "grants": "Grants (JSON)",
+        "requiresLicense": "Litsenziya talab qiladi",
+        "creditKind": "Kredit turi",
+        "creditUnits": "Kredit soni",
+        "maxQuantity": "Maksimal son",
+        "sortOrder": "Tartib"
       },
       "grantsInvalid": "grants must be valid JSON",
       "save": "Save",
-      "create": "Create"
+      "create": "Create",
+      "needsLicence": "talab qilinadi",
+      "perYear": "/yil",
+      "creditIncomplete": "Kredit paketi uchun turi va soni majburiy.",
+      "publishedNeedsPrice": "Chop etilgan mahsulot narxi noldan katta bo‘lishi kerak.",
+      "licenceSelfRequire": "Litsenziya mahsuloti o‘zini talab qila olmaydi.",
+      "planDepsGone": "`plan:` bog‘liqliklari olib tashlandi — mahsulot kodini ishlating.",
+      "i18nTitle": "Tarjima matnlari (5 til)",
+      "requiresLicenseHint": "Belgilansa: litsenziyasiz sotib olinmaydi va litsenziya o‘chganda huquqlari to‘xtatiladi (ma’lumot o‘chirilmaydi).",
+      "grantsHint": "Kalitlar: feature.*, limit.*, integration.*, credit.*"
     },
     "products": {
       "catalogue": "Hardware catalogue",
@@ -486,7 +402,11 @@
       "createFailed": "Yaratib bo'lmadi.",
       "updateFailed": "Yangilab bo'lmadi.",
       "archiveFailed": "Arxivlab bo'lmadi.",
-      "stockFailed": "Ombor kirimini qayd etib bo'lmadi."
+      "stockFailed": "Ombor kirimini qayd etib bo'lmadi.",
+      "comped": "Mahsulot berildi.",
+      "compFailed": "Mahsulotni berib bo‘lmadi.",
+      "compRevoked": "Berilgan mahsulot qaytarildi.",
+      "revokeFailed": "Qaytarib bo‘lmadi."
     }
   },
   "legal": {
@@ -529,16 +449,6 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
-    }
-  },
-  "bankTransfer": {
-    "toasts": {
-      "settingsSaved": "Bank o'tkazmasi sozlamalari saqlandi.",
-      "settingsSaveFailed": "Saqlab bo'lmadi.",
-      "confirmed": "O'tkazma tasdiqlandi, obuna faollashtirildi.",
-      "confirmFailed": "Tasdiqlab bo'lmadi.",
-      "rejected": "O'tkazma rad etildi.",
-      "rejectFailed": "Rad etib bo'lmadi."
     }
   }
 }

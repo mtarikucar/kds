@@ -1,4 +1,7 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -121,4 +124,21 @@ export class CreateCheckoutIntentDto {
   @IsString()
   @MaxLength(64)
   referralCode?: string;
+
+  /**
+   * The three current legal documents the buyer ticked: KVKK, Mesafeli Satış
+   * and İade Politikası.
+   *
+   * Mirrors the contract the retired /payments/create-intent enforced. The ids
+   * are verified against the `isCurrent=true` rows and three Consent records
+   * are written — with ip and user-agent — before any PayTR token is minted,
+   * so a sale always has evidence the terms were shown in the version that was
+   * live at the time. Ids come from `/legal/documents/:kind/current`.
+   */
+  @ApiProperty({ type: [String], minItems: 3, maxItems: 3 })
+  @IsArray()
+  @ArrayMinSize(3)
+  @ArrayMaxSize(3)
+  @IsUUID("all", { each: true })
+  acceptedDocumentIds!: string[];
 }

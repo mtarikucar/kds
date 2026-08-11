@@ -4,20 +4,78 @@ import i18n from '../../../i18n/config';
 import { getApiErrorMessage } from '../../../lib/api-error';
 import { superAdminApi as api } from './superAdminApi';
 
+/** Mirrors the backend CreateAddOnDto vocabulary (dto/addon.dto.ts). */
+export type AddOnKind =
+  | 'license'
+  | 'module'
+  | 'integration'
+  | 'capacity'
+  | 'credit'
+  | 'service';
+export type AddOnBilling = 'annual' | 'oneTime';
+export type CreditKind = 'PHOTO' | 'VIDEO' | 'MODEL3D' | 'SMS';
+
+export const ADDON_KINDS: AddOnKind[] = [
+  'license',
+  'module',
+  'integration',
+  'capacity',
+  'credit',
+  'service',
+];
+export const ADDON_BILLINGS: AddOnBilling[] = ['annual', 'oneTime'];
+export const CREDIT_KINDS: CreditKind[] = ['PHOTO', 'VIDEO', 'MODEL3D', 'SMS'];
+export const CATALOG_LOCALES = ['tr', 'en', 'ar', 'ru', 'uz'] as const;
+
 export interface AdminAddOn {
   id: string;
   code: string;
   name: string;
   description: string | null;
-  kind: 'software' | 'integration' | 'capacity' | 'support';
-  billing: 'recurring' | 'oneTime';
+  kind: AddOnKind;
+  billing: AddOnBilling;
   priceCents: number;
   currency: string;
   grants: Record<string, unknown>;
   deps: string[];
   status: 'draft' | 'published' | 'archived';
+  /** Whether a live licence is required to buy AND use this product. */
+  requiresLicense: boolean;
+  creditKind: CreditKind | null;
+  creditUnits: number | null;
+  maxQuantity: number | null;
+  sortOrder: number;
+  /** { tr: { name, description }, en: {...}, … } — copy ships without a release. */
+  i18n: Record<string, { name?: string; description?: string }> | null;
+  commissionRate: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TenantLicensingSnapshot {
+  tenant: { id: string; name: string };
+  license: {
+    active: boolean;
+    anchorAt: string | null;
+    anniversaryAt: string | null;
+    daysRemaining: number | null;
+  };
+  owned: Array<{
+    id: string;
+    code: string;
+    name: string;
+    kind: string;
+    quantity: number;
+    status: string;
+    origin: string;
+    compReason: string | null;
+    periodEnd: string | null;
+    chargedCents: number | null;
+    listCents: number;
+    currency: string;
+    suppressedByLicence: boolean;
+  }>;
+  credits: Record<string, number>;
 }
 
 export interface AdminHardwareProduct {
@@ -101,6 +159,72 @@ export const useSaArchiveAddOn = () => {
     },
     onError: (e) =>
       toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.archiveFailed'))),
+  });
+};
+
+// ── Tenant entitlements: licence, owned products, comps ────────────────
+
+export const useSaTenantLicensing = (tenantId: string | undefined) =>
+  useQuery({
+    queryKey: ['sa', 'tenant-licensing', tenantId] as const,
+    enabled: !!tenantId,
+    queryFn: async (): Promise<TenantLicensingSnapshot> => {
+      const r = await api.get(
+        `/v1/superadmin/marketplace/tenants/${tenantId}/licensing`,
+      );
+      return r.data;
+    },
+  });
+
+/**
+ * Hand a tenant a product for free.
+ *
+ * NOT the same lever as a feature override. A comp is an ownership row: it
+ * expires on the anniversary, shows up in the tenant's own list, records who
+ * granted it and why, and cannot outrank a later purchase of the same code.
+ */
+export const useSaCompProduct = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      tenantId: string;
+      addOnCode: string;
+      quantity?: number;
+      reason: string;
+      branchId?: string;
+    }): Promise<{ ok: true; kind: string; warning: string | null }> => {
+      const r = await api.post('/v1/superadmin/marketplace/comp', body);
+      return r.data;
+    },
+    onSuccess: (data, vars) => {
+      qc.invalidateQueries({ queryKey: ['sa', 'tenant-licensing', vars.tenantId] });
+      qc.invalidateQueries({ queryKey: ['superadmin', 'tenants'] });
+      // The comp landed either way; the warning is about whether its grants
+      // are live yet, so it must not be reported as a failure.
+      if (data.warning) toast.warning(data.warning);
+      else toast.success(i18n.t('superadmin:marketplace.toasts.comped'));
+    },
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.compFailed'))),
+  });
+};
+
+export const useSaRevokeComp = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ tenantId, tenantAddOnId }: { tenantId: string; tenantAddOnId: string }) => {
+      const r = await api.delete(
+        `/v1/superadmin/marketplace/comp/${tenantAddOnId}`,
+        { params: { tenantId } },
+      );
+      return r.data;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['sa', 'tenant-licensing', vars.tenantId] });
+      toast.success(i18n.t('superadmin:marketplace.toasts.compRevoked'));
+    },
+    onError: (e) =>
+      toast.error(getApiErrorMessage(e, i18n.t('superadmin:marketplace.toasts.revokeFailed'))),
   });
 };
 

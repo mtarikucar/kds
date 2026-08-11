@@ -6,6 +6,7 @@ import { OutboxModule } from "../outbox/outbox.module";
 import { DeviceMeshModule } from "../device-mesh/device-mesh.module";
 import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { DemoGuardModule } from "../demo/demo-guard.module";
+import { LegalModule } from "../legal/legal.module";
 import { QuoteService } from "./quote.service";
 import { CheckoutService } from "./checkout.service";
 import { CheckoutController } from "./checkout.controller";
@@ -33,6 +34,9 @@ import { TenantInvoiceService } from "./tenant-invoice.service";
     // DemoGuardService — blocks real-money initiation for the shared demo
     // tenant (marketplace/hardware checkout intent + confirm).
     DemoGuardModule,
+    // ConsentService — distance-selling consent (KVKK + Mesafeli Satış +
+    // İade) is verified and recorded before any PayTR token is minted.
+    LegalModule,
   ],
   controllers: [CheckoutController, HardwareOrdersController],
   providers: [

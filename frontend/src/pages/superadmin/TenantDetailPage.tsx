@@ -9,12 +9,16 @@ import {
   useTenantUsers,
   useTenantStats,
   useUpdateTenantStatus,
-  usePlans,
-  useChangeSubscriptionPlan,
   useTenantOverrides,
   useUpdateTenantOverrides,
   useResetTenantOverrides,
 } from '../../features/superadmin/api/superAdminApi';
+import {
+  useSaCompProduct,
+  useSaListAddOns,
+  useSaRevokeComp,
+  useSaTenantLicensing,
+} from '../../features/superadmin/api/superadminMarketplaceApi';
 import {
   FeatureOverrideState,
   buildFeatureOverridesPayload,
@@ -26,7 +30,6 @@ import {
   initLimitValues,
 } from './tenantOverrides.helpers';
 import { getApiErrorMessage } from '../../lib/api-error';
-import { isDemoPlan, resolvePlanAmountForCycle } from './plans.helpers';
 
 const statusStyles = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -72,8 +75,10 @@ const LIMIT_LABELS: Record<string, string> = {
 export default function TenantDetailPage() {
   const { t } = useTranslation('superadmin');
   const { id } = useParams<{ id: string }>();
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [showCompModal, setShowCompModal] = useState(false);
+  const [compCode, setCompCode] = useState('');
+  const [compQty, setCompQty] = useState(1);
+  const [compReason, setCompReason] = useState('');
   // F6: SUSPEND/DELETE go through a styled confirm modal that collects the
   // DTO-supported `reason` (required for DELETE) and, for DELETE, states the
   // consequences + requires re-typing the tenant name.
@@ -84,10 +89,12 @@ export default function TenantDetailPage() {
   const { data: tenant, isLoading } = useTenant(id!);
   const { data: users } = useTenantUsers(id!, 1, 10);
   const { data: stats } = useTenantStats(id!);
-  const { data: plans } = usePlans();
+  const { data: licensing } = useSaTenantLicensing(id);
+  const { data: catalogAddOns = [] } = useSaListAddOns({ status: 'published' });
   const { data: overridesData } = useTenantOverrides(id!);
   const updateStatusMutation = useUpdateTenantStatus();
-  const changePlanMutation = useChangeSubscriptionPlan();
+  const compMutation = useSaCompProduct();
+  const revokeCompMutation = useSaRevokeComp();
   const updateOverridesMutation = useUpdateTenantOverrides();
   const resetOverridesMutation = useResetTenantOverrides();
 
@@ -169,44 +176,26 @@ export default function TenantDetailPage() {
     );
   };
 
-  const activeSubscription = tenant.subscriptions?.find(
-    (sub: { status: string }) => sub.status === 'ACTIVE' || sub.status === 'TRIALING',
+  // Products an operator can hand over. Archived rows are excluded by the
+  // published filter; the licence itself is offered too, because comping it is
+  // what makes every other requiresLicense product actually light up.
+  const compableProducts = [...catalogAddOns].sort((a, b) =>
+    a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind.localeCompare(b.kind),
   );
 
-  // Plan-change modal offers only assignable plans: the internal DEMO plan
-  // (its name keys the demo money-path guard; the backend refuses assigning
-  // it) and retired isActive:false plans are excluded.
-  const selectablePlans = (plans ?? []).filter(
-    (plan) => !isDemoPlan(plan) && plan.isActive !== false,
-  );
-
-  // F3 preview: the subscription keeps its billing cycle across a SA plan
-  // change, so the resulting amount is the NEW plan's price for the CURRENT
-  // cycle (discount-window aware — mirrors backend resolvePlanAmount, which
-  // recomputes the authoritative value on apply).
-  const billingCycle: string = activeSubscription?.billingCycle || 'MONTHLY';
-  const selectedPlan = selectablePlans.find((plan) => plan.id === selectedPlanId);
-  const newAmountPreview =
-    selectedPlan && selectedPlan.id !== tenant.currentPlan?.id
-      ? resolvePlanAmountForCycle(selectedPlan, billingCycle)
-      : null;
-
-  const handleChangePlan = () => {
-    if (!activeSubscription || !selectedPlanId) return;
-    changePlanMutation.mutate(
-      { subscriptionId: activeSubscription.id, planId: selectedPlanId },
+  const handleComp = () => {
+    if (!id || !compCode || compReason.trim().length < 3) return;
+    compMutation.mutate(
+      { tenantId: id, addOnCode: compCode, quantity: compQty, reason: compReason.trim() },
       {
         onSuccess: () => {
-          setShowPlanModal(false);
-          setSelectedPlanId('');
+          setShowCompModal(false);
+          setCompCode('');
+          setCompQty(1);
+          setCompReason('');
         },
-      }
+      },
     );
-  };
-
-  const openPlanModal = () => {
-    setSelectedPlanId(tenant.currentPlan?.id || '');
-    setShowPlanModal(true);
   };
 
   const cycleFeatureState = (key: string) => {
@@ -292,19 +281,21 @@ export default function TenantDetailPage() {
           <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.overview')}</h3>
           <dl className="space-y-3">
             <div className="flex justify-between items-center">
-              <dt className="text-sm text-zinc-500">{t('tenantDetail.plan')}</dt>
+              <dt className="text-sm text-zinc-500">{t('tenantDetail.licence')}</dt>
               <dd className="flex items-center gap-2">
-                <span className="text-sm font-medium text-zinc-900">
-                  {tenant.currentPlan?.displayName || '—'}
+                <span
+                  className={`text-sm font-medium ${
+                    licensing?.license.active ? 'text-emerald-700' : 'text-zinc-500'
+                  }`}
+                >
+                  {licensing?.license.active
+                    ? t('tenantDetail.licenceActive')
+                    : t('tenantDetail.licenceNone')}
                 </span>
-                {activeSubscription && (
-                  <button
-                    onClick={openPlanModal}
-                    className="p-1 rounded hover:bg-zinc-100 transition-colors"
-                    title={t('tenantDetail.changePlanTitle')}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-                  </button>
+                {licensing?.license.anniversaryAt && (
+                  <span className="text-xs text-zinc-500">
+                    {new Date(licensing.license.anniversaryAt).toLocaleDateString('tr-TR')}
+                  </span>
                 )}
               </dd>
             </div>
@@ -366,45 +357,118 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      {/* Subscription Info */}
-      {activeSubscription && (
-        <div className="bg-white rounded-xl border border-zinc-200 p-5">
-          <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.activeSubscription')}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-zinc-500">{t('tenantDetail.plan')}</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{activeSubscription.plan?.displayName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">{t('tenantDetail.status')}</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{activeSubscription.status}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">{t('tenantDetail.billingCycle')}</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">{activeSubscription.billingCycle}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">{t('tenantDetail.periodEnd')}</p>
-              <p className="text-sm font-medium text-zinc-900 mt-0.5">
-                {new Date(activeSubscription.currentPeriodEnd).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
+      {/* What this tenant owns. Replaces the subscription card: there is no
+          plan to show any more, only a licence and a list of products — and,
+          crucially, whether each one's grants are actually live. */}
+      <div className="bg-white rounded-xl border border-zinc-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-zinc-900">
+            {t('tenantDetail.owned.title')}
+          </h3>
+          {licensing && !licensing.license.active && licensing.owned.length > 0 && (
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+              {t('tenantDetail.owned.darkWarning')}
+            </span>
+          )}
         </div>
-      )}
+
+        {!licensing || licensing.owned.length === 0 ? (
+          <p className="text-sm text-zinc-500">{t('tenantDetail.owned.empty')}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[40rem]">
+              <thead>
+                <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+                  <th className="pb-2 pr-4 font-medium">{t('tenantDetail.owned.col.product')}</th>
+                  <th className="pb-2 pr-4 font-medium">{t('tenantDetail.owned.col.origin')}</th>
+                  <th className="pb-2 pr-4 font-medium">{t('tenantDetail.owned.col.until')}</th>
+                  <th className="pb-2 pr-4 font-medium">{t('tenantDetail.owned.col.status')}</th>
+                  <th className="pb-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {licensing.owned.map((item) => (
+                  <tr key={item.id}>
+                    <td className="py-2.5 pr-4">
+                      <span className="font-medium text-zinc-900">{item.name}</span>
+                      {item.quantity > 1 && (
+                        <span className="ml-1 text-zinc-500">×{item.quantity}</span>
+                      )}
+                      <div className="font-mono text-xs text-zinc-400">{item.code}</div>
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      {item.origin === 'comp' ? (
+                        <span
+                          className="rounded bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                          title={item.compReason ?? undefined}
+                        >
+                          {t('tenantDetail.owned.comp')}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-500">
+                          {t('tenantDetail.owned.purchased')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-4 text-zinc-600">
+                      {item.periodEnd
+                        ? new Date(item.periodEnd).toLocaleDateString('tr-TR')
+                        : '—'}
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      {item.suppressedByLicence ? (
+                        <span className="rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          {t('tenantDetail.owned.suppressed')}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-600">{item.status}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      {/* Only comps are revocable here — taking back a purchase
+                          is a refund decision on the payment rail. */}
+                      {item.origin === 'comp' && item.status !== 'cancelled' && (
+                        <button
+                          onClick={() => {
+                            if (!id) return;
+                            if (confirm(t('tenantDetail.owned.confirmRevoke', { name: item.name })))
+                              revokeCompMutation.mutate({ tenantId: id, tenantAddOnId: item.id });
+                          }}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          {t('tenantDetail.owned.revoke')}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {licensing && Object.keys(licensing.credits).length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-3 border-t border-zinc-100 pt-4">
+            {Object.entries(licensing.credits).map(([kind, remaining]) => (
+              <div key={kind} className="rounded-lg border border-zinc-200 px-3 py-1.5">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">{kind}</span>
+                <span className="ml-2 text-sm font-semibold text-zinc-900">{remaining}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Actions */}
       <div className="bg-white rounded-xl border border-zinc-200 p-5">
         <h3 className="text-sm font-medium text-zinc-900 mb-4">{t('tenantDetail.actions')}</h3>
         <div className="flex flex-wrap gap-3">
-          {activeSubscription && (
-            <button
-              onClick={openPlanModal}
-              className="px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition-colors"
-            >
-              {t('tenantDetail.changePlan')}
-            </button>
-          )}
+          <button
+            onClick={() => setShowCompModal(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition-colors"
+          >
+            {t('tenantDetail.comp.action')}
+          </button>
           {tenant.status === 'ACTIVE' && (
             <button
               onClick={() => openStatusModal('SUSPENDED')}
@@ -632,92 +696,89 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      {/* Plan Change Modal */}
+      {/* Comp modal — the supported way to give a tenant a product.
+          Deliberately NOT a feature override: an override cannot expire, does
+          not say who granted it, and can outrank a later purchase of the same
+          capability. A comp is an ownership row that behaves like every other. */}
       <Modal
-        isOpen={showPlanModal}
-        onClose={() => setShowPlanModal(false)}
-        title={t('tenantDetail.changePlan')}
+        isOpen={showCompModal}
+        onClose={() => setShowCompModal(false)}
+        title={t('tenantDetail.comp.title')}
         size="md"
       >
-              <p className="text-sm text-zinc-500 mb-4">
-                {t('tenantDetail.selectNewPlan')} <span className="font-medium text-zinc-900">{tenant.name}</span>
-              </p>
+        <p className="text-sm text-zinc-500 mb-4">
+          {t('tenantDetail.comp.subtitle')}{' '}
+          <span className="font-medium text-zinc-900">{tenant.name}</span>
+        </p>
 
-              <div className="space-y-2 mb-6">
-                {selectablePlans.map((plan) => (
-                  <label
-                    key={plan.id}
-                    className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${
-                      selectedPlanId === plan.id
-                        ? 'border-zinc-900 bg-zinc-50'
-                        : 'border-zinc-200 hover:border-zinc-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="plan"
-                        value={plan.id}
-                        checked={selectedPlanId === plan.id}
-                        onChange={(e) => setSelectedPlanId(e.target.value)}
-                        className="w-4 h-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-zinc-900">{plan.displayName}</p>
-                        <p className="text-xs text-zinc-500">
-                          {t('tenantDetail.usersTablesProducts', { users: plan.maxUsers, tables: plan.maxTables, products: plan.maxProducts })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-zinc-900">
-                        ₺{Number(plan.monthlyPrice).toLocaleString()}{t('plans.perMonth')}
-                      </p>
-                      {plan.id === tenant.currentPlan?.id && (
-                        <span className="text-xs text-zinc-500">{t('tenantDetail.current')}</span>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
+        <label className="block text-xs text-zinc-600 mb-1">
+          {t('tenantDetail.comp.product')}
+        </label>
+        <select
+          value={compCode}
+          onChange={(e) => setCompCode(e.target.value)}
+          className="mb-4 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+        >
+          <option value="">{t('tenantDetail.comp.selectProduct')}</option>
+          {compableProducts.map((product) => (
+            <option key={product.id} value={product.code}>
+              [{product.kind}] {product.name} — ₺
+              {(product.priceCents / 100).toLocaleString('tr-TR')}
+            </option>
+          ))}
+        </select>
 
-              {/* F3: show the resulting billing amount so the operator sees
-                  the price the subscription row will carry after the change. */}
-              {newAmountPreview !== null && (
-                <div className="mb-4 p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-                  <p className="text-sm text-zinc-700">
-                    {t('tenantDetail.newAmountInfo', {
-                      amount: `₺${newAmountPreview.toLocaleString()}`,
-                      cycle: t(`tenantDetail.cycle.${billingCycle}`, billingCycle),
-                    })}
-                  </p>
-                </div>
-              )}
+        <label className="block text-xs text-zinc-600 mb-1">
+          {t('tenantDetail.comp.quantity')}
+        </label>
+        <input
+          type="number"
+          min={1}
+          value={compQty}
+          onChange={(e) => setCompQty(Math.max(1, Number(e.target.value) || 1))}
+          className="mb-4 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm tabular-nums"
+        />
 
-              {changePlanMutation.isError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
-                  <p className="text-sm text-red-600">
-                    {getApiErrorMessage(changePlanMutation.error, t('tenantDetail.changePlanError'))}
-                  </p>
-                </div>
-              )}
+        <label className="block text-xs text-zinc-600 mb-1">
+          {t('tenantDetail.comp.reason')}
+        </label>
+        <textarea
+          rows={2}
+          value={compReason}
+          onChange={(e) => setCompReason(e.target.value)}
+          placeholder={t('tenantDetail.comp.reasonPlaceholder')}
+          className="mb-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+        />
+        <p className="mb-4 text-xs text-zinc-500">
+          {t('tenantDetail.comp.reasonHint')}
+        </p>
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPlanModal(false)}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-                >
-                  {t('tenantDetail.cancel')}
-                </button>
-                <button
-                  onClick={handleChangePlan}
-                  disabled={!selectedPlanId || selectedPlanId === tenant.currentPlan?.id || changePlanMutation.isPending}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {changePlanMutation.isPending ? t('tenantDetail.changing') : t('tenantDetail.changePlan')}
-                </button>
-              </div>
+        {!licensing?.license.active && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm text-amber-800">
+              {t('tenantDetail.comp.noLicenceWarning')}
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowCompModal(false)}
+            className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            {t('tenantDetail.cancel')}
+          </button>
+          <button
+            onClick={handleComp}
+            disabled={!compCode || compReason.trim().length < 3 || compMutation.isPending}
+            className="flex-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {compMutation.isPending
+              ? t('tenantDetail.comp.granting')
+              : t('tenantDetail.comp.grant')}
+          </button>
+        </div>
       </Modal>
 
       {/* F6: Suspend / Delete destructive-confirm modal. States consequences,

@@ -8,6 +8,17 @@ import type { MarketplaceAddOn, TenantAddOn } from './marketplaceApi';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+  // The consent block reaches legalApi → i18n/config, which calls
+  // `.use(initReactI18next)` at import time. A partial mock without it fails
+  // the whole suite at collection.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
+
+// The consent block is exercised in its own spec; here it would drag the
+// legal-document queries into every marketplace test for no added coverage.
+vi.mock('../legal/CheckoutConsent', () => ({
+  default: () => null,
+  useConsentComplete: () => true,
 }));
 
 let lastKind: string | undefined = undefined;
@@ -133,7 +144,12 @@ describe('MarketplacePage purchase', () => {
     const card = screen.getByText('POS Pro').closest('article') as HTMLElement;
     fireEvent.click(within(card).getByText('hummytummy.marketplace.purchase'));
     expect(confirmSpy).toHaveBeenCalled();
-    expect(purchaseMutate).toHaveBeenCalledWith({ addOnCode: 'pos-pro' });
+    // The consent ids ride along on every purchase — the server records them
+    // before minting a PayTR token, and a checkout without them is refused.
+    expect(purchaseMutate).toHaveBeenCalledWith({
+      addOnCode: 'pos-pro',
+      acceptedDocumentIds: expect.any(Array),
+    });
     confirmSpy.mockRestore();
   });
 

@@ -154,58 +154,41 @@
   },
   "pricing": {
     "badge": "Narxlar",
-    "title": "Oddiy, shaffof narxlar",
-    "subtitle": "Bepul boshlang, tayyor bo'lganingizda yangilang. Yashirin to'lovlar yo'q, istalgan vaqtda bekor qiling.",
-    "mostPopular": "Eng mashhur",
-    "perMonth": "/oy",
-    "plans": {
-      "basic": {
-        "name": "Boshlang'ich",
-        "description": "Kafe va kichik restoranlar uchun",
-        "price": "₺499",
-        "cta": "Bepul sinovni boshlash",
-        "features": [
-          "5 ta foydalanuvchi",
-          "20 ta stol",
-          "100 ta mahsulot",
-          "20 ta kategoriya",
-          "Inventar kuzatuvi",
-          "KDS integratsiyasi"
-        ]
-      },
-      "pro": {
-        "name": "Pro",
-        "description": "Shahar markazidagi restoranlar uchun",
-        "price": "₺1.299",
-        "cta": "Bepul sinovni boshlash",
-        "features": [
-          "15 ta foydalanuvchi",
-          "50 ta stol",
-          "500 ta mahsulot",
-          "50 ta kategoriya",
-          "Kengaytirilgan hisobotlar",
-          "Bron qilish tizimi",
-          "Xodimlarni boshqarish",
-          "Yetkazib berish integratsiyalari (Yemeksepeti, Trendyol, Getir, Migros)",
-          "Maxsus brend ranglari",
-          "Ustuvor yordam"
-        ]
-      },
-      "business": {
-        "name": "Biznes",
-        "description": "Ko'p filialli restoran tarmoqlari uchun",
-        "price": "₺2.999",
-        "cta": "Sotuvlar bilan bog'lanish",
-        "features": [
-          "Cheksiz foydalanuvchi, stol va mahsulot",
-          "Ko'p joylashuv",
-          "API kirish",
-          "Barcha xususiyatlar kiritilgan",
-          "Korporativ yordam"
-        ]
-      }
+    "title": "Yadro bepul. Faqat ishlatganingiz uchun to‘lang.",
+    "subtitle": "Paketlar ham, darajalar ham yo‘q. Restoranni ishlatadigan hamma narsa bepul va cheksiz; og‘ir modullar esa bittalab, yillik sotib olinadi.",
+    "perYear": "/yil",
+    "oneTime": " bir martalik",
+    "free": {
+      "badge": "Cheksiz va bepul",
+      "name": "HummyTummy Yadro",
+      "description": "Karta ham, litsenziya ham kerak emas; foydalanuvchi, stol va mahsulot cheklovi yo‘q.",
+      "cta": "Bepul boshlash",
+      "features": [
+        "POS va cheklar",
+        "Oshxona ekrani (KDS)",
+        "Menyu boshqaruvi",
+        "Stollar va zal rejasi",
+        "QR menyu",
+        "Buyurtma boshqaruvi",
+        "Kassa",
+        "Asosiy hisobotlar",
+        "Jamoa va rollar",
+        "Mijozlar",
+        "Qurilma va filiallar",
+        "Shaxsiy brend va domen"
+      ]
     },
-    "trialNote": "Barcha rejalar 14 kunlik bepul Biznes sinov davri bilan boshlanadi. Kredit karta talab qilinmaydi."
+    "licence": {
+      "description": "Pullik modullarni sotib olish va ishlatish uchun zarur yillik litsenziya. Sotib olingan kun hisobingizning yillik sanasiga aylanadi."
+    },
+    "kind": {
+      "module": "Modullar",
+      "integration": "Integratsiyalar",
+      "capacity": "Sig‘im",
+      "credit": "Kreditlar"
+    },
+    "catalogUnavailable": "Narxlar ro‘yxatini yuklab bo‘lmadi. Joriy narxlar uchun biz bilan bog‘laning.",
+    "prorationNote": "Yil davomida sotib olingan har bir narsa yillik sanaga qadar kunlab hisoblanadi — bitta hisob-faktura, bitta yangilash sanasi."
   },
   "business": {
     "badge": "Muhim natijalar",

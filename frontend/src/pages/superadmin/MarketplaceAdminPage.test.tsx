@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MarketplaceAdminPage from './MarketplaceAdminPage';
 
@@ -25,6 +25,12 @@ vi.mock('../../features/superadmin/api/superadminMarketplaceApi', () => ({
   useSaUpdateProduct: () => ({ mutate: updateProductMutate }),
   useSaArchiveProduct: () => ({ mutate: archiveProductMutate }),
   useSaReceiveStock: () => ({ mutate: receiveStockMutate }),
+  // Vocabulary constants are plain data — the editor renders its selects from
+  // them, so the mock has to carry them or every field disappears.
+  ADDON_KINDS: ['license', 'module', 'integration', 'capacity', 'credit', 'service'],
+  ADDON_BILLINGS: ['annual', 'oneTime'],
+  CREDIT_KINDS: ['PHOTO', 'VIDEO', 'MODEL3D', 'SMS'],
+  CATALOG_LOCALES: ['tr', 'en', 'ar', 'ru', 'uz'],
 }));
 
 vi.mock('react-i18next', () => ({
@@ -118,6 +124,161 @@ describe('MarketplaceAdminPage — add-on archive flow', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.publish' }));
     expect(updateAddOnMutate).toHaveBeenCalledWith({ id: 'draft-1', status: 'published' });
+  });
+});
+
+describe('MarketplaceAdminPage — à-la-carte editor invariants', () => {
+  beforeEach(() => {
+    createAddOnAsync.mockClear();
+    addons = [];
+    products = [];
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  function openEditor() {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.new' }));
+  }
+
+  function field(label: string) {
+    const wrap = screen.getByText(label).closest('label') as HTMLElement;
+    return wrap;
+  }
+
+  function setKind(kind: string) {
+    const wrap = field('marketplace.addons.fields.kind');
+    fireEvent.change(within(wrap).getByRole('combobox'), { target: { value: kind } });
+  }
+
+  function setPrice(cents: number) {
+    const wrap = field('marketplace.addons.fields.priceCents');
+    fireEvent.change(within(wrap).getByRole('spinbutton'), { target: { value: String(cents) } });
+  }
+
+  function setStatus(status: string) {
+    const wrap = field('marketplace.addons.fields.status');
+    fireEvent.change(within(wrap).getByRole('combobox'), { target: { value: status } });
+  }
+
+  const submit = () =>
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.addons.create' }));
+
+  it('defaults a new product to annual, licence-gated', async () => {
+    // The pre-v3.3.0 form defaulted to `recurring`, a cadence the pricer now
+    // refuses — a new product created from the old defaults was unsellable.
+    openEditor();
+    const billing = within(field('marketplace.addons.fields.billing')).getByRole(
+      'combobox',
+    ) as HTMLSelectElement;
+    expect(billing.value).toBe('annual');
+
+    const codeWrap = field('marketplace.addons.fields.code');
+    fireEvent.change(within(codeWrap).getByRole('textbox'), { target: { value: 'module_x' } });
+    setPrice(129000);
+    submit();
+
+    await waitFor(() => expect(createAddOnAsync).toHaveBeenCalled());
+    expect(createAddOnAsync.mock.calls[0][0]).toMatchObject({
+      billing: 'annual',
+      requiresLicense: true,
+    });
+  });
+
+  it('flips a credit pack to oneTime and demands kind + units', async () => {
+    openEditor();
+    setKind('credit');
+
+    const billing = within(field('marketplace.addons.fields.billing')).getByRole(
+      'combobox',
+    ) as HTMLSelectElement;
+    expect(billing.value).toBe('oneTime');
+
+    fireEvent.change(
+      within(field('marketplace.addons.fields.code')).getByRole('textbox'),
+      { target: { value: 'credit_x' } },
+    );
+    setPrice(69000);
+    submit();
+    expect(await screen.findByText('marketplace.addons.creditIncomplete')).toBeInTheDocument();
+    expect(createAddOnAsync).not.toHaveBeenCalled();
+
+    fireEvent.change(
+      within(field('marketplace.addons.fields.creditKind')).getByRole('combobox'),
+      { target: { value: 'PHOTO' } },
+    );
+    fireEvent.change(
+      within(field('marketplace.addons.fields.creditUnits')).getByRole('spinbutton'),
+      { target: { value: '100' } },
+    );
+    submit();
+    await waitFor(() => expect(createAddOnAsync).toHaveBeenCalled());
+    expect(createAddOnAsync.mock.calls[0][0]).toMatchObject({
+      creditKind: 'PHOTO',
+      creditUnits: 100,
+      billing: 'oneTime',
+    });
+  });
+
+  it('refuses to publish a free product', async () => {
+    // A published zero-price row is a giveaway: checkout provisions it without
+    // any payment at all, because purchase() only demands a paymentRef when
+    // priceCents > 0.
+    openEditor();
+    fireEvent.change(
+      within(field('marketplace.addons.fields.code')).getByRole('textbox'),
+      { target: { value: 'module_free' } },
+    );
+    setStatus('published');
+    submit();
+    expect(
+      await screen.findByText('marketplace.addons.publishedNeedsPrice'),
+    ).toBeInTheDocument();
+    expect(createAddOnAsync).not.toHaveBeenCalled();
+  });
+
+  it('clears requiresLicense when the product IS the licence', () => {
+    // A licence that requires a licence can never be bought — the projector
+    // would suppress the very grant that unsuppresses everything.
+    openEditor();
+    setKind('license');
+    const checkbox = screen.getByRole('checkbox');
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toBeDisabled();
+  });
+
+  it('rejects a plan: dependency left over from the tier era', async () => {
+    openEditor();
+    fireEvent.change(
+      within(field('marketplace.addons.fields.code')).getByRole('textbox'),
+      { target: { value: 'module_y' } },
+    );
+    setPrice(99000);
+    fireEvent.change(
+      within(field('marketplace.addons.fields.deps')).getByRole('textbox'),
+      { target: { value: 'plan:PRO' } },
+    );
+    submit();
+    expect(await screen.findByText('marketplace.addons.planDepsGone')).toBeInTheDocument();
+    expect(createAddOnAsync).not.toHaveBeenCalled();
+  });
+
+  it('sends localized copy so a product ships without a frontend release', async () => {
+    openEditor();
+    fireEvent.change(
+      within(field('marketplace.addons.fields.code')).getByRole('textbox'),
+      { target: { value: 'module_z' } },
+    );
+    setPrice(99000);
+
+    const trRow = screen.getByText('tr').parentElement as HTMLElement;
+    const [nameInput] = within(trRow).getAllByRole('textbox');
+    fireEvent.change(nameInput, { target: { value: 'Personel Yönetimi' } });
+
+    submit();
+    await waitFor(() => expect(createAddOnAsync).toHaveBeenCalled());
+    expect(createAddOnAsync.mock.calls[0][0].i18n).toMatchObject({
+      tr: { name: 'Personel Yönetimi' },
+    });
   });
 });
 

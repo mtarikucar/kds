@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CalendarClock, ArrowLeft } from 'lucide-react';
 import { useEntitlements } from '../../contexts/SubscriptionContext';
 import { formatCents } from './licensingApi';
 import { usePurchaseAddOnViaCheckout } from '../marketplace/marketplaceApi';
+import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
 import Button from '../../components/ui/Button';
 
 /**
@@ -22,6 +24,8 @@ const RenewalPage = () => {
   const { cycleId } = useParams<{ cycleId: string }>();
   const { renewal, owned, isLoading } = useEntitlements();
   const purchase = usePurchaseAddOnViaCheckout();
+  const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
+  const consentGiven = useConsentComplete(acceptedDocs);
 
   if (isLoading) {
     return <div className="p-6 text-sm text-gray-500">{t('common:loading')}</div>;
@@ -54,6 +58,7 @@ const RenewalPage = () => {
         code: l.code,
         qty: l.quantity,
       })),
+      acceptedDocumentIds: acceptedDocs,
     });
 
   return (
@@ -121,7 +126,19 @@ const RenewalPage = () => {
         </table>
       </section>
 
-      <Button onClick={pay} disabled={purchase.isPending} className="w-full">
+      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+        <h2 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {t('licensing:consent.title')}
+        </h2>
+        <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
+      </section>
+
+      <Button
+        onClick={pay}
+        disabled={purchase.isPending || !consentGiven}
+        title={consentGiven ? undefined : t('licensing:consent.required')}
+        className="w-full"
+      >
         {t('licensing:renewal.payCta', {
           total: formatCents(renewal.totalCents, renewal.currency),
         })}

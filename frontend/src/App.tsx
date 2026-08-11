@@ -30,13 +30,6 @@ const TenantDetailPage = lazyWithReload(
 const AllUsersPage = lazyWithReload(
   () => import("./pages/superadmin/AllUsersPage"),
 );
-const PlansPage = lazyWithReload(() => import("./pages/superadmin/PlansPage"));
-const SubscriptionsPage = lazyWithReload(
-  () => import("./pages/superadmin/SubscriptionsPage"),
-);
-const BankTransferPage = lazyWithReload(
-  () => import("./pages/superadmin/BankTransferPage"),
-);
 const AuditLogsPage = lazyWithReload(
   () => import("./pages/superadmin/AuditLogsPage"),
 );
@@ -838,18 +831,24 @@ function App() {
                 element={<TenantDetailPage />}
               />
               <Route path="/superadmin/users" element={<AllUsersPage />} />
-              <Route path="/superadmin/plans" element={<PlansPage />} />
               <Route
                 path="/superadmin/marketplace"
                 element={<MarketplaceAdminPage />}
               />
+              {/* Plans, subscriptions and the havale queue went with the
+                  subscription rail in v3.3.0. Old bookmarks land on the
+                  catalog, which is what replaced all three. */}
+              <Route
+                path="/superadmin/plans"
+                element={<Navigate to="/superadmin/marketplace" replace />}
+              />
               <Route
                 path="/superadmin/subscriptions"
-                element={<SubscriptionsPage />}
+                element={<Navigate to="/superadmin/marketplace" replace />}
               />
               <Route
                 path="/superadmin/bank-transfer"
-                element={<BankTransferPage />}
+                element={<Navigate to="/superadmin/marketplace" replace />}
               />
               <Route
                 path="/superadmin/audit-logs"

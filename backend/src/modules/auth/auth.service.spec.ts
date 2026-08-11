@@ -203,7 +203,8 @@ describe('AuthService', () => {
       });
 
       expect(prisma.tenant.create).toHaveBeenCalled();
-      expect(prisma.subscription.create).toHaveBeenCalled();
+      // v3.3.0 — no subscription row: a new tenant is on the free core.
+      expect(prisma.subscription.create).not.toHaveBeenCalled();
       expect(prisma.branch.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ name: 'Main', status: 'active' }),
@@ -722,7 +723,7 @@ describe('AuthService', () => {
       mockJwtService.sign.mockReturnValue('signed-token');
     };
 
-    it('provisions a BUSINESS trial + Main branch + ADMIN for a new social user', async () => {
+    it('provisions the free core + Main branch + ADMIN for a new social user', async () => {
       armHappyPath();
 
       const result = await (service as any).createSocialAuthUser({
@@ -733,35 +734,21 @@ describe('AuthService', () => {
         authProvider: 'google',
       });
 
-      // BUSINESS trial subscription (bug was: FREE / none → trial never started)
-      expect(prisma.subscription.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            planId: 'plan-business',
-            status: 'TRIALING',
-            isTrialPeriod: true,
-          }),
-        }),
-      );
+      // v3.3.0 — no plan, no subscription, no trial. Social signup gets
+      // exactly what email signup gets: the free core.
+      expect(prisma.subscription.create).not.toHaveBeenCalled();
       // A Main branch (bug was: none → MULTI_LOCATION gate blocked first branch)
       expect(prisma.branch.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ name: 'Main', status: 'active' }),
         }),
       );
-      // Tenant seeded with the trial markers + the plan's featureOverrides
-      expect(prisma.tenant.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            currentPlanId: 'plan-business',
-            trialUsed: true,
-            // v3.3.0 — provisioning seeds NOTHING here. Mirroring the plan's
-          // flags would become permanent `override:admin` grants for the
-          // whole paid feature set.
-          featureOverrides: {},
-          }),
-        }),
-      );
+      // No plan link and no override seed — the latter would have become
+      // permanent `override:admin` grants for the whole paid feature set.
+      const tenantData = prisma.tenant.create.mock.calls[0][0].data;
+      expect(tenantData.currentPlanId).toBeUndefined();
+      expect(tenantData.trialUsed).toBeUndefined();
+      expect(tenantData.featureOverrides).toBeUndefined();
       // ADMIN pinned to the Main branch
       expect(prisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -776,11 +763,13 @@ describe('AuthService', () => {
       expect(result).toBeDefined();
     });
 
-    it('throws when the BUSINESS plan is unseeded (never silently under-provisions)', async () => {
+    it('registers even with no subscription plan seeded at all', async () => {
+      // The inverse of the old assertion, and the reason for the change:
+      // signup used to REFUSE when the seeded plan was missing. Plans are
+      // retired, so that dependency could only ever break registration —
+      // deleting one leftover catalogue row would have taken signup with it.
+      armHappyPath();
       prisma.subscriptionPlan.findUnique.mockResolvedValue(null as any);
-      jest
-        .spyOn(service as any, 'allocateSubdomain')
-        .mockResolvedValue('x-restaurant');
 
       await expect(
         (service as any).createSocialAuthUser({
@@ -790,9 +779,8 @@ describe('AuthService', () => {
           googleId: 'gid',
           authProvider: 'google',
         }),
-      ).rejects.toThrow();
-      // No tenant is created on the failure path.
-      expect(prisma.tenant.create).not.toHaveBeenCalled();
+      ).resolves.toBeTruthy();
+      expect(prisma.tenant.create).toHaveBeenCalled();
     });
   });
 

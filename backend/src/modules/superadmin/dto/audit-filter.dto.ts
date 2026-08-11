@@ -29,6 +29,8 @@ export enum EntityType {
   USER = "USER",
   SUBSCRIPTION = "SUBSCRIPTION",
   PLAN = "PLAN",
+  // à-la-carte ownership rows: comps granted and revoked by an operator.
+  ENTITLEMENT = "ENTITLEMENT",
   SUPER_ADMIN = "SUPER_ADMIN",
 }
 

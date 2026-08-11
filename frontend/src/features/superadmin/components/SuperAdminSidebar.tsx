@@ -22,10 +22,10 @@ const navigation = [
   { nameKey: 'nav.dashboard', href: '/superadmin/dashboard', icon: LayoutDashboard },
   { nameKey: 'nav.tenants', href: '/superadmin/tenants', icon: Building2 },
   { nameKey: 'nav.users', href: '/superadmin/users', icon: Users },
-  { nameKey: 'nav.plans', href: '/superadmin/plans', icon: Layers },
-  { nameKey: 'nav.marketplace', href: '/superadmin/marketplace', icon: Layers },
-  { nameKey: 'nav.subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
-  { nameKey: 'nav.bankTransfer', href: '/superadmin/bank-transfer', icon: Banknote, defaultLabel: 'Havale' },
+  // Plans / Subscriptions / Havale were three entries onto one retired rail.
+  // The catalog replaced all three: it is where products and prices live, and
+  // a tenant's licence, purchases and comps are on the tenant detail page.
+  { nameKey: 'nav.marketplace', href: '/superadmin/marketplace', icon: Layers, defaultLabel: 'Katalog' },
   { nameKey: 'nav.auditLogs', href: '/superadmin/audit-logs', icon: FileText },
   { nameKey: 'nav.legal', href: '/superadmin/legal', icon: Scale, defaultLabel: 'Yasal Belgeler' },
   { nameKey: 'nav.settings', href: '/superadmin/settings', icon: Settings },

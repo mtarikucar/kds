@@ -24,6 +24,7 @@ import {
 import Card from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
+import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
 
 const KIND_CODES = [undefined, 'software', 'integration', 'capacity', 'support'] as const;
 
@@ -65,6 +66,10 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
   const cancel = useCancelAddOn();
 
   const [purchasingCode, setPurchasingCode] = useState<string | null>(null);
+  // Distance-selling consent — the same three documents the licensing store
+  // collects. Every path that can reach PayTR has to carry them.
+  const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
+  const consentGiven = useConsentComplete(acceptedDocs);
 
   // Codes the tenant already owns (active) — drives the "owned" card state.
   const ownedCodes = useMemo(
@@ -138,7 +143,7 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
     });
     if (window.confirm(message) === false) return;
     setPurchasingCode(code);
-    purchase.mutate({ addOnCode: code });
+    purchase.mutate({ addOnCode: code, acceptedDocumentIds: acceptedDocs });
   };
 
   const handleCancel = (id: string, name: string) => {
@@ -152,6 +157,14 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
 
   return (
     <div className={embedded ? 'space-y-6' : 'mx-auto max-w-6xl space-y-6 p-4 sm:p-6'}>
+      <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <h2 className="mb-2 text-sm font-semibold text-gray-900">
+          {t('hummytummy.marketplace.consentTitle', {
+            defaultValue: 'Satın almadan önce onaylayın',
+          })}
+        </h2>
+        <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
+      </section>
       {/* Header — suppressed when embedded in the Mağaza hub (it owns the title) */}
       {!embedded && (
         <div className="flex items-center gap-3">
@@ -309,8 +322,9 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
                       // may still be loading), so an already-owned add-on can't
                       // be re-bought in the catalogue-rendered-but-mine-pending
                       // window.
-                      disabled={purchase.isPending || mineLoading}
+                      disabled={purchase.isPending || mineLoading || !consentGiven}
                       onClick={() => handlePurchase(a.code)}
+                      title={consentGiven ? undefined : t('hummytummy.marketplace.consentRequired', { defaultValue: 'Devam etmek için yasal belgeleri onaylayın.' })}
                     >
                       <ShoppingCart className="mr-1.5 h-4 w-4" />
                       {isBusy

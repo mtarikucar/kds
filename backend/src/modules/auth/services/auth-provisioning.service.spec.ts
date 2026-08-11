@@ -50,40 +50,52 @@ describe("AuthProvisioningService.allocateSubdomain", () => {
   });
 });
 
-describe("AuthProvisioningService.loadTrialPlanOrThrow", () => {
-  // Onboarding-trial redesign: new tenants start on the dedicated TRIAL plan,
-  // not BUSINESS. The guard now loads/validates the TRIAL plan.
-  it("returns the TRIAL plan when seeded with a positive trial", async () => {
-    const prisma = makePrisma();
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({
-      name: "TRIAL",
-      trialDays: 7,
-    });
-    const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.loadTrialPlanOrThrow()).resolves.toMatchObject({
-      trialDays: 7,
-    });
+describe("AuthProvisioningService — signup no longer touches the plan rail", () => {
+  // Registration used to call loadTrialPlanOrThrow() and REFUSE to create a
+  // tenant when the seeded `TRIAL` SubscriptionPlan was missing. Plans are
+  // retired: that made signup depend on a row nothing else reads, so deleting
+  // one leftover catalogue entry during cleanup would have taken registration
+  // down with it.
+  it("does not expose a trial-plan loader any more", () => {
+    const svc = new AuthProvisioningService(makePrisma() as any);
+    expect(
+      (svc as unknown as Record<string, unknown>).loadTrialPlanOrThrow,
+    ).toBeUndefined();
   });
 
-  it("throws when the TRIAL plan is missing (seed/migration misconfig)", async () => {
+  it("creates a tenant with no plan, no subscription and no trial countdown", async () => {
     const prisma = makePrisma();
-    prisma.subscriptionPlan.findUnique.mockResolvedValue(null);
+    const tx = {
+      tenant: { create: jest.fn().mockResolvedValue({ id: "t-1" }) },
+      subscription: { create: jest.fn() },
+      subscriptionPlan: { findUnique: jest.fn() },
+      branch: { create: jest.fn().mockResolvedValue({ id: "b-1" }) },
+      user: { create: jest.fn().mockResolvedValue({ id: "u-1" }) },
+      userBranchAssignment: { create: jest.fn() },
+    };
     const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.loadTrialPlanOrThrow()).rejects.toBeInstanceOf(
-      ResourceNotFoundException,
-    );
-  });
 
-  it("throws when the TRIAL plan has no trialDays", async () => {
-    const prisma = makePrisma();
-    prisma.subscriptionPlan.findUnique.mockResolvedValue({
-      name: "TRIAL",
-      trialDays: 0,
+    await svc.provisionNewTenantWithAdmin(tx as any, {
+      restaurantName: "Acme",
+      finalSubdomain: "acme",
+      userParams: {
+        email: "a@b.com",
+        hashedPassword: "x",
+        firstName: "A",
+        lastName: "B",
+        userRole: "ADMIN",
+        userStatus: "ACTIVE",
+      } as any,
     });
-    const svc = new AuthProvisioningService(prisma as any);
-    await expect(svc.loadTrialPlanOrThrow()).rejects.toBeInstanceOf(
-      ResourceNotFoundException,
-    );
+
+    expect(tx.subscription.create).not.toHaveBeenCalled();
+    expect(tx.subscriptionPlan.findUnique).not.toHaveBeenCalled();
+    const data = tx.tenant.create.mock.calls[0][0].data;
+    expect(data.currentPlanId).toBeUndefined();
+    expect(data.trialEndsAt).toBeUndefined();
+    // The one seed that mattered: an override map here would have granted the
+    // paid catalogue to every new tenant.
+    expect(data.featureOverrides).toBeUndefined();
   });
 });
 

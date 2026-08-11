@@ -112,6 +112,13 @@ export const usePurchaseAddOnViaCheckout = () => {
         qty?: number;
         branchId?: string;
       }>;
+      /**
+       * Ids of the three current legal documents the buyer ticked (KVKK,
+       * Mesafeli Satış, İade). The server re-verifies they are the live
+       * versions and records consent before minting a PayTR token, so this
+       * is not optional — a checkout without it is refused.
+       */
+      acceptedDocumentIds: string[];
     }): Promise<AddOnCheckoutIntent> => {
       const user = useAuthStore.getState().user;
       if (!user) throw new Error('Not authenticated');
@@ -125,6 +132,7 @@ export const usePurchaseAddOnViaCheckout = () => {
       ];
       const r = await api.post('/v1/checkout/intent', {
         cart: { items },
+        acceptedDocumentIds: input.acceptedDocumentIds,
         buyer: {
           email: user.email,
           name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
