@@ -161,6 +161,9 @@ services:
     restart: always
     environment:
       NODE_ENV: production
+      # Same reason as prod: the server-side catalog fetch stays on the docker
+      # network instead of hairpinning through the public host.
+      INTERNAL_API_URL: http://backend:3000/api
       NEXT_PUBLIC_API_URL: https://staging.hummytummy.com/api
       NEXT_PUBLIC_SITE_URL: https://staging.hummytummy.com
     ports:

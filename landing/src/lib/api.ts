@@ -15,30 +15,48 @@ export function getStats(): FormattedStats {
   };
 }
 
-// Fail loud if API URL is missing. The previous silent fallback to a
-// hard-coded prod host (`api.hummytummy.com.tr`) was the same anti-pattern
-// the frontend removed in commit 5154c2e — a staging/preview build with no
-// NEXT_PUBLIC_API_URL would silently call production and either leak or
-// scribble. In dev the localhost fallback is fine; in build/runtime prod
-// we'd rather miss the value at config time than serve cross-env data.
-const API_BASE = (() => {
-  const fromEnv = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
-  if (fromEnv) return fromEnv;
-  if (process.env.NODE_ENV === 'production') {
-    console.error(
-      '[landing] NEXT_PUBLIC_API_URL is not set in production — refusing to use a hard-coded fallback. The catalog fetch will return empty and the pricing section renders the free core only.',
-    );
-    return '';
-  }
-  return 'http://localhost:3000';
-})();
+/**
+ * Where to reach the API, most-reliable first.
+ *
+ * The catalog fetch runs on the SERVER (a server component), and from inside
+ * the container a request to the public host has to leave the box, cross
+ * Cloudflare and come back — which is a hairpin that can quietly fail while
+ * the very same URL works from a browser. INTERNAL_API_URL points at the
+ * backend service on the shared docker network and skips the round trip; the
+ * public base stays as the fallback for build-time generation, where the
+ * internal name does not resolve.
+ *
+ * No hard-coded production host: a staging or preview build with nothing set
+ * would otherwise silently read production data. In dev, localhost.
+ */
+const API_BASES: string[] = [
+  process.env.INTERNAL_API_URL,
+  process.env.NEXT_PUBLIC_API_URL,
+  process.env.API_URL,
+  process.env.NODE_ENV === 'production' ? undefined : 'http://localhost:3000',
+].filter((v): v is string => !!v);
+
+/**
+ * Join a base with an API path exactly once.
+ *
+ * Prod passes NEXT_PUBLIC_API_URL=https://hummytummy.com/api — already
+ * carrying the prefix — while a dev base does not. Appending `/api`
+ * unconditionally sent every production request to /api/api/... where it
+ * 404'd, and the failure was invisible: the fetch swallowed it, returned [],
+ * and the pricing section fell back to hardcoded tier prices. The page looked
+ * right while showing numbers no API had confirmed in months.
+ */
+function apiUrl(base: string, path: string): string {
+  const root = base.replace(/\/+$/, '');
+  return `${root}${root.endsWith('/api') ? '' : '/api'}${path}`;
+}
 
 /**
  * The published à-la-carte catalog — the same rows checkout prices from.
  *
- * Replaces `getPlans()`. Plans were retired in v3.3.0: that endpoint now
- * returns an empty array forever, and the pricing section it fed was falling
- * back to hardcoded tier prices that no longer exist.
+ * Replaces the retired plan list: that endpoint returns an empty array
+ * forever, and the pricing section it fed was falling back to hardcoded tier
+ * prices that no longer exist.
  */
 export interface CatalogProduct {
   code: string;
@@ -54,36 +72,21 @@ export interface CatalogProduct {
   sortOrder: number;
 }
 
-/**
- * Join the configured base with an API path exactly once.
- *
- * Prod builds pass NEXT_PUBLIC_API_URL=https://hummytummy.com/api — already
- * carrying the prefix — while a dev build points at http://localhost:3000,
- * which does not. The previous code appended `/api` unconditionally, so every
- * production fetch went to /api/api/... and 404'd. That failure was invisible:
- * the fetch swallowed it, returned [], and the pricing section fell back to
- * hardcoded tier prices, so the page looked right while showing numbers no
- * API had confirmed for months.
- */
-function apiUrl(path: string): string {
-  const root = API_BASE.replace(/\/+$/, '');
-  return `${root}${root.endsWith('/api') ? '' : '/api'}${path}`;
-}
-
 export async function getCatalog(locale = 'tr'): Promise<CatalogProduct[]> {
-  // Static generation with no API base configured renders the free core and a
-  // contact CTA. A missing price is recoverable; a stale one is not.
-  if (!API_BASE) return [];
-  try {
-    const res = await fetch(
-      apiUrl(`/v1/catalog/pricing?locale=${encodeURIComponent(locale)}`),
-      { next: { revalidate: 300 } },
-    );
-    if (!res.ok) return [];
-    const body: { products: CatalogProduct[] } = await res.json();
-    return (body.products ?? []).filter((p) => p.kind !== 'service');
-  } catch {
-    return [];
+  const path = `/v1/catalog/pricing?locale=${encodeURIComponent(locale)}`;
+  for (const base of API_BASES) {
+    try {
+      const res = await fetch(apiUrl(base, path), { next: { revalidate: 300 } });
+      if (!res.ok) continue;
+      const body: { products: CatalogProduct[] } = await res.json();
+      // Services are sold with hardware, not from the price list.
+      return (body.products ?? []).filter((p) => p.kind !== 'service');
+    } catch {
+      // Try the next base. A price the page cannot verify is worse than none:
+      // if every base fails the section renders the free core and says the
+      // list is unavailable, instead of a remembered number.
+    }
   }
+  return [];
 }
 

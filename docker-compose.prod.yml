@@ -190,6 +190,13 @@ services:
     restart: always
     environment:
       NODE_ENV: production
+      # Server-side catalog fetch goes over the shared docker network. Reaching
+      # the public host from inside the container means leaving the box,
+      # crossing Cloudflare and hairpinning back — which can fail while the
+      # same URL works fine from a browser, leaving the pricing section with
+      # nothing to show. The public base stays as the fallback for build-time
+      # generation, where this name does not resolve.
+      INTERNAL_API_URL: http://backend:3000/api
     ports:
       - '3100:3000'
     healthcheck:
