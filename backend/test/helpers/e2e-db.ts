@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { SchedulerRegistry } from "@nestjs/schedule";
 import * as bcrypt from "bcryptjs";
 import request from "supertest";
 import { AppModule } from "../../src/app.module";
@@ -23,6 +24,46 @@ const cookieParser = require("cookie-parser");
  * redis://localhost:6379) — AppService + the entitlement bus open Redis clients
  * at boot, and an unreachable one leaves a dangling handle so jest never exits.
  */
+
+/**
+ * Silence every scheduled job on a booted test app.
+ *
+ * Each e2e suite boots the full AppModule, which registers ScheduleModule at
+ * the root — so every cron in the product starts firing against the same
+ * 5-connection pool the tests are using. In CI that showed up as
+ * "Timed out fetching a new connection from the connection pool" inside a
+ * spec that had nothing to do with the job that stole the connection, i.e. a
+ * failure that moves around between runs.
+ *
+ * The jobs are not under test here (they have their own unit specs), so they
+ * are stopped immediately after init. Production wiring is untouched.
+ */
+function stopScheduledJobs(app: INestApplication): void {
+  let registry: SchedulerRegistry;
+  try {
+    registry = app.get(SchedulerRegistry, { strict: false });
+  } catch {
+    return; // no scheduler in this module graph — nothing to stop
+  }
+  for (const [, job] of registry.getCronJobs()) {
+    try {
+      job.stop();
+    } catch {
+      // A job mid-tick can refuse to stop; it will not be re-scheduled.
+    }
+  }
+  // getIntervals()/getTimeouts() return NAME ARRAYS (getCronJobs returns a
+  // Map) — destructuring them like entries yields the first character of each
+  // name and deletes nothing. Copy before deleting: the registry mutates the
+  // same collection being iterated.
+  for (const name of [...registry.getIntervals()]) {
+    registry.deleteInterval(name);
+  }
+  for (const name of [...registry.getTimeouts()]) {
+    registry.deleteTimeout(name);
+  }
+}
+
 export async function bootE2EApp(): Promise<{
   app: INestApplication;
   prisma: PrismaService;
@@ -32,6 +73,7 @@ export async function bootE2EApp(): Promise<{
   }).compile();
   const app = mod.createNestApplication();
   await app.init();
+  stopScheduledJobs(app);
   const prisma = app.get(PrismaService);
   return { app, prisma };
 }
@@ -108,6 +150,7 @@ export async function bootHttpApp(): Promise<{
     }),
   );
   await app.init();
+  stopScheduledJobs(app);
   const prisma = app.get(PrismaService);
   return { app, prisma };
 }
