@@ -12,15 +12,23 @@
 # It speaks git's smart-HTTP receive-pack protocol directly:
 #   POST <repo>/git-receive-pack  with  <pkt-line ref-update><flush><packfile>
 #
-# Usage:  bash scripts/push-via-openssl.sh [branch]
+# Usage:  bash scripts/push-via-openssl.sh [branch | refs/...]
 #         (defaults to the current branch)
+#
+# A bare name is treated as a branch. A full ref is pushed as given, so a
+# release tag goes out the same way:
+#   bash scripts/push-via-openssl.sh refs/tags/v3.3.0
 #
 set -euo pipefail
 
 REMOTE_URL="https://github.com/mtarikucar/kds.git"
 CA_BUNDLE="/etc/ssl/certs/ca-certificates.crt"
-BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
-REF="refs/heads/${BRANCH}"
+TARGET="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+if [[ "$TARGET" == refs/* ]]; then
+  REF="$TARGET"
+else
+  REF="refs/heads/${TARGET}"
+fi
 ZERO="0000000000000000000000000000000000000000"
 
 TOKEN="$(gh auth token)"
@@ -29,7 +37,13 @@ if [[ -z "$TOKEN" ]]; then
   exit 1
 fi
 
-NEW="$(git rev-parse HEAD)"
+# For an annotated tag this resolves to the tag object, which is what has to
+# travel — the release workflow triggers on annotated tags.
+if git rev-parse --verify --quiet "$REF" >/dev/null; then
+  NEW="$(git rev-parse "$REF")"
+else
+  NEW="$(git rev-parse HEAD)"
+fi
 
 # The remote already has main; only send objects reachable from HEAD but not
 # from origin/main (a normal, self-contained pack — no --thin).
