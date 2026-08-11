@@ -148,62 +148,11 @@ describe('SubscriptionService.getEffectiveFeatures (v2.8.88)', () => {
     expect(result.features.multiLocation).toBe(true);
   });
 
-  it('3) engine empty → plan-only fallback (paranoid path for projector race)', async () => {
-    prisma.tenant.findUnique.mockResolvedValue({
-      id: tenantId,
-      currentPlan: planRow({ multiLocation: false, advancedReports: false }),
-      usedTrialPlanIds: [],
-      featureOverrides: null,
-      limitOverrides: null,
-    });
-    entitlements.getForTenant.mockResolvedValue({
-      features: {},
-      limits: {},
-      integrations: {},
-      computedAt: new Date(0).toISOString(),
-    });
-
-    const result = await svc.getEffectiveFeatures(tenantId);
-
-    // Fallback walks plan + overrides — must still produce the
-    // canonical response shape so the frontend has something to render.
-    expect(result.features.multiLocation).toBe(false);
-    expect(result.features.advancedReports).toBe(false);
-    expect(result.limits.maxUsers).toBe(15);
-    expect(result.integrations).toEqual({});
-    // v3.0.7 regression — posAccess + maxBranches must survive the engine-empty
-    // fallback. They were omitted from the fallback's hardcoded lists (added to
-    // the projector in v3.0.0 but not mirrored here), so a fresh BUSINESS tenant
-    // whose projector hadn't run resolved posAccess=undefined → the POS UI and
-    // sidebar item were hidden. Pins the fallback to the projector's columns.
-    expect(result.features.posAccess).toBe(true);
-    expect((result.limits as Record<string, number>).maxBranches).toBe(3);
-  });
-
   it('throws NotFound when tenant has no plan (preserved from legacy behavior)', async () => {
     prisma.tenant.findUnique.mockResolvedValue(null);
     await expect(svc.getEffectiveFeatures(tenantId)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-  });
-
-  it('feature overrides win on the fallback path (admin force-grant scenario)', async () => {
-    prisma.tenant.findUnique.mockResolvedValue({
-      id: tenantId,
-      currentPlan: planRow({ apiAccess: false }),
-      usedTrialPlanIds: [],
-      featureOverrides: { apiAccess: true }, // admin-granted
-      limitOverrides: null,
-    });
-    entitlements.getForTenant.mockResolvedValue({
-      features: {},
-      limits: {},
-      integrations: {},
-      computedAt: new Date(0).toISOString(),
-    });
-
-    const result = await svc.getEffectiveFeatures(tenantId);
-    expect(result.features.apiAccess).toBe(true);
   });
 
   it('trialEligiblePlanIds excludes already-used trial plans', async () => {

@@ -1,0 +1,1685 @@
+- generic [active] [ref=f2e1]:
+  - iframe [ref=f2e2]:
+    
+  - generic [ref=f2e3]:
+    - table [ref=f2e5]:
+      - rowgroup [ref=f2e6]:
+        - row [ref=f2e7]:
+          - cell [ref=f2e8]
+          - cell [ref=f2e9]:
+            - table [ref=f2e12]:
+              - rowgroup [ref=f2e13]:
+                - row [ref=f2e14]:
+                  - cell [ref=f2e15]:
+                    - link [ref=f2e16] [cursor=pointer]:
+                      - /url: https://continent-online.com/
+                  - cell [ref=f2e18]:
+                    - table [ref=f2e20]:
+                      - rowgroup [ref=f2e21]:
+                        - row [ref=f2e22]:
+                          - cell [ref=f2e23]:
+                            - generic [ref=f2e24]:
+                              - link "Регистрация" [ref=f2e25] [cursor=pointer]:
+                                - /url: https://continent-online.com/ContentPagesContinent/Registration.aspx
+                              - text: "|"
+                            - link "Заказать правовой акт" [ref=f2e26] [cursor=pointer]:
+                              - /url: JavaScript:void(0)
+                            - generic [ref=f2e27]:
+                              - text: "|"
+                              - link "О нас" [ref=f2e28] [cursor=pointer]:
+                                - /url: /ContentPagesContinent/about_us.aspx
+                              - text: "|"
+                              - link "О продукте" [ref=f2e29] [cursor=pointer]:
+                                - /url: /ContentPagesContinent/about.aspx
+                              - text: "|"
+                              - link "Контакты" [ref=f2e30] [cursor=pointer]:
+                                - /url: /ContentPagesContinent/contacts.aspx
+                              - text: "|"
+                              - link "Наши цены" [ref=f2e31] [cursor=pointer]:
+                                - /url: /ContentPagesContinent/prices.aspx
+                          - cell [ref=f2e32]
+        - row [ref=f2e33]:
+          - cell [ref=f2e34]
+          - cell [ref=f2e37]:
+            - generic [ref=f2e38]:
+              - generic [ref=f2e41]:
+                - table [ref=f2e42]:
+                  - rowgroup [ref=f2e43]:
+                    - row [ref=f2e44]:
+                      - cell [ref=f2e45]
+                      - cell [ref=f2e46]:
+                        - table [ref=f2e47]:
+                          - rowgroup [ref=f2e48]:
+                            - row [ref=f2e49]:
+                              - cell [ref=f2e50]
+                              - cell [ref=f2e52]
+                    - row [ref=f2e53]:
+                      - cell [ref=f2e54]
+                      - cell [ref=f2e55]:
+                        - table [ref=f2e56]:
+                          - rowgroup [ref=f2e57]:
+                            - row [ref=f2e58]:
+                              - cell "Поиск" [ref=f2e59]
+                              - cell [ref=f2e60]:
+                                - button [ref=f2e64] [cursor=pointer]:
+                                  - emphasis [ref=f2e65]: В документе
+                      - cell [ref=f2e66]:
+                        - table [ref=f2e67]:
+                          - rowgroup [ref=f2e68]:
+                            - row [ref=f2e69]:
+                              - cell [ref=f2e70]:
+                                - generic [ref=f2e71]:
+                                  - table [ref=f2e72]:
+                                    - rowgroup [ref=f2e73]:
+                                      - row [ref=f2e74]:
+                                        - cell [ref=f2e75]
+                                        - cell [ref=f2e76]
+                                  - textbox [ref=f2e78]: Введите текст для поиска
+                              - cell [ref=f2e79]:
+                                - table [ref=f2e80]:
+                                  - rowgroup [ref=f2e81]:
+                                    - row [ref=f2e82]:
+                                      - cell [ref=f2e83]:
+                                        - table [ref=f2e85] [cursor=pointer]:
+                                          - rowgroup [ref=f2e86]:
+                                            - row [ref=f2e87]:
+                                              - cell "<<" [ref=f2e88]
+                                              - cell "Назад" [ref=f2e89]
+                                      - cell [ref=f2e90]:
+                                        - table [ref=f2e92] [cursor=pointer]:
+                                          - rowgroup [ref=f2e93]:
+                                            - row [ref=f2e94]:
+                                              - cell "Далее" [ref=f2e95]
+                                              - cell ">>" [ref=f2e96]
+                      - cell [ref=f2e97]
+                      - cell "Показать настройки" [ref=f2e98]
+                      - cell [ref=f2e100]
+                - generic [ref=f2e101]:
+                  - generic [ref=f2e103]:
+                    - generic "Документы, полученные по ссылке, открывать в режиме два документа рядом" [ref=f2e106] [cursor=pointer]
+                    - generic "Сохранить(документ)" [ref=f2e108] [cursor=pointer]
+                    - generic "Распечатать" [ref=f2e109] [cursor=pointer]
+                    - generic "Копировать в Word" [ref=f2e110] [cursor=pointer]
+                    - generic "Скрыть комментарии системы" [ref=f2e111] [cursor=pointer]
+                    - generic "Информация о документе" [ref=f2e112] [cursor=pointer]
+                    - generic "Справка документа" [ref=f2e113] [cursor=pointer]
+                    - generic "Поставить на контроль" [ref=f2e114] [cursor=pointer]
+                    - generic "В избранное" [ref=f2e115] [cursor=pointer]
+                    - generic "Посмотреть мои закладки" [ref=f2e116] [cursor=pointer]: "0"
+                    - generic "Скрыть мои комментарии" [ref=f2e117] [cursor=pointer]
+                    - generic "Посмотреть мои комментарии" [ref=f2e118] [cursor=pointer]: "0"
+                  - generic [ref=f2e121]:
+                    - generic "Сравнение редакций" [ref=f2e122] [cursor=pointer]
+                    - generic "Увеличить шрифт" [ref=f2e124] [cursor=pointer]
+                    - generic "Уменьшить шрифт" [ref=f2e125] [cursor=pointer]
+                    - generic "Корреспонденты" [ref=f2e127] [cursor=pointer]
+                    - generic "Респонденты" [ref=f2e128] [cursor=pointer]
+                    - generic "Сообщить об ошибке" [ref=f2e129] [cursor=pointer]
+                - table [ref=f2e130]:
+                  - rowgroup [ref=f2e131]:
+                    - row [ref=f2e132]:
+                      - cell [ref=f2e133]
+                      - cell [ref=f2e134]:
+                        - table [ref=f2e137]:
+                          - rowgroup [ref=f2e138]:
+                            - row [ref=f2e139]:
+                              - cell [ref=f2e140]:
+                                - heading "Налоговый кодекс Кыргызской Республики от 18 января 2022 года № 3 (с изменениями и дополнениями по состоянию на 31.12.2025 г.)" [level=1] [ref=f2e141]
+              - table [ref=f2e142]:
+                - rowgroup [ref=f2e143]:
+                  - row [ref=f2e144]:
+                    - cell [ref=f2e145]
+                    - cell [ref=f2e146]:
+                      - generic [ref=f2e151]:
+                        - generic [ref=f2e152]:
+                          - paragraph [ref=f2e155]: Налоговый кодекс Кыргызской Республики от 18 января 2022 года № 3
+                          - paragraph [ref=f2e156]:
+                            - text: (с
+                            - link "изменениями и дополнениями" [ref=f2e158] [cursor=pointer]:
+                              - /url: "?doc_id=39777243"
+                            - text: по состоянию на 31.12.2025 г.)
+                          - paragraph [ref=f2e159]
+                          - paragraph [ref=f2e160]:
+                            - text: Настоящий Кодекс введен в действие с 1 января 2022 года в соответствии с
+                            - link "Законом" [ref=f2e162] [cursor=pointer]:
+                              - /url: "?doc_id=37774907#sub_id=10000"
+                            - text: КР от 18 января 2022 года № 4
+                          - paragraph [ref=f2e163]
+                          - paragraph [ref=f2e164]:
+                            - link "ОБЩАЯ ЧАСТЬ" [ref=f2e166] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=10000"
+                          - paragraph [ref=f2e167]:
+                            - link "РАЗДЕЛ I. ОБЩИЕ ПОЛОЖЕНИЯ" [ref=f2e169] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=10000"
+                          - paragraph [ref=f2e170]:
+                            - link "Глава 1. Общие положения" [ref=f2e172] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=10000"
+                          - paragraph [ref=f2e173]:
+                            - link "Статья 1. Отношения, регулируемые Налоговым кодексом Кыргызской Республики" [ref=f2e175] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=10000"
+                          - paragraph [ref=f2e176]:
+                            - link "Статья 2. Налоговое законодательство Кыргызской Республики" [ref=f2e178] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=20000"
+                          - paragraph [ref=f2e179]:
+                            - link "Статья 3. Действие международных договоров и иных соглашений" [ref=f2e181] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=30000"
+                          - paragraph [ref=f2e182]:
+                            - link "Статья 4. Термины и определения, используемые в настоящем Кодексе" [ref=f2e184] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=40000"
+                          - paragraph [ref=f2e185]:
+                            - link "Статья 5. Принципы налогового законодательства Кыргызской Республики" [ref=f2e187] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=50000"
+                          - paragraph [ref=f2e188]:
+                            - link "Статья 6. Принцип законности налогообложения" [ref=f2e190] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=60000"
+                          - paragraph [ref=f2e191]:
+                            - link "Статья 7. Принцип обязательности налогообложения" [ref=f2e193] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=70000"
+                          - paragraph [ref=f2e194]:
+                            - link "Статья 8. Принцип единства налоговой системы" [ref=f2e196] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=80000"
+                          - paragraph [ref=f2e197]:
+                            - link "Статья 9. Принцип гласности налогового законодательства Кыргызской Республики" [ref=f2e199] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=90000"
+                          - paragraph [ref=f2e200]:
+                            - link "Статья 10. Принцип справедливости налогообложения" [ref=f2e202] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=100000"
+                          - paragraph [ref=f2e203]:
+                            - link "Статья 11. Принцип презумпции добросовестности" [ref=f2e205] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=110000"
+                          - paragraph [ref=f2e206]:
+                            - link "Статья 12. Принцип презумпции правомерности" [ref=f2e208] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=120000"
+                          - paragraph [ref=f2e209]:
+                            - link "Статья 13. Принцип определенности налогообложения" [ref=f2e211] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=130000"
+                          - paragraph [ref=f2e212]:
+                            - link "Статья 14. Принцип эффективности налоговых льгот" [ref=f2e214] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=140000"
+                          - paragraph [ref=f2e215]:
+                            - link "Статья 15. Действие налогового законодательства Кыргызской Республики в пространстве, во времени и по кругу лиц" [ref=f2e217] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=150000"
+                          - paragraph [ref=f2e218]:
+                            - link "Статья 16. Действие налогового законодательства Кыргызской Республики во времени в отдельных случаях" [ref=f2e220] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=160000"
+                          - paragraph [ref=f2e221]:
+                            - link "Статья 17. Соотношение нормативных правовых актов" [ref=f2e223] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=170000"
+                          - paragraph [ref=f2e224]:
+                            - link "Статья 18. Порядок исчисления сроков, установленных налоговым законодательством Кыргызской Республики" [ref=f2e226] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=180000"
+                          - paragraph [ref=f2e227]:
+                            - link "Статья 19. Участники налоговых правоотношений" [ref=f2e229] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=190000"
+                          - paragraph [ref=f2e230]:
+                            - link "Статья 20. Документы по применению норм налогового законодательства Кыргызской Республики" [ref=f2e232] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=200000"
+                          - paragraph [ref=f2e233]:
+                            - link "Статья 21. Понятие налога" [ref=f2e235] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=210000"
+                          - paragraph [ref=f2e236]:
+                            - link "Статья 22. Косвенные налоги" [ref=f2e238] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=220000"
+                          - paragraph [ref=f2e239]:
+                            - link "Статья 23. Экономическая деятельность" [ref=f2e241] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=230000"
+                          - paragraph [ref=f2e242]:
+                            - link "Статья 24. Физическое лицо" [ref=f2e244] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=240000"
+                          - paragraph [ref=f2e245]:
+                            - link "Статья 25. Организация" [ref=f2e247] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=250000"
+                          - paragraph [ref=f2e248]:
+                            - link "Статья 26. Индивидуальный предприниматель" [ref=f2e250] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=260000"
+                          - paragraph [ref=f2e251]:
+                            - link "Статья 27. Физическое лицо, осуществляющее индивидуальную трудовую деятельность" [ref=f2e253] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=270000"
+                          - paragraph [ref=f2e254]:
+                            - link "Статья 28. Постоянное учреждение иностранной организации в Кыргызской Республике" [ref=f2e256] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=280000"
+                          - paragraph [ref=f2e257]:
+                            - link "Статья 29. Обособленное подразделение" [ref=f2e259] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=290000"
+                          - paragraph [ref=f2e260]:
+                            - link "Статья 30. Товар. Реализация товара" [ref=f2e262] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=300000"
+                          - paragraph [ref=f2e263]:
+                            - link "Статья 31. Выполнение работы или оказание услуги" [ref=f2e265] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=310000"
+                          - paragraph [ref=f2e266]:
+                            - link "Статья 32. Услуга в электронной форме" [ref=f2e268] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=320000"
+                          - paragraph [ref=f2e269]:
+                            - link "Статья 33. Электронный документ налогоплательщика" [ref=f2e271] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=330000"
+                          - paragraph [ref=f2e272]:
+                            - link "Статья 34. Непреодолимая сила" [ref=f2e274] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=340000"
+                          - paragraph [ref=f2e275]:
+                            - link "Статья 34-1. Права Кабинета Министров" [ref=f2e277] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=34010000"
+                          - paragraph [ref=f2e278]:
+                            - link "Статья 35. Взаимозависимые субъекты" [ref=f2e280] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=350000"
+                          - paragraph [ref=f2e281]:
+                            - link "Статья 36. Оценка эффективности налоговых льгот" [ref=f2e283] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=360000"
+                          - paragraph [ref=f2e284]:
+                            - link "Глава 2. Налоговая система Кыргызской Республики" [ref=f2e286] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=370000"
+                          - paragraph [ref=f2e287]:
+                            - link "Статья 37. Виды налогов" [ref=f2e289] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=370000"
+                          - paragraph [ref=f2e290]:
+                            - link "Статья 38. Общие условия установления налогов" [ref=f2e292] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=380000"
+                          - paragraph [ref=f2e293]:
+                            - link "Статья 39. Объект налогообложения" [ref=f2e295] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=390000"
+                          - paragraph [ref=f2e296]:
+                            - link "Статья 40. Налоговая база" [ref=f2e298] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=400000"
+                          - paragraph [ref=f2e299]:
+                            - link "Статья 41. Ставка налога" [ref=f2e301] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=410000"
+                          - paragraph [ref=f2e302]:
+                            - link "Статья 42. Налоговый период" [ref=f2e304] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=420000"
+                          - paragraph [ref=f2e305]:
+                            - link "- разделительный баланс или передаточный акт при реорганизации;" [ref=f2e307] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=420000"
+                          - paragraph [ref=f2e308]:
+                            - link "Статья 43. Порядок исчисления налога" [ref=f2e310] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=430000"
+                          - paragraph [ref=f2e311]:
+                            - link "Статья 44. Срок уплаты налога" [ref=f2e313] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=440000"
+                          - paragraph [ref=f2e314]:
+                            - link "Статья 45. Порядок уплаты налогов" [ref=f2e316] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=450000"
+                          - paragraph [ref=f2e317]:
+                            - link "Статья 46. Налоговые режимы" [ref=f2e319] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=460000"
+                          - paragraph [ref=f2e320]:
+                            - link "РАЗДЕЛ II. УЧАСТНИКИ НАЛОГОВЫХ ПРАВООТНОШЕНИЙ" [ref=f2e322] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=470000"
+                          - paragraph [ref=f2e323]:
+                            - link "Глава 3. Налогоплательщик. Налоговый представитель" [ref=f2e325] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=470000"
+                          - paragraph [ref=f2e326]:
+                            - link "Статья 47. Налогоплательщик" [ref=f2e328] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=470000"
+                          - paragraph [ref=f2e329]:
+                            - link "Статья 48. Кабинет налогоплательщика" [ref=f2e331] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=480000"
+                          - paragraph [ref=f2e332]:
+                            - link "Статья 49. Права налогоплательщика" [ref=f2e334] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=490000"
+                          - paragraph [ref=f2e335]:
+                            - link "Статья 50. Обеспечение и защита прав налогоплательщика" [ref=f2e337] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=500000"
+                          - paragraph [ref=f2e338]:
+                            - link "Статья 51. Обязанности налогоплательщика" [ref=f2e340] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=510000"
+                          - paragraph [ref=f2e341]:
+                            - link "Статья 52. Должностное лицо налогоплательщика" [ref=f2e343] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=520000"
+                          - paragraph [ref=f2e344]:
+                            - link "Статья 53. Налоговый агент, права, обязанности и ответственность" [ref=f2e346] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=530000"
+                          - paragraph [ref=f2e347]:
+                            - link "Статья 54. Налоговый представитель, его полномочия, права, обязанности и ответственность" [ref=f2e349] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=540000"
+                          - paragraph [ref=f2e350]:
+                            - link "Глава 4. Налоговая служба. Разграничение полномочий в сфере налоговых правоотношений" [ref=f2e352] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=550000"
+                          - paragraph [ref=f2e353]:
+                            - link "Статья 55. Органы налоговой службы" [ref=f2e355] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=550000"
+                          - paragraph [ref=f2e356]:
+                            - link "Статья 56. Должностное лицо органа налоговой службы. Порядок прохождения службы и присвоения специальных званий" [ref=f2e358] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=560000"
+                          - paragraph [ref=f2e359]:
+                            - link "Статья 57. Финансовое и материально-техническое обеспечение органов налоговой службы" [ref=f2e361] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=570000"
+                          - paragraph [ref=f2e362]:
+                            - link "Статья 58. Задачи органов налоговой службы" [ref=f2e364] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=580000"
+                          - paragraph [ref=f2e365]:
+                            - link "Статья 59. Права органов налоговой службы и их должностных лиц" [ref=f2e367] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=590000"
+                          - paragraph [ref=f2e368]:
+                            - link "Статья 60. Обязанности органов налоговой службы и их должностных лиц" [ref=f2e370] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=600000"
+                          - paragraph [ref=f2e371]:
+                            - link "Статья 60-1. Система управления рисками, применяемая органами налоговой службы" [ref=f2e373] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=60010000"
+                          - paragraph [ref=f2e374]:
+                            - link "Статья 61. Разграничение полномочий налоговых и таможенных органов в сфере налоговых правоотношений" [ref=f2e376] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=610000"
+                          - paragraph [ref=f2e377]:
+                            - link "Статья 62. Права и обязанности органов местного самоуправления в сфере налоговых правоотношений" [ref=f2e379] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=620000"
+                          - paragraph [ref=f2e380]:
+                            - link "Статья 62-1. Права и обязанности администраций рынков и торговых центров в сфере налоговых правоотношений" [ref=f2e382] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=62010000"
+                          - paragraph [ref=f2e383]:
+                            - link "Статья 63. Конфликт интересов" [ref=f2e385] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=630000"
+                          - paragraph [ref=f2e386]:
+                            - link "Статья 64. Налоговая тайна" [ref=f2e388] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=640000"
+                          - paragraph [ref=f2e389]:
+                            - link "РАЗДЕЛ III. НАЛОГОВОЕ ОБЯЗАТЕЛЬСТВО И НАЛОГОВАЯ ЗАДОЛЖЕННОСТЬ" [ref=f2e391] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=650000"
+                          - paragraph [ref=f2e392]:
+                            - link "Глава 5. Общие положения" [ref=f2e394] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=650000"
+                          - paragraph [ref=f2e395]:
+                            - link "Статья 65. Налоговое обязательство" [ref=f2e397] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=650000"
+                          - paragraph [ref=f2e398]:
+                            - link "Статья 66. Возникновение, изменение, исполнение и прекращение налогового обязательства" [ref=f2e400] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=660000"
+                          - paragraph [ref=f2e401]:
+                            - link "Статья 67. Валюта исполнения налогового обязательства" [ref=f2e403] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=670000"
+                          - paragraph [ref=f2e404]:
+                            - link "Статья 68. Срок исковой давности по налоговому обязательству, излишне уплаченной сумме налога и сумме превышения НДС" [ref=f2e406] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=680000"
+                          - paragraph [ref=f2e407]:
+                            - link "Глава 6. Исполнение налогового обязательства. Прекращение налогового обязательства" [ref=f2e409] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=690000"
+                          - paragraph [ref=f2e410]:
+                            - link "Статья 69. Исполнение налогового обязательства" [ref=f2e412] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=690000"
+                          - paragraph [ref=f2e413]:
+                            - link "Статья 70. Дата исполнения налогового обязательства" [ref=f2e415] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=700000"
+                          - paragraph [ref=f2e416]:
+                            - link "Статья 71. Порядок погашения налоговой задолженности" [ref=f2e418] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=710000"
+                          - paragraph [ref=f2e419]:
+                            - link "Статья 72. Льготный режим исполнения налогового обязательства" [ref=f2e421] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=720000"
+                          - paragraph [ref=f2e422]:
+                            - link "Статья 73. Исполнение налогового обязательства и погашение налоговой задолженности при реорганизации организации" [ref=f2e424] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=730000"
+                          - paragraph [ref=f2e425]:
+                            - link "Статья 74. Исполнение налогового обязательства и погашение налоговой задолженности ликвидируемой платежеспособной организации или индивидуального предпринимателя" [ref=f2e427] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=740000"
+                          - paragraph [ref=f2e428]:
+                            - link "Статья 75. Исполнение налогового обязательства и погашение налоговой задолженности неплатежеспособной организации или индивидуального предпринимателя, признанных или объявленных банкротом" [ref=f2e430] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=750000"
+                          - paragraph [ref=f2e431]:
+                            - link "Статья 76. Исполнение налогового обязательства и погашение налоговой задолженности умершего или объявленного умершим физического лица" [ref=f2e433] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=760000"
+                          - paragraph [ref=f2e434]:
+                            - link "Статья 77. Исполнение налогового обязательства и погашение налоговой задолженности безвестно отсутствующего или недееспособного физического лица" [ref=f2e436] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=770000"
+                          - paragraph [ref=f2e437]:
+                            - link "Статья 78. Исполнение налогового обязательства и погашение налоговой задолженности при осуществлении иностранной организацией деятельности в Кыргызской Республике через постоянное учреждение" [ref=f2e439] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=780000"
+                          - paragraph [ref=f2e440]:
+                            - link "Статья 79. Прекращение налогового обязательства" [ref=f2e442] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=790000"
+                          - paragraph [ref=f2e443]:
+                            - link "Статья 80. Списание безнадежных долгов по налоговому обязательству" [ref=f2e445] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=800000"
+                          - paragraph [ref=f2e446]:
+                            - link "Глава 7. Обеспечение исполнения налогового обязательства и погашения налоговой задолженности" [ref=f2e448] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=810000"
+                          - paragraph [ref=f2e449]:
+                            - link "Статья 81. Меры взыскания налоговой задолженности и способы обеспечения исполнения налоговой задолженности" [ref=f2e451] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=810000"
+                          - paragraph [ref=f2e452]:
+                            - link "Статья 82. Начисление пеней" [ref=f2e454] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=820000"
+                          - paragraph [ref=f2e455]:
+                            - link "Статья 83. Банковская гарантия налогоплательщика" [ref=f2e457] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=830000"
+                          - paragraph [ref=f2e458]:
+                            - link "Статья 84. Депозит налогоплательщика" [ref=f2e460] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=840000"
+                          - paragraph [ref=f2e461]:
+                            - link "Статья 85. Налоговое платежное требование" [ref=f2e463] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=850000"
+                          - paragraph [ref=f2e464]:
+                            - link "Статья 85-1. Взыскание за счет наличных денежных средств" [ref=f2e466] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=85010000"
+                          - paragraph [ref=f2e467]:
+                            - link "Статья 86. Принудительное взыскание налоговой задолженности, признанной налогоплательщиком" [ref=f2e469] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=860000"
+                          - paragraph [ref=f2e470]:
+                            - link "Статья 87. Утратила силу." [ref=f2e472] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=870000"
+                          - paragraph [ref=f2e473]:
+                            - link "Глава 8. Изменение сроков исполнения налогового обязательства и погашения налоговой задолженности" [ref=f2e475] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=880000"
+                          - paragraph [ref=f2e476]:
+                            - link "Статья 88. Общие условия изменения срока исполнения налогового обязательства и погашения налоговой задолженности" [ref=f2e478] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=880000"
+                          - paragraph [ref=f2e479]:
+                            - link "Статья 89. Обстоятельства, исключающие изменение срока уплаты суммы налоговой задолженности" [ref=f2e481] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=890000"
+                          - paragraph [ref=f2e482]:
+                            - link "Статья 90. Орган, уполномоченный принимать решение об изменении срока уплаты суммы налоговой задолженности" [ref=f2e484] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=900000"
+                          - paragraph [ref=f2e485]:
+                            - link "Статья 91. Порядок и условия предоставления отсрочки или рассрочки по уплате суммы налоговой задолженности" [ref=f2e487] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=910000"
+                          - paragraph [ref=f2e488]:
+                            - link "Статья 92. Прекращение действия отсрочки и рассрочки" [ref=f2e490] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=920000"
+                          - paragraph [ref=f2e491]:
+                            - link "Глава 9. Зачет и возврат налогов" [ref=f2e493] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=930000"
+                          - paragraph [ref=f2e494]:
+                            - link "Статья 93. Зачет и возврат излишне уплаченной суммы налога" [ref=f2e496] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=930000"
+                          - paragraph [ref=f2e497]:
+                            - link "Статья 94. Зачет и возврат ошибочно уплаченной суммы налога в бюджет" [ref=f2e499] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=940000"
+                          - paragraph [ref=f2e500]:
+                            - link "Статья 95. Утратила силу." [ref=f2e502] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=950000"
+                          - paragraph [ref=f2e503]:
+                            - link "Глава 10. Решение органа налоговой службы" [ref=f2e505] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=960000"
+                          - paragraph [ref=f2e506]:
+                            - link "Статья 96. Решение органа налоговой службы и его содержание" [ref=f2e508] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=960000"
+                          - paragraph [ref=f2e509]:
+                            - link "Статья 97. Вручение решения и других документов органа налоговой службы налогоплательщику" [ref=f2e511] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=970000"
+                          - paragraph [ref=f2e512]:
+                            - link "Глава 11. Налоговая отчетность" [ref=f2e514] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=980000"
+                          - paragraph [ref=f2e515]:
+                            - link "Статья 98. Составление и хранение учетной документации" [ref=f2e517] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=980000"
+                          - paragraph [ref=f2e518]:
+                            - link "Статья 99. Налоговая отчетность" [ref=f2e520] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=990000"
+                          - paragraph [ref=f2e521]:
+                            - link "Статья 100. Порядок составления и представления налоговой отчетности" [ref=f2e523] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1000000"
+                          - paragraph [ref=f2e524]:
+                            - link "Статья 101. Сроки представления налоговой отчетности" [ref=f2e526] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1010000"
+                          - paragraph [ref=f2e527]:
+                            - link "Статья 102. Продление срока представления налоговой отчетности" [ref=f2e529] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1020000"
+                          - paragraph [ref=f2e530]:
+                            - link "Статья 103. Дата исполнения обязательства по представлению налоговой отчетности" [ref=f2e532] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1030000"
+                          - paragraph [ref=f2e533]:
+                            - link "Статья 104. Внесение изменений и/или дополнений в налоговую отчетность" [ref=f2e535] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1040000"
+                          - paragraph [ref=f2e536]:
+                            - link "Статья 105. Срок хранения налоговой отчетности" [ref=f2e538] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1050000"
+                          - paragraph [ref=f2e539]:
+                            - link "Статья 106. Единая налоговая декларация" [ref=f2e541] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1060000"
+                          - paragraph [ref=f2e542]:
+                            - link "Статья 107. Особенности представления Единой налоговой декларации государственными и муниципальными служащими и отдельными физическими лицами" [ref=f2e544] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1070000"
+                          - paragraph [ref=f2e545]:
+                            - link "РАЗДЕЛ IV. НАЛОГОВЫЙ КОНТРОЛЬ" [ref=f2e547] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1080000"
+                          - paragraph [ref=f2e548]:
+                            - link "Статья 108. Термины и определения, используемые в настоящем разделе" [ref=f2e550] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1080000"
+                          - paragraph [ref=f2e551]:
+                            - link "Глава 12. Регистрация в налоговом органе. Учет поступлений в бюджет" [ref=f2e553] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1090000"
+                          - paragraph [ref=f2e554]:
+                            - link "Статья 109. Понятие и формы налогового контроля" [ref=f2e556] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1090000"
+                          - paragraph [ref=f2e557]:
+                            - link "Статья 110. Налоговая регистрация налогоплательщика" [ref=f2e559] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1100000"
+                          - paragraph [ref=f2e560]:
+                            - link "Статья 111. Основания, сроки и порядок налоговой регистрации налогоплательщика" [ref=f2e562] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1110000"
+                          - paragraph [ref=f2e563]:
+                            - link "Статья 112. Основания, сроки и место перерегистрации налогоплательщика" [ref=f2e565] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1120000"
+                          - paragraph [ref=f2e566]:
+                            - link "Статья 113. ИНН налогоплательщика" [ref=f2e568] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1130000"
+                          - paragraph [ref=f2e569]:
+                            - link "Статья 114. Учетная регистрация налогоплательщика" [ref=f2e571] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1140000"
+                          - paragraph [ref=f2e572]:
+                            - link "Статья 115. Аннулирование регистрации налогоплательщика" [ref=f2e574] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1150000"
+                          - paragraph [ref=f2e575]:
+                            - link "Статья 116. Лицевой счет налогоплательщика" [ref=f2e577] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1160000"
+                          - paragraph [ref=f2e578]:
+                            - link "Статья 116-1. Налоговый аудит" [ref=f2e580] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=116010000"
+                          - paragraph [ref=f2e581]:
+                            - link "Статья 116-2. Единый налоговый счет. Единый налоговый платеж" [ref=f2e583] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=116020000"
+                          - paragraph [ref=f2e584]:
+                            - link "Глава 13. Налоговые проверки" [ref=f2e586] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1170000"
+                          - paragraph [ref=f2e587]:
+                            - link "Статья 117. Понятие и виды налоговых проверок" [ref=f2e589] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1170000"
+                          - paragraph [ref=f2e590]:
+                            - link "Статья 118. Планирование проведения выездной проверки" [ref=f2e592] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1180000"
+                          - paragraph [ref=f2e593]:
+                            - link "Статья 119. Период и сроки проведения выездной проверки" [ref=f2e595] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1190000"
+                          - paragraph [ref=f2e596]:
+                            - link "Статья 120. Предписание на выездную проверку" [ref=f2e598] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1200000"
+                          - paragraph [ref=f2e599]:
+                            - link "Статья 121. Начало проведения выездной проверки" [ref=f2e601] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1210000"
+                          - paragraph [ref=f2e602]:
+                            - link "Статья 122. Завершение выездной проверки" [ref=f2e604] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1220000"
+                          - paragraph [ref=f2e605]:
+                            - link "Статья 123. Вынесение решения по результатам рассмотрения материалов выездной проверки" [ref=f2e607] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1230000"
+                          - paragraph [ref=f2e608]:
+                            - link "Статья 124. Основание и порядок проведения обследования налогоплательщика при ликвидации организации или прекращении деятельности индивидуального предпринимателя" [ref=f2e610] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1240000"
+                          - paragraph [ref=f2e611]:
+                            - link "Статья 125. Проведение камеральной проверки" [ref=f2e613] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1250000"
+                          - paragraph [ref=f2e614]:
+                            - link "Статья 126. Проведение камеральной проверки по заявлению налогоплательщика НДС о возмещении и/или возврате суммы превышения НДС" [ref=f2e616] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1260000"
+                          - paragraph [ref=f2e617]:
+                            - link "Глава 14. Рейдовый налоговый контроль. Применение контрольно-кассовых машин. Налоговый пост" [ref=f2e619] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1270000"
+                          - paragraph [ref=f2e620]:
+                            - link "Статья 127. Рейдовый налоговый контроль" [ref=f2e622] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1270000"
+                          - paragraph [ref=f2e623]:
+                            - link "Статья 128. Применение контрольно-кассовых машин" [ref=f2e625] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1280000"
+                          - paragraph [ref=f2e626]:
+                            - link "Статья 129. Требования к применению ККМ" [ref=f2e628] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1290000"
+                          - paragraph [ref=f2e629]:
+                            - link "Статья 130. Налоговый контроль соблюдения порядка применения ККМ" [ref=f2e631] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1300000"
+                          - paragraph [ref=f2e632]:
+                            - link "Статья 131. Налоговый пост" [ref=f2e634] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1310000"
+                          - paragraph [ref=f2e635]:
+                            - link "Глава 15. Доступ, обследование, истребование документов, экспертиза и составление протокола" [ref=f2e637] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1320000"
+                          - paragraph [ref=f2e638]:
+                            - link "Статья 132. Доступ должностного лица органов налоговой службы на территорию или в помещение для проведения выездной проверки, рейдового налогового контроля, установки налогового поста" [ref=f2e640] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1320000"
+                          - paragraph [ref=f2e641]:
+                            - link "Статья 133. Обследование" [ref=f2e643] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1330000"
+                          - paragraph [ref=f2e644]:
+                            - link "Статья 134. Истребование документов" [ref=f2e646] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1340000"
+                          - paragraph [ref=f2e647]:
+                            - link "Статья 135. Экспертиза" [ref=f2e649] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1350000"
+                          - paragraph [ref=f2e650]:
+                            - link "Статья 136. Общие требования, предъявляемые к протоколу, составленному при производстве налоговых действий" [ref=f2e652] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1360000"
+                          - paragraph [ref=f2e653]:
+                            - link "Глава 16. Особенности проведения налогового контроля в отдельных случаях" [ref=f2e655] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1370000"
+                          - paragraph [ref=f2e656]:
+                            - link "Статья 137. Термины и определения, используемые в настоящей главе" [ref=f2e658] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1370000"
+                          - paragraph [ref=f2e659]:
+                            - link "Статья 138. Использование косвенных методов оценки" [ref=f2e661] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1380000"
+                          - paragraph [ref=f2e662]:
+                            - link "Статья 139. Применение рыночной цены товаров, работ или услуг для целей налогообложения" [ref=f2e664] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1390000"
+                          - paragraph [ref=f2e665]:
+                            - link "Статья 140. Источники информации и методы определения рыночной цены товаров, работ или услуг для целей налогообложения" [ref=f2e667] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1400000"
+                          - paragraph [ref=f2e668]:
+                            - link "Глава 17. Взаимодействие органов налоговой службы с другими субъектами" [ref=f2e670] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1410000"
+                          - paragraph [ref=f2e671]:
+                            - link "Статья 141. Взаимодействие органов налоговой службы с таможенными органами, органами финансовой разведки и органами внутренних дел" [ref=f2e673] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1410000"
+                          - paragraph [ref=f2e674]:
+                            - link "Статья 142. Взаимодействие органов налоговой службы с органами юстиции" [ref=f2e676] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1420000"
+                          - paragraph [ref=f2e677]:
+                            - link "Статья 143. Взаимодействие органов налоговой службы с органами статистики" [ref=f2e679] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1430000"
+                          - paragraph [ref=f2e680]:
+                            - link "Статья 144. Взаимодействие органов налоговой службы с Оператором маркировки" [ref=f2e682] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1440000"
+                          - paragraph [ref=f2e683]:
+                            - link "Статья 144-1. Взаимодействие органов налоговой службы с Национальным оператором навигационной пломбы" [ref=f2e685] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=144010000"
+                          - paragraph [ref=f2e686]:
+                            - link "Статья 145. Взаимодействие органов налоговой службы с органами, осуществляющими регистрацию объектов налогообложения" [ref=f2e688] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1450000"
+                          - paragraph [ref=f2e689]:
+                            - link "Статья 146. Взаимодействие органов налоговой службы с банком и платежной организацией/оператором платежной системы" [ref=f2e691] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1460000"
+                          - paragraph [ref=f2e692]:
+                            - link "Статья 147. Взаимодействие органов налоговой службы с органами, осуществляющими государственную регистрацию населения и актов гражданского состояния" [ref=f2e694] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1470000"
+                          - paragraph [ref=f2e695]:
+                            - link "Статья 148. Взаимодействие органов налоговой службы с органами, наделенными полномочиями в отношении иностранных граждан и лиц без гражданства" [ref=f2e697] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1480000"
+                          - paragraph [ref=f2e698]:
+                            - link "Статья 149. Взаимодействие органов налоговой службы с организациями налогоплательщиков" [ref=f2e700] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1490000"
+                          - paragraph [ref=f2e701]:
+                            - link "Статья 150. Взаимодействие органов налоговой службы с дипломатическим, консульским и другим представительством иностранного государства или международной организацией" [ref=f2e703] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1500000"
+                          - paragraph [ref=f2e704]:
+                            - link "Статья 151. Взаимодействие органов налоговой службы с органами местного самоуправления" [ref=f2e706] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1510000"
+                          - paragraph [ref=f2e707]:
+                            - link "Статья 152. Взаимодействие органов налоговой службы с органами, осуществляющими выдачу лицензий и разрешений организациям и физическим лицам" [ref=f2e709] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1520000"
+                          - paragraph [ref=f2e710]:
+                            - link "Статья 152-1. Взаимодействие органов налоговой службы с иными субъектами, располагающими информацией об организациях и физических лицах" [ref=f2e712] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=152010000"
+                          - paragraph [ref=f2e713]:
+                            - link "Статья 153. Взаимодействие органов налоговой службы с другими правоохранительными органами" [ref=f2e715] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1530000"
+                          - paragraph [ref=f2e716]:
+                            - link "Статья 153-1. Взаимодействие с операторами мобильной сотовой связи" [ref=f2e718] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=153010000"
+                          - paragraph [ref=f2e719]:
+                            - link "Статья 154. Ответственность за нарушение положений настоящей главы" [ref=f2e721] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1540000"
+                          - paragraph [ref=f2e722]:
+                            - link "РАЗДЕЛ V. НАЛОГОВОЕ ПРАВОНАРУШЕНИЕ И ОТВЕТСТВЕННОСТЬ ЗА ЕГО СОВЕРШЕНИЕ" [ref=f2e724] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1550000"
+                          - paragraph [ref=f2e725]:
+                            - link "Глава 18. Общие положения об ответственности за совершение налоговых правонарушений" [ref=f2e727] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1550000"
+                          - paragraph [ref=f2e728]:
+                            - link "Статья 155. Понятие налогового правонарушения" [ref=f2e730] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1550000"
+                          - paragraph [ref=f2e731]:
+                            - link "Статья 156. Ответственность за совершение налогового правонарушения" [ref=f2e733] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1560000"
+                          - paragraph [ref=f2e734]:
+                            - link "Статья 157. Участники налоговых правоотношений, подлежащие привлечению к ответственности за совершение налогового правонарушения" [ref=f2e736] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1570000"
+                          - paragraph [ref=f2e737]:
+                            - link "Статья 158. Общие принципы привлечения к ответственности за совершение налогового правонарушения" [ref=f2e739] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1580000"
+                          - paragraph [ref=f2e740]:
+                            - link "Статья 159. Давность привлечения к ответственности за совершение налогового правонарушения" [ref=f2e742] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1590000"
+                          - paragraph [ref=f2e743]:
+                            - link "Статья 160. Налоговая санкция за совершение налогового правонарушения" [ref=f2e745] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1600000"
+                          - paragraph [ref=f2e746]:
+                            - link "Статья 161. Давность взыскания налоговой санкции" [ref=f2e748] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1610000"
+                          - paragraph [ref=f2e749]:
+                            - link "Глава 19. Виды налоговых правонарушений и ответственность за их совершение" [ref=f2e751] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1620000"
+                          - paragraph [ref=f2e752]:
+                            - link "Статья 162. Утратила силу" [ref=f2e754] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1620000"
+                          - paragraph [ref=f2e755]:
+                            - link "Статья 163. Занижение суммы налога, непредставление налоговой отчетности и неправомерный зачет НДС" [ref=f2e757] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1630000"
+                          - paragraph [ref=f2e758]:
+                            - link "Статья 164. Невыполнение обязанности по уплате налогов налоговым агентом" [ref=f2e760] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1640000"
+                          - paragraph [ref=f2e761]:
+                            - link "Статья 165. Ответственность должностного лица органа налоговой службы" [ref=f2e763] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1650000"
+                          - paragraph [ref=f2e764]:
+                            - link "РАЗДЕЛ VI. ОБЖАЛОВАНИЕ РЕШЕНИЯ ОРГАНОВ НАЛОГОВОЙ СЛУЖБЫ, ДЕЙСТВИЙ И/ИЛИ БЕЗДЕЙСТВИЯ ИХ ДОЛЖНОСТНЫХ ЛИЦ" [ref=f2e766] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1660000"
+                          - paragraph [ref=f2e767]:
+                            - link "Глава 20. Порядок обжалования решений и действий органов налоговой службы" [ref=f2e769] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1660000"
+                          - paragraph [ref=f2e770]:
+                            - link "Статья 166. Орган, рассматривающий жалобу налогоплательщика на решение и действие органов налоговой службы" [ref=f2e772] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1660000"
+                          - paragraph [ref=f2e773]:
+                            - link "Статья 167. Порядок и сроки подачи жалобы налогоплательщиком" [ref=f2e775] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1670000"
+                          - paragraph [ref=f2e776]:
+                            - link "Статья 168. Форма и содержание жалобы налогоплательщика" [ref=f2e778] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1680000"
+                          - paragraph [ref=f2e779]:
+                            - link "Статья 169. Порядок рассмотрения жалобы налогоплательщика" [ref=f2e781] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1690000"
+                          - paragraph [ref=f2e782]:
+                            - link "Статья 170. Содержание решения органа налоговой службы по жалобе налогоплательщика" [ref=f2e784] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1700000"
+                          - paragraph [ref=f2e785]:
+                            - link "Статья 171. Последствия подачи жалобы" [ref=f2e787] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1710000"
+                          - paragraph [ref=f2e788]:
+                            - link "Статья 172. Порядок обжалования действий и/или бездействия должностных лиц органов налоговой службы" [ref=f2e790] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1720000"
+                          - paragraph [ref=f2e791]:
+                            - link "Статья 173. Порядок обжалования решений и действий (бездействия) должностных лиц органов налоговой службы, принимаемых (осуществляемых) в рамках уголовно-процессуального законодательства" [ref=f2e793] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1730000"
+                          - paragraph [ref=f2e794]:
+                            - link "ОСОБЕННАЯ ЧАСТЬ" [ref=f2e796] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1740000"
+                          - paragraph [ref=f2e797]:
+                            - link "Глава 21. Налоговый учет" [ref=f2e799] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1740000"
+                          - paragraph [ref=f2e800]:
+                            - link "Статья 174. Термины и определения, используемые в Особенной части настоящего Кодекса" [ref=f2e802] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1740000"
+                          - paragraph [ref=f2e803]:
+                            - link "Статья 175. Налоговый учет и налоговая политика налогоплательщика" [ref=f2e805] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1750000"
+                          - paragraph [ref=f2e806]:
+                            - link "Статья 176. Метод налогового учета доходов и расходов" [ref=f2e808] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1760000"
+                          - paragraph [ref=f2e809]:
+                            - link "Статья 177. Документы налогового учета" [ref=f2e811] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1770000"
+                          - paragraph [ref=f2e812]:
+                            - link "Статья 178. Счет-фактура. Счет-фактура, оформляемый налогоплательщиком НДС" [ref=f2e814] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1780000"
+                          - paragraph [ref=f2e815]:
+                            - link "Статья 179. Утратила силу" [ref=f2e817] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1790000"
+                          - paragraph [ref=f2e818]:
+                            - link "Статья 180. Кассовый метод учета" [ref=f2e820] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1800000"
+                          - paragraph [ref=f2e821]:
+                            - link "Статья 181. Раздельный учет и правила его ведения" [ref=f2e823] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1810000"
+                          - paragraph [ref=f2e824]:
+                            - link "2. Раздельный учет ведется налогоплательщиками на основании данных бухгалтерского учета." [ref=f2e826] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1810000"
+                          - paragraph [ref=f2e827]:
+                            - link "Статья 182. Особенности учета финансовой аренды" [ref=f2e829] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1820000"
+                          - paragraph [ref=f2e830]:
+                            - link "Статья 183. Виды деятельности, подлежащие льготному налогообложению" [ref=f2e832] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1830000"
+                          - paragraph [ref=f2e833]:
+                            - link "Статья 183-1. Участники договора простого товарищества" [ref=f2e835] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=183010000"
+                          - paragraph [ref=f2e836]:
+                            - link "РАЗДЕЛ VII. ПОДОХОДНЫЙ НАЛОГ" [ref=f2e838] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1840000"
+                          - paragraph [ref=f2e839]:
+                            - link "Глава 22. Общие положения" [ref=f2e841] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1840000"
+                          - paragraph [ref=f2e842]:
+                            - link "Статья 184. Понятия и термины, используемые в настоящем разделе" [ref=f2e844] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1840000"
+                          - paragraph [ref=f2e845]:
+                            - link "Статья 185. Налогоплательщик подоходного налога" [ref=f2e847] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1850000"
+                          - paragraph [ref=f2e848]:
+                            - link "Статья 186. Объект налогообложения" [ref=f2e850] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1860000"
+                          - paragraph [ref=f2e851]:
+                            - link "Статья 187. Налоговая база" [ref=f2e853] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1870000"
+                          - paragraph [ref=f2e854]:
+                            - link "Статья 188. Налоговый период" [ref=f2e856] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1880000"
+                          - paragraph [ref=f2e857]:
+                            - link "Глава 23. Совокупный годовой доход и другие доходы" [ref=f2e859] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1890000"
+                          - paragraph [ref=f2e860]:
+                            - link "Статья 189. Состав совокупного годового дохода" [ref=f2e862] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1890000"
+                          - paragraph [ref=f2e863]:
+                            - link "Статья 190. Доход, получаемый в форме материальной выгоды" [ref=f2e865] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1900000"
+                          - paragraph [ref=f2e866]:
+                            - link "Статья 191. Льготы по подоходному налогу" [ref=f2e868] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1910000"
+                          - paragraph [ref=f2e869]:
+                            - link "Статья 192. Дата возникновения дохода" [ref=f2e871] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1920000"
+                          - paragraph [ref=f2e872]:
+                            - link "Глава 24. Вычеты из совокупного дохода для определения налоговой базы" [ref=f2e874] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1930000"
+                          - paragraph [ref=f2e875]:
+                            - link "Статья 193. Общие положения" [ref=f2e877] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1930000"
+                          - paragraph [ref=f2e878]:
+                            - link "Статья 194. Стандартные вычеты" [ref=f2e880] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1940000"
+                          - paragraph [ref=f2e881]:
+                            - link "Статья 195. Социальный вычет" [ref=f2e883] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1950000"
+                          - paragraph [ref=f2e884]:
+                            - link "Статья 196. Имущественный вычет" [ref=f2e886] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1960000"
+                          - paragraph [ref=f2e887]:
+                            - link "Статья 196-1. Инвестиционный вычет" [ref=f2e889] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1960000"
+                          - paragraph [ref=f2e890]:
+                            - link "Глава 25. Ставка подоходного налога. Порядок исчисления подоходного налога" [ref=f2e892] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1970000"
+                          - paragraph [ref=f2e893]:
+                            - link "Статья 197. Ставка подоходного налога" [ref=f2e895] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1970000"
+                          - paragraph [ref=f2e896]:
+                            - link "Статья 198. Исчисление подоходного налога" [ref=f2e898] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1980000"
+                          - paragraph [ref=f2e899]:
+                            - link "Статья 199. Порядок исчисления, срок и место уплаты подоходного налога" [ref=f2e901] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=1990000"
+                          - paragraph [ref=f2e902]:
+                            - link "Глава 26. Исполнение налогового обязательства налоговым агентом по подоходному налогу" [ref=f2e904] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2000000"
+                          - paragraph [ref=f2e905]:
+                            - link "Статья 200. Налоговое обязательство работодателя" [ref=f2e907] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2000000"
+                          - paragraph [ref=f2e908]:
+                            - link "Статья 201. Налоговое обязательство налогового агента при выплате дохода физическому лицу, не находящемуся с ним в трудовых отношениях" [ref=f2e910] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2010000"
+                          - paragraph [ref=f2e911]:
+                            - link "Статья 202. Порядок исполнения налогового обязательства налоговым агентом" [ref=f2e913] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2020000"
+                          - paragraph [ref=f2e914]:
+                            - link "Статья 203. Представление отчетности по подоходному налогу налоговым агентом" [ref=f2e916] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2030000"
+                          - paragraph [ref=f2e917]:
+                            - link "Глава 27. Особенности налогообложения отдельных категорий физических лиц" [ref=f2e919] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2040000"
+                          - paragraph [ref=f2e920]:
+                            - link "Статья 204. Налогообложение работника дипломатического представительства и консульского учреждения иностранного государства или представительства международной организации" [ref=f2e922] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2040000"
+                          - paragraph [ref=f2e923]:
+                            - link "Статья 205. Устранение двойного налогообложения" [ref=f2e925] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2050000"
+                          - paragraph [ref=f2e926]:
+                            - link "РАЗДЕЛ VIII. НАЛОГ НА ПРИБЫЛЬ" [ref=f2e928] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2060000"
+                          - paragraph [ref=f2e929]:
+                            - link "Глава 28. Общие положения" [ref=f2e931] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2060000"
+                          - paragraph [ref=f2e932]:
+                            - link "Статья 206. Понятия и термины, используемые в настоящем разделе" [ref=f2e934] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2060000"
+                          - paragraph [ref=f2e935]:
+                            - link "Статья 207. Налогоплательщик налога на прибыль" [ref=f2e937] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2070000"
+                          - paragraph [ref=f2e938]:
+                            - link "Статья 208. Особенности уплаты налога на прибыль налоговым агентом" [ref=f2e940] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2080000"
+                          - paragraph [ref=f2e941]:
+                            - link "Статья 208-1. Утратила силу." [ref=f2e943] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=208010000"
+                          - paragraph [ref=f2e944]:
+                            - link "Статья 209. Объект налогообложения" [ref=f2e946] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2090000"
+                          - paragraph [ref=f2e947]:
+                            - link "Статья 210. Налоговая база" [ref=f2e949] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2100000"
+                          - paragraph [ref=f2e950]:
+                            - link "Статья 211. Налоговый период" [ref=f2e952] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2110000"
+                          - paragraph [ref=f2e953]:
+                            - link "Глава 29. Совокупный годовой доход" [ref=f2e955] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2120000"
+                          - paragraph [ref=f2e956]:
+                            - link "Статья 212. Состав совокупного годового дохода" [ref=f2e958] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2120000"
+                          - paragraph [ref=f2e959]:
+                            - link "Статья 213. Необлагаемые доходы" [ref=f2e961] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2130000"
+                          - paragraph [ref=f2e962]:
+                            - link "Статья 214. Корректировка дохода" [ref=f2e964] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2140000"
+                          - paragraph [ref=f2e965]:
+                            - link "Статья 215. Компенсируемые вычеты" [ref=f2e967] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2150000"
+                          - paragraph [ref=f2e968]:
+                            - link "Статья 216. Доходы и вычеты по долгосрочному контракту или договору" [ref=f2e970] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2160000"
+                          - paragraph [ref=f2e971]:
+                            - link "Глава 30. Расходы, подлежащие вычету из совокупного годового дохода" [ref=f2e973] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2170000"
+                          - paragraph [ref=f2e974]:
+                            - link "Статья 217. Вычеты расходов, связанных с получением дохода" [ref=f2e976] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2170000"
+                          - paragraph [ref=f2e977]:
+                            - link "Статья 218. Вычет сумм расходов в пределах технологических норм" [ref=f2e979] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2180000"
+                          - paragraph [ref=f2e980]:
+                            - link "Статья 219. Вычет сумм расходов при служебных командировках и по представительским расходам" [ref=f2e982] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2190000"
+                          - paragraph [ref=f2e983]:
+                            - link "Статья 220. Вычет расходов на обучение" [ref=f2e985] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2200000"
+                          - paragraph [ref=f2e986]:
+                            - link "Статья 221. Вычеты процентных расходов" [ref=f2e988] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2210000"
+                          - paragraph [ref=f2e989]:
+                            - link "Статья 222. Вычеты по расходам на инновационную деятельность" [ref=f2e991] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2220000"
+                          - paragraph [ref=f2e992]:
+                            - link "Статья 223. Резерв на геологоразведочные работы" [ref=f2e994] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2230000"
+                          - paragraph [ref=f2e995]:
+                            - link "Статья 224. Стоимость основных средств, нематериальных активов и товарно-материальных запасов" [ref=f2e997] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2240000"
+                          - paragraph [ref=f2e998]:
+                            - link "Статья 225. Амортизируемое основное средство" [ref=f2e1000] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2250000"
+                          - paragraph [ref=f2e1001]:
+                            - link "Статья 226. Классификация основных средств и определение размера амортизационных начислений" [ref=f2e1003] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2260000"
+                          - paragraph [ref=f2e1004]:
+                            - link "Статья 227. Поступление и выбытие основных средств в целях амортизации" [ref=f2e1006] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2270000"
+                          - paragraph [ref=f2e1007]:
+                            - link "Статья 228. Вычеты сумм амортизационных начислений" [ref=f2e1009] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2280000"
+                          - paragraph [ref=f2e1010]:
+                            - link "Статья 229. Вычеты расходов на ремонт" [ref=f2e1012] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2290000"
+                          - paragraph [ref=f2e1013]:
+                            - link "Статья 230. Вычет суммы страховых взносов по государственному социальному страхованию" [ref=f2e1015] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2300000"
+                          - paragraph [ref=f2e1016]:
+                            - link "Статья 230-1. Вычет суммы пенсионных взносов по дополнительным пенсионным программам накопительных пенсионных фондов" [ref=f2e1018] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=230010000"
+                          - paragraph [ref=f2e1019]:
+                            - link "Статья 231. Убытки, возникающие при реализации ценных бумаг" [ref=f2e1021] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2310000"
+                          - paragraph [ref=f2e1022]:
+                            - link "Статья 232. Перенос убытков, связанных с экономической деятельностью" [ref=f2e1024] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2320000"
+                          - paragraph [ref=f2e1025]:
+                            - link "Статья 233. Резерв на покрытие потенциальных потерь и убытков. Взносы банков в Фонд защиты депозитов" [ref=f2e1027] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2330000"
+                          - paragraph [ref=f2e1028]:
+                            - link "Статья 234. Вычеты по расходам на благотворительность" [ref=f2e1030] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2340000"
+                          - paragraph [ref=f2e1031]:
+                            - link "Статья 235. Вычет сумм налогов" [ref=f2e1033] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2350000"
+                          - paragraph [ref=f2e1034]:
+                            - link "Статья 236. Расходы, не подлежащие вычету" [ref=f2e1036] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2360000"
+                          - paragraph [ref=f2e1037]:
+                            - link "Статья 237. Особенности определения налоговой базы участников договора доверительного управления имуществом" [ref=f2e1039] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2370000"
+                          - paragraph [ref=f2e1040]:
+                            - link "Статья 238. Особенности определения налоговой базы участников договора простого товарищества" [ref=f2e1042] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2380000"
+                          - paragraph [ref=f2e1043]:
+                            - link "Глава 31. Налоговые льготы" [ref=f2e1045] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2390000"
+                          - paragraph [ref=f2e1046]:
+                            - link "Статья 239. Льготы по налогу на прибыль" [ref=f2e1048] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2390000"
+                          - paragraph [ref=f2e1049]:
+                            - link "Глава 32. Ставки налога. Порядок исчисления, представления отчета и уплаты налога на прибыль" [ref=f2e1051] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2400000"
+                          - paragraph [ref=f2e1052]:
+                            - link "Статья 240. Ставка налога на прибыль" [ref=f2e1054] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2400000"
+                          - paragraph [ref=f2e1055]:
+                            - link "Статья 241. Исчисление налога на прибыль" [ref=f2e1057] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2410000"
+                          - paragraph [ref=f2e1058]:
+                            - link "Статья 242. Порядок определения, срок и место уплаты налога на прибыль" [ref=f2e1060] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2420000"
+                          - paragraph [ref=f2e1061]:
+                            - link "Статья 243. Порядок определения, срок, место уплаты и представления налоговой отчетности по предварительной сумме налога на прибыль" [ref=f2e1063] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2430000"
+                          - paragraph [ref=f2e1064]:
+                            - link "Глава 33. Особенности налогообложения отдельных категорий налогоплательщиков и доходов" [ref=f2e1066] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2440000"
+                          - paragraph [ref=f2e1067]:
+                            - link "Статья 244. Вычеты по отчислениям в страховые резервные фонды, формируемые страховыми организациями" [ref=f2e1069] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2440000"
+                          - paragraph [ref=f2e1070]:
+                            - link "Статья 244-1. Вычеты по отчислениям в резервный фонд, формируемый накопительными пенсионными фондами" [ref=f2e1072] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=244010000"
+                          - paragraph [ref=f2e1073]:
+                            - link "Статья 245. Особенности налогообложения горнодобывающих и/или горноперерабатывающих предприятий" [ref=f2e1075] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2450000"
+                          - paragraph [ref=f2e1076]:
+                            - link "Статья 245-1. Утратила силу." [ref=f2e1078] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=245010000"
+                          - paragraph [ref=f2e1079]:
+                            - link "Глава 34. Особенности налогообложения дохода отечественной организации, полученного за пределами Кыргызской Республики, и дохода иностранной организации, полученного в Кыргызской Республике или из источников в Кыргызской Республике" [ref=f2e1081] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2460000"
+                          - paragraph [ref=f2e1082]:
+                            - link "Статья 246. Особенности налогообложения дохода отечественной организации, полученного за пределами Кыргызской Республики" [ref=f2e1084] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2460000"
+                          - paragraph [ref=f2e1085]:
+                            - link "Статья 247. Особенности налогообложения иностранной организации, осуществляющей деятельность через постоянное учреждение в Кыргызской Республике" [ref=f2e1087] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2470000"
+                          - paragraph [ref=f2e1088]:
+                            - link "Статья 248. Особенности налогообложения дохода из источника в Кыргызской Республике иностранной организации, не связанной с постоянным учреждением в Кыргызской Республике" [ref=f2e1090] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2480000"
+                          - paragraph [ref=f2e1091]:
+                            - link "Статья 249. Налоговая база и ставки налога на доход из источника в Кыргызской Республике иностранной организации, не связанной с постоянным учреждением в Кыргызской Республике" [ref=f2e1093] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2490000"
+                          - paragraph [ref=f2e1094]:
+                            - link "Статья 249-1. Утратила силу." [ref=f2e1096] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=249010000"
+                          - paragraph [ref=f2e1097]:
+                            - link "Статья 249-2. Утратила силу." [ref=f2e1099] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=249020000"
+                          - paragraph [ref=f2e1100]:
+                            - link "Статья 250. Срок уплаты и представления отчета по налогу, удержанному источником дохода" [ref=f2e1102] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2500000"
+                          - paragraph [ref=f2e1103]:
+                            - link "РАЗДЕЛ IX. НАЛОГ НА ДОБАВЛЕННУЮ СТОИМОСТЬ" [ref=f2e1105] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2510000"
+                          - paragraph [ref=f2e1106]:
+                            - link "Глава 35. Общие положения" [ref=f2e1108] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2510000"
+                          - paragraph [ref=f2e1109]:
+                            - link "Статья 251. Понятия и термины, используемые в настоящем разделе" [ref=f2e1111] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2510000"
+                          - paragraph [ref=f2e1112]:
+                            - link "Статья 252. Налог на добавленную стоимость" [ref=f2e1114] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2520000"
+                          - paragraph [ref=f2e1115]:
+                            - link "Статья 253. Налогоплательщик НДС" [ref=f2e1117] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2530000"
+                          - paragraph [ref=f2e1118]:
+                            - link "Статья 254. Ставка НДС" [ref=f2e1120] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2540000"
+                          - paragraph [ref=f2e1121]:
+                            - link "Глава 36. Регистрация по НДС" [ref=f2e1123] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2550000"
+                          - paragraph [ref=f2e1124]:
+                            - link "Статья 255. Требования и порядок регистрации по НДС" [ref=f2e1126] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2550000"
+                          - paragraph [ref=f2e1127]:
+                            - link "Статья 256. Аннулирование регистрации по НДС" [ref=f2e1129] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2560000"
+                          - paragraph [ref=f2e1130]:
+                            - link "Глава 37. Объект налогообложения" [ref=f2e1132] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2570000"
+                          - paragraph [ref=f2e1133]:
+                            - link "Статья 257. Объект налогообложения" [ref=f2e1135] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2570000"
+                          - paragraph [ref=f2e1136]:
+                            - link "Статья 258. Поставка товаров, работ и услуг" [ref=f2e1138] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2580000"
+                          - paragraph [ref=f2e1139]:
+                            - link "Статья 259. Поставка товаров, работ, услуг, осуществляемая агентом" [ref=f2e1141] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2590000"
+                          - paragraph [ref=f2e1142]:
+                            - link "Статья 260. Импорт товаров, осуществляемый агентом" [ref=f2e1144] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2600000"
+                          - paragraph [ref=f2e1145]:
+                            - link "Статья 261. Дата возникновения налогового обязательства" [ref=f2e1147] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2610000"
+                          - paragraph [ref=f2e1148]:
+                            - link "Статья 262. Место поставки товаров" [ref=f2e1150] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2620000"
+                          - paragraph [ref=f2e1151]:
+                            - link "Статья 263. Место поставки работ и/или услуг" [ref=f2e1153] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2630000"
+                          - paragraph [ref=f2e1154]:
+                            - link "Глава 38. Освобожденные поставки и поставки с нулевой ставкой НДС" [ref=f2e1156] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2640000"
+                          - paragraph [ref=f2e1157]:
+                            - link "Статья 264. Освобожденные поставки" [ref=f2e1159] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2640000"
+                          - paragraph [ref=f2e1160]:
+                            - link "Статья 265. Поставка недвижимого имущества" [ref=f2e1162] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2650000"
+                          - paragraph [ref=f2e1163]:
+                            - link "Статья 266. Поставка сельскохозяйственной продукции и продуктов ее переработки" [ref=f2e1165] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2660000"
+                          - paragraph [ref=f2e1166]:
+                            - link "Статья 267. Поставка коммунальных услуг" [ref=f2e1168] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2670000"
+                          - paragraph [ref=f2e1169]:
+                            - link "Статья 268. Поставка товаров, услуг и лекарственных средств, изделий медицинского назначения в сфере медицинской и ветеринарной деятельности" [ref=f2e1171] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2680000"
+                          - paragraph [ref=f2e1172]:
+                            - link "Статья 269. Поставка специализированной организацией, независимо от ее формы собственности, услуги по технологическому присоединению к сетям инженерно-технического обеспечения" [ref=f2e1174] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2690000"
+                          - paragraph [ref=f2e1175]:
+                            - link "Статья 270. Финансовые услуги" [ref=f2e1177] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2700000"
+                          - paragraph [ref=f2e1178]:
+                            - link "Статья 271. Поставка товаров, связанных с операциями по исламскому финансированию" [ref=f2e1180] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2710000"
+                          - paragraph [ref=f2e1181]:
+                            - link "Статья 272. Поставка товара, связанного с финансовыми услугами" [ref=f2e1183] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2720000"
+                          - paragraph [ref=f2e1184]:
+                            - link "Статья 273. Услуги по страхованию" [ref=f2e1186] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2730000"
+                          - paragraph [ref=f2e1187]:
+                            - link "Статья 274. Услуги по пенсионному обеспечению" [ref=f2e1189] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2740000"
+                          - paragraph [ref=f2e1190]:
+                            - link "Статья 275. Транспортные услуги" [ref=f2e1192] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2750000"
+                          - paragraph [ref=f2e1193]:
+                            - link "Статья 276. Поставка учебных пособий и школьных принадлежностей, научных изданий, литературно-художественных книг на государственном языке" [ref=f2e1195] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2760000"
+                          - paragraph [ref=f2e1196]:
+                            - link "Статья 277. Переработка давальческого сырья, помещенного под таможенные процедуры переработки товаров на таможенной территории и переработки товаров для внутреннего потребления" [ref=f2e1198] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2770000"
+                          - paragraph [ref=f2e1199]:
+                            - link "Статья 278. Услуги по гарантийному ремонту" [ref=f2e1201] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2780000"
+                          - paragraph [ref=f2e1202]:
+                            - link "Статья 279. Поставка товаров на территории таможенного склада" [ref=f2e1204] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2790000"
+                          - paragraph [ref=f2e1205]:
+                            - link "Статья 280. Поставка средств идентификации, а также услуг по выдаче и генерации кодов маркировки товаров" [ref=f2e1207] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2800000"
+                          - paragraph [ref=f2e1208]:
+                            - link "Статья 281. Поставки благотворительных организаций" [ref=f2e1210] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2810000"
+                          - paragraph [ref=f2e1211]:
+                            - link "Статья 282. Поставка услуг дошкольными образовательными организациями и общеобразовательными организациями, созданными на основе частной формы собственности" [ref=f2e1213] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2820000"
+                          - paragraph [ref=f2e1214]:
+                            - link "Статья 283. Поставка товаров, работ и услуг исправительными учреждениями и предприятиями уголовно-исполнительной системы Министерства юстиции Кыргызской Республики" [ref=f2e1216] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2830000"
+                          - paragraph [ref=f2e1217]:
+                            - link "Статья 284. Поставка технологий, оборудования и его комплектующих, отвечающих требованиям энерго- и ресурсоэффективности" [ref=f2e1219] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2840000"
+                          - paragraph [ref=f2e1220]:
+                            - link "Статья 285. Утратила силу." [ref=f2e1222] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2850000"
+                          - paragraph [ref=f2e1223]:
+                            - link "Статья 286. Поставка частными медицинскими организациями услуг гемодиализа лицам с хронической почечной недостаточностью в терминальной стадии" [ref=f2e1225] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2860000"
+                          - paragraph [ref=f2e1226]:
+                            - link "Статья 287. Поставки, осуществляемые некоммерческими организациями" [ref=f2e1228] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2870000"
+                          - paragraph [ref=f2e1229]:
+                            - link "Статья 288. Поставка на безвозмездной основе" [ref=f2e1231] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2880000"
+                          - paragraph [ref=f2e1232]:
+                            - link "Статья 289. Поставки минеральных удобрений и средств химической защиты растений" [ref=f2e1234] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2890000"
+                          - paragraph [ref=f2e1235]:
+                            - link "Статья 290. Поставка сельскохозяйственной техники, производимой на предприятиях Кыргызской Республики" [ref=f2e1237] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2900000"
+                          - paragraph [ref=f2e1238]:
+                            - link "Статья 291. Поставка транспортных средств, приводимых в движение только электрическим двигателем" [ref=f2e1240] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2910000"
+                          - paragraph [ref=f2e1241]:
+                            - link "Статья 292. Поставка и экспорт металлосодержащих руд, концентратов, сплавов и аффинированных металлов" [ref=f2e1243] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2920000"
+                          - paragraph [ref=f2e1244]:
+                            - link "Статья 293. Поставки, осуществляемые частным партнером и (или) проектной компанией в соответствии с законодательством Кыргызской Республики о государственно-частном партнерстве" [ref=f2e1246] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2930000"
+                          - paragraph [ref=f2e1247]:
+                            - link "Статья 294. Поставка реактивного топлива для заправки воздушных судов, осуществляющих международные воздушные перевозки" [ref=f2e1249] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2940000"
+                          - paragraph [ref=f2e1250]:
+                            - link "Статья 295. Поставка товаров или работ согласно договору о социально значимом объекте" [ref=f2e1252] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2950000"
+                          - paragraph [ref=f2e1253]:
+                            - link "Статья 296. Другие поставки, освобожденные от НДС" [ref=f2e1255] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2960000"
+                          - paragraph [ref=f2e1256]:
+                            - link "Статья 297. Освобождение от НДС импортируемых товаров" [ref=f2e1258] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2970000"
+                          - paragraph [ref=f2e1259]:
+                            - link "Статья 298. Освобождение от НДС импортируемых племенных сельскохозяйственных животных и семенных материалов, минеральных удобрений и средств химической защиты растений" [ref=f2e1261] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2980000"
+                          - paragraph [ref=f2e1262]:
+                            - link "Статья 299. Освобождение от НДС импортируемых вооружения, военной техники, военного имущества, специальной техники и специальных средств" [ref=f2e1264] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=2990000"
+                          - paragraph [ref=f2e1265]:
+                            - link "Статья 300. Освобождение от уплаты НДС при временном ввозе на таможенную территорию ЕАЭС в Кыргызской Республике воздушных судов, двигателей и запасных частей к данным воздушным судам" [ref=f2e1267] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3000000"
+                          - paragraph [ref=f2e1268]:
+                            - link "Статья 301. Освобождение от НДС импорта основных средств, а также отдельных товаров на территорию Кыргызской Республики" [ref=f2e1270] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3010000"
+                          - paragraph [ref=f2e1271]:
+                            - link "Статья 302. Переработка давальческого сырья, ввезенного из государств-членов ЕАЭС" [ref=f2e1273] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3020000"
+                          - paragraph [ref=f2e1274]:
+                            - link "Статья 303. Экспорт товаров" [ref=f2e1276] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3030000"
+                          - paragraph [ref=f2e1277]:
+                            - link "Статья 304. Международные перевозки" [ref=f2e1279] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3040000"
+                          - paragraph [ref=f2e1280]:
+                            - link "Статья 305. Услуги по обслуживанию транзитных рейсов воздушных судов и услуги, связанные с международной перевозкой" [ref=f2e1282] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3050000"
+                          - paragraph [ref=f2e1283]:
+                            - link "Статья 306. Услуги, связанные с электроснабжением насосных станций, занимающихся поливом сельскохозяйственных угодий, обеспечением населения питьевой водой" [ref=f2e1285] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3060000"
+                          - paragraph [ref=f2e1286]:
+                            - link "Статья 306-1. Реализация товаров по системе «такс-фри»" [ref=f2e1288] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=306010000"
+                          - paragraph [ref=f2e1289]:
+                            - link "Глава 39. Налоговая база" [ref=f2e1291] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3070000"
+                          - paragraph [ref=f2e1292]:
+                            - link "Статья 307. Налоговая база" [ref=f2e1294] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3070000"
+                          - paragraph [ref=f2e1295]:
+                            - link "Статья 308. Облагаемая стоимость поставок" [ref=f2e1297] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3080000"
+                          - paragraph [ref=f2e1298]:
+                            - link "Статья 309. Корректировка стоимости облагаемой поставки и НДС, подлежащего зачету" [ref=f2e1300] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3090000"
+                          - paragraph [ref=f2e1301]:
+                            - link "Статья 310. Облагаемая стоимость импорта товаров, ввозимых из государств, не являющихся членами ЕАЭС" [ref=f2e1303] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3100000"
+                          - paragraph [ref=f2e1304]:
+                            - link "Статья 311. Облагаемая стоимость импорта товаров из государств-членов ЕАЭС" [ref=f2e1306] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3110000"
+                          - paragraph [ref=f2e1307]:
+                            - link "Статья 312. Особенности уплаты НДС при вывозе товаров с территории свободных складов" [ref=f2e1309] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3120000"
+                          - paragraph [ref=f2e1310]:
+                            - link "Глава 40. Налоговый период. Порядок исчисления, уплаты и возмещения НДС" [ref=f2e1312] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3130000"
+                          - paragraph [ref=f2e1313]:
+                            - link "Статья 313. Налоговый период" [ref=f2e1315] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3130000"
+                          - paragraph [ref=f2e1316]:
+                            - link "Статья 314. Порядок исчисления НДС" [ref=f2e1318] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3140000"
+                          - paragraph [ref=f2e1319]:
+                            - link "Статья 315. Порядок зачета НДС" [ref=f2e1321] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3150000"
+                          - paragraph [ref=f2e1322]:
+                            - link "Статья 316. НДС за приобретенные материальные ресурсы, не подлежащий зачету" [ref=f2e1324] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3160000"
+                          - paragraph [ref=f2e1325]:
+                            - link "Статья 317. Порядок распределения НДС за приобретаемые материальные ресурсы" [ref=f2e1327] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3170000"
+                          - paragraph [ref=f2e1328]:
+                            - link "Статья 318. Особенности исчисления НДС по лотерейной деятельности" [ref=f2e1330] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3180000"
+                          - paragraph [ref=f2e1331]:
+                            - link "Статья 319. Срок представления налоговой отчетности и уплаты НДС" [ref=f2e1333] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3190000"
+                          - paragraph [ref=f2e1334]:
+                            - link "Статья 320. Представление налоговой отчетности и уплата НДС при импорте товаров" [ref=f2e1336] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3200000"
+                          - paragraph [ref=f2e1337]:
+                            - link "Статья 321. Особенности внесения изменений и дополнений в налоговую отчетность по НДС и косвенным налогам" [ref=f2e1339] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3210000"
+                          - paragraph [ref=f2e1340]:
+                            - link "Статья 322. Порядок уплаты НДС отдельными налогоплательщиками НДС" [ref=f2e1342] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3220000"
+                          - paragraph [ref=f2e1343]:
+                            - link "Статья 323. Порядок уплаты НДС при осуществлении поставок в соответствии с договором простого товарищества" [ref=f2e1345] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3230000"
+                          - paragraph [ref=f2e1346]:
+                            - link "Статья 324. Порядок уплаты НДС на импорт при условном начислении" [ref=f2e1348] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3240000"
+                          - paragraph [ref=f2e1349]:
+                            - link "Статья 325. Порядок уплаты НДС при осуществлении поставок в соответствии с договором доверительного управления" [ref=f2e1351] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3250000"
+                          - paragraph [ref=f2e1352]:
+                            - link "Статья 326. Возмещение суммы превышения НДС" [ref=f2e1354] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3260000"
+                          - paragraph [ref=f2e1355]:
+                            - link "Статья 327. Возврат суммы превышения НДС по поставкам, облагаемым по нулевой ставке" [ref=f2e1357] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3270000"
+                          - paragraph [ref=f2e1358]:
+                            - link "Статья 328. Упрощенный порядок возврата суммы превышения НДС по поставкам, облагаемым по нулевой ставке" [ref=f2e1360] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3280000"
+                          - paragraph [ref=f2e1361]:
+                            - link "Статья 329. Порядок возмещения и/или возврата суммы превышения НДС" [ref=f2e1363] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3290000"
+                          - paragraph [ref=f2e1364]:
+                            - link "Статья 330. Возврат НДС в соответствии с международными обязательствами Кыргызской Республики" [ref=f2e1366] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3300000"
+                          - paragraph [ref=f2e1367]:
+                            - link "РАЗДЕЛ X. АКЦИЗНЫЙ НАЛОГ" [ref=f2e1369] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3310000"
+                          - paragraph [ref=f2e1370]:
+                            - link "Глава 41. Общие положения" [ref=f2e1372] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3310000"
+                          - paragraph [ref=f2e1373]:
+                            - link "Статья 331. Налогоплательщик акцизного налога" [ref=f2e1375] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3310000"
+                          - paragraph [ref=f2e1376]:
+                            - link "Статья 332. Особенности определения налогоплательщиков акцизного налога при импорте товаров" [ref=f2e1378] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3320000"
+                          - paragraph [ref=f2e1379]:
+                            - link "Статья 333. Объект налогообложения" [ref=f2e1381] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3330000"
+                          - paragraph [ref=f2e1382]:
+                            - link "Статья 334. Перечень подакцизных товаров" [ref=f2e1384] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3340000"
+                          - paragraph [ref=f2e1385]:
+                            - link "Статья 335. Налоговая база" [ref=f2e1387] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3350000"
+                          - paragraph [ref=f2e1388]:
+                            - link "Статья 336. Базовые ставки акциза" [ref=f2e1390] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3360000"
+                          - paragraph [ref=f2e1391]:
+                            - link "Статья 337. Налоговый период" [ref=f2e1393] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3370000"
+                          - paragraph [ref=f2e1394]:
+                            - link "Статья 338. Порядок исчисления" [ref=f2e1396] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3380000"
+                          - paragraph [ref=f2e1397]:
+                            - link "Статья 339. Срок уплаты и представления налоговой отчетности" [ref=f2e1399] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3390000"
+                          - paragraph [ref=f2e1400]:
+                            - link "Статья 340. Администрирование акцизного налога" [ref=f2e1402] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3400000"
+                          - paragraph [ref=f2e1403]:
+                            - link "Глава 42. Особенности налогообложения" [ref=f2e1405] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3410000"
+                          - paragraph [ref=f2e1406]:
+                            - link "Статья 341. Специальные правила" [ref=f2e1408] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3410000"
+                          - paragraph [ref=f2e1409]:
+                            - link "1. Статья 342 настоящего Кодекса применяется в отношении подакцизного товара, произведенного из давальческого сырья и подлежащего отгрузке на экспорт." [ref=f2e1411] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3410000"
+                          - paragraph [ref=f2e1412]:
+                            - link "Статья 342. Особенности уплаты акциза по подакцизным товарам, произведенным из давальческого сырья" [ref=f2e1414] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3420000"
+                          - paragraph [ref=f2e1415]:
+                            - link "Статья 343. Особенности уплаты акциза в отдельных случаях" [ref=f2e1417] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3430000"
+                          - paragraph [ref=f2e1418]:
+                            - link "Статья 344. Вычет суммы акциза" [ref=f2e1420] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3440000"
+                          - paragraph [ref=f2e1421]:
+                            - link "Статья 345. Подакцизные товары, подлежащие маркировке" [ref=f2e1423] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3450000"
+                          - paragraph [ref=f2e1424]:
+                            - link "Статья 346. Порча, утрата подакцизных товаров и марок акцизного сбора, аннулирование кодов маркировки" [ref=f2e1426] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3460000"
+                          - paragraph [ref=f2e1427]:
+                            - link "Статья 347. Освобождение от акцизов" [ref=f2e1429] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3470000"
+                          - paragraph [ref=f2e1430]:
+                            - link "РАЗДЕЛ XI. НАЛОГИ ЗА ПОЛЬЗОВАНИЕ НЕДРАМИ" [ref=f2e1432] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3480000"
+                          - paragraph [ref=f2e1433]:
+                            - link "Глава 43. Общие положения" [ref=f2e1435] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3480000"
+                          - paragraph [ref=f2e1436]:
+                            - link "Статья 348. Виды налогов за пользование недрами" [ref=f2e1438] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3480000"
+                          - paragraph [ref=f2e1439]:
+                            - link "Статья 349. Освобождение от уплаты налогов за пользование недрами" [ref=f2e1441] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3490000"
+                          - paragraph [ref=f2e1442]:
+                            - link "Глава 44. Бонус" [ref=f2e1444] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3490000"
+                          - paragraph [ref=f2e1445]:
+                            - link "Статья 350. Налогоплательщик бонуса" [ref=f2e1447] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3500000"
+                          - paragraph [ref=f2e1448]:
+                            - link "Статья 351. Объект налогообложения" [ref=f2e1450] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3510000"
+                          - paragraph [ref=f2e1451]:
+                            - link "Статья 352. Налоговая база" [ref=f2e1453] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3520000"
+                          - paragraph [ref=f2e1454]:
+                            - link "Статья 353. Ставка бонуса" [ref=f2e1456] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3530000"
+                          - paragraph [ref=f2e1457]:
+                            - link "Статья 354. Порядок исчисления" [ref=f2e1459] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3540000"
+                          - paragraph [ref=f2e1460]:
+                            - link "Статья 355. Сроки представления налоговой отчетности и уплаты" [ref=f2e1462] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3550000"
+                          - paragraph [ref=f2e1463]:
+                            - link "Глава 45. Роялти" [ref=f2e1465] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3560000"
+                          - paragraph [ref=f2e1466]:
+                            - link "Статья 356. Налогоплательщик роялти" [ref=f2e1468] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3560000"
+                          - paragraph [ref=f2e1469]:
+                            - link "Статья 357. Объект налогообложения" [ref=f2e1471] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3570000"
+                          - paragraph [ref=f2e1472]:
+                            - link "Статья 358. Налоговая база" [ref=f2e1474] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3580000"
+                          - paragraph [ref=f2e1475]:
+                            - link "Статья 359. Ставка роялти" [ref=f2e1477] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3590000"
+                          - paragraph [ref=f2e1478]:
+                            - link "Статья 360. Налоговый период" [ref=f2e1480] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3600000"
+                          - paragraph [ref=f2e1481]:
+                            - link "Статья 361. Порядок исчисления" [ref=f2e1483] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3610000"
+                          - paragraph [ref=f2e1484]:
+                            - link "Статья 362. Срок уплаты роялти и представления налоговой отчетности" [ref=f2e1486] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3620000"
+                          - paragraph [ref=f2e1487]:
+                            - link "РАЗДЕЛ XII. НАЛОГ С ПРОДАЖ" [ref=f2e1489] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3630000"
+                          - paragraph [ref=f2e1490]:
+                            - link "Глава 46. Общие положения" [ref=f2e1492] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3630000"
+                          - paragraph [ref=f2e1493]:
+                            - link "Статья 363. Налогоплательщик налога с продаж" [ref=f2e1495] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3630000"
+                          - paragraph [ref=f2e1496]:
+                            - link "Статья 364. Освобождение от уплаты налога с продаж" [ref=f2e1498] [cursor=pointer]:
+                              - /url: "?doc_id=31756556#sub_id=3640000"
+                        - generic [ref=f2e1523]:
+                          - link "вверх" [ref=f2e1524] [cursor=pointer]:
+                            - /url: javascript:docScroll(0)
+                          - text: "|"
+                          - link "документ постранично" [ref=f2e1525] [cursor=pointer]:
+                            - /url: "?doc_id=31756556&mode=p"
+                    - cell:
+                      - generic [ref=f2e1526]:
+                        - generic [ref=f2e1527]: Содержание
+                        - generic [ref=f2e1529]:
+                          - link "ОБЩАЯ ЧАСТЬ" [ref=f2e1530] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ I. ОБЩИЕ ПОЛОЖЕНИЯ" [ref=f2e1531] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 1. Общие положения" [ref=f2e1532] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 2. Налоговая система Кыргызской Республики" [ref=f2e1533] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "- разделительный баланс или передаточный акт при реорганизации;" [ref=f2e1534] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ II. УЧАСТНИКИ НАЛОГОВЫХ ПРАВООТНОШЕНИЙ" [ref=f2e1535] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 3. Налогоплательщик. Налоговый представитель" [ref=f2e1536] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 4. Налоговая служба. Разграничение полномочий в сфере налоговых правоотношений" [ref=f2e1537] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ III. НАЛОГОВОЕ ОБЯЗАТЕЛЬСТВО И НАЛОГОВАЯ ЗАДОЛЖЕННОСТЬ" [ref=f2e1538] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 5. Общие положения" [ref=f2e1539] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 6. Исполнение налогового обязательства. Прекращение налогового обязательства" [ref=f2e1540] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 7. Обеспечение исполнения налогового обязательства и погашения налоговой задолженности" [ref=f2e1541] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 8. Изменение сроков исполнения налогового обязательства и погашения налоговой задолженности" [ref=f2e1542] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 9. Зачет и возврат налогов" [ref=f2e1543] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 10. Решение органа налоговой службы" [ref=f2e1544] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 11. Налоговая отчетность" [ref=f2e1545] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ IV. НАЛОГОВЫЙ КОНТРОЛЬ" [ref=f2e1546] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 12. Регистрация в налоговом органе. Учет поступлений в бюджет" [ref=f2e1547] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 13. Налоговые проверки" [ref=f2e1548] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 14. Рейдовый налоговый контроль. Применение контрольно-кассовых машин. Налоговый пост" [ref=f2e1549] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 15. Доступ, обследование, истребование документов, экспертиза и составление протокола" [ref=f2e1550] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 16. Особенности проведения налогового контроля в отдельных случаях" [ref=f2e1551] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 17. Взаимодействие органов налоговой службы с другими субъектами" [ref=f2e1552] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ V. НАЛОГОВОЕ ПРАВОНАРУШЕНИЕ И ОТВЕТСТВЕННОСТЬ ЗА ЕГО СОВЕРШЕНИЕ" [ref=f2e1553] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 18. Общие положения об ответственности за совершение налоговых правонарушений" [ref=f2e1554] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 19. Виды налоговых правонарушений и ответственность за их совершение" [ref=f2e1555] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ VI. ОБЖАЛОВАНИЕ РЕШЕНИЯ ОРГАНОВ НАЛОГОВОЙ СЛУЖБЫ, ДЕЙСТВИЙ И/ИЛИ БЕЗДЕЙСТВИЯ ИХ ДОЛЖНОСТНЫХ ЛИЦ" [ref=f2e1556] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 20. Порядок обжалования решений и действий органов налоговой службы" [ref=f2e1557] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "ОСОБЕННАЯ ЧАСТЬ" [ref=f2e1558] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 21. Налоговый учет" [ref=f2e1559] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "2. Раздельный учет ведется налогоплательщиками на основании данных бухгалтерского учета." [ref=f2e1560] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ VII. ПОДОХОДНЫЙ НАЛОГ" [ref=f2e1561] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 22. Общие положения" [ref=f2e1562] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 23. Совокупный годовой доход и другие доходы" [ref=f2e1563] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 24. Вычеты из совокупного дохода для определения налоговой базы" [ref=f2e1564] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 25. Ставка подоходного налога. Порядок исчисления подоходного налога" [ref=f2e1565] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 26. Исполнение налогового обязательства налоговым агентом по подоходному налогу" [ref=f2e1566] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 27. Особенности налогообложения отдельных категорий физических лиц" [ref=f2e1567] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ VIII. НАЛОГ НА ПРИБЫЛЬ" [ref=f2e1568] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 28. Общие положения" [ref=f2e1569] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 29. Совокупный годовой доход" [ref=f2e1570] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 30. Расходы, подлежащие вычету из совокупного годового дохода" [ref=f2e1571] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 31. Налоговые льготы" [ref=f2e1572] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 32. Ставки налога. Порядок исчисления, представления отчета и уплаты налога на прибыль" [ref=f2e1573] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 33. Особенности налогообложения отдельных категорий налогоплательщиков и доходов" [ref=f2e1574] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 34. Особенности налогообложения дохода отечественной организации, полученного за пределами Кыргызской Республики, и дохода иностранной организации, полученного в Кыргызской Республике или из источников в Кыргызской Республике" [ref=f2e1575] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ IX. НАЛОГ НА ДОБАВЛЕННУЮ СТОИМОСТЬ" [ref=f2e1576] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 35. Общие положения" [ref=f2e1577] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 36. Регистрация по НДС" [ref=f2e1578] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 37. Объект налогообложения" [ref=f2e1579] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 38. Освобожденные поставки и поставки с нулевой ставкой НДС" [ref=f2e1580] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 39. Налоговая база" [ref=f2e1581] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 40. Налоговый период. Порядок исчисления, уплаты и возмещения НДС" [ref=f2e1582] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ X. АКЦИЗНЫЙ НАЛОГ" [ref=f2e1583] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 41. Общие положения" [ref=f2e1584] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 42. Особенности налогообложения" [ref=f2e1585] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "1. Статья 342 настоящего Кодекса применяется в отношении подакцизного товара, произведенного из давальческого сырья и подлежащего отгрузке на экспорт." [ref=f2e1586] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ XI. НАЛОГИ ЗА ПОЛЬЗОВАНИЕ НЕДРАМИ" [ref=f2e1587] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 43. Общие положения" [ref=f2e1588] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 44. Бонус" [ref=f2e1589] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 45. Роялти" [ref=f2e1590] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ XII. НАЛОГ С ПРОДАЖ" [ref=f2e1591] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 46. Общие положения" [ref=f2e1592] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 47. Исчисление налога с продаж" [ref=f2e1593] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ XIII. НАЛОГ НА ИМУЩЕСТВО" [ref=f2e1594] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 48. Общие положения" [ref=f2e1595] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Н = (НБж ⨯ Сж ⨯ Ки) + (НБзу ⨯ Сзу ⨯ Ки)," [ref=f2e1596] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Н = (НБнж ⨯ Снж ⨯ Кнз ⨯ Ки) + (НБзу ⨯ Сзу ⨯ Кнзу ⨯ Ки)," [ref=f2e1597] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Н = НБ ⨯ НС ⨯ С," [ref=f2e1598] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 49. Порядок исчисления, дата налогового обязательства, место уплаты и представления отчетности по налогу на имущество" [ref=f2e1599] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 50. Исчисление, срок уплаты налога на здания и помещения" [ref=f2e1600] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 51. Исчисление, срок уплаты налога на нежилые объекты имущества" [ref=f2e1601] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 52. Исчисление и срок уплаты налога на имущество на земельный участок, относящийся к сельскохозяйственным угодьям" [ref=f2e1602] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "НС = БНС х Ки," [ref=f2e1603] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 53. Утратила силу" [ref=f2e1604] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 54. Утратила силу." [ref=f2e1605] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 55. Льготы и освобождения по налогу на имущество" [ref=f2e1606] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 55-1. Утратила силу." [ref=f2e1607] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "РАЗДЕЛ XIV. СПЕЦИАЛЬНЫЕ НАЛОГОВЫЕ РЕЖИМЫ" [ref=f2e1608] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 56. Налог на основе патента" [ref=f2e1609] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 57. Упрощенная система налогообложения налогоплательщиков на основе единого налога" [ref=f2e1610] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 58. Налоговый режим в свободных экономических зонах" [ref=f2e1611] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 59. Налоговый режим в Парке высоких технологий" [ref=f2e1612] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 60. Налог на майнинг" [ref=f2e1613] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 61. Налог на деятельность в сфере электронной торговли" [ref=f2e1614] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 62. Налог на игорную деятельность" [ref=f2e1615] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 63. Налог на деятельность в зоне торговли с особым режимом" [ref=f2e1616] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "СН = С / 12 х М," [ref=f2e1617] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 64. Налоговый режим на специальной финансовой инвестиционной территории «Тамчы» с особым правовым режимом и статусом" [ref=f2e1618] [cursor=pointer]:
+                            - /url: javascript:void(0)
+                          - link "Глава 65. Налог на транзакцию" [ref=f2e1619] [cursor=pointer]:
+                            - /url: javascript:void(0)
+    - list [ref=f2e1622]:
+      - listitem [ref=f2e1623]:
+        - link "ВКонтакте" [ref=f2e1624] [cursor=pointer]:
+          - /url: https://vk.com/share.php?url=https%3A%2F%2Fcontinent-online.com%2FDocument%2F%3Fdoc_id%3D31756556&title=%D0%9D%D0%B0%D0%BB%D0%BE%D0%B3%D0%BE%D0%B2%D1%8B%D0%B9%20%D0%BA%D0%BE%D0%B4%D0%B5%D0%BA%D1%81%20%D0%9A%D1%8B%D1%80%D0%B3%D1%8B%D0%B7%D1%81%D0%BA%D0%BE%D0%B9%20%D0%A0%D0%B5%D1%81%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D0%BA%D0%B8%20%D0%BE%D1%82%2018%20%D1%8F%D0%BD%D0%B2%D0%B0%D1%80%D1%8F%202022%20%D0%B3%D0%BE%D0%B4%D0%B0%20%E2%84%96%203%20(%D1%81%20%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%B8%20%D0%B4%D0%BE%D0%BF%D0%BE%D0%BB%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%BF%D0%BE%20%D1%81%D0%BE%D1%81%D1%82%D0%BE%D1%8F%D0%BD%D0%B8%D1%8E%20%D0%BD%D0%B0%2031.12.2025%20%D0%B3.)&utm_source=share2
+      - listitem [ref=f2e1627]:
+        - link "Мой Мир" [ref=f2e1628] [cursor=pointer]:
+          - /url: https://connect.mail.ru/share?url=https%3A%2F%2Fcontinent-online.com%2FDocument%2F%3Fdoc_id%3D31756556&title=%D0%9D%D0%B0%D0%BB%D0%BE%D0%B3%D0%BE%D0%B2%D1%8B%D0%B9%20%D0%BA%D0%BE%D0%B4%D0%B5%D0%BA%D1%81%20%D0%9A%D1%8B%D1%80%D0%B3%D1%8B%D0%B7%D1%81%D0%BA%D0%BE%D0%B9%20%D0%A0%D0%B5%D1%81%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D0%BA%D0%B8%20%D0%BE%D1%82%2018%20%D1%8F%D0%BD%D0%B2%D0%B0%D1%80%D1%8F%202022%20%D0%B3%D0%BE%D0%B4%D0%B0%20%E2%84%96%203%20(%D1%81%20%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%B8%20%D0%B4%D0%BE%D0%BF%D0%BE%D0%BB%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%BF%D0%BE%20%D1%81%D0%BE%D1%81%D1%82%D0%BE%D1%8F%D0%BD%D0%B8%D1%8E%20%D0%BD%D0%B0%2031.12.2025%20%D0%B3.)&utm_source=share2
+      - listitem [ref=f2e1631]:
+        - link "Одноклассники" [ref=f2e1632] [cursor=pointer]:
+          - /url: https://connect.ok.ru/offer?url=https%3A%2F%2Fcontinent-online.com%2FDocument%2F%3Fdoc_id%3D31756556&title=%D0%9D%D0%B0%D0%BB%D0%BE%D0%B3%D0%BE%D0%B2%D1%8B%D0%B9%20%D0%BA%D0%BE%D0%B4%D0%B5%D0%BA%D1%81%20%D0%9A%D1%8B%D1%80%D0%B3%D1%8B%D0%B7%D1%81%D0%BA%D0%BE%D0%B9%20%D0%A0%D0%B5%D1%81%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D0%BA%D0%B8%20%D0%BE%D1%82%2018%20%D1%8F%D0%BD%D0%B2%D0%B0%D1%80%D1%8F%202022%20%D0%B3%D0%BE%D0%B4%D0%B0%20%E2%84%96%203%20(%D1%81%20%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%B8%20%D0%B4%D0%BE%D0%BF%D0%BE%D0%BB%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%D0%BC%D0%B8%20%D0%BF%D0%BE%20%D1%81%D0%BE%D1%81%D1%82%D0%BE%D1%8F%D0%BD%D0%B8%D1%8E%20%D0%BD%D0%B0%2031.12.2025%20%D0%B3.)&utm_source=share2
+      - listitem [ref=f2e1635]:
+        - link [ref=f2e1636] [cursor=pointer]:
+          - /url: javascript:void(0);

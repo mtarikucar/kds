@@ -1350,7 +1350,6 @@ model SubscriptionPlan {
   subscriptions       Subscription[]
   currentPlanTenants  Tenant[]            @relation("CurrentPlan")
   scheduledDowngrades Subscription[]      @relation("ScheduledDowngrade")
-  pendingPlanChanges  PendingPlanChange[] @relation("PendingPlanChange")
   // Step-F decoupling: LeadOffer.planId is now a soft (no-FK) reference + plan snapshot.
 
   @@map("subscription_plans")
@@ -1417,7 +1416,6 @@ model Subscription {
   // Relations
   payments           SubscriptionPayment[]
   invoices           Invoice[]
-  pendingPlanChanges PendingPlanChange[]
 
   @@index([tenantId])
   @@index([planId])
@@ -1516,20 +1514,14 @@ model BankTransferSettings {
  * and calls applyUpgrade() — keeps the intent endpoint stateless about
  * what plan was being purchased.
  */
-model PendingPlanChange {
-  id             String           @id @default(uuid())
-  subscriptionId String
-  subscription   Subscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  targetPlanId   String
-  targetPlan     SubscriptionPlan @relation("PendingPlanChange", fields: [targetPlanId], references: [id], onDelete: Restrict)
-  billingCycle   String // MONTHLY, YEARLY
-  merchantOid    String           @unique
-  expiresAt      DateTime
-  createdAt      DateTime         @default(now())
 
-  @@index([subscriptionId])
-  @@map("pending_plan_changes")
-}
+// PendingPlanChange was dropped in v3.3.0
+// (20260811140000_retire_subscription_rail). It recorded "when this PayTR
+// payment settles, switch the tenant to that plan" — and there are no plans to
+// switch between. Products are bought and dropped individually through the
+// checkout rail; capacity downgrades apply at renewal via
+// TenantAddOn.pendingQuantity.
+
 
 model Invoice {
   id String @id @default(uuid())

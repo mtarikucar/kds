@@ -81,5 +81,10 @@
     "untilDate": "{{date}} tarihine kadar",
     "licenceFirst": "Bu ürün için önce lisans gerekir — sepete otomatik eklenir.",
     "empty": "Bu kategoride ürün yok."
+  },
+  "invoices": {
+    "title": "Faturalar",
+    "empty": "Henüz faturanız yok.",
+    "lineCount": "{{count}} kalem"
   }
 }

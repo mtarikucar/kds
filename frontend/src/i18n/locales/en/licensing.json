@@ -81,5 +81,10 @@
     "untilDate": "until {{date}}",
     "licenceFirst": "This product needs a licence — it will be added to your cart.",
     "empty": "No products in this category."
+  },
+  "invoices": {
+    "title": "Invoices",
+    "empty": "No invoices yet.",
+    "lineCount": "{{count}} line(s)"
   }
 }

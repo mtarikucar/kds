@@ -12,7 +12,6 @@ import {
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { SubscriptionService } from "../services/subscription.service";
 import { BillingService } from "../services/billing.service";
-import { UsageService } from "../services/usage.service";
 import { Public } from "../../auth/decorators/public.decorator";
 import { SkipBranchScope } from "../../auth/decorators/skip-branch-scope.decorator";
 import { Roles } from "../../auth/decorators/roles.decorator";
@@ -41,7 +40,6 @@ export class SubscriptionController {
   constructor(
     private readonly subscriptionService: SubscriptionService,
     private readonly billingService: BillingService,
-    private readonly usageService: UsageService,
   ) {}
 
   @Public()
@@ -59,12 +57,10 @@ export class SubscriptionController {
   // v2.8.88 — usage snapshot feeds the Plan & Erişim page kotalar grid
   // + dashboard quota mini-cards. 60s cached per tenant; safe to call
   // on every render.
-  @Get("usage/snapshot")
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getUsageSnapshot(@Request() req) {
-    return this.usageService.getSnapshot(req.user.tenantId);
-  }
 
+  // v3.3.0 — GET /subscriptions/usage/snapshot is retired. It reported usage
+  // against five plan caps; four are now unlimited and the fifth (branches)
+  // is served by GET /v1/me/licensing alongside the products that change it.
   @Get("current")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getCurrentSubscription(@Request() req) {
@@ -115,21 +111,11 @@ export class SubscriptionController {
     );
   }
 
-  @Post(":id/change-plan")
-  @Roles(UserRole.ADMIN)
-  async changePlan(
-    @Param("id") id: string,
-    @Body() dto: ChangePlanDto,
-    @Request() req,
-  ) {
-    return this.subscriptionService.changePlan(
-      id,
-      req.user.tenantId,
-      dto,
-      req.user.id,
-    );
-  }
-
+  // v3.3.0 — POST /subscriptions/:id/change-plan is retired along with plans.
+  // There are no tiers to move between: a tenant buys and drops individual
+  // products through the checkout rail, and capacity downgrades take effect at
+  // renewal via TenantAddOn.pendingQuantity. It was also the last writer of
+  // the pending_plan_changes table, which this release drops.
   @Get(":id/scheduled-downgrade")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getScheduledDowngrade(@Param("id") id: string, @Request() req) {

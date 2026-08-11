@@ -1,9 +1,11 @@
-import { Global, Module } from "@nestjs/common";
+import { Global, Module, forwardRef } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { LicensingService } from "./licensing.service";
 import { RenewalCycleService } from "./renewal-cycle.service";
 import { RenewalSchedulerService } from "./renewal-scheduler.service";
 import { LicensingController } from "./licensing.controller";
+import { RenewalNotificationsService } from "./renewal-notifications.service";
+import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import { CheckoutModule } from "../checkout/checkout.module";
 import { OutboxModule } from "../outbox/outbox.module";
 
@@ -27,9 +29,22 @@ import { OutboxModule } from "../outbox/outbox.module";
   // priced through the same engine as any other cart) and does not import
   // this module back — LicensingService reaches checkout through the @Global()
   // export, not an import.
-  imports: [PrismaModule, CheckoutModule, OutboxModule],
+  imports: [
+    PrismaModule,
+    CheckoutModule,
+    OutboxModule,
+    // NotificationService (the email templates + transporter) still lives in
+    // SubscriptionsModule; the renewal reminder reuses it rather than
+    // standing up a second mailer.
+    forwardRef(() => SubscriptionsModule),
+  ],
   controllers: [LicensingController],
-  providers: [LicensingService, RenewalCycleService, RenewalSchedulerService],
+  providers: [
+    LicensingService,
+    RenewalCycleService,
+    RenewalSchedulerService,
+    RenewalNotificationsService,
+  ],
   exports: [LicensingService, RenewalCycleService],
 })
 export class LicensingModule {}

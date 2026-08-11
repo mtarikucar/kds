@@ -58,12 +58,6 @@ describe("SubscriptionController", () => {
     expect(sub.createSubscription).toHaveBeenCalledWith("t1", dto, "u1");
   });
 
-  it("changePlan threads id, tenantId, dto and user id", async () => {
-    const dto = { newPlanId: "biz" } as any;
-    await ctrl.changePlan("s1", dto, req);
-    expect(sub.changePlan).toHaveBeenCalledWith("s1", "t1", dto, "u1");
-  });
-
   it("cancelSubscription coalesces immediate to false when absent", async () => {
     await ctrl.cancelSubscription("s1", {} as any, req);
     expect(sub.cancelSubscription).toHaveBeenCalledWith(
@@ -103,10 +97,5 @@ describe("SubscriptionController", () => {
       undefined,
       undefined,
     );
-  });
-
-  it("getUsageSnapshot reads the tenant usage snapshot", async () => {
-    await ctrl.getUsageSnapshot(req);
-    expect(usage.getSnapshot).toHaveBeenCalledWith("t1");
   });
 });

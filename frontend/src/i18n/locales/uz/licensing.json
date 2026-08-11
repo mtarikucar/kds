@@ -81,5 +81,10 @@
     "untilDate": "{{date}} sanasigacha",
     "licenceFirst": "Bu mahsulot uchun litsenziya kerak — savatga qo'shiladi.",
     "empty": "Bu toifada mahsulot yo'q."
+  },
+  "invoices": {
+    "title": "Hisob-fakturalar",
+    "empty": "Hali hisob-faktura yo'q.",
+    "lineCount": "{{count}} ta qator"
   }
 }

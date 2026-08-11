@@ -228,6 +228,53 @@ export class NotificationService {
   }
 
   /**
+   * Annual renewal reminder (30 / 7 / 1 days out).
+   *
+   * Replaces sendSubscriptionExpiryReminder, whose copy was written for tiers
+   * ("switch to another plan", "your account drops to the free plan") and is
+   * now actively wrong: there are no plans to switch to, and the free core is
+   * not a downgrade the account "drops" to — it is what the tenant already
+   * runs their floor on. The new template leads with the total and says
+   * plainly that nothing is deleted, because an operator who reads "your
+   * account will be closed" calls support instead of paying.
+   */
+  async sendRenewalReminder(
+    email: string,
+    args: {
+      tenantName: string;
+      anniversaryAt: Date;
+      daysLeft: number;
+      totalCents: number;
+      currency: string;
+      renewalCycleId: string;
+    },
+  ) {
+    const totalFormatted = new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: args.currency || "TRY",
+    }).format(args.totalCents / 100);
+
+    const subject =
+      args.daysLeft <= 1
+        ? `${args.tenantName} — yıllık yenilemeniz yarın (${totalFormatted})`
+        : `${args.tenantName} — yenilemenize ${args.daysLeft} gün kaldı (${totalFormatted})`;
+
+    return this.sendEmail({
+      to: email,
+      subject,
+      template: "licence-renewal-reminder",
+      context: {
+        tenantName: args.tenantName,
+        anniversaryAt: args.anniversaryAt.toISOString().slice(0, 10),
+        daysLeft: args.daysLeft,
+        totalFormatted,
+        renewUrl: `${this.appUrl}/admin/license/renewal/${args.renewalCycleId}`,
+        appUrl: this.appUrl,
+      },
+    });
+  }
+
+  /**
    * Send trial-expired notification.
    */
   async sendTrialExpired(email: string, tenantName: string, planName: string) {

@@ -1,0 +1,31 @@
+-- @doctor:idempotent verified=single DROP TABLE IF EXISTS. The table is purely ephemeral (rows carry an expiresAt and are swept hourly), so there is nothing to archive.
+--
+-- Retire the plan-change rail (P8 of 9, the last).
+--
+-- `pending_plan_changes` recorded "this PayTR payment, when it settles, should
+-- switch the tenant to that plan". There are no plans to switch between: a
+-- tenant buys and drops individual products through the checkout rail, and
+-- capacity downgrades take effect at renewal via TenantAddOn.pendingQuantity.
+-- Its only writer, POST /subscriptions/:id/change-plan, is removed in the same
+-- release.
+--
+-- Safe to drop rather than archive: rows are ephemeral by construction. Each
+-- carries an `expiresAt` an hour out and the orphan-cleanup cron sweeps them,
+-- so the table holds nothing older than a checkout that is still in flight.
+--
+-- WHAT IS DELIBERATELY *NOT* DROPPED
+--
+--   subscription_plans / subscriptions — kept, inert. `subscriptions.planId`
+--   is a Restrict FK and the legacy `invoices` table hangs off `subscriptions`;
+--   those invoices are tax records Turkish VUK requires retaining for years.
+--   Three inert rows cost nothing, and a migration whose down cannot restore
+--   what it destroyed is not reversible. They were deactivated in P3
+--   (isActive/isPublic false) and nothing reads them.
+--
+--   invoices / invoice_counters / subscription_payments — kept permanently.
+--   invoice_counters is still actively shared: the à-la-carte TenantInvoice
+--   writer draws from the SAME sequence, because two independent counters over
+--   one number format would eventually collide at settlement, after the card
+--   was charged.
+
+DROP TABLE IF EXISTS "pending_plan_changes";

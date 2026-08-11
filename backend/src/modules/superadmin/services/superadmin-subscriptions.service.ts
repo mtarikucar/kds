@@ -19,7 +19,6 @@ import { RefundSubscriptionPaymentDto } from "../dto/refund-subscription-payment
 import { SuperAdminAuditService } from "./superadmin-audit.service";
 import { AuditAction, EntityType } from "../dto/audit-filter.dto";
 import { SubscriptionService } from "../../subscriptions/services/subscription.service";
-import { SubscriptionSchedulerService } from "../../subscriptions/services/subscription-scheduler.service";
 import { resolvePlanAmount } from "../../subscriptions/plan-pricing.helper";
 import { DEMO_PLAN_NAME } from "../../demo/demo.constants";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
@@ -46,7 +45,6 @@ export class SuperAdminSubscriptionsService {
     private prisma: PrismaService,
     private auditService: SuperAdminAuditService,
     private subscriptionService: SubscriptionService,
-    private scheduler: SubscriptionSchedulerService,
     private paytr: PaytrAdapter,
   ) {}
 

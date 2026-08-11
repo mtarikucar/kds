@@ -1,0 +1,41 @@
+- generic [ref=e2]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - link [ref=e6] [cursor=pointer]:
+        - /url: /ru
+        - img "logo" [ref=e7]
+        - img "logo"
+        - generic [ref=e8]:
+          - paragraph [ref=e9]: Кыргызская Республика
+          - paragraph [ref=e10]: Министерство юстиции
+      - paragraph [ref=e11]: Централизованный банк данных правовой информации Кыргызской Республики
+  - navigation [ref=e13]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - link "Быстрый поиск НПА" [ref=e17] [cursor=pointer]:
+          - /url: /search-docs/ru
+        - link "Государственный реестр НПА" [ref=e18] [cursor=pointer]:
+          - /url: /notional-register-npa/ru
+        - link "Обратная связь" [ref=e19] [cursor=pointer]:
+          - /url: /feedback/ru
+        - link "Новые документы" [ref=e20] [cursor=pointer]:
+          - /url: /new-docs/ru
+        - link "Избранные документы" [ref=e21] [cursor=pointer]:
+          - /url: /selected-docs/ru
+        - link "Справка" [ref=e22] [cursor=pointer]:
+          - /url: /synopsis/ru
+        - button [ref=e24] [cursor=pointer]:
+          - paragraph [ref=e25]: Популярные запросы
+      - generic [ref=e31]:
+        - button [ref=e32] [cursor=pointer]
+        - text: "|"
+        - button [ref=e36] [cursor=pointer]
+  - navigation "breadcrumb" [ref=e42]:
+    - list [ref=e43]:
+      - listitem [ref=e44]:
+        - link "Главная" [ref=e45] [cursor=pointer]:
+          - /url: /ru
+      - listitem [ref=e46]: ›
+      - listitem:
+        - paragraph
+  - progressbar [ref=e50]

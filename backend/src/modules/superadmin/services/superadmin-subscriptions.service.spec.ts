@@ -58,10 +58,9 @@ describe("SuperAdminSubscriptionsService.refundPayment", () => {
       prisma as any,
       audit,
       subscriptionService,
-      {
-        handleSubscriptionPeriodEnd: jest.fn(),
-        handleSubscriptionExpiryReminders: jest.fn(),
-      } as any,
+      // v3.3.0 — the scheduler collaborator is gone: its jobs managed
+      // subscriptions, and the renewal equivalents live on
+      // RenewalSchedulerService.
       paytr,
     );
   });

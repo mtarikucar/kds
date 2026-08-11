@@ -9,6 +9,7 @@ import { featureKey } from "../entitlements/entitlement-keys.const";
 import { CreditService } from "../credits/credit.service";
 import { LicensingService } from "./licensing.service";
 import { RenewalCycleService } from "./renewal-cycle.service";
+import { TenantInvoiceService } from "../checkout/tenant-invoice.service";
 import { anchorDateFor, daysBetweenUtc } from "./anniversary";
 
 /**
@@ -32,6 +33,7 @@ export class LicensingController {
     private readonly licensing: LicensingService,
     private readonly credits: CreditService,
     private readonly renewals: RenewalCycleService,
+    private readonly tenantInvoices: TenantInvoiceService,
   ) {}
 
   @Get("me/licensing")
@@ -99,10 +101,7 @@ export class LicensingController {
           : "active"
         : "expired";
 
-    const localized = (row: {
-      name: string;
-      i18n: unknown;
-    }) =>
+    const localized = (row: { name: string; i18n: unknown }) =>
       (row.i18n as Record<string, { name?: string }> | null)?.[locale]?.name ??
       row.name;
 
@@ -151,6 +150,20 @@ export class LicensingController {
       // THIS tenant today. The upsell price and the checkout price are the
       // same number because they come from the same read.
       offers: this.buildOffers(catalog, ctx, locale),
+    };
+  }
+
+  @Get("me/invoices")
+  @UseGuards(JwtAuthGuard)
+  @SkipBranchScope()
+  @ApiOperation({ summary: "Itemized à-la-carte invoices for this tenant" })
+  async invoices(@Req() req: any) {
+    // Reads tenant_invoices, not the legacy `invoices` archive: the two
+    // coexist deliberately (that table holds tax records behind a NOT NULL
+    // subscriptionId), and only one of them describes a purchase anybody can
+    // still make.
+    return {
+      invoices: await this.tenantInvoices.listForTenant(req.user.tenantId),
     };
   }
 

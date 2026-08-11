@@ -26,9 +26,7 @@ import {
 import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
 import { ChangePlanDto } from "../dto/change-plan.dto";
 import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
-import { foldPlanGrants } from "./effective-features.fold";
 import { MetricsService } from "../../../common/metrics/metrics.service";
-import { DowngradeUsageGuardService } from "./downgrade-usage-guard.service";
 import { DemoGuardService } from "../../demo/demo-guard.service";
 
 @Injectable()
@@ -54,11 +52,6 @@ export class SubscriptionService {
     // so a context without MetricsModule never fails to resolve.
     @Optional() private readonly metrics?: MetricsService,
     // Downgrade usage-limit guard extracted from this service. @Optional()
-    // so the bare unit-test constructors (which predate it) keep resolving;
-    // when DI omits it, `downgradeGuard` below lazily builds one over the
-    // same PrismaService so the extracted query runs identically.
-    @Optional()
-    private readonly injectedDowngradeGuard?: DowngradeUsageGuardService,
     // Demo-tenant real-money block. REQUIRED (no @Optional) —
     // SubscriptionsModule imports DemoGuardModule, so DI fails loud at boot
     // if a future module-wiring regression ever drops that import, instead
@@ -68,20 +61,11 @@ export class SubscriptionService {
     private readonly demoGuard?: DemoGuardService,
   ) {}
 
-  /**
-   * Resolve the downgrade usage-limit guard. Prefers the DI-provided
-   * collaborator; falls back to a Prisma-backed instance so unit tests that
-   * construct SubscriptionService without the guard still exercise the real
-   * (extracted-verbatim) check rather than a stub.
-   */
-  private get downgradeGuard(): DowngradeUsageGuardService {
-    if (!this.injectedDowngradeGuard) {
-      this.lazyDowngradeGuard ??= new DowngradeUsageGuardService(this.prisma);
-      return this.lazyDowngradeGuard;
-    }
-    return this.injectedDowngradeGuard;
-  }
-  private lazyDowngradeGuard?: DowngradeUsageGuardService;
+  // v3.3.0 — the downgrade usage guard is gone with plan downgrades. It
+  // blocked a tier change that would leave a tenant over the target plan's
+  // user/table/product/category caps; four of those caps no longer exist and
+  // the fifth (branches) is capacity the tenant buys, reduced at renewal
+  // through TenantAddOn.pendingQuantity rather than by a blocking check.
 
   /**
    * Track 2 — record a committed subscription billing transition for
@@ -730,7 +714,7 @@ export class SubscriptionService {
     }
 
     // Downgrade: validate current usage against new plan limits first.
-    await this.assertDowngradeAllowed(subscription.tenantId, newPlan);
+    await this.assertDowngradeAllowed();
 
     // Compound WHERE on tenantId + scheduledDowngradePlanId IS NULL.
     // Without the null guard, two admins clicking "Downgrade to Plan B"
@@ -789,20 +773,16 @@ export class SubscriptionService {
   }
 
   /**
-   * Thin facade over the extracted DowngradeUsageGuardService. Behavior and
-   * call sites (changePlan, applyScheduledDowngrade) are unchanged — the
-   * usage-count queries and violation-message formatting moved verbatim.
+   * v3.3.0 — no-op. Plan downgrades are gone, and with them the check that a
+   * tenant was not left over the target tier's user/table/product/category
+   * caps. Four of those caps no longer exist; branch capacity is reduced at
+   * renewal through TenantAddOn.pendingQuantity rather than blocked here.
+   *
+   * Kept as a method so the two remaining call sites read as deliberate
+   * rather than as a check someone forgot to reinstate.
    */
-  private async assertDowngradeAllowed(
-    tenantId: string,
-    newPlan: {
-      maxUsers: number;
-      maxTables: number;
-      maxProducts: number;
-      maxCategories: number;
-    },
-  ) {
-    return this.downgradeGuard.assertDowngradeAllowed(tenantId, newPlan);
+  private async assertDowngradeAllowed(): Promise<void> {
+    return;
   }
 
   /**
@@ -824,7 +804,7 @@ export class SubscriptionService {
     }
 
     const newPlan = subscription.scheduledDowngradePlan;
-    await this.assertDowngradeAllowed(subscription.tenantId, newPlan);
+    await this.assertDowngradeAllowed();
 
     const billingCycle =
       subscription.scheduledDowngradeBillingCycle || subscription.billingCycle;
@@ -1365,39 +1345,15 @@ export class SubscriptionService {
       Object.keys(engineSet.limits).length > 0 ||
       Object.keys(engineSet.integrations).length > 0;
 
-    if (!hasAnyEngineGrants) {
-      // Engine empty — projector hasn't run for this tenant yet. Fall
-      // through to plan + override + add-on fold computation so the UI
-      // still renders. v2.8.90 — the fold now reads active TenantAddOn
-      // rows so a tenant who purchased an add-on but hit a projector
-      // race sees their purchase reflected; pre-v2.8.90 this branch
-      // returned plan-only and the frontend showed locked features.
-      // reconcileNightly still catches the engine miss within 24h.
-      this.logger.debug(
-        `getEffectiveFeatures fell back to plan + override + addon fold for tenant=${tenantId} (engine empty)`,
-      );
-      // Engine-empty fallback fold extracted to a pure, tested helper
-      // (effective-features.fold.ts) — mirrors PlanProjectorService's
-      // FEATURE_COLUMNS/LIMIT_COLUMNS in one named place.
-      // Wave D — include `past_due` so the engine-empty fallback matches the
-      // projector: a recurring add-on whose period lapsed keeps its grant
-      // through the grace window (mirrors Subscription PAST_DUE). Only
-      // `cancelled` / `expired` drop out.
-      const activeAddOns = await this.prisma.tenantAddOn.findMany({
-        where: { tenantId, status: { in: ["active", "past_due"] } },
-        include: { addOn: { select: { grants: true } } },
-      });
-      const folded = foldPlanGrants(
-        plan,
-        activeAddOns.map((ta) => ({
-          grants: (ta.addOn?.grants ?? null) as Record<string, unknown> | null,
-          quantity: ta.quantity,
-        })),
-        (tenant.featureOverrides as Record<string, boolean>) || null,
-        (tenant.limitOverrides as Record<string, number>) || null,
-      );
-      return { ...folded, trialEligiblePlanIds };
-    }
+    // v3.3.0 — no engine-empty fallback.
+    //
+    // The fallback existed because the projector had a warm-up window: a
+    // freshly provisioned tenant had no entitlement rows until the projector
+    // ran, so the guard read plan columns instead. There is no such window
+    // now — FREE_BASELINE_GRANTS is projected for every tenant on the same
+    // events, and a genuinely empty set means "no access", not "not ready".
+    // Keeping a plan-shaped fallback would also have been the one path still
+    // reading the retired plan columns.
 
     // Engine-resolved path: strip the `feature.` / `limit.` /
     // `integration.` prefixes to match the frontend's shape. Engine

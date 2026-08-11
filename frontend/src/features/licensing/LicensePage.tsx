@@ -4,12 +4,17 @@ import {
   AlertTriangle,
   CalendarClock,
   Coins,
+  FileText,
   Package,
   ShieldCheck,
   ShoppingCart,
 } from 'lucide-react';
 import { useEntitlements } from '../../contexts/SubscriptionContext';
-import { formatCents, OwnedProduct } from './licensingApi';
+import {
+  formatCents,
+  OwnedProduct,
+  useTenantInvoices,
+} from './licensingApi';
 import Button from '../../components/ui/Button';
 
 /**
@@ -80,6 +85,7 @@ const LicensePage = () => {
   const { t } = useTranslation(['licensing', 'common']);
   const navigate = useNavigate();
   const { license, owned, credits, renewal, isLoading } = useEntitlements();
+  const { data: invoices = [] } = useTenantInvoices();
 
   if (isLoading) {
     return (
@@ -234,6 +240,47 @@ const LicensePage = () => {
           </div>
         )}
         <p className="mt-3 text-xs text-gray-500">{t('licensing:credits.note')}</p>
+      </section>
+
+      {/* Invoices. A customer who has paid must be able to see what for —
+          the à-la-carte invoice is itemized, so this links to the detail
+          rather than restating a single total. */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-3 flex items-center gap-2">
+          <FileText size={18} className="text-gray-500" />
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+            {t('licensing:invoices.title')}
+          </h2>
+        </div>
+        {invoices.length === 0 ? (
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t('licensing:invoices.empty')}
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {invoices.map((inv) => (
+              <li
+                key={inv.id}
+                className="flex items-center justify-between gap-4 py-3"
+              >
+                <div>
+                  <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
+                    {inv.invoiceNumber}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {new Date(inv.issuedAt).toLocaleDateString('tr-TR')} ·{' '}
+                    {t('licensing:invoices.lineCount', {
+                      count: inv.lines.length,
+                    })}
+                  </div>
+                </div>
+                <div className="text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {formatCents(inv.totalCents, inv.currency)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

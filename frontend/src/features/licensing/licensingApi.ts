@@ -109,6 +109,51 @@ export interface PricingProduct {
   sortOrder: number;
 }
 
+export interface InvoiceLine {
+  lineNo: number;
+  kind: string;
+  code: string;
+  name: string;
+  qty: number;
+  unitCents: number;
+  subtotalCents: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+}
+
+export interface TenantInvoice {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  kind: string;
+  subtotalCents: number;
+  taxCents: number;
+  totalCents: number;
+  currency: string;
+  issuedAt: string;
+  lines: InvoiceLine[];
+}
+
+/**
+ * Itemized invoices for the à-la-carte world.
+ *
+ * Reads `tenant_invoices`, not the legacy `invoices` archive — the two coexist
+ * deliberately (that table holds tax records behind a NOT NULL subscriptionId)
+ * and only one of them describes a purchase anybody can still make.
+ */
+export function useTenantInvoices() {
+  return useQuery({
+    queryKey: ['licensing', 'invoices'] as const,
+    queryFn: async () => {
+      const { data } = await api.get<{ invoices: TenantInvoice[] }>(
+        '/v1/me/invoices',
+      );
+      return data.invoices;
+    },
+    staleTime: 60_000,
+  });
+}
+
 /** Public price list — the same rows checkout prices from. */
 export function useCatalogPricing() {
   return useQuery({

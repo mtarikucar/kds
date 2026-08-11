@@ -164,9 +164,6 @@ const BranchSelectPage = lazyWithReload(
 const RenewalPage = lazyWithReload(
   () => import("./features/licensing/RenewalPage"),
 );
-const CheckoutPage = lazyWithReload(
-  () => import("./pages/subscription/CheckoutPage"),
-);
 const PaymentResultPage = lazyWithReload(
   () => import("./pages/subscription/PaymentResultPage"),
 );
@@ -730,7 +727,6 @@ function App() {
               path="/subscription/plans"
               element={<Navigate to="/admin/license" replace />}
             />
-            <Route path="/subscription/checkout" element={<CheckoutPage />} />
             <Route
               path="/subscription/success"
               element={<PaymentResultPage outcome="success" />}

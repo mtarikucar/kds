@@ -1,7 +1,6 @@
 import { Global, Module, forwardRef } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
-import { PaytrSettlementModule } from "../payments/services/paytr-settlement.module";
 // v2.8.88: SubscriptionService.getEffectiveFeatures now routes through
 // the entitlement engine so add-on grants (TenantAddOn) reach the
 // frontend. Previously this read tenant.currentPlan + overrides only,
@@ -12,11 +11,8 @@ import { DemoGuardModule } from "../demo/demo-guard.module";
 // Services
 import { SubscriptionService } from "./services/subscription.service";
 import { BillingService } from "./services/billing.service";
-import { SubscriptionSchedulerService } from "./services/subscription-scheduler.service";
 import { NotificationService } from "./services/notification.service";
 import { InvoicePdfService } from "./services/invoice-pdf.service";
-import { UsageService } from "./services/usage.service";
-import { DowngradeUsageGuardService } from "./services/downgrade-usage-guard.service";
 
 // Controllers
 import { SubscriptionController } from "./controllers/subscription.controller";
@@ -38,11 +34,6 @@ import { InvoiceController } from "./controllers/invoice.controller";
     // PaymentsModule to avoid a Payments ↔ Subscriptions cycle.
     PaytrAdapterModule,
     // PaytrSettlementService is consumed by the inquiry-recovery
-    // sweeper here, and by the real-time webhook controller in
-    // PaymentsModule. forwardRef breaks the cycle: settlement needs
-    // Billing+Notification (exported from this module), this module
-    // needs settlement.
-    forwardRef(() => PaytrSettlementModule),
     // EntitlementsModule is a leaf — no inbound deps — so this import
     // is safe (no cycle).
     EntitlementsModule,
@@ -57,9 +48,6 @@ import { InvoiceController } from "./controllers/invoice.controller";
     BillingService,
     NotificationService,
     InvoicePdfService,
-    SubscriptionSchedulerService,
-    UsageService,
-    DowngradeUsageGuardService,
 
     // Guards
   ],
@@ -71,8 +59,6 @@ import { InvoiceController } from "./controllers/invoice.controller";
     NotificationService,
     // SuperAdmin manual-trigger endpoints (sweep-period-end,
     // send-expiry-reminders) call into the scheduler directly.
-    SubscriptionSchedulerService,
-    UsageService,
   ],
 })
 export class SubscriptionsModule {}

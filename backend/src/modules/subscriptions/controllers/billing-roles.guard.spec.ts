@@ -59,7 +59,6 @@ describe("Billing mutations are ADMIN-only (security)", () => {
     const mutationMethods = [
       "createSubscription", // @Post()
       "updateSubscription", // @Patch(":id")
-      "changePlan", // @Post(":id/change-plan")
       "cancelScheduledDowngrade", // @Delete(":id/scheduled-downgrade")
       "cancelSubscription", // @Post(":id/cancel")
       "reactivateSubscription", // @Post(":id/reactivate")
