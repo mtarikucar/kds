@@ -90,16 +90,23 @@ describe('usePurchaseAddOnViaCheckout', () => {
     const client = makeClient();
     const { result } = renderHook(() => usePurchaseAddOnViaCheckout(), { wrapper: wrap(client) });
 
-    result.current.mutate({ addOnCode: 'kds_extra_screen' });
+    result.current.mutate({
+      addOnCode: 'kds_extra_screen',
+      acceptedDocumentIds: ['doc-kvkk', 'doc-sales', 'doc-refund'],
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     // Posts a single `addon` cart line + the buyer, NOT the free grant endpoint.
+    // The three consent ids ride along: the server verifies they are the live
+    // versions and records them BEFORE minting a PayTR token, so a sale can
+    // never exist without evidence the terms were shown.
     expect(apiPost).toHaveBeenCalledWith(
       '/v1/checkout/intent',
       expect.objectContaining({
         cart: { items: [{ type: 'addon', code: 'kds_extra_screen', qty: 1, branchId: undefined }] },
         buyer: { email: 'a@b.com', name: 'Ada Lovelace', phone: '+905551112233' },
         returnUrl: expect.stringContaining('/admin/license'),
+        acceptedDocumentIds: ['doc-kvkk', 'doc-sales', 'doc-refund'],
       }),
     );
     // Hands off to PayTR's hosted page so payment is actually collected.
@@ -110,7 +117,10 @@ describe('usePurchaseAddOnViaCheckout', () => {
     apiPost.mockResolvedValue({ data: { paymentLink: 'https://paytr.test/x' } });
     const client = makeClient();
     const { result } = renderHook(() => usePurchaseAddOnViaCheckout(), { wrapper: wrap(client) });
-    result.current.mutate({ addOnCode: 'kds_extra_screen' });
+    result.current.mutate({
+      addOnCode: 'kds_extra_screen',
+      acceptedDocumentIds: ['doc-kvkk', 'doc-sales', 'doc-refund'],
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(apiPost).not.toHaveBeenCalledWith('/v1/marketplace/addons/purchase', expect.anything());
   });

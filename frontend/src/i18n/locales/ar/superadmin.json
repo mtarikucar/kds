@@ -19,9 +19,7 @@
     "dashboard": "Dashboard",
     "tenants": "Tenants",
     "users": "Users",
-    "plans": "Plans",
-    "marketplace": "Marketplace",
-    "subscriptions": "Subscriptions",
+    "marketplace": "الكتالوج",
     "auditLogs": "Audit Logs",
     "legal": "المستندات القانونية",
     "settings": "Settings",
@@ -126,8 +124,6 @@
     "confirmStatusChange": "Change status to {{status}}?",
     "confirmResetOverrides": "Reset all overrides to plan defaults?",
     "overview": "Overview",
-    "plan": "Plan",
-    "changePlanTitle": "Change Plan",
     "currency": "Currency",
     "created": "Created",
     "statistics": "Statistics",
@@ -139,12 +135,8 @@
     "products": "Products",
     "tables": "Tables",
     "customers": "Customers",
-    "activeSubscription": "Active Subscription",
     "status": "Status",
-    "billingCycle": "Billing Cycle",
-    "periodEnd": "Period End",
     "actions": "Actions",
-    "changePlan": "Change Plan",
     "suspend": "Suspend",
     "activate": "Activate",
     "delete": "Delete",
@@ -175,16 +167,6 @@
       "role": "Role",
       "status": "Status"
     },
-    "selectNewPlan": "Select a new plan for",
-    "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
-    "current": "Current",
-    "changePlanError": "Failed to change plan",
-    "newAmountInfo": "بعد التغيير سيصبح مبلغ الفوترة {{amount}} ({{cycle}}).",
-    "cycle": {
-      "MONTHLY": "Monthly",
-      "YEARLY": "Yearly"
-    },
-    "changing": "Changing...",
     "cancel": "Cancel",
     "featureLabels": {
       "advancedReports": "Advanced Reports",
@@ -231,52 +213,39 @@
       "reasonRequired": "السبب (إلزامي — يُسجَّل في سجل التدقيق ويُدرَج في البريد المرسَل إلى المسؤولين)",
       "reasonOptional": "السبب (اختياري — يُسجَّل في سجل التدقيق ويُدرَج في البريد المرسَل إلى المسؤولين)",
       "reasonPlaceholder": "مثال: عدم السداد، بلاغ عن إساءة استخدام…"
-    }
-  },
-  "subscriptions": {
-    "title": "Subscriptions",
-    "subtitle": "Manage tenant subscriptions",
-    "filters": {
-      "allStatus": "All Status",
-      "active": "Active",
-      "cancelled": "Cancelled",
-      "expired": "Expired",
-      "pastDue": "Past Due",
-      "trialing": "Trialing",
-      "allPlans": "All Plans"
     },
-    "col": {
-      "tenant": "Tenant",
-      "plan": "Plan",
-      "status": "Status",
-      "billing": "Billing",
-      "ends": "Ends"
+    "licence": "الترخيص",
+    "licenceActive": "نشط",
+    "licenceNone": "لا يوجد",
+    "owned": {
+      "title": "المنتجات المملوكة",
+      "empty": "لا توجد منتجات مدفوعة بعد — النواة مجانية وبلا حدود أصلًا.",
+      "darkWarning": "لا يوجد ترخيص: الصلاحيات المدفوعة معطَّلة",
+      "col": {
+        "product": "المنتج",
+        "origin": "المصدر",
+        "until": "ينتهي",
+        "status": "الحالة"
+      },
+      "comp": "منحة",
+      "purchased": "مُشترى",
+      "suppressed": "معطَّل",
+      "revoke": "سحب",
+      "confirmRevoke": "هل تريد سحب منحة {{name}}؟"
     },
-    "extend": "Extend",
-    "cancel": "Cancel",
-    "extendSuccess": "تم تمديد الاشتراك.",
-    "extendFailed": "فشل تمديد الاشتراك.",
-    "cancelSuccess": "تم إلغاء الاشتراك.",
-    "cancelFailed": "فشل إلغاء الاشتراك.",
-    "extendModal": {
-      "title": "تمديد الاشتراك",
-      "subtitle": "سيتم تأجيل تاريخ انتهاء فترة اشتراك {{tenant}}.",
-      "reinstateWarning": "هذا الاشتراك في الحالة {{status}}. سيؤدي التمديد إلى إعادته إلى الحالة «نشط» وفتح قفل المستأجر.",
-      "days": "عدد أيام التمديد",
-      "reason": "السبب (اختياري)",
-      "back": "Back",
-      "confirm": "Extend",
-      "extending": "Extending..."
-    },
-    "cancelModal": {
-      "title": "إلغاء الاشتراك",
-      "subtitle": "سيتم إلغاء اشتراك {{tenant}}.",
-      "atPeriodEnd": "في نهاية الفترة (الافتراضي) — يستمر الوصول حتى نهاية الفترة الحالية.",
-      "immediate": "فورًا — يُلغى الاشتراك الآن ويتوقف الوصول.",
-      "reason": "السبب (اختياري)",
-      "keep": "الإبقاء على الاشتراك",
-      "confirm": "تأكيد الإلغاء",
-      "cancelling": "Cancelling..."
+    "comp": {
+      "action": "منح منتج",
+      "title": "منح منتج",
+      "subtitle": "المنتج الذي سيُمنح مجانًا إلى",
+      "product": "المنتج",
+      "selectProduct": "اختر…",
+      "quantity": "الكمية",
+      "reason": "السبب",
+      "reasonPlaceholder": "عميل تجريبي — عقد الربع الثالث 2026",
+      "reasonHint": "يُحفظ في سجل الملكية؛ يجيب عن «من ولماذا» بعد أشهر.",
+      "noLicenceWarning": "لا يملك هذا الحساب ترخيصًا نشطًا. منح منتج يتطلب ترخيصًا يُنشئ الملكية، لكن صلاحياته تبقى معطَّلة حتى تفعيل الترخيص.",
+      "grant": "منح",
+      "granting": "جارٍ المنح…"
     }
   },
   "auditLogs": {
@@ -334,74 +303,6 @@
       "time": "Time"
     }
   },
-  "plans": {
-    "title": "Plans",
-    "subtitle": "Manage subscription plans",
-    "addPlan": "Add Plan",
-    "confirmDelete": "Delete this plan?",
-    "demoLockBadge": "Locked",
-    "demoLockTooltip": "اسم خطة DEMO هو مفتاح الحماية التي تحظر مسارات الدفع الحقيقية للمستأجر التجريبي؛ لا يمكن تعديل هذه الخطة أو حذفها.",
-    "defaultDiscountLabel": "INDIRIM",
-    "perMonth": "/mo",
-    "perYear": "/year",
-    "users": "Users",
-    "tables": "Tables",
-    "products": "Products",
-    "ordersPerMonth": "Orders/mo",
-    "activeSubscriptions": "{{count}} active subscriptions",
-    "featureTags": {
-      "reports": "Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "api": "API",
-      "priority": "Priority",
-      "inventory": "Inventory",
-      "kds": "KDS",
-      "reservations": "Reservations",
-      "personnel": "Personnel"
-    },
-    "modal": {
-      "editTitle": "Edit Plan",
-      "createTitle": "Create Plan",
-      "internalName": "Internal Name",
-      "displayName": "Display Name",
-      "monthlyPrice": "Monthly Price (₺)",
-      "yearlyPrice": "Yearly Price (₺)",
-      "maxUsers": "Max Users",
-      "maxTables": "Max Tables",
-      "maxBranches": "الحد الأقصى للفروع",
-      "maxProducts": "Max Products",
-      "categories": "Categories",
-      "ordersPerMonth": "Orders/mo",
-      "limitHint": "-1 = غير محدود",
-      "advancedReports": "Advanced Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "apiAccess": "API Access",
-      "prioritySupport": "Priority Support",
-      "inventoryTracking": "Inventory Tracking",
-      "kdsIntegration": "KDS Integration",
-      "reservations": "Reservations",
-      "personnelManagement": "Personnel Management",
-      "active": "Active",
-      "discountSettings": "Discount Settings",
-      "discountPercent": "Discount %",
-      "label": "Label",
-      "labelPlaceholder": "e.g. Ramazan Kampanyasi",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "cancel": "Cancel",
-      "update": "Update",
-      "create": "Create",
-      "deliveryIntegration": "تكامل التوصيل",
-      "externalDisplay": "شاشة خارجية (شاشة الشريك)",
-      "posAccess": "وصول نقطة البيع",
-      "aiPhotosPerMonth": "صور AI/شهر",
-      "aiVideosPerMonth": "فيديو AI/شهر",
-      "aiContentGeneration": "إنشاء المحتوى بالذكاء الاصطناعي",
-      "ai3dPerMonth": "نماذج 3D/شهر"
-    }
-  },
   "marketplace": {
     "title": "Marketplace Admin",
     "tabAddons": "Add-ons",
@@ -417,7 +318,8 @@
         "kind": "Kind",
         "billing": "Billing",
         "price": "Price",
-        "status": "Status"
+        "status": "Status",
+        "licence": "الترخيص"
       },
       "edit": "Edit",
       "publish": "Publish",
@@ -435,11 +337,25 @@
         "status": "Status",
         "deps": "Deps (comma-separated; plan:PRO or addon code)",
         "description": "Description",
-        "grants": "Grants (JSON)"
+        "grants": "Grants (JSON)",
+        "requiresLicense": "يتطلب ترخيصًا",
+        "creditKind": "نوع الرصيد",
+        "creditUnits": "عدد الوحدات",
+        "maxQuantity": "الحد الأقصى للكمية",
+        "sortOrder": "الترتيب"
       },
       "grantsInvalid": "grants must be valid JSON",
       "save": "Save",
-      "create": "Create"
+      "create": "Create",
+      "needsLicence": "مطلوب",
+      "perYear": "/سنة",
+      "creditIncomplete": "تحتاج حزمة الرصيد إلى النوع والعدد معًا.",
+      "publishedNeedsPrice": "يجب أن يكون سعر المنتج المنشور أكبر من صفر.",
+      "licenceSelfRequire": "لا يمكن أن يشترط منتج الترخيص نفسه.",
+      "planDepsGone": "اعتماديات `plan:` أُلغيت — استخدم رمز المنتج مباشرة.",
+      "i18nTitle": "النصوص المترجمة (٥ لغات)",
+      "requiresLicenseHint": "عند التفعيل: لا يمكن شراؤه بدون ترخيص، وتُعطَّل صلاحياته أثناء انقطاع الترخيص (دون حذف أي بيانات).",
+      "grantsHint": "المفاتيح: feature.*‎ و limit.*‎ و integration.*‎ و credit.*‎"
     },
     "products": {
       "catalogue": "Hardware catalogue",
@@ -486,7 +402,11 @@
       "createFailed": "فشل الإنشاء.",
       "updateFailed": "فشل التحديث.",
       "archiveFailed": "فشلت الأرشفة.",
-      "stockFailed": "فشل استلام المخزون."
+      "stockFailed": "فشل استلام المخزون.",
+      "comped": "تم منح المنتج.",
+      "compFailed": "تعذّر منح المنتج.",
+      "compRevoked": "تم سحب المنحة.",
+      "revokeFailed": "تعذّر السحب."
     }
   },
   "legal": {
@@ -529,16 +449,6 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
-    }
-  },
-  "bankTransfer": {
-    "toasts": {
-      "settingsSaved": "تم حفظ إعدادات التحويل البنكي.",
-      "settingsSaveFailed": "فشل الحفظ.",
-      "confirmed": "تم تأكيد التحويل وتفعيل الاشتراك.",
-      "confirmFailed": "فشل التأكيد.",
-      "rejected": "تم رفض التحويل.",
-      "rejectFailed": "فشل الرفض."
     }
   }
 }

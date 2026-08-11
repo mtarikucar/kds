@@ -8,7 +8,7 @@ import BusinessValue from '@/components/sections/BusinessValue';
 import TrustSecurity from '@/components/sections/TrustSecurity';
 import Pricing from '@/components/sections/Pricing';
 import FinalCTA from '@/components/sections/FinalCTA';
-import { getPlans } from '@/lib/api';
+import { getCatalog } from '@/lib/api';
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -17,7 +17,7 @@ type Props = {
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const plans = await getPlans();
+  const products = await getCatalog(locale);
 
   return (
     <>
@@ -28,7 +28,7 @@ export default async function HomePage({ params }: Props) {
         <FeatureScroller />
         <BusinessValue />
         <TrustSecurity />
-        <Pricing apiPlans={plans} />
+        <Pricing products={products} />
         <FinalCTA />
       </main>
       <Footer />

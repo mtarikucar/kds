@@ -8,6 +8,7 @@ import {
   useCatalogPricing,
 } from './licensingApi';
 import { usePurchaseAddOnViaCheckout } from '../marketplace/marketplaceApi';
+import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
 import Button from '../../components/ui/Button';
 
 /** Display order of the catalog sections. */
@@ -37,6 +38,9 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   const { offerFor, owned, license, snapshot } = useEntitlements();
   const purchase = usePurchaseAddOnViaCheckout();
   const [busy, setBusy] = useState<string | null>(null);
+  // Distance-selling consent, collected before the buyer can reach PayTR.
+  const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
+  const consentGiven = useConsentComplete(acceptedDocs);
 
   const ownedCodes = useMemo(
     () => new Set(owned.filter((o) => o.status === 'active').map((o) => o.code)),
@@ -85,7 +89,7 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
               { type: 'addon' as const, code: product.code, qty: 1 },
             ]
           : [{ type: 'addon' as const, code: product.code, qty: 1 }];
-      await purchase.mutateAsync({ items });
+      await purchase.mutateAsync({ items, acceptedDocumentIds: acceptedDocs });
     } finally {
       setBusy(null);
     }
@@ -93,6 +97,16 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
 
   return (
     <div className="space-y-8">
+      {/* Consent sits above the catalog, not inside a per-card modal: the
+          buyer must have accepted before ANY Buy button does anything, and
+          one visible block beats three identical dialogs. */}
+      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+        <h2 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {t('licensing:consent.title')}
+        </h2>
+        <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
+      </section>
+
       {KIND_ORDER.filter((k) => grouped.has(k)).map((kind) => (
         <section key={kind}>
           <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -167,7 +181,8 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                     ) : (
                       <Button
                         onClick={() => buy(product)}
-                        disabled={busy === product.code}
+                        disabled={busy === product.code || !consentGiven}
+                        title={consentGiven ? undefined : t('licensing:consent.required')}
                         className="w-full"
                       >
                         <ShoppingCart size={16} className="mr-1" />

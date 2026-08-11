@@ -244,24 +244,9 @@ export class AuthService {
 
       const finalSubdomain = await this.allocateSubdomain(baseSubdomain);
 
-      // Every new tenant starts on the dedicated 7-day onboarding TRIAL plan —
-      // full premium, zero charge. At trialEnd SchedulerService.expireTrials
-      // flips the subscription to TRIAL_ENDED (locked) and the tenant must
-      // activate a paid plan to continue (no FREE landing). Using a dedicated
-      // TRIAL plan decouples signup from any paid tier.
-      const trialPlan = await this.provisioning.loadTrialPlanOrThrow();
-
-      // Tenant + TRIALING TRIAL subscription must be created atomically so
-      // other modules never observe a tenant without a matching subscription.
-      const now = new Date();
-      const trialEnd = addDays(now, trialPlan.trialDays);
-
-      // Seed `featureOverrides` with the plan's flag set so PlanFeatureGuard's
-      // fallback path resolves correctly during the first ~30 seconds while the
-      // entitlement engine projector is still warming up.
-      const planFeatureOverrides =
-        this.provisioning.buildPlanFeatureOverrides();
-
+      // v3.3.0 — a new tenant starts on the free core. No plan lookup, no
+      // trial, no subscription row: entitlement comes from the free baseline
+      // the projector grants every tenant, plus whatever they later buy.
       try {
         const txResult = await this.prisma.$transaction(async (tx) =>
           // Tenant + subscription + branch + ADMIN user are all written
@@ -271,10 +256,6 @@ export class AuthService {
           this.provisioning.provisionNewTenantWithAdmin(tx, {
             restaurantName: registerDto.restaurantName,
             finalSubdomain,
-            trialPlan,
-            planFeatureOverrides,
-            now,
-            trialEnd,
             userParams: {
               email: registerDto.email,
               hashedPassword,

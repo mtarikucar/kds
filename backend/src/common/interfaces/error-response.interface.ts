@@ -38,6 +38,22 @@ export interface ErrorResponse {
   path: string;
 
   /**
+   * Structured, actionable payload the client branches on. Present only when
+   * the thrown exception attaches it.
+   *
+   * Today this carries the entitlement denial detail — what was required, the
+   * cheapest product that satisfies it (priced for this tenant, today), and
+   * whether the blocker is a missing licence or a lapsed one. The filter
+   * rebuilds every error body from scratch, so anything not listed on this
+   * interface is dropped; before this field existed the resolver did a catalog
+   * read and a proration on EVERY 403 and the result never left the process.
+   *
+   * Carries no PII and is surfaced in every environment — the UI's
+   * buy-this-to-continue flow depends on it in production.
+   */
+  actionable?: Record<string, unknown>;
+
+  /**
    * Error details (only in development mode)
    */
   details?: any;

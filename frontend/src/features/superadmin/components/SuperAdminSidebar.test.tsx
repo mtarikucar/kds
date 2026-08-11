@@ -38,9 +38,7 @@ describe('SuperAdminSidebar', () => {
       '/superadmin/dashboard',
       '/superadmin/tenants',
       '/superadmin/users',
-      '/superadmin/plans',
       '/superadmin/marketplace',
-      '/superadmin/subscriptions',
       '/superadmin/audit-logs',
       '/superadmin/legal',
       '/superadmin/settings',
@@ -49,6 +47,19 @@ describe('SuperAdminSidebar', () => {
       .getAllByRole('link')
       .map((a) => a.getAttribute('href'));
     expected.forEach((href) => expect(hrefs).toContain(href));
+  });
+
+  it('no longer links to the retired subscription rail', () => {
+    // Plans / Subscriptions / Havale were three entries onto one rail that
+    // nothing writes to since v3.3.0. Leaving them would send an operator to
+    // a page whose every action is a no-op.
+    renderSidebar();
+    const hrefs = screen
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href'));
+    expect(hrefs).not.toContain('/superadmin/plans');
+    expect(hrefs).not.toContain('/superadmin/subscriptions');
+    expect(hrefs).not.toContain('/superadmin/bank-transfer');
   });
 
   it('shows the operator initials and email', () => {

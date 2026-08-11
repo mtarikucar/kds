@@ -86,5 +86,12 @@
     "title": "Hisob-fakturalar",
     "empty": "Hali hisob-faktura yo'q.",
     "lineCount": "{{count}} ta qator"
+  },
+  "consent": {
+    "title": "Sotib olishdan oldin tasdiqlang",
+    "suffix": "— ushbu hujjatni o‘qidim va qabul qilaman.",
+    "loading": "Huquqiy hujjatlar yuklanmoqda…",
+    "unavailable": "Huquqiy hujjatlarni yuklab bo‘lmadi. Ular qabul qilinmaguncha to‘lov boshlanmaydi.",
+    "required": "Davom etish uchun uchala hujjatni ham qabul qiling."
   }
 }

@@ -19,9 +19,7 @@
     "dashboard": "Dashboard",
     "tenants": "Tenants",
     "users": "Users",
-    "plans": "Plans",
-    "marketplace": "Marketplace",
-    "subscriptions": "Subscriptions",
+    "marketplace": "Catalog",
     "auditLogs": "Audit Logs",
     "legal": "Legal Documents",
     "settings": "Settings",
@@ -126,8 +124,6 @@
     "confirmStatusChange": "Change status to {{status}}?",
     "confirmResetOverrides": "Reset all overrides to plan defaults?",
     "overview": "Overview",
-    "plan": "Plan",
-    "changePlanTitle": "Change Plan",
     "currency": "Currency",
     "created": "Created",
     "statistics": "Statistics",
@@ -139,12 +135,8 @@
     "products": "Products",
     "tables": "Tables",
     "customers": "Customers",
-    "activeSubscription": "Active Subscription",
     "status": "Status",
-    "billingCycle": "Billing Cycle",
-    "periodEnd": "Period End",
     "actions": "Actions",
-    "changePlan": "Change Plan",
     "suspend": "Suspend",
     "activate": "Activate",
     "delete": "Delete",
@@ -175,16 +167,6 @@
       "role": "Role",
       "status": "Status"
     },
-    "selectNewPlan": "Select a new plan for",
-    "usersTablesProducts": "{{users}} users · {{tables}} tables · {{products}} products",
-    "current": "Current",
-    "changePlanError": "Failed to change plan",
-    "newAmountInfo": "After the change the billing amount will be {{amount}} ({{cycle}}).",
-    "cycle": {
-      "MONTHLY": "Monthly",
-      "YEARLY": "Yearly"
-    },
-    "changing": "Changing...",
     "cancel": "Cancel",
     "featureLabels": {
       "advancedReports": "Advanced Reports",
@@ -231,52 +213,39 @@
       "reasonRequired": "Reason (required — recorded in the audit log and included in the admin email)",
       "reasonOptional": "Reason (optional — recorded in the audit log and included in the admin email)",
       "reasonPlaceholder": "E.g. non-payment, abuse report…"
-    }
-  },
-  "subscriptions": {
-    "title": "Subscriptions",
-    "subtitle": "Manage tenant subscriptions",
-    "filters": {
-      "allStatus": "All Status",
-      "active": "Active",
-      "cancelled": "Cancelled",
-      "expired": "Expired",
-      "pastDue": "Past Due",
-      "trialing": "Trialing",
-      "allPlans": "All Plans"
     },
-    "col": {
-      "tenant": "Tenant",
-      "plan": "Plan",
-      "status": "Status",
-      "billing": "Billing",
-      "ends": "Ends"
+    "licence": "Licence",
+    "licenceActive": "Active",
+    "licenceNone": "None",
+    "owned": {
+      "title": "Owned products",
+      "empty": "Nothing paid yet — the core is free and unlimited already.",
+      "darkWarning": "No licence: paid grants are suppressed",
+      "col": {
+        "product": "Product",
+        "origin": "Origin",
+        "until": "Ends",
+        "status": "Status"
+      },
+      "comp": "comp",
+      "purchased": "purchased",
+      "suppressed": "suppressed",
+      "revoke": "Revoke",
+      "confirmRevoke": "Revoke the {{name}} comp?"
     },
-    "extend": "Extend",
-    "cancel": "Cancel",
-    "extendSuccess": "Subscription extended.",
-    "extendFailed": "Failed to extend the subscription.",
-    "cancelSuccess": "Subscription cancelled.",
-    "cancelFailed": "Failed to cancel the subscription.",
-    "extendModal": {
-      "title": "Extend Subscription",
-      "subtitle": "The period end of {{tenant}}'s subscription will be pushed forward.",
-      "reinstateWarning": "This subscription is {{status}}. Extending will REINSTATE it to ACTIVE and unlock the tenant.",
-      "days": "Days to extend",
-      "reason": "Reason (optional)",
-      "back": "Back",
-      "confirm": "Extend",
-      "extending": "Extending..."
-    },
-    "cancelModal": {
-      "title": "Cancel Subscription",
-      "subtitle": "{{tenant}}'s subscription will be cancelled.",
-      "atPeriodEnd": "At period end (default) — access continues until the current period ends.",
-      "immediate": "Immediately — the subscription is CANCELLED right now and access stops.",
-      "reason": "Reason (optional)",
-      "keep": "Keep subscription",
-      "confirm": "Confirm Cancellation",
-      "cancelling": "Cancelling..."
+    "comp": {
+      "action": "Grant a product",
+      "title": "Grant a product",
+      "subtitle": "Product to hand over free to",
+      "product": "Product",
+      "selectProduct": "Select…",
+      "quantity": "Quantity",
+      "reason": "Reason",
+      "reasonPlaceholder": "Pilot customer — 2026 Q3 agreement",
+      "reasonHint": "Stored on the ownership row; answers 'who and why' months later.",
+      "noLicenceWarning": "This account has no active licence. Comping a licence-gated product still creates the ownership row, but its grants stay suppressed until a licence is active.",
+      "grant": "Grant",
+      "granting": "Granting…"
     }
   },
   "auditLogs": {
@@ -334,74 +303,6 @@
       "time": "Time"
     }
   },
-  "plans": {
-    "title": "Plans",
-    "subtitle": "Manage subscription plans",
-    "addPlan": "Add Plan",
-    "confirmDelete": "Delete this plan?",
-    "demoLockBadge": "Locked",
-    "demoLockTooltip": "The DEMO plan's name keys the guard that blocks the demo tenant's real money paths; this plan cannot be edited or deleted.",
-    "defaultDiscountLabel": "INDIRIM",
-    "perMonth": "/mo",
-    "perYear": "/year",
-    "users": "Users",
-    "tables": "Tables",
-    "products": "Products",
-    "ordersPerMonth": "Orders/mo",
-    "activeSubscriptions": "{{count}} active subscriptions",
-    "featureTags": {
-      "reports": "Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "api": "API",
-      "priority": "Priority",
-      "inventory": "Inventory",
-      "kds": "KDS",
-      "reservations": "Reservations",
-      "personnel": "Personnel"
-    },
-    "modal": {
-      "editTitle": "Edit Plan",
-      "createTitle": "Create Plan",
-      "internalName": "Internal Name",
-      "displayName": "Display Name",
-      "monthlyPrice": "Monthly Price (₺)",
-      "yearlyPrice": "Yearly Price (₺)",
-      "maxUsers": "Max Users",
-      "maxTables": "Max Tables",
-      "maxBranches": "Max Branches",
-      "maxProducts": "Max Products",
-      "categories": "Categories",
-      "ordersPerMonth": "Orders/mo",
-      "limitHint": "-1 = unlimited",
-      "advancedReports": "Advanced Reports",
-      "multiLocation": "Multi-Location",
-      "customBranding": "Custom Branding",
-      "apiAccess": "API Access",
-      "prioritySupport": "Priority Support",
-      "inventoryTracking": "Inventory Tracking",
-      "kdsIntegration": "KDS Integration",
-      "reservations": "Reservations",
-      "personnelManagement": "Personnel Management",
-      "active": "Active",
-      "discountSettings": "Discount Settings",
-      "discountPercent": "Discount %",
-      "label": "Label",
-      "labelPlaceholder": "e.g. Ramazan Kampanyasi",
-      "startDate": "Start Date",
-      "endDate": "End Date",
-      "cancel": "Cancel",
-      "update": "Update",
-      "create": "Create",
-      "deliveryIntegration": "Delivery Integration",
-      "externalDisplay": "External Display (Partner Display)",
-      "posAccess": "POS Access",
-      "aiPhotosPerMonth": "AI photos/mo",
-      "aiVideosPerMonth": "AI videos/mo",
-      "aiContentGeneration": "AI Content Generation",
-      "ai3dPerMonth": "AI 3D/mo"
-    }
-  },
   "marketplace": {
     "title": "Marketplace Admin",
     "tabAddons": "Add-ons",
@@ -417,7 +318,8 @@
         "kind": "Kind",
         "billing": "Billing",
         "price": "Price",
-        "status": "Status"
+        "status": "Status",
+        "licence": "Licence"
       },
       "edit": "Edit",
       "publish": "Publish",
@@ -435,11 +337,25 @@
         "status": "Status",
         "deps": "Deps (comma-separated; plan:PRO or addon code)",
         "description": "Description",
-        "grants": "Grants (JSON)"
+        "grants": "Grants (JSON)",
+        "requiresLicense": "Requires a licence",
+        "creditKind": "Credit kind",
+        "creditUnits": "Credit units",
+        "maxQuantity": "Max quantity",
+        "sortOrder": "Sort order"
       },
       "grantsInvalid": "grants must be valid JSON",
       "save": "Save",
-      "create": "Create"
+      "create": "Create",
+      "needsLicence": "required",
+      "perYear": "/year",
+      "creditIncomplete": "A credit pack needs both a kind and a unit count.",
+      "publishedNeedsPrice": "A published product must cost more than zero.",
+      "licenceSelfRequire": "The licence product cannot require itself.",
+      "planDepsGone": "`plan:` dependencies are gone — use a bare product code.",
+      "i18nTitle": "Localized copy (5 locales)",
+      "requiresLicenseHint": "If set: unbuyable without a licence, and its grants are suppressed while the licence is dark (no data is deleted).",
+      "grantsHint": "Keys: feature.*, limit.*, integration.*, credit.*"
     },
     "products": {
       "catalogue": "Hardware catalogue",
@@ -486,7 +402,11 @@
       "createFailed": "Create failed.",
       "updateFailed": "Update failed.",
       "archiveFailed": "Archive failed.",
-      "stockFailed": "Stock receive failed."
+      "stockFailed": "Stock receive failed.",
+      "comped": "Product granted.",
+      "compFailed": "Could not grant the product.",
+      "compRevoked": "Comp revoked.",
+      "revokeFailed": "Could not revoke the comp."
     }
   },
   "legal": {
@@ -529,16 +449,6 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
-    }
-  },
-  "bankTransfer": {
-    "toasts": {
-      "settingsSaved": "Bank-transfer settings saved.",
-      "settingsSaveFailed": "Saving failed.",
-      "confirmed": "Transfer confirmed, subscription activated.",
-      "confirmFailed": "Confirmation failed.",
-      "rejected": "Transfer rejected.",
-      "rejectFailed": "Rejection failed."
     }
   }
 }

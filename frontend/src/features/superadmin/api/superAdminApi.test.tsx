@@ -53,11 +53,6 @@ import {
   useTenant,
   useUpdateTenantStatus,
   useUpdateTenantOverrides,
-  usePlans,
-  useCreatePlan,
-  useChangeSubscriptionPlan,
-  useExtendSubscription,
-  useCancelSubscription,
   useAuditLogs,
 } from './superAdminApi';
 
@@ -156,14 +151,6 @@ describe('superadmin queries', () => {
     expect(result.current.fetchStatus).toBe('idle');
   });
 
-  it('usePlans GETs the plans endpoint', async () => {
-    h.instance.get.mockResolvedValue({ data: [] });
-    renderHook(() => usePlans(), { wrapper });
-    await waitFor(() =>
-      expect(h.instance.get).toHaveBeenCalledWith('/superadmin/plans'),
-    );
-  });
-
   it('useAuditLogs forwards filters', async () => {
     h.instance.get.mockResolvedValue({ data: { items: [] } });
     renderHook(() => useAuditLogs({ action: 'login' } as never), { wrapper });
@@ -216,53 +203,4 @@ describe('superadmin mutations', () => {
     });
   });
 
-  it('F8: useExtendSubscription POSTs days + reason', async () => {
-    h.instance.post.mockResolvedValue({ data: {} });
-    const { result } = renderHook(() => useExtendSubscription(), { wrapper });
-    await result.current.mutateAsync({ id: 's1', days: 14, reason: 'goodwill' });
-    expect(h.instance.post).toHaveBeenCalledWith(
-      '/superadmin/subscriptions/s1/extend',
-      { days: 14, reason: 'goodwill' },
-    );
-  });
-
-  it('F8: useCancelSubscription POSTs the DTO mode alongside the reason', async () => {
-    h.instance.post.mockResolvedValue({ data: {} });
-    const { result } = renderHook(() => useCancelSubscription(), { wrapper });
-    await result.current.mutateAsync({ id: 's1', mode: 'IMMEDIATE', reason: 'fraud' });
-    expect(h.instance.post).toHaveBeenCalledWith(
-      '/superadmin/subscriptions/s1/cancel',
-      { mode: 'IMMEDIATE', reason: 'fraud' },
-    );
-  });
-
-  it('useCreatePlan POSTs and invalidates the plans cache', async () => {
-    h.instance.post.mockResolvedValue({ data: {} });
-    const invalidate = vi.spyOn(client, 'invalidateQueries');
-    const { result } = renderHook(() => useCreatePlan(), { wrapper });
-    await result.current.mutateAsync({ name: 'Pro' } as never);
-    expect(h.instance.post).toHaveBeenCalledWith('/superadmin/plans', {
-      name: 'Pro',
-    });
-    expect(invalidate).toHaveBeenCalledWith({
-      queryKey: ['superadmin', 'plans'],
-    });
-  });
-
-  it('useChangeSubscriptionPlan PATCHes and fans out invalidations', async () => {
-    h.instance.patch.mockResolvedValue({ data: {} });
-    const invalidate = vi.spyOn(client, 'invalidateQueries');
-    const { result } = renderHook(() => useChangeSubscriptionPlan(), {
-      wrapper,
-    });
-    await result.current.mutateAsync({ subscriptionId: 's1', planId: 'p2' });
-    expect(h.instance.patch).toHaveBeenCalledWith(
-      '/superadmin/subscriptions/s1',
-      { planId: 'p2' },
-    );
-    const keys = invalidate.mock.calls.map((c) => (c[0] as any).queryKey);
-    expect(keys).toContainEqual(['superadmin', 'subscriptions']);
-    expect(keys).toContainEqual(['superadmin', 'tenants']);
-    expect(keys).toContainEqual(['subscriptions']);
-  });
 });

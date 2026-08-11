@@ -15,103 +15,6 @@ export function getStats(): FormattedStats {
   };
 }
 
-export interface PlanFromAPI {
-  id: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  monthlyPrice: number;
-  yearlyPrice: number;
-  currency: string;
-  maxUsers: number;
-  maxTables: number;
-  maxProducts: number;
-  maxCategories: number;
-  maxMonthlyOrders: number;
-  advancedReports: boolean;
-  multiLocation: boolean;
-  customBranding: boolean;
-  apiAccess: boolean;
-  prioritySupport: boolean;
-  inventoryTracking: boolean;
-  kdsIntegration: boolean;
-  isActive: boolean;
-  discountPercentage?: number;
-  discountLabel?: string;
-  discountStartDate?: string;
-  discountEndDate?: string;
-  isDiscountActive?: boolean;
-}
-
-interface RawPlanFromAPI {
-  id: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  monthlyPrice: string | number;
-  yearlyPrice: string | number;
-  currency: string;
-  trialDays: number;
-  limits: {
-    maxUsers: number;
-    maxTables: number;
-    maxProducts: number;
-    maxCategories: number;
-    maxMonthlyOrders: number;
-  };
-  features: {
-    advancedReports: boolean;
-    multiLocation: boolean;
-    customBranding: boolean;
-    apiAccess: boolean;
-    prioritySupport: boolean;
-    inventoryTracking: boolean;
-    kdsIntegration: boolean;
-    reservationSystem?: boolean;
-    personnelManagement?: boolean;
-    deliveryIntegration?: boolean;
-  };
-  discount?: {
-    percentage: number;
-    label?: string;
-    startDate?: string;
-    endDate?: string;
-  } | null;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-function flattenPlan(raw: RawPlanFromAPI): PlanFromAPI {
-  return {
-    id: raw.id,
-    name: raw.name,
-    displayName: raw.displayName,
-    description: raw.description,
-    monthlyPrice: Number(raw.monthlyPrice),
-    yearlyPrice: Number(raw.yearlyPrice),
-    currency: raw.currency,
-    maxUsers: raw.limits?.maxUsers ?? 0,
-    maxTables: raw.limits?.maxTables ?? 0,
-    maxProducts: raw.limits?.maxProducts ?? 0,
-    maxCategories: raw.limits?.maxCategories ?? 0,
-    maxMonthlyOrders: raw.limits?.maxMonthlyOrders ?? 0,
-    advancedReports: raw.features?.advancedReports ?? false,
-    multiLocation: raw.features?.multiLocation ?? false,
-    customBranding: raw.features?.customBranding ?? false,
-    apiAccess: raw.features?.apiAccess ?? false,
-    prioritySupport: raw.features?.prioritySupport ?? false,
-    inventoryTracking: raw.features?.inventoryTracking ?? false,
-    kdsIntegration: raw.features?.kdsIntegration ?? true,
-    isActive: raw.isActive,
-    discountPercentage: raw.discount?.percentage,
-    discountLabel: raw.discount?.label,
-    discountStartDate: raw.discount?.startDate,
-    discountEndDate: raw.discount?.endDate,
-    isDiscountActive: raw.discount != null && raw.discount.percentage > 0,
-  };
-}
-
 // Fail loud if API URL is missing. The previous silent fallback to a
 // hard-coded prod host (`api.hummytummy.com.tr`) was the same anti-pattern
 // the frontend removed in commit 5154c2e — a staging/preview build with no
@@ -123,28 +26,48 @@ const API_BASE = (() => {
   if (fromEnv) return fromEnv;
   if (process.env.NODE_ENV === 'production') {
     console.error(
-      '[landing] NEXT_PUBLIC_API_URL is not set in production — refusing to use a hard-coded fallback. /api/plans calls will fail.',
+      '[landing] NEXT_PUBLIC_API_URL is not set in production — refusing to use a hard-coded fallback. The catalog fetch will return empty and the pricing section renders the free core only.',
     );
     return '';
   }
   return 'http://localhost:3000';
 })();
 
-export async function getPlans(): Promise<PlanFromAPI[]> {
-  // If API_BASE is empty (prod build without NEXT_PUBLIC_API_URL — already
-  // logged by the resolver above), short-circuit instead of hanging on a
-  // relative-URL fetch. Static page generation falls back to the empty
-  // plans state, which renders the contact CTA — far better than blocking
-  // the build for 60s × 3 retries.
+/**
+ * The published à-la-carte catalog — the same rows checkout prices from.
+ *
+ * Replaces `getPlans()`. Plans were retired in v3.3.0: that endpoint now
+ * returns an empty array forever, and the pricing section it fed was falling
+ * back to hardcoded tier prices that no longer exist.
+ */
+export interface CatalogProduct {
+  code: string;
+  name: string;
+  description: string | null;
+  kind: 'license' | 'module' | 'integration' | 'capacity' | 'credit' | 'service';
+  billing: 'annual' | 'oneTime';
+  priceCents: number;
+  currency: string;
+  creditKind: string | null;
+  creditUnits: number | null;
+  requiresLicense: boolean;
+  sortOrder: number;
+}
+
+export async function getCatalog(locale = 'tr'): Promise<CatalogProduct[]> {
+  // Static generation with no API base configured renders the free core and a
+  // contact CTA. A missing price is recoverable; a stale one is not.
   if (!API_BASE) return [];
   try {
-    const res = await fetch(`${API_BASE}/api/subscriptions/plans`, {
-      next: { revalidate: 300 },
-    });
+    const res = await fetch(
+      `${API_BASE}/api/v1/catalog/pricing?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 300 } },
+    );
     if (!res.ok) return [];
-    const raw: RawPlanFromAPI[] = await res.json();
-    return raw.map(flattenPlan);
+    const body: { products: CatalogProduct[] } = await res.json();
+    return (body.products ?? []).filter((p) => p.kind !== 'service');
   } catch {
     return [];
   }
 }
+

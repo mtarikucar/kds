@@ -14,6 +14,7 @@ import { CheckoutBuyerDto } from "./dto/create-intent.dto";
 import { AddonPurchasabilityService } from "./addon-purchasability.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { DemoGuardService } from "../demo/demo-guard.service";
+import { ConsentService } from "../legal/services/consent.service";
 import {
   REFERRAL_DIRECTORY_PORT,
   ReferralDirectoryPort,
@@ -82,6 +83,11 @@ export class CheckoutIntentService {
     // call site below stay only as belt-and-suspenders (and to keep any
     // bare-`new`-constructed spec compiling).
     private readonly demoGuard?: DemoGuardService,
+    // Legal consent for distance selling. Optional in the type only so
+    // hand-constructed specs keep compiling; CheckoutModule imports
+    // LegalModule, and the call site below runs for every authenticated
+    // buyer.
+    private readonly consent?: ConsentService,
   ) {}
 
   async createIntent(args: {
@@ -91,13 +97,43 @@ export class CheckoutIntentService {
     buyerIp: string;
     returnUrl?: string;
     referralCode?: string;
+    userId?: string;
+    userAgent?: string;
+    acceptedDocumentIds?: string[];
   }): Promise<CreateIntentResult> {
-    const { tenantId, cart, buyer, buyerIp, returnUrl, referralCode } = args;
+    const {
+      tenantId,
+      cart,
+      buyer,
+      buyerIp,
+      returnUrl,
+      referralCode,
+      userId,
+      userAgent,
+      acceptedDocumentIds,
+    } = args;
 
     // Demo-tenant real-money block — the shared "explore demo" tenant must
     // never reach PayTR via marketplace/hardware checkout. First statement,
     // before pricing/guard/stock checks or any PayTR call.
     await this.demoGuard?.assertNotDemo(tenantId);
+
+    // Distance-selling consent, recorded BEFORE any PayTR token is minted.
+    //
+    // The retired /payments/create-intent required KVKK + Mesafeli Satış +
+    // İade on every paid checkout and wrote three audit rows carrying the
+    // document version, the IP and the user-agent. When purchasing moved to
+    // this rail the requirement did not come with it, so à-la-carte sales
+    // were taking money with no record that the buyer had ever been shown
+    // the terms — the same obligation, minus the evidence. Same service,
+    // same three documents, same point in the flow.
+    if (userId) {
+      await this.consent.verifyAndRecord(acceptedDocumentIds ?? [], {
+        userId,
+        ipAddress: buyerIp,
+        userAgent,
+      });
+    }
 
     // Tahsilat-önü guard (DEF-1/2/4/8): every `addon` cart line must clear
     // included-in-plan / already-owned / deps-tier / redundant-limit BEFORE

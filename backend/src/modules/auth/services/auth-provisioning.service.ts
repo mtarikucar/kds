@@ -82,29 +82,6 @@ export class AuthProvisioningService {
   }
 
   /**
-   * Load the dedicated onboarding TRIAL plan and assert it is seeded with a
-   * positive trial length. Every new tenant starts on this plan (full-premium
-   * 7-day trial) instead of the old "trial on the BUSINESS plan" coupling —
-   * which made signup depend on BUSINESS.trialDays and caused silent
-   * trial→FREE transitions. Throws (refusing to register) if the seed/migration
-   * for the TRIAL plan is missing or misconfigured.
-   */
-  async loadTrialPlanOrThrow() {
-    const trialPlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: "TRIAL" },
-    });
-    if (!trialPlan) {
-      throw new ResourceNotFoundException("TRIAL subscription plan");
-    }
-    if (trialPlan.trialDays <= 0) {
-      throw new ResourceNotFoundException(
-        "TRIAL plan has no trialDays configured — re-seed/migrate plans",
-      );
-    }
-    return trialPlan;
-  }
-
-  /**
    * Seed `featureOverrides` with the plan's TRUE features so PlanFeatureGuard's
    * fallback path resolves correctly during the first ~30 seconds while the
    * entitlement engine projector is still warming up.
@@ -212,62 +189,37 @@ export class AuthProvisioningService {
    * caller's rollback boundary. The caller owns the $transaction and the
    * P2002 mapping so a user.create failure rolls back the tenant.
    */
+  /**
+   * Create a tenant with its ADMIN and a Main branch.
+   *
+   * v3.3.0 — no plan, no subscription row, no trial.
+   *
+   * Signup used to require a seeded `TRIAL` SubscriptionPlan and would refuse
+   * to register without one, then stamp `currentPlanId`, a TRIALING
+   * subscription and a trial countdown onto every new tenant. None of that
+   * governs access any more: entitlement comes from the free baseline plus
+   * what the tenant owns, and nothing reads `trialEndsAt`. What remained was a
+   * hard dependency on a retired table — deleting one leftover plan row would
+   * have taken registration down with it — plus a `featureOverrides` seed that
+   * had already had to be emptied once because it granted the paid catalogue
+   * to everyone.
+   *
+   * A new tenant now gets exactly what the product promises: the free core.
+   */
   async provisionNewTenantWithAdmin(
     tx: Prisma.TransactionClient,
     args: {
       restaurantName: string;
       finalSubdomain: string;
-      trialPlan: any;
-      planFeatureOverrides: Record<string, boolean>;
-      now: Date;
-      trialEnd: Date;
       userParams: CreateUserParams;
     },
   ) {
-    const {
-      restaurantName,
-      finalSubdomain,
-      trialPlan,
-      planFeatureOverrides,
-      now,
-      trialEnd,
-      userParams,
-    } = args;
+    const { restaurantName, finalSubdomain, userParams } = args;
 
     const created = await tx.tenant.create({
       data: {
         name: restaurantName,
         subdomain: finalSubdomain,
-        currentPlanId: trialPlan.id,
-        // Onboarding trial bookkeeping (the single trial; per-plan
-        // usedTrialPlanIds is retired). trialEndsAt drives the lock countdown.
-        trialUsed: true,
-        trialStartedAt: now,
-        trialEndsAt: trialEnd,
-        featureOverrides: planFeatureOverrides,
-      },
-    });
-    await tx.subscription.create({
-      data: {
-        tenantId: created.id,
-        planId: trialPlan.id,
-        status: "TRIALING",
-        billingCycle: "MONTHLY",
-        // PayTR is the only configured provider; this row is the
-        // trial — no charge moves until the post-trial checkout.
-        paymentProvider: PaymentProvider.PAYTR,
-        startDate: now,
-        currentPeriodStart: now,
-        // During trial, currentPeriodEnd == trialEnd. At expiry expireTrials
-        // flips the status to TRIAL_ENDED (locked) — the plan does NOT change
-        // (no FREE landing); the tenant must activate a paid plan to continue.
-        currentPeriodEnd: trialEnd,
-        isTrialPeriod: true,
-        trialStart: now,
-        trialEnd,
-        amount: trialPlan.monthlyPrice,
-        currency: trialPlan.currency,
-        cancelAtPeriodEnd: false,
       },
     });
     // v3.0.0 — every new tenant ships with a Main branch.
@@ -334,49 +286,16 @@ export class AuthProvisioningService {
     const subdomain = await this.allocateSubdomain(baseSubdomain);
 
     // Social signups get the SAME provisioning as email registration: the
-    // 7-day onboarding TRIAL plan + an auto-created Main branch + seeded
-    // featureOverrides. Keep this in lockstep with register()'s ADMIN scenario.
-    const trialPlan = await this.loadTrialPlanOrThrow();
-
-    const now = new Date();
-    const trialEnd = addDays(now, trialPlan.trialDays);
-
-    // v3.3.0 — empty by design. See buildPlanFeatureOverrides().
-    const planFeatureOverrides = this.buildPlanFeatureOverrides();
-
-    // Tenant + subscription + Main branch + user in one transaction so a
-    // failure midway does not leave orphaned rows.
+    // free core plus an auto-created Main branch. Keep this in lockstep with
+    // register()'s ADMIN scenario.
+    //
+    // Tenant + Main branch + user in one transaction so a failure midway does
+    // not leave orphaned rows.
     let user;
     try {
       user = await this.prisma.$transaction(async (tx) => {
         const tenant = await tx.tenant.create({
-          data: {
-            name: restaurantName,
-            subdomain,
-            currentPlanId: trialPlan.id,
-            trialUsed: true,
-            trialStartedAt: now,
-            trialEndsAt: trialEnd,
-            featureOverrides: planFeatureOverrides,
-          },
-        });
-        await tx.subscription.create({
-          data: {
-            tenantId: tenant.id,
-            planId: trialPlan.id,
-            status: "TRIALING",
-            billingCycle: "MONTHLY",
-            paymentProvider: PaymentProvider.PAYTR,
-            startDate: now,
-            currentPeriodStart: now,
-            currentPeriodEnd: trialEnd,
-            isTrialPeriod: true,
-            trialStart: now,
-            trialEnd,
-            amount: trialPlan.monthlyPrice,
-            currency: trialPlan.currency,
-            cancelAtPeriodEnd: false,
-          },
+          data: { name: restaurantName, subdomain },
         });
         // Every new tenant ships with a Main branch (matches register()), so
         // the dashboard never prompts "create a branch" against the

@@ -8,7 +8,6 @@ import {
   SuperAdminDashboardController,
   SuperAdminTenantsController,
   SuperAdminUsersController,
-  SuperAdminSubscriptionsController,
   SuperAdminAuditController,
   SuperAdminOutboxController,
 } from "./controllers";
@@ -20,28 +19,15 @@ import {
   SuperAdminDashboardService,
   SuperAdminTenantsService,
   SuperAdminUsersService,
-  SuperAdminSubscriptionsService,
   SuperAdminOutboxService,
 } from "./services";
 
 import { SuperAdminGuard } from "./guards/superadmin.guard";
 import { NotificationsModule } from "../notifications/notifications.module";
-import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
-import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
 
 @Module({
   imports: [
     NotificationsModule,
-    // Havale confirm/reject + settings endpoints on the subscriptions controller.
-    // SuperAdminSubscriptionsService dispatches into SubscriptionService
-    // for ops-only actions (e.g. forcing the trial-expiry cron from a
-    // test or support session). Keeps the canonical lifecycle logic in
-    // one place instead of duplicating it under superadmin/.
-    SubscriptionsModule,
-    // SuperAdmin refund endpoint and cancel-subscription token revoke
-    // both call PaytrAdapter directly. PaytrAdapterModule is the same
-    // standalone module SubscriptionsModule already uses.
-    PaytrAdapterModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -79,7 +65,6 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminDashboardController,
     SuperAdminTenantsController,
     SuperAdminUsersController,
-    SuperAdminSubscriptionsController,
     SuperAdminAuditController,
     SuperAdminOutboxController,
   ],
@@ -89,7 +74,6 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminDashboardService,
     SuperAdminTenantsService,
     SuperAdminUsersService,
-    SuperAdminSubscriptionsService,
     SuperAdminOutboxService,
     SuperAdminGuard,
   ],

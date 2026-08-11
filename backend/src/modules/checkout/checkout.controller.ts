@@ -94,6 +94,11 @@ export class CheckoutController {
       buyerIp,
       returnUrl: body.returnUrl,
       referralCode: body.referralCode,
+      // Distance-selling consent is recorded against the human who clicked,
+      // with the IP and user-agent that PayTR will see, before a token exists.
+      userId: req.user.id ?? req.user.sub,
+      userAgent: req.headers?.["user-agent"],
+      acceptedDocumentIds: body.acceptedDocumentIds,
     });
   }
 

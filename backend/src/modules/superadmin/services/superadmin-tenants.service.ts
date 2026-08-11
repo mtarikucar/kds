@@ -15,58 +15,36 @@ import { EmailService } from "../../../common/services/email.service";
 import { reserveSubdomain } from "../../../common/helpers/subdomain.helper";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
+import { FEATURE_KEYS as CANONICAL_FEATURE_KEYS } from "../../entitlements/entitlement-keys.const";
+import { EntitlementService } from "../../entitlements/entitlement.service";
 
-type PlanFeatureKey =
-  | "advancedReports"
-  | "multiLocation"
-  | "customBranding"
-  | "apiAccess"
-  | "externalDisplay"
-  | "prioritySupport"
-  | "inventoryTracking"
-  | "kdsIntegration"
-  | "reservationSystem"
-  | "personnelManagement"
-  | "deliveryIntegration"
-  | "posAccess"
-  | "aiContentGeneration";
-const FEATURE_KEYS: readonly PlanFeatureKey[] = [
-  "advancedReports",
-  "multiLocation",
-  "customBranding",
-  "apiAccess",
-  "externalDisplay",
-  "prioritySupport",
-  "inventoryTracking",
-  "kdsIntegration",
-  "reservationSystem",
-  "personnelManagement",
-  "deliveryIntegration",
-  "posAccess",
-  "aiContentGeneration",
-];
+/**
+ * Override whitelist — deliberately the canonical entitlement vocabulary and
+ * nothing more.
+ *
+ * `license` is excluded on purpose. It is granted by owning the licence
+ * product and by nothing else; an override that forged it would hand a tenant
+ * the entire paid catalogue for free while leaving no ownership row, no
+ * anniversary and no renewal. Comp the licence product instead
+ * (POST /v1/superadmin/marketplace/comp) — that path is auditable and expires.
+ */
+type PlanFeatureKey = (typeof FEATURE_KEYS)[number];
+const FEATURE_KEYS = CANONICAL_FEATURE_KEYS.filter(
+  (k): k is Exclude<(typeof CANONICAL_FEATURE_KEYS)[number], "license"> =>
+    k !== "license",
+);
 
-type PlanLimitKey =
-  | "maxUsers"
-  | "maxTables"
-  | "maxBranches"
-  | "maxProducts"
-  | "maxCategories"
-  | "maxMonthlyOrders"
-  | "maxMonthlyAiPhotos"
-  | "maxMonthlyAiVideos"
-  | "maxMonthlyAi3dModels";
-const LIMIT_KEYS: readonly PlanLimitKey[] = [
-  "maxUsers",
-  "maxTables",
-  "maxBranches",
-  "maxProducts",
-  "maxCategories",
-  "maxMonthlyOrders",
-  "maxMonthlyAiPhotos",
-  "maxMonthlyAiVideos",
-  "maxMonthlyAi3dModels",
-];
+/**
+ * The only cap left in the product.
+ *
+ * maxUsers/maxTables/maxProducts/maxCategories/maxMonthlyOrders were removed
+ * in v3.3.0 — the free baseline grants them as -1 and no call site reads them,
+ * so an override here would have written a number that changed nothing while
+ * looking like a working control. The AI-quota caps went the same way: usage
+ * is prepaid credits now, not a monthly ceiling.
+ */
+type PlanLimitKey = "maxBranches";
+const LIMIT_KEYS: readonly PlanLimitKey[] = ["maxBranches"];
 
 @Injectable()
 export class SuperAdminTenantsService {
@@ -81,6 +59,9 @@ export class SuperAdminTenantsService {
     // by super-admin are entitlement-shaping events: the projector reads the
     // freshly written Tenant row and rebuilds grants.
     private readonly outbox: OutboxService,
+    // EntitlementsModule is @Global. The override editor reads the engine's
+    // own projection rather than plan columns, which no longer carry anything.
+    private readonly entitlements: EntitlementService,
   ) {}
 
   async findAll(filters: TenantFilterDto) {
@@ -542,97 +523,59 @@ export class SuperAdminTenantsService {
     };
   }
 
+  /**
+   * What a tenant is entitled to, and where each grant comes from.
+   *
+   * This used to layer overrides on top of `tenant.currentPlan`'s columns.
+   * Since v3.3.0 `currentPlanId` is null on every tenant and nothing reads
+   * those columns, so `planDefaults` was an empty object and `effective`
+   * showed only the overrides — the editor presented a tenant with the whole
+   * free core plus everything they had bought as though they had nothing.
+   *
+   * The baseline is now the engine's own projection, which is the thing that
+   * actually governs access, and the per-source breakdown is surfaced so an
+   * operator can tell a free-core grant from a purchased one from an override
+   * before deciding what to change.
+   */
   async getOverrides(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      include: { currentPlan: true },
+      select: { id: true, featureOverrides: true, limitOverrides: true },
     });
 
     if (!tenant) {
       throw new NotFoundException("Tenant not found");
     }
 
-    const plan = tenant.currentPlan;
     const featureOverrides =
       (tenant.featureOverrides as Record<string, boolean> | null) ?? null;
     const limitOverrides =
       (tenant.limitOverrides as Record<string, number> | null) ?? null;
 
-    const planFeatures = plan
-      ? {
-          advancedReports: plan.advancedReports,
-          multiLocation: plan.multiLocation,
-          customBranding: plan.customBranding,
-          apiAccess: plan.apiAccess,
-          externalDisplay: plan.externalDisplay,
-          prioritySupport: plan.prioritySupport,
-          inventoryTracking: plan.inventoryTracking,
-          kdsIntegration: plan.kdsIntegration,
-          reservationSystem: plan.reservationSystem,
-          personnelManagement: plan.personnelManagement,
-          deliveryIntegration: plan.deliveryIntegration,
-          // M10: posAccess is in FEATURE_KEYS (so updateOverrides accepts it)
-          // but was omitted from the plan-default column the override editor
-          // reads — so the editor was blind to it on read. The override editor
-          // is the canonical grant path for posAccess (no plan-form toggle by
-          // default), so the plan default must be surfaced here.
-          posAccess: plan.posAccess,
-          aiContentGeneration: plan.aiContentGeneration,
-        }
-      : {};
+    const [effective, rows] = await Promise.all([
+      this.entitlements.getForTenant(tenantId, null),
+      this.prisma.featureEntitlement.findMany({
+        where: { tenantId, scope: "tenant" },
+        select: { key: true, value: true, source: true },
+      }),
+    ]);
 
-    const planLimits = plan
-      ? {
-          maxUsers: plan.maxUsers,
-          maxTables: plan.maxTables,
-          // M10: maxBranches is in LIMIT_KEYS (updateOverrides accepts it) but
-          // was missing from the plan-default column shown by the override
-          // editor, so the per-tenant branch-cap override row had no default.
-          maxBranches: plan.maxBranches,
-          maxProducts: plan.maxProducts,
-          maxCategories: plan.maxCategories,
-          maxMonthlyOrders: plan.maxMonthlyOrders,
-          maxMonthlyAiPhotos: plan.maxMonthlyAiPhotos,
-          maxMonthlyAiVideos: plan.maxMonthlyAiVideos,
-          maxMonthlyAi3dModels: plan.maxMonthlyAi3dModels,
-        }
-      : {};
-
-    const effectiveFeatures: Record<string, boolean> = {
-      ...(planFeatures as Record<string, boolean>),
-    };
-    if (featureOverrides) {
-      for (const key of FEATURE_KEYS) {
-        const value = featureOverrides[key];
-        if (value !== null && value !== undefined) {
-          effectiveFeatures[key] = value;
-        }
-      }
-    }
-
-    const effectiveLimits: Record<string, number> = {
-      ...(planLimits as Record<string, number>),
-    };
-    if (limitOverrides) {
-      for (const key of LIMIT_KEYS) {
-        const value = limitOverrides[key];
-        if (value !== null && value !== undefined) {
-          effectiveLimits[key] = value;
-        }
-      }
+    // key → the sources granting it, so "why does this tenant have X" is
+    // answerable from the panel instead of from a psql session.
+    const sources: Record<string, string[]> = {};
+    for (const row of rows) {
+      (sources[row.key] ??= []).push(row.source);
     }
 
     return {
       featureOverrides,
       limitOverrides,
-      planDefaults: {
-        features: planFeatures,
-        limits: planLimits,
-      },
       effective: {
-        features: effectiveFeatures,
-        limits: effectiveLimits,
+        features: effective.features,
+        limits: effective.limits,
+        integrations: effective.integrations,
       },
+      sources,
     };
   }
 

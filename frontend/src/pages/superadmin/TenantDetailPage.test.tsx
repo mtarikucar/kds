@@ -6,25 +6,32 @@ import TenantDetailPage from './TenantDetailPage';
 
 // ── api-hook mocks ───────────────────────────────────────────────────────
 const updateStatusMutate = vi.fn();
-const changePlanMutate = vi.fn();
+const compMutate = vi.fn();
+const revokeCompMutate = vi.fn();
 const updateOverridesMutate = vi.fn();
 const resetOverridesMutate = vi.fn();
 
 let tenant: any;
 let overridesData: any;
-let plans: any;
+let licensing: any;
+let catalogAddOns: any;
 
 vi.mock('../../features/superadmin/api/superAdminApi', () => ({
   useTenant: () => ({ data: tenant, isLoading: false }),
   useTenantUsers: () => ({ data: { data: [] } }),
   useTenantOrders: () => ({ data: { data: [] } }),
   useTenantStats: () => ({ data: { revenue: { total: 0 }, orders: { today: 0, thisMonth: 0 } } }),
-  usePlans: () => ({ data: plans }),
-  useChangeSubscriptionPlan: () => ({ mutate: changePlanMutate, isPending: false, isError: false }),
   useTenantOverrides: () => ({ data: overridesData }),
   useUpdateTenantStatus: () => ({ mutate: updateStatusMutate, isPending: false }),
   useUpdateTenantOverrides: () => ({ mutate: updateOverridesMutate, isPending: false }),
   useResetTenantOverrides: () => ({ mutate: resetOverridesMutate, isPending: false }),
+}));
+
+vi.mock('../../features/superadmin/api/superadminMarketplaceApi', () => ({
+  useSaTenantLicensing: () => ({ data: licensing }),
+  useSaListAddOns: () => ({ data: catalogAddOns ?? [] }),
+  useSaCompProduct: () => ({ mutate: compMutate, isPending: false }),
+  useSaRevokeComp: () => ({ mutate: revokeCompMutate, isPending: false }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -101,7 +108,8 @@ describe('TenantDetailPage — status-change modal flow (F6)', () => {
     updateStatusMutate.mockReset();
     tenant = baseTenant();
     overridesData = undefined;
-    plans = [];
+    licensing = undefined;
+    catalogAddOns = [];
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
   afterEach(() => vi.restoreAllMocks());
@@ -209,7 +217,8 @@ describe('TenantDetailPage — feature override default→on→off cycle', () =>
     resetOverridesMutate.mockReset();
     tenant = baseTenant();
     overridesData = baseOverrides();
-    plans = [];
+    licensing = undefined;
+    catalogAddOns = [];
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
   afterEach(() => vi.restoreAllMocks());
@@ -336,106 +345,140 @@ describe('TenantDetailPage — feature override default→on→off cycle', () =>
   });
 });
 
-describe('TenantDetailPage — change-plan modal', () => {
+function licensingFixture(over: Partial<any> = {}) {
+  return {
+    tenant: { id: 'tid-1', name: 'Acme Diner' },
+    license: {
+      active: true,
+      anchorAt: '2026-03-10T00:00:00.000Z',
+      anniversaryAt: '2027-03-10T00:00:00.000Z',
+      daysRemaining: 211,
+    },
+    owned: [],
+    credits: {},
+    ...over,
+  };
+}
+
+describe('TenantDetailPage — comp modal', () => {
   beforeEach(() => {
-    changePlanMutate.mockReset();
+    compMutate.mockReset();
+    revokeCompMutate.mockReset();
     tenant = baseTenant();
     overridesData = undefined;
-    plans = [
-      { id: 'p1', displayName: 'Pro Plan', monthlyPrice: 500, maxUsers: 5, maxTables: 10, maxProducts: 100 },
-      { id: 'p2', displayName: 'Enterprise', monthlyPrice: 1500, maxUsers: 50, maxTables: 100, maxProducts: 1000 },
+    licensing = licensingFixture();
+    catalogAddOns = [
+      { id: 'a1', code: 'license_annual', name: 'Lisans', kind: 'license', priceCents: 299000 },
+      { id: 'a2', code: 'module_personnel', name: 'Personel', kind: 'module', priceCents: 99000 },
     ];
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('opens the modal, selecting a new plan enables Confirm, and fires changePlan with subscriptionId+planId', () => {
+  function openModal() {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.changePlan' }));
-    // current plan (p1) preselected; confirm disabled because == current
-    const radios = screen.getAllByRole('radio');
-    // pick the Enterprise (p2) radio
-    fireEvent.click(radios[1]);
-    // the modal's confirm button label is changePlan too — grab the enabled one
-    const confirmBtns = screen.getAllByRole('button', { name: 'tenantDetail.changePlan' });
-    const modalConfirm = confirmBtns[confirmBtns.length - 1];
-    fireEvent.click(modalConfirm);
-    expect(changePlanMutate).toHaveBeenCalledTimes(1);
-    expect(changePlanMutate.mock.calls[0][0]).toMatchObject({
-      subscriptionId: 'sub-1',
-      planId: 'p2',
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.comp.action' }));
+  }
+
+  it('sends tenantId, product, quantity and reason', () => {
+    openModal();
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'module_personnel' } });
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '2' } });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Pilot müşteri' } });
+    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.comp.grant' }));
+
+    expect(compMutate).toHaveBeenCalledTimes(1);
+    expect(compMutate.mock.calls[0][0]).toMatchObject({
+      tenantId: 'tid-1',
+      addOnCode: 'module_personnel',
+      quantity: 2,
+      reason: 'Pilot müşteri',
     });
   });
 
-  it('Confirm stays disabled when the selected plan equals the current plan', () => {
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.changePlan' }));
-    const confirmBtns = screen.getAllByRole('button', { name: 'tenantDetail.changePlan' });
-    const modalConfirm = confirmBtns[confirmBtns.length - 1];
-    expect(modalConfirm).toBeDisabled();
-    fireEvent.click(modalConfirm);
-    expect(changePlanMutate).not.toHaveBeenCalled();
+  it('will not grant without a reason', () => {
+    // The reason is what makes a comp auditable months later; an unexplained
+    // giveaway is the thing this modal exists to prevent.
+    openModal();
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'module_personnel' } });
+    const grant = screen.getByRole('button', { name: 'tenantDetail.comp.grant' });
+    expect(grant).toBeDisabled();
+    fireEvent.click(grant);
+    expect(compMutate).not.toHaveBeenCalled();
+  });
+
+  it('warns up-front when the tenant has no licence to light the product up', () => {
+    licensing = licensingFixture({
+      license: { active: false, anchorAt: null, anniversaryAt: null, daysRemaining: null },
+    });
+    openModal();
+    expect(
+      screen.getByText('tenantDetail.comp.noLicenceWarning'),
+    ).toBeInTheDocument();
   });
 });
 
-describe('TenantDetailPage — change-plan modal: DEMO/inactive filtering + amount preview (F2/F3)', () => {
+describe('TenantDetailPage — owned products panel', () => {
   beforeEach(() => {
-    changePlanMutate.mockReset();
+    revokeCompMutate.mockReset();
     tenant = baseTenant();
     overridesData = undefined;
-    plans = [
-      { id: 'p1', name: 'PRO', isActive: true, displayName: 'Pro Plan', monthlyPrice: 500, yearlyPrice: 5000, maxUsers: 5, maxTables: 10, maxProducts: 100 },
-      { id: 'p2', name: 'BUSINESS', isActive: true, displayName: 'Enterprise', monthlyPrice: 1500, yearlyPrice: 15000, maxUsers: 50, maxTables: 100, maxProducts: 1000 },
-      { id: 'p-demo', name: 'DEMO', isActive: false, displayName: 'Demo Plan', monthlyPrice: 0, yearlyPrice: 0, maxUsers: 999, maxTables: 999, maxProducts: 999 },
-      { id: 'p-old', name: 'LEGACY', isActive: false, displayName: 'Legacy Plan', monthlyPrice: 100, yearlyPrice: 1000, maxUsers: 1, maxTables: 1, maxProducts: 1 },
-    ];
+    catalogAddOns = [];
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
   afterEach(() => vi.restoreAllMocks());
 
-  function openModal() {
+  const ownedRow = (over: Partial<any> = {}) => ({
+    id: 'ta-1',
+    code: 'module_personnel',
+    name: 'Personel',
+    kind: 'module',
+    quantity: 1,
+    status: 'active',
+    origin: 'purchase',
+    compReason: null,
+    periodEnd: '2027-03-10T00:00:00.000Z',
+    chargedCents: 99000,
+    listCents: 99000,
+    currency: 'TRY',
+    suppressedByLicence: false,
+    ...over,
+  });
+
+  it('flags a product that is owned but dark for lack of a licence', () => {
+    licensing = licensingFixture({
+      license: { active: false, anchorAt: null, anniversaryAt: null, daysRemaining: null },
+      owned: [ownedRow({ suppressedByLicence: true })],
+    });
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'tenantDetail.changePlan' }));
-  }
-
-  it('offers neither the DEMO plan nor inactive plans', () => {
-    openModal();
-    // "Pro Plan" also appears in the subscription summary card, so assert
-    // presence without the single-match constraint.
-    expect(screen.getAllByText('Pro Plan').length).toBeGreaterThan(0);
-    expect(screen.getByText('Enterprise')).toBeInTheDocument();
-    expect(screen.queryByText('Demo Plan')).not.toBeInTheDocument();
-    expect(screen.queryByText('Legacy Plan')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.getByText('tenantDetail.owned.suppressed')).toBeInTheDocument();
+    expect(screen.getByText('tenantDetail.owned.darkWarning')).toBeInTheDocument();
   });
 
-  it('shows the resulting billing amount for the selected plan on the MONTHLY cycle', () => {
-    openModal();
-    // Preselected current plan (p1) → no preview yet.
-    expect(screen.queryByText(/tenantDetail\.newAmountInfo/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('radio')[1]); // Enterprise
-    // t(key, {amount, cycle}) mock → "key::amount,cycle"; cycle label falls
-    // back to the raw cycle since t(key, fallbackString) returns the fallback.
-    expect(
-      screen.getByText('tenantDetail.newAmountInfo::₺1,500,MONTHLY'),
-    ).toBeInTheDocument();
-  });
-
-  it('uses the yearly price when the subscription bills YEARLY', () => {
-    tenant = baseTenant({
-      subscriptions: [
-        {
-          id: 'sub-1',
-          status: 'ACTIVE',
-          plan: { displayName: 'Pro Plan' },
-          billingCycle: 'YEARLY',
-          currentPeriodEnd: '2026-12-31T00:00:00.000Z',
-        },
+  it('offers revoke for a comp and never for a purchase', () => {
+    // Taking back a purchase is a refund decision on the payment rail, not a
+    // panel click — so the button must not exist for a bought product.
+    licensing = licensingFixture({
+      owned: [
+        ownedRow({ id: 'ta-paid', origin: 'purchase' }),
+        ownedRow({ id: 'ta-comp', code: 'module_inventory', name: 'Stok', origin: 'comp', compReason: 'pilot' }),
       ],
     });
-    openModal();
-    fireEvent.click(screen.getAllByRole('radio')[1]);
-    expect(
-      screen.getByText('tenantDetail.newAmountInfo::₺15,000,YEARLY'),
-    ).toBeInTheDocument();
+    renderPage();
+    const revokeButtons = screen.getAllByRole('button', { name: 'tenantDetail.owned.revoke' });
+    expect(revokeButtons).toHaveLength(1);
+
+    fireEvent.click(revokeButtons[0]);
+    expect(revokeCompMutate).toHaveBeenCalledWith({
+      tenantId: 'tid-1',
+      tenantAddOnId: 'ta-comp',
+    });
+  });
+
+  it('shows credit balances alongside the products', () => {
+    licensing = licensingFixture({ owned: [ownedRow()], credits: { PHOTO: 42 } });
+    renderPage();
+    expect(screen.getByText('PHOTO')).toBeInTheDocument();
+    expect(screen.getByText('42')).toBeInTheDocument();
   });
 });

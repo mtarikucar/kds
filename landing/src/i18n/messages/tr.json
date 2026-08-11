@@ -154,58 +154,41 @@
   },
   "pricing": {
     "badge": "Fiyatlandırma",
-    "title": "Basit, şeffaf fiyatlandırma",
-    "subtitle": "Ücretsiz başlayın, hazır olduğunuzda yükseltin. Gizli ücret yok, istediğiniz zaman iptal edin.",
-    "mostPopular": "En Popüler",
-    "perMonth": "/ay",
-    "plans": {
-      "basic": {
-        "name": "Başlangıç",
-        "description": "Kafe ve küçük restoranlar için",
-        "price": "499₺",
-        "cta": "Ücretsiz denemeye başla",
-        "features": [
-          "5 kullanıcı",
-          "20 masa",
-          "100 ürün",
-          "20 kategori",
-          "Stok takibi",
-          "KDS entegrasyonu"
-        ]
-      },
-      "pro": {
-        "name": "Profesyonel",
-        "description": "Şehir merkezi restoranlar için",
-        "price": "1.299₺",
-        "cta": "Ücretsiz denemeye başla",
-        "features": [
-          "15 kullanıcı",
-          "50 masa",
-          "500 ürün",
-          "50 kategori",
-          "Gelişmiş raporlar",
-          "Rezervasyon sistemi",
-          "Personel takibi",
-          "Delivery entegrasyonları (Yemeksepeti, Trendyol, Getir, Migros)",
-          "Özel marka renkleri",
-          "Öncelikli destek"
-        ]
-      },
-      "business": {
-        "name": "Kurumsal",
-        "description": "Çok şubeli zincirler için",
-        "price": "2.999₺",
-        "cta": "Satışla iletişime geç",
-        "features": [
-          "Sınırsız kullanıcı, masa, ürün",
-          "Çoklu şube",
-          "API erişimi",
-          "Tüm özellikler dahil",
-          "Kurumsal destek"
-        ]
-      }
+    "title": "Çekirdek ücretsiz. Sadece kullandığınızı ödeyin.",
+    "subtitle": "Paket yok, kademe yok. Restoranı çalıştıran her şey ücretsiz ve sınırsız; ağır modülleri tek tek, yıllık alırsınız.",
+    "perYear": "/yıl",
+    "oneTime": " tek seferlik",
+    "free": {
+      "badge": "Sınırsız ve ücretsiz",
+      "name": "HummyTummy Çekirdek",
+      "description": "Kredi kartı gerekmez, lisans gerekmez, kullanıcı/masa/ürün sınırı yoktur.",
+      "cta": "Ücretsiz başla",
+      "features": [
+        "POS ve adisyon",
+        "Mutfak ekranı (KDS)",
+        "Menü yönetimi",
+        "Masa ve kat planı",
+        "QR menü",
+        "Sipariş yönetimi",
+        "Kasa ve nakit",
+        "Temel raporlar",
+        "Ekip ve rol yönetimi",
+        "Müşteriler",
+        "Cihaz ve şube paneli",
+        "Özel marka ve alan adı"
+      ]
     },
-    "trialNote": "Tüm planlar 14 günlük ücretsiz Kurumsal deneme ile başlar. Kredi kartı gerekmez."
+    "licence": {
+      "description": "Ücretli modülleri satın alabilmek ve kullanabilmek için gereken yıllık lisans. Satın alma günü hesabınızın yıl dönümü olur."
+    },
+    "kind": {
+      "module": "Modüller",
+      "integration": "Entegrasyonlar",
+      "capacity": "Kapasite",
+      "credit": "Kontör"
+    },
+    "catalogUnavailable": "Fiyat listesi şu anda yüklenemedi. Güncel fiyatlar için bizimle iletişime geçin.",
+    "prorationNote": "Yıl içinde aldığınız her modül, hesabınızın yıl dönümüne kadar gün bazlı orantılı ücretlendirilir — hepsi tek faturada, tek tarihte yenilenir."
   },
   "business": {
     "badge": "Önemli Sonuçlar",

@@ -154,58 +154,41 @@
   },
   "pricing": {
     "badge": "Pricing",
-    "title": "Simple, transparent pricing",
-    "subtitle": "Start free, upgrade when you're ready. No hidden fees, cancel anytime.",
-    "mostPopular": "Most Popular",
-    "perMonth": "/month",
-    "plans": {
-      "basic": {
-        "name": "Starter",
-        "description": "For cafés and small restaurants",
-        "price": "₺499",
-        "cta": "Start free trial",
-        "features": [
-          "5 users",
-          "20 tables",
-          "100 products",
-          "20 categories",
-          "Inventory tracking",
-          "KDS integration"
-        ]
-      },
-      "pro": {
-        "name": "Pro",
-        "description": "For city-centre restaurants",
-        "price": "₺1,299",
-        "cta": "Start free trial",
-        "features": [
-          "15 users",
-          "50 tables",
-          "500 products",
-          "50 categories",
-          "Advanced reports",
-          "Reservation system",
-          "Staff management",
-          "Delivery integrations (Yemeksepeti, Trendyol, Getir, Migros)",
-          "Custom branding colours",
-          "Priority support"
-        ]
-      },
-      "business": {
-        "name": "Business",
-        "description": "For multi-location chains",
-        "price": "₺2,999",
-        "cta": "Contact sales",
-        "features": [
-          "Unlimited users, tables, products",
-          "Multi-location",
-          "API access",
-          "All features included",
-          "Enterprise support"
-        ]
-      }
+    "title": "The core is free. Pay only for what you use.",
+    "subtitle": "No packages, no tiers. Everything that runs the restaurant is free and unlimited; the heavy modules are bought one at a time, annually.",
+    "perYear": "/year",
+    "oneTime": " one-time",
+    "free": {
+      "badge": "Unlimited and free",
+      "name": "HummyTummy Core",
+      "description": "No credit card, no licence, and no cap on users, tables or products.",
+      "cta": "Start free",
+      "features": [
+        "POS and tickets",
+        "Kitchen display (KDS)",
+        "Menu management",
+        "Tables and floor plan",
+        "QR menu",
+        "Order management",
+        "Cash drawer",
+        "Basic reports",
+        "Team and roles",
+        "Customers",
+        "Device and branch hub",
+        "Custom branding and domain"
+      ]
     },
-    "trialNote": "Every plan starts with a 14-day free Business trial. No credit card required."
+    "licence": {
+      "description": "The annual licence required to buy and use any paid module. Its purchase date becomes your account's anniversary."
+    },
+    "kind": {
+      "module": "Modules",
+      "integration": "Integrations",
+      "capacity": "Capacity",
+      "credit": "Credits"
+    },
+    "catalogUnavailable": "The price list could not be loaded. Contact us for current pricing.",
+    "prorationNote": "Anything bought mid-year is charged day-by-day up to your anniversary — one invoice, one renewal date."
   },
   "business": {
     "badge": "Results That Matter",

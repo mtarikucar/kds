@@ -46,10 +46,10 @@ export class SuperAdminDashboardController {
     return this.dashboardService.getGrowthMetrics();
   }
 
-  @Get("plans")
-  @ApiOperation({ summary: "Get plan distribution" })
-  async getPlanDistribution() {
-    return this.dashboardService.getPlanDistribution();
+  @Get("products")
+  @ApiOperation({ summary: "How many tenants own each catalog product" })
+  async getProductDistribution() {
+    return this.dashboardService.getProductDistribution();
   }
 
   @Get("recent")

@@ -6,6 +6,7 @@ import { TenantMarketplaceService } from "./tenant-marketplace.service";
 import { TenantAddOnSweeperService } from "./tenant-addon-sweeper.service";
 import { MarketplaceController } from "./marketplace.controller";
 import { SuperadminAddOnsController } from "./superadmin-addons.controller";
+import { SuperadminEntitlementsController } from "./superadmin-entitlements.controller";
 
 /**
  * Marketplace module — catalog of add-ons + tenant purchase/cancel flow.
@@ -15,7 +16,11 @@ import { SuperadminAddOnsController } from "./superadmin-addons.controller";
  */
 @Module({
   imports: [PrismaModule, SuperAdminModule],
-  controllers: [MarketplaceController, SuperadminAddOnsController],
+  controllers: [
+    MarketplaceController,
+    SuperadminAddOnsController,
+    SuperadminEntitlementsController,
+  ],
   providers: [
     AddOnCatalogService,
     TenantMarketplaceService,

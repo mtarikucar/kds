@@ -19,9 +19,7 @@
     "dashboard": "Panel",
     "tenants": "Kiracılar",
     "users": "Kullanıcılar",
-    "plans": "Planlar",
-    "marketplace": "Pazar Yeri",
-    "subscriptions": "Abonelikler",
+    "marketplace": "Katalog",
     "auditLogs": "Denetim Kayıtları",
     "legal": "Yasal Belgeler",
     "settings": "Ayarlar",
@@ -126,8 +124,6 @@
     "confirmStatusChange": "Durum {{status}} olarak değiştirilsin mi?",
     "confirmResetOverrides": "Tüm geçersiz kılmalar plan varsayılanlarına sıfırlansın mı?",
     "overview": "Genel Bakış",
-    "plan": "Plan",
-    "changePlanTitle": "Planı Değiştir",
     "currency": "Para Birimi",
     "created": "Oluşturuldu",
     "statistics": "İstatistikler",
@@ -139,12 +135,8 @@
     "products": "Ürünler",
     "tables": "Masalar",
     "customers": "Müşteriler",
-    "activeSubscription": "Aktif Abonelik",
     "status": "Durum",
-    "billingCycle": "Faturalama Döngüsü",
-    "periodEnd": "Dönem Sonu",
     "actions": "İşlemler",
-    "changePlan": "Planı Değiştir",
     "suspend": "Askıya Al",
     "activate": "Etkinleştir",
     "delete": "Sil",
@@ -175,16 +167,6 @@
       "role": "Rol",
       "status": "Durum"
     },
-    "selectNewPlan": "Şunun için yeni bir plan seçin:",
-    "usersTablesProducts": "{{users}} kullanıcı · {{tables}} masa · {{products}} ürün",
-    "current": "Mevcut",
-    "changePlanError": "Plan değiştirilemedi",
-    "newAmountInfo": "Plan değişikliği sonrası faturalama tutarı {{amount}} olacak ({{cycle}}).",
-    "cycle": {
-      "MONTHLY": "Aylık",
-      "YEARLY": "Yıllık"
-    },
-    "changing": "Değiştiriliyor...",
     "cancel": "İptal",
     "featureLabels": {
       "advancedReports": "Gelişmiş Raporlar",
@@ -231,52 +213,39 @@
       "reasonRequired": "Neden (zorunlu — denetim kaydına ve yöneticilere giden e-postaya eklenir)",
       "reasonOptional": "Neden (isteğe bağlı — denetim kaydına ve yöneticilere giden e-postaya eklenir)",
       "reasonPlaceholder": "Örn. ödeme yapılmadı, kötüye kullanım bildirimi…"
-    }
-  },
-  "subscriptions": {
-    "title": "Abonelikler",
-    "subtitle": "Kiracı aboneliklerini yönetin",
-    "filters": {
-      "allStatus": "Tüm Durumlar",
-      "active": "Aktif",
-      "cancelled": "İptal Edildi",
-      "expired": "Süresi Doldu",
-      "pastDue": "Vadesi Geçti",
-      "trialing": "Deneme",
-      "allPlans": "Tüm Planlar"
     },
-    "col": {
-      "tenant": "Kiracı",
-      "plan": "Plan",
-      "status": "Durum",
-      "billing": "Faturalama",
-      "ends": "Bitiş"
+    "licence": "Lisans",
+    "licenceActive": "Aktif",
+    "licenceNone": "Yok",
+    "owned": {
+      "title": "Sahip olunan ürünler",
+      "empty": "Henüz ücretli ürün yok — çekirdek zaten ücretsiz ve sınırsız.",
+      "darkWarning": "Lisans yok: ücretli grant'lar bastırılmış durumda",
+      "col": {
+        "product": "Ürün",
+        "origin": "Kaynak",
+        "until": "Bitiş",
+        "status": "Durum"
+      },
+      "comp": "hediye",
+      "purchased": "satın alındı",
+      "suppressed": "bastırıldı",
+      "revoke": "Geri al",
+      "confirmRevoke": "{{name}} hediyesi geri alınsın mı?"
     },
-    "extend": "Uzat",
-    "cancel": "İptal",
-    "extendSuccess": "Abonelik uzatıldı.",
-    "extendFailed": "Abonelik uzatılamadı.",
-    "cancelSuccess": "Abonelik iptal edildi.",
-    "cancelFailed": "Abonelik iptal edilemedi.",
-    "extendModal": {
-      "title": "Aboneliği Uzat",
-      "subtitle": "{{tenant}} aboneliğinin dönem sonu ileri alınacak.",
-      "reinstateWarning": "Bu abonelik {{status}} durumunda. Uzatma, aboneliği yeniden AKTİF yapar ve kiracının kilidini açar.",
-      "days": "Uzatılacak gün sayısı",
-      "reason": "Neden (isteğe bağlı)",
-      "back": "Vazgeç",
-      "confirm": "Uzat",
-      "extending": "Uzatılıyor..."
-    },
-    "cancelModal": {
-      "title": "Aboneliği İptal Et",
-      "subtitle": "{{tenant}} aboneliği iptal edilecek.",
-      "atPeriodEnd": "Dönem sonunda (varsayılan) — erişim mevcut dönem bitene kadar sürer.",
-      "immediate": "Hemen — abonelik şimdi İPTAL edilir ve erişim kapanır.",
-      "reason": "Neden (isteğe bağlı)",
-      "keep": "Vazgeç",
-      "confirm": "İptali Onayla",
-      "cancelling": "İptal ediliyor..."
+    "comp": {
+      "action": "Ürün hediye et",
+      "title": "Ürün hediye et",
+      "subtitle": "Ücretsiz verilecek ürün:",
+      "product": "Ürün",
+      "selectProduct": "Seçin…",
+      "quantity": "Adet",
+      "reason": "Gerekçe",
+      "reasonPlaceholder": "Pilot müşteri — 2026 Q3 sözleşmesi",
+      "reasonHint": "Sahiplik satırında saklanır; aylar sonra 'kim, neden' sorusunu yanıtlar.",
+      "noLicenceWarning": "Bu hesabın aktif lisansı yok. Lisans gerektiren bir ürün hediye edilirse sahiplik oluşur ama grant'lar lisans gelene kadar bastırılmış kalır.",
+      "grant": "Hediye et",
+      "granting": "Veriliyor…"
     }
   },
   "auditLogs": {
@@ -334,74 +303,6 @@
       "time": "Zaman"
     }
   },
-  "plans": {
-    "title": "Planlar",
-    "subtitle": "Abonelik planlarını yönetin",
-    "addPlan": "Plan Ekle",
-    "confirmDelete": "Bu plan silinsin mi?",
-    "demoLockBadge": "Kilitli",
-    "demoLockTooltip": "DEMO planının adı, demo kiracının gerçek ödeme yollarını kilitleyen korumanın anahtarıdır; bu plan düzenlenemez ve silinemez.",
-    "defaultDiscountLabel": "İNDİRİM",
-    "perMonth": "/ay",
-    "perYear": "/yıl",
-    "users": "Kullanıcılar",
-    "tables": "Masalar",
-    "products": "Ürünler",
-    "ordersPerMonth": "Sipariş/ay",
-    "activeSubscriptions": "{{count}} aktif abonelik",
-    "featureTags": {
-      "reports": "Raporlar",
-      "multiLocation": "Çoklu Lokasyon",
-      "customBranding": "Özel Markalama",
-      "api": "API",
-      "priority": "Öncelik",
-      "inventory": "Stok",
-      "kds": "KDS",
-      "reservations": "Rezervasyonlar",
-      "personnel": "Personel"
-    },
-    "modal": {
-      "editTitle": "Planı Düzenle",
-      "createTitle": "Plan Oluştur",
-      "internalName": "Dahili Ad",
-      "displayName": "Görünen Ad",
-      "monthlyPrice": "Aylık Fiyat (₺)",
-      "yearlyPrice": "Yıllık Fiyat (₺)",
-      "maxUsers": "Maks. Kullanıcı",
-      "maxTables": "Maks. Masa",
-      "maxBranches": "Maks. Şube",
-      "maxProducts": "Maks. Ürün",
-      "categories": "Kategoriler",
-      "ordersPerMonth": "Sipariş/ay",
-      "limitHint": "-1 = sınırsız",
-      "advancedReports": "Gelişmiş Raporlar",
-      "multiLocation": "Çoklu Lokasyon",
-      "customBranding": "Özel Markalama",
-      "apiAccess": "API Erişimi",
-      "prioritySupport": "Öncelikli Destek",
-      "inventoryTracking": "Stok Takibi",
-      "kdsIntegration": "KDS Entegrasyonu",
-      "reservations": "Rezervasyonlar",
-      "personnelManagement": "Personel Yönetimi",
-      "active": "Aktif",
-      "discountSettings": "İndirim Ayarları",
-      "discountPercent": "İndirim %",
-      "label": "Etiket",
-      "labelPlaceholder": "örn. Ramazan Kampanyası",
-      "startDate": "Başlangıç Tarihi",
-      "endDate": "Bitiş Tarihi",
-      "cancel": "İptal",
-      "update": "Güncelle",
-      "create": "Oluştur",
-      "deliveryIntegration": "Teslimat Entegrasyonu",
-      "externalDisplay": "Harici Ekran (Partner Display)",
-      "posAccess": "POS Erişimi",
-      "aiPhotosPerMonth": "AI foto/ay",
-      "aiVideosPerMonth": "AI video/ay",
-      "aiContentGeneration": "AI içerik üretimi",
-      "ai3dPerMonth": "AI 3D/ay"
-    }
-  },
   "marketplace": {
     "title": "Pazar Yeri Yönetimi",
     "tabAddons": "Eklentiler",
@@ -417,7 +318,8 @@
         "kind": "Tür",
         "billing": "Faturalama",
         "price": "Fiyat",
-        "status": "Durum"
+        "status": "Durum",
+        "licence": "Lisans"
       },
       "edit": "Düzenle",
       "publish": "Yayınla",
@@ -435,11 +337,25 @@
         "status": "Durum",
         "deps": "Bağımlılıklar (virgülle ayrılmış; plan:PRO veya eklenti kodu)",
         "description": "Açıklama",
-        "grants": "İzinler (JSON)"
+        "grants": "İzinler (JSON)",
+        "requiresLicense": "Lisans gerektirir",
+        "creditKind": "Kontör türü",
+        "creditUnits": "Kontör adedi",
+        "maxQuantity": "Azami adet",
+        "sortOrder": "Sıra"
       },
       "grantsInvalid": "izinler geçerli JSON olmalı",
       "save": "Kaydet",
-      "create": "Oluştur"
+      "create": "Oluştur",
+      "needsLicence": "gerekli",
+      "perYear": "/yıl",
+      "creditIncomplete": "Kontör paketi için tür ve adet zorunlu.",
+      "publishedNeedsPrice": "Yayınlanan ürünün fiyatı sıfırdan büyük olmalı.",
+      "licenceSelfRequire": "Lisans ürünü kendini ön koşul yapamaz.",
+      "planDepsGone": "`plan:` bağımlılığı kalktı — çıplak ürün kodu kullanın.",
+      "i18nTitle": "Yerelleştirilmiş metinler (5 dil)",
+      "requiresLicenseHint": "İşaretliyse: lisans yoksa satın alınamaz ve grant'ları bastırılır (veri silinmez).",
+      "grantsHint": "Anahtarlar: feature.*, limit.*, integration.*, credit.*"
     },
     "products": {
       "catalogue": "Donanım kataloğu",
@@ -486,7 +402,11 @@
       "createFailed": "Oluşturma başarısız oldu.",
       "updateFailed": "Güncelleme başarısız oldu.",
       "archiveFailed": "Arşivleme başarısız oldu.",
-      "stockFailed": "Stok girişi başarısız oldu."
+      "stockFailed": "Stok girişi başarısız oldu.",
+      "comped": "Ürün hediye edildi.",
+      "compFailed": "Hediye edilemedi.",
+      "compRevoked": "Hediye geri alındı.",
+      "revokeFailed": "Geri alınamadı."
     }
   },
   "legal": {
@@ -529,16 +449,6 @@
       "cancel": "Vazgeç",
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
-    }
-  },
-  "bankTransfer": {
-    "toasts": {
-      "settingsSaved": "Havale ayarları kaydedildi.",
-      "settingsSaveFailed": "Kaydetme başarısız oldu.",
-      "confirmed": "Havale onaylandı, abonelik etkinleştirildi.",
-      "confirmFailed": "Onaylama başarısız oldu.",
-      "rejected": "Havale reddedildi.",
-      "rejectFailed": "Reddetme başarısız oldu."
     }
   }
 }

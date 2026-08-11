@@ -86,5 +86,12 @@
     "title": "Invoices",
     "empty": "No invoices yet.",
     "lineCount": "{{count}} line(s)"
+  },
+  "consent": {
+    "title": "Accept before purchasing",
+    "suffix": "— I have read and accept this document.",
+    "loading": "Loading the legal documents…",
+    "unavailable": "The legal documents could not be loaded. Checkout cannot start until they are accepted.",
+    "required": "Accept all three legal documents to continue."
   }
 }

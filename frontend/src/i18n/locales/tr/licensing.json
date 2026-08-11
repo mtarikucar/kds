@@ -86,5 +86,12 @@
     "title": "Faturalar",
     "empty": "Henüz faturanız yok.",
     "lineCount": "{{count}} kalem"
+  },
+  "consent": {
+    "title": "Satın almadan önce onaylayın",
+    "suffix": "belgesini okudum ve onaylıyorum.",
+    "loading": "Yasal belgeler yükleniyor…",
+    "unavailable": "Yasal belgeler şu anda yüklenemedi. Ödeme, belgeler onaylanmadan başlatılamaz.",
+    "required": "Devam etmek için üç yasal belgeyi de onaylayın."
   }
 }

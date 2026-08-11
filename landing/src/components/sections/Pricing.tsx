@@ -1,113 +1,58 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { appHref } from '@/lib/urls';
 import { Container } from '@/components/ui/Container';
-import { Check, ArrowRight, Sparkles, Tag } from 'lucide-react';
+import { Check, ArrowRight, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
-import { type PlanFromAPI } from '@/lib/api';
+import { type CatalogProduct } from '@/lib/api';
 
 interface PricingProps {
-  apiPlans?: PlanFromAPI[];
+  products?: CatalogProduct[];
 }
 
-export default function Pricing({ apiPlans }: PricingProps) {
+/**
+ * Public pricing — the à-la-carte catalog, read from the same endpoint
+ * checkout prices from.
+ *
+ * This section used to render three tiers (Başlangıç ₺499/ay, Profesyonel
+ * ₺1.299/ay, Kurumsal ₺2.999/ay) out of static translations, with the API only
+ * overlaying a discount badge. When packages were removed in v3.3.0 the API
+ * side went empty but the static side kept rendering, so the public homepage
+ * went on advertising monthly plans that could no longer be bought at prices
+ * that no longer existed.
+ *
+ * Now the numbers come from the catalog. If the API is unreachable at build
+ * time the section renders the free core plus a contact CTA rather than a
+ * remembered price — a missing price is recoverable, a wrong one is not.
+ */
+const KIND_ORDER = ['license', 'module', 'integration', 'capacity', 'credit'] as const;
+
+function formatTry(cents: number): string {
+  return new Intl.NumberFormat('tr-TR', {
+    style: 'currency',
+    currency: 'TRY',
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
+export default function Pricing({ products }: PricingProps) {
   const t = useTranslations('pricing');
   const sectionRef = useScrollReveal<HTMLElement>();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const licence = products?.find((p) => p.kind === 'license');
+  const paid = (products ?? []).filter((p) => p.kind !== 'license');
 
-  // Build plans from translations (static) with optional API discount overlay.
-  // FREE is intentionally absent — registration grants a 14-day BUSINESS
-  // trial; FREE is only the post-trial fallback and never a self-serve choice.
-  const staticPlans = [
-    {
-      key: 'basic',
-      name: t('plans.basic.name'),
-      description: t('plans.basic.description'),
-      price: t('plans.basic.price'),
-      period: t('perMonth'),
-      features: t.raw('plans.basic.features') as string[],
-      cta: t('plans.basic.cta'),
-      href: appHref('/register?plan=BASIC'),
-      popular: false,
-      monthlyPrice: 499,
-    },
-    {
-      key: 'pro',
-      name: t('plans.pro.name'),
-      description: t('plans.pro.description'),
-      price: t('plans.pro.price'),
-      period: t('perMonth'),
-      features: t.raw('plans.pro.features') as string[],
-      cta: t('plans.pro.cta'),
-      href: appHref('/register?plan=PRO'),
-      popular: true,
-      monthlyPrice: 1299,
-    },
-    {
-      key: 'business',
-      name: t('plans.business.name'),
-      description: t('plans.business.description'),
-      price: t('plans.business.price'),
-      period: t('perMonth'),
-      features: t.raw('plans.business.features') as string[],
-      cta: t('plans.business.cta'),
-      href: appHref('/register?plan=BUSINESS'),
-      popular: false,
-      monthlyPrice: 2999,
-    },
-  ];
+  const grouped = KIND_ORDER.filter((k) => k !== 'license')
+    .map((kind) => ({ kind, items: paid.filter((p) => p.kind === kind) }))
+    .filter((g) => g.items.length > 0);
 
-  // Map API plans to overlay discount info.
-  // v2.8.97 — case-folded comparison strips trailing whitespace and
-  // accidental locale-case anomalies (Turkish "İ"/"i"/"I" lower-cased
-  // inconsistently across browsers). The case-insensitive comparison
-  // alone passed for "free" vs "FREE" but missed "Free " (trailing
-  // space from a CMS paste). Folding both sides via `toLocaleLowerCase`
-  // + trim keeps the match resilient to upstream data hygiene drift.
-  const normalize = (s: string) => s.toLocaleLowerCase('en-US').trim();
-  const plans = staticPlans.map((sp) => {
-    const apiPlan = apiPlans?.find(
-      (ap) => normalize(ap.name) === normalize(sp.key)
-    );
-    const hasDiscount = mounted && apiPlan?.isDiscountActive && apiPlan?.discountPercentage &&
-      apiPlan?.discountEndDate && new Date(apiPlan.discountEndDate) > new Date();
-
-    return {
-      ...sp,
-      discountPercentage: hasDiscount ? apiPlan!.discountPercentage : undefined,
-      discountLabel: hasDiscount ? apiPlan!.discountLabel : undefined,
-      discountEndDate: hasDiscount ? apiPlan!.discountEndDate : undefined,
-      // Discounted price is rendered alongside the strikethrough original.
-      // v2.8.98 — render via Intl.NumberFormat so the symbol + grouping
-      // follow the active locale. Pre-fix the hardcoded ₺ suffix
-      // surfaced in Arabic/Russian/Uzbek strings that otherwise group
-      // numbers with their own separators and place the currency
-      // glyph on the leading side. Intl.NumberFormat with
-      // `currencyDisplay: 'narrowSymbol'` keeps "₺" for tr/en and
-      // does the right thing for the others.
-      discountedPrice: hasDiscount && sp.monthlyPrice > 0
-        ? new Intl.NumberFormat(undefined, {
-            style: 'currency',
-            currency: 'TRY',
-            currencyDisplay: 'narrowSymbol',
-            maximumFractionDigits: 0,
-          }).format(Math.round(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100)))
-        : undefined,
-    };
-  });
+  const freeFeatures = t.raw('free.features') as string[];
 
   return (
     <section ref={sectionRef} id="pricing" className="section-padding relative overflow-hidden">
-      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
 
-      {/* Gradient orbs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
           className="gradient-orb"
@@ -144,100 +89,110 @@ export default function Pricing({ apiPlans }: PricingProps) {
           <p className="text-lg text-slate-600">{t('subtitle')}</p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {plans.map((plan, index) => (
-            <div
-              key={plan.key}
-              data-animate="slide-up"
-              style={{ '--delay': `${index * 0.1}s` } as React.CSSProperties}
-              className={plan.popular ? 'lg:-mt-4 lg:mb-4' : ''}
+        {/* The free core comes first because it is the offer: the whole
+            point-of-sale runs at no cost, with no licence and no limits. */}
+        <div
+          data-animate="slide-up"
+          className="max-w-6xl mx-auto mb-8 rounded-3xl border-2 border-green-500 bg-white p-8 shadow-xl shadow-green-500/10"
+        >
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-sm font-semibold text-green-700">
+                <Sparkles className="h-4 w-4" />
+                {t('free.badge')}
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900">{t('free.name')}</h3>
+              <p className="mt-1 text-slate-600">{t('free.description')}</p>
+            </div>
+            <a
+              href={appHref('/register')}
+              className="hover-lift inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3.5 font-semibold text-white shadow-lg shadow-green-500/25"
             >
-              <div className={plan.popular ? 'hover-tilt-strong' : 'hover-tilt'}>
-                <div
-                  className={`
-                    relative h-full bg-white rounded-3xl p-8
-                    ${plan.popular
-                      ? 'shadow-2xl shadow-orange-500/20 border-2 border-orange-500'
-                      : 'shadow-xl shadow-slate-200/50 border border-slate-200'}
-                  `}
-                >
-                  {/* Popular badge */}
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-900 text-sm font-semibold px-4 py-1.5 rounded-full shadow-lg">
-                        <Sparkles className="w-4 h-4" />
-                        {t('mostPopular')}
-                      </div>
-                    </div>
-                  )}
+              {t('free.cta')}
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          </div>
+          <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {freeFeatures.map((feature) => (
+              <li key={feature} className="flex items-center gap-2 text-sm">
+                <Check className="h-5 w-5 flex-shrink-0 text-green-500" />
+                <span className="text-slate-600">{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-                  {/* Discount badge */}
-                  {plan.discountPercentage && (
-                    <div className="mb-3">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-full">
-                        <Tag className="w-3 h-3" />
-                        {plan.discountPercentage}% OFF
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold text-slate-900 mb-1">{plan.name}</h3>
-                    <p className="text-sm text-slate-500">{plan.description}</p>
-                  </div>
-
-                  <div className="text-center mb-6">
-                    {plan.discountedPrice ? (
-                      <>
-                        <span className="text-xl text-slate-400 line-through mr-2">{plan.price}</span>
-                        <span className="text-5xl font-bold text-orange-500 animate-scale-in">
-                          {plan.discountedPrice}
-                        </span>
-                      </>
-                    ) : (
-                      <span className={`text-5xl font-bold ${plan.popular ? 'text-orange-500' : 'text-slate-900'}`}>
-                        {plan.price}
-                      </span>
-                    )}
-                    <span className="text-slate-500">{plan.period}</span>
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, i) => (
-                      <li
-                        key={feature}
-                        className="flex items-center gap-3 text-sm"
-                      >
-                        <Check className={`w-5 h-5 flex-shrink-0 ${plan.popular ? 'text-orange-500' : 'text-green-500'}`} />
-                        <span className="text-slate-600">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <a
-                    href={plan.href}
-                    className={`
-                      hover-lift w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all
-                      ${plan.popular
-                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-900 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30'
-                        : 'bg-slate-100 text-slate-900 hover:bg-slate-200'}
-                    `}
-                  >
-                    {plan.cta}
-                    <ArrowRight className="w-4 h-4" />
-                  </a>
-                </div>
+        {/* Licence — the prerequisite for anything paid. */}
+        {licence && (
+          <div
+            data-animate="slide-up"
+            className="max-w-6xl mx-auto mb-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50"
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">{licence.name}</h3>
+                <p className="mt-1 max-w-xl text-sm text-slate-500">
+                  {licence.description ?? t('licence.description')}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-4xl font-bold text-orange-500">
+                  {formatTry(licence.priceCents)}
+                </span>
+                <span className="text-slate-500">{t('perYear')}</span>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* Everything else, priced per product. */}
+        {grouped.length > 0 ? (
+          <div className="max-w-6xl mx-auto space-y-8">
+            {grouped.map((group) => (
+              <div key={group.kind} data-animate="slide-up">
+                <h3 className="mb-4 text-lg font-semibold text-slate-900">
+                  {t(`kind.${group.kind}`)}
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.items.map((product) => (
+                    <div
+                      key={product.code}
+                      className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/40"
+                    >
+                      <h4 className="font-semibold text-slate-900">{product.name}</h4>
+                      {product.description && (
+                        <p className="mt-1 flex-1 text-sm text-slate-500">
+                          {product.description}
+                        </p>
+                      )}
+                      <div className="mt-4">
+                        <span className="text-2xl font-bold text-slate-900">
+                          {formatTry(product.priceCents)}
+                        </span>
+                        <span className="text-sm text-slate-500">
+                          {product.billing === 'annual'
+                            ? t('perYear')
+                            : t('oneTime')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mx-auto max-w-xl text-center text-slate-500">
+            {t('catalogUnavailable')}
+          </p>
+        )}
 
         <p
           data-animate="fade"
           style={{ '--delay': '0.6s' } as React.CSSProperties}
           className="text-center text-sm text-slate-500 mt-12"
         >
-          {t('trialNote')}
+          {t('prorationNote')}
         </p>
       </Container>
     </section>

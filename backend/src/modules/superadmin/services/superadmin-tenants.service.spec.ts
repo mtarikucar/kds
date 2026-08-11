@@ -25,6 +25,7 @@ describe("SuperAdminTenantsService", () => {
   let svc: SuperAdminTenantsService;
 
   const ACTOR_ID = "sa-1";
+  let entitlements: { getForTenant: jest.Mock };
   const ACTOR_EMAIL = "ops@platform.com";
   const TENANT_ID = "tenant-1";
 
@@ -37,12 +38,21 @@ describe("SuperAdminTenantsService", () => {
     };
     email = { sendPlainEmail: jest.fn().mockResolvedValue(undefined) };
     outbox = { append: jest.fn().mockResolvedValue(undefined) };
+    entitlements = {
+      getForTenant: jest.fn().mockResolvedValue({
+        features: {},
+        limits: {},
+        integrations: {},
+        computedAt: new Date().toISOString(),
+      }),
+    };
     svc = new SuperAdminTenantsService(
       prisma as any,
       audit as any,
       notifications as any,
       email as any,
       outbox as any,
+      entitlements as any,
     );
     // Drive $transaction(cb => ...) with the real prisma mock as the tx.
     (prisma.$transaction as jest.Mock).mockImplementation(async (cb: any) =>
@@ -205,81 +215,52 @@ describe("SuperAdminTenantsService", () => {
       );
     });
 
-    it("layers feature overrides over plan defaults to compute effective features", async () => {
+    it("reports the engine's projection as effective, not plan columns", async () => {
+      // Regression: this used to layer overrides over tenant.currentPlan.
+      // currentPlanId is null on every tenant since v3.3.0, so the editor
+      // showed a tenant with the whole free core plus everything they had
+      // bought as though they had nothing at all.
       prisma.tenant.findUnique.mockResolvedValue({
         id: TENANT_ID,
-        featureOverrides: { advancedReports: true, apiAccess: false },
-        limitOverrides: { maxUsers: 99 },
-        currentPlan: {
-          advancedReports: false,
-          multiLocation: true,
-          customBranding: false,
-          apiAccess: true,
-          prioritySupport: false,
-          inventoryTracking: false,
-          kdsIntegration: false,
-          reservationSystem: false,
-          personnelManagement: false,
-          deliveryIntegration: false,
-          maxUsers: 5,
-          maxTables: 10,
-          maxProducts: 100,
-          maxCategories: 20,
-          maxMonthlyOrders: 1000,
-        },
+        featureOverrides: { advancedReports: true },
+        limitOverrides: null,
       } as any);
+      entitlements.getForTenant.mockResolvedValue({
+        features: { posAccess: true, advancedReports: true, license: true },
+        limits: { maxBranches: 3 },
+        integrations: { delivery: ["getir"] },
+        computedAt: "2026-08-11T00:00:00.000Z",
+      });
+      prisma.featureEntitlement.findMany.mockResolvedValue([] as any);
 
       const res = await svc.getOverrides(TENANT_ID);
-      // override wins over the plan default
-      expect(res.effective.features.advancedReports).toBe(true);
-      expect(res.effective.features.apiAccess).toBe(false);
-      // plan default flows through where there's no override
-      expect(res.effective.features.multiLocation).toBe(true);
-      expect(res.effective.limits.maxUsers).toBe(99); // override
-      expect(res.effective.limits.maxTables).toBe(10); // plan default
+
+      expect(res.effective.features.posAccess).toBe(true);
+      expect(res.effective.limits.maxBranches).toBe(3);
+      expect(res.effective.integrations.delivery).toEqual(["getir"]);
+      expect(res.featureOverrides).toEqual({ advancedReports: true });
     });
 
-    // M10: posAccess (feature) and maxBranches (limit) are in
-    // FEATURE_KEYS/LIMIT_KEYS so updateOverrides accepts them, but the plan
-    // default the override editor reads on the left omitted them — the editor
-    // was blind to those keys on read. Surface the plan default so the
-    // override row shows the correct baseline + effective value.
-    it("exposes posAccess and maxBranches plan defaults so the override editor can show them", async () => {
+    it("breaks each grant down by source so 'why does this tenant have X' is answerable", async () => {
       prisma.tenant.findUnique.mockResolvedValue({
         id: TENANT_ID,
         featureOverrides: null,
         limitOverrides: null,
-        currentPlan: {
-          advancedReports: false,
-          multiLocation: false,
-          customBranding: false,
-          apiAccess: false,
-          externalDisplay: true,
-          prioritySupport: false,
-          inventoryTracking: false,
-          kdsIntegration: true,
-          reservationSystem: false,
-          personnelManagement: false,
-          deliveryIntegration: true,
-          posAccess: false,
-          maxUsers: 5,
-          maxTables: 10,
-          maxBranches: -1,
-          maxProducts: 100,
-          maxCategories: 20,
-          maxMonthlyOrders: 1000,
-        },
       } as any);
+      prisma.featureEntitlement.findMany.mockResolvedValue([
+        { key: "feature.posAccess", value: true, source: "free:baseline" },
+        { key: "limit.maxBranches", value: 1, source: "free:baseline" },
+        { key: "limit.maxBranches", value: 2, source: "addon:extra_branch:ta-1" },
+        { key: "feature.apiAccess", value: true, source: "override:admin" },
+      ] as any);
 
       const res = await svc.getOverrides(TENANT_ID);
-      // Plan-default column now carries the previously-omitted keys.
-      expect(res.planDefaults.features.posAccess).toBe(false);
-      expect(res.planDefaults.features.deliveryIntegration).toBe(true);
-      expect(res.planDefaults.features.externalDisplay).toBe(true);
-      expect(res.planDefaults.limits.maxBranches).toBe(-1);
-      // ...and they flow through to effective with no override.
-      expect(res.effective.features.posAccess).toBe(false);
-      expect(res.effective.limits.maxBranches).toBe(-1);
+
+      expect(res.sources["limit.maxBranches"]).toEqual([
+        "free:baseline",
+        "addon:extra_branch:ta-1",
+      ]);
+      expect(res.sources["feature.apiAccess"]).toEqual(["override:admin"]);
     });
   });
 
@@ -289,7 +270,7 @@ describe("SuperAdminTenantsService", () => {
         id: TENANT_ID,
         name: "Acme",
         featureOverrides: { advancedReports: true },
-        limitOverrides: { maxUsers: 50 },
+        limitOverrides: { maxBranches: 2 },
       } as any);
       prisma.tenant.update.mockResolvedValue({} as any);
 
@@ -297,7 +278,7 @@ describe("SuperAdminTenantsService", () => {
         TENANT_ID,
         {
           featureOverrides: { advancedReports: null, apiAccess: true } as any,
-          limitOverrides: { maxUsers: 75 } as any,
+          limitOverrides: { maxBranches: 4 } as any,
         } as any,
         ACTOR_ID,
         ACTOR_EMAIL,
@@ -305,7 +286,7 @@ describe("SuperAdminTenantsService", () => {
 
       // advancedReports null → removed; apiAccess true → added.
       expect(res.featureOverrides).toEqual({ apiAccess: true });
-      expect(res.limitOverrides).toEqual({ maxUsers: 75 });
+      expect(res.limitOverrides).toEqual({ maxBranches: 4 });
       // Appended INSIDE the tenant-update transaction (tx-aware append) so the
       // override write + reprojection event commit atomically.
       expect(outbox.append).toHaveBeenCalledTimes(1);

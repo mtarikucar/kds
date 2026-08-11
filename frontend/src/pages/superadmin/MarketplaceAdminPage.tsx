@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from '../../components/ui/Modal';
 import {
+  ADDON_BILLINGS,
+  ADDON_KINDS,
+  CATALOG_LOCALES,
+  CREDIT_KINDS,
   type AdminAddOn,
   type AdminHardwareProduct,
   useSaArchiveAddOn,
@@ -89,6 +93,7 @@ function AddOnsSection() {
               <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.name')}</th>
               <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.kind')}</th>
               <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.billing')}</th>
+              <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.licence')}</th>
               <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.price')}</th>
               <th className="px-3 py-2 font-medium">{tr('marketplace.addons.col.status')}</th>
               <th className="px-3 py-2"></th>
@@ -101,8 +106,22 @@ function AddOnsSection() {
                 <td className="px-3 py-2">{a.name}</td>
                 <td className="px-3 py-2 text-xs">{a.kind}</td>
                 <td className="px-3 py-2 text-xs">{a.billing}</td>
+                <td className="px-3 py-2 text-xs">
+                  {a.requiresLicense ? (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
+                      {tr('marketplace.addons.needsLicence')}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 tabular-nums">
                   {(a.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: a.currency })}
+                  {a.creditKind && (
+                    <div className="text-xs font-normal text-gray-500">
+                      {a.creditUnits} × {a.creditKind}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <StatusPill status={a.status} />
@@ -175,15 +194,34 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
     code: initial?.code ?? '',
     name: initial?.name ?? '',
     description: initial?.description ?? '',
-    kind: initial?.kind ?? 'capacity',
-    billing: initial?.billing ?? 'recurring',
+    kind: initial?.kind ?? 'module',
+    billing: initial?.billing ?? 'annual',
     priceCents: initial?.priceCents ?? 0,
     currency: initial?.currency ?? 'TRY',
     grantsJson: JSON.stringify(initial?.grants ?? {}, null, 2),
     depsCsv: (initial?.deps ?? []).join(','),
     status: initial?.status ?? 'draft',
+    // Defaults to true, matching the backend column: the safe answer for a new
+    // product is "needs a licence", because the alternative hands capability to
+    // tenants who have bought nothing.
+    requiresLicense: initial?.requiresLicense ?? true,
+    creditKind: initial?.creditKind ?? '',
+    creditUnits: initial?.creditUnits ?? '',
+    maxQuantity: initial?.maxQuantity ?? '',
+    sortOrder: initial?.sortOrder ?? 0,
+    i18n: initial?.i18n ?? {},
   });
   const [error, setError] = useState<string | null>(null);
+
+  const isCredit = form.kind === 'credit';
+  const isLicence = form.kind === 'license';
+
+  function patchI18n(locale: string, field: 'name' | 'description', value: string) {
+    setForm((f) => ({
+      ...f,
+      i18n: { ...f.i18n, [locale]: { ...(f.i18n[locale] ?? {}), [field]: value } },
+    }));
+  }
 
   async function submit() {
     setError(null);
@@ -194,6 +232,27 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
       setError(tr('marketplace.addons.grantsInvalid'));
       return;
     }
+
+    // Mirror the server-side invariants (catalog-validation.ts) so a bad row
+    // fails here with a readable message instead of a round-trip 400. The
+    // server still checks: this is a convenience, not the gate.
+    if (isCredit && (!form.creditKind || !Number(form.creditUnits))) {
+      setError(tr('marketplace.addons.creditIncomplete'));
+      return;
+    }
+    if (form.status === 'published' && Number(form.priceCents) <= 0) {
+      setError(tr('marketplace.addons.publishedNeedsPrice'));
+      return;
+    }
+    if (isLicence && form.requiresLicense) {
+      setError(tr('marketplace.addons.licenceSelfRequire'));
+      return;
+    }
+    if (form.depsCsv.includes('plan:')) {
+      setError(tr('marketplace.addons.planDepsGone'));
+      return;
+    }
+
     const body: Partial<AdminAddOn> = {
       ...(initial ? {} : { code: form.code }),
       name: form.name,
@@ -205,6 +264,12 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
       grants,
       deps: form.depsCsv.split(',').map((s) => s.trim()).filter(Boolean),
       status: form.status as AdminAddOn['status'],
+      requiresLicense: form.requiresLicense,
+      creditKind: isCredit ? (form.creditKind as AdminAddOn['creditKind']) : null,
+      creditUnits: isCredit ? Number(form.creditUnits) : null,
+      maxQuantity: form.maxQuantity === '' ? null : Number(form.maxQuantity),
+      sortOrder: Number(form.sortOrder) || 0,
+      i18n: Object.keys(form.i18n).length ? form.i18n : null,
     };
     await onSubmit(body);
   }
@@ -223,43 +288,98 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
               disabled={!!initial}
               value={form.code}
               onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-              placeholder="kds_extra_screen"
+              placeholder="module_personnel"
             />
           </Field>
           <Field label={tr('marketplace.addons.fields.name')}>
             <input className="rounded border px-2 py-1 text-sm w-full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </Field>
           <Field label={tr('marketplace.addons.fields.kind')}>
-            <select className="rounded border px-2 py-1 text-sm w-full" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as any }))}>
-              <option value="software">software</option>
-              <option value="integration">integration</option>
-              <option value="capacity">capacity</option>
-              <option value="support">support</option>
+            <select
+              className="rounded border px-2 py-1 text-sm w-full"
+              value={form.kind}
+              onChange={(e) => {
+                const kind = e.target.value as AdminAddOn['kind'];
+                setForm((f) => ({
+                  ...f,
+                  kind,
+                  // A credit pack is a one-time balance; the licence never
+                  // requires itself. Steering these here stops the two
+                  // combinations the server rejects from being reachable.
+                  billing: kind === 'credit' || kind === 'service' ? 'oneTime' : 'annual',
+                  requiresLicense: kind === 'license' ? false : f.requiresLicense,
+                }));
+              }}
+            >
+              {ADDON_KINDS.map((kind) => (
+                <option key={kind} value={kind}>{kind}</option>
+              ))}
             </select>
           </Field>
           <Field label={tr('marketplace.addons.fields.billing')}>
-            <select className="rounded border px-2 py-1 text-sm w-full" value={form.billing} onChange={(e) => setForm((f) => ({ ...f, billing: e.target.value as any }))}>
-              <option value="recurring">recurring</option>
-              <option value="oneTime">oneTime</option>
+            <select className="rounded border px-2 py-1 text-sm w-full" value={form.billing} onChange={(e) => setForm((f) => ({ ...f, billing: e.target.value as AdminAddOn['billing'] }))}>
+              {ADDON_BILLINGS.map((billing) => (
+                <option key={billing} value={billing}>{billing}</option>
+              ))}
             </select>
           </Field>
           <Field label={tr('marketplace.addons.fields.priceCents')}>
             <input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.priceCents} onChange={(e) => setForm((f) => ({ ...f, priceCents: Number(e.target.value) }))} />
+            <span className="mt-0.5 block text-[11px] text-gray-500">
+              {(Number(form.priceCents) / 100).toLocaleString('tr-TR', { style: 'currency', currency: form.currency || 'TRY' })}
+              {form.billing === 'annual' && ` ${tr('marketplace.addons.perYear')}`}
+            </span>
           </Field>
           <Field label={tr('marketplace.addons.fields.currency')}>
             <input className="rounded border px-2 py-1 text-sm w-full" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} />
           </Field>
           <Field label={tr('marketplace.addons.fields.status')}>
-            <select className="rounded border px-2 py-1 text-sm w-full" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}>
+            <select className="rounded border px-2 py-1 text-sm w-full" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as AdminAddOn['status'] }))}>
               <option value="draft">draft</option>
               <option value="published">published</option>
               <option value="archived">archived</option>
             </select>
           </Field>
+          <Field label={tr('marketplace.addons.fields.sortOrder')}>
+            <input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))} />
+          </Field>
           <Field label={tr('marketplace.addons.fields.deps')}>
-            <input className="rounded border px-2 py-1 text-sm w-full" value={form.depsCsv} onChange={(e) => setForm((f) => ({ ...f, depsCsv: e.target.value }))} placeholder="plan:PRO, delivery_hub" />
+            <input className="rounded border px-2 py-1 text-sm w-full" value={form.depsCsv} onChange={(e) => setForm((f) => ({ ...f, depsCsv: e.target.value }))} placeholder="license_annual, module_inventory" />
+          </Field>
+          <Field label={tr('marketplace.addons.fields.maxQuantity')}>
+            <input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" min={1} value={form.maxQuantity} onChange={(e) => setForm((f) => ({ ...f, maxQuantity: e.target.value }))} placeholder="∞" />
           </Field>
         </div>
+
+        <label className="mt-3 flex items-start gap-2 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            disabled={isLicence}
+            checked={form.requiresLicense}
+            onChange={(e) => setForm((f) => ({ ...f, requiresLicense: e.target.checked }))}
+          />
+          <span>
+            <span className="font-medium">{tr('marketplace.addons.fields.requiresLicense')}</span>
+            <span className="block text-gray-500">{tr('marketplace.addons.requiresLicenseHint')}</span>
+          </span>
+        </label>
+
+        {isCredit && (
+          <div className="mt-3 grid grid-cols-1 gap-3 rounded border border-dashed p-3 sm:grid-cols-2">
+            <Field label={tr('marketplace.addons.fields.creditKind')}>
+              <select className="rounded border px-2 py-1 text-sm w-full" value={form.creditKind} onChange={(e) => setForm((f) => ({ ...f, creditKind: e.target.value }))}>
+                <option value="">—</option>
+                {CREDIT_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>{kind}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={tr('marketplace.addons.fields.creditUnits')}>
+              <input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" min={1} value={form.creditUnits} onChange={(e) => setForm((f) => ({ ...f, creditUnits: e.target.value }))} />
+            </Field>
+          </div>
+        )}
 
         <Field label={tr('marketplace.addons.fields.description')}>
           <textarea
@@ -270,6 +390,34 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
           />
         </Field>
 
+        {/* Localized copy lives in the DB, so a new product or a reworded one
+            ships without a frontend release. Blank locales fall back to the
+            base name/description at read time. */}
+        <details className="mt-3 rounded border p-2">
+          <summary className="cursor-pointer text-xs font-medium text-gray-700">
+            {tr('marketplace.addons.i18nTitle')}
+          </summary>
+          <div className="mt-2 space-y-2">
+            {CATALOG_LOCALES.map((locale) => (
+              <div key={locale} className="grid grid-cols-1 gap-2 sm:grid-cols-[3rem_1fr_1fr] sm:items-center">
+                <span className="font-mono text-xs uppercase text-gray-500">{locale}</span>
+                <input
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder={tr('marketplace.addons.fields.name')}
+                  value={form.i18n[locale]?.name ?? ''}
+                  onChange={(e) => patchI18n(locale, 'name', e.target.value)}
+                />
+                <input
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder={tr('marketplace.addons.fields.description')}
+                  value={form.i18n[locale]?.description ?? ''}
+                  onChange={(e) => patchI18n(locale, 'description', e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </details>
+
         <Field label={tr('marketplace.addons.fields.grants')}>
           <textarea
             className="mt-1 w-full rounded border px-2 py-1 font-mono text-xs"
@@ -277,6 +425,9 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
             value={form.grantsJson}
             onChange={(e) => setForm((f) => ({ ...f, grantsJson: e.target.value }))}
           />
+          <span className="mt-0.5 block text-[11px] text-gray-500">
+            {tr('marketplace.addons.grantsHint')}
+          </span>
         </Field>
 
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -290,6 +441,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
     </Modal>
   );
 }
+
 
 // ── Hardware products ──────────────────────────────────────────────────
 

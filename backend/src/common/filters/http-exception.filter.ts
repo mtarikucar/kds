@@ -13,6 +13,20 @@ import { Prisma } from "@prisma/client";
 import { captureException, setContext } from "../../sentry.config";
 
 /**
+ * Fields an exception may attach that survive into the response body.
+ *
+ * Deliberately an allowlist rather than a spread: the body is a public
+ * contract and an accidental `...exceptionResponse` would leak whatever a
+ * future thrower happens to put on it.
+ */
+const ACTIONABLE_KEYS = [
+  "requirement",
+  "offer",
+  "licenseRequired",
+  "reason",
+] as const;
+
+/**
  * Global exception filter
  * Catches all exceptions and formats them into a standardized error response
  */
@@ -42,6 +56,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // dropping any `errorCode`/`code` the thrower attached, so the inline
     // remediation never fired in prod.
     let errorCode: string | undefined = undefined;
+    // Structured remediation payload (see ErrorResponse.actionable).
+    let actionable: Record<string, unknown> | undefined = undefined;
     let details: any = undefined;
     let stack: string | undefined = undefined;
 
@@ -69,6 +85,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
         errorCode =
           (exceptionResponse as any).errorCode ??
           (exceptionResponse as any).code;
+
+        // Preserve the actionable payload an exception attached. The filter
+        // rebuilds the body from a fixed shape, so anything not copied here
+        // is silently discarded — which is exactly what happened to the
+        // entitlement offer: EntitlementRequiredException carried the
+        // requirement, the resolved product and its prorated price, and every
+        // one of those fields died in this method.
+        const structured = exceptionResponse as Record<string, unknown>;
+        const carried = ACTIONABLE_KEYS.filter((k) => k in structured);
+        if (carried.length > 0) {
+          actionable = Object.fromEntries(
+            carried.map((k) => [k, structured[k]]),
+          );
+        }
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       // Prisma database errors
@@ -106,6 +136,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // actionable-error flow can branch on it. Omitted entirely when absent
     // to keep ordinary error bodies unchanged.
     if (errorCode) errorResponse.errorCode = errorCode;
+    if (actionable) errorResponse.actionable = actionable;
 
     // Include details and stack only in development
     if (isDevelopment) {

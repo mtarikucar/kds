@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from './http-exception.filter';
 import { BusinessException, ResourceNotFoundException } from '../exceptions/business.exception';
 import { ErrorCode } from '../interfaces/error-response.interface';
+import { EntitlementRequiredException } from '../../modules/entitlements/entitlement-required.exception';
 
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter;
@@ -51,6 +52,72 @@ describe('HttpExceptionFilter', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('actionable payload', () => {
+    // The filter rebuilds every response body from a fixed shape, so anything
+    // an exception attaches is dropped unless it is explicitly carried.
+    // EntitlementRequiredException attached the requirement, the resolved
+    // product and its prorated price — a catalog read and a proration computed
+    // on EVERY denial — and all of it died here. The client saw a bare 403.
+    it('carries the entitlement denial detail onto the response', () => {
+      const exception = new EntitlementRequiredException({
+        requirement: { type: 'feature', key: 'feature.personnelManagement' },
+        offer: {
+          code: 'module_personnel',
+          name: 'Personel Yönetimi',
+          kind: 'module',
+          annualPriceCents: 99_000,
+          proratedCents: 54_123,
+          currency: 'TRY',
+          periodEnd: '2027-03-10T00:00:00.000Z',
+        },
+        licenseRequired: true,
+        reason: 'not_owned',
+      });
+
+      filter.catch(exception, mockArgumentsHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.errorCode).toBe('ENTITLEMENT_REQUIRED');
+      expect(body.actionable).toEqual({
+        requirement: { type: 'feature', key: 'feature.personnelManagement' },
+        offer: expect.objectContaining({
+          code: 'module_personnel',
+          proratedCents: 54_123,
+        }),
+        licenseRequired: true,
+        reason: 'not_owned',
+      });
+    });
+
+    it('omits the field entirely for an ordinary error', () => {
+      filter.catch(
+        new HttpException('Nope', HttpStatus.BAD_REQUEST),
+        mockArgumentsHost,
+      );
+      expect(mockResponse.json.mock.calls[0][0].actionable).toBeUndefined();
+    });
+
+    it('carries only the allowlisted keys, never the whole exception body', () => {
+      // The body is a public contract; a spread would publish whatever a
+      // future thrower happens to attach.
+      filter.catch(
+        new HttpException(
+          {
+            statusCode: 403,
+            message: 'no',
+            reason: 'lapsed',
+            internalDebugTrace: 'SELECT * FROM users',
+          },
+          HttpStatus.FORBIDDEN,
+        ),
+        mockArgumentsHost,
+      );
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.actionable).toEqual({ reason: 'lapsed' });
+      expect(JSON.stringify(body)).not.toContain('internalDebugTrace');
+    });
   });
 
   describe('catch', () => {
