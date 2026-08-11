@@ -84,40 +84,8 @@ export class SuperAdminSubscriptionsController {
   }
 
   // Subscriptions
-  @Post("subscriptions/expire-trials")
-  @ApiOperation({
-    summary:
-      "Manually run the trial-expiry sweep (same code path as the nightly cron). " +
-      "Each subscription whose trialEnd has passed is moved to ACTIVE FREE. " +
-      "Used by support to force a tenant off trial early, and by E2E tests.",
-  })
-  async expireTrials() {
-    return this.subscriptionsService.triggerExpireTrials();
-  }
-
-  @Post("subscriptions/sweep-period-end")
-  @ApiOperation({
-    summary:
-      "Manually run the period-end sweep (same code path as the 02:00 daily cron). " +
-      "Each ACTIVE subscription with currentPeriodEnd in the past gets demoted to PAST_DUE " +
-      "and the tenant admin receives a past-due email.",
-  })
-  async sweepPeriodEnd() {
-    return this.subscriptionsService.triggerPeriodEndSweep();
-  }
-
-  @Post("subscriptions/send-expiry-reminders")
-  @ApiOperation({
-    summary:
-      "Manually fire the 7d/3d/1d pre-expiry reminder cron. Used by support to " +
-      "hand-trigger a notification window for a specific batch, and by E2E tests.",
-  })
-  async sendExpiryReminders() {
-    return this.subscriptionsService.triggerExpiryReminders();
-  }
-
   @Get("subscriptions")
-  @ApiOperation({ summary: "List all subscriptions" })
+  @ApiOperation({ summary: "List subscriptions" })
   async findAllSubscriptions(@Query() filters: SubscriptionFilterDto) {
     return this.subscriptionsService.findAllSubscriptions(filters);
   }

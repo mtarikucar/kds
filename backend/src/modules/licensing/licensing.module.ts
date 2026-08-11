@@ -1,6 +1,10 @@
 import { Global, Module } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { LicensingService } from "./licensing.service";
+import { RenewalCycleService } from "./renewal-cycle.service";
+import { RenewalSchedulerService } from "./renewal-scheduler.service";
+import { CheckoutModule } from "../checkout/checkout.module";
+import { OutboxModule } from "../outbox/outbox.module";
 
 /**
  * Anniversary + proration for the à-la-carte model.
@@ -18,8 +22,12 @@ import { LicensingService } from "./licensing.service";
  */
 @Global()
 @Module({
-  imports: [PrismaModule],
-  providers: [LicensingService],
-  exports: [LicensingService],
+  // forwardRef-free: CheckoutModule provides QuoteService (the renewal cart is
+  // priced through the same engine as any other cart) and does not import
+  // this module back — LicensingService reaches checkout through the @Global()
+  // export, not an import.
+  imports: [PrismaModule, CheckoutModule, OutboxModule],
+  providers: [LicensingService, RenewalCycleService, RenewalSchedulerService],
+  exports: [LicensingService, RenewalCycleService],
 })
 export class LicensingModule {}

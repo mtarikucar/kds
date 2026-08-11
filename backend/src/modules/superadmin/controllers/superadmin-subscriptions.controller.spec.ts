@@ -40,13 +40,16 @@ describe("SuperAdminSubscriptionsController", () => {
     expect(svc.createPlan).toHaveBeenCalledWith(dto, actorId, actorEmail);
   });
 
-  it("manual trigger endpoints route to their cron-equivalent service methods", async () => {
-    await ctrl.expireTrials();
-    await ctrl.sweepPeriodEnd();
-    await ctrl.sendExpiryReminders();
-    expect(svc.triggerExpireTrials).toHaveBeenCalled();
-    expect(svc.triggerPeriodEndSweep).toHaveBeenCalled();
-    expect(svc.triggerExpiryReminders).toHaveBeenCalled();
+  it("no longer exposes the retired subscription cron triggers", () => {
+    // v3.3.0 — trial expiry, period-end sweep and pre-expiry reminders were
+    // ops triggers for crons that existed to manage SUBSCRIPTIONS. The
+    // equivalents now live on RenewalSchedulerService (generate / remind /
+    // lapse) and operate on the annual renewal cycle, so leaving these
+    // endpoints would let an operator fire a job that no longer does
+    // anything.
+    expect((ctrl as any).expireTrials).toBeUndefined();
+    expect((ctrl as any).sweepPeriodEnd).toBeUndefined();
+    expect((ctrl as any).sendExpiryReminders).toBeUndefined();
   });
 
   it("extendSubscription threads dto + actor identity", async () => {

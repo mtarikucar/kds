@@ -47,7 +47,16 @@ export class TenantAddOnSweeperService {
     @Optional() private readonly notifications?: NotificationService,
   ) {}
 
-  @Cron("0 3 * * *")
+  // v3.3.0 — moved from 03:00 to 00:05.
+  //
+  // The entitlement engine sweeps expired grants every 5 minutes while this
+  // ran daily at 03:00, so an `active` grant that expired at midnight went
+  // dark for three hours before the sweeper flipped it to past_due and
+  // restored the grace grant — an annual, hours-long lockout for every paying
+  // tenant. The projector now gives active rows the same +grace validUntil,
+  // and this runs just after midnight, so the two clocks agree and the
+  // SWEEPER (not a timestamp) is what ends access.
+  @Cron("5 0 * * *")
   async runDaily(): Promise<void> {
     await withAdvisoryLock(
       this.prisma,

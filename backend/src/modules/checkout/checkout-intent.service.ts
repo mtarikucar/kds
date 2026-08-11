@@ -123,7 +123,9 @@ export class CheckoutIntentService {
           branchId: item.branchId,
           quantity: item.qty,
         },
-        { cartCodes },
+        // A generated renewal re-buys what the tenant already owns; the
+        // ownership checks would otherwise reject every single line.
+        { cartCodes, isRenewal: !!cart.renewalCycleId },
       );
     }
 

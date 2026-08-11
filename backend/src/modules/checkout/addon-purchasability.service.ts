@@ -32,6 +32,17 @@ export interface AssertPurchasableInput {
  */
 export interface CartContext {
   cartCodes?: ReadonlySet<string>;
+  /**
+   * This cart is a generated RENEWAL. Every line is something the tenant
+   * already owns — that is what a renewal IS — so the ownership and
+   * already-granted checks must not fire. Without this the renewal cart is
+   * rejected line by line and nobody can ever pay their anniversary invoice.
+   *
+   * The licence prerequisite and the dependency check still run: a renewal
+   * that drops the licence but keeps a module is exactly the case the
+   * prerequisite exists for.
+   */
+  isRenewal?: boolean;
 }
 
 /**
@@ -77,10 +88,10 @@ export class AddonPurchasabilityService {
       }
     }
 
-    // 2) The licence itself: one at a time. Renewal goes through the renewal
-    // cycle, which re-pays the EXISTING row rather than minting a second one.
+    // 2) The licence itself: one at a time — EXCEPT on a renewal, which
+    // re-pays the existing row rather than minting a second one.
     if (addOn.kind === "license") {
-      if (hasLicense) {
+      if (hasLicense && !ctx.isRenewal) {
         this.reject(
           "ADDON_ALREADY_OWNED",
           addOn.code,
@@ -100,8 +111,12 @@ export class AddonPurchasabilityService {
     }
 
     // 4) Already covered by the tenant's effective entitlements — paying
-    // again buys nothing (DEF-1).
-    if (TenantMarketplaceService.isIncludedInEntitlements(grants, ent)) {
+    // again buys nothing (DEF-1). A renewal is the one case where paying for
+    // something you already have is the whole point.
+    if (
+      !ctx.isRenewal &&
+      TenantMarketplaceService.isIncludedInEntitlements(grants, ent)
+    ) {
       this.reject(
         "ADDON_ALREADY_GRANTED",
         addOn.code,
@@ -125,7 +140,8 @@ export class AddonPurchasabilityService {
     });
 
     if (addOn.kind === "capacity") {
-      const owned = activeOwned?.quantity ?? 0;
+      // A renewal re-buys the units already held rather than adding to them.
+      const owned = ctx.isRenewal ? 0 : (activeOwned?.quantity ?? 0);
       const wanted = owned + (input.quantity ?? 1);
       if (addOn.maxQuantity != null && wanted > addOn.maxQuantity) {
         this.reject(
@@ -134,7 +150,7 @@ export class AddonPurchasabilityService {
           `"${addOn.name}" is limited to ${addOn.maxQuantity} per account (you have ${owned}).`,
         );
       }
-    } else if (activeOwned) {
+    } else if (activeOwned && !ctx.isRenewal) {
       this.reject(
         "ADDON_ALREADY_OWNED",
         addOn.code,
