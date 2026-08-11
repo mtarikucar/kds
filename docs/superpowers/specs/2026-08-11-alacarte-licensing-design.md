@@ -1,7 +1,7 @@
 # À-la-carte yıllık lisans — tasarım
 
 **Tarih:** 2026-08-11
-**Durum:** Onaylandı, uygulanıyor
+**Durum:** ✅ Tamamlandı (9/9 faz), `feat/alacarte-groundwork` dalında
 **Başlangıç sürümü:** v3.2.148
 
 ---
@@ -745,6 +745,28 @@ eskiler **silinmeden önce** yazılır ki CI kapısı hiç açıkta kalmasın.
 `prisma generate` + `tsc` (lokalde `migrate dev` kırık).
 
 ---
+
+## 13b. Uygulamada değişenler
+
+Plandan bilinçli sapmalar ve uygulama sırasında ortaya çıkanlar:
+
+| Konu | Planlanan | Yapılan / neden |
+|---|---|---|
+| Katalog yayını | P1'de yayınla | P1'de **draft**, P2'de yayın. Quote motoru `annual` cadence'i henüz anlamıyordu; yayınlasaydım ₺2.990'lık yıllık lisans 30 günlük düz ücret olarak satılırdı |
+| Superadmin katalog UI | P1 | P6'ya alındı — aksi halde değişmekte olan bir kontrata karşı iki kez yazılacaktı |
+| Kontör sözlüğü | `AI_PHOTO/AI_VIDEO/AI_3D` | `PHOTO/VIDEO/MODEL3D` — mevcut `ai_generation_usage.kind` ile aynı, böylece P4 migration'ı satır-satır kopya oldu, değer eşlemesi değil |
+| `limit.branches` hatası (L5) | P1'de düzelt | Güncel main'de zaten düzeltilmişti (`20260722130000_fix_extra_branch_grant`) |
+| Cihaz kapasitesi | Dokunma | **Kaldırıldı** — ürünler arşivlenince gate tek yönde erişilemez, diğer yönde ayarlanamaz hale geldi; ölü kod bir yeteneği ima ediyordu |
+| Dashboard kota şeridi | Bahsedilmemişti | **Kaldırıldı** — beş kapasitesinden dördü artık yok, kalanı (şube) satın alma kararı ve ilgili ürünün yanına ait |
+
+Uygulama sırasında bulunan, planda olmayan iki gerçek boşluk:
+
+1. **`RenewalReminder` tüketicisi yoktu.** Scheduler olayı yayıyordu, outbox teslim ediyordu, kimse dinlemiyordu — hatırlatmalar 30/7/1 günde "gönderiliyor" ama müşteriye hiç ulaşmıyordu. `RenewalNotificationsService` + yeni şablon eklendi (eskisi hâlâ "başka bir plana geçin" diyordu).
+2. **Ödeme yapan müşterinin faturasını göreceği yer kalmamıştı.** Ayarlar sayfası silinince `TenantInvoice` uçsuz kaldı. `GET /v1/me/invoices` + Lisans sayfasında fatura bölümü eklendi.
+
+Ayrıca **boot doğrulaması** (Nest DI grafiğini portsuz ayağa kaldırma) budanmış
+`PaymentsModule`'ün QR self-pay sağlayıcısını düşürdüğünü yakaladı — tsc ve
+jest'in ikisinin de içinden geçtiği, prod boot'unu kıracak bir hata.
 
 ## 14. Açık kararlar
 
