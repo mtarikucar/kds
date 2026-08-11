@@ -23,6 +23,7 @@ import enPersonnel from './locales/en/personnel.json';
 import enStock from './locales/en/stock.json';
 import enHelp from './locales/en/help.json';
 import enPlan from './locales/en/plan.json';
+import enLicensing from './locales/en/licensing.json';
 import enWebhooks from './locales/en/webhooks.json';
 import enPartnerKeys from './locales/en/partnerKeys.json';
 import enBridges from './locales/en/bridges.json';
@@ -50,6 +51,7 @@ import trPersonnel from './locales/tr/personnel.json';
 import trStock from './locales/tr/stock.json';
 import trHelp from './locales/tr/help.json';
 import trPlan from './locales/tr/plan.json';
+import trLicensing from './locales/tr/licensing.json';
 import trWebhooks from './locales/tr/webhooks.json';
 import trPartnerKeys from './locales/tr/partnerKeys.json';
 import trBridges from './locales/tr/bridges.json';
@@ -77,6 +79,7 @@ import ruPersonnel from './locales/ru/personnel.json';
 import ruStock from './locales/ru/stock.json';
 import ruHelp from './locales/ru/help.json';
 import ruPlan from './locales/ru/plan.json';
+import ruLicensing from './locales/ru/licensing.json';
 import ruWebhooks from './locales/ru/webhooks.json';
 import ruPartnerKeys from './locales/ru/partnerKeys.json';
 import ruBridges from './locales/ru/bridges.json';
@@ -104,6 +107,7 @@ import uzPersonnel from './locales/uz/personnel.json';
 import uzStock from './locales/uz/stock.json';
 import uzHelp from './locales/uz/help.json';
 import uzPlan from './locales/uz/plan.json';
+import uzLicensing from './locales/uz/licensing.json';
 import uzWebhooks from './locales/uz/webhooks.json';
 import uzPartnerKeys from './locales/uz/partnerKeys.json';
 import uzBridges from './locales/uz/bridges.json';
@@ -131,6 +135,7 @@ import arPersonnel from './locales/ar/personnel.json';
 import arStock from './locales/ar/stock.json';
 import arHelp from './locales/ar/help.json';
 import arPlan from './locales/ar/plan.json';
+import arLicensing from './locales/ar/licensing.json';
 import arWebhooks from './locales/ar/webhooks.json';
 import arPartnerKeys from './locales/ar/partnerKeys.json';
 import arBridges from './locales/ar/bridges.json';
@@ -161,6 +166,7 @@ const resources = {
     stock: enStock,
     help: enHelp,
     plan: enPlan,
+    licensing: enLicensing,
     webhooks: enWebhooks,
     partnerKeys: enPartnerKeys,
     bridges: enBridges,
@@ -189,6 +195,7 @@ const resources = {
     stock: trStock,
     help: trHelp,
     plan: trPlan,
+    licensing: trLicensing,
     webhooks: trWebhooks,
     partnerKeys: trPartnerKeys,
     bridges: trBridges,
@@ -217,6 +224,7 @@ const resources = {
     stock: ruStock,
     help: ruHelp,
     plan: ruPlan,
+    licensing: ruLicensing,
     webhooks: ruWebhooks,
     partnerKeys: ruPartnerKeys,
     bridges: ruBridges,
@@ -245,6 +253,7 @@ const resources = {
     stock: uzStock,
     help: uzHelp,
     plan: uzPlan,
+    licensing: uzLicensing,
     webhooks: uzWebhooks,
     partnerKeys: uzPartnerKeys,
     bridges: uzBridges,
@@ -273,6 +282,7 @@ const resources = {
     stock: arStock,
     help: arHelp,
     plan: arPlan,
+    licensing: arLicensing,
     webhooks: arWebhooks,
     partnerKeys: arPartnerKeys,
     bridges: arBridges,

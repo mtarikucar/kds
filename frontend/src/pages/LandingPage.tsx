@@ -24,7 +24,6 @@ import BentoShowcase from "../marketing/components/BentoShowcase";
 import StatBand from "../marketing/components/StatBand";
 import IntegrationChips from "../marketing/components/IntegrationChips";
 import SectorGrid from "../marketing/components/SectorGrid";
-import PlanTeaser from "../marketing/components/PlanTeaser";
 import Faq from "../marketing/components/Faq";
 import CtaBand from "../marketing/components/CtaBand";
 import { FAQ } from "../marketing/data/faq";
@@ -497,7 +496,6 @@ export default function LandingPage() {
         title="Şeffaf ve esnek planlar"
         subtitle="7 gün ücretsiz deneyin; sonra işletmenize uygun planı seçin. Fiyatlar TRY ve KDV dahildir."
       >
-        <PlanTeaser />
         <div className="mt-8 text-center">
           <Link
             to="/fiyatlandirma"

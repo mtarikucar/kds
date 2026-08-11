@@ -161,11 +161,8 @@ const BranchSelectPage = lazyWithReload(
 );
 
 // Subscription & Settings Pages (lazy-loaded)
-const SubscriptionPlansPage = lazyWithReload(
-  () => import("./pages/subscription/SubscriptionPlansPage"),
-);
-const ChangePlanPage = lazyWithReload(
-  () => import("./pages/subscription/ChangePlanPage"),
+const RenewalPage = lazyWithReload(
+  () => import("./features/licensing/RenewalPage"),
 );
 const CheckoutPage = lazyWithReload(
   () => import("./pages/subscription/CheckoutPage"),
@@ -221,7 +218,7 @@ import HealthPage from "./features/health/HealthPage";
 import WebhooksPage from "./features/webhooks/WebhooksPage";
 import PartnerKeysPage from "./features/partner-keys/PartnerKeysPage";
 import CallerFeedPage from "./features/caller/CallerFeedPage";
-import PlanAndAccessPage from "./features/plan/PlanAndAccessPage";
+import LicensePage from "./features/licensing/LicensePage";
 import FeatureGate from "./components/subscriptions/FeatureGate";
 import UpsellCard from "./components/subscriptions/UpsellCard";
 import { UpdateDialog } from "./components/UpdateDialog";
@@ -576,7 +573,7 @@ function App() {
               existing bookmark keeps working. */}
               <Route
                 path="subscription"
-                element={<Navigate to="/admin/plan" replace />}
+                element={<Navigate to="/admin/license" replace />}
               />
               <Route path="pos" element={<POSSettingsPage />} />
               <Route path="qr-menu" element={<QRMenuSettingsPage />} />
@@ -725,17 +722,13 @@ function App() {
             (/admin/plan); old links/bookmarks redirect there. */}
             <Route
               path="/subscription/manage"
-              element={<Navigate to="/admin/plan" replace />}
+              element={<Navigate to="/admin/license" replace />}
             />
 
             {/* Subscription pages */}
             <Route
               path="/subscription/plans"
-              element={<SubscriptionPlansPage />}
-            />
-            <Route
-              path="/subscription/change-plan"
-              element={<ChangePlanPage />}
+              element={<Navigate to="/admin/license" replace />}
             />
             <Route path="/subscription/checkout" element={<CheckoutPage />} />
             <Route
@@ -749,7 +742,7 @@ function App() {
             {/* Legacy redirect for old payment URLs */}
             <Route
               path="/subscription/payment"
-              element={<Navigate to="/subscription/plans" replace />}
+              element={<Navigate to="/admin/license" replace />}
             />
             <Route
               path="/subscription/payment/success"
@@ -814,7 +807,17 @@ function App() {
               }
             />
             {/* v2.8.88: top-level Plan & Erişim page — plan + quota + active add-ons. */}
-            <Route path="/admin/plan" element={<PlanAndAccessPage />} />
+            <Route path="/admin/license" element={<LicensePage />} />
+            <Route
+              path="/admin/license/renewal/:cycleId"
+              element={<RenewalPage />}
+            />
+            {/* Old bookmark. The page it pointed at compared plan tiers, a
+                concept that no longer exists. */}
+            <Route
+              path="/admin/plan"
+              element={<Navigate to="/admin/license" replace />}
+            />
             {/* v3.0.6: Desktop app as a standalone sidebar destination (moved out of
             the Settings sub-tabs), mirroring Plan & Erişim. */}
             <Route path="/admin/desktop" element={<DesktopAppSettingsPage />} />

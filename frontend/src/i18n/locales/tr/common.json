@@ -1032,7 +1032,7 @@
     }
   },
   "pricing": {
-    "title": "Basit, Şeffaf Fiyatlandırma",
+    "title": "Fiyatlandırma",
     "description": "Restoranınız için mükemmel planı seçin. Tüm planlar ücretsiz deneme sürümü içerir.",
     "monthly": "Aylık",
     "yearly": "Yıllık",
@@ -1056,7 +1056,28 @@
     "save": "Tasarruf",
     "youSave": "Tasarruf",
     "endsOn": "Bitiş",
-    "dayFreeTrial": " gün ücretsiz deneme"
+    "dayFreeTrial": " gün ücretsiz deneme",
+    "subtitle": "Paket yok. Çekirdek ücretsiz; sadece kullandığınız modülü ödersiniz.",
+    "freeCore": {
+      "title": "Ücretsiz çekirdek",
+      "subtitle": "Lisans bile gerekmez. Sınırsız kullanıcı, masa, ürün ve sipariş.",
+      "items": {
+        "pos": "POS",
+        "kds": "Mutfak ekranı (KDS)",
+        "menu": "Menü yönetimi",
+        "tables": "Masa & kat planı",
+        "qr": "QR menü",
+        "orders": "Sipariş yönetimi",
+        "cash": "Kasa & nakit",
+        "reports": "Temel raporlar",
+        "team": "Ekip & rol yönetimi",
+        "customers": "Müşteriler",
+        "branding": "Özel marka & subdomain"
+      }
+    },
+    "licenceNote": "Ücretli modül almak ve kullanmak için yıllık lisans gerekir. Lisans tarihiniz yıl dönümünüz olur; sonradan aldığınız her modül o tarihe orantılı fiyatlanır.",
+    "cta": "Ücretsiz başlayın",
+    "kdvNote": "Tüm fiyatlar KDV dahildir."
   },
   "subscriptions": {
     "plans": {

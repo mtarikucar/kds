@@ -1012,7 +1012,7 @@
     }
   },
   "pricing": {
-    "title": "Oddiy, shaffof narxlar",
+    "title": "Narxlar",
     "description": "Restoraningiz uchun mukammal tarifni tanlang. Barcha tariflarga bepul sinov davri kiradi.",
     "monthly": "Oylik",
     "yearly": "Yillik",
@@ -1036,7 +1036,28 @@
     "save": "Tejash",
     "youSave": "Tejash",
     "endsOn": "gacha",
-    "dayFreeTrial": " kun bepul"
+    "dayFreeTrial": " kun bepul",
+    "subtitle": "Paketlar yo'q. Yadro bepul; faqat ishlatgan modulingiz uchun to'laysiz.",
+    "freeCore": {
+      "title": "Bepul yadro",
+      "subtitle": "Litsenziya ham kerak emas. Cheksiz foydalanuvchi, stol, mahsulot va buyurtma.",
+      "items": {
+        "pos": "POS",
+        "kds": "Oshxona ekrani (KDS)",
+        "menu": "Menyu boshqaruvi",
+        "tables": "Stollar va zal rejasi",
+        "qr": "QR menyu",
+        "orders": "Buyurtma boshqaruvi",
+        "cash": "Kassa",
+        "reports": "Asosiy hisobotlar",
+        "team": "Jamoa va rollar",
+        "customers": "Mijozlar",
+        "branding": "Shaxsiy brend va subdomen"
+      }
+    },
+    "licenceNote": "Pullik modulni sotib olish va ishlatish uchun yillik litsenziya kerak. Uning sanasi yillik sanangiz bo'ladi; keyin qo'shilgani unga mutanosib hisoblanadi.",
+    "cta": "Bepul boshlang",
+    "kdvNote": "Barcha narxlar QQS bilan."
   },
   "subscriptions": {
     "plans": {

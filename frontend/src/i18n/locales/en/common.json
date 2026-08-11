@@ -1032,7 +1032,7 @@
     }
   },
   "pricing": {
-    "title": "Simple, Transparent Pricing",
+    "title": "Pricing",
     "description": "Choose the perfect plan for your restaurant. All plans include a free trial.",
     "monthly": "Monthly",
     "yearly": "Yearly",
@@ -1056,7 +1056,28 @@
     "save": "Save",
     "youSave": "You save",
     "endsOn": "Ends",
-    "dayFreeTrial": "-day free trial"
+    "dayFreeTrial": "-day free trial",
+    "subtitle": "No packages. The core is free; you pay only for the modules you use.",
+    "freeCore": {
+      "title": "Free core",
+      "subtitle": "No licence needed. Unlimited users, tables, products and orders.",
+      "items": {
+        "pos": "POS",
+        "kds": "Kitchen display (KDS)",
+        "menu": "Menu management",
+        "tables": "Tables & floor plan",
+        "qr": "QR menu",
+        "orders": "Order management",
+        "cash": "Cash drawer",
+        "reports": "Basic reports",
+        "team": "Team & roles",
+        "customers": "Customers",
+        "branding": "Custom branding & subdomain"
+      }
+    },
+    "licenceNote": "An annual licence is required to buy and use any paid module. Its date becomes your anniversary; anything you add later is priced pro rata to it.",
+    "cta": "Start free",
+    "kdvNote": "All prices include VAT."
   },
   "subscriptions": {
     "plans": {

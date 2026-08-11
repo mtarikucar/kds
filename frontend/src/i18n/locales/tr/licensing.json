@@ -1,0 +1,85 @@
+{
+  "page": {
+    "title": "Lisans & Erişim",
+    "subtitle": "Sahip olduğunuz modüller, yenileme tarihiniz ve kontör bakiyeleriniz."
+  },
+  "license": {
+    "heading": "HummyTummy Lisansı",
+    "status": {
+      "active": "Aktif",
+      "grace": "Ek süre — ödeme bekleniyor",
+      "expired": "Süresi doldu",
+      "none": "Lisans yok"
+    },
+    "anniversary": "Yenileme tarihi {{date}} ({{days}} gün kaldı)",
+    "buyCta": "Lisans al",
+    "renewCta": "Lisansı yenile",
+    "freeCoreNote": "POS, mutfak ekranı, menü, masa & kat planı, QR menü, sipariş, kasa ve ekip yönetimi lisans gerektirmez — sınırsız ve ücretsizdir."
+  },
+  "owned": {
+    "title": "Sahip olduğunuz ürünler",
+    "empty": "Henüz ücretli bir ürün almadınız.",
+    "comped": "Hediye edildi",
+    "perYear": "/yıl",
+    "pendingQuantity": "Yenilemede {{qty}} adede düşecek",
+    "col": {
+      "product": "Ürün",
+      "until": "Bitiş",
+      "status": "Durum",
+      "renewal": "Yenileme"
+    },
+    "status": {
+      "active": "Aktif",
+      "past_due": "Ek süre",
+      "expired": "Süresi doldu",
+      "cancelled": "İptal"
+    }
+  },
+  "credits": {
+    "title": "Kontör bakiyeleri",
+    "empty": "Kontörünüz yok.",
+    "note": "Kontörlerin süresi yoktur; tükenene kadar geçerlidir.",
+    "kind": {
+      "PHOTO": "AI görsel",
+      "VIDEO": "AI video",
+      "MODEL3D": "AI 3D model",
+      "SMS": "SMS"
+    }
+  },
+  "renewal": {
+    "title": "{{date}} tarihinde yenileme",
+    "body": "Toplam {{total}} — {{days}} gün kaldı.",
+    "cta": "Yenilemeyi görüntüle",
+    "notFound": "Açık bir yenileme bulunamadı.",
+    "backToLicense": "Lisansa dön",
+    "graceNote": "Ödeme için son tarih: {{date}}. Sonrasında ücretli modüller kapanır, verileriniz korunur.",
+    "total": "Toplam",
+    "payCta": "{{total}} öde"
+  },
+  "store": {
+    "title": "Mağaza",
+    "subtitle": "İhtiyacınız olan modülü tek tek satın alın.",
+    "tabs": {
+      "catalog": "Katalog",
+      "hardware": "Donanım",
+      "orders": "Siparişler"
+    },
+    "kind": {
+      "license": "Lisans",
+      "module": "Modüller",
+      "integration": "Entegrasyonlar",
+      "capacity": "Kapasite",
+      "credit": "Kontör",
+      "service": "Hizmetler"
+    },
+    "owned": "Sahipsiniz",
+    "buy": "Satın al",
+    "add": "Sepete ekle",
+    "perYear": "/yıl",
+    "oneTime": "tek seferlik",
+    "todayPrice": "Bugün alırsanız {{prorated}}",
+    "untilDate": "{{date}} tarihine kadar",
+    "licenceFirst": "Bu ürün için önce lisans gerekir — sepete otomatik eklenir.",
+    "empty": "Bu kategoride ürün yok."
+  }
+}

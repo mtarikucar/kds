@@ -412,7 +412,7 @@ const TableManagementPage = () => {
       {/* Upgrade Prompt when limit reached */}
       {view !== 'edit' && !canAddTable && (
         <UpgradePrompt
-          limitType="maxTables"
+          limitKey="maxTables"
           currentCount={tables?.length ?? 0}
           limit={tableLimit.limit}
         />

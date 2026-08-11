@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Store, Puzzle, Cpu, Truck } from 'lucide-react';
-import MarketplacePage from '../marketplace/MarketplacePage';
+import CatalogStore from '../licensing/CatalogStore';
 import StorePage from '../hardware-store/StorePage';
 import HardwareOrdersListPage from '../hardware-store/HardwareOrdersListPage';
 
-type Tab = 'addons' | 'hardware' | 'orders';
-const TABS: Tab[] = ['addons', 'hardware', 'orders'];
-const TAB_ICON: Record<Tab, typeof Cpu> = { addons: Puzzle, hardware: Cpu, orders: Truck };
+type Tab = 'catalog' | 'hardware' | 'orders';
+const TABS: Tab[] = ['catalog', 'hardware', 'orders'];
+const TAB_ICON: Record<Tab, typeof Cpu> = { catalog: Puzzle, hardware: Cpu, orders: Truck };
 
 /**
  * Consolidated "Mağaza" hub — one home for the add-on marketplace, the hardware
@@ -17,7 +17,7 @@ const TAB_ICON: Record<Tab, typeof Cpu> = { addons: Puzzle, hardware: Cpu, order
  * the hub owns the single page header.
  */
 export default function StoreHubPage() {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['common', 'licensing']);
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab') as Tab | null;
   // A `?sku=` deeplink (the public landing "Sipariş ver" CTA → /admin/store?sku=)
@@ -27,11 +27,11 @@ export default function StoreHubPage() {
   // (no ?tab=) must open on 'hardware', not the default 'addons', or the bridge
   // silently no-ops and the buy link is dead.
   const hasSku = !!params.get('sku');
-  const tab: Tab = raw && TABS.includes(raw) ? raw : hasSku ? 'hardware' : 'addons';
+  const tab: Tab = raw && TABS.includes(raw) ? raw : hasSku ? 'hardware' : 'catalog';
 
   // Pin the derived tab to the URL when a ?sku= deeplink picked it, so once
   // StorePage strips ?sku= the tab stays 'hardware' (without this, the next
-  // render would have no tab + no sku and fall back to 'addons', unmounting
+  // render would have no tab + no sku and fall back to 'catalog', unmounting
   // StorePage right after it added the item).
   useEffect(() => {
     if (hasSku && !raw) {
@@ -84,10 +84,7 @@ export default function StoreHubPage() {
               }
             >
               <Icon className="h-4 w-4" />
-              {t(`hummytummy.storeHub.tabs.${key}`, {
-                defaultValue:
-                  key === 'addons' ? 'Eklentiler' : key === 'hardware' ? 'Donanım' : 'Siparişlerim',
-              })}
+              {t(`licensing:store.tabs.${key}`)}
             </button>
           );
         })}
@@ -95,7 +92,7 @@ export default function StoreHubPage() {
 
       {/* Active tab */}
       <div>
-        {tab === 'addons' && <MarketplacePage embedded />}
+        {tab === 'catalog' && <CatalogStore focusCode={params.get('focus') ?? undefined} />}
         {tab === 'hardware' && <StorePage embedded />}
         {tab === 'orders' && <HardwareOrdersListPage embedded />}
       </div>

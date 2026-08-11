@@ -42,7 +42,13 @@
     "defaultDescription": "You'll need to upgrade your plan or buy the matching add-on to access this page.",
     "upgradePlanCta": "Upgrade plan",
     "viewAddOnCta": "See add-on",
-    "helpHint": "Reach out to support if you have questions."
+    "helpHint": "Reach out to support if you have questions.",
+    "buyCta": "Buy",
+    "renewCta": "Renew",
+    "perYear": "/yr",
+    "proratedPrice": "{{prorated}} if you buy today ({{annual}}/yr)",
+    "licenceRequired": "This feature needs an active annual licence.",
+    "limitReached": "You have reached your limit ({{current}}/{{limit}})."
   },
   "branchPicker": {
     "activeBranch": "Select active branch",

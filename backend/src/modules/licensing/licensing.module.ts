@@ -3,6 +3,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { LicensingService } from "./licensing.service";
 import { RenewalCycleService } from "./renewal-cycle.service";
 import { RenewalSchedulerService } from "./renewal-scheduler.service";
+import { LicensingController } from "./licensing.controller";
 import { CheckoutModule } from "../checkout/checkout.module";
 import { OutboxModule } from "../outbox/outbox.module";
 
@@ -27,6 +28,7 @@ import { OutboxModule } from "../outbox/outbox.module";
   // this module back — LicensingService reaches checkout through the @Global()
   // export, not an import.
   imports: [PrismaModule, CheckoutModule, OutboxModule],
+  controllers: [LicensingController],
   providers: [LicensingService, RenewalCycleService, RenewalSchedulerService],
   exports: [LicensingService, RenewalCycleService],
 })

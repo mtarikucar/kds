@@ -42,7 +42,13 @@
     "defaultDescription": "Bu sayfayı görüntülemek için planınızı yükseltmeniz veya ilgili eklentiyi satın almanız gerekir.",
     "upgradePlanCta": "Pakete Geç",
     "viewAddOnCta": "Eklentiyi Gör",
-    "helpHint": "Sorularınız için destek ekibimizle iletişime geçebilirsiniz."
+    "helpHint": "Sorularınız için destek ekibimizle iletişime geçebilirsiniz.",
+    "buyCta": "Satın al",
+    "renewCta": "Yenile",
+    "perYear": "/yıl",
+    "proratedPrice": "Bugün alırsanız {{prorated}} (yıllık {{annual}})",
+    "licenceRequired": "Bu özellik için önce yıllık lisans gerekiyor.",
+    "limitReached": "Limitinize ulaştınız ({{current}}/{{limit}})."
   },
   "branchPicker": {
     "activeBranch": "Aktif şube seçin",

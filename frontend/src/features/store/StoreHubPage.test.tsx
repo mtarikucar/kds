@@ -4,8 +4,8 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 // Stub the three heavy child pages so the hub can be tested in isolation —
 // each renders an identifiable marker we assert on.
-vi.mock('../marketplace/MarketplacePage', () => ({
-  default: () => <div>ADDONS_PAGE</div>,
+vi.mock('../licensing/CatalogStore', () => ({
+  default: () => <div>CATALOG_PAGE</div>,
 }));
 vi.mock('../hardware-store/StorePage', () => ({
   default: () => <div>HARDWARE_PAGE</div>,
@@ -27,9 +27,9 @@ function renderAt(url: string) {
 }
 
 describe('StoreHubPage tab selection', () => {
-  it('defaults to the add-ons tab with no params', () => {
+  it('defaults to the catalogue tab with no params', () => {
     renderAt('/admin/store');
-    expect(screen.getByText('ADDONS_PAGE')).toBeInTheDocument();
+    expect(screen.getByText('CATALOG_PAGE')).toBeInTheDocument();
     expect(screen.queryByText('HARDWARE_PAGE')).not.toBeInTheDocument();
   });
 
@@ -50,11 +50,11 @@ describe('StoreHubPage tab selection', () => {
   it('opens the hardware tab for a ?sku= deeplink with no explicit tab', () => {
     renderAt('/admin/store?sku=KDS-21');
     expect(screen.getByText('HARDWARE_PAGE')).toBeInTheDocument();
-    expect(screen.queryByText('ADDONS_PAGE')).not.toBeInTheDocument();
+    expect(screen.queryByText('CATALOG_PAGE')).not.toBeInTheDocument();
   });
 
   it('an explicit ?tab= still wins over ?sku=', () => {
-    renderAt('/admin/store?tab=addons&sku=KDS-21');
-    expect(screen.getByText('ADDONS_PAGE')).toBeInTheDocument();
+    renderAt('/admin/store?tab=catalog&sku=KDS-21');
+    expect(screen.getByText('CATALOG_PAGE')).toBeInTheDocument();
   });
 });

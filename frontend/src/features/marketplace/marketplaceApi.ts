@@ -96,23 +96,35 @@ export const usePurchaseAddOnViaCheckout = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      addOnCode: string;
+      /** Single-product form. */
+      addOnCode?: string;
       qty?: number;
       branchId?: string;
+      /**
+       * MULTI-LINE form. Needed because a first purchase is necessarily
+       * "licence + the product it unlocks": the server rejects a
+       * licence-gated line without one, and making the customer discover
+       * that by failing at checkout would be hostile.
+       */
+      items?: Array<{
+        type: 'addon';
+        code: string;
+        qty?: number;
+        branchId?: string;
+      }>;
     }): Promise<AddOnCheckoutIntent> => {
       const user = useAuthStore.getState().user;
       if (!user) throw new Error('Not authenticated');
-      const r = await api.post('/v1/checkout/intent', {
-        cart: {
-          items: [
-            {
-              type: 'addon',
-              code: input.addOnCode,
-              qty: input.qty ?? 1,
-              branchId: input.branchId,
-            },
-          ],
+      const items = input.items ?? [
+        {
+          type: 'addon' as const,
+          code: input.addOnCode!,
+          qty: input.qty ?? 1,
+          branchId: input.branchId,
         },
+      ];
+      const r = await api.post('/v1/checkout/intent', {
+        cart: { items },
         buyer: {
           email: user.email,
           name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
@@ -121,8 +133,8 @@ export const usePurchaseAddOnViaCheckout = () => {
           phone: (user as { phone?: string }).phone ?? '',
         },
         // PayTR bounces the buyer back here after the hosted page closes; the
-        // add-on lands on the Plan & Erişim page once the webhook provisions it.
-        returnUrl: `${window.location.origin}/admin/plan`,
+        // product lands on the Licence page once the webhook provisions it.
+        returnUrl: `${window.location.origin}/admin/license`,
       });
       return r.data;
     },
