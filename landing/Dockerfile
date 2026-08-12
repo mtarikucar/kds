@@ -15,6 +15,14 @@ COPY . .
 # Build arguments
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SITE_URL
+# Public origin of THIS site (canonical/og/sitemap/robots/JSON-LD URLs).
+# Distinct from NEXT_PUBLIC_SITE_URL, which is the POS app origin that
+# login/register links point at. In prod the landing is served from
+# landing.hummytummy.com while the apex belongs to the SPA — without this
+# the metadata falls back to the apex, where every URL is answered by the
+# SPA shell, and search engines see canonicals pointing at pages whose
+# content does not exist there.
+ARG NEXT_PUBLIC_BASE_URL
 # Sentry build args for source map upload
 ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
@@ -22,6 +30,7 @@ ARG SENTRY_PROJECT
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 # Sentry environment variables for source map upload during build
 ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
