@@ -2,7 +2,7 @@
   "metadata": {
     "title": "HummyTummy - Restoran Yönetim Sistemi",
     "description": "Restoranlar için modern POS sistemi. Siparişleri, mutfak ekranını, masaları ve ödemeleri tek bir yerden yönetin.",
-    "keywords": "restoran pos, mutfak ekran sistemi, restoran yönetimi, qr menü, masa yönetimi"
+    "keywords": "restoran pos, mutfak ekran sistemi, restoran yönetimi, qr menü, masa yönetimi, karekod menü, dijital menü, qr menü oluşturma, bulut mutfak, paket servis yazılımı, adisyon programı"
   },
   "nav": {
     "product": "Ürün",
@@ -10,6 +10,7 @@
     "pricing": "Fiyatlandırma",
     "security": "Güvenlik",
     "store": "Mağaza",
+    "qrMenu": "QR Menü",
     "signIn": "Giriş yap",
     "startFree": "Ücretsiz başla",
     "openMenu": "Menüyü aç",
@@ -280,6 +281,8 @@
       "security": "Güvenlik",
       "shop": "Donanım Mağazası",
       "integrations": "Entegrasyonlar",
+      "qrMenu": "QR Menü",
+      "cloudKitchen": "Bulut Mutfak",
       "about": "Hakkımızda",
       "blog": "Blog",
       "careers": "Kariyer",
@@ -538,6 +541,241 @@
         "network": "Bağlantı sorunu — tekrar deneyin.",
         "generic": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
       }
+    }
+  },
+  "qrMenuPage": {
+    "meta": {
+      "title": "QR Menü Oluştur — Ücretsiz Karekod Menü",
+      "description": "Restoranınız için ücretsiz QR menü (karekod menü) oluşturun: sınırsız ürün, anında fiyat güncelleme, çok dilli menü, alerjen bilgisi ve masadan sipariş. 5 dakikada kurulur, kredi kartı gerekmez.",
+      "keywords": "qr menü, karekod menü, qr kod menü, qr menü oluşturma, ücretsiz qr menü, dijital menü, temassız menü, restoran qr menü, kafe qr menü, online menü"
+    },
+    "hero": {
+      "badge": "Ücretsiz ve sınırsız",
+      "title": "Karekod menünüz",
+      "titleHighlight": "5 dakikada yayında",
+      "subtitle": "Müşteriniz masadaki karekodu telefonuna okutur, menünüz anında açılır — uygulama indirmeden. Fiyat değişikliği saniyeler içinde yayında, baskı maliyeti sıfır. HummyTummy'de QR menü tamamen ücretsizdir: ürün, kategori, masa ve şube sınırı yoktur.",
+      "ctaPrimary": "Ücretsiz QR menü oluştur",
+      "ctaSecondary": "Bize ulaşın",
+      "trust1": "Kredi kartı gerekmez",
+      "trust2": "Uygulama indirme yok",
+      "trust3": "Sınırsız ürün ve masa"
+    },
+    "how": {
+      "title": "3 adımda QR menü nasıl oluşturulur?",
+      "subtitle": "Teknik bilgi gerekmez. Menünüzü ekleyin, karekodunuzu indirin, masaya yapıştırın.",
+      "steps": [
+        {
+          "title": "Ücretsiz kaydolun",
+          "description": "İşletmenizin adını ve telefonunuzu girin — hesabınız dakikalar içinde hazır. Kredi kartı istemiyoruz."
+        },
+        {
+          "title": "Menünüzü ekleyin",
+          "description": "Ürünlerinizi panelden girin ya da basılı menünüzün fotoğrafını yükleyin: yapay zekâ ürünleri, fiyatları ve kategorileri sizin yerinize aktarır."
+        },
+        {
+          "title": "Karekodu masaya koyun",
+          "description": "Her masa için hazır QR kodunuzu PDF olarak indirin, bastırın, masaya yapıştırın. Menünüz artık her telefonda."
+        }
+      ]
+    },
+    "features": {
+      "title": "Basit bir karekoddan çok daha fazlası",
+      "subtitle": "HummyTummy QR menü, restoranınızı uçtan uca yöneten ücretsiz sistemin bir parçasıdır.",
+      "items": [
+        {
+          "title": "Anında güncelleme",
+          "description": "Fiyat ya da ürün değişikliği panelden tek dokunuşla yayına girer. Bir daha asla menü bastırmazsınız."
+        },
+        {
+          "title": "Masadan sipariş",
+          "description": "Müşteri menüye bakmakla kalmaz, dilerse siparişini masadan verir; sipariş mutfak ekranına ve kasaya anında düşer."
+        },
+        {
+          "title": "Çok dilli menü",
+          "description": "Menünüz Türkçe, İngilizce, Rusça, Arapça ve Özbekçe görüntülenebilir — turist misafirleriniz için garson beklemeye gerek yok."
+        },
+        {
+          "title": "Alerjen ve diyet bilgisi",
+          "description": "Gluten, laktoz, vegan gibi etiketleri ürünlere ekleyin; misafirleriniz güvenle seçim yapsın."
+        },
+        {
+          "title": "Markanıza özel",
+          "description": "Logo, kapak görseli ve renkleriyle menü size ait görünür; özel alan adı bile bağlayabilirsiniz."
+        },
+        {
+          "title": "POS ve mutfakla entegre",
+          "description": "QR menü tek başına bir araç değil: aynı sistemde POS, adisyon, mutfak ekranı, kasa ve raporlar da ücretsiz."
+        }
+      ]
+    },
+    "why": {
+      "title": "QR menü neden ücretsiz?",
+      "body1": "Restoranı çalıştıran çekirdek — POS, adisyon, mutfak ekranı, menü yönetimi, masa planı ve QR menü — HummyTummy'de ücretsiz ve sınırsızdır. Gizli ücret, süre kısıtı ya da 'ilk 10 ürün' tuzağı yoktur.",
+      "body2": "Biz gelirimizi isteğe bağlı modüllerden kazanırız: paket servis platform entegrasyonları, yapay zekâ araçları ve donanım gibi. QR menünüz için hiçbir zaman ücret ödemezsiniz."
+    },
+    "coverage": {
+      "title": "Türkiye'nin her yerinde",
+      "body": "HummyTummy bulut tabanlıdır: kurulum gerektirmez, 81 ilin tamamında aynı gün kullanmaya başlarsınız. Restoran, kafe, pastane, bar, otel, kantin ve plaj işletmeleri — her ölçekte işletme için.",
+      "cities": "İstanbul, Ankara, İzmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Eskişehir, Samsun, Trabzon, Diyarbakır, Muğla, Aydın…"
+    },
+    "faq": {
+      "title": "QR menü hakkında sık sorulan sorular",
+      "items": [
+        {
+          "q": "QR menü (karekod menü) nedir?",
+          "a": "QR menü, basılı menü yerine masadaki bir karekodun telefon kamerasıyla okutulmasıyla açılan dijital menüdür. Müşteri uygulama indirmeden, tarayıcıda menünüzü görür; siz de fiyat ve ürünleri anında güncellersiniz."
+        },
+        {
+          "q": "QR menü gerçekten ücretsiz mi?",
+          "a": "Evet. QR menü, HummyTummy'nin ücretsiz çekirdeğinin parçasıdır; ürün, kategori, masa ve görüntülenme sınırı yoktur. Ücretli olan yalnızca isteğe bağlı modüllerdir (örneğin paket servis entegrasyonları)."
+        },
+        {
+          "q": "QR kod menü nasıl oluşturulur?",
+          "a": "Ücretsiz kaydolun, menünüzü panelden ekleyin veya basılı menünüzün fotoğrafını yükleyerek yapay zekâya aktartın, ardından masa karekodlarınızı PDF olarak indirip bastırın. Toplam süre çoğu işletme için 5-10 dakikadır."
+        },
+        {
+          "q": "Müşteri uygulama indirmek zorunda mı?",
+          "a": "Hayır. Karekod telefonun kamerasıyla okutulur ve menü tarayıcıda açılır; iOS ve Android'de ek uygulama gerekmez."
+        },
+        {
+          "q": "Müşteri QR menüden sipariş verebilir mi?",
+          "a": "Evet. Dilerseniz menüyü yalnızca görüntüleme modunda tutar, dilerseniz masadan siparişi açarsınız; siparişler mutfak ekranına ve kasaya otomatik düşer."
+        },
+        {
+          "q": "Fiyatları nasıl güncellerim?",
+          "a": "Yönetim panelinden ürünü açıp yeni fiyatı yazmanız yeterli; değişiklik saniyeler içinde tüm masalarda yayındadır. Yeniden baskı ya da yeni karekod gerekmez."
+        },
+        {
+          "q": "Menü birden fazla dilde gösterilebilir mi?",
+          "a": "Evet. Menünüzü Türkçe, İngilizce, Rusça, Arapça ve Özbekçe sunabilirsiniz; müşteri dili tek dokunuşla değiştirir."
+        },
+        {
+          "q": "Alerjen bilgisi ekleyebilir miyim?",
+          "a": "Evet. Ürünlere alerjen ve diyet etiketleri (gluten, laktoz, vegan vb.) ekleyebilirsiniz; etiketler menüde ürünün yanında görünür."
+        },
+        {
+          "q": "Hangi şehirlerde kullanabilirim?",
+          "a": "Türkiye'nin 81 ilinin tamamında — İstanbul'dan Hakkâri'ye — aynı gün başlayabilirsiniz. Sistem bulut tabanlıdır; internet bağlantısı olan her işletmede çalışır."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Menünüzü bugün dijitale taşıyın",
+      "subtitle": "5 dakikada QR menünüz hazır — takıldığınız yerde telefonla da yardımcı oluruz.",
+      "primary": "Ücretsiz başla",
+      "secondary": "Bize ulaşın",
+      "callUs": "Sorularınız için arayın"
+    }
+  },
+  "cloudKitchenPage": {
+    "meta": {
+      "title": "Bulut Mutfak Yazılımı — Tüm Platformlar Tek Ekranda",
+      "description": "Bulut mutfak ve paket servis işletmeleri için sipariş yönetimi: Yemeksepeti, Getir, Trendyol ve Migros Yemek siparişleri tek ekranda toplanır, mutfak ekranına otomatik düşer. Çok markalı sanal mutfaklar için sınırsız menü ve şube.",
+      "keywords": "bulut mutfak, cloud kitchen, sanal mutfak, hayalet mutfak, paket servis yazılımı, yemeksepeti entegrasyonu, getir entegrasyonu, trendyol yemek entegrasyonu, paket servis pos"
+    },
+    "hero": {
+      "badge": "Paket servis entegrasyonları",
+      "title": "Üç tablet, dört zil, tek mutfak mı?",
+      "titleHighlight": "Hepsi tek ekranda.",
+      "subtitle": "Yemeksepeti, Getir Yemek, Trendyol Yemek ve Migros Yemek siparişleri HummyTummy'de tek sipariş akışında birleşir, mutfak ekranına platform etiketiyle otomatik düşer. Bulut mutfaklar ve paket servis yapan her restoran için.",
+      "ctaPrimary": "Ücretsiz başla",
+      "ctaSecondary": "Bize ulaşın",
+      "trust1": "4 platform entegrasyonu",
+      "trust2": "Mutfak ekranı dahil",
+      "trust3": "Sınırsız marka ve şube"
+    },
+    "pain": {
+      "title": "Tablet kaosuna son",
+      "body": "Her platformun ayrı tableti, ayrı zili, ayrı ekranı… Yoğun saatte kaçan siparişler, mutfağa elle taşınan fişler ve platformlar arasında bölünen ekip. HummyTummy tüm platform siparişlerini tek havuzda toplar: tek ekran, tek akış, sıfır kaçırılan sipariş."
+    },
+    "platforms": {
+      "title": "Entegre platformlar",
+      "subtitle": "Türkiye'nin dört büyük yemek platformu, kutudan çıktığı gibi bağlanır.",
+      "items": [
+        {
+          "name": "Yemeksepeti",
+          "description": "Türkiye'nin en büyük yemek platformundaki siparişleriniz saniyeler içinde ekranınızda."
+        },
+        {
+          "name": "Getir Yemek",
+          "description": "Getir siparişleri diğerleriyle aynı akışta — ayrı tablet, ayrı takip yok."
+        },
+        {
+          "name": "Trendyol Yemek",
+          "description": "Trendyol siparişleri otomatik alınır; onay ve hazırlık durumu tek yerden yönetilir."
+        },
+        {
+          "name": "Migros Yemek",
+          "description": "Migros Yemek siparişleri de aynı havuzda birleşir, mutfağa otomatik iletilir."
+        }
+      ],
+      "note": "Platform entegrasyonları isteğe bağlı ücretli modüllerdir; çekirdek sistem (POS, mutfak ekranı, menü, QR menü) ücretsizdir."
+    },
+    "features": {
+      "title": "Bulut mutfağınızı tek sistemden yönetin",
+      "subtitle": "Sipariş almaktan rapora — paket servisin tüm zinciri tek yerde.",
+      "items": [
+        {
+          "title": "Tek sipariş havuzu",
+          "description": "Tüm platform siparişleri ve telefon siparişleri tek listede; yoğun saatte hiçbir sipariş gözden kaçmaz."
+        },
+        {
+          "title": "Mutfak ekranına otomatik",
+          "description": "Sipariş, platform etiketiyle mutfak ekranına (KDS) anında düşer; elle fiş taşıma ve yazdırma derdi biter."
+        },
+        {
+          "title": "Çok markalı mutfak",
+          "description": "Tek mutfaktan birden fazla sanal marka mı işletiyorsunuz? Her marka için ayrı menü ve şube tanımlayın — sınırsız."
+        },
+        {
+          "title": "Telefon siparişi ve paket takibi",
+          "description": "Arayan müşteriyi tanıyın, telefon siparişini saniyeler içinde girin, paketin durumunu teslimata kadar izleyin."
+        },
+        {
+          "title": "Platform bazlı raporlar",
+          "description": "Hangi platform ne kadar ciro getiriyor, hangi ürün nerede satıyor? Platform performansını tek raporda karşılaştırın."
+        },
+        {
+          "title": "Adisyon ve kasa aynı sistemde",
+          "description": "Paket servisin yanında salon satışını da aynı POS'tan yönetin; gün sonu kasa ve raporlar tek yerde."
+        }
+      ]
+    },
+    "faq": {
+      "title": "Bulut mutfak hakkında sık sorulan sorular",
+      "items": [
+        {
+          "q": "Bulut mutfak (cloud kitchen) nedir?",
+          "a": "Bulut mutfak, salonu olmayan, yalnızca paket servis için üretim yapan mutfaktır. Tek mutfaktan birden fazla sanal marka işletilebilir; siparişler Yemeksepeti, Getir gibi platformlardan gelir."
+        },
+        {
+          "q": "Hangi platformlarla entegrasyon var?",
+          "a": "Yemeksepeti, Getir Yemek, Trendyol Yemek ve Migros Yemek. Siparişler otomatik alınır ve tek ekranda birleşir."
+        },
+        {
+          "q": "Siparişler mutfağa nasıl iletiliyor?",
+          "a": "Platformdan gelen sipariş, saniyeler içinde mutfak ekranına (KDS) platform etiketiyle düşer; tablet başında bekleyen birine gerek kalmaz."
+        },
+        {
+          "q": "Tek mutfaktan birden fazla markayı yönetebilir miyim?",
+          "a": "Evet. Her sanal markanız için ayrı menü ve şube tanımlarsınız; marka ve şube sayısında sınır yoktur."
+        },
+        {
+          "q": "Fiyatlandırma nasıl?",
+          "a": "Çekirdek sistem (POS, mutfak ekranı, menü, QR menü) ücretsiz ve sınırsızdır. Platform entegrasyonları, yıllık lisansla birlikte modül olarak satın alınır; güncel fiyatlar ana sayfadaki fiyatlandırma bölümündedir."
+        },
+        {
+          "q": "Salonu olan restoranım paket servis de yapıyor — bu bana uygun mu?",
+          "a": "Evet. Entegrasyonlar yalnızca bulut mutfaklar için değildir; salon + paket servis çalışan her restoran aynı ekrandan iki kanalı birden yönetir."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Paket servisinizi tek ekrana toplayın",
+      "subtitle": "Kurulumda menü aktarımı ve platform bağlantısında ekibimiz yanınızda.",
+      "primary": "Ücretsiz başla",
+      "secondary": "Bize ulaşın",
+      "callUs": "Satış ve destek"
     }
   }
 }

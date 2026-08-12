@@ -21,6 +21,24 @@ export default function middleware(req: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // SEO alias slugs → canonical pages. "karekod menü" is the Turkish
+  // synonym people actually type/search for the QR menu; /cloud-kitchen is
+  // the English name of /bulut-mutfak. Works with or without a locale
+  // prefix so both typed URLs and stale external links land correctly.
+  const seoAliases: Record<string, string> = {
+    '/karekod-menu': '/qr-menu',
+    '/cloud-kitchen': '/bulut-mutfak',
+  };
+  const localeMatch = pathname.match(/^\/(en|tr|ru|uz|ar)(\/.*)$/);
+  const aliasPrefix = localeMatch ? `/${localeMatch[1]}` : '';
+  const aliasPath = localeMatch ? localeMatch[2] : pathname;
+  const aliasTarget = seoAliases[aliasPath];
+  if (aliasTarget) {
+    const url = req.nextUrl.clone();
+    url.pathname = aliasPrefix + aliasTarget;
+    return NextResponse.redirect(url, 308);
+  }
+
   return intlMiddleware(req);
 }
 

@@ -45,10 +45,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // (homepage > store > pricing > contact > legal), and a
   // changeFrequency hint that lets crawlers schedule re-visits
   // sensibly.
+  // NOTE: there is intentionally no '/pricing' entry — no such page exists
+  // (pricing is the '#pricing' section on the homepage), and a sitemap URL
+  // that 404s erodes crawl trust. The v2.8.97 entry was removed for that
+  // reason. /qr-menu sits just below the homepage because "qr menü /
+  // karekod menü" is the highest-intent query family we target.
   const routes: Array<{ path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }> = [
     { path: '', priority: 1.0, changeFrequency: 'weekly' },
+    { path: '/qr-menu', priority: 0.95, changeFrequency: 'weekly' },
     { path: '/store', priority: 0.9, changeFrequency: 'weekly' },
-    { path: '/pricing', priority: 0.85, changeFrequency: 'monthly' },
+    { path: '/bulut-mutfak', priority: 0.85, changeFrequency: 'weekly' },
     { path: '/contact', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/terms', priority: 0.3, changeFrequency: 'monthly' },
     { path: '/privacy', priority: 0.3, changeFrequency: 'monthly' },

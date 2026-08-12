@@ -95,11 +95,51 @@ export default async function LocaleLayout({ children, params }: Props) {
   const messages = await getMessages();
   const dir = localeConfig[locale as Locale]?.dir || 'ltr';
 
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, '') ||
+    'https://hummytummy.com';
+
+  // Organization + ContactPoint structured data on every page: search
+  // engines and AI assistants pick the support phone/address from here,
+  // so a "hummytummy telefon" query (or an AI answer citing us) surfaces
+  // the real 0850 line instead of a scraped guess.
+  const organizationJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'HummyTummy',
+    url: baseUrl,
+    logo: `${baseUrl}/logo.webp`,
+    email: 'contact@hummytummy.com',
+    telephone: '+90-850-840-73-03',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: 'Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32',
+      addressLocality: 'Etimesgut',
+      addressRegion: 'Ankara',
+      addressCountry: 'TR',
+    },
+    contactPoint: [
+      {
+        '@type': 'ContactPoint',
+        telephone: '+90-850-840-73-03',
+        contactType: 'customer support',
+        areaServed: 'TR',
+        availableLanguage: ['Turkish', 'English', 'Russian', 'Uzbek', 'Arabic'],
+      },
+    ],
+  };
+
   return (
     <html lang={locale} dir={dir} className={inter.className}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationJsonLd).replace(/</g, '\\u003c'),
+          }}
+        />
       </head>
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>

@@ -32,6 +32,7 @@ export default function Navbar() {
     { href: '#features', label: t('features'), kind: 'anchor' },
     { href: '#pricing', label: t('pricing'), kind: 'anchor' },
     { href: '#security', label: t('security'), kind: 'anchor' },
+    { href: '/qr-menu', label: t('qrMenu'), kind: 'page' },
     { href: '/store', label: t('store'), kind: 'page' },
     { href: '/privacy', label: tf('links.privacy'), kind: 'page' },
   ];
