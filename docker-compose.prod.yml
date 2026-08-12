@@ -186,10 +186,15 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://hummytummy.com/api}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://hummytummy.com}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_LANDING_BASE_URL:-https://landing.hummytummy.com}
     container_name: kds_landing_prod
     restart: always
     environment:
       NODE_ENV: production
+      # Runtime copy of the build arg: robots.ts / sitemap.ts evaluate on
+      # request (not at build), so they read the container env. Must match
+      # the vhost that actually serves this container — see Dockerfile note.
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_LANDING_BASE_URL:-https://landing.hummytummy.com}
       # Server-side catalog fetch goes over the shared docker network. Reaching
       # the public host from inside the container means leaving the box,
       # crossing Cloudflare and hairpinning back — which can fail while the
