@@ -23,7 +23,7 @@ import { useAssignModifiersToProduct } from "../../features/modifiers/modifiersA
 import { ProductModifierSelector } from "../../components/modifiers";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
-import ImageLibraryModal from "../../components/product/ImageLibraryModal";
+import ProductImageField from "../../components/product/ProductImageField";
 import Product3dPanel from "../../components/product/Product3dPanel";
 import ProductMediaPanel from "../../components/product/ProductMediaPanel";
 import ComboBuilder from "./menuManagement/ComboBuilder";
@@ -86,10 +86,30 @@ function Section({
  * creates a draft from the current form, so the operator never has to "save
  * first". Sectioned layout with a sticky action bar.
  */
-export default function ProductEditorPage() {
+export interface ProductEditorProps {
+  /** Overrides the route param — set when the editor runs inside the menu
+      workspace panel instead of on its own page. */
+  productId?: string;
+  /** Pre-selects a category for a new product (the workspace passes the one
+      the operator was looking at). */
+  defaultCategoryId?: string;
+  /** Panel mode: no page header, no navigation on save. */
+  embedded?: boolean;
+  onSaved?: (product: Product) => void;
+  onCancel?: () => void;
+}
+
+export default function ProductEditorPage({
+  productId: propProductId,
+  defaultCategoryId,
+  embedded = false,
+  onSaved,
+  onCancel,
+}: ProductEditorProps = {}) {
   const { t } = useTranslation(["menu", "common"]);
   const navigate = useNavigate();
-  const { productId: routeProductId } = useParams<{ productId?: string }>();
+  const { productId: routeParamId } = useParams<{ productId?: string }>();
+  const routeProductId = propProductId ?? routeParamId;
   const [searchParams] = useSearchParams();
   const isEdit = !!routeProductId;
 
@@ -113,7 +133,6 @@ export default function ProductEditorPage() {
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(
     [],
   );
-  const [imageLibraryOpen, setImageLibraryOpen] = useState(false);
 
   const productForm = useForm<ProductFormData>({
     resolver: zodResolver(createProductSchema(t)),
@@ -122,7 +141,7 @@ export default function ProductEditorPage() {
       stockTracked: false,
       taxRate: 10,
       price: 0,
-      categoryId: searchParams.get("categoryId") ?? "",
+      categoryId: defaultCategoryId ?? searchParams.get("categoryId") ?? "",
     },
   });
 
@@ -283,7 +302,12 @@ export default function ProductEditorPage() {
         if (!created?.id) return null;
         setProduct(created);
         await persistModifiers(created.id);
-        navigate(`/admin/menu/products/${created.id}/edit`, { replace: true });
+        // On its own page the URL has to adopt the new id so a refresh lands
+        // on the draft. In the panel there is no URL to adopt — the workspace
+        // owns selection — and navigating would tear the panel down mid-edit.
+        if (!embedded) {
+          navigate(`/admin/menu/products/${created.id}/edit`, { replace: true });
+        }
         return created.id;
       } catch {
         return null;
@@ -335,12 +359,20 @@ export default function ProductEditorPage() {
           // the next Save must run the update path — re-running create would
           // silently duplicate the product.
           setProduct(created);
-          navigate(`/admin/menu/products/${created.id}/edit`, { replace: true });
+          if (!embedded) {
+            navigate(`/admin/menu/products/${created.id}/edit`, {
+              replace: true,
+            });
+          }
           await persistModifiers(created.id);
         }
       }
       toast.success(t("menu.itemSaved", "Ürün kaydedildi"));
-      navigate("/admin/menu");
+      if (embedded) {
+        onSaved?.((product ?? productForm.getValues()) as unknown as Product);
+      } else {
+        navigate("/admin/menu");
+      }
     } catch {
       /* toast surfaced by the mutation */
     }
@@ -358,22 +390,23 @@ export default function ProductEditorPage() {
     .map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }));
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      {/* Header */}
-      <div className="mb-5 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/admin/menu")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-xl font-bold text-slate-900">
-          {isEdit || product
-            ? t("menu.editItem", "Ürünü düzenle")
-            : t("menu.addItem", "Yeni ürün")}
-        </h1>
-      </div>
+    <div className={embedded ? "" : "mx-auto max-w-3xl px-4 py-6"}>
+      {!embedded && (
+        <div className="mb-5 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/menu")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-bold text-slate-900">
+            {isEdit || product
+              ? t("menu.editItem", "Ürünü düzenle")
+              : t("menu.addItem", "Yeni ürün")}
+          </h1>
+        </div>
+      )}
 
       <form onSubmit={productForm.handleSubmit(onSubmit)} className="pb-24">
         {/* Two columns on desktop so the editor isn't one very tall scroll. */}
@@ -474,66 +507,11 @@ export default function ProductEditorPage() {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     {t("menu.productImages")}
                   </label>
-                  {productImages.length > 0 ? (
-                    <div className="mb-3 grid grid-cols-4 gap-2">
-                      {productImages.map((image, index) => (
-                        <div key={image.id} className="group relative">
-                          <div className="aspect-square overflow-hidden rounded-lg border-2 border-slate-200">
-                            <img
-                              src={getImageUrl(image.url)}
-                              alt={image.filename}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          {index === 0 && (
-                            <div className="absolute left-1 top-1 rounded bg-yellow-500 px-2 py-0.5 text-xs text-white">
-                              {t("menu.primary")}
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setProductImages((imgs) =>
-                                imgs.filter((img) => img.id !== image.id),
-                              )
-                            }
-                            className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : product?.image ? (
-                    <div className="mb-3">
-                      <div className="relative aspect-square w-32 overflow-hidden rounded-lg border-2 border-slate-200">
-                        <img
-                          src={getImageUrl(product.image)}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute left-1 top-1 rounded bg-yellow-500 px-2 py-0.5 text-xs text-white">
-                          {t("menu.primary")}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-4 rounded-xl border-2 border-dashed border-slate-300 py-8 text-center">
-                      <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
-                      <p className="mt-2 text-sm text-slate-600">
-                        {t("menu.noImagesSelected")}
-                      </p>
-                    </div>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setImageLibraryOpen(true)}
-                    className="w-full"
-                  >
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    {t("menu.chooseImagesFromLibrary")}
-                  </Button>
+                  <ProductImageField
+                    images={productImages}
+                    onChange={setProductImages}
+                    legacyImageUrl={product?.image}
+                  />
                 </div>
               </div>
             </Section>
@@ -735,26 +713,6 @@ export default function ProductEditorPage() {
         </div>
       </div>
 
-      <ImageLibraryModal
-        isOpen={imageLibraryOpen}
-        onClose={() => setImageLibraryOpen(false)}
-        onSelectImages={(images) => {
-          // Preserve the existing attachment order — images[0] is the primary
-          // photo on QR/POS. The library lists newest-first, so replacing the
-          // array wholesale would silently promote the newest upload to
-          // primary; instead keep still-selected images in place and append
-          // the newly added ones.
-          setProductImages((prev) => {
-            const selectedById = new Map(images.map((img) => [img.id, img]));
-            const kept = prev.filter((img) => selectedById.has(img.id));
-            const keptIds = new Set(kept.map((img) => img.id));
-            const added = images.filter((img) => !keptIds.has(img.id));
-            return [...kept, ...added];
-          });
-          setImageLibraryOpen(false);
-        }}
-        selectedImageIds={productImages.map((img) => img.id)}
-      />
     </div>
   );
 }
