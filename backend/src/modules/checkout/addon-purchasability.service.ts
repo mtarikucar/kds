@@ -8,15 +8,13 @@ import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { featureKey } from "../entitlements/entitlement-keys.const";
-import { LICENSE_ADDON_CODE } from "../marketplace/catalog-validation";
+import {
+  evaluatePurchasability,
+  type PurchaseBlock,
+} from "./addon-purchasability.rules";
 
-export type AddonPurchasabilityErrorCode =
-  | "ADDON_ALREADY_GRANTED"
-  | "ADDON_ALREADY_OWNED"
-  | "ADDON_REQUIRES_DEPENDENCY"
-  | "ADDON_LIMIT_REDUNDANT"
-  | "ADDON_MAX_QUANTITY"
-  | "LICENSE_REQUIRED";
+export type { AddonPurchasabilityErrorCode } from "./addon-purchasability.rules";
+import type { AddonPurchasabilityErrorCode } from "./addon-purchasability.rules";
 
 export interface AssertPurchasableInput {
   addOnCode: string;
@@ -69,111 +67,58 @@ export class AddonPurchasabilityService {
     ctx: CartContext = {},
   ): Promise<void> {
     const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
-    const grants = (addOn.grants as Record<string, unknown> | null) ?? null;
     const ent = await this.entitlements.getForTenant(tenantId);
     const cartCodes = ctx.cartCodes ?? new Set<string>();
-    const hasLicense = ent.features?.[featureKey("license")] === true;
 
-    // 1) The licence prerequisite. Everything gated on it is unusable without
-    // one — the projector suppresses the grants of every `requiresLicense`
-    // product while the licence is dark — so selling one first would take
-    // money for access the buyer cannot exercise.
-    if (addOn.requiresLicense && !hasLicense) {
-      if (!cartCodes.has(LICENSE_ADDON_CODE)) {
-        this.reject(
-          "LICENSE_REQUIRED",
-          addOn.code,
-          `"${addOn.name}" requires an active HummyTummy licence. Add the licence to your cart first.`,
-        );
-      }
-    }
-
-    // 2) The licence itself: one at a time — EXCEPT on a renewal, which
-    // re-pays the existing row rather than minting a second one.
-    if (addOn.kind === "license") {
-      if (hasLicense && !ctx.isRenewal) {
-        this.reject(
-          "ADDON_ALREADY_OWNED",
-          addOn.code,
-          `Your licence is already active. It renews on your anniversary.`,
-        );
-      }
-      return; // no ownership/redundancy checks apply to the licence
-    }
-
-    // 3) Credit packs are consumable, not entitlements: buying a second pack
-    // is always meaningful, so none of the ownership or redundancy checks
-    // below apply. Only the dependency check does — a pack whose spending
-    // module the tenant does not own is money they cannot use.
-    if (addOn.kind === "credit") {
-      await this.assertDeps(tenantId, addOn, cartCodes);
-      return;
-    }
-
-    // 4) Already covered by the tenant's effective entitlements — paying
-    // again buys nothing (DEF-1). A renewal is the one case where paying for
-    // something you already have is the whole point.
-    if (
-      !ctx.isRenewal &&
-      TenantMarketplaceService.isIncludedInEntitlements(grants, ent)
-    ) {
-      this.reject(
-        "ADDON_ALREADY_GRANTED",
-        addOn.code,
-        `"${addOn.name}" is already active on your account.`,
-      );
-    }
-
-    // 5) Capacity is quantity-based: owning one extra branch must not block
-    // buying a second. Enforce the catalog ceiling instead of an
-    // already-owned rejection (pre-3.3 this threw "change quantity instead",
-    // pointing at a path that did not exist — capacity was unsellable past
-    // one unit).
-    const activeOwned = await this.prisma.tenantAddOn.findFirst({
-      where: {
-        tenantId,
-        addOnId: addOn.id,
-        branchId: input.branchId ?? null,
-        status: "active",
+    const facts = {
+      addOn: {
+        code: addOn.code,
+        name: addOn.name,
+        kind: addOn.kind,
+        grants: (addOn.grants as Record<string, unknown> | null) ?? null,
+        requiresLicense: addOn.requiresLicense,
+        maxQuantity: addOn.maxQuantity ?? null,
       },
-      select: { id: true, quantity: true },
-    });
+      entitlements: ent,
+      quantity: input.quantity ?? 1,
+      cartCodes,
+      isRenewal: ctx.isRenewal,
+    };
 
-    if (addOn.kind === "capacity") {
-      // A renewal re-buys the units already held rather than adding to them.
-      const owned = ctx.isRenewal ? 0 : (activeOwned?.quantity ?? 0);
-      const wanted = owned + (input.quantity ?? 1);
-      if (addOn.maxQuantity != null && wanted > addOn.maxQuantity) {
-        this.reject(
-          "ADDON_MAX_QUANTITY",
-          addOn.code,
-          `"${addOn.name}" is limited to ${addOn.maxQuantity} per account (you have ${owned}).`,
-        );
-      }
-    } else if (activeOwned && !ctx.isRenewal) {
-      this.reject(
-        "ADDON_ALREADY_OWNED",
-        addOn.code,
-        `"${addOn.name}" is already active for this ${
-          input.branchId ? "branch" : "account"
-        }.`,
-      );
+    // One implementation of "can this be bought", shared with the storefront.
+    // When these were separate the store offered anything without an ownership
+    // ROW — comps, operator overrides, the demo tenant's entire feature set —
+    // and checkout refused the whole cart.
+    //
+    // Evaluated in two passes so the ownership read stays conditional: the
+    // licence, already-granted and redundancy rules need no ownership at all,
+    // and a product that is already granted must not cost a query to refuse.
+    const withoutOwnership = evaluatePurchasability({
+      ...facts,
+      ownedQuantity: 0,
+      isOwned: false,
+    });
+    if (withoutOwnership) this.rejectWith(withoutOwnership);
+
+    if (addOn.kind !== "credit" && addOn.kind !== "license") {
+      const activeOwned = await this.prisma.tenantAddOn.findFirst({
+        where: {
+          tenantId,
+          addOnId: addOn.id,
+          branchId: input.branchId ?? null,
+          status: "active",
+        },
+        select: { id: true, quantity: true },
+      });
+      const blocked = evaluatePurchasability({
+        ...facts,
+        ownedQuantity: activeOwned?.quantity ?? 0,
+        isOwned: !!activeOwned,
+      });
+      if (blocked) this.rejectWith(blocked);
     }
 
     await this.assertDeps(tenantId, addOn, cartCodes);
-
-    // 6) Redundant capacity (DEF-8) — a limit.* grant whose effective limit
-    // is already unlimited (-1) buys nothing.
-    for (const [key] of Object.entries(grants ?? {})) {
-      if (!key.startsWith("limit.")) continue;
-      if (ent.limits?.[key] === -1) {
-        this.reject(
-          "ADDON_LIMIT_REDUNDANT",
-          addOn.code,
-          `"${addOn.name}" adds capacity you already have unlimited.`,
-        );
-      }
-    }
   }
 
   /**
@@ -218,6 +163,14 @@ export class AddonPurchasabilityService {
         `"${addOn.name}" requires "${depName}". Add it to your cart first.`,
       );
     }
+  }
+
+  private rejectWith(blocked: PurchaseBlock): never {
+    throw new ConflictException({
+      code: blocked.code,
+      message: blocked.message,
+      addOnCode: blocked.addOnCode,
+    });
   }
 
   private reject(

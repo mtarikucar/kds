@@ -92,7 +92,8 @@
     "decrease": "Уменьшить количество",
     "pay": "Оплатить",
     "reviewBill": "К счёту",
-    "selectedCount": "Выбрано: {{count}}"
+    "selectedCount": "Выбрано: {{count}}",
+    "maxReached": "Достигнут максимум"
   },
   "invoices": {
     "title": "Счета",

@@ -10,6 +10,7 @@ import { PasswordService } from "./services/password.service";
 import { EmailVerificationService } from "./services/email-verification.service";
 import { AuthProvisioningService } from "./services/auth-provisioning.service";
 import { DemoService } from "../demo/demo.service";
+import { MarketplaceModule } from "../marketplace/marketplace.module";
 import { LocalStrategy } from "./strategies/local.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -23,6 +24,10 @@ import { NotificationsModule } from "../notifications/notifications.module";
   imports: [
     PassportModule,
     forwardRef(() => NotificationsModule),
+    // DemoService comps the demo tenant's licence + integrations through the
+    // real purchase path, so the marketplace service must resolve here.
+    // forwardRef because MarketplaceModule's graph reaches back into auth.
+    forwardRef(() => MarketplaceModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

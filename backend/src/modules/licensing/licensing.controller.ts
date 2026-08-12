@@ -5,7 +5,12 @@ import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator"
 import { Public } from "../auth/decorators/public.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
-import { featureKey } from "../entitlements/entitlement-keys.const";
+import {
+  featureKey,
+  LICENSE_PRODUCT_CODE,
+} from "../entitlements/entitlement-keys.const";
+import { EntitlementSet } from "../entitlements/entitlement.types";
+import { evaluatePurchasability } from "../checkout/addon-purchasability.rules";
 import { CreditService } from "../credits/credit.service";
 import { LicensingService } from "./licensing.service";
 import { RenewalCycleService } from "./renewal-cycle.service";
@@ -78,6 +83,7 @@ export class LicensingController {
           currency: true,
           grants: true,
           requiresLicense: true,
+          maxQuantity: true,
           i18n: true,
         },
       }),
@@ -92,14 +98,22 @@ export class LicensingController {
 
     // Which of the four states the licence is in decides what the UI offers:
     // buy, nothing, renew-now, or renew-to-restore.
+    //
+    // Derived from the LIVE entitlement first, not from the anchor. It used to
+    // start with `!anchorAt ? "none"`, so a tenant holding a live licence with
+    // no anchor was reported as unlicensed — and the store, believing that,
+    // added a second licence to the cart, which checkout then refused with
+    // ADDON_ALREADY_OWNED, failing the whole basket including the module the
+    // customer actually wanted. The anchor answers "when is the anniversary",
+    // never "is there a licence".
     const licenceRow = owned.find((o) => o.addOn.kind === "license");
-    const status = !ctx.anchorAt
-      ? "none"
-      : hasLicense
-        ? licenceRow?.status === "past_due"
-          ? "grace"
-          : "active"
-        : "expired";
+    const status = hasLicense
+      ? licenceRow?.status === "past_due"
+        ? "grace"
+        : "active"
+      : ctx.anchorAt || licenceRow
+        ? "expired"
+        : "none";
 
     const localized = (row: { name: string; i18n: unknown }) =>
       (row.i18n as Record<string, { name?: string }> | null)?.[locale]?.name ??
@@ -150,6 +164,14 @@ export class LicensingController {
       // THIS tenant today. The upsell price and the checkout price are the
       // same number because they come from the same read.
       offers: this.buildOffers(catalog, ctx, locale),
+      // Whether each product can be bought RIGHT NOW, decided by the same
+      // function the pre-payment guard uses. The storefront used to decide
+      // this for itself by looking for an ownership row, so anything granted
+      // without one — a comp, an operator override, every feature the demo
+      // tenant has — showed a Buy button that checkout refuses. A rejected
+      // line fails the entire cart, so the customer could not buy the product
+      // they DID want either.
+      purchasability: this.buildPurchasability(catalog, ent, owned),
     };
   }
 
@@ -214,6 +236,60 @@ export class LicensingController {
         };
       }),
     };
+  }
+
+  private buildPurchasability(
+    catalog: Array<{
+      code: string;
+      kind: string;
+      grants: unknown;
+      requiresLicense: boolean;
+      maxQuantity?: number | null;
+      name: string;
+    }>,
+    ent: EntitlementSet,
+    owned: Array<{
+      quantity: number;
+      status: string;
+      addOn: { code: string };
+    }>,
+  ): Record<string, { ok: boolean; reason?: string; message?: string }> {
+    const activeByCode = new Map(
+      owned
+        .filter((o) => o.status === "active")
+        .map((o) => [o.addOn.code, o.quantity]),
+    );
+
+    const out: Record<
+      string,
+      { ok: boolean; reason?: string; message?: string }
+    > = {};
+    for (const row of catalog) {
+      const ownedQuantity = activeByCode.get(row.code) ?? 0;
+      const blocked = evaluatePurchasability({
+        addOn: {
+          code: row.code,
+          name: row.name,
+          kind: row.kind,
+          grants: (row.grants as Record<string, unknown> | null) ?? null,
+          requiresLicense: row.requiresLicense,
+          maxQuantity: row.maxQuantity ?? null,
+        },
+        entitlements: ent,
+        ownedQuantity,
+        isOwned: activeByCode.has(row.code),
+        quantity: 1,
+        // The store adds the licence to the basket itself when one is needed,
+        // so a licence-gated product is not "unbuyable" — it is buyable WITH
+        // the licence. Modelling the cart here keeps the store from greying
+        // out its entire catalogue for a tenant who has not bought yet.
+        cartCodes: new Set([LICENSE_PRODUCT_CODE]),
+      });
+      out[row.code] = blocked
+        ? { ok: false, reason: blocked.code, message: blocked.message }
+        : { ok: true };
+    }
+    return out;
   }
 
   private buildOffers(

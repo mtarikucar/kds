@@ -92,7 +92,8 @@
     "decrease": "Adedi azalt",
     "pay": "Öde",
     "reviewBill": "Adisyonu gör",
-    "selectedCount": "{{count}} kalem seçildi"
+    "selectedCount": "{{count}} kalem seçildi",
+    "maxReached": "Azami adet"
   },
   "invoices": {
     "title": "Faturalar",
