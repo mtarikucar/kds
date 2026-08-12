@@ -11,10 +11,11 @@ export default function Footer() {
     { label: t('links.features'), href: '#features' },
     { label: t('links.pricing'), href: '#pricing' },
     { label: t('links.security'), href: '#security' },
-    // Locale-aware page link (rest are anchors). Renderer below switches
+    // Locale-aware page links (rest are anchors). Renderer below switches
     // between <Link> and <a> based on the href shape.
+    { label: t('links.qrMenu'), href: '/qr-menu' },
+    { label: t('links.cloudKitchen'), href: '/bulut-mutfak' },
     { label: t('links.shop'), href: '/store' },
-    { label: t('links.integrations'), href: '#' },
   ];
 
   const companyLinks = [

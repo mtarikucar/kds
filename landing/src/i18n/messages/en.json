@@ -2,7 +2,7 @@
   "metadata": {
     "title": "HummyTummy - Restaurant Management System",
     "description": "Modern POS system for restaurants. Manage orders, kitchen display, tables, and payments all in one place.",
-    "keywords": "restaurant pos, kitchen display system, restaurant management, qr menu, table management"
+    "keywords": "restaurant pos, kitchen display system, restaurant management, qr menu, table management, qr code menu, digital menu, cloud kitchen, delivery software"
   },
   "nav": {
     "product": "Product",
@@ -10,6 +10,7 @@
     "pricing": "Pricing",
     "security": "Security",
     "store": "Shop",
+    "qrMenu": "QR Menu",
     "signIn": "Sign in",
     "startFree": "Start free",
     "openMenu": "Open menu",
@@ -280,6 +281,8 @@
       "security": "Security",
       "shop": "Hardware Shop",
       "integrations": "Integrations",
+      "qrMenu": "QR Menu",
+      "cloudKitchen": "Cloud Kitchen",
       "about": "About",
       "blog": "Blog",
       "careers": "Careers",
@@ -538,6 +541,241 @@
         "network": "Connection problem — please retry.",
         "generic": "Could not send the message. Please try again."
       }
+    }
+  },
+  "qrMenuPage": {
+    "meta": {
+      "title": "Free QR Menu for Restaurants — Unlimited",
+      "description": "Create a free QR menu for your restaurant: unlimited items, instant price updates, multi-language menus, allergen labels and order-from-table. Ready in 5 minutes, no credit card required.",
+      "keywords": "qr menu, qr code menu, digital menu, free qr menu, restaurant qr menu, contactless menu, online menu, create qr menu"
+    },
+    "hero": {
+      "badge": "Free & unlimited",
+      "title": "Your QR menu,",
+      "titleHighlight": "live in 5 minutes",
+      "subtitle": "Guests scan the code on the table and your menu opens instantly — no app download. Price changes go live in seconds and printing costs drop to zero. QR menus on HummyTummy are completely free: no item, category, table or branch limits.",
+      "ctaPrimary": "Create your free QR menu",
+      "ctaSecondary": "Contact us",
+      "trust1": "No credit card",
+      "trust2": "No app download",
+      "trust3": "Unlimited items & tables"
+    },
+    "how": {
+      "title": "How to create a QR menu in 3 steps",
+      "subtitle": "No technical knowledge needed. Add your menu, download your code, place it on the table.",
+      "steps": [
+        {
+          "title": "Sign up for free",
+          "description": "Enter your business name and phone — your account is ready in minutes. We don't ask for a credit card."
+        },
+        {
+          "title": "Add your menu",
+          "description": "Enter items in the panel, or upload a photo of your printed menu and let AI import items, prices and categories for you."
+        },
+        {
+          "title": "Put the code on the table",
+          "description": "Download a ready-made QR code for every table as a PDF, print it and stick it on the table. Your menu is now on every phone."
+        }
+      ]
+    },
+    "features": {
+      "title": "Much more than a simple QR code",
+      "subtitle": "The HummyTummy QR menu is part of a free system that runs your whole restaurant.",
+      "items": [
+        {
+          "title": "Instant updates",
+          "description": "Price or item changes go live with one tap from the panel. You'll never print a menu again."
+        },
+        {
+          "title": "Order from the table",
+          "description": "Guests don't just browse — they can order right from the table, and orders land on the kitchen display and the register instantly."
+        },
+        {
+          "title": "Multi-language menus",
+          "description": "Your menu can be shown in Turkish, English, Russian, Arabic and Uzbek — international guests don't need to wait for a waiter."
+        },
+        {
+          "title": "Allergen & dietary info",
+          "description": "Add labels like gluten, lactose or vegan to items so guests can choose with confidence."
+        },
+        {
+          "title": "Your brand, your menu",
+          "description": "Logo, cover image and colors make the menu yours — you can even connect a custom domain."
+        },
+        {
+          "title": "Integrated with POS & kitchen",
+          "description": "The QR menu isn't a standalone tool: POS, tabs, kitchen display, cash register and reports are free in the same system."
+        }
+      ]
+    },
+    "why": {
+      "title": "Why is the QR menu free?",
+      "body1": "Everything that runs a restaurant — POS, tabs, kitchen display, menu management, floor plan and the QR menu — is free and unlimited on HummyTummy. No hidden fees, no time limits, no 'first 10 items' trap.",
+      "body2": "We earn from optional modules instead: delivery platform integrations, AI tools and hardware. You will never pay for your QR menu."
+    },
+    "coverage": {
+      "title": "Everywhere in Türkiye",
+      "body": "HummyTummy is cloud-based: no installation, and you can start the same day in all 81 provinces. Restaurants, cafés, patisseries, bars, hotels, canteens and beach clubs — businesses of every size.",
+      "cities": "Istanbul, Ankara, Izmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Eskişehir, Samsun, Trabzon, Diyarbakır, Muğla, Aydın…"
+    },
+    "faq": {
+      "title": "Frequently asked questions about QR menus",
+      "items": [
+        {
+          "q": "What is a QR menu?",
+          "a": "A QR menu is a digital menu that opens when guests scan a code on the table with their phone camera, replacing the printed menu. Guests see your menu in the browser without installing an app, and you update prices and items instantly."
+        },
+        {
+          "q": "Is the QR menu really free?",
+          "a": "Yes. The QR menu is part of HummyTummy's free core: there are no item, category, table or view limits. Only optional modules (such as delivery integrations) are paid."
+        },
+        {
+          "q": "How do I create a QR code menu?",
+          "a": "Sign up for free, add your menu in the panel or upload a photo of your printed menu for AI import, then download and print your table QR codes as a PDF. Most businesses finish in 5–10 minutes."
+        },
+        {
+          "q": "Do guests have to install an app?",
+          "a": "No. The code is scanned with the phone camera and the menu opens in the browser; no extra app is needed on iOS or Android."
+        },
+        {
+          "q": "Can guests order through the QR menu?",
+          "a": "Yes. You can keep the menu view-only or enable ordering from the table; orders land on the kitchen display and the register automatically."
+        },
+        {
+          "q": "How do I update prices?",
+          "a": "Open the item in the admin panel and type the new price; the change is live on every table within seconds. No reprinting, no new QR code."
+        },
+        {
+          "q": "Can the menu be shown in multiple languages?",
+          "a": "Yes. You can offer your menu in Turkish, English, Russian, Arabic and Uzbek; guests switch languages with one tap."
+        },
+        {
+          "q": "Can I add allergen information?",
+          "a": "Yes. You can add allergen and dietary labels (gluten, lactose, vegan, etc.) to items; they appear next to the item on the menu."
+        },
+        {
+          "q": "Where can I use it?",
+          "a": "In all 81 provinces of Türkiye — the system is cloud-based and works in any business with an internet connection."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Take your menu digital today",
+      "subtitle": "Your QR menu is ready in 5 minutes — and we're a phone call away if you get stuck.",
+      "primary": "Start free",
+      "secondary": "Contact us",
+      "callUs": "Call us with any questions"
+    }
+  },
+  "cloudKitchenPage": {
+    "meta": {
+      "title": "Cloud Kitchen Software — Every Platform on One Screen",
+      "description": "Order management for cloud kitchens and delivery restaurants: Yemeksepeti, Getir, Trendyol and Migros Yemek orders in a single feed, sent automatically to the kitchen display. Unlimited menus and branches for multi-brand kitchens.",
+      "keywords": "cloud kitchen, ghost kitchen, virtual kitchen, delivery software, yemeksepeti integration, getir integration, trendyol yemek integration, delivery pos"
+    },
+    "hero": {
+      "badge": "Delivery platform integrations",
+      "title": "Three tablets, four ringers, one kitchen?",
+      "titleHighlight": "Everything on one screen.",
+      "subtitle": "Yemeksepeti, Getir Yemek, Trendyol Yemek and Migros Yemek orders merge into a single order feed on HummyTummy and land on the kitchen display tagged by platform. Built for cloud kitchens and every restaurant that delivers.",
+      "ctaPrimary": "Start free",
+      "ctaSecondary": "Contact us",
+      "trust1": "4 platform integrations",
+      "trust2": "Kitchen display included",
+      "trust3": "Unlimited brands & branches"
+    },
+    "pain": {
+      "title": "End the tablet chaos",
+      "body": "A separate tablet, ringer and screen for every platform… Orders missed at rush hour, tickets carried to the kitchen by hand, and a team split across platforms. HummyTummy collects every platform order in one pool: one screen, one flow, zero missed orders."
+    },
+    "platforms": {
+      "title": "Integrated platforms",
+      "subtitle": "Türkiye's four major food platforms connect out of the box.",
+      "items": [
+        {
+          "name": "Yemeksepeti",
+          "description": "Orders from Türkiye's biggest food platform reach your screen in seconds."
+        },
+        {
+          "name": "Getir Yemek",
+          "description": "Getir orders flow in the same feed — no separate tablet, no separate tracking."
+        },
+        {
+          "name": "Trendyol Yemek",
+          "description": "Trendyol orders are received automatically; confirmation and prep status are managed in one place."
+        },
+        {
+          "name": "Migros Yemek",
+          "description": "Migros Yemek orders join the same pool and are forwarded to the kitchen automatically."
+        }
+      ],
+      "note": "Platform integrations are optional paid modules; the core system (POS, kitchen display, menu, QR menu) is free."
+    },
+    "features": {
+      "title": "Run your cloud kitchen from one system",
+      "subtitle": "From taking the order to the report — the whole delivery chain in one place.",
+      "items": [
+        {
+          "title": "One order pool",
+          "description": "All platform and phone orders in a single list; nothing slips through at rush hour."
+        },
+        {
+          "title": "Straight to the kitchen display",
+          "description": "Orders land on the kitchen display (KDS) instantly, tagged by platform; no more hand-carried or printed tickets."
+        },
+        {
+          "title": "Multi-brand kitchen",
+          "description": "Running several virtual brands from one kitchen? Define a separate menu and branch for each brand — unlimited."
+        },
+        {
+          "title": "Phone orders & delivery tracking",
+          "description": "Recognize the caller, enter a phone order in seconds and track the package until it's delivered."
+        },
+        {
+          "title": "Per-platform reports",
+          "description": "Which platform brings how much revenue, which item sells where? Compare platform performance in one report."
+        },
+        {
+          "title": "Tabs & register in the same system",
+          "description": "Manage dine-in sales alongside delivery from the same POS; end-of-day cash and reports live in one place."
+        }
+      ]
+    },
+    "faq": {
+      "title": "Frequently asked questions about cloud kitchens",
+      "items": [
+        {
+          "q": "What is a cloud kitchen?",
+          "a": "A cloud kitchen (ghost kitchen) is a kitchen that produces only for delivery, with no dining room. One kitchen can run several virtual brands; orders arrive from platforms like Yemeksepeti and Getir."
+        },
+        {
+          "q": "Which platforms are integrated?",
+          "a": "Yemeksepeti, Getir Yemek, Trendyol Yemek and Migros Yemek. Orders are received automatically and merged into one screen."
+        },
+        {
+          "q": "How do orders reach the kitchen?",
+          "a": "A platform order lands on the kitchen display (KDS) within seconds, tagged with its platform; nobody needs to sit next to a tablet."
+        },
+        {
+          "q": "Can I manage several brands from one kitchen?",
+          "a": "Yes. You define a separate menu and branch for each virtual brand; there is no limit on brands or branches."
+        },
+        {
+          "q": "How is it priced?",
+          "a": "The core system (POS, kitchen display, menu, QR menu) is free and unlimited. Platform integrations are purchased as modules with an annual licence; current prices are in the pricing section on the homepage."
+        },
+        {
+          "q": "My restaurant has a dining room and also delivers — is this for me?",
+          "a": "Yes. The integrations aren't only for cloud kitchens; any restaurant running dine-in plus delivery manages both channels from the same screen."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Bring your delivery orders onto one screen",
+      "subtitle": "Our team helps with menu import and platform connection during setup.",
+      "primary": "Start free",
+      "secondary": "Contact us",
+      "callUs": "Sales & support"
     }
   }
 }

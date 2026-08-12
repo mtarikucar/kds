@@ -2,7 +2,7 @@
   "metadata": {
     "title": "HummyTummy - Restoran boshqaruv tizimi",
     "description": "Restoranlar uchun zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
-    "keywords": "restoran pos, oshxona displeyi, restoran boshqaruvi, qr menyu, stollarni boshqarish"
+    "keywords": "restoran pos, oshxona displeyi, restoran boshqaruvi, qr menyu, stollarni boshqarish, qr menyu, raqamli menyu, bulutli oshxona, yetkazib berish dasturi"
   },
   "nav": {
     "product": "Mahsulot",
@@ -10,6 +10,7 @@
     "pricing": "Narxlar",
     "security": "Xavfsizlik",
     "store": "Do'kon",
+    "qrMenu": "QR menyu",
     "signIn": "Kirish",
     "startFree": "Bepul boshlash",
     "openMenu": "Menyuni ochish",
@@ -280,6 +281,8 @@
       "security": "Xavfsizlik",
       "shop": "Jihozlar do'koni",
       "integrations": "Integratsiyalar",
+      "qrMenu": "QR menyu",
+      "cloudKitchen": "Bulutli oshxona",
       "about": "Haqida",
       "blog": "Blog",
       "careers": "Karyera",
@@ -538,6 +541,241 @@
         "network": "Ulanish muammosi — qaytadan urinib ko‘ring.",
         "generic": "Xabar yuborilmadi. Iltimos, qaytadan urinib ko‘ring."
       }
+    }
+  },
+  "qrMenuPage": {
+    "meta": {
+      "title": "Restoran uchun bepul QR menyu — cheksiz",
+      "description": "Restoraningiz uchun bepul QR menyu yarating: cheksiz taomlar, narxlarni bir zumda yangilash, ko'p tilli menyu, allergen belgilari va stoldan buyurtma. 5 daqiqada tayyor, bank kartasi shart emas.",
+      "keywords": "qr menyu, qr kod menyu, elektron menyu, bepul qr menyu, raqamli menyu, restoran qr menyu, kontaktsiz menyu"
+    },
+    "hero": {
+      "badge": "Bepul va cheksiz",
+      "title": "QR menyuingiz",
+      "titleHighlight": "5 daqiqada tayyor",
+      "subtitle": "Mehmon stoldagi kodni telefoniga skanerlaydi va menyu bir zumda ochiladi — ilova yuklab olish shart emas. Narx o'zgarishi soniyalarda e'lon qilinadi, chop etish xarajati nol. HummyTummy'da QR menyu butunlay bepul: taom, kategoriya, stol va filial cheklovi yo'q.",
+      "ctaPrimary": "Bepul QR menyu yarating",
+      "ctaSecondary": "Biz bilan bog'laning",
+      "trust1": "Bank kartasi shart emas",
+      "trust2": "Ilova yuklab olinmaydi",
+      "trust3": "Cheksiz taom va stol"
+    },
+    "how": {
+      "title": "3 qadamda QR menyu qanday yaratiladi",
+      "subtitle": "Texnik bilim shart emas. Menyuni qo'shing, kodni yuklab oling, stolga qo'ying.",
+      "steps": [
+        {
+          "title": "Bepul ro'yxatdan o'ting",
+          "description": "Muassasa nomi va telefoningizni kiriting — hisobingiz bir necha daqiqada tayyor. Bank kartasi so'ramaymiz."
+        },
+        {
+          "title": "Menyuni qo'shing",
+          "description": "Taomlarni panelda kiriting yoki bosma menyuning suratini yuklang — sun'iy intellekt taomlar, narxlar va kategoriyalarni siz uchun ko'chiradi."
+        },
+        {
+          "title": "Kodni stolga qo'ying",
+          "description": "Har bir stol uchun tayyor QR kodni PDF ko'rinishida yuklab oling, chop eting va stolga yopishtiring. Menyuingiz endi har bir telefonda."
+        }
+      ]
+    },
+    "features": {
+      "title": "Oddiy QR koddan ancha ko'proq",
+      "subtitle": "HummyTummy QR menyusi butun restoranni boshqaradigan bepul tizimning bir qismidir.",
+      "items": [
+        {
+          "title": "Bir zumda yangilanish",
+          "description": "Narx yoki taom o'zgarishi paneldan bir tegishda e'lon qilinadi. Boshqa hech qachon menyu chop etmaysiz."
+        },
+        {
+          "title": "Stoldan buyurtma",
+          "description": "Mehmon menyuni ko'rish bilan cheklanmaydi — stoldan buyurtma bera oladi; buyurtma oshxona ekrani va kassaga darhol tushadi."
+        },
+        {
+          "title": "Ko'p tilli menyu",
+          "description": "Menyu turk, ingliz, rus, arab va o'zbek tillarida ko'rsatiladi — xorijiy mehmonlar ofitsiant kutmaydi."
+        },
+        {
+          "title": "Allergen va parhez ma'lumoti",
+          "description": "Taomlarga gluten, laktoza, vegan kabi belgilar qo'shing; mehmonlar ishonch bilan tanlaydi."
+        },
+        {
+          "title": "Brendingizga mos",
+          "description": "Logotip, muqova rasmi va ranglar menyuni sizniki qiladi; hatto shaxsiy domen ham ulash mumkin."
+        },
+        {
+          "title": "POS va oshxona bilan birlashgan",
+          "description": "QR menyu alohida vosita emas: POS, hisoblar, oshxona ekrani, kassa va hisobotlar ham xuddi shu tizimda bepul."
+        }
+      ]
+    },
+    "why": {
+      "title": "QR menyu nega bepul?",
+      "body1": "Restoranni yuritadigan hamma narsa — POS, hisoblar, oshxona ekrani, menyu boshqaruvi, zal rejasi va QR menyu — HummyTummy'da bepul va cheksiz. Yashirin to'lov, muddat cheklovi yoki «birinchi 10 taom» tuzog'i yo'q.",
+      "body2": "Biz ixtiyoriy modullardan daromad qilamiz: yetkazib berish platformalari integratsiyalari, sun'iy intellekt vositalari va uskunalar. QR menyu uchun hech qachon to'lamaysiz."
+    },
+    "coverage": {
+      "title": "Turkiyaning har yerida",
+      "body": "HummyTummy bulutli tizim: o'rnatish shart emas, barcha 81 viloyatda o'sha kuniyoq boshlaysiz. Restoran, kafe, qandolatxona, bar, mehmonxona, oshxona va plyaj klublari — har qanday hajmdagi muassasa uchun.",
+      "cities": "Istanbul, Anqara, Izmir, Bursa, Antaliya, Adana, Konya, G'aziantep, Mersin, Kayseri, Eskishehir, Samsun, Trabzon, Diyarbakir, Mug'la, Aydin…"
+    },
+    "faq": {
+      "title": "QR menyu haqida ko'p so'raladigan savollar",
+      "items": [
+        {
+          "q": "QR menyu nima?",
+          "a": "QR menyu — stoldagi kod telefon kamerasi bilan skanerlanganda ochiladigan, bosma menyuning o'rnini bosadigan raqamli menyu. Mehmon ilova o'rnatmasdan menyuni brauzerda ko'radi, siz esa narx va taomlarni bir zumda yangilaysiz."
+        },
+        {
+          "q": "QR menyu chindan ham bepulmi?",
+          "a": "Ha. QR menyu HummyTummy'ning bepul yadrosiga kiradi: taom, kategoriya, stol va ko'rish cheklovi yo'q. Faqat ixtiyoriy modullar (masalan, yetkazib berish integratsiyalari) pullik."
+        },
+        {
+          "q": "QR kodli menyu qanday yaratiladi?",
+          "a": "Bepul ro'yxatdan o'ting, menyuni panelda qo'shing yoki bosma menyu suratini yuklab sun'iy intellektga ko'chirting, so'ng stol QR kodlarini PDF qilib yuklab oling va chop eting. Ko'pchilik 5–10 daqiqada tugatadi."
+        },
+        {
+          "q": "Mehmon ilova o'rnatishi kerakmi?",
+          "a": "Yo'q. Kod telefon kamerasi bilan skanerlanadi va menyu brauzerda ochiladi; iOS va Android'da qo'shimcha ilova kerak emas."
+        },
+        {
+          "q": "Mehmon QR menyu orqali buyurtma bera oladimi?",
+          "a": "Ha. Menyuni faqat ko'rish rejimida qoldirishingiz yoki stoldan buyurtmani yoqishingiz mumkin; buyurtmalar oshxona ekrani va kassaga avtomatik tushadi."
+        },
+        {
+          "q": "Narxlarni qanday yangilayman?",
+          "a": "Boshqaruv panelida taomni oching va yangi narxni yozing — o'zgarish soniyalarda barcha stollarda ko'rinadi. Qayta chop etish yoki yangi QR kod kerak emas."
+        },
+        {
+          "q": "Menyu bir nechta tilda ko'rsatilishi mumkinmi?",
+          "a": "Ha. Menyuni turk, ingliz, rus, arab va o'zbek tillarida taqdim eta olasiz; mehmon tilni bir tegishda almashtiradi."
+        },
+        {
+          "q": "Allergen ma'lumotini qo'sha olamanmi?",
+          "a": "Ha. Taomlarga allergen va parhez belgilari (gluten, laktoza, vegan va hokazo) qo'shiladi; ular menyuda taom yonida ko'rinadi."
+        },
+        {
+          "q": "Qayerda ishlata olaman?",
+          "a": "Turkiyaning barcha 81 viloyatida — tizim bulutli bo'lib, interneti bor har qanday muassasada ishlaydi."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Menyuingizni bugun raqamlashtiring",
+      "subtitle": "QR menyuingiz 5 daqiqada tayyor — qiynalsangiz telefon orqali ham yordam beramiz.",
+      "primary": "Bepul boshlang",
+      "secondary": "Biz bilan bog'laning",
+      "callUs": "Savollar uchun qo'ng'iroq qiling"
+    }
+  },
+  "cloudKitchenPage": {
+    "meta": {
+      "title": "Bulutli oshxona dasturi — barcha platformalar bitta ekranda",
+      "description": "Bulutli oshxona va yetkazib beruvchi restoranlar uchun buyurtma boshqaruvi: Yemeksepeti, Getir, Trendyol va Migros Yemek buyurtmalari yagona oqimda, oshxona ekraniga avtomatik tushadi. Ko'p brendli oshxonalar uchun cheksiz menyu va filial.",
+      "keywords": "bulutli oshxona, cloud kitchen, virtual oshxona, yetkazib berish dasturi, yemeksepeti integratsiyasi, getir integratsiyasi"
+    },
+    "hero": {
+      "badge": "Yetkazib berish integratsiyalari",
+      "title": "Uchta planshet, to'rtta qo'ng'iroq, bitta oshxonami?",
+      "titleHighlight": "Hammasi bitta ekranda.",
+      "subtitle": "Yemeksepeti, Getir Yemek, Trendyol Yemek va Migros Yemek buyurtmalari HummyTummy'da yagona oqimga birlashadi va platforma belgisi bilan oshxona ekraniga tushadi. Bulutli oshxonalar va yetkazib beradigan har bir restoran uchun.",
+      "ctaPrimary": "Bepul boshlang",
+      "ctaSecondary": "Biz bilan bog'laning",
+      "trust1": "4 ta platforma integratsiyasi",
+      "trust2": "Oshxona ekrani ichida",
+      "trust3": "Cheksiz brend va filial"
+    },
+    "pain": {
+      "title": "Planshet tartibsizligiga chek",
+      "body": "Har platforma uchun alohida planshet, qo'ng'iroq va ekran… Gavjum soatlarda yo'qolgan buyurtmalar, oshxonaga qo'lda tashiladigan cheklar, platformalar orasida bo'lingan jamoa. HummyTummy barcha buyurtmalarni bitta hovuzga yig'adi: bitta ekran, bitta oqim, nol yo'qotilgan buyurtma."
+    },
+    "platforms": {
+      "title": "Integratsiyalangan platformalar",
+      "subtitle": "Turkiyaning to'rtta yirik taom platformasi darhol ulanadi.",
+      "items": [
+        {
+          "name": "Yemeksepeti",
+          "description": "Turkiyaning eng yirik taom platformasidagi buyurtmalar soniyalarda ekraningizda."
+        },
+        {
+          "name": "Getir Yemek",
+          "description": "Getir buyurtmalari umumiy oqimda — alohida planshet, alohida nazorat yo'q."
+        },
+        {
+          "name": "Trendyol Yemek",
+          "description": "Trendyol buyurtmalari avtomatik qabul qilinadi; tasdiqlash va tayyorlash holati bir joydan boshqariladi."
+        },
+        {
+          "name": "Migros Yemek",
+          "description": "Migros Yemek buyurtmalari ham o'sha hovuzga qo'shiladi va oshxonaga avtomatik uzatiladi."
+        }
+      ],
+      "note": "Platforma integratsiyalari ixtiyoriy pullik modullar; asosiy tizim (POS, oshxona ekrani, menyu, QR menyu) bepul."
+    },
+    "features": {
+      "title": "Bulutli oshxonangizni bitta tizimdan boshqaring",
+      "subtitle": "Buyurtma olishdan hisobotgacha — yetkazib berishning butun zanjiri bir joyda.",
+      "items": [
+        {
+          "title": "Yagona buyurtma hovuzi",
+          "description": "Barcha platforma va telefon buyurtmalari bitta ro'yxatda; gavjum soatda hech narsa e'tibordan chetda qolmaydi."
+        },
+        {
+          "title": "To'g'ridan-to'g'ri oshxona ekraniga",
+          "description": "Buyurtma platforma belgisi bilan oshxona ekraniga (KDS) darhol tushadi; qo'lda chek tashish tugaydi."
+        },
+        {
+          "title": "Ko'p brendli oshxona",
+          "description": "Bitta oshxonadan bir nechta virtual brend yuritasizmi? Har brend uchun alohida menyu va filial belgilang — cheksiz."
+        },
+        {
+          "title": "Telefon buyurtmasi va yetkazish nazorati",
+          "description": "Qo'ng'iroq qilgan mijozni taning, telefon buyurtmasini soniyalarda kiriting va paketni topshirilgunicha kuzating."
+        },
+        {
+          "title": "Platforma bo'yicha hisobotlar",
+          "description": "Qaysi platforma qancha daromad keltiradi, qaysi taom qayerda sotiladi? Platformalarni bitta hisobotda solishtiring."
+        },
+        {
+          "title": "Hisob va kassa o'sha tizimda",
+          "description": "Zal savdosini yetkazib berish bilan birga o'sha POS'dan boshqaring; kun yakuni kassasi va hisobotlar bir joyda."
+        }
+      ]
+    },
+    "faq": {
+      "title": "Bulutli oshxona haqida ko'p so'raladigan savollar",
+      "items": [
+        {
+          "q": "Bulutli oshxona nima?",
+          "a": "Bulutli oshxona (cloud kitchen) — zali bo'lmagan, faqat yetkazib berish uchun ishlaydigan oshxona. Bitta oshxona bir nechta virtual brendni yuritishi mumkin; buyurtmalar Yemeksepeti, Getir kabi platformalardan keladi."
+        },
+        {
+          "q": "Qaysi platformalar bilan integratsiya bor?",
+          "a": "Yemeksepeti, Getir Yemek, Trendyol Yemek va Migros Yemek. Buyurtmalar avtomatik qabul qilinadi va bitta ekranda birlashadi."
+        },
+        {
+          "q": "Buyurtmalar oshxonaga qanday yetadi?",
+          "a": "Platformadan kelgan buyurtma soniyalarda oshxona ekraniga (KDS) platforma belgisi bilan tushadi; planshet yonida kutish shart emas."
+        },
+        {
+          "q": "Bitta oshxonadan bir nechta brendni boshqara olamanmi?",
+          "a": "Ha. Har virtual brend uchun alohida menyu va filial belgilaysiz; brend va filial soni cheklanmagan."
+        },
+        {
+          "q": "Narxi qanday?",
+          "a": "Asosiy tizim (POS, oshxona ekrani, menyu, QR menyu) bepul va cheksiz. Platforma integratsiyalari yillik litsenziya bilan modul sifatida sotib olinadi; narxlar bosh sahifadagi tariflar bo'limida."
+        },
+        {
+          "q": "Restoranimning zali bor, yetkazib ham beramiz — bu menga mosmi?",
+          "a": "Ha. Integratsiyalar faqat bulutli oshxonalar uchun emas; zal va yetkazib berish bilan ishlaydigan har restoran ikkala kanalni bitta ekrandan boshqaradi."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Yetkazib berish buyurtmalarini bitta ekranga yig'ing",
+      "subtitle": "O'rnatishda menyu ko'chirish va platforma ulashda jamoamiz yoningizda.",
+      "primary": "Bepul boshlang",
+      "secondary": "Biz bilan bog'laning",
+      "callUs": "Savdo va qo'llab-quvvatlash"
     }
   }
 }
