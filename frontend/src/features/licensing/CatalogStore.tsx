@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, ShoppingCart } from 'lucide-react';
+import { Check, Lock, Minus, Plus, ShoppingCart } from 'lucide-react';
 import { useEntitlements } from '../../contexts/SubscriptionContext';
 import {
   formatCents,
@@ -21,24 +21,35 @@ const KIND_ORDER = [
   'service',
 ] as const;
 
+/** Kinds you can hold more than one of, so they get a quantity stepper. */
+const COUNTABLE_KINDS = new Set(['capacity', 'credit']);
+
+const LICENCE_CODE = 'license_annual';
+
 /**
- * The à-la-carte storefront.
+ * The à-la-carte storefront, built as a bill rather than a wall of cards.
  *
- * Every card shows two numbers: the annual list price and what the product
- * costs THIS tenant today, day-prorated to their anniversary. Showing only the
- * list price would overstate a mid-year purchase by up to twelve times, and
- * showing only the prorated one would hide what they will pay at renewal.
+ * Products are sold individually, and buying them one card at a time meant one
+ * checkout — one consent, one card entry, one PayTR round trip — per product,
+ * with the running cost never shown anywhere. A tenant kitting out a new
+ * restaurant wants the licence, two modules and a credit pack, and wants to
+ * know what that comes to before they commit. So: tick what you want, watch the
+ * total, pay once.
  *
- * Both figures come from the licensing snapshot — the same catalog read the
- * checkout prices from — so what the card says is what the card charges.
+ * Every line shows two numbers, because either alone misleads. The prorated
+ * price is what this tenant pays TODAY — a mid-year purchase runs only to the
+ * anniversary — and the annual price is what it costs at renewal. Both come
+ * from the licensing snapshot, the same catalog read checkout prices from, so
+ * the total on screen is the total charged.
  */
 const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   const { t } = useTranslation(['licensing', 'common']);
   const { data: products, isLoading } = useCatalogPricing();
-  const { offerFor, owned, license, snapshot } = useEntitlements();
+  const { owned, license, snapshot } = useEntitlements();
   const purchase = usePurchaseAddOnViaCheckout();
-  const [busy, setBusy] = useState<string | null>(null);
-  // Distance-selling consent, collected before the buyer can reach PayTR.
+  const [busy, setBusy] = useState(false);
+  // code → quantity. Absent means unticked.
+  const [picked, setPicked] = useState<Record<string, number>>({});
   const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
   const consentGiven = useConsentComplete(acceptedDocs);
 
@@ -50,155 +61,391 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   // Offers are keyed by GRANT key, not by product code, so index them by code
   // once rather than guessing which key a product happens to grant.
   const offerByCode = useMemo(() => {
-    const map = new Map<string, ReturnType<typeof offerFor>>();
-    for (const p of products ?? []) {
-      const found = (snapshot?.offers ? Object.values(snapshot.offers) : []).find(
-        (o) => o.code === p.code,
-      );
-      if (found) map.set(p.code, found);
+    const map = new Map<string, { proratedCents: number; periodEnd: string | null }>();
+    for (const offer of Object.values(snapshot?.offers ?? {})) {
+      map.set(offer.code, {
+        proratedCents: offer.proratedCents,
+        periodEnd: offer.periodEnd,
+      });
     }
     return map;
-  }, [products, snapshot]);
+  }, [snapshot]);
+
+  const byCode = useMemo(() => {
+    const map = new Map<string, PricingProduct>();
+    for (const product of products ?? []) map.set(product.code, product);
+    return map;
+  }, [products]);
 
   const grouped = useMemo(() => {
     const by = new Map<string, PricingProduct[]>();
-    for (const p of products ?? []) {
-      if (!by.has(p.kind)) by.set(p.kind, []);
-      by.get(p.kind)!.push(p);
+    for (const product of products ?? []) {
+      if (!by.has(product.kind)) by.set(product.kind, []);
+      by.get(product.kind)!.push(product);
     }
     return by;
   }, [products]);
+
+  // Arriving from an upsell ("buy Personnel to continue") should land with that
+  // line already ticked — the customer already said what they wanted.
+  useEffect(() => {
+    if (!focusCode || !byCode.has(focusCode) || ownedCodes.has(focusCode)) return;
+    setPicked((prev) => (focusCode in prev ? prev : { ...prev, [focusCode]: 1 }));
+  }, [focusCode, byCode, ownedCodes]);
+
+  const needsLicence = license.status === 'none' || license.status === 'expired';
+
+  /** Today's price for one unit — prorated when the engine priced it. */
+  const unitCents = (product: PricingProduct) =>
+    offerByCode.get(product.code)?.proratedCents ?? product.priceCents;
+
+  const pickedLines = useMemo(
+    () =>
+      Object.entries(picked)
+        .map(([code, qty]) => ({ product: byCode.get(code), qty }))
+        .filter((l): l is { product: PricingProduct; qty: number } => !!l.product),
+    [picked, byCode],
+  );
+
+  // The licence rides along when something on the bill needs one: the server
+  // rejects a licence-gated line without it, and letting the customer discover
+  // that at the payment page would be hostile. Shown as a real line, never a
+  // surprise on the receipt.
+  const licenceAutoAdded =
+    needsLicence &&
+    !(LICENCE_CODE in picked) &&
+    pickedLines.some((l) => l.product.requiresLicense);
+
+  const licenceProduct = byCode.get(LICENCE_CODE);
+  const billLines = useMemo(() => {
+    const lines = [...pickedLines];
+    if (licenceAutoAdded && licenceProduct) {
+      lines.unshift({ product: licenceProduct, qty: 1 });
+    }
+    return lines;
+  }, [pickedLines, licenceAutoAdded, licenceProduct]);
+
+  const totalCents = billLines.reduce(
+    (sum, l) => sum + unitCents(l.product) * l.qty,
+    0,
+  );
+  // What the same basket costs at the next renewal: full list, no proration.
+  const renewalCents = billLines.reduce(
+    (sum, l) => (l.product.billing === 'annual' ? sum + l.product.priceCents * l.qty : sum),
+    0,
+  );
+
+  const toggle = (product: PricingProduct) =>
+    setPicked((prev) => {
+      const next = { ...prev };
+      if (product.code in next) delete next[product.code];
+      else next[product.code] = 1;
+      return next;
+    });
+
+  const setQty = (code: string, qty: number) =>
+    setPicked((prev) => ({ ...prev, [code]: Math.max(1, Math.min(99, qty)) }));
+
+  const pay = async () => {
+    if (billLines.length === 0 || !consentGiven) return;
+    setBusy(true);
+    try {
+      await purchase.mutateAsync({
+        items: billLines.map((l) => ({
+          type: 'addon' as const,
+          code: l.product.code,
+          qty: l.qty,
+        })),
+        acceptedDocumentIds: acceptedDocs,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (isLoading) {
     return <div className="p-6 text-sm text-gray-500">{t('common:loading')}</div>;
   }
 
-  const needsLicence =
-    license.status === 'none' || license.status === 'expired';
-
-  const buy = async (product: PricingProduct) => {
-    setBusy(product.code);
-    try {
-      // The licence rides along automatically when the tenant does not have
-      // one: the server rejects a licence-gated line without it, and making
-      // the customer discover that by failing at checkout would be hostile.
-      const items =
-        product.requiresLicense && needsLicence
-          ? [
-              { type: 'addon' as const, code: 'license_annual', qty: 1 },
-              { type: 'addon' as const, code: product.code, qty: 1 },
-            ]
-          : [{ type: 'addon' as const, code: product.code, qty: 1 }];
-      await purchase.mutateAsync({ items, acceptedDocumentIds: acceptedDocs });
-    } finally {
-      setBusy(null);
-    }
-  };
+  if (grouped.size === 0) {
+    return <p className="text-sm text-gray-500">{t('licensing:store.empty')}</p>;
+  }
 
   return (
-    <div className="space-y-8">
-      {/* Consent sits above the catalog, not inside a per-card modal: the
-          buyer must have accepted before ANY Buy button does anything, and
-          one visible block beats three identical dialogs. */}
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-        <h2 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {t('licensing:consent.title')}
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      {/* ── The checklist ───────────────────────────────────────────── */}
+      <div className="space-y-6">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('licensing:store.checklistHint')}
+        </p>
+
+        {/* Said once, here, rather than on each gated row. Repeated per line it
+            was noise — it appeared on products the tenant already owns, and it
+            kept promising to add a licence that was already on the bill. When
+            it becomes relevant the licence shows up as a real line, labelled. */}
+        {needsLicence && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+            {t('licensing:store.licenceFirst')}
+          </p>
+        )}
+
+        {KIND_ORDER.filter((k) => grouped.has(k)).map((kind) => (
+          <section key={kind}>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {t(`licensing:store.kind.${kind}`)}
+            </h2>
+            <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
+              {grouped.get(kind)!.map((product) => {
+                // Credits and extra branches are bought repeatedly; a module is
+                // owned once, so owning it takes it off the menu.
+                const repeatable = COUNTABLE_KINDS.has(product.kind);
+                const isOwned = ownedCodes.has(product.code) && !repeatable;
+                const isLicenceAuto =
+                  product.code === LICENCE_CODE && licenceAutoAdded;
+                const checked = product.code in picked || isLicenceAuto;
+                const qty = picked[product.code] ?? 1;
+                const today = unitCents(product);
+                const prorated =
+                  product.billing === 'annual' && today !== product.priceCents;
+                const offer = offerByCode.get(product.code);
+
+                return (
+                  <li
+                    key={product.code}
+                    id={`product-${product.code}`}
+                    className={
+                      focusCode === product.code
+                        ? 'bg-blue-50/60 dark:bg-blue-950/30'
+                        : undefined
+                    }
+                  >
+                    <label
+                      className={`flex items-start gap-3 p-3 sm:p-4 ${
+                        isOwned || isLicenceAuto
+                          ? 'cursor-default'
+                          : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-60"
+                        checked={isOwned || checked}
+                        disabled={isOwned || isLicenceAuto}
+                        onChange={() => toggle(product)}
+                        aria-label={product.name}
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {product.name}
+                          </span>
+                          {isOwned && (
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              <Check size={12} />
+                              {t('licensing:store.owned')}
+                            </span>
+                          )}
+                          {isLicenceAuto && (
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                              <Lock size={12} />
+                              {t('licensing:store.licenceAuto')}
+                            </span>
+                          )}
+                        </div>
+                        {product.description && (
+                          <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+                            {product.description}
+                          </p>
+                        )}
+                        {checked && repeatable && !isOwned && (
+                          <div
+                            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700"
+                            // The stepper lives inside the row's <label>; without
+                            // this the browser forwards its clicks to the
+                            // checkbox and every +/- also unticks the line.
+                            onClick={(e) => e.preventDefault()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setQty(product.code, qty - 1)}
+                              disabled={qty <= 1}
+                              aria-label={t('licensing:store.decrease')}
+                              className="px-2 py-1 text-gray-600 disabled:opacity-40 dark:text-gray-400"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className="min-w-[2ch] text-center text-sm tabular-nums">
+                              {qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setQty(product.code, qty + 1)}
+                              aria-label={t('licensing:store.increase')}
+                              className="px-2 py-1 text-gray-600 dark:text-gray-400"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="shrink-0 text-end">
+                        <div className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                          {formatCents(today, product.currency)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {prorated
+                            ? t('licensing:store.thenPerYear', {
+                                annual: formatCents(product.priceCents, product.currency),
+                              })
+                            : product.billing === 'annual'
+                              ? t('licensing:store.perYear')
+                              : t('licensing:store.oneTime')}
+                        </div>
+                        {prorated && offer?.periodEnd && (
+                          <div className="text-xs text-gray-400">
+                            {t('licensing:store.untilDate', {
+                              date: new Date(offer.periodEnd).toLocaleDateString('tr-TR'),
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      {/* ── The bill ────────────────────────────────────────────────── */}
+      <aside
+        id="catalog-bill"
+        className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 lg:sticky lg:top-6"
+      >
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {t('licensing:store.billTitle')}
         </h2>
-        <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
-      </section>
 
-      {KIND_ORDER.filter((k) => grouped.has(k)).map((kind) => (
-        <section key={kind}>
-          <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {t(`licensing:store.kind.${kind}`)}
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {grouped.get(kind)!.map((product) => {
-              const isOwned = ownedCodes.has(product.code);
-              // Credits and services grant nothing gate-able, so they have no
-              // offer entry — their list price IS the price.
-              const offer = offerByCode.get(product.code) ?? null;
-              const prorated = offer?.proratedCents ?? product.priceCents;
-              const isAnnual = product.billing === 'annual';
-              const showProrated = isAnnual && prorated !== product.priceCents;
-
-              return (
-                <article
-                  key={product.code}
-                  id={`product-${product.code}`}
-                  className={`flex flex-col rounded-xl border p-4 transition ${
-                    focusCode === product.code
-                      ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900'
-                      : 'border-gray-200 dark:border-gray-800'
-                  } bg-white dark:bg-gray-900`}
-                >
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                    {product.name}
-                  </h3>
-                  {product.description && (
-                    <p className="mt-1 flex-1 text-sm text-gray-600 dark:text-gray-400">
-                      {product.description}
-                    </p>
+        {billLines.length === 0 ? (
+          <p className="text-sm text-gray-500">{t('licensing:store.billEmpty')}</p>
+        ) : (
+          <ul className="space-y-2">
+            {billLines.map((line) => (
+              <li
+                key={line.product.code}
+                className="flex items-start justify-between gap-3 text-sm"
+              >
+                <span className="min-w-0 text-gray-700 dark:text-gray-300">
+                  {line.product.name}
+                  {line.qty > 1 && (
+                    <span className="text-gray-500"> ×{line.qty}</span>
                   )}
-
-                  <div className="mt-3">
-                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {formatCents(product.priceCents, product.currency)}
-                      <span className="ml-1 text-xs font-normal text-gray-500">
-                        {isAnnual
-                          ? t('licensing:store.perYear')
-                          : t('licensing:store.oneTime')}
-                      </span>
-                    </div>
-                    {showProrated && (
-                      <div className="text-sm text-emerald-700 dark:text-emerald-400">
-                        {t('licensing:store.todayPrice', {
-                          prorated: formatCents(prorated, product.currency),
-                        })}
-                      </div>
-                    )}
-                    {offer?.periodEnd && (
-                      <div className="text-xs text-gray-500">
-                        {t('licensing:store.untilDate', {
-                          date: new Date(offer.periodEnd).toLocaleDateString('tr-TR'),
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {product.requiresLicense && needsLicence && (
-                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                      {t('licensing:store.licenceFirst')}
-                    </p>
+                  {line.product.code === LICENCE_CODE && licenceAutoAdded && (
+                    <span className="block text-xs text-amber-600 dark:text-amber-400">
+                      {t('licensing:store.licenceAuto')}
+                    </span>
                   )}
+                </span>
+                <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
+                  {formatCents(unitCents(line.product) * line.qty, line.product.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
-                  <div className="mt-4">
-                    {isOwned && product.kind !== 'credit' && product.kind !== 'capacity' ? (
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                        <Check size={16} />
-                        {t('licensing:store.owned')}
-                      </span>
-                    ) : (
-                      <Button
-                        onClick={() => buy(product)}
-                        disabled={busy === product.code || !consentGiven}
-                        title={consentGiven ? undefined : t('licensing:consent.required')}
-                        className="w-full"
-                      >
-                        <ShoppingCart size={16} className="mr-1" />
-                        {t('licensing:store.buy')}
-                      </Button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
+        <div className="border-t border-gray-200 pt-3 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              {t('licensing:store.total')}
+            </span>
+            <span className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+              {formatCents(totalCents)}
+            </span>
           </div>
-        </section>
-      ))}
-      {grouped.size === 0 && (
-        <p className="text-sm text-gray-500">{t('licensing:store.empty')}</p>
+          {renewalCents > 0 && (
+            // Today's figure is prorated to the anniversary, so it is smaller
+            // than the recurring cost. Saying only the small number would set
+            // the wrong expectation for next year.
+            <p className="mt-1 text-xs text-gray-500">
+              {t('licensing:store.renewalNote', {
+                amount: formatCents(renewalCents),
+              })}
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-gray-200 pt-3 dark:border-gray-800">
+          <h3 className="mb-2 text-xs font-semibold text-gray-900 dark:text-gray-100">
+            {t('licensing:consent.title')}
+          </h3>
+          <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
+        </div>
+
+        <Button
+          onClick={pay}
+          disabled={billLines.length === 0 || !consentGiven || busy}
+          title={
+            billLines.length === 0
+              ? t('licensing:store.billEmpty')
+              : consentGiven
+                ? undefined
+                : t('licensing:consent.required')
+          }
+          className="w-full"
+        >
+          <ShoppingCart size={16} className="mr-1" />
+          {busy
+            ? t('licensing:store.paying')
+            : t('licensing:store.payTotal', { amount: formatCents(totalCents) })}
+        </Button>
+      </aside>
+
+      {/* On a phone the bill sits below the whole catalog, so ticking a line
+          gives no feedback until you scroll past every section. Mirrors the POS
+          sticky cart bar (components/pos/StickyCartBar): running total always
+          visible, one tap to act. Hidden at lg, where the bill is beside the
+          list and already in view. */}
+      {billLines.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95 lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs text-gray-500">
+                {t('licensing:store.selectedCount', { count: billLines.length })}
+              </div>
+              <div className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                {formatCents(totalCents)}
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                // Consent lives in the bill. Sending them there beats a
+                // disabled button with no explanation of what to do about it.
+                if (!consentGiven) {
+                  document
+                    .getElementById('catalog-bill')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  return;
+                }
+                void pay();
+              }}
+              disabled={busy}
+              className="shrink-0"
+            >
+              <ShoppingCart size={16} className="mr-1" />
+              {consentGiven
+                ? t('licensing:store.pay')
+                : t('licensing:store.reviewBill')}
+            </Button>
+          </div>
+        </div>
       )}
+
+      {/* Clears the fixed bar so the last row is never trapped under it. */}
+      {billLines.length > 0 && <div className="h-24 lg:hidden" aria-hidden />}
     </div>
   );
 };
