@@ -1,6 +1,11 @@
 import { useRef, useState } from "react";
-import { Plus } from "lucide-react";
-import { useCollections, useCreateCollection } from "../../../features/menu/menuApi";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  useCollections,
+  useCreateCollection,
+  useUpdateCollection,
+  useDeleteCollection,
+} from "../../../features/menu/menuApi";
 
 /**
  * Multi-select of menu collections with an inline "create new" quick-add.
@@ -15,7 +20,13 @@ export default function CollectionMultiSelect({
 }) {
   const { data: collections } = useCollections();
   const { mutateAsync: createCollection, isPending } = useCreateCollection();
+  const { mutateAsync: updateCollection } = useUpdateCollection();
+  const { mutateAsync: deleteCollection } = useDeleteCollection();
   const [newName, setNewName] = useState("");
+  // Renaming and deleting used to need the retired Koleksiyonlar tab. They are
+  // rare next to "tick this product into a collection", so they hide behind a
+  // toggle rather than putting two icons on every chip.
+  const [managing, setManaging] = useState(false);
   // Latest selection for the post-create append: two in-flight creates would
   // otherwise both spread the same stale `selected` and clobber each other.
   const selectedRef = useRef(selected);
@@ -53,24 +64,61 @@ export default function CollectionMultiSelect({
       {(collections ?? []).length === 0 ? (
         <p className="text-sm text-slate-500">Henüz koleksiyon yok.</p>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {collections!.map((c) => {
             const on = selected.includes(c.id);
             return (
-              <button
+              <span
                 key={c.id}
-                type="button"
-                onClick={() => toggle(c.id)}
-                className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm transition-colors ${
                   on
                     ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+                    : "border-slate-300 bg-white text-slate-600"
                 }`}
               >
-                {c.name}
-              </button>
+                <button type="button" onClick={() => toggle(c.id)}>
+                  {c.name}
+                </button>
+                {managing && (
+                  <>
+                    <button
+                      type="button"
+                      title="Yeniden adlandır"
+                      onClick={async () => {
+                        const name = prompt("Koleksiyon adı", c.name)?.trim();
+                        if (name && name !== c.name) {
+                          await updateCollection({ id: c.id, data: { name } });
+                        }
+                      }}
+                      className="text-slate-400 hover:text-slate-700"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Sil"
+                      onClick={async () => {
+                        if (!confirm(`"${c.name}" koleksiyonu silinsin mi? Ürünler silinmez, yalnız bu gruptan çıkar.`))
+                          return;
+                        await deleteCollection(c.id);
+                        onChange(selectedRef.current.filter((id) => id !== c.id));
+                      }}
+                      className="text-slate-400 hover:text-red-600"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </>
+                )}
+              </span>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setManaging((m) => !m)}
+            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700"
+          >
+            {managing ? "Bitti" : "Düzenle"}
+          </button>
         </div>
       )}
 
