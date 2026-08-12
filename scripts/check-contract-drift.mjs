@@ -255,6 +255,151 @@ try {
   console.error(`✗ branch-scope mirror: ${err.message}`);
 }
 
+
+// ---------------------------------------------------------------------------
+// Entitlement reachability: every gate must be openable.
+//
+// A gate keyed on something no product sells and no baseline grants is a
+// permanent denial that reads like working code. It has happened twice:
+// `integration.accounting` gated the e-document credential surface and 403'd
+// for EVERY tenant until someone re-pointed the route, and a finance counter
+// went on reading the same dead domain for months afterwards.
+//
+// So: collect the vocabulary, collect what the catalog + free baseline can
+// actually grant, collect every gate the code declares, and fail when a gate
+// cannot be opened or names something outside the vocabulary.
+// ---------------------------------------------------------------------------
+try {
+  const keysSrc = read("backend/src/modules/entitlements/entitlement-keys.const.ts");
+  const listOf = (name) => {
+    const m = keysSrc.match(
+      new RegExp(`export const ${name} = \\[([\\s\\S]*?)\\] as const`),
+    );
+    return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : [];
+  };
+  const features = listOf("FEATURE_KEYS");
+  const integrations = listOf("INTEGRATION_KEYS");
+
+  // A gate that has been COMMENTED OUT is not a gate. Without this the
+  // scanner flags the very comment left behind explaining why a dead gate was
+  // removed, and the only way to keep CI green is to delete the explanation.
+  const stripComments = (src) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  const catalogSrc = read("backend/src/modules/marketplace/alacarte-catalog.const.ts");
+  const baselineSrc = read("backend/src/modules/entitlements/free-baseline.const.ts");
+  const grantable = new Set(
+    [...catalogSrc.matchAll(/"(feature|integration)\.([A-Za-z0-9]+)"/g)].map(
+      (m) => `${m[1]}.${m[2]}`,
+    ),
+  );
+  for (const m of baselineSrc.matchAll(/featureKey\("([A-Za-z0-9]+)"\)/g)) {
+    grantable.add(`feature.${m[1]}`);
+  }
+
+  const unreachable = [
+    ...features.map((f) => `feature.${f}`),
+    ...integrations.map((i) => `integration.${i}`),
+  ].filter((k) => !grantable.has(k));
+
+  // Every gate declared anywhere in the product.
+  const gates = new Map(); // key -> sample location
+  const scan = (dir, exts, patterns) => {
+    const stack = [dir];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const entry of readdirSync(cur, { withFileTypes: true })) {
+        const full = join(cur, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "node_modules") stack.push(full);
+        } else if (
+          exts.some((e) => entry.name.endsWith(e)) &&
+          !/\.(spec|test)\./.test(entry.name)
+        ) {
+          const src = stripComments(readFileSync(full, "utf8"));
+          for (const [re, prefix] of patterns) {
+            for (const m of src.matchAll(re)) {
+              const key = `${prefix}.${m[1]}`;
+              if (!gates.has(key)) gates.set(key, `${full}`);
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const PLAN_FEATURE = new Map(
+    [...read("backend/src/common/constants/subscription.enum.ts").matchAll(
+      /(\w+)\s*=\s*"([A-Za-z0-9]+)"/g,
+    )].map((m) => [m[1], m[2]]),
+  );
+
+  scan(join(repoRoot, "backend/src"), [".ts"], [
+    [/@RequiresIntegration\(\s*["']([a-z]+)["']/g, "integration"],
+  ]);
+  // PlanFeature.X enum members resolve through the enum map.
+  {
+    const stack = [join(repoRoot, "backend/src")];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const entry of readdirSync(cur, { withFileTypes: true })) {
+        const full = join(cur, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "node_modules") stack.push(full);
+        } else if (full.endsWith(".ts") && !/\.(spec|test)\./.test(entry.name)) {
+          const src = stripComments(readFileSync(full, "utf8"));
+          for (const m of src.matchAll(/@RequiresFeature\(\s*PlanFeature\.([A-Z_0-9]+)\s*\)/g)) {
+            const resolved = PLAN_FEATURE.get(m[1]);
+            if (resolved && !gates.has(`feature.${resolved}`)) {
+              gates.set(`feature.${resolved}`, full);
+            }
+          }
+        }
+      }
+    }
+  }
+  scan(join(repoRoot, "frontend/src"), [".ts", ".tsx"], [
+    [/hasIntegration\(\s*["']([a-z]+)["']/g, "integration"],
+    [/hasFeature\(\s*["']([A-Za-z]+)["']/g, "feature"],
+    [/\bdomain:\s*["']([a-z]+)["']/g, "integration"],
+  ]);
+
+  const known = new Set([
+    ...features.map((f) => `feature.${f}`),
+    ...integrations.map((i) => `integration.${i}`),
+  ]);
+  const badGates = [...gates.entries()].filter(([k]) => !known.has(k));
+
+  if (unreachable.length === 0 && badGates.length === 0) {
+    console.log(
+      `✓ entitlement reachability (${features.length} features + ${integrations.length} integrations, every gate openable)`,
+    );
+  } else {
+    failures += 1;
+    if (unreachable.length > 0) {
+      console.error(
+        "✗ entitlement vocabulary contains keys NO published product and no free baseline grants:",
+      );
+      for (const k of unreachable) console.error(`    ${k}`);
+      console.error(
+        "    Sell it (add a catalog product), give it away (free baseline), or drop the key.",
+      );
+    }
+    if (badGates.length > 0) {
+      console.error("✗ gates reference keys outside the entitlement vocabulary:");
+      for (const [k, where] of badGates) {
+        console.error(`    ${k}  (${where.replace(repoRoot + "/", "")})`);
+      }
+      console.error(
+        "    A gate on an unknown key can never open. Fix the key or add it to entitlement-keys.const.ts AND the catalog.",
+      );
+    }
+  }
+} catch (err) {
+  failures += 1;
+  console.error(`✗ entitlement reachability: ${err.message}`);
+}
+
 if (failures > 0) {
   console.error(
     `\n${failures} mirrored contract(s) drifted. Align the values above (the backend is the source of truth) or update CHECKS if a mirror was intentionally retired.`,

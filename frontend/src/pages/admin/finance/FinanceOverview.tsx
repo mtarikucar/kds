@@ -142,18 +142,17 @@ function FiscalUpsellCard() {
   );
 }
 
-/** Sayaç iki koşullu kaynaktan gelebilir (accounting sync-failed + fiscal
- *  pending-receipts). Rules-of-hooks: hangi hook'ların çağrılacağı entegrasyon
- *  setine göre DEĞİŞTİĞİ için (fiscal'siz tenant'ta useListPendingReceipts hiç
- *  çağrılmamalı — 403'e bağlı gereksiz istek), varyant bileşenlere ayrılır;
- *  her varyant kendi sabit hook setini koşulsuz çağırır. */
+/** Sayaç iki kaynaktan toplanır: muhasebe senkron hatası + bekleyen fiş.
+ *
+ *  İkisi de `fiscal` entegrasyonuna bağlı — `/accounting-settings/sync-status`
+ *  ucu da `@RequiresIntegration("fiscal")` ile kapılı. Burada ayrı bir
+ *  `accounting` entegrasyonu okunuyordu; onu hiçbir ürün vermiyor, dolayısıyla
+ *  senkron sayacı HİÇBİR tenant'ta çalışmıyordu (ve `accounting` var ama
+ *  `fiscal` yok varyantı hiç render edilemezdi). Tek kapı, tek varyant. */
 function DocumentsCounterRow({ onNavigate }: { onNavigate: NavigateFn }) {
   const { hasIntegration } = useSubscription();
-  const acc = hasIntegration('accounting');
-  const fis = hasIntegration('fiscal');
-  if (!acc && !fis) return null;
-  if (fis) return <DocumentsCounterWithFiscal acc={acc} onNavigate={onNavigate} />;
-  return <DocumentsCounterAccountingOnly onNavigate={onNavigate} />;
+  if (!hasIntegration('fiscal')) return null;
+  return <DocumentsCounterWithFiscal onNavigate={onNavigate} />;
 }
 
 function DocumentsCounterBody({ failedDocs, onNavigate }: { failedDocs: number; onNavigate: NavigateFn }) {
@@ -177,17 +176,10 @@ function DocumentsCounterBody({ failedDocs, onNavigate }: { failedDocs: number; 
 }
 
 /** fiscal entegrasyonu VAR — iki hook da koşulsuz çağrılır. */
-function DocumentsCounterWithFiscal({ acc, onNavigate }: { acc: boolean; onNavigate: NavigateFn }) {
-  const sync = useAccountingSyncStatus(acc);
-  const pending = useListPendingReceipts();
-  const failedDocs = (acc ? (sync.data?.failed ?? 0) : 0) + (pending.data?.length ?? 0);
-  return <DocumentsCounterBody failedDocs={failedDocs} onNavigate={onNavigate} />;
-}
-
-/** fiscal YOK, sadece accounting — useListPendingReceipts hiç çağrılmaz. */
-function DocumentsCounterAccountingOnly({ onNavigate }: { onNavigate: NavigateFn }) {
+function DocumentsCounterWithFiscal({ onNavigate }: { onNavigate: NavigateFn }) {
   const sync = useAccountingSyncStatus(true);
-  const failedDocs = sync.data?.failed ?? 0;
+  const pending = useListPendingReceipts();
+  const failedDocs = (sync.data?.failed ?? 0) + (pending.data?.length ?? 0);
   return <DocumentsCounterBody failedDocs={failedDocs} onNavigate={onNavigate} />;
 }
 

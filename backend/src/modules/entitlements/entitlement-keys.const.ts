@@ -68,13 +68,22 @@ export const LIMIT_KEYS = [
   "maxMonthlyOrders",
 ] as const;
 
-/** Integration domains. Values are vendor-id arrays, UNIONed across grants. */
+/**
+ * Integration domains. Values are vendor-id arrays, UNIONed across grants.
+ *
+ * Every domain here MUST be grantable by a published product — a domain no
+ * product sells is a permanently-locked capability, and the code that gates on
+ * it looks correct while denying every tenant forever. `accounting` was
+ * exactly that: nothing granted it, the backend route it guarded was
+ * re-pointed at `fiscal` after 403'ing for everyone, and a finance counter
+ * went on reading it long after. `catalog-coverage.spec.ts` now fails if a
+ * domain drifts out of the catalog.
+ */
 export const INTEGRATION_KEYS = [
   "delivery",
   "fiscal",
   "caller",
   "sms",
-  "accounting",
 ] as const;
 
 /**
