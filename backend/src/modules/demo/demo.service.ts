@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import * as bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { PlanProjectorService } from "../entitlements/plan-projector.service";
 import { DEMO_PLAN_NAME } from "./demo.constants";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -83,7 +84,10 @@ export class DemoService {
     license: true,
   };
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projector: PlanProjectorService,
+  ) {}
 
   /**
    * Returns the demo admin user (with the fields generateTokens needs),
@@ -104,9 +108,151 @@ export class DemoService {
         locale: true,
       },
     });
-    if (existing) return existing;
+    if (existing) {
+      // RECONCILE, don't just return.
+      //
+      // This used to return the moment the demo user existed, so everything
+      // the tenant is granted was written exactly once, at first seed. The
+      // v3.3.0 `free_core` migration then archived and cleared
+      // `Tenant.featureOverrides` for EVERY tenant — the demo included — and
+      // nothing ever wrote them back. The demo silently dropped to the free
+      // core: no reports, no reservations, no personnel, no stock, no AI, no
+      // API. It stayed that way until a human noticed the settings nav had
+      // gone short.
+      //
+      // A demo whose entitlements are written once is a demo that any future
+      // data migration can quietly strip. Repairing on every entry costs a
+      // couple of queries on a cold path and makes that class of failure
+      // self-healing.
+      await this.reconcileEntitlements(existing.tenantId);
+      return existing;
+    }
 
     return this.seed();
+  }
+
+  /**
+   * Bring the demo tenant's grants back to what the demo promises: every
+   * screen reachable.
+   *
+   * Two mechanisms, because one cannot express the other:
+   *
+   *   - FEATURES come from grant-mode `featureOverrides`. They work even in an
+   *     environment whose catalog was never seeded (a `db push` dev database),
+   *     which is why the demo does not rely on owning products for these.
+   *   - INTEGRATIONS cannot be expressed as overrides at all — the projector
+   *     writes `feature.${key}` for every override entry, so an
+   *     `integration.sms` grant has no route through that map. They come from
+   *     comped ownership rows instead, which is also the honest path: the demo
+   *     exercises catalog → ownership → projector → guard exactly as a paying
+   *     tenant does, instead of a special lane where an entire gate class can
+   *     go untested. SMS settings, e-Belge/ÖKC and caller-ID were unreachable
+   *     in the demo for this reason even before the migration.
+   */
+  private async reconcileEntitlements(tenantId: string): Promise<void> {
+    const desired = DemoService.featureOverridePayload();
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { featureOverrides: true },
+    });
+
+    const current = (tenant?.featureOverrides ?? null) as Record<
+      string,
+      unknown
+    > | null;
+    const featuresStale =
+      !current || Object.keys(desired).some((k) => !(k in current));
+
+    if (featuresStale) {
+      await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: { featureOverrides: desired as any },
+      });
+      this.logger.warn(
+        `Demo tenant ${tenantId}: feature overrides were missing or stale — restored`,
+      );
+    }
+
+    const comped = await this.compIntegrationProducts(tenantId);
+
+    if (featuresStale || comped > 0) {
+      await this.projector.projectTenant(tenantId);
+    }
+  }
+
+  /**
+   * Own the licence + every published integration product, for free.
+   *
+   * The licence first, and not only for symmetry: the projector suppresses
+   * every `requiresLicense` product's grants while no LICENCE PRODUCT is
+   * owned — a `feature.license` override does not satisfy it, because the
+   * check reads ownership rows. Comping the integrations without the licence
+   * would write rows that grant nothing.
+   *
+   * Products absent from the catalog are skipped rather than created: an
+   * environment seeded with `prisma db push` has no catalog at all, and the
+   * demo must still come up there.
+   *
+   * Returns how many rows it had to create.
+   */
+  private async compIntegrationProducts(tenantId: string): Promise<number> {
+    const wanted = await this.prisma.marketplaceAddOn.findMany({
+      where: {
+        status: "published",
+        OR: [{ kind: "license" }, { kind: "integration" }],
+      },
+      select: { id: true, code: true, kind: true },
+    });
+    if (wanted.length === 0) return 0;
+
+    const held = await this.prisma.tenantAddOn.findMany({
+      where: {
+        tenantId,
+        status: "active",
+        addOnId: { in: wanted.map((w) => w.id) },
+      },
+      select: { addOnId: true },
+    });
+    const heldIds = new Set(held.map((h) => h.addOnId));
+    const missing = wanted.filter((w) => !heldIds.has(w.id));
+    if (missing.length === 0) return 0;
+
+    const now = new Date();
+    // A decade out: the demo has no anniversary, no renewal cycle and nobody
+    // to invoice, and an expiring row would darken the demo on a date nobody
+    // is watching.
+    const periodEnd = new Date(now.getTime() + 3650 * 24 * 3600 * 1000);
+
+    await this.prisma.tenantAddOn.createMany({
+      data: missing.map((m) => ({
+        tenantId,
+        addOnId: m.id,
+        quantity: 1,
+        status: "active",
+        origin: "comp",
+        compReason: "Demo restaurant — every screen reachable",
+        chargedCents: 0,
+        activatedAt: now,
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      })),
+      skipDuplicates: true,
+    });
+    this.logger.warn(
+      `Demo tenant ${tenantId}: comped ${missing.length} product(s) — ${missing
+        .map((m) => m.code)
+        .join(", ")}`,
+    );
+    return missing.length;
+  }
+
+  /** The override map, in the projector's grant-mode shape. */
+  private static featureOverridePayload(): Record<string, { mode: string }> {
+    return Object.fromEntries(
+      Object.entries(DemoService.ALL_FEATURES)
+        .filter(([, on]) => on)
+        .map(([key]) => [key, { mode: "grant" }]),
+    );
   }
 
   private async seed() {
@@ -162,11 +308,7 @@ export class DemoService {
         status: "ACTIVE",
         currentPlanId: plan.id,
         // Grant-mode overrides: plain `true` grants, never `__replace:false`.
-        featureOverrides: Object.fromEntries(
-          Object.entries(DemoService.ALL_FEATURES)
-            .filter(([, on]) => on)
-            .map(([key]) => [key, { mode: "grant" }]),
-        ) as any,
+        featureOverrides: DemoService.featureOverridePayload() as any,
       },
     });
 
@@ -243,6 +385,10 @@ export class DemoService {
     if (categoryCount === 0) {
       await this.seedContent(tenant.id, branch.id, admin.id);
     }
+    // Integrations + the licence they hang off, and the projection that makes
+    // any of it visible.
+    await this.reconcileEntitlements(tenant.id);
+
     this.logger.log(`Ensured demo tenant ${tenant.id} (${tenant.subdomain})`);
     return admin;
   }

@@ -25,15 +25,26 @@ import {
 describe('DemoService', () => {
   let service: DemoService;
   let prisma: MockPrismaClient;
+  let projector: { projectTenant: jest.Mock };
 
   beforeEach(async () => {
     prisma = mockPrismaClient();
+    projector = { projectTenant: jest.fn().mockResolvedValue(undefined) };
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DemoService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        DemoService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: PlanProjectorService, useValue: projector },
+      ],
     }).compile();
     service = module.get(DemoService);
     jest.spyOn(service['logger'], 'log').mockImplementation(() => undefined);
     jest.spyOn(service['logger'], 'debug').mockImplementation(() => undefined);
+    jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
+    // Reconcile reads these on every entry; default to "already correct" so
+    // only the tests that care about repair have to arrange it.
+    (prisma.marketplaceAddOn.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.tenantAddOn.findMany as jest.Mock).mockResolvedValue([]);
     // resetDemoData now runs under a Postgres advisory lock (multi-replica
     // guard). Grant it by default so the body runs; a dedicated test overrides
     // this to assert the lock actually gates the destructive wipe.
@@ -206,5 +217,150 @@ describe('DemoService', () => {
     // fires once as the v2 lock holder — assert on the body's calls.)
     expect(prisma.tenant.findFirst).not.toHaveBeenCalled();
     expect(prisma.order.deleteMany).not.toHaveBeenCalled();
+  });
+
+  describe('entitlement repair on every entry', () => {
+    // THE BUG THIS PINS: ensureDemoTenant used to return the moment the demo
+    // admin existed, so grants were written once, at first seed. The v3.3.0
+    // free_core migration then cleared Tenant.featureOverrides for EVERY
+    // tenant — demo included — and nothing wrote them back. The demo silently
+    // fell to the free core: no reports, reservations, personnel, stock, AI or
+    // API, and the settings nav quietly went short. Nobody noticed until a
+    // human did.
+    const existingAdmin = {
+      id: 'demo-admin',
+      email: DemoService.ADMIN_EMAIL,
+      firstName: 'Demo',
+      lastName: 'Yönetici',
+      role: 'ADMIN',
+      tenantId: 'demo-tenant',
+      phone: '+905550000000',
+      locale: 'tr',
+    };
+
+    beforeEach(() => {
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue(existingAdmin);
+    });
+
+    it('restores feature overrides a data migration wiped', async () => {
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        featureOverrides: null,
+      });
+
+      await service.ensureDemoTenant();
+
+      const written = (prisma.tenant.update as jest.Mock).mock.calls[0][0].data
+        .featureOverrides;
+      expect(written.advancedReports).toEqual({ mode: 'grant' });
+      expect(written.reservationSystem).toEqual({ mode: 'grant' });
+      expect(written.aiContentGeneration).toEqual({ mode: 'grant' });
+      // …and the tenant is re-projected, or the repair would sit in the DB
+      // without reaching the entitlement engine.
+      expect(projector.projectTenant).toHaveBeenCalledWith('demo-tenant');
+    });
+
+    it('leaves a healthy demo alone', async () => {
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        featureOverrides: Object.fromEntries(
+          Object.keys((DemoService as any).ALL_FEATURES).map((k) => [
+            k,
+            { mode: 'grant' },
+          ]),
+        ),
+      });
+
+      await service.ensureDemoTenant();
+
+      expect(prisma.tenant.update).not.toHaveBeenCalled();
+      expect(projector.projectTenant).not.toHaveBeenCalled();
+    });
+
+    it('grants integrations as owned products, which overrides cannot express', async () => {
+      // The projector writes `feature.${key}` for every override entry, so an
+      // integration grant has no route through that map at all. SMS settings,
+      // e-Belge/ÖKC and caller-ID were therefore unreachable in the demo even
+      // before the migration.
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        featureOverrides: Object.fromEntries(
+          Object.keys((DemoService as any).ALL_FEATURES).map((k) => [
+            k,
+            { mode: 'grant' },
+          ]),
+        ),
+      });
+      (prisma.marketplaceAddOn.findMany as jest.Mock).mockResolvedValue([
+        { id: 'p-lic', code: 'license_annual', kind: 'license' },
+        { id: 'p-sms', code: 'sms_integration', kind: 'integration' },
+      ]);
+      (prisma.tenantAddOn.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.ensureDemoTenant();
+
+      const rows = (prisma.tenantAddOn.createMany as jest.Mock).mock.calls[0][0]
+        .data;
+      expect(rows.map((r: any) => r.addOnId).sort()).toEqual(['p-lic', 'p-sms']);
+      // Comped, not sold: free, auditable, and never a real payment.
+      expect(rows.every((r: any) => r.origin === 'comp')).toBe(true);
+      expect(rows.every((r: any) => r.chargedCents === 0)).toBe(true);
+      expect(projector.projectTenant).toHaveBeenCalledWith('demo-tenant');
+    });
+
+    it('comps the LICENCE too, or every integration it grants stays dark', async () => {
+      // The projector suppresses a requiresLicense product while no LICENCE
+      // PRODUCT is owned — a feature.license override does not satisfy it,
+      // because the check reads ownership rows.
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        featureOverrides: { license: { mode: 'grant' } },
+      });
+      (prisma.marketplaceAddOn.findMany as jest.Mock).mockResolvedValue([
+        { id: 'p-lic', code: 'license_annual', kind: 'license' },
+      ]);
+      (prisma.tenantAddOn.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.ensureDemoTenant();
+
+      const where = (prisma.marketplaceAddOn.findMany as jest.Mock).mock
+        .calls[0][0].where;
+      expect(where.OR).toEqual(
+        expect.arrayContaining([{ kind: 'license' }, { kind: 'integration' }]),
+      );
+    });
+
+    it('does not re-comp what the demo already owns', async () => {
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        featureOverrides: Object.fromEntries(
+          Object.keys((DemoService as any).ALL_FEATURES).map((k) => [
+            k,
+            { mode: 'grant' },
+          ]),
+        ),
+      });
+      (prisma.marketplaceAddOn.findMany as jest.Mock).mockResolvedValue([
+        { id: 'p-lic', code: 'license_annual', kind: 'license' },
+      ]);
+      (prisma.tenantAddOn.findMany as jest.Mock).mockResolvedValue([
+        { addOnId: 'p-lic' },
+      ]);
+
+      await service.ensureDemoTenant();
+
+      expect(prisma.tenantAddOn.createMany).not.toHaveBeenCalled();
+      expect(projector.projectTenant).not.toHaveBeenCalled();
+    });
+
+    it('still comes up on an environment with no catalog at all', async () => {
+      // A `prisma db push` dev database has no catalog rows. Features come
+      // from overrides precisely so the demo works there.
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        featureOverrides: null,
+      });
+      (prisma.marketplaceAddOn.findMany as jest.Mock).mockResolvedValue([]);
+
+      await expect(service.ensureDemoTenant()).resolves.toMatchObject({
+        id: 'demo-admin',
+      });
+      expect(prisma.tenantAddOn.createMany).not.toHaveBeenCalled();
+      expect(prisma.tenant.update).toHaveBeenCalled();
+    });
   });
 });
